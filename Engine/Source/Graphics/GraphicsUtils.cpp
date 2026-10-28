@@ -3,7 +3,6 @@
 #include "GraphicsUtils.h"
 
 #include "Graphics/CameraBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 namespace engine
@@ -128,17 +127,6 @@ void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT
 	rLayout.fRotation = 0.0f; // non-island consumers render axis-aligned
 	rLayout.uiTextureSlot = 0; // non-island consumers don't sample the island texture array
 	rLayout.uiColor = uiColor;
-}
-
-float MinLightingDepositSize()
-{
-	// At settled camera heights, eight constant-density lighting texels prevent sub-texel light flicker.
-	// Lighting-area and texture headroom factors cancel, so texel world size uses the base DetailTextureSize.
-	// Ceil inflates the floor by a sub-texel amount.
-	auto [iLightingTextureX, iLightingTextureY] = TextureManager::DetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
-	float fTexelSizeX = std::ceil(engine::gpCamera->mf4RenderVisibleArea.z - engine::gpCamera->mf4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);
-	float fTexelSizeY = std::ceil(engine::gpCamera->mf4RenderVisibleArea.y - engine::gpCamera->mf4RenderVisibleArea.w) / static_cast<float>(iLightingTextureY);
-	return std::max(fTexelSizeX, fTexelSizeY) * 8.0f;
 }
 
 bool SupportsStorageImage(VkFormat vkFormat)

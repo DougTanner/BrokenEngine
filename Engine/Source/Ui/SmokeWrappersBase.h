@@ -12,7 +12,6 @@ extern Wrapper gSmokeEdgeDecayDistance;
 
 extern Wrapper gSmokeColorMinimum;
 extern Wrapper gSmokeColorMultiplier;
-extern Wrapper gSmokeLightingMultiplier;
 
 extern Wrapper gSmokeNoiseScaleOne;
 extern Wrapper gSmokeNoiseScaleTwo;

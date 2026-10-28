@@ -2,7 +2,6 @@
 
 #include "CameraBase.h"
 
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -171,11 +170,10 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	}
 	UpdateEyeHeight();
 
-	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap
-	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
-	// density change remains gradual. At a settled height both references converge to the live height.
+	// Keep the shadow texel reference at or above the live eye height: zero initialization and outward zoom snap
+	// immediately for full viewport coverage, while inward zoom contracts at the existing rate so the
+	// density change remains gradual. At a settled height the reference converges to the live height.
 	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelEyeHeight);
-	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelEyeHeight);
 
 	// Eye sits directly above target along +Z (straight-down view).
 	// W=0 — eye-local offset, not a homogeneous point; added to mVecPosition (W=1) preserves position.
@@ -328,7 +326,6 @@ void CameraBase::ResetForSession()
 	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
 	// contraction across sessions.
 	mfShadowTexelEyeHeight = 0.0f;
-	mfLightingTexelEyeHeight = 0.0f;
 	mVecVisualErrorOffset = {};
 }
 
@@ -365,6 +362,16 @@ XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 
 void CameraBase::CalculateMatricesAndVisibleArea()
 {
+	LightingCameraPose comparisonPose;
+	bool bComparison = gpGraphics->mpLighting != nullptr && gpGraphics->mpLighting->GetComparisonCamera(comparisonPose);
+	if (bComparison)
+	{
+		RenderBasis basis = MakeRenderBasis(comparisonPose.coordinate, mBasisCoordinate);
+		mVecEyePosition = Rebase(basis, XMVectorSetW(XMLoadFloat3A(&comparisonPose.f3Eye), 1.0f));
+		mVecPosition = Rebase(basis, XMVectorSetW(XMLoadFloat3A(&comparisonPose.f3Target), 1.0f));
+		mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
+		mfShadowTexelEyeHeight = std::max(mfShadowTexelEyeHeight, comparisonPose.f3Eye.z);
+	}
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
 	auto vecUpNormal = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, vecUpNormal);
@@ -378,6 +385,11 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
 	mMatPerspective = XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent / fAspectRatio), fAspectRatio, kfNearClip, fFarClip);
+	if (bComparison)
+	{
+		mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMLoadFloat3A(&comparisonPose.f3Up));
+		mMatPerspective = XMMatrixPerspectiveFovRH(comparisonPose.fVerticalFieldOfView, fAspectRatio, comparisonPose.fNear, comparisonPose.fFar);
+	}
 
 	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorZero(), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
 
@@ -503,6 +515,21 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	mf4RenderVisibleArea.y = common::RoundDown(mf4RenderVisibleArea.y + mf2VisibleAreaQuadSize.y, mf2VisibleAreaQuadSize.y);
 	mf4RenderVisibleArea.z = mf4RenderVisibleArea.x + fQuadsX * mf2VisibleAreaQuadSize.x;
 	mf4RenderVisibleArea.w = mf4RenderVisibleArea.y - fQuadsY * mf2VisibleAreaQuadSize.y;
+}
+
+float CameraBase::GetRenderEyeHeight() const
+{
+	LightingCameraPose pose;
+	return gpGraphics->mpLighting->GetComparisonCamera(pose) ? XMVectorGetZ(mVecEyePosition) - gpFlightPlanes->Lowest().fHeightMeters : mfCameraEyeHeight;
+}
+
+void CameraBase::UpdateComparisonCamera()
+{
+	LightingCameraPose pose;
+	if (gpGraphics->mpLighting->GetComparisonCamera(pose))
+	{
+		CalculateMatricesAndVisibleArea();
+	}
 }
 
 } // namespace engine

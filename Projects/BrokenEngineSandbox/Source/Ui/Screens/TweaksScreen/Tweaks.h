@@ -14,7 +14,6 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen);
 void RenderSmokeDepositsTab(engine::TweaksScreen& rScreen);
 void RenderWindDepositsTab(engine::TweaksScreen& rScreen);
 void RenderLightingEffectsVisibleTab(engine::TweaksScreen& rScreen);
-void RenderLightingEffectsLightingTab(engine::TweaksScreen& rScreen);
 void RenderSoundEffects(engine::TweaksScreen& rScreen);
 
 // Called by name from the engine Lighting, Smoke, Wind, and Sound sections. Sub-tabs are numbered from iFirstSubtab in the order drawn; Sound draws inline in the engine Volumes sub-tab.

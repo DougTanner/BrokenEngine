@@ -7,7 +7,7 @@
 namespace engine
 {
 
-void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, int64_t iMipmapLevels, int64_t iArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData)
+void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, int64_t iMipmapLevels, int64_t iArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData, LightingAllocation* pReadbackBytes)
 {
 	// Heap: rOutputData.resize + staging-buffer creation. Main-loop-reachable per frame via the kbScreenshots trigger
 	// (Graphics::RenderMainPresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutputData
@@ -24,6 +24,12 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 	rOutputData.resize(iTotalSize);
 
 	StagingBuffer stagingBuffer("ImageCopyStaging", iTotalSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	if (pReadbackBytes != nullptr)
+	{
+		VmaAllocationInfo info {};
+		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, stagingBuffer.vmaAllocation, &info);
+		*pReadbackBytes = {.uiPayload = static_cast<uint64_t>(iTotalSize), .uiAllocated = info.size};
+	}
 
 	OneShotCommandBuffer oneShotCommandBuffer;
 

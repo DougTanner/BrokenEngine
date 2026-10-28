@@ -2,7 +2,6 @@
 
 #include "Graphics/CameraBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/MiscWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
@@ -234,11 +233,6 @@ static void PopulateSunAndLighting(shaders::GlobalLayout& rGlobalLayout, float f
 	rvecAmbientColorOut = PopulateDayCycleColors(rGlobalLayout, fSunAngle);
 	PopulateDayCycleFeatherWindows(fSunAngle, rfDayPercent, rfNoonPercent);
 
-	float fLightingTimeOfDayMultiplier = rfDayPercent * gLightingDayFinalMultiplier.mfCurrent + (1.0f - rfDayPercent) * gLightingNightFinalMultiplier.mfCurrent;
-	rGlobalLayout.fLightingTimeOfDayMultiplier = fLightingTimeOfDayMultiplier;
-	// Smoke lighting multiplier folded with time-of-day (AddSmoke/BlendSmokePrecomputed): both inputs are known
-	// here (fSmokeLightingMultiplier source from RenderSmokeGlobal earlier this frame, time-of-day just above).
-	rGlobalLayout.fSmokeLightingCombinedMultiplier = fLightingTimeOfDayMultiplier * gSmokeLightingMultiplier.mfCurrent;
 	rGlobalLayout.fLightingWaterSkyboxOne = gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent;
 	// Skybox normal soften blends a sunrise/sunset (low-sun) value toward a noon value by the noon feather (1 at solar noon, 0 toward both horizons / night).
 	rGlobalLayout.fLightingWaterSkyboxNormalSoften = (1.0f - rfNoonPercent) * gLightingWaterSkyboxNormalSoftenSunrise.mfCurrent + rfNoonPercent * gLightingWaterSkyboxNormalSoftenNoon.mfCurrent;
@@ -325,8 +319,7 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 		++gPresentationContinuity.shadow.iHistoryResets;
 	}
 
-	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety). Shadow phase 1
-	// against lighting's phase 0 keeps the two refreshes off the same frame whenever their cadences share a factor.
+	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety).
 	bool bShadowRefreshFrame = gbShadowTemporalReset || !sTemporalAreaLatch.bInitialized
 	                        || (gpGraphics->miFrameCounter + 1) % gShadowUpdateCadence.Get<int64_t>() == 0
 	                        || !IsVisibleAreaInsideHeldArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
@@ -491,7 +484,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 	// PopulateSunMoonDirection folds fTerrainSnowBlend into f4TerrainSnowSunNormal.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.mfCurrent;
-	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
+	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->GetRenderEyeHeight(), gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
 
 	rGlobalLayout.fTerrainRockSize = gTerrainRockSize.mfCurrent;
 	rGlobalLayout.fTerrainRockBlend = gTerrainRockBlend.mfCurrent;
@@ -510,7 +503,6 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime)
 {
-	RenderLightingGlobal(iCommandBuffer);
 	RenderSmokeGlobal(iCommandBuffer);
 	RenderWindGlobal(iCommandBuffer);
 

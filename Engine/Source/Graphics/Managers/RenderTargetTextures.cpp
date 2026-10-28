@@ -18,7 +18,6 @@ static_assert(std::ssize(kpSmokeOneNames) == shaders::kiMaxFlightPlanes && std::
 
 void RenderTargetTextures::Create()
 {
-	CreateLightingTextures();
 	CreateShadowTextures();
 	CreateSmokeTextures();
 	CreateWindTextures();
@@ -26,6 +25,7 @@ void RenderTargetTextures::Create()
 	CreateTerrainTextures();
 	CreateWaterDisplacementTextures();
 	CreateWaterFoamTextures();
+	RegisterDebugTextures();
 }
 
 void RenderTargetTextures::CreateWaterDisplacementTextures()
@@ -460,6 +460,17 @@ void RenderTargetTextures::CreateTerrainTextures()
 		.vkRenderPassClearColorValue = {gpIslandTerrain->mfSeaFloorElevation, 0.0f, 0.0f, 1.0f},
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
+}
+
+void RenderTargetTextures::RegisterDebugTextures()
+{
+	miDebugTextureCount = 1;
+	for (int64_t i = 0; i < shaders::kiMaxDebugTextures; ++i)
+	{
+		mppDebugTextures[i] = &mTerrainElevationTexture;
+		mpiDebugTextureFormats[i] = shaders::kiDebugTextureFormatTerrainElevation;
+	}
+	gDebugTextureIndex.Set(0.0f);
 }
 
 } // namespace engine

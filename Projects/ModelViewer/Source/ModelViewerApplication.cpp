@@ -789,6 +789,7 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		{
 			engine::gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(rPreview.crc)->WriteIndirectBuffer(iCommandBuffer, 0);
 		}
+		engine::gpGraphics->mpLighting->AddModels(rPreview.crc, rPreview.crc, 0, 1);
 	}
 }
 
@@ -1241,7 +1242,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	{
 		engine::gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 0);
 	}
-	engine::RenderLightingSpreadIndirect(iCommandBuffer);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(engine::gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory);
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
@@ -1253,8 +1253,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	rMainLayout.iRenderNumber = static_cast<int32_t>(engine::gpGraphics->miFrameCounter);
 	if (engine::gpGraphics->mFlags & engine::GraphicsFlags::kDrawModelsOverWorld)
 	{
-		rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;
-		rMainLayout.fPhysicallyBasedRenderingLightingSpecular = 0.0f;
 		rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
 		rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
 	}

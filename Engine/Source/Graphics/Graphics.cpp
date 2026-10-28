@@ -5,7 +5,6 @@
 #include "File/PackChunks.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
@@ -89,9 +88,8 @@ Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
 
 	CHECK_VK(volkInitialize());
 
-	Create();
-
 	LoadAnimationDataFromEagerChunks();
+	Create();
 
 	gpSwapchainManager->AcquireNextImage();
 
@@ -206,7 +204,9 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime)
 {
 	gpProfileManager->CpuStart(kCpuTimerRenderMain);
+	mpLighting->BeginRender(iCommandBuffer);
 	RenderFrameMain(iCommandBuffer, rRenderInterpolates, rActiveCoords, cameraCoord, currentTime);
+	mpLighting->EndRender();
 	gpProfileManager->CpuStop(kCpuTimerRenderMain);
 
 	gpImGuiManager->Prepare(iCommandBuffer);
@@ -214,6 +214,7 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	gpCommandBufferManager->SubmitMainCommandBuffer(iCommandBuffer);
 
 	gpCommandBufferManager->SubmitUiCommandBuffer(iCommandBuffer);
+	mpLighting->FinishCapture(iCommandBuffer);
 
 	// Capture after SubmitUiCommandBuffer and before Present: the UI submit has queued mVkFence, so SaveScreenshot waits on a pending or
 	// completed signal while the present image remains application-owned.
@@ -385,7 +386,6 @@ void Graphics::Create()
 	// Open over a surviving texture manager's rebuild through the pipeline manager's construction; never encloses
 	// InitializeBootTextures, whose waits open their own epoch.
 	std::optional<TextureDescriptors::ScopedBindlessWriteEpoch> optionalBindlessWriteEpoch;
-	bool bReblurLightingTextures = false;
 	if (mpTextureManager == nullptr)
 	{
 		mpTextureManager = std::make_unique<TextureManager>();
@@ -401,7 +401,6 @@ void Graphics::Create()
 		{
 			optionalBindlessWriteEpoch.emplace(gpTextureManager->mTextureDescriptors, TextureDescriptors::kiAllFramebuffers);
 			// RecreateResources clears the flags
-			bReblurLightingTextures = mDestroyFlags & DestroyFlags::kLightingBlur;
 			RecreateResources();
 		}
 
@@ -432,17 +431,9 @@ void Graphics::Create()
 	}
 	if (optionalBindlessWriteEpoch.has_value())
 	{
-		// After the pipeline manager, which owns the lighting blur pipelines
-		if (bReblurLightingTextures)
-		{
-			gpTextureManager->ReblurAllLightingTextures();
-		}
 		gpTextureManager->mTextureDescriptors.PublishAllFramebuffers();
 		optionalBindlessWriteEpoch.reset();
 	}
-	// After the pipeline manager, so the lighting blur pipelines exist before any adoption the boot waits drive can
-	// reach TextureManager::BlurLightingTexture. The texture manager is still constructed first, which the pipeline
-	// manager's constructor requires.
 	if (bInitializeBootTextures)
 	{
 		try
@@ -456,6 +447,19 @@ void Graphics::Create()
 			throw;
 		}
 	}
+	if (mpLighting == nullptr)
+	{
+		mpLighting = std::make_unique<Lighting>();
+	}
+	else if (eDestroyType >= DestroyType::kSwapchain)
+	{
+		mpLighting->CreateResources();
+	}
+	else if (eDestroyType >= DestroyType::kPipelines)
+	{
+		mpLighting->CreateTerrainPipelines();
+	}
+
 	if (mpParticleManager == nullptr)
 	{
 		mpParticleManager = std::make_unique<ParticleManager>();
@@ -559,27 +563,6 @@ void Graphics::Refresh()
 
 	PollSetting<float>(gShadowRenderMultiplier, "Shadow render multiplier", DestroyType::kPipelines, DestroyFlags::kShadowTextures, gpTextureManager != nullptr);
 
-	[[maybe_unused]] auto [fLightingMultiplier, fLightingMultiplierPrevious, bLightingMultiplierChanged] = gLightingDepositTextureMultiplier.Changed<float>();
-	[[maybe_unused]] auto [fSpreadTextureMultiplierStart, fSpreadTextureMultiplierStartPrevious, bSpreadTextureMultiplierStartChanged] = gSpreadTextureMultiplierStart.Changed<float>();
-	[[maybe_unused]] auto [fSpreadTextureMultiplierEnd, fSpreadTextureMultiplierEndPrevious, bSpreadTextureMultiplierEndChanged] = gSpreadTextureMultiplierEnd.Changed<float>();
-	[[maybe_unused]] auto [fSpreadPassCount, fSpreadPassCountPrevious, bSpreadPassCountChanged] = gSpreadPassCount.Changed<float>();
-	if ((bLightingMultiplierChanged || bSpreadTextureMultiplierStartChanged || bSpreadTextureMultiplierEndChanged || bSpreadPassCountChanged) && gpTextureManager != nullptr) [[unlikely]]
-	{
-		mDestroyFlags.Set(DestroyFlags::kLightingTextures);
-
-		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
-	}
-
-	[[maybe_unused]] auto [fLightingBlurSigma, fLightingBlurSigmaPrevious, bLightingBlurSigmaChanged] = gLightingBlurSigma.Changed<float>();
-	[[maybe_unused]] auto [fLightingBlurSampleCount, fLightingBlurSampleCountPrevious, bLightingBlurSampleCountChanged] = gLightingBlurSampleCount.Changed<float>();
-	[[maybe_unused]] auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
-	if ((bLightingBlurSigmaChanged || bLightingBlurSampleCountChanged || bLightingBlurEdgeFalloffChanged) && gpTextureManager != nullptr) [[unlikely]]
-	{
-		mDestroyFlags.Set(DestroyFlags::kLightingBlur);
-
-		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
-	}
-
 	[[maybe_unused]] auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
 	[[maybe_unused]] auto [fObjectShadowsBlurMultiplier, fObjectShadowsBlurMultiplierPrevious, bObjectShadowsBlurMultiplierChanged] = gObjectShadowsBlurMultiplier.Changed<float>();
 	if ((bObjectShadowsRenderMultiplierChanged || bObjectShadowsBlurMultiplierChanged) && gpTextureManager != nullptr) [[unlikely]]
@@ -623,11 +606,6 @@ void Graphics::RecreateResources()
 	if (mDestroyFlags & DestroyFlags::kObjectShadows)
 	{
 		gpTextureManager->mRenderTargetTextures.CreateObjectShadowsTextures();
-	}
-
-	if (mDestroyFlags & DestroyFlags::kLightingTextures)
-	{
-		gpTextureManager->mRenderTargetTextures.CreateLightingTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kWaterMesh)
@@ -711,11 +689,19 @@ void Graphics::Destroy()
 
 	if (meDestroyType >= DestroyType::kPipelines)
 	{
+		if (mpLighting != nullptr)
+		{
+			mpLighting->DestroyTerrainPipelines();
+		}
 		mpPipelineManager.reset();
 	}
 
 	if (meDestroyType >= DestroyType::kSwapchain)
 	{
+		if (mpLighting != nullptr)
+		{
+			mpLighting->DestroyResources();
+		}
 		if (meDestroyType < DestroyType::kSurface)
 		{
 			// Partial destroy: keep TextureManager, BufferManager, and ImGuiManager alive, only destroy screen-dependent internals

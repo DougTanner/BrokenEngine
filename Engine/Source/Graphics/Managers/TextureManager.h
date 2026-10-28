@@ -14,9 +14,6 @@ enum class TextureManagerFlags : uint8_t
 {
 	kPendingAcquireBarriers = 1 << 0,
 	kAcquireCommandBufferBegun = 1 << 1,
-	// Set when a blur is recorded into the acquire command buffer, cleared by EndAcquireCommandBuffer: set f of the blur
-	// pipelines holds one blur's bindings, so a second blur in the same acquire command buffer waits for a later frame.
-	kBlurRecorded = 1 << 2,
 };
 
 class TextureManager : public common::Singleton<TextureManager>
@@ -24,7 +21,6 @@ class TextureManager : public common::Singleton<TextureManager>
 public:
 
 	static std::tuple<int64_t, int64_t> DetailTextureSize(float fMultiplier);
-	static std::tuple<int64_t, int64_t> LightingDetailTextureSize(float fMultiplier);
 	static std::tuple<int64_t, int64_t> WaterDetailTextureSize(float fMultiplier);
 	static float DetailTextureAspectRatio();
 
@@ -182,6 +178,7 @@ public:
 		kSamplerSlotCount,
 	};
 	VkSampler mpSamplersVkSampler[kSamplerSlotCount] {};
+	VkSamplerCreateInfo mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotCount] {};
 
 	// Per-mip Toksvig variance tables for the water normal maps, copied from TextureHeader::pfMipVariance
 	// during the ctor chunk walk (headers are resident at startup; the lazy pixel data is not). Indexed by
@@ -202,15 +199,6 @@ public:
 	Texture mIslandPlaceholderMasks;
 
 	std::unordered_map<common::crc_t, Texture> mTextureMap;
-
-	// Pre-blur lighting textures (the registered CRC set lives on TextureUploadManager, which outlives this manager)
-	std::unordered_map<common::crc_t, Texture> mBlurredLightingTextures;
-	std::unordered_map<common::crc_t, Texture> mBlurIntermediateTextures;
-	// Records the blur into vkCommandBuffer through the blur pipelines' Set 1 copy iDescriptorSet, which must not be bound
-	// by another recording command buffer.
-	void BlurLightingTexture(common::crc_t crc, int64_t iDescriptorSet, VkCommandBuffer vkCommandBuffer);
-	// Drained context only: one executed one-shot per ready lighting texture, rewriting its blur images in place.
-	void ReblurAllLightingTextures();
 
 	VkCommandPool mAcquireVkCommandPool = VK_NULL_HANDLE;
 	std::vector<VkCommandBuffer> mAcquireVkCommandBuffers;

@@ -319,6 +319,9 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 	{
 		vkDestroySwapchainKHR(gpDeviceManager->mVkDevice, vkOldSwapchain, nullptr);
 	}
+	// TEMP START descriptor census
+	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS surface min={} max={} requested={} presentMode={}", vkSurfaceCapabilitiesKHR.minImageCount, vkSurfaceCapabilitiesKHR.maxImageCount, vkSwapchainCreateInfoKHR.minImageCount, static_cast<int32_t>(vkSwapchainCreateInfoKHR.presentMode));
+	// TEMP END descriptor census
 	VkName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, mVkSwapchainKHR, "");
 }
 
@@ -331,6 +334,9 @@ void SwapchainManager::CreateFramebuffers()
 	std::vector<VkImage> swapchainImages(static_cast<size_t>(iImageCount));
 	CHECK_VK(vkGetSwapchainImagesKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, &uiImageCount, swapchainImages.data()));
 	iImageCount = static_cast<int64_t>(uiImageCount);
+	// TEMP START descriptor census
+	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS framebuffers={}", iImageCount);
+	// TEMP END descriptor census
 
 	VkImageAspectFlags vkImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if (gpInstanceManager->mDepthVkFormat == VK_FORMAT_D16_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D24_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)

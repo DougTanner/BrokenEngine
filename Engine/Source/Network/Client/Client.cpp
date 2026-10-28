@@ -13,6 +13,12 @@
 namespace engine
 {
 
+bool Client::ServiceCaptureTransport()
+{
+	// A null event services ENet acknowledgements and keepalives without delivering queued session mutations.
+	return enet_host_service(mpHost, nullptr, 0) >= 0;
+}
+
 Client::Client(const char* pcServerAddress, int64_t iPort, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
 : common::Singleton<Client>(gpClient, this)
 {

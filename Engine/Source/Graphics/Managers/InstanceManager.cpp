@@ -383,9 +383,9 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 	SelectSurfaceFormat();
 	SelectDepthFormat();
 
-	// Elevation, lighting, smoke, and wind prepasses enable MAX/ADD blending with kMax/kAdd.
+	// Elevation, smoke, and wind prepasses enable MAX/ADD blending with kMax/kAdd.
 	// Their attachment formats require VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT; absence makes pipeline creation undefined behavior.
-	const VkFormat pVkBlendedRenderTargetFormats[] {shaders::kVkFormatElevation, shaders::kVkFormatLighting, shaders::kVkFormatSmoke, shaders::kVkFormatWind};
+	const VkFormat pVkBlendedRenderTargetFormats[] {shaders::kVkFormatElevation, shaders::kVkFormatSmoke, shaders::kVkFormatWind};
 	for (const VkFormat& rVkFormat : pVkBlendedRenderTargetFormats)
 	{
 		if (!SupportsColorAttachmentBlend(rVkFormat))
@@ -468,6 +468,51 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	vkGetPhysicalDeviceMemoryProperties(mVkPhysicalDevice, &mVkPhysicalDeviceMemoryProperties);
 
 	vkGetPhysicalDeviceFeatures2(mVkPhysicalDevice, &mVkPhysicalDeviceFeatures2);
+	VkPhysicalDeviceProperties2 vkProperties
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+		.pNext = &mVkPhysicalDeviceAccelerationStructurePropertiesKHR,
+	};
+	vkGetPhysicalDeviceProperties2(mVkPhysicalDevice, &vkProperties);
+	uint32_t uiExtensionCount = 0;
+	CHECK_VK(vkEnumerateDeviceExtensionProperties(mVkPhysicalDevice, nullptr, &uiExtensionCount, nullptr));
+	std::vector<VkExtensionProperties> extensions(uiExtensionCount);
+	CHECK_VK(vkEnumerateDeviceExtensionProperties(mVkPhysicalDevice, nullptr, &uiExtensionCount, extensions.data()));
+	const char* pRequiredExtensions[]
+	{
+		VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+		VK_KHR_RAY_QUERY_EXTENSION_NAME,
+		VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+	};
+	for (const char* pcExtension : pRequiredExtensions)
+	{
+		if (!std::ranges::any_of(extensions, [pcExtension](const VkExtensionProperties& rExtension)
+		{
+			return std::strcmp(pcExtension, rExtension.extensionName) == 0;
+		}))
+		{
+			LOG(kGraphics, kError, "Required lighting extension {} not supported", pcExtension);
+			throw std::runtime_error(std::format("Required lighting extension {} not supported", pcExtension));
+		}
+	}
+	VkFormatProperties vkReferenceFormat {};
+	vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, VK_FORMAT_R32G32B32A32_SFLOAT, &vkReferenceFormat);
+	static constexpr VkFormatFeatureFlags kVkReferenceFeatures = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+	if ((vkReferenceFormat.optimalTilingFeatures & kVkReferenceFeatures) != kVkReferenceFeatures)
+	{
+		throw std::runtime_error("Lighting reference requires RGBA32F sampled/storage/color-attachment support");
+	}
+	VkFormatProperties vkPositionFormat {};
+	vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, VK_FORMAT_R32G32B32_SFLOAT, &vkPositionFormat);
+	if ((vkPositionFormat.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR) == 0)
+	{
+		throw std::runtime_error("Lighting geometry requires R32G32B32_SFLOAT acceleration vertices");
+	}
+	if (mVkPhysicalDeviceProperties.apiVersion < VK_API_VERSION_1_2)
+	{
+		throw std::runtime_error("Lighting requires Vulkan 1.2");
+	}
+	LOG(kGraphics, kInfo, "Lighting selected GPU: {} vendor {} device {} driver {}; scratch alignment {}, max geometry {}, max instances {}, max primitives {}; U16/U32 triangle indices", mVkPhysicalDeviceProperties.deviceName, mVkPhysicalDeviceProperties.vendorID, mVkPhysicalDeviceProperties.deviceID, mVkPhysicalDeviceProperties.driverVersion, mVkPhysicalDeviceAccelerationStructurePropertiesKHR.minAccelerationStructureScratchOffsetAlignment, mVkPhysicalDeviceAccelerationStructurePropertiesKHR.maxGeometryCount, mVkPhysicalDeviceAccelerationStructurePropertiesKHR.maxInstanceCount, mVkPhysicalDeviceAccelerationStructurePropertiesKHR.maxPrimitiveCount);
 
 	struct RequiredFeature
 	{
@@ -477,6 +522,12 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	};
 	const RequiredFeature pRequiredFeatures[]
 	{
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.vertexPipelineStoresAndAtomics, .pcName = "vertexPipelineStoresAndAtomics", .pcReason = "original terrain vertex-output validation"},
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderInt64, .pcName = "shaderInt64", .pcReason = "lighting resident buffer addresses"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.bufferDeviceAddress, .pcName = "bufferDeviceAddress", .pcReason = "lighting geometry and acceleration scratch"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.scalarBlockLayout, .pcName = "scalarBlockLayout", .pcReason = "shared lighting GPU records"},
+		{.pVkFeature = &mVkPhysicalDeviceAccelerationStructureFeaturesKHR.accelerationStructure, .pcName = "accelerationStructure", .pcReason = "resident lighting geometry"},
+		{.pVkFeature = &mVkPhysicalDeviceRayQueryFeaturesKHR.rayQuery, .pcName = "rayQuery", .pcReason = "lighting visibility and closest hits"},
 		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderStorageImageExtendedFormats, .pcName = "shaderStorageImageExtendedFormats", .pcReason = "R16_SFLOAT smoke storage images"},
 		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderSampledImageArrayDynamicIndexing, .pcName = "shaderSampledImageArrayDynamicIndexing", .pcReason = "dynamically uniform smoke and water-normal sampler-array indexing"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingStorageBufferUpdateAfterBind, .pcName = "descriptorBindingStorageBufferUpdateAfterBind", .pcReason = "VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT"},

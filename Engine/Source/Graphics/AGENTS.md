@@ -4,7 +4,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 ## Frame and Resource Lifecycle
 
-- Frames submit Global, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
+- Frames submit Global, preparation, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
 - Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
 - Model depth ordering is runtime host policy in `Graphics::mFlags`, initialized
   from the host's `kbDrawModelsOverWorld` default. Change it only on the owning
@@ -24,7 +24,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   marks waited, each other framebuffer whose fence already reads signaled,
   without blocking.
 - Staging buffers, evicted images, and evicted mesh ranges that recorded work or descriptors may still use are retired, not destroyed. Every frame, outside the churn gate, each waited framebuffer leaves every retirement entry, and after that frame's publications an entry no framebuffer holds is destroyed; `Graphics::Destroy` destroys every entry after its device drain, at every tier.
-- The acquire command buffer, prepended to Global, carries queue-family acquire barriers, recorded uploads, and lighting blurs, and its work precedes any descriptor or indirect record exposing the result. It is single-publication work: clear prior publication before the churn scan, end it at most once per frame after the last recording, and let only fresh recording republish it. An idle frame must not replay prior barriers.
+- The acquire command buffer, prepended to Global, carries queue-family acquire barriers and recorded uploads; its work precedes any descriptor or indirect record exposing the result. It is single-publication work: clear prior publication before the churn scan, end it at most once per frame after the last recording, and let only fresh recording republish it. An idle frame must not replay prior barriers.
 - `CheckVkFailed` handles every failed `CHECK_VK` result: out-of-date and
   suboptimal swapchain results escalate to the swapchain tier, surface loss to
   the surface tier, and `VK_ERROR_DEVICE_LOST` throws `std::system_error` with
@@ -46,7 +46,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   For a surviving tier, `Graphics::Create` rebuilds flagged texture and buffer
   resources and, at the sampler tier and above, the texture manager's samplers;
   destroy flags stay set across both swapchain deferrals.
-- `Graphics::Create` constructs the texture manager before the pipeline manager, which that constructor requires, but runs the boot-texture initialization only after the pipeline manager exists, so no texture adoption its waits drive can reach the lighting blur without the blur pipelines. A lighting-blur tunable change requests pipeline-tier recreation, whose `Create` reblurs every ready lighting texture once the pipeline manager exists.
+- `Graphics::Create` constructs the texture manager before the pipeline manager, then initializes boot textures after both managers exist.
 - A zero-area swapchain extent defers swapchain-tier recreation. The render loop
   skips submission, retries creation at sim-tick cadence, and acquires again
   only after recreation succeeds; surface-loss recovery remains a full recreate.
@@ -93,17 +93,16 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   whole-cell centre offset (`CellCenterOffset`); a larger change discards the
   tracking caches. A new cached position must join
   that shift or it will describe a place in the previous cell.
-- Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
-- Shadow and lighting texel sizes track independent camera-height references
-  that expand immediately with outward zoom and contract at their existing rates
-  inward. The references never fall below live eye height, preserving
-  raw-frustum coverage without changing settled on-screen density. Lighting
-  temporal history rejects newly exposed texels when their reprojected UV falls
-  outside the previous footprint, so outward live-eye movement follows the
-  configured lighting refresh cadence unless crop safety requires an earlier
-  refresh; recreation still re-seeds history from current data only. Shadow uses
-  the same per-texel rejection and follows the terrain shadow update cadence
-  unless crop safety requires an earlier refresh.
+- Comparison pose/projection is render-only and updates even without an
+  interpolate frame. Render-height consumers use `GetRenderEyeHeight`; stored
+  zoom, persistence and ordinary camera policy retain their own height. Main
+  publishes comparison matrices with zero shake, including empty-frame paths.
+- Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, and shadow areas must preserve this shared grid contract.
+- Shadow texel size tracks a camera-height reference that expands immediately
+  with outward zoom and contracts at its existing rate inward. The reference
+  never falls below live eye height. Shadow history rejects reprojected texels
+  outside the previous footprint and follows the terrain shadow cadence unless
+  crop safety requires an earlier refresh; recreation re-seeds current data.
 - Terrain rendering uses boot-fixed island templates, a stable 128 MiB mesh
   arena, and a per-framebuffer placement arena derived from the active-cell
   subscription slots plus one local unconfirmed cell and the 107-placement cell
@@ -132,9 +131,64 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   creation only on lower-limit devices.
 - Terrain collision belongs to shared Frame island terrain (`../Frame/AGENTS.md`), not this client renderer.
 
+## Lighting Publication
+
+- Graphics owns client-only Lighting state outside Frame and CRC. Begin/end
+  publication runs for every acquired framebuffer, including ModelViewer and
+  empty gameplay frames. Gameplay Frame arguments are borrowed synchronously;
+  do not retain Frame/collection pointers, capture them in workers, or copy CPU
+  geometry and matrix snapshots. Gameplay source publication is a zero stub.
+- Model publication records owner identities and ranges after ordinary render
+  writes, including off-screen opaque instances after the visible prefix.
+  Resolve current GPU handles after capacity growth and reuse final mesh/joint
+  ranges. Resident terrain/model geometry, material tables, and acceleration
+  structures remain tied to the framebuffer's publication and resource lifetime.
+- Terrain and scene diagnostics each share one pipeline instance per kind across
+  framebuffers, with descriptor sets indexed by framebuffer; backing resources
+  and completion ownership remain per framebuffer. After its fence completes,
+  refresh only the selected framebuffer's sets with its current scratch, work,
+  query and diagnostic resources after growth and before use. Terrain scratch
+  bindings bypass texture-descriptor registration so callbacks cannot publish
+  one framebuffer's image into every set; resolve the current sampler when
+  binding scratch, including after sampler recreation. Destroy and unregister
+  shared pipelines before their backing resources in both explicit teardown
+  and member destruction.
+- Preparation completes lighting and environmental updates before receivers or Main.
+  A recorded publication is not completed GPU evidence: latch diagnostic
+  readback only after its covering fence completes. Submission ownership belongs
+  to [CommandBufferManager](Managers/AGENTS.md#commandbuffermanager).
+- Lighting owns comparison capture. Apply settings only after draining render,
+  present and upload workers and device work, before the next CPU publication.
+  Its publication hold alone prevents only framebuffer reuse; the controller
+  also withholds the ordinary update/render/adoption/retirement loop through
+  receiver, tiled reference, original-frame composition and export. Retain all
+  geometry, animation, water, material and residency inputs throughout.
+- Before Main is committed, a queued mutation cancels comparison and Main uses
+  zero local diffuse. After commitment, mutations wait through export. Disable
+  composition, bind the zero fallback and fence restoration before releasing
+  the publication or dispatching pending input. The first ordinary Main/UI
+  fence records zero diffuse; another capture waits for that receipt. Recreation
+  preserves that obligation; device-loss teardown records abort, not success.
+- The capture pump dispatches only safe lifecycle messages and the host's narrow
+  service hook; ordinary input and synthetic frame-stepped scripts stay pending.
+  Sandbox's hook owns agent and non-dispatching transport service; ModelViewer
+  supplies an empty hook. Command gating belongs to [Agent](../Agent/AGENTS.md#architecture),
+  and transport limits to [Client](../Network/Client/AGENTS.md#receive-paths).
+- The fixed client fixture supplies immutable sources, samples, geometry and
+  events without consuming simulation IDs or RNG. Physical emission is authored
+  independently of visible sprites, shield colors, and smoke appearance.
+
 ## Assets and Capture
 
-- Animation data aliases eagerly loaded pack memory and therefore cannot outlive `FileManager`. Validate all pack-derived ranges and indices before constructing aliases; temporary transforms use the workbuffer.
+Comparison export waits for the original Main/UI fence and completes raw
+readbacks and the finished PNG write before export-complete. Capture manifests
+and `query_profile.lighting` distinguish submitted work, completed GPU diagnostics
+and completed export; none by itself establishes acceptance. Link the final
+emitted manifest hash to an immutable external build receipt and source-tree
+snapshot, with the executable, pack and shader hashes. Runtime supplies no
+repository revision constant; never invent one or edit a hashed emitted manifest.
+
+- Animation aliases initialize before Graphics creation so record-once fixture draws can resolve them. They alias eagerly loaded pack memory and therefore cannot outlive `FileManager`. Validate all pack-derived ranges and indices before constructing aliases; temporary transforms use the workbuffer.
 - DirectXMath matrices are uploaded without an extra transpose. Animation nodes remain parent-before-child, enabling a single forward world-transform pass.
 - Screenshot and render-target capture run after the ImGui submission is enqueued and before present. The fence signal must already be pending before readback waits, or capture deadlocks. Requests enter through `Graphics` mailboxes; asynchronous encoders own separate thread-local state.
 

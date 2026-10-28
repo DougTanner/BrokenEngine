@@ -78,6 +78,7 @@ public:
 	// Sends only valid chat text on an accepted connection; anything else is discarded unsent.
 	void SendChat(std::string_view text);
 	void Disconnect();
+	bool ServiceCaptureTransport();
 	// The caller ensures a connected and accepted client; this send does not check the connection.
 	void SendCrashReport(std::span<const uint8_t> report, ENetPacketFreeCallback pFreeCallback);
 	// Crash path only, on a connected and accepted client: sends the report with pFreeCallback, then disconnects and

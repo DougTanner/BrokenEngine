@@ -298,7 +298,11 @@ void AgentCommandServer::Drain()
 
 		// Liveness timeout: a capture request lost to device-loss Graphics recreation (mailboxes wiped) never
 		// resolves — bound the wait and publish a failure so the channel isn't deadlocked forever.
-		if (++miDeferredDrainCount > kiDeferredTimeoutDrains)
+		bool bCountDrain = true;
+#if defined(BT_CLIENT)
+		bCountDrain = gpGraphics == nullptr || gpGraphics->mpLighting == nullptr || !gpGraphics->mpLighting->IsCaptureHeld();
+#endif
+		if (bCountDrain && ++miDeferredDrainCount > kiDeferredTimeoutDrains)
 		{
 			mDeferredPoll = nullptr;
 			response["ok"] = false;
@@ -335,6 +339,21 @@ void AgentCommandServer::Drain()
 		{
 			return;
 		}
+#if defined(BT_CLIENT)
+		if (gpGraphics != nullptr && gpGraphics->mpLighting != nullptr && gpGraphics->mpLighting->IsCaptureHeld())
+		{
+			const nlohmann::json& pending = mOptionalPendingRequest->request;
+			if (pending.contains("cmd") && pending["cmd"].is_string())
+			{
+				const std::string& command = pending["cmd"].get_ref<const std::string&>();
+				if (command != "query_profile" && command != "status" && command != "describe_ui" && command != "ping")
+				{
+					gpGraphics->mpLighting->CancelCapture();
+					return;
+				}
+			}
+		}
+#endif
 		request = std::move(*mOptionalPendingRequest);
 		mOptionalPendingRequest.reset();
 	}

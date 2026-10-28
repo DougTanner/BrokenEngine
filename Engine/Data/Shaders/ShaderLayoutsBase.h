@@ -29,12 +29,9 @@ namespace shaders
 
 inline constexpr VkFormat kVkFormatElevation = VK_FORMAT_R16_SFLOAT;
 
-inline constexpr VkFormat kVkFormatLighting = VK_FORMAT_R16G16B16A16_SFLOAT;
-
 inline constexpr VkFormat kVkFormatSmoke = VK_FORMAT_R16_SFLOAT;
 inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
 inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
-inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
 inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatWaterFoam = VK_FORMAT_R16_SFLOAT;
 
@@ -125,6 +122,8 @@ CONSTEXPR int kiGlobalBindingSamplerRepeatModelData = 13;
 CONSTEXPR int kiGlobalBindingSamplerRepeat = 3;
 CONSTEXPR int kiGlobalBindingBindlessTextures = 4;
 CONSTEXPR int kiGlobalBindingSamplerClamp = 12;
+CONSTEXPR int kiGlobalBindingLightingReference = 29;
+CONSTEXPR int kiGlobalBindingLightingControl = 30;
 
 // Set-1 per-pipeline descriptor binding numbers. Single-sourced here (dual-language) like the Set-0
 // block above, so the C++ pipeline setup (ModelPipeline kModel descriptor append, BufferManager mesh/joint
@@ -159,15 +158,9 @@ CONSTEXPR int kiWaterSpecularAntialiasingMipTableSize = 10;
 // and the TextureManager render-target pointer vectors.
 CONSTEXPR int kiMaxIslands = 128;
 
-CONSTEXPR int kiMaxSpreadPasses = 40;
-CONSTEXPR int kiMaxDebugTextures = kiMaxSpreadPasses + 16;
+CONSTEXPR int kiMaxDebugTextures = 16;
 
-CONSTEXPR int kiDebugTextureFormatFloat16LightingDirectional = 0;
-CONSTEXPR int kiDebugTextureFormatUnormLightingDirectional = 1;
 CONSTEXPR int kiDebugTextureFormatFloat16Linear = 2;
-CONSTEXPR int kiDebugTextureFormatFloat16LinearVisibleArea = 3;
-CONSTEXPR int kiDebugTextureFormatFloat16DepositDirectionCombined = 4;
-CONSTEXPR int kiDebugTextureFormatFloat16SpreadDirectionCombined = 5;
 CONSTEXPR int kiDebugTextureFormatRgb = 6;
 CONSTEXPR int kiDebugTextureFormatGrayscaleR = 7;
 CONSTEXPR int kiDebugTextureFormatTerrainElevation = 8;
@@ -297,12 +290,10 @@ struct HexShieldLayout
 	vec4 f3x4Transform[3] INIT;
 	vec4 f3x4TransformNormal[3] INIT;
 	vec4 f4Color INIT;
-	vec4 f4LightingColor INIT;
 	vec4 pf4Directions[kiHexShieldDirections] INIT;
 	float pfVertexIntensities[kiHexShieldDirections] INIT;
 	float pfFragmentIntensities[kiHexShieldDirections] INIT;
 
-	float fLightingIntensity INIT;
 	float fSize INIT;
 	float fColorMix INIT;
 	float fMinimumIntensity INIT;
@@ -369,3 +360,5 @@ static_assert(sizeof(GlobalLayout) <= 65'536);
 } // namespace shaders
 
 #endif
+
+#include "Lighting/LightingCommon.h"

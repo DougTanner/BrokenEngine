@@ -22,10 +22,6 @@ const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 	{"Saturation", &gColorGradingSaturation},
 	{"Contrast", &gColorGradingContrast},
 	{"Temperature", &gColorGradingTemperature},
-	{"Lighting Specular", &gPhysicallyBasedRenderingLightingSpecular},
-	{"Lighting Specular Power", &gPhysicallyBasedRenderingLightingSpecularPower},
-	{"Lighting", &gPhysicallyBasedRenderingLighting},
-	{"Lighting Power", &gPhysicallyBasedRenderingLightingPower},
 	{"IBL Ambient", &gPhysicallyBasedRenderingImageBasedLightingAmbient},
 	{"IBL Diffuse", &gPhysicallyBasedRenderingImageBasedLightingDiffuse},
 	{"IBL Diffuse Power", &gPhysicallyBasedRenderingImageBasedLightingDiffusePower},
@@ -61,12 +57,6 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
 				rScreen.WrapperSlider("BRDF Specular", iSection, 1.0f);
 				rScreen.WrapperSlider("BRDF Specular Power", iSection, 1.0f);
-
-				rScreen.WrapperSeparatorText("Post Lighting");
-				rScreen.WrapperSlider("Lighting Specular", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting Specular Power", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 

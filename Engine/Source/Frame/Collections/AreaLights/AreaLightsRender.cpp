@@ -2,10 +2,7 @@
 
 #if defined(BT_CLIENT)
 
-#include "Data/Shader.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileRows.h"
@@ -17,8 +14,6 @@ constexpr int64_t kiDynamicBufferInitialCapacity = 8'192;
 
 void AreaLightsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), kiDynamicBufferInitialCapacity);
-	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineLighting, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersLightingAreaLightfragCrc, DescriptorFlags::kSamplerRepeat);
 	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), kiDynamicBufferInitialCapacity);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineVisibleLights(kuiCrc, kpcName, pVisibleLightsBuffers);
 }
@@ -41,10 +36,6 @@ void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
-	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineLighting].at(kuiCrc), iCommandBuffer, 1, pBuffer);
-	}
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
 		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc), iCommandBuffer, 2, pBuffer);
@@ -63,43 +54,24 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 	}
 
 	auto [pVisibleLightsLayouts, iVisibleLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::VisibleLightQuadLayout>(kuiCrc, kBufferVisibleLights, iCommandBuffer);
-	auto [pAreaLightsLayouts, iAreaLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::QuadLayout>(kuiCrc, kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iVisibleLightsBufferCapacity);
-	ASSERT(siRendered + rCurrent.iCount <= iAreaLightsBufferCapacity);
-
-	float fMinimumLightingSize = MinLightingDepositSize();
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Every position below stays local to the rendered cell until it reaches the GPU
-		// layout, the frustum test, or ProjectToBaseHeight — the three conversion points of this renderer.
+		// layout or the frustum test.
 		XMVECTOR vecVisiblePosition0 = rCurrent.pVecVisiblePositions[0][i];
 		XMVECTOR vecVisiblePosition1 = rCurrent.pVecVisiblePositions[1][i];
 		XMVECTOR vecVisiblePosition2 = rCurrent.pVecVisiblePositions[2][i];
 		XMVECTOR vecVisiblePosition3 = rCurrent.pVecVisiblePositions[3][i];
 
-		XMVECTOR vecCenter = XMVectorScale(XMVectorAdd(XMVectorAdd(vecVisiblePosition0, vecVisiblePosition1), XMVectorAdd(vecVisiblePosition2, vecVisiblePosition3)), 0.25f);
 		const AreaLightsType& rType = AreaLightsInterpolate::sTypes.at(rCurrent.puiTypeIndices[i]);
 		int64_t iTextureIndex = gpTextureManager->mTextureDescriptors.CrcToIndex(rType.uiCrc);
-		float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
 		float fIntensityMultiplier = rCurrent.pfIntensityMultipliers[i];
 		float fVisibleIntensity = rType.pVisibleIntensityWrapper != nullptr ? rType.pVisibleIntensityWrapper->mfCurrent : rType.fVisibleIntensity;
-		float fLightingSize = std::max(rType.pLightingSizeWrapper != nullptr ? rType.pLightingSizeWrapper->mfCurrent : rType.fLightingSize, fMinimumLightingSize);
-		float fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
-
-		// Lighting quads preserve the visible quad's orientation.
-		XMVECTOR vecOffset0 = XMVectorSubtract(vecVisiblePosition0, vecCenter);
-		float fVisibleExtent = XMVectorGetX(XMVector2Length(vecOffset0));
-		float fScale = fVisibleExtent > 0.0f ? fLightingSize / fVisibleExtent : 1.0f;
-		XMVECTOR vecScaleFactor = XMVectorReplicate(fScale);
-
-		XMVECTOR vecLightingPosition0 = XMVectorMultiplyAdd(vecOffset0, vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition1 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition1, vecCenter), vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition2 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition2, vecCenter), vecScaleFactor, vecCenter);
-		XMVECTOR vecLightingPosition3 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition3, vecCenter), vecScaleFactor, vecCenter);
 
 		// Rebasing translates the bounding box, so converting its two corners preserves the rectangle.
-		auto [vecMinimum, vecMaximum] = common::ComputeAxisAlignedBoundingBox(vecVisiblePosition0, vecVisiblePosition1, vecVisiblePosition2, vecVisiblePosition3, vecLightingPosition0, vecLightingPosition1, vecLightingPosition2, vecLightingPosition3);
+		auto [vecMinimum, vecMaximum] = common::ComputeAxisAlignedBoundingBox(vecVisiblePosition0, vecVisiblePosition1, vecVisiblePosition2, vecVisiblePosition3);
 		if (!common::AxisAlignedBoundingBoxIntersectsArea(engine::gpCamera->mf4RenderVisibleArea, Rebase(rBasis, vecMinimum), Rebase(rBasis, vecMaximum)))
 		{
 			continue;
@@ -125,33 +97,6 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		rVisibleLayout.fRotation = 0.0f;
 		rVisibleLayout.uiTextureIndex = static_cast<uint32_t>(iTextureIndex);
 
-		// Populate area light quad with base height positions for ground shadow effect
-		shaders::QuadLayout& rAreaLayout = pAreaLightsLayouts[siRendered];
-
-		XMVECTOR vecBaseLighting0 = ProjectToBaseHeight(vecLightingPosition0, rBasis);
-		XMVECTOR vecBaseLighting1 = ProjectToBaseHeight(vecLightingPosition1, rBasis);
-		XMVECTOR vecBaseLighting2 = ProjectToBaseHeight(vecLightingPosition2, rBasis);
-		XMVECTOR vecBaseLighting3 = ProjectToBaseHeight(vecLightingPosition3, rBasis);
-
-		XMFLOAT4A f4Base {};
-		XMStoreFloat4A(&f4Base, vecBaseLighting0);
-		rAreaLayout.pf4VerticesTextureCoordinates[0] = {f4Base.x, f4Base.y, rType.pf2TextureCoordinates[0].x, rType.pf2TextureCoordinates[0].y};
-		XMStoreFloat4A(&f4Base, vecBaseLighting1);
-		rAreaLayout.pf4VerticesTextureCoordinates[1] = {f4Base.x, f4Base.y, rType.pf2TextureCoordinates[1].x, rType.pf2TextureCoordinates[1].y};
-		XMStoreFloat4A(&f4Base, vecBaseLighting2);
-		rAreaLayout.pf4VerticesTextureCoordinates[2] = {f4Base.x, f4Base.y, rType.pf2TextureCoordinates[2].x, rType.pf2TextureCoordinates[2].y};
-		XMStoreFloat4A(&f4Base, vecBaseLighting3);
-		rAreaLayout.pf4VerticesTextureCoordinates[3] = {f4Base.x, f4Base.y, rType.pf2TextureCoordinates[3].x, rType.pf2TextureCoordinates[3].y};
-
-		XMFLOAT4A f4Parameters {};
-		f4Parameters.x = fBlurredTextureIndex;
-		f4Parameters.y = fLightingIntensity * fIntensityMultiplier;
-		rAreaLayout.pf4Parameters[0] = f4Parameters;
-		rAreaLayout.pf4Parameters[1] = f4Parameters;
-		rAreaLayout.pf4Parameters[2] = f4Parameters;
-		rAreaLayout.pf4Parameters[3] = f4Parameters;
-		rAreaLayout.uiColor = rType.puiColors[0];
-
 		++siRendered;
 	}
 }
@@ -166,7 +111,6 @@ void AreaLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterAreaLightsRendered).iCount = siRendered;
 	}
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 

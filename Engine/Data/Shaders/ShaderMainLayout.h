@@ -82,40 +82,6 @@ struct MainLayout
 	float fWaterNormalWeightFullTwo INIT;
 	float fWaterNormalWeightFullThree INIT;
 
-	float fLightingWaterReflectedAmount INIT;
-	float fLightingWaterReflectedNormalBlendWave INIT;
-	float fLightingWaterReflectedDistortion INIT;
-	float fLightingWaterReflectedFalloffStart INIT;
-	float fLightingWaterReflectedFalloffPower INIT;
-	float fLightingWaterReflectedFresnel INIT;
-	float fLightingWaterReflectedIntensity INIT;
-
-	float fLightingWaterNormalSoften INIT;
-	float fLightingWaterNormalBlendWave INIT;
-	float fLightingWaterIntensity INIT;
-	float fLightingWaterAdd INIT;
-	float fLightingWaterOne INIT;
-	float fLightingWaterOnePower INIT;
-	float fLightingWaterTwo INIT;
-	float fLightingWaterTwoPower INIT;
-	float fLightingWaterThree INIT;
-	float fLightingWaterThreePower INIT;
-	float fLightingWaterPowerMode INIT;
-
-	float fLightingDirectionalIntensity INIT;
-	float fLightingDirectionalPower INIT;
-	float fLightingDirectionalPowerMode INIT;
-	float fLightingAmbientIntensity INIT;
-	float fLightingAmbientPower INIT;
-	float fLightingAmbientPowerMode INIT;
-	float fLightingWaterEastWestNorthSouthPower INIT;
-	float fLightingWaterEastWestNorthSouthPowerMode INIT;
-	float fLightingWaterAmbientIntensity INIT;
-	float fLightingWaterAmbientPower INIT;
-	float fLightingWaterAmbientPowerMode INIT;
-	float fLightingTerrainBelowBaseMultiplier INIT;
-	float fLightingTerrainBelowBasePower INIT;
-
 	float fPhysicallyBasedRenderingExposure INIT;
 	float fPhysicallyBasedRenderingGammaInverse INIT; // 1 / gamma, applied in HdrResolve.frag
 	float fColorGradingSaturation INIT;
@@ -136,10 +102,6 @@ struct MainLayout
 	float fPhysicallyBasedRenderingImageBasedLightingSpecular INIT;
 	float fPhysicallyBasedRenderingImageBasedLightingSpecularPower INIT;
 	float fPhysicallyBasedRenderingSun INIT;
-	float fPhysicallyBasedRenderingLighting INIT;
-	float fPhysicallyBasedRenderingLightingPower INIT;
-	float fPhysicallyBasedRenderingLightingSpecular INIT;
-	float fPhysicallyBasedRenderingLightingSpecularPower INIT;
 	float fPhysicallyBasedRenderingEmissive INIT;
 	float fPhysicallyBasedRenderingImageBasedLightingShadowBlend INIT;
 	float fPhysicallyBasedRenderingShadowFloor INIT;

@@ -2,7 +2,7 @@
 
 Shared runtime settings, standard localization, player-facing menu helpers, the
 six standard menu screens, renderer quality levels, network-pending controls,
-and client-only curve/editor support. Screen composition and the standard-menu
+and client-only developer controls. Screen composition and the standard-menu
 game contract live in Screens (`Screens/AGENTS.md`); engine Tweaks registration
 contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); the game-side
 localization facade lives in game UI (the game project's own
@@ -41,10 +41,10 @@ is engine-owned here.
 
 - `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
-- `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
-- `GraphicsSettings.bin` version 19 persists Water quality, Water Foam, the
-  Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Lighting
-  and Water Foam default on, and Defaults restores them. Older versions fail the
+- `GraphicsSettings.cpp` persists the engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
+- `GraphicsSettings.bin` version 20 persists Water quality, Water Foam, the
+  Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Water
+  Foam defaults on, and Defaults restores it. Older versions fail the
   current-format gate and use defaults. Water Foam is a validated Boolean byte;
   any value other than zero or one rejects the whole file before application.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
@@ -57,8 +57,6 @@ is engine-owned here.
 - The client-only `StandardMenuFeature`, `StandardMenuState`, `StandardMenuModel`, and `StandardMenuAction` types plus the `game::Game` members `GetStandardMenuModel` and `ApplyStandardMenuAction`, which the screens call, extend that contract for the engine-owned menus. They are the only surface through which a standard screen reaches game-owned networking and frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on them.
 - The client-only `GameBase::mChatLog` (`ChatLog.h`) is the chat state: a `ChatLog::kiCapacity`-entry history ring that `Client::ServerChat` appends to, plus the input box's open flag and text. `GameBase::ProcessInput` opens the box; `ChatScreen` draws the history and closes the box (`Screens/AGENTS.md`).
 - Height-dependent wrapper groups resolve camera-height-conditioned render values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values reach the per-frame GPU buffers.
-- Client-only curves use bounded monotone cubic interpolation and an ImPlot editor. Endpoints remain X-locked and interior control points ordered.
-- The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be compared live against the shipping baseline. They currently hold identical control points; that is the A/B setup, not dead duplication. Collapse to a single curve once tuning settles.
 - `NetworkUiControl` disables a control while authoritative state has not resolved its request; call `Update` every frame with that authoritative state.
 
 Engine UI headers stay out of `Engine.h` and are included directly, or through
@@ -67,7 +65,7 @@ is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
 `ChatLog.h` and carries it into the game PCH. Headers compiling into both builds
 carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so
 server-side simulation can read defaults, and the shared menu helper that shared
-game UI code includes on both sides. Client-only ImPlot types and menu panel,
+game UI code includes on both sides. Client-only menu panel,
 font, and chrome state remain `BT_CLIENT`-guarded, and game screen headers guard
 their client-only members without hiding shared declarations needed by
 server-side screens.

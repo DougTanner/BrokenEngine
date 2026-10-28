@@ -123,7 +123,7 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 		ASSERT(mInfo.vkExtent3D.width != 0 && mInfo.vkExtent3D.height != 0);
 	}
 
-	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible || mInfo.flags & kPerCommandBuffer;
+	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
 	mbPerCommandBuffer = std::ranges::any_of(mInfo.descriptorInfos, [](const DescriptorInfo& rDescriptorInfo)
 	{
 		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers || IsPublishedTextureDescriptor(rDescriptorInfo);
@@ -167,12 +167,18 @@ void Pipeline::Destroy() noexcept
 	// Free Set 1 descriptor sets (not allocated for inner multi-set pipelines with external Set 1)
 	if (!mVkDescriptorSets.empty())
 	{
+		// TEMP START descriptor census
+		for (VkDescriptorSet vkSet : mVkDescriptorSets) LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS free pool={} set={}", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(vkSet));
+		// TEMP END descriptor census
 		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, vkDescriptorPool, static_cast<uint32_t>(std::ssize(mVkDescriptorSets)), mVkDescriptorSets.data());
 	}
 	mVkDescriptorSets.clear();
 
 	if (!mVkDescriptorSetsSet2.empty())
 	{
+		// TEMP START descriptor census
+		for (VkDescriptorSet vkSet : mVkDescriptorSetsSet2) LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS free pool={} set={}", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(vkSet));
+		// TEMP END descriptor census
 		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, vkDescriptorPool, static_cast<uint32_t>(std::ssize(mVkDescriptorSetsSet2)), mVkDescriptorSetsSet2.data());
 	}
 	mVkDescriptorSetsSet2.clear();

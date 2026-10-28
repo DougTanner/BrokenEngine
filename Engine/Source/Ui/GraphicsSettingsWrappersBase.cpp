@@ -23,7 +23,6 @@ Wrapper gUiTheme(UiTheme::kNavalSteel, std::vector<UiTheme> {UiTheme::kNavalStee
 Wrapper gSmokeEnabled(true);
 Wrapper gSmokeLayerStagger(true);
 Wrapper gWindEnabled(true);
-Wrapper gLightingEnabled(true);
 Wrapper gSunAngleOverride(1.15f, 0.0f, XM_2PI);
 
 } // namespace engine

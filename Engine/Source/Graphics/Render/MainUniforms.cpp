@@ -228,10 +228,45 @@ static void EndFrameInterpolateRender(int64_t iCommandBuffer)
 	game::FrameInterpolate::EndRender(iCommandBuffer);
 }
 
+static void PopulateMainCamera(shaders::MainLayout& rMainLayout, int64_t iTick)
+{
+	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
+	rMainLayout.iRenderNumber = static_cast<int32_t>(gpGraphics->miFrameCounter);
+
+	LightingCameraPose comparisonPose;
+	float fCameraShake = gpGraphics->mpLighting->GetComparisonCamera(comparisonPose) ? 0.0f : engine::gpCamera->mfShake;
+	static constexpr float kfMaxRoll = 0.005f;
+	static constexpr float kfMaxPitch = 0.005f;
+	static constexpr float kfMaxYaw = 0.01f;
+	// Fixed-seed permutation tables are identical every frame — construct once (each ctor reshuffles a 256-entry table).
+	static const siv::BasicPerlinNoise<float> sPerlinRoll(0);
+	static const siv::BasicPerlinNoise<float> sPerlinPitch(1);
+	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
+	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(iTick).time_since_epoch());
+	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
+
+	XMMATRIX matViewProjection = XMMatrixTranspose(XMMatrixMultiply(engine::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective)));
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), matViewProjection);
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ModelViewProjection[0]), matViewProjection);
+
+	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
+	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, engine::gpCamera->mVecEyePosition);
+	XMVECTOR vecToEyeNormal = engine::gpCamera->mVecToEyeNormal;
+	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, vecToEyeNormal);
+	// DebugRenderBillboard.vert consumes this basis for every vertex; forward remains f4ToEyeNormal.
+	// The reference axis switches from +Z to +X at |forward.z| = 0.999; right is normalized and up = cross(forward, right) is not.
+	XMVECTOR vecBillboardWorldUpNormal = std::abs(XMVectorGetZ(vecToEyeNormal)) < 0.999f ? XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR vecBillboardRightNormal = XMVector3Normalize(XMVector3Cross(vecBillboardWorldUpNormal, vecToEyeNormal));
+	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRightNormal);
+	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRightNormal));
+}
+
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime)
 {
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	RenderWaterMain(iCommandBuffer, currentTime);
+	RenderLightingMain(iCommandBuffer);
+	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 
 	if (rActiveCoordinates.empty() || !rRenderInterpolates.contains(cameraCoordinate))
 	{
@@ -241,19 +276,16 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		// Return before accessing the absent camera interpolate.
 		BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 		EndFrameInterpolateRender(iCommandBuffer);
-		RenderLightingSpreadIndirect(iCommandBuffer);
 		if constexpr (kbDebugRender)
 		{
 			DebugRender::BeginRender(iCommandBuffer);
 			DebugRender::EndRender(iCommandBuffer);
 		}
+		PopulateMainCamera(rMainLayout, 0);
 		return;
 	}
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoordinate);
-
-	RenderLightingMain(iCommandBuffer);
-	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 
 	BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
@@ -266,6 +298,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 			return;
 		}
 		const game::FrameInterpolate& rFrameInterpolate = it->second;
+		gpGraphics->mpLighting->AddFrame(rFrameInterpolate);
 		// Automatically dispatched main collections
 		ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
 		ForEachInterpolateRender(InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
@@ -286,9 +319,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	EndFrameInterpolateRender(iCommandBuffer);
 
-	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
-	RenderLightingSpreadIndirect(iCommandBuffer);
-
 	// Phase 4: Game-specific debug rendering (positions from fully-interpolated frame)
 	if constexpr (kbDebugRender)
 	{
@@ -303,36 +333,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	DebugRender::BeginRender(iCommandBuffer);
 	DebugRender::EndRender(iCommandBuffer);
 
-	const game::FrameInterpolate& rFrameInterpolate = rCameraInterpolate;
-
-	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
-	rMainLayout.iRenderNumber = static_cast<int32_t>(gpGraphics->miFrameCounter);
-
-	float fCameraShake = engine::gpCamera->mfShake;
-	static constexpr float kfMaxRoll = 0.005f;
-	static constexpr float kfMaxPitch = 0.005f;
-	static constexpr float kfMaxYaw = 0.01f;
-	// Fixed-seed permutation tables are identical every frame — construct once (each ctor reshuffles a 256-entry table).
-	static const siv::BasicPerlinNoise<float> sPerlinRoll(0);
-	static const siv::BasicPerlinNoise<float> sPerlinPitch(1);
-	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
-	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(rFrameInterpolate.iTick).time_since_epoch());
-	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
-
-	XMMATRIX matViewProjection = XMMatrixTranspose(XMMatrixMultiply(engine::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective)));
-	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), matViewProjection);
-	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ModelViewProjection[0]), matViewProjection);
-
-	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
-	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, engine::gpCamera->mVecEyePosition);
-	XMVECTOR vecToEyeNormal = engine::gpCamera->mVecToEyeNormal;
-	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, vecToEyeNormal);
-	// DebugRenderBillboard.vert consumes this basis for every vertex; forward remains f4ToEyeNormal.
-	// The reference axis switches from +Z to +X at |forward.z| = 0.999; right is normalized and up = cross(forward, right) is not.
-	XMVECTOR vecBillboardWorldUpNormal = std::abs(XMVectorGetZ(vecToEyeNormal)) < 0.999f ? XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR vecBillboardRightNormal = XMVector3Normalize(XMVector3Cross(vecBillboardWorldUpNormal, vecToEyeNormal));
-	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRightNormal);
-	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRightNormal));
+	PopulateMainCamera(rMainLayout, rCameraInterpolate.iTick);
 
 	PopulateHexShield(rMainLayout);
 }

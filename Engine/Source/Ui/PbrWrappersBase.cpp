@@ -15,10 +15,6 @@ Wrapper gPhysicallyBasedRenderingGamma(0.558f, shaders::kfEpsilon, 2.0f); // Non
 Wrapper gColorGradingSaturation(1.207f, 0.0f, 2.0f);
 Wrapper gColorGradingContrast(1.205f, 0.5f, 2.0f);
 Wrapper gColorGradingTemperature(-0.205f, -1.0f, 1.0f);
-Wrapper gPhysicallyBasedRenderingLightingSpecular(0.5f, 0.0f, 1.0f);
-Wrapper gPhysicallyBasedRenderingLightingSpecularPower(0.5f, 0.1f, 1.0f);
-Wrapper gPhysicallyBasedRenderingLighting(0.2f, 0.0f, 0.3f);
-Wrapper gPhysicallyBasedRenderingLightingPower(1.5f, 0.5f, 2.0f);
 Wrapper gPhysicallyBasedRenderingImageBasedLightingAmbient(0.809f, 0.0f, 1.0f);
 Wrapper gPhysicallyBasedRenderingImageBasedLightingDiffuse(1.254f, 0.0f, 3.0f);
 Wrapper gPhysicallyBasedRenderingImageBasedLightingDiffusePower(0.759f, 0.5f, 2.0f);

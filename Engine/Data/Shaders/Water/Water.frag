@@ -2,6 +2,7 @@
 
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
+#include "Lighting/LightingCompose.h"
 
 // WATER_SPEC_AA_MODE selects compile-time filtering of sub-pixel high-power skybox lobes; re-run DataPacker after
 // define edits, as for DT_LIGHTING_ONLY. 0: pointwise reference; 1: closed-form box integral of s^p over the pixel
@@ -32,16 +33,14 @@ layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
 	MainLayout mainLayout;
 };
 
-layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[3];
-layout (set = 1, binding = 3) uniform sampler2D shadowTextureSampler;
-layout (set = 1, binding = 4) uniform sampler2D objectShadowsTextureSampler;
-layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
-layout (set = 1, binding = 6) uniform samplerCube skyboxSampler;
-layout (set = 1, binding = 7) uniform sampler2D noiseTextureSampler;
-layout (set = 1, binding = 8) uniform sampler2D pWaterNormalSamplers[kiWaterNormalCount];
-layout (set = 1, binding = 9) uniform sampler2D depthLutSampler;
-layout (set = 1, binding = 10) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
-layout (set = 1, binding = 11) uniform sampler2D ambientLightingSampler;
+layout (set = 1, binding = 2) uniform sampler2D shadowTextureSampler;
+layout (set = 1, binding = 3) uniform sampler2D objectShadowsTextureSampler;
+layout (set = 1, binding = 4) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = 5) uniform samplerCube skyboxSampler;
+layout (set = 1, binding = 6) uniform sampler2D noiseTextureSampler;
+layout (set = 1, binding = 7) uniform sampler2D pWaterNormalSamplers[kiWaterNormalCount];
+layout (set = 1, binding = 8) uniform sampler2D depthLutSampler;
+layout (set = 1, binding = 9) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 layout (set = 1, binding = kiWaterBindingFoam) uniform sampler2D foamTextureSampler;
 layout (set = 1, binding = kiWaterBindingFoamColor) uniform sampler2D pFoamColorTextureSamplers[kiWaterFoamTextureCount];
 layout (set = 1, binding = kiWaterBindingFoamBreakup) uniform sampler2D pFoamBreakupTextureSamplers[kiWaterFoamBreakupTextureCount];
@@ -57,7 +56,7 @@ layout (location = 0) out vec4 f4OutColor;
 
 #include "WaterNormalSampling.h"
 #include "WaterSpecular.h"
-#include "WaterReflectionProjection.h"
+#include "Water/WaterMaterial.h"
 
 void main()
 {
@@ -86,46 +85,11 @@ void main()
 
 	WaterNormalSamplingResult normalResult = SampleWaterNormals();
 
-	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).
-	// CPU stores fmod(freq*camera, 10.0) so mult * 10 must be integer for fract() to absorb the wrap.
-	// gWaterColorNoiseMultiplierOne/Two sliders (WaterWrappersBase.cpp) snap to a 0.1 grid so the
-	// product stays integer for any tuning (0.0, 0.1, 0.2, ...). Derivatives taken from the un-scaled
-	// local position and scaled the same way as the UV keep mip selection stable across the wrap
-	// (plain texture() pops at the seam).
-	vec2 f2LocalDisplacedPos = f3InPosition.xy - f2WaterOrigin;
-	vec2 f2ReducedNoiseOrigin = vec2(globalLayout.fWaterReducedNoiseOriginX, globalLayout.fWaterReducedNoiseOriginY);
-	float fMultOne = globalLayout.fWaterColorNoiseMultiplierOne;
-	float fMultTwo = globalLayout.fWaterColorNoiseMultiplierTwo;
-	vec2 f2NoiseLocalDx = dFdx(f2LocalDisplacedPos);
-	vec2 f2NoiseLocalDy = dFdy(f2LocalDisplacedPos);
-	float fScaleOne = fMultOne * globalLayout.fWaterColorNoiseFrequency;
-	vec2 f2NoiseUvOne = fScaleOne * f2LocalDisplacedPos + fMultOne * f2ReducedNoiseOrigin;
-	float fNoiseColorOne = clamp(globalLayout.fWaterColorNoiseWeightOne * globalLayout.fWaterColorNoiseAmount * textureGrad(noiseTextureSampler, fract(f2NoiseUvOne), fScaleOne * f2NoiseLocalDx, fScaleOne * f2NoiseLocalDy).x, -1.0f, 1.0f);
-	float fScaleTwo = fMultTwo * globalLayout.fWaterColorNoiseFrequency;
-	vec2 f2NoiseUvTwo = fScaleTwo * f2LocalDisplacedPos + fMultTwo * f2ReducedNoiseOrigin;
-	float fNoiseColorTwo = clamp(globalLayout.fWaterColorNoiseWeightTwo * globalLayout.fWaterColorNoiseAmount * textureGrad(noiseTextureSampler, fract(f2NoiseUvTwo), fScaleTwo * f2NoiseLocalDx, fScaleTwo * f2NoiseLocalDy).x, -1.0f, 1.0f);
-	vec3 f3WaterColor = mix(1.0f * vec3(0.0f, 15.0f / 100.0f, 25.0f / 100.0f), 1.5f * vec3(15.0f / 100.0f, 30.0f / 100.0f, 50.0f / 100.0f), clamp(fNoiseColorOne + fNoiseColorTwo + (f3InPosition.z * globalLayout.fWaterColorHeightInverse + globalLayout.fWaterColorBottom), 0.0f, 1.0f));
-
-	vec3 f3DepthColor = texture(depthLutSampler, vec2(globalLayout.fWaterDepthLookupTableFeather * -fTerrainElevation, 0.0f)).xyz;
-
-	float fHeight = f3InPosition.z - fTerrainElevation;
-	vec3 f3PreLightingColor = mix(f3DepthColor, f3WaterColor, clamp(fHeight * globalLayout.fWaterDepthColorFeather + globalLayout.fWaterDepthLookupTableSunsetFade, globalLayout.fWaterDepthColorFloor, 1.0f));
-
-	bool bFoamEnabled = globalLayout.iWaterFoamEnabled != 0;
+	vec3 f3PreLightingColor;
+	bool bFoamEnabled;
 	vec3 f3FoamColor;
 	float fFoamShade;
-	if (bFoamEnabled)
-	{
-		vec2 f2FoamUv = vec2(f2WorldInitialPosition.x - globalLayout.f4WaterFoamArea.x, globalLayout.f4WaterFoamArea.y - f2WorldInitialPosition.y) * globalLayout.f2WaterFoamAreaInverseSize;
-		float fCoverage = texture(foamTextureSampler, f2FoamUv).x;
-		vec2 f2FoamTextureUv = globalLayout.fWaterFoamTextureInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamReducedTextureOrigin;
-		f3FoamColor = textureGrad(pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, globalLayout.fWaterFoamTextureInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamTextureInverseTileSize * dFdy(f2InInitialPosition)).rgb;
-		vec2 f2FoamBreakupUv = globalLayout.fWaterFoamBreakupInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamBreakupReducedTextureOrigin;
-		float fFoamBreakupOpacity = textureGrad(pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamBreakupInverseTileSize * dFdy(f2InInitialPosition)).x;
-		float fFoamMask = mix(1.0f, fFoamBreakupOpacity, globalLayout.fWaterFoamBreakupAmount);
-		fFoamShade = clamp(fCoverage * fFoamMask * globalLayout.fWaterFoamTextureStrength, 0.0f, 1.0f);
-		f3FoamColor = pow(f3FoamColor, vec3(2.2));
-	}
+	WaterMaterial(fTerrainElevation, f2WaterOrigin, f2WorldInitialPosition, f3PreLightingColor, bFoamEnabled, f3FoamColor, fFoamShade);
 
 	float fDirectionalLighting = max(1.0f - globalLayout.fWaterDirectional, dot(f3InNormal, globalLayout.f4SunMoonNormal.xyz));
 	vec3 f3DirectionalLighting = f3PreLightingColor * fDirectionalLighting;
@@ -164,7 +128,7 @@ void main()
 
 	// Wave trough darken: at z >= Top no darkening (multiplier 1.0); at z <= Bottom max darkening (multiplier 1.0 - Target).
 	// Source/Lighting weights independently mix the per-path multiplier toward 1.0 so each contribution can opt in/out.
-	// Lighting also covers the skybox specular and the EWNS lighting deposit (applied at f3WaterLightingMults below).
+	// Lighting weights the skybox specular.
 	float fHeightT = clamp((f3InPosition.z - mainLayout.fWaterHeightDarkenBottom) * mainLayout.fWaterHeightDarkenRangeInverse, 0.0f, 1.0f);
 	float fHeightDarken = mix(1.0f - mainLayout.fWaterHeightDarkenTarget, 1.0f, fHeightT);
 	float fHeightDarkenSource = mix(1.0f, fHeightDarken, mainLayout.fWaterHeightDarkenSource);
@@ -194,68 +158,15 @@ void main()
 	// Terrain elevation (for water transparency)
 	f4OutColor.w = clamp(-fTerrainElevation * globalLayout.fWaterTerrainFadeInverse, globalLayout.fWaterTerrainFadeClamp, 1.0f);
 
-	// Sample lighting texture at projected base-height x/y
-	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f));
-	vec2 f2PositionAtBaseHeightFinal = ProjectWaterReflection(normalResult, f2WorldInitialPosition, f2PositionAtBaseHeight);
+	vec3 f3LocalDiffuse = LightingReferenceDiffuse();
+	f4OutColor.xyz += f3LocalDiffuse;
 
-	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.f4LightingArea);
-	vec4 pf4LightingBaseHeight[3];
-	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, f2LightingTexcoordBaseHeight);
-
-	// Ambient sample — straight-down base-height projection, no reflection offset.
-	// Uses the precomputed direction-averaged ambient texture (single fetch replaces three EWNS samples).
-	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4LightingArea);
-	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeightAmbient);
-
-	// Scale base-height lighting (hue-preserving: pow applied to per-direction luminance/average scalar)
-	float fWaterEwnsPowMode = mainLayout.fLightingWaterEastWestNorthSouthPowerMode;
-	// Skip the pow for whichever ratio the mode discards at its extremes (mode is a uniform, so the branch is warp-coherent)
-	bool bNeedLumRatio = fWaterEwnsPowMode < 0.999f;
-	bool bNeedAvgRatio = fWaterEwnsPowMode > 0.001f;
-	for (int i = 0; i < 4; i++)
-	{
-		vec3 f3Dir = vec3(pf4LightingBaseHeight[0][i], pf4LightingBaseHeight[1][i], pf4LightingBaseHeight[2][i]);
-		float fLum = dot(f3Dir, kRec709);
-		float fAvg = (f3Dir.x + f3Dir.y + f3Dir.z) / 3.0f;
-		float fLumRatio = bNeedLumRatio ? pow(max(fLum, 0.001f), mainLayout.fLightingWaterEastWestNorthSouthPower) / max(fLum, 0.001f) : 0.0f;
-		float fAvgRatio = bNeedAvgRatio ? pow(max(fAvg, 0.001f), mainLayout.fLightingWaterEastWestNorthSouthPower) / max(fAvg, 0.001f) : 0.0f;
-		float fRatio = mix(fLumRatio, fAvgRatio, fWaterEwnsPowMode);
-		pf4LightingBaseHeight[0][i] *= fRatio;
-		pf4LightingBaseHeight[1][i] *= fRatio;
-		pf4LightingBaseHeight[2][i] *= fRatio;
-	}
-
-	// Water lighting
-	const float fWaterNormalBlendWave = mainLayout.fLightingWaterNormalBlendWave;
-	vec3 f3LightingNormal = (1.0f - fWaterNormalBlendWave) * normalResult.f3SampledNormal + fWaterNormalBlendWave * f3InNormal;
-	vec3 f3WaterLighting = WaterLighting(pf4LightingBaseHeight, f3LightingNormal, mainLayout.fLightingWaterNormalSoften, mainLayout.fLightingWaterOne, mainLayout.fLightingWaterOnePower, mainLayout.fLightingWaterTwo, mainLayout.fLightingWaterTwoPower, mainLayout.fLightingWaterThree, mainLayout.fLightingWaterThreePower, mainLayout.fLightingWaterPowerMode);
-	float fDepthAttenuation = clamp(-fTerrainElevation * globalLayout.fWaterDepthReflectionFeatherInverse, 0.0f, 1.0f);
-	vec3 f3WaterLightingScaled = fDepthAttenuation * globalLayout.fLightingTimeOfDayMultiplier * mainLayout.fLightingWaterIntensity * f3WaterLighting;
-	// Mix between water-tinted lighting (Add=0) and pure lighting color (Add=1).
-	// Total contribution magnitude is conserved across the mix.
-	float fWaterLightingAdd = mainLayout.fLightingWaterAdd;
-	vec3 f3WaterLightingMults = fHeightDarkenLighting * fReflectionTerrainMultiplier * f3WaterLightingScaled;
-	f4OutColor.xyz += (1.0f - fWaterLightingAdd) * f3PreLightingColor * f3WaterLightingMults + fWaterLightingAdd * f3WaterLightingMults;
-
-	// Water ambient (terrain-style, sampled without reflection offset)
-	vec3 f3WaterAmbient = globalLayout.fLightingTimeOfDayMultiplier * AmbientLightingPrecomputed(f3AmbientSum, mainLayout.fLightingWaterAmbientIntensity, mainLayout.fLightingWaterAmbientPower, mainLayout.fLightingWaterAmbientPowerMode);
-	f4OutColor.xyz += f3WaterAmbient;
-
-	// DT: TEMP — show only lighting texture contributions (with normals and base color)
-#ifdef DT_LIGHTING_ONLY
-	f4OutColor.xyz = (1.0f - fWaterLightingAdd) * f3PreLightingColor * f3WaterLightingMults + fWaterLightingAdd * f3WaterLightingMults + f3WaterAmbient;
-	return;
-#endif
-
-	// Additive smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
-	// decouples smoke from wave normals)
+	// Additive smoke per flight plane, lowest first.
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane));
 		float fSmokeRaw = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
-		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
-		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout);
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, globalLayout);
 	}
 }

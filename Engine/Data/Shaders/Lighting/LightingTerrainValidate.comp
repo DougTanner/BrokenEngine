@@ -1,0 +1,366 @@
+#version 460
+
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "Lighting/LightingTerrainCommon.h"
+#include "Lighting/LightingTerrainValidation.h"
+
+layout(local_size_x = kiLightingTerrainGroup) in;
+layout(push_constant) uniform validatePush { LightingTerrainValidatePush push; };
+layout(set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform { GlobalLayout globalLayout; };
+layout(scalar, set = 1, binding = 1) readonly buffer quadsBuffer { AxisAlignedQuadLayout pQuads[]; };
+layout(set = 1, binding = 2) uniform sampler2D ownHeightmaps[kiMaxIslands];
+layout(set = 1, binding = 3) uniform sampler2D visibleElevation;
+layout(set = 1, binding = 4) uniform sampler2D scratchElevation;
+layout(scalar, set = 1, binding = 5) readonly buffer workBuffer { LightingTerrainWork pWork[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer ValidationXY { vec2 pXY[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer ValidationXYZ { vec3 pXYZ[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer ValidationIndices { uint pIndices[]; };
+// TEMP START bounded terrain evidence
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ValidationBaseZ { LightingTerrainBaseSample pSamples[]; };
+// TEMP END bounded terrain evidence
+layout(buffer_reference, scalar, buffer_reference_align = 8) readonly buffer ValidationGeometry { LightingGeometry geometry; };
+
+// TEMP START bounded terrain evidence
+LightingTerrainEvidenceRecord EvidenceRecord(LightingTerrainWork work, uint vertex, uint flags, vec2 local, vec3 xyz, vec2 world, vec2 uv, vec2 pixel, ivec2 lower, ivec2 origin, ivec2 shift, float own, vec2 sampleUV, float before, float after, bool globalOther)
+{
+	LightingTerrainEvidenceRecord r;
+	for (uint i = 0u; i < 128u; ++i) r.puiWords[i] = 0u;
+	ivec2 size = textureSize(visibleElevation, 0);
+	vec4 rect = pQuads[push.uiPlacement].f4VertexRect;
+	LightingTerrainOriginal o = LightingTerrainOriginals(work.uiOriginalAddress).pOriginals[vertex];
+	r.puiWords[0] = flags;
+	r.puiWords[1] = push.uiPlacement;
+	r.puiWords[2] = vertex;
+	r.puiWords[3] = work.uiVertexCount;
+	r.puiWords[4] = work.uiVertexCount % 3u;
+	r.puiWords[5] = uint(work.uiTemplate);
+	r.puiWords[6] = uint(work.uiTemplate >> 32);
+	r.puiWords[7] = all(greaterThanEqual(lower, ivec2(0))) && all(lessThan(lower + 1, size)) ? 1u : 0u;
+	r.puiWords[8] = o.uiWritten;
+	r.puiWords[9] = o.uiInvocations;
+	r.puiWords[10] = own < globalLayout.fUnderwaterMaskThreshold ? 1u : 0u;
+	r.puiWords[11] = pQuads[push.uiPlacement].uiTextureSlot;
+	r.puiWords[12] = floatBitsToUint(local.x); r.puiWords[13] = floatBitsToUint(local.y);
+	r.puiWords[14] = floatBitsToUint(xyz.x); r.puiWords[15] = floatBitsToUint(xyz.y); r.puiWords[16] = floatBitsToUint(xyz.z);
+	r.puiWords[17] = floatBitsToUint(own);
+	r.puiWords[18] = floatBitsToUint(globalLayout.fUnderwaterMaskThreshold);
+	r.puiWords[19] = floatBitsToUint(globalLayout.fSeaFloorElevation);
+	r.puiWords[20] = floatBitsToUint(world.x); r.puiWords[21] = floatBitsToUint(world.y);
+	r.puiWords[22] = floatBitsToUint(uv.x); r.puiWords[23] = floatBitsToUint(uv.y);
+	r.puiWords[24] = floatBitsToUint(pixel.x); r.puiWords[25] = floatBitsToUint(pixel.y);
+	r.puiWords[26] = uint(lower.x); r.puiWords[27] = uint(lower.y);
+	ivec2 owner = ivec2(floor(vec2(lower) / float(kiLightingTerrainTile))) * kiLightingTerrainTile;
+	r.puiWords[28] = uint(owner.x); r.puiWords[29] = uint(owner.y);
+	r.puiWords[30] = uint(origin.x); r.puiWords[31] = uint(origin.y);
+	r.puiWords[32] = uint(shift.x); r.puiWords[33] = uint(shift.y);
+	r.puiWords[34] = uint(size.x); r.puiWords[35] = uint(size.y);
+	r.puiWords[36] = uint(kiLightingTerrainScratch);
+	ivec2 ownSize = textureSize(ownHeightmaps[nonuniformEXT(r.puiWords[11])], 0);
+	r.puiWords[37] = uint(ownSize.x); r.puiWords[38] = uint(ownSize.y);
+	r.puiWords[39] = floatBitsToUint(pQuads[push.uiPlacement].fRotation);
+	for (uint i = 0u; i < 4u; ++i) { r.puiWords[40u+i] = floatBitsToUint(rect[i]); r.puiWords[44u+i] = floatBitsToUint(globalLayout.f4VisibleArea[i]); }
+	vec2 ownUV = vec2(0.5f) + local / rect.zw;
+	r.puiWords[48] = floatBitsToUint(ownUV.x); r.puiWords[49] = floatBitsToUint(ownUV.y);
+	if (push.uiMode != 0u)
+	{
+		LightingTerrainBaseSample b = ValidationBaseZ(work.uiBaseZAddress).pSamples[vertex];
+		r.puiWords[50] = floatBitsToUint(b.f2UV.x); r.puiWords[51] = floatBitsToUint(b.f2UV.y);
+		r.puiWords[52] = floatBitsToUint(b.fBefore); r.puiWords[53] = floatBitsToUint(b.fAfter);
+	}
+	r.puiWords[54] = floatBitsToUint(sampleUV.x); r.puiWords[55] = floatBitsToUint(sampleUV.y);
+	r.puiWords[56] = floatBitsToUint(before); r.puiWords[57] = floatBitsToUint(after);
+	r.puiWords[58] = floatBitsToUint(o.f3Position.x); r.puiWords[59] = floatBitsToUint(o.f3Position.y); r.puiWords[60] = floatBitsToUint(o.f3Position.z);
+	r.puiWords[61] = floatBitsToUint(o.fOwn); r.puiWords[62] = o.uiCutoff; r.puiWords[63] = o.uiWritten;
+	r.puiWords[64] = floatBitsToUint(o.f2UV.x); r.puiWords[65] = floatBitsToUint(o.f2UV.y);
+	r.puiWords[66] = floatBitsToUint(o.f2OwnUV.x); r.puiWords[67] = floatBitsToUint(o.f2OwnUV.y); r.puiWords[68] = floatBitsToUint(o.fSampledZ);
+	for (int i = 0; i < 4; ++i)
+	{
+		ivec2 g = lower + ivec2(i % 2, i / 2);
+		ivec2 b = g - origin + kiLightingTerrainHalo;
+		ivec2 s = b - shift;
+		if (push.uiMode != 0u && all(greaterThanEqual(b, ivec2(0))) && all(lessThan(b, ivec2(kiLightingTerrainScratch))))
+		{
+			r.puiWords[69+i] = LightingTerrainSavedHalf(work, b); r.puiWords[77] |= 1u << uint(i);
+		}
+		if (globalOther && all(greaterThanEqual(g, ivec2(0))) && all(lessThan(g, size)))
+		{
+			r.puiWords[73+i] = LightingTerrainHalf(texelFetch(visibleElevation, g, 0).r); r.puiWords[77] |= 16u << uint(i);
+		}
+		else if (!globalOther && all(greaterThanEqual(s, ivec2(0))) && all(lessThan(s, ivec2(kiLightingTerrainScratch))))
+		{
+			r.puiWords[73+i] = LightingTerrainHalf(texelFetch(scratchElevation, s, 0).r); r.puiWords[77] |= 16u << uint(i);
+		}
+	}
+	r.puiWords[82] = push.uiMode; r.puiWords[83] = push.uiShift; r.puiWords[84] = globalOther ? 1u : 0u;
+	r.puiWords[85] = floatBitsToUint(o.f2ProductionUV.x); r.puiWords[86] = floatBitsToUint(o.f2ProductionUV.y);
+	r.puiWords[87] = floatBitsToUint(o.f2ProductionOwnUV.x); r.puiWords[88] = floatBitsToUint(o.f2ProductionOwnUV.y);
+	r.puiWords[89] = floatBitsToUint(o.f2ProductionPixel.x); r.puiWords[90] = floatBitsToUint(o.f2ProductionPixel.y);
+	r.puiWords[91] = floatBitsToUint(o.fProductionBefore); r.puiWords[92] = floatBitsToUint(o.fProductionOwn);
+	ivec2 originalLower = ivec2(floor(o.f2UV * vec2(size) - 0.5f));
+	r.puiWords[114] = uint(originalLower.x); r.puiWords[115] = uint(originalLower.y);
+	for (int i = 0; i < 4; ++i)
+	{
+		ivec2 tap = originalLower + ivec2(i % 2, i / 2);
+		if (o.uiWritten == 1u && all(greaterThanEqual(tap, ivec2(0))) && all(lessThan(tap, size)))
+		{
+			r.puiWords[109+i] = LightingTerrainHalf(texelFetch(visibleElevation, tap, 0).r); r.puiWords[113] |= 1u << uint(i);
+		}
+	}
+	return r;
+}
+void EvidenceClass(LightingTerrainWork work, uint id, LightingTerrainEvidenceRecord r)
+{
+	TerrainEvidence e = TerrainEvidence(work.uiEvidenceAddress);
+	atomicAdd(e.data.puiCounts[id], 1u);
+	if (atomicCompSwap(e.data.puiClaims[id], 0u, 1u) != 0u) return;
+	e.data.pClasses[id] = r;
+	memoryBarrierBuffer();
+	atomicExchange(e.data.puiClaims[id], 2u);
+}
+// TEMP END bounded terrain evidence
+
+void main()
+{
+	LightingTerrainWork work = pWork[push.uiPlacement];
+	LightingTerrainSummary summary = LightingTerrainSummary(work.uiSummaryAddress);
+	uint vertex = push.uiBase + gl_GlobalInvocationID.x;
+	// TEMP START bounded terrain evidence
+	if (push.uiMode == 6u)
+	{
+		if (vertex >= 3u * work.uiPrimitiveCount) return;
+		uint index = ValidationIndices(work.uiIndexAddress).pIndices[vertex];
+		TerrainEvidence e = TerrainEvidence(work.uiEvidenceAddress);
+		uint count = min(e.data.uiListCount, uint(kiTerrainEvidenceCapacity));
+		for (uint i = 0u; i < count; ++i)
+		{
+			if (e.data.pVertices[i].puiWords[1] == push.uiPlacement && e.data.pVertices[i].puiWords[2] == index)
+			{
+				atomicAdd(e.data.pVertices[i].puiWords[80], 1u);
+				atomicMin(e.data.pVertices[i].puiWords[81], vertex);
+			}
+		}
+		return;
+	}
+	// TEMP END bounded terrain evidence
+	if (push.uiMode == 3u)
+	{
+		if (vertex == 0u) summary.result.uiCompletedSerial = work.uiSerial;
+		if (vertex < push.uiTile && LightingTerrainTileResults(work.uiTileResultsAddress).pTiles[vertex].uiVertices == 0u) atomicAdd(summary.result.uiEmptyTiles, 1u);
+		return;
+	}
+	if (push.uiMode == 0u && vertex < 3u * work.uiPrimitiveCount)
+	{
+		uint index = ValidationIndices(work.uiIndexAddress).pIndices[vertex];
+		atomicAdd(summary.result.uiIndices, 1u);
+		if (vertex % 3u == 0u) atomicAdd(summary.result.uiTriangles, 1u);
+		if (index >= work.uiVertexCount)
+		{
+			atomicAdd(summary.result.uiInvalidIndices, 1u);
+			LightingTerrainFailure(work, push.uiPlacement, vertex, index, vec2(0.0f), vec3(0.0f), vec2(0.0f), ivec2(0), -1, ivec2(0), 0u, 0u, 0.0f, 0.0f, 0.0f, globalLayout.fUnderwaterMaskThreshold);
+		}
+	}
+	if (vertex >= work.uiVertexCount) return;
+	vec2 local = ValidationXY(work.uiXYAddress).pXY[vertex];
+	vec3 xyz = ValidationXYZ(work.uiXYZAddress).pXYZ[vertex];
+	vec4 rect = pQuads[push.uiPlacement].f4VertexRect;
+	float rotation = pQuads[push.uiPlacement].fRotation;
+	float cosine = cos(rotation);
+	float sine = sin(rotation);
+	vec2 world = vec2(rect.x + 0.5f * rect.z + local.x * cosine - local.y * sine, rect.y + 0.5f * rect.w + local.x * sine + local.y * cosine);
+	vec2 uv = (world - globalLayout.f4VisibleArea.xy) / (globalLayout.f4VisibleArea.zw - globalLayout.f4VisibleArea.xy);
+	ivec2 size = textureSize(visibleElevation, 0);
+	vec2 pixel = uv * vec2(size);
+	ivec2 lower = ivec2(floor(pixel - 0.5f));
+	ivec2 owner = ivec2(floor(vec2(lower) / float(kiLightingTerrainTile)));
+	bool covered = all(greaterThanEqual(lower, ivec2(0))) && all(lessThan(lower + 1, size));
+	float own = textureLod(ownHeightmaps[nonuniformEXT(pQuads[push.uiPlacement].uiTextureSlot)], vec2(0.5f) + local / rect.zw, 0.0f).r;
+	bool cutoff = own < globalLayout.fUnderwaterMaskThreshold;
+	ivec2 origin = ivec2(push.iOriginX, push.iOriginY);
+	bool bad = any(isnan(xyz)) || any(isinf(xyz));
+	if (push.uiMode == 0u)
+	{
+		// TEMP START bounded terrain evidence
+		LightingTerrainOriginal evidenceOriginal = LightingTerrainOriginals(work.uiOriginalAddress).pOriginals[vertex];
+		bool evidenceTail = vertex >= work.uiVertexCount - work.uiVertexCount % 3u;
+		bool evidenceMissing = covered && evidenceOriginal.uiWritten != 1u;
+		if (evidenceTail || evidenceMissing)
+		{
+			TerrainEvidence e = TerrainEvidence(work.uiEvidenceAddress);
+			uint slot = atomicAdd(e.data.uiListCount, 1u);
+			if (slot < uint(kiTerrainEvidenceCapacity))
+			{
+				LightingTerrainEvidenceRecord r = EvidenceRecord(work, vertex, (evidenceMissing ? 1u : 0u) | (evidenceTail ? 2u : 0u), local, xyz, world, uv, pixel, lower, owner * kiLightingTerrainTile, ivec2(0), own, uv, 0.0f, xyz.z, true);
+				r.puiWords[81] = 0xffffffffu;
+				e.data.pVertices[slot] = r;
+			}
+			else atomicAdd(e.data.uiOverflow, 1u);
+		}
+		// TEMP END bounded terrain evidence
+		uint writes = LightingTerrainWrites(work.uiWritesAddress).pCounts[vertex];
+		if (writes == 1u) atomicAdd(summary.result.uiOnce, 1u);
+		else if (writes == 0u) atomicAdd(summary.result.uiUntouched, 1u);
+		else atomicAdd(summary.result.uiDuplicate, 1u);
+		if (bad) atomicAdd(summary.result.uiNonfinite, 1u);
+		if (cutoff) atomicAdd(summary.result.uiCutoffBelow, 1u);
+		if (own == globalLayout.fUnderwaterMaskThreshold) atomicAdd(summary.result.uiCutoffEqual, 1u);
+		if (any(greaterThan(abs(local), 0.5f * abs(rect.zw))))
+		{
+			atomicAdd(summary.result.uiOverhang, 1u);
+			if (owner.x < work.iFootprintMinTileX || owner.y < work.iFootprintMinTileY || owner.x > work.iFootprintMaxTileX || owner.y > work.iFootprintMaxTileY) atomicAdd(summary.result.uiOverhangBeyondFootprint, 1u);
+		}
+		ivec2 within = lower - owner * kiLightingTerrainTile;
+		if (any(lessThanEqual(within, ivec2(1))) || any(greaterThanEqual(within, ivec2(254)))) atomicAdd(summary.result.uiSeam, 1u);
+		if (covered)
+		{
+			LightingTerrainOriginal original = LightingTerrainOriginals(work.uiOriginalAddress).pOriginals[vertex];
+			if (original.uiWritten != 1u)
+			{
+				atomicAdd(summary.result.uiOriginalMissing, 1u);
+				LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, owner * kiLightingTerrainTile, -1, lower, original.uiWritten, 0u, xyz.z, original.f3Position.z, own, globalLayout.fUnderwaterMaskThreshold);
+			}
+			else
+			{
+				atomicAdd(summary.result.uiOriginalComparisons, 1u);
+				float error = max(max(abs(xyz.x - original.f3Position.x), abs(xyz.y - original.f3Position.y)), abs(xyz.z - original.f3Position.z));
+				atomicMax(summary.result.uiOriginalMaxBits, floatBitsToUint(error));
+				bool invalidOriginal = any(isnan(original.f3Position)) || any(isinf(original.f3Position)) || isnan(original.fOwn) || isinf(original.fOwn);
+				// TEMP START bounded terrain evidence
+				if (invalidOriginal || error > 0.001f || original.uiCutoff != (cutoff ? 1u : 0u) || original.fOwn != own)
+				{
+					LightingTerrainEvidenceRecord r = EvidenceRecord(work, vertex, 0u, local, xyz, world, uv, pixel, lower, owner * kiLightingTerrainTile, ivec2(0), own, uv, 0.0f, xyz.z, true);
+					if (error > 0.001f) EvidenceClass(work, 12u, r);
+					if (original.fOwn != own) EvidenceClass(work, 13u, r);
+					if (original.uiCutoff != (cutoff ? 1u : 0u)) EvidenceClass(work, 14u, r);
+					if (invalidOriginal) EvidenceClass(work, 15u, r);
+				}
+				// TEMP END bounded terrain evidence
+				if (invalidOriginal || error > 0.001f || original.uiCutoff != (cutoff ? 1u : 0u) || original.fOwn != own)
+				{
+					atomicAdd(summary.result.uiOriginalMismatches, 1u);
+					LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, owner * kiLightingTerrainTile, -1, lower, 0u, 0u, xyz.z, original.f3Position.z, own, globalLayout.fUnderwaterMaskThreshold);
+				}
+			}
+		}
+		if (vertex == 0u)
+		{
+			LightingGeometry geometry = ValidationGeometry(work.uiHitGeometryAddress).geometry;
+			if (geometry.uiIndexAddress != work.uiIndexAddress || geometry.uiPositionAddress != work.uiXYZAddress || geometry.uiPrimitiveCount != work.uiPrimitiveCount || work.uiBuildPrimitiveCount != work.uiPrimitiveCount || work.uiBuildVertexCount != work.uiVertexCount)
+			{
+				atomicAdd(summary.result.uiMappingMismatches, 1u);
+				bad = true;
+			}
+		}
+		if (writes != 1u || bad) LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, owner * kiLightingTerrainTile, -1, lower, writes, 0u, xyz.z, xyz.z, own, globalLayout.fUnderwaterMaskThreshold);
+		return;
+	}
+	LightingTerrainTileResults tiles = LightingTerrainTileResults(work.uiTileResultsAddress);
+	if (vertex == 0u)
+	{
+		if (push.uiMode == 1u)
+		{
+			tiles.pTiles[push.uiTile].iOriginX = origin.x;
+			tiles.pTiles[push.uiTile].iOriginY = origin.y;
+			tiles.pTiles[push.uiTile].uiPlacement = push.uiPlacement;
+			atomicAdd(summary.result.uiTiles, 1u);
+		}
+		else if (push.uiMode == 2u) atomicAdd(summary.result.uiShifts, 1u);
+		else atomicAdd(summary.result.uiAdjacentRenders, 1u);
+	}
+	if (any(notEqual(owner * kiLightingTerrainTile, origin))) return;
+	ivec2 shifts[4] = ivec2[4](ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2));
+	ivec2 shift = push.uiMode == 1u ? ivec2(0) : shifts[push.uiShift];
+	if (push.uiMode == 4u)
+	{
+		shift *= kiLightingTerrainTile / 2;
+		ivec2 shiftedLower = lower - origin - shift + kiLightingTerrainHalo;
+		if (any(lessThan(shiftedLower, ivec2(2))) || any(greaterThanEqual(shiftedLower + 1, ivec2(kiLightingTerrainScratch - 2)))) return;
+	}
+	if (push.uiMode == 1u) atomicAdd(tiles.pTiles[push.uiTile].uiVertices, 1u);
+	// TEMP START bounded terrain evidence
+	vec2 evidenceUV = (pixel - vec2(origin + shift) + float(kiLightingTerrainHalo)) / float(kiLightingTerrainScratch);
+	float filtered = textureLod(scratchElevation, evidenceUV, 0.0f).r;
+	float evidenceBefore = filtered;
+	// TEMP END bounded terrain evidence
+	if (cutoff) filtered = globalLayout.fSeaFloorElevation;
+	// TEMP START bounded terrain evidence
+	if (push.uiMode == 1u)
+	{
+		ValidationBaseZ(work.uiBaseZAddress).pSamples[vertex].f2UV = evidenceUV;
+		ValidationBaseZ(work.uiBaseZAddress).pSamples[vertex].fBefore = evidenceBefore;
+		ValidationBaseZ(work.uiBaseZAddress).pSamples[vertex].fAfter = filtered;
+	}
+	float baseZ = push.uiMode == 1u ? xyz.z : ValidationBaseZ(work.uiBaseZAddress).pSamples[vertex].fAfter;
+	// TEMP END bounded terrain evidence
+	float error = abs(baseZ - filtered);
+	// TEMP START bounded terrain evidence
+	if (error > 0.001f || isnan(error) || isinf(error))
+		EvidenceClass(work, push.uiMode == 1u ? 0u : (push.uiMode == 2u ? 1u + push.uiShift : 10u), EvidenceRecord(work, vertex, 0u, local, xyz, world, uv, pixel, lower, origin, shift, own, evidenceUV, evidenceBefore, filtered, false));
+	// TEMP END bounded terrain evidence
+	if (push.uiMode == 2u)
+	{
+		atomicMax(tiles.pTiles[push.uiTile].puiXYZMaxBits[push.uiShift], floatBitsToUint(error));
+		if (error > 0.001f) atomicAdd(tiles.pTiles[push.uiTile].puiXYZMismatches[push.uiShift], 1u);
+	}
+	else if (push.uiMode == 4u && error > 0.001f) atomicAdd(summary.result.uiAdjacentMismatches, 1u);
+	else if (push.uiMode == 1u && error > 0.001f) atomicAdd(summary.result.uiBaseXYZMismatches, 1u);
+	if (error > 0.001f || isnan(error) || isinf(error)) LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, origin, push.uiMode == 1u ? -1 : int(push.uiShift), lower, 0u, 0u, baseZ, filtered, own, globalLayout.fUnderwaterMaskThreshold);
+	for (int y = 0; y < 2; ++y)
+	{
+		for (int x = 0; x < 2; ++x)
+		{
+			ivec2 globalTap = lower + ivec2(x, y);
+			ivec2 baseTap = globalTap - origin + kiLightingTerrainHalo;
+			ivec2 shiftedTap = baseTap - shift;
+			uint baseBits = LightingTerrainSavedHalf(work, baseTap);
+			if (push.uiMode != 1u && (any(lessThan(shiftedTap, ivec2(2))) || any(greaterThanEqual(shiftedTap, ivec2(kiLightingTerrainScratch - 2)))))
+			{
+				atomicAdd(summary.result.uiExcludedTaps, 1u);
+				continue;
+			}
+			uint actualBits = LightingTerrainHalf(texelFetch(scratchElevation, shiftedTap, 0).r);
+			if (push.uiMode == 1u)
+			{
+				atomicAdd(summary.result.uiBaseComparisons, 1u);
+				if (baseBits != actualBits) atomicAdd(summary.result.uiBaseMismatches, 1u);
+				if (all(greaterThanEqual(globalTap, ivec2(0))) && all(lessThan(globalTap, size)))
+				{
+					uint globalBits = LightingTerrainHalf(texelFetch(visibleElevation, globalTap, 0).r);
+					atomicAdd(summary.result.uiGlobalComparisons, 1u);
+					if (baseBits != globalBits)
+					{
+						atomicAdd(summary.result.uiGlobalMismatches, 1u);
+						// TEMP START bounded terrain evidence
+						LightingTerrainEvidenceRecord r = EvidenceRecord(work, vertex, 0u, local, xyz, world, uv, pixel, lower, origin, shift, own, evidenceUV, evidenceBefore, filtered, true);
+						r.puiWords[78] = uint(globalTap.x); r.puiWords[79] = uint(globalTap.y);
+						EvidenceClass(work, 11u, r);
+						// TEMP END bounded terrain evidence
+						LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, origin, -1, globalTap, baseBits, globalBits, baseZ, filtered, own, globalLayout.fUnderwaterMaskThreshold);
+					}
+				}
+			}
+			else if (push.uiMode == 2u)
+			{
+				atomicAdd(tiles.pTiles[push.uiTile].puiComparisons[push.uiShift], 1u);
+				if (baseBits != actualBits) atomicAdd(tiles.pTiles[push.uiTile].puiRawMismatches[push.uiShift], 1u);
+			}
+			else
+			{
+				atomicAdd(summary.result.uiAdjacentComparisons, 1u);
+				if (baseBits != actualBits) atomicAdd(summary.result.uiAdjacentMismatches, 1u);
+			}
+			if (baseBits != actualBits) LightingTerrainFailure(work, push.uiPlacement, vertex, 0u, local, xyz, pixel, origin, push.uiMode == 1u ? -1 : int(push.uiShift), globalTap, baseBits, actualBits, baseZ, filtered, own, globalLayout.fUnderwaterMaskThreshold);
+			// TEMP START bounded terrain evidence
+			if (baseBits != actualBits && push.uiMode != 1u)
+			{
+				LightingTerrainEvidenceRecord r = EvidenceRecord(work, vertex, 0u, local, xyz, world, uv, pixel, lower, origin, shift, own, evidenceUV, evidenceBefore, filtered, false);
+				r.puiWords[78] = uint(globalTap.x); r.puiWords[79] = uint(globalTap.y);
+				EvidenceClass(work, push.uiMode == 2u ? 5u + push.uiShift : 9u, r);
+			}
+			// TEMP END bounded terrain evidence
+		}
+	}
+}

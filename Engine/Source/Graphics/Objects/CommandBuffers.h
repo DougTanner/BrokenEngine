@@ -34,9 +34,11 @@ public:
 	VkCommandPool mVkCommandPool = VK_NULL_HANDLE;
 	VkCommandBuffer mGlobalVkCommandBuffer = VK_NULL_HANDLE;
 	VkCommandBuffer mMainVkCommandBuffer = VK_NULL_HANDLE;
+	VkCommandBuffer mPreparationVkCommandBuffer = VK_NULL_HANDLE;
 
 	VkSemaphore mGlobalFinishedVkSemaphore = VK_NULL_HANDLE;
 	VkSemaphore mMainFinishedVkSemaphore = VK_NULL_HANDLE;
+	VkSemaphore mPreparationFinishedVkSemaphore = VK_NULL_HANDLE;
 
 	VkCommandBuffer mImGuiVkCommandBuffer = VK_NULL_HANDLE;
 	VkSemaphore mImGuiFinishedVkSemaphore = VK_NULL_HANDLE;

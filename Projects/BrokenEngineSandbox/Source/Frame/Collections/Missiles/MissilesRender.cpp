@@ -15,6 +15,7 @@ constexpr common::crc_t kMissileModelCrc = data::kModelsaim9_missilescenegltfCrc
 constexpr int64_t kiDynamicBufferInitialCapacity = 512;
 
 static int64_t siRendered = 0;
+static int64_t siTraceOnly = 0;
 // Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
@@ -45,6 +46,7 @@ void MissilesInterpolate::GraphicsResources()
 void MissilesInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
+	siTraceOnly = 0;
 
 	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const MissilesInterpolate&
 	{
@@ -87,7 +89,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 	matPreRotate *= XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
-	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
+	ASSERT(siRendered + siTraceOnly + rCurrent.iCount <= iBufferCapacity);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -96,11 +98,8 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
-		    && !engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position)))
-		{
-			continue;
-		}
+		bool bVisible = engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
+		                || engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position));
 
 		// Sentinel value: 0.0f means explosion finished, skip rendering
 		if (rCurrent.pDestroyedTimes[i] == std::chrono::duration<float>::zero())
@@ -122,7 +121,8 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matYaw * matTranslation;
 
-		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
+		int64_t iOutput = bVisible ? siRendered++ : iBufferCapacity - 1 - siTraceOnly++;
+		shaders::ModelLayout& rModelLayout = pLayouts[iOutput];
 		rModelLayout.f4Position = f4Position;
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
@@ -138,6 +138,9 @@ void MissilesInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 		gpProfileManager->GetCpuCounter(game::kCpuCounterMissilesRendered).iCount = siRendered;
 	}
 	engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiCrc, iCommandBuffer, siRendered);
+	int64_t iCapacity = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer).iCapacity;
+	engine::gpGraphics->mpLighting->AddModels(kMissileModelCrc, kuiCrc, 0, siRendered);
+	engine::gpGraphics->mpLighting->AddModels(kMissileModelCrc, kuiCrc, iCapacity - siTraceOnly, siTraceOnly);
 }
 
 } // namespace game

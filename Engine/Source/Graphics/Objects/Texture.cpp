@@ -222,7 +222,22 @@ void Texture::CreateImage(const TextureInfo& rInfo)
 		}
 	}
 
-	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &mVkImage, &mVmaAllocation, nullptr));
+	// TEMP START memory allocation observation
+	int64_t iMemoryThread = GetCurrentThreadId();
+	LOG(kTemp, kInfo, "MEMORY CREATE_BEGIN thread={} site=Texture.cpp owner={} destination={}", iMemoryThread, mInfo.name, static_cast<const void*>(&mVkImage));
+	LOG(kTemp, kInfo, "MEMORY IMAGE_REQUEST thread={} flags={} type={} format={} width={} height={} depth={} mips={} layers={}", iMemoryThread, vkImageCreateInfo.flags, static_cast<int32_t>(vkImageCreateInfo.imageType), static_cast<int32_t>(vkImageCreateInfo.format), vkImageCreateInfo.extent.width, vkImageCreateInfo.extent.height, vkImageCreateInfo.extent.depth, vkImageCreateInfo.mipLevels, vkImageCreateInfo.arrayLayers);
+	LOG(kTemp, kInfo, "MEMORY IMAGE_PROPERTIES thread={} samples={} tiling={} usage={} sharing={} queueCount={} layout={} pNext={}", iMemoryThread, static_cast<uint32_t>(vkImageCreateInfo.samples), static_cast<int32_t>(vkImageCreateInfo.tiling), vkImageCreateInfo.usage, static_cast<int32_t>(vkImageCreateInfo.sharingMode), vkImageCreateInfo.queueFamilyIndexCount, static_cast<int32_t>(vkImageCreateInfo.initialLayout), vkImageCreateInfo.pNext);
+	LOG(kTemp, kInfo, "MEMORY VMA_REQUEST thread={} flags={} usage={} required={} preferred={} typeBits={} pool={}", iMemoryThread, vmaAllocationCreateInfo.flags, static_cast<int32_t>(vmaAllocationCreateInfo.usage), vmaAllocationCreateInfo.requiredFlags, vmaAllocationCreateInfo.preferredFlags, vmaAllocationCreateInfo.memoryTypeBits, reinterpret_cast<uint64_t>(vmaAllocationCreateInfo.pool));
+	VkResult vkMemoryCreateResult = vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &mVkImage, &mVmaAllocation, nullptr);
+	LOG(kTemp, kInfo, "MEMORY CREATE_END thread={} site=Texture.cpp destination={} result={}", iMemoryThread, static_cast<const void*>(&mVkImage), static_cast<int32_t>(vkMemoryCreateResult));
+	if (vkMemoryCreateResult == VK_SUCCESS)
+	{
+		VmaAllocationInfo vmaAllocationInfo {};
+		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, mVmaAllocation, &vmaAllocationInfo);
+		LOG(kTemp, kInfo, "MEMORY CREATE_ALLOCATION thread={} destination={} resource={} allocation={} type={} memory={} offset={} size={}", iMemoryThread, static_cast<const void*>(&mVkImage), reinterpret_cast<uint64_t>(mVkImage), reinterpret_cast<uint64_t>(mVmaAllocation), vmaAllocationInfo.memoryType, reinterpret_cast<uint64_t>(vmaAllocationInfo.deviceMemory), vmaAllocationInfo.offset, vmaAllocationInfo.size);
+	}
+	CHECK_VK(vkMemoryCreateResult);
+	// TEMP END memory allocation observation
 	VkName(VK_OBJECT_TYPE_IMAGE, mVkImage, mInfo.name.data());
 
 	CreateImageView(mVkImage, mInfo, true, mVkImageView);

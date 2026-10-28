@@ -56,9 +56,6 @@ enum Pipelines
 	kPipelineSquareParticlesUpdate,
 	kPipelineSquareParticlesRender,
 
-	kPipelineLightingBlurH,
-	kPipelineLightingBlurV,
-
 	kPipelineDebugTexture,
 
 	kPipelineUiDepthPrepass,
@@ -96,24 +93,9 @@ public:
 	Texture* mppWaterFoamTextures[shaders::kiWaterFoamTextureCount] {};
 	Texture* mppWaterFoamBreakupTextures[shaders::kiWaterFoamBreakupTextureCount] {};
 
-	// Spread pipelines [pass]: radial directional spread, fragment shader with MRT
-	Pipeline mpSpreadPipelines[shaders::kiMaxSpreadPasses];
-	// Owns the spread pipeline name strings (PipelineInfo::name is a string_view that must outlive the Create call;
-	// mirrors mShadowPipelineNames in DynamicPipelines)
-	std::string mpSpreadPipelineNames[shaders::kiMaxSpreadPasses];
-
-	// Combine pipeline (tone map accumulate → UNORM, all 3 colors in one dispatch)
-	Pipeline mCombinePipeline;
-
-	// Temporal-accumulation pass after combine: reprojects + EMA-blends the 4 combine outputs in place against history
-	Pipeline mLightingTemporalPipeline;
-
-	// Publishes the temporal-blended combine outputs into the distinct persistent history images.
-	Pipeline mLightingHistoryCopyPipeline;
-
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
+	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;

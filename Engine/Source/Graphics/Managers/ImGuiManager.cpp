@@ -314,7 +314,19 @@ void ImGuiManager::CreateUiPrepassIndirectBuffer()
 		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	};
 	VmaAllocationInfo vmaAllocationInfo {};
-	CHECK_VK(vmaCreateBuffer(gpDeviceManager->mpAllocator, &vkBufferCreateInfo, &vmaAllocationCreateInfo, &mUiPrepassIndirectVkBuffer, &mUiPrepassIndirectVmaAllocation, &vmaAllocationInfo));
+	// TEMP START memory allocation observation
+	int64_t iMemoryThread = GetCurrentThreadId();
+	LOG(kTemp, kInfo, "MEMORY CREATE_BEGIN thread={} site=ImGuiManager.cpp owner={} destination={}", iMemoryThread, "UiPrepassIndirect", static_cast<const void*>(&mUiPrepassIndirectVkBuffer));
+	LOG(kTemp, kInfo, "MEMORY BUFFER_REQUEST thread={} flags={} size={} usage={} sharing={} queueCount={} pNext={}", iMemoryThread, vkBufferCreateInfo.flags, vkBufferCreateInfo.size, vkBufferCreateInfo.usage, static_cast<int32_t>(vkBufferCreateInfo.sharingMode), vkBufferCreateInfo.queueFamilyIndexCount, vkBufferCreateInfo.pNext);
+	LOG(kTemp, kInfo, "MEMORY VMA_REQUEST thread={} flags={} usage={} required={} preferred={} typeBits={} pool={}", iMemoryThread, vmaAllocationCreateInfo.flags, static_cast<int32_t>(vmaAllocationCreateInfo.usage), vmaAllocationCreateInfo.requiredFlags, vmaAllocationCreateInfo.preferredFlags, vmaAllocationCreateInfo.memoryTypeBits, reinterpret_cast<uint64_t>(vmaAllocationCreateInfo.pool));
+	VkResult vkMemoryCreateResult = vmaCreateBuffer(gpDeviceManager->mpAllocator, &vkBufferCreateInfo, &vmaAllocationCreateInfo, &mUiPrepassIndirectVkBuffer, &mUiPrepassIndirectVmaAllocation, &vmaAllocationInfo);
+	LOG(kTemp, kInfo, "MEMORY CREATE_END thread={} site=ImGuiManager.cpp destination={} result={}", iMemoryThread, static_cast<const void*>(&mUiPrepassIndirectVkBuffer), static_cast<int32_t>(vkMemoryCreateResult));
+	if (vkMemoryCreateResult == VK_SUCCESS)
+	{
+		LOG(kTemp, kInfo, "MEMORY CREATE_ALLOCATION thread={} destination={} resource={} allocation={} type={} memory={} offset={} size={}", iMemoryThread, static_cast<const void*>(&mUiPrepassIndirectVkBuffer), reinterpret_cast<uint64_t>(mUiPrepassIndirectVkBuffer), reinterpret_cast<uint64_t>(mUiPrepassIndirectVmaAllocation), vmaAllocationInfo.memoryType, reinterpret_cast<uint64_t>(vmaAllocationInfo.deviceMemory), vmaAllocationInfo.offset, vmaAllocationInfo.size);
+	}
+	CHECK_VK(vkMemoryCreateResult);
+	// TEMP END memory allocation observation
 	VkName(VK_OBJECT_TYPE_BUFFER, mUiPrepassIndirectVkBuffer, "UiPrepassIndirect");
 	mpUiPrepassIndirectMappedVkDrawIndirectCommand = static_cast<VkDrawIndirectCommand*>(vmaAllocationInfo.pMappedData);
 	ASSERT(mpUiPrepassIndirectMappedVkDrawIndirectCommand != nullptr);

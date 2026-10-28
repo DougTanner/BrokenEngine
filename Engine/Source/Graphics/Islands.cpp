@@ -16,7 +16,7 @@ Islands::Islands()
 	mIslandMeshArena.Create(
 	{
 		.name = "IslandMeshArena",
-		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
+		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal, BufferFlags::kAccelerationInput},
 		.vkIndexType = VK_INDEX_TYPE_UINT32,
 		.iVertexStride = static_cast<int64_t>(2 * sizeof(float)),
 		.iDataSize = kiIslandMeshArenaBytes,

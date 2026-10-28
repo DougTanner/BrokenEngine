@@ -155,7 +155,10 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   arena room returns only when retirement frees them; do not evict another
   template for arena room while earlier evictions are still retiring. Renderer
   teardown invalidates its mesh allocations without cancelling File-owned
-  range-reload state.
+  range-reload state. Before decommitting restored CPU mesh data, reduce its
+  original XY topology to scalar bounds for client lighting tile coverage;
+  authored heightmap footprints can omit retained vertices. Publish those bounds
+  with the resident mesh ranges and invalidate them on eviction or GPU teardown.
 - Each flight plane has its own template contours and cell graph, index-parallel with the planes (`CellStaticData::navigationData`); a plane without `kTerrainCollision` gets an empty one. A caller picks the plane by passing that plane's graph, and queries take waypoint Z from the query position.
 - The obstacle visibility graph is built once per cell, in that cell's local meters, over every obstacle polygon the cell contains; island templates contribute contour geometry only, because per-template building would yield disjoint per-island graphs with inter-island routes unreachable. Because the graph spans the cell, an A* miss is unexpected: disconnection is the usual cause, and a found path whose first waypoint coincides with the start also reports as a miss.
 - The build path and the runtime query share one segment-blocked and one point-in-polygon predicate through `NavBuildInternal.h`. Keep them shared: a divergent epsilon or boundary rule lets the graph claim a segment the query rejects, threading paths through obstacles.

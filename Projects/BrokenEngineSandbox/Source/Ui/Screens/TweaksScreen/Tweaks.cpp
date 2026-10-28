@@ -21,11 +21,6 @@ void RenderLightingTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSecti
 		RenderLightingEffectsVisibleTab(rScreen);
 		ImGui::EndTabItem();
 	}
-	if (rScreen.BeginSubtab("Lighting", iSection, iFirstSubtab + 1))
-	{
-		RenderLightingEffectsLightingTab(rScreen);
-		ImGui::EndTabItem();
-	}
 }
 
 void RenderSmokeTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab)
