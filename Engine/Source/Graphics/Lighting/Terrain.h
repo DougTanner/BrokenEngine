@@ -99,6 +99,10 @@ public:
 	void WritePlacementIdentities(int64_t iFramebuffer, std::span<LightingTerrainPlacementIdentity> identities) const;
 
 private:
+	// TEMP START matched memory cost
+	friend class Lighting;
+	void RecordMatchedCostReceipt(int64_t iFramebuffer, const Buffer& rGeometry, nlohmann::json& rReceipt) const;
+	// TEMP END matched memory cost
 	struct State;
 	std::unique_ptr<State> mpState;
 };

@@ -9,6 +9,13 @@ using enum BufferFlags;
 
 void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo, BufferMemoryPlacement eMemoryPlacement)
 {
+	// TEMP START matched memory cost
+	static constexpr bool kbMatchedMemoryCostR = true;
+	if constexpr (!kbMatchedMemoryCostR)
+	{
+		eMemoryPlacement = BufferMemoryPlacement::kDefault;
+	}
+	// TEMP END matched memory cost
 	int64_t iRoundedDeviceSize = common::RoundUp(iDeviceSize, static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.nonCoherentAtomSize));
 
 	VkBufferCreateInfo vkBufferCreateInfo
@@ -72,7 +79,7 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDevic
 	{
 		vkMemoryCreateResult = vmaCreateBuffer(gpDeviceManager->mpAllocator, &vkBufferCreateInfo, &vmaAllocationCreateInfo, &vkBuffer, &vmaAllocation, &vmaAllocationInfo);
 	}
-	if (eMemoryPlacement == BufferMemoryPlacement::kDefault && (vkMemoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0 && vkMemoryCreateResult == VK_ERROR_OUT_OF_DEVICE_MEMORY)
+	if (kbMatchedMemoryCostR && eMemoryPlacement == BufferMemoryPlacement::kDefault && (vkMemoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0 && vkMemoryCreateResult == VK_ERROR_OUT_OF_DEVICE_MEMORY)
 	{
 		LOG(kGraphics, kWarning, "Buffer {} device-local allocation exhausted: size={} usage={} required={} result={}; ordinary RAM allowed types={}", name, iRoundedDeviceSize, vkBufferUsageFlags, vkMemoryPropertyFlags, static_cast<int32_t>(vkMemoryCreateResult), uiOrdinaryRamTypes);
 		DEBUG_BREAK();
@@ -98,6 +105,13 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDevic
 		LOG(kTemp, kInfo, "MEMORY CREATE_ALLOCATION thread={} destination={} resource={} allocation={} type={} memory={} offset={} size={}", iMemoryThread, static_cast<const void*>(&rVkBuffer), reinterpret_cast<uint64_t>(vkBuffer), reinterpret_cast<uint64_t>(vmaAllocation), vmaAllocationInfo.memoryType, reinterpret_cast<uint64_t>(vmaAllocationInfo.deviceMemory), vmaAllocationInfo.offset, vmaAllocationInfo.size);
 	}
 	// TEMP END memory allocation observation
+	// TEMP START matched memory cost
+	if (vkMemoryCreateResult == VK_SUCCESS)
+	{
+		const VkMemoryType& rSelectedType = rVkPhysicalDeviceMemoryProperties.memoryTypes[vmaAllocationInfo.memoryType];
+		LOG(kTemp, kInfo, "MATCHED_MEMORY R={} destination={} resource={} requestedFlags={} placement={} type={} heap={} heapFlags={} properties={} allocated={} mapped={}", kbMatchedMemoryCostR, static_cast<const void*>(&rVkBuffer), reinterpret_cast<uint64_t>(vkBuffer), vkMemoryPropertyFlags, static_cast<int32_t>(eMemoryPlacement), vmaAllocationInfo.memoryType, rSelectedType.heapIndex, rVkPhysicalDeviceMemoryProperties.memoryHeaps[rSelectedType.heapIndex].flags, rSelectedType.propertyFlags, vmaAllocationInfo.size, vmaAllocationInfo.pMappedData != nullptr);
+	}
+	// TEMP END matched memory cost
 	CHECK_VK(vkMemoryCreateResult);
 	rVkBuffer = vkBuffer;
 	rVmaAllocation = vmaAllocation;
