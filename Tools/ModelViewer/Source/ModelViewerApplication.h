@@ -13,6 +13,9 @@ public:
 	void UpdateDefaultComparison(bool bHeld);
 	void SelectLightingPreset(int64_t iSlot);
 	void ResetLightingPreset();
+	void ToggleFlight();
+	bool WorldVisible() const;
+	void ResetDisplayTime();
 	bool Render();
 	void RenderUi();
 	void CreateGraphicsResources();
@@ -24,6 +27,18 @@ private:
 	{
 		kComparingDefaults = 0x01,
 		kPlaying = 0x02,
+		kFlying = 0x04,
+		kMetadataLoaded = 0x08,
+		kMetadataValid = 0x10,
+	};
+	struct FlightBody
+	{
+		XMVECTOR vecPosition {0.0f, 0.0f, 6.0f, 1.0f};
+		XMVECTOR vecDirection {1.0f, 0.0f, 0.0f, 0.0f};
+		XMVECTOR vecVelocity {};
+		XMVECTOR vecDestination {};
+		float fDeltaRotation = 0.0f;
+		float fClimbTilt = 0.0f;
 	};
 
 	struct Preview
@@ -37,7 +52,14 @@ private:
 		float fRadius = 0.0f;
 	};
 	void PreparePreview(Preview& rPreview);
+	void LoadModelMetadata();
+	void SaveModelMetadata();
+	void ValidateModelAlignment();
 	void GenerateIslands();
+	bool DiscClear(FXMVECTOR vecPosition, float fHeight) const;
+	void ResetFlight();
+	void SelectDestination();
+	void UpdateFlight(float fDeltaTime);
 	void ApplyLightingValues(const std::array<float, 20>& rValues);
 	void SaveLightingPreset(const std::array<float, 20>& rValues);
 	std::vector<Preview> mPreviews;
@@ -53,6 +75,23 @@ private:
 	glm::vec2 mPreviousMousePosition {};
 
 	common::Timer mTimer;
+	common::Timer mDisplayTimer;
+	FlightBody mFlightBody;
+	XMVECTOR mVecWaterAnchor {};
+	std::vector<XMFLOAT2> mWaterDestinations;
+	XMFLOAT3A mf3ModelScale {1.0f, 1.0f, 1.0f};
+	XMFLOAT3A mf3ModelRotation {};
+	XMFLOAT3A mf3ModelOffset {};
+	// Invalid edits retain the last complete renderable authored alignment.
+	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
+	std::filesystem::path mCheckoutPath;
+	std::filesystem::path mModelDataPath;
+	std::filesystem::path mModelSourcePath;
+	std::filesystem::path mModelMetadataPath;
+	std::string mModelMetadataStatus;
+	std::string mModelAlignmentError;
+	int miFlightPlane = 0;
+	engine::FrameInterpolateBase mCameraFrame;
 	engine::GridCoord mIslandSeed = engine::kOriginCoordinate;
 	engine::CellStaticData mIslandCell {.coordinate = engine::kOriginCoordinate};
 	common::RandomEngine mSeedRandomEngine;

@@ -46,6 +46,14 @@ enum class DestroyFlags : uint16_t
 };
 using DestroyFlags_t = common::Flags<DestroyFlags>;
 
+enum class GraphicsFlags : uint8_t
+{
+	kDrawModelsOverWorld = 1 << 0,
+	// The latest Create completed a requested recreation; cleared on every Create entry.
+	kRecreated = 1 << 1,
+};
+using GraphicsFlags_t = common::Flags<GraphicsFlags>;
+
 inline VkExtent2D gVkWantedFramebufferExtent2D {};
 
 std::tuple<int64_t, int64_t> FullDetail();
@@ -112,6 +120,7 @@ public:
 	int64_t miMonitorRefreshRate = 60;
 	int64_t miFrameCounter = 0;
 	VkExtent2D mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
+	GraphicsFlags_t mFlags = kbDrawModelsOverWorld ? GraphicsFlags_t {GraphicsFlags::kDrawModelsOverWorld} : GraphicsFlags_t {};
 
 	DestroyType meDestroyType = DestroyType::kNone;
 	DestroyFlags_t mDestroyFlags;

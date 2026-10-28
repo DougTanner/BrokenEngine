@@ -66,6 +66,7 @@
       <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnableModules>false</EnableModules>
       <BuildStlModules>false</BuildStlModules>
@@ -160,6 +161,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavQuery.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\AnimationData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
@@ -309,6 +313,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h" />

@@ -594,9 +594,15 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 	}
 }
 
-void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, FXMVECTOR vecPosition, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity)
+void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX)
 {
-	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, vecPosition, pusher);
+	rfPositionCorrectionX = 0.0f;
+	if (!(pusher.uuid.iValue != 0))
+	{
+		return;
+	}
+
+	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, pusher, rfPositionCorrectionX);
 	float fPushLength = XMVectorGetX(XMVector3Length(vecPush));
 	if (fPushLength > 0.0f)
 	{

@@ -45,6 +45,11 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	switch (uiMessage)
 	{
 		case WM_KEYDOWN:
+			if (uiWordParameter == VK_SPACE && (iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantCaptureKeyboard))
+			{
+				gpModelViewerApplication->ToggleFlight();
+				return 0;
+			}
 			if (uiWordParameter == VK_F4 && (GetKeyState(VK_SHIFT) & 0x8000) == 0 && (GetKeyState(VK_CONTROL) & 0x8000) == 0 && (GetKeyState(VK_MENU) & 0x8000) == 0 && (GetKeyState(VK_LWIN) & 0x8000) == 0 && (GetKeyState(VK_RWIN) & 0x8000) == 0)
 			{
 				sbQuit = true;
@@ -284,6 +289,7 @@ int RunModelViewer(HINSTANCE hinstance)
 			pGraphics.reset();
 			pGraphics = std::make_unique<engine::Graphics>(hinstance, hwnd);
 			pGraphics->mOptionalScreenshotRequest = std::move(optionalScreenshotRequest);
+			pApplication->ResetDisplayTime();
 		}
 		if (siScreenshotToken != 0)
 		{

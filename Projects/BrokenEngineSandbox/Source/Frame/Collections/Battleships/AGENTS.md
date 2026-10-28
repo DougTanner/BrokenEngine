@@ -1,6 +1,6 @@
 # Battleships - Two-Gun Heavy Ships
 
-Battleships are a copy of Fighters with larger, slower constants (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with the Battleship names. Keep the two collections parallel; only the guns and fleet health below and the Fighters' client-only climb tilt and launch spawning differ.
+Battleships are a copy of Fighters with larger, slower constants (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with the Battleship names. Keep the two collections parallel; only the guns and fleet health below and the Fighters' client-only climb tilt differ.
 
 ## Weapon Invariants
 

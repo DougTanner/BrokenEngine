@@ -470,7 +470,6 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfOmniRadius,
-		.fDamage = kfShipCollisionDamage,
 		.uiCategory = CollisionCategory::kuiOmni,
 		.uiCollidesWith = CollidesWith::kuiOmni,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -596,12 +595,14 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		{
 			ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, fHeight, kfPushMargin, vecVelocity);
 		}
-		ApplyPusherPush(rFrame, vecPosition, rPreviousInterpolate.pPushers[i], kfOmniMaximumPusherPushVelocity, vecVelocity);
+		float fPositionCorrectionX = 0.0f;
+		ApplyPusherPush(rFrame, rFrame.interpolate.pOmnis->pPushers[i], kfOmniMaximumPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 		if (bTerrainContact)
 		{
 			ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity, GetTargetFlightPlane(orders));
 		}
-		// Last velocity write: pushers keep their 3D direction, but only the climb moves height.
+		rFrame.interpolate.pOmnis->pVecPositions[i] = XMVectorSetX(rFrame.interpolate.pOmnis->pVecPositions[i], XMVectorGetX(rFrame.interpolate.pOmnis->pVecPositions[i]) + fPositionCorrectionX);
+		// Only the climb moves height.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 
 		SetNavigationDirection(flags, iNavigationDirection);

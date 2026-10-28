@@ -11,6 +11,7 @@ public:
 
 	Camera();
 	void Update();
+	void UpdateFlight(const engine::FrameInterpolateBase& rFrame, FXMVECTOR vecTarget, float fDeltaTime);
 	void Fit(const XMFLOAT3A& rf3Center, float fRadius);
 	void Zoom(float fWheelDelta);
 	void RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition);

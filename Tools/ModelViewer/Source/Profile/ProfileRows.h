@@ -12,6 +12,7 @@ enum GameCpuCounters : int64_t
 enum GameCpuTimers : int64_t
 {
 	kCpuTimerFrameUpdate = engine::kEngineCpuTimerCount,
+	kCpuTimerPostRenderUpdateNavigationQuery,
 	kGameCpuTimerCount,
 };
 
@@ -25,6 +26,7 @@ static_assert(std::size(kpGameCpuCounterNames) == static_cast<size_t>(kGameCpuCo
 inline constexpr std::string_view kpGameCpuTimerNames[]
 {
 	"Viewer frame",
+	"Navigation query",
 };
 static_assert(std::size(kpGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
 

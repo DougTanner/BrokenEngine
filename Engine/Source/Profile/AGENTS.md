@@ -33,6 +33,12 @@ Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileMana
   the FPS-header slot, which is free because the FPS header renders only on the
   CPU and GPU screens. Server formatting must remain server-safe and
   allocation-disciplined.
+- CPU and GPU memory panels share client-process samples, refreshed on screen
+  selection and every two seconds while visible. Private commit measures private
+  committed backing; working set measures resident pages, including shared pages.
+  These views overlap with pack payload and VMA accounting and must not be added
+  into a combined total. Pack payload leaves other owners unmeasured; VMA block
+  slack is the difference between VMA blocks and VMA allocations only.
 - The ImPlot trend graphs beside the Network screen render only while that
   screen is selected and a client exists. The Network formatter itself samples
   most of their series, so the graphs only accumulate history while that screen

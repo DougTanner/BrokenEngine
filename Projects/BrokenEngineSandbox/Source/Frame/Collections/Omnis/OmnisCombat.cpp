@@ -131,9 +131,10 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 	}
 }
 
-static void BeginExplosion(OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
+static void BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
 {
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
 	rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 
@@ -156,16 +157,7 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 		// Missile damage arrives through the area-damage phase, so a missile contact applies none here.
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
-			// A contact with a spawning Fighter damages neither side; its own PostCollision drops the same contact.
-			if (rResult.uiOtherCategory == CollisionCategory::kuiFighter && (rFrame.postRender.pFighters->pOrders[rResult.iOtherIndex] & ShipOrders::kSpawning))
-			{
-				continue;
-			}
-			if (rResult.uiOtherCategory & CollisionCategory::kuiShips)
-			{
-				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, kfShipCollisionDamage, rResult.vecContactPoint);
-			}
-			else if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
+			if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
 			{
 				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
@@ -178,7 +170,7 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 
 		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
 		{
-			BeginExplosion(rCurrentInterpolate, rCurrentPostRender, i);
+			BeginExplosion(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 		}
 		else if (!engine::IsInsideCell(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
@@ -217,7 +209,7 @@ void OmnisPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
 		{
-			BeginExplosion(rCurrentInterpolate, rCurrentPostRender, i);
+			BeginExplosion(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 		}
 	}
 }

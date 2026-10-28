@@ -20,5 +20,17 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   registered in every overlapping zone; a query reads only the single zone
   containing its position (queries outside the rectangle clamp to the border
   zone).
-- Push falloff: `(1 - d²/r²)^power * intensity`, directed pusher-to-query, summed across every pusher in the query's zone (not max-blended). Query skips a self-ignore id and any pusher coincident with the query point. Include/exclude masks on `PusherFlags_t` (default include `kTypeDefault`, exclude `kTypeMines`) — new pusher types opt in/out via a new `PusherFlags` enum value.
+- A query requires a registered self handle and uses its registered position,
+  excluding that row. Keep registered positions and zones unchanged throughout
+  the game collection Updates; the next ordinary Interpolate Sync refreshes
+  positions, rather than each consumer changing the shared query snapshot.
+- Push falloff: `(1 - d²/r²)^power * intensity`, using true XY distance
+  regardless of height, directed pusher-to-query and summed across the query's
+  zone. Include/exclude masks on `PusherFlags_t` default to `kTypeDefault` and
+  `kTypeMines`; new pusher types opt in/out through those flags.
+- At XY distance <= 0.0001 m, each included peer contributes a signed 0.001 m
+  X position correction and uses the same unit-X direction for force: negative
+  when the self row index is lower, positive otherwise. This avoids normalizing
+  zero without changing the true-distance falloff. Force has zero Z/W; the
+  correction is transient output for the caller, never a snapshot-position write.
 - ApplyClampedPush (`Pushers.h`): inline impulse that caps the velocity component in push direction, preventing stacking beyond caller-supplied max. General helper — game code also uses it for non-pusher impulses (terrain-normal push).

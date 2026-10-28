@@ -308,6 +308,10 @@ struct ModelHeader
 	int64_t iIndexCount = 0;
 	int64_t iVertexCount = 0;
 	int64_t iStride = 0;
+	XMFLOAT3 f3RotationRadians {};
+	XMFLOAT3 f3Scale {1.0f, 1.0f, 1.0f};
+	XMFLOAT3 f3Offset {};
+	uint32_t uiPad = 0;
 
 	// Runtime model chunk layout: [indices ALIGN4] [vertices]. Single source for the writer
 	// (ExportModel.cpp) and the generic index+vertex bind reader (Buffer::RecordBindVertexBuffer).
@@ -323,7 +327,11 @@ struct ModelHeader
 		return iVertexCount < UINT16_MAX;
 	}
 };
-static_assert(sizeof(ModelHeader) == 24, "ModelHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportModel::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(sizeof(ModelHeader) == 64, "ModelHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportModel::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(BT_OFFSETOF(ModelHeader, f3RotationRadians) == 24, "ModelHeader rotation offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, f3Scale) == 36, "ModelHeader scale offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, f3Offset) == 48, "ModelHeader offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, uiPad) == 60, "ModelHeader padding changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 
 struct ShaderHeader
 {
@@ -429,7 +437,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 55 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 56 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

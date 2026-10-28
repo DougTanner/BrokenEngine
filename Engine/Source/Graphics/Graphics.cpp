@@ -286,6 +286,8 @@ bool Graphics::SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabil
 
 void Graphics::Create()
 {
+	mFlags.Set(GraphicsFlags::kRecreated, false);
+
 	// Heap: make_unique for each manager (~12 objects that live for the app's lifetime or until device loss).
 	// Can't use workbuffer (temporary) or pre-allocate (managers have complex internal state built in constructors)
 	ScopedSuppressAllocationTracking suppress;
@@ -472,6 +474,7 @@ void Graphics::Create()
 		gpCommandBufferManager->RecordCommandBuffers();
 	}
 
+	mFlags.Set(GraphicsFlags::kRecreated, eDestroyType != DestroyType::kNone);
 }
 
 template <typename T>

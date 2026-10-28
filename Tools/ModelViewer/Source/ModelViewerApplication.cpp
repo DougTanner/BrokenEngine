@@ -1,6 +1,7 @@
 #include "ModelViewerApplication.h"
 
 #include "File/PackChunks.h"
+#include "Frame/TerrainCollisionUtils.h"
 #include "Graphics/Camera.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
@@ -12,6 +13,28 @@ namespace game
 {
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1;
+constexpr float kfFlightRadius = 1.5f;
+
+bool ModelViewerApplication::WorldVisible() const
+{
+	return (mFlags & ViewerFlags::kFlying) || mbWorldBackground;
+}
+
+void ModelViewerApplication::ResetDisplayTime()
+{
+	mDisplayTimer.Reset();
+	engine::gpGraphics->mRenderFrameTimer.Reset();
+	engine::gpProfileManager->DiscardSkippedFrameSamples();
+}
+
+void ModelViewerApplication::ToggleFlight()
+{
+	mFlags.Set(ViewerFlags::kFlying, !(mFlags & ViewerFlags::kFlying));
+	engine::gpGraphics->mFlags.Set(engine::GraphicsFlags::kDrawModelsOverWorld, !(mFlags & ViewerFlags::kFlying));
+	engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
+	miDragButton = -1;
+	ResetDisplayTime();
+}
 
 struct LightingPreset
 {
@@ -67,7 +90,263 @@ ModelViewerApplication::ModelViewerApplication()
 	{
 		PreparePreview(rPreview);
 	}
+	if (!mPreviews.empty())
+	{
+		LoadModelMetadata();
+	}
 	SelectLightingPreset(0);
+}
+
+static std::filesystem::path FindExecutableCheckout()
+{
+	std::wstring executable(32'768, L'\0');
+	int64_t iLength = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+	if (iLength == 0 || std::cmp_equal(iLength, executable.size()))
+	{
+		throw std::runtime_error("Cannot resolve ModelViewer executable path");
+	}
+	executable.resize(static_cast<std::size_t>(iLength));
+	std::filesystem::path path = std::filesystem::canonical(std::filesystem::path(executable).parent_path());
+	while (true)
+	{
+		std::filesystem::path gitPath = path / ".git";
+		if (std::filesystem::is_regular_file(gitPath) || std::filesystem::is_directory(gitPath))
+		{
+			return path;
+		}
+		if (path == path.parent_path())
+		{
+			throw std::runtime_error("ModelViewer executable is outside a checkout");
+		}
+		path = path.parent_path();
+	}
+}
+
+static void RequireContainedPath(const std::filesystem::path& rPath, const std::filesystem::path& rOwner)
+{
+	auto it = rPath.begin();
+	for (const std::filesystem::path& rPart : rOwner)
+	{
+		if (it == rPath.end() || _wcsicmp(it->c_str(), rPart.c_str()) != 0)
+		{
+			throw std::runtime_error(std::format("Source path outside {}: {}", rOwner.string(), rPath.string()));
+		}
+		++it;
+	}
+}
+
+static void CheckMetadataPaths(const std::filesystem::path& rCheckout, const std::filesystem::path& rData, const std::filesystem::path& rSource, const std::filesystem::path& rMetadata)
+{
+	std::filesystem::path dataPath = std::filesystem::canonical(rData);
+	RequireContainedPath(dataPath, rCheckout);
+	std::filesystem::path sourcePath = std::filesystem::canonical(rSource);
+	RequireContainedPath(sourcePath, dataPath);
+	if (!std::filesystem::is_regular_file(sourcePath))
+	{
+		throw std::runtime_error(std::format("Model source is not a regular file: {}", rSource.string()));
+	}
+	RequireContainedPath(std::filesystem::canonical(rMetadata.parent_path()), dataPath);
+	RequireContainedPath(std::filesystem::weakly_canonical(rMetadata), dataPath);
+	// A dangling link is present input too, not a missing identity sidecar.
+	if (std::filesystem::is_symlink(std::filesystem::symlink_status(rMetadata)) && !std::filesystem::exists(rMetadata))
+	{
+		throw std::runtime_error(std::format("Unreadable metadata link: {}", rMetadata.string()));
+	}
+}
+
+static XMFLOAT3A ReadMetadataVector(const nlohmann::json& rMetadata, std::string_view name)
+{
+	const nlohmann::json& rValues = rMetadata.at(name);
+	if (!rValues.is_array() || !std::cmp_equal(rValues.size(), 3))
+	{
+		throw std::runtime_error(std::format("{} must contain three finite float components", name));
+	}
+	float pfValues[3] {};
+	for (const auto& [i, rValue] : std::views::enumerate(rValues))
+	{
+		if (!rValue.is_number())
+		{
+			throw std::runtime_error(std::format("{} must be numeric", name));
+		}
+		double fValue = rValue.get<double>();
+		if (!std::isfinite(fValue) || std::abs(fValue) > std::numeric_limits<float>::max())
+		{
+			throw std::runtime_error(std::format("{} must fit in finite floats", name));
+		}
+		pfValues[i] = static_cast<float>(fValue);
+	}
+	return {pfValues[0], pfValues[1], pfValues[2]};
+}
+
+void ModelViewerApplication::ValidateModelAlignment()
+{
+	mFlags.Set(ViewerFlags::kMetadataValid, false);
+	mModelAlignmentError.clear();
+	for (const XMFLOAT3A* pf3Value : {&mf3ModelScale, &mf3ModelRotation, &mf3ModelOffset})
+	{
+		if (!std::isfinite(pf3Value->x) || !std::isfinite(pf3Value->y) || !std::isfinite(pf3Value->z))
+		{
+			mModelAlignmentError = "Alignment components must be finite";
+			return;
+		}
+	}
+	if (mf3ModelScale.x <= 0.0f || mf3ModelScale.y <= 0.0f || mf3ModelScale.z <= 0.0f)
+	{
+		mModelAlignmentError = "Scale XYZ must be positive";
+		return;
+	}
+	XMFLOAT3A f3Radians {XMConvertToRadians(mf3ModelRotation.x), XMConvertToRadians(mf3ModelRotation.y), XMConvertToRadians(mf3ModelRotation.z)};
+	if (!std::isfinite(f3Radians.x) || !std::isfinite(f3Radians.y) || !std::isfinite(f3Radians.z))
+	{
+		mModelAlignmentError = "Rotation in radians must be finite";
+		return;
+	}
+	XMMATRIX matAlignment = XMMatrixTranslation(mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z) * XMMatrixScaling(kfFlightRadius * mf3ModelScale.x, kfFlightRadius * mf3ModelScale.y, kfFlightRadius * mf3ModelScale.z) * XMMatrixRotationX(f3Radians.x) * XMMatrixRotationY(f3Radians.y) * XMMatrixRotationZ(f3Radians.z);
+	XMVECTOR vecDeterminant;
+	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(&vecDeterminant, matAlignment));
+	float fDeterminant = XMVectorGetX(vecDeterminant);
+	if (XMMatrixIsNaN(matAlignment) || XMMatrixIsInfinite(matAlignment) || XMMatrixIsNaN(matNormal) || XMMatrixIsInfinite(matNormal) || !std::isfinite(fDeterminant) || fDeterminant == 0.0f)
+	{
+		mModelAlignmentError = "Derived alignment and normal matrix must be finite and invertible";
+		return;
+	}
+	mMatModelAlignment = matAlignment;
+	mFlags.Set(ViewerFlags::kMetadataValid);
+}
+
+void ModelViewerApplication::LoadModelMetadata()
+{
+	// Heap: selection loads checkout paths, JSON and status strings.
+	ScopedSuppressAllocationTracking suppress;
+	mFlags.Set(ViewerFlags::kMetadataLoaded, false);
+	mf3ModelScale = {1.0f, 1.0f, 1.0f};
+	mf3ModelRotation = {};
+	mf3ModelOffset = {};
+	ValidateModelAlignment();
+	mModelMetadataPath.clear();
+	try
+	{
+		mCheckoutPath = FindExecutableCheckout();
+		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunks = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+		const common::SceneHeader& rScene = rChunks.at(mPreviews.at(miSelected).crc).pHeader->sceneHeader;
+		std::filesystem::path sourceRelativePath(rChunks.at(rScene.modelCrc).pHeader->pcPath);
+		if (!sourceRelativePath.is_relative() || sourceRelativePath.has_root_path() || sourceRelativePath.extension() != ".MODEL")
+		{
+			throw std::runtime_error(std::format("Invalid packed model identity: {}", sourceRelativePath.string()));
+		}
+		if (std::ranges::contains(sourceRelativePath, std::filesystem::path("..")))
+		{
+			throw std::runtime_error("Packed model identity contains parent traversal");
+		}
+		sourceRelativePath.replace_extension();
+		int64_t iMatches = 0;
+		for (const std::filesystem::path& rData : {mCheckoutPath / "Engine/Data", mCheckoutPath / "Projects/BrokenEngineSandbox/Data"})
+		{
+			std::filesystem::path sourcePath = rData / sourceRelativePath;
+			if (std::filesystem::is_regular_file(sourcePath))
+			{
+				++iMatches;
+				mModelDataPath = rData;
+				mModelSourcePath = sourcePath;
+			}
+		}
+		if (iMatches != 1)
+		{
+			throw std::runtime_error(std::format("Expected one source for {} under {}; found {}", sourceRelativePath.string(), mCheckoutPath.string(), iMatches));
+		}
+		mModelMetadataPath = mModelSourcePath;
+		mModelMetadataPath += ".model.json";
+		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
+		if (std::filesystem::exists(mModelMetadataPath))
+		{
+			std::vector<std::byte> bytes = common::ReadEntireFile(mModelMetadataPath);
+			const char* pcBytes = reinterpret_cast<const char*>(bytes.data());
+			nlohmann::json metadata = nlohmann::json::parse(pcBytes, pcBytes + bytes.size());
+			if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 1)
+			{
+				throw std::runtime_error("Model metadata requires integer version 1");
+			}
+			XMFLOAT3A f3Scale = ReadMetadataVector(metadata, "scale");
+			XMFLOAT3A f3Rotation = ReadMetadataVector(metadata, "rotationDegrees");
+			XMFLOAT3A f3Offset = ReadMetadataVector(metadata, "offset");
+			mf3ModelScale = f3Scale;
+			mf3ModelRotation = f3Rotation;
+			mf3ModelOffset = f3Offset;
+			ValidateModelAlignment();
+			if (!(mFlags & ViewerFlags::kMetadataValid))
+			{
+				throw std::runtime_error(mModelAlignmentError);
+			}
+			mModelMetadataStatus = "Loaded source metadata";
+		}
+		else
+		{
+			mModelMetadataStatus = "No sidecar: identity defaults; Save creates source metadata";
+		}
+		mFlags.Set(ViewerFlags::kMetadataLoaded);
+	}
+	catch (const std::exception& rException)
+	{
+		mf3ModelScale = {1.0f, 1.0f, 1.0f};
+		mf3ModelRotation = {};
+		mf3ModelOffset = {};
+		ValidateModelAlignment();
+		mModelMetadataStatus = std::format("Load failed: {} ({})", rException.what(), mModelMetadataPath.string());
+	}
+}
+
+void ModelViewerApplication::SaveModelMetadata()
+{
+	// Heap: explicit source Save serializes JSON and resolves filesystem paths.
+	ScopedSuppressAllocationTracking suppress;
+	try
+	{
+		nlohmann::json metadata
+		{
+			{"version", 1},
+			{"rotationDegrees", {mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z}},
+			{"scale", {mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z}},
+			{"offset", {mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z}},
+		};
+		std::string content = metadata.dump(2) + "\n";
+		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
+		std::filesystem::path stagingPath = mModelMetadataPath;
+		stagingPath += std::format(".{}.tmp", GetCurrentProcessId());
+		RequireContainedPath(std::filesystem::weakly_canonical(stagingPath), std::filesystem::canonical(mModelDataPath));
+		HANDLE handle = CreateFileW(stagingPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			throw std::runtime_error(std::format("Cannot create staging file {} (Windows error {})", stagingPath.string(), GetLastError()));
+		}
+		DWORD uiWritten = 0;
+		bool bWritten = WriteFile(handle, content.data(), static_cast<DWORD>(content.size()), &uiWritten, nullptr) != FALSE && uiWritten == content.size();
+		bool bClosed = CloseHandle(handle) != FALSE;
+		if (!bWritten || !bClosed)
+		{
+			DeleteFileW(stagingPath.c_str());
+			throw std::runtime_error("Cannot write complete metadata staging file");
+		}
+		try
+		{
+			CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
+		}
+		catch (...)
+		{
+			DeleteFileW(stagingPath.c_str());
+			throw;
+		}
+		if (!MoveFileExW(stagingPath.c_str(), mModelMetadataPath.c_str(), MOVEFILE_REPLACE_EXISTING))
+		{
+			int64_t iError = GetLastError();
+			DeleteFileW(stagingPath.c_str());
+			throw std::runtime_error(std::format("Cannot replace metadata (Windows error {})", iError));
+		}
+		mModelMetadataStatus = "Saved source metadata. Game packs update on the next data build.";
+	}
+	catch (const std::exception& rException)
+	{
+		mModelMetadataStatus = std::format("Save failed: {} ({})", rException.what(), mModelMetadataPath.string());
+	}
 }
 
 struct LightingDescriptor
@@ -311,6 +590,141 @@ void ModelViewerApplication::GenerateIslands()
 	// Heap: island generation builds placement and hull vectors on seed changes.
 	ScopedSuppressAllocationTracking suppress;
 	engine::GenerateIslandChain(mIslandSeed, mIslandCell.islands);
+	engine::gpIslandTerrain->BuildElevationGrid(mIslandCell.islands, mIslandCell.elevationGrid);
+	mWaterDestinations.clear();
+	const XMFLOAT2& rf2Island = mIslandCell.islands.at(0).f2WorldPosition;
+	float fBestScore = std::numeric_limits<float>::max();
+	for (float fY = -engine::kfCellHalfHeight; fY < engine::kfCellHalfHeight; fY += 8.0f)
+	{
+		for (float fX = -engine::kfCellHalfWidth; fX < engine::kfCellHalfWidth; fX += 8.0f)
+		{
+			XMVECTOR vecCandidate = XMVectorSet(fX, fY, 6.0f, 1.0f);
+			if (!DiscClear(vecCandidate, 0.0f))
+			{
+				continue;
+			}
+			mWaterDestinations.emplace_back(fX, fY);
+			float fDistance = std::hypot(fX - rf2Island.x, fY - rf2Island.y);
+			float fScore = std::abs(fDistance - 140.0f);
+			if (fScore < fBestScore)
+			{
+				fBestScore = fScore;
+				mVecWaterAnchor = vecCandidate;
+			}
+		}
+	}
+	if (mWaterDestinations.empty())
+	{
+		throw std::runtime_error("ModelViewer generated cell has no clear-water flight anchor");
+	}
+	ResetFlight();
+}
+
+bool ModelViewerApplication::DiscClear(FXMVECTOR vecPosition, float fHeight) const
+{
+	if (!common::IsInsideHex(vecPosition, engine::kCellDirections, kfFlightRadius + 0.01f))
+	{
+		return false;
+	}
+	engine::NavData navigation;
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(mIslandCell, navigation, vecPosition, vecPosition, kfFlightRadius, fHeight, false);
+	return !(result.flags & engine::DiscTerrainFlags::kStartOverlap);
+}
+
+void ModelViewerApplication::ResetFlight()
+{
+	mFlightBody = {.vecPosition = mVecWaterAnchor};
+	miFlightPlane = 0;
+	SelectDestination();
+	mDisplayTimer.Reset();
+}
+
+void ModelViewerApplication::SelectDestination()
+{
+	const XMFLOAT2& rf2Destination = mWaterDestinations.at(common::Random(std::ssize(mWaterDestinations), mSeedRandomEngine));
+	mFlightBody.vecDestination = XMVectorSet(rf2Destination.x, rf2Destination.y, 0.0f, 1.0f);
+}
+
+void ModelViewerApplication::UpdateFlight(float fDeltaTime)
+{
+	FlightBody& rBody = mFlightBody;
+	XMVECTOR vecToDestination = XMVectorSetZ(XMVectorSubtract(rBody.vecDestination, rBody.vecPosition), 0.0f);
+	if (XMVectorGetX(XMVector3LengthSq(vecToDestination)) < 20.0f * 20.0f)
+	{
+		SelectDestination();
+		vecToDestination = XMVectorSetZ(XMVectorSubtract(rBody.vecDestination, rBody.vecPosition), 0.0f);
+	}
+	if (XMVectorGetX(XMVector3LengthSq(vecToDestination)) > 0.0f)
+	{
+		float fCrossZ = XMVectorGetZ(XMVector3Cross(rBody.vecDirection, XMVector3Normalize(vecToDestination)));
+		float fWantedTurn = fCrossZ > 0.0f ? 4.0f : -4.0f;
+		rBody.fDeltaRotation = std::lerp(fWantedTurn, rBody.fDeltaRotation, common::ExponentialDecay(0.064f, fDeltaTime));
+	}
+	rBody.fDeltaRotation *= common::ExponentialDecay(6.0f, fDeltaTime);
+	float fHeight = XMVectorGetZ(rBody.vecPosition);
+	float fTargetHeight = engine::gpFlightPlanes->Plane(miFlightPlane).fHeightMeters;
+	float fNextHeight = fHeight + std::clamp(fTargetHeight - fHeight, -25.0f * fDeltaTime, 25.0f * fDeltaTime);
+	if (fNextHeight < fHeight && (!DiscClear(rBody.vecPosition, 0.0f) || !DiscClear(rBody.vecPosition, fNextHeight)))
+	{
+		fNextHeight = fHeight;
+	}
+	rBody.fClimbTilt = fDeltaTime > 0.0f ? 0.35f * (fNextHeight - fHeight) / (25.0f * fDeltaTime) : rBody.fClimbTilt;
+	if (fNextHeight < engine::gpFlightPlanes->Highest().fHeightMeters)
+	{
+		engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(mIslandCell);
+		XMVECTOR vecLeft = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rBody.vecDirection);
+		float fLeft = 0.0f;
+		float fRight = 0.0f;
+		float fTotalWeight = 0.0f;
+		for (int64_t j = 0; j < 4; ++j)
+		{
+			XMVECTOR vecAhead = XMVectorMultiplyAdd(XMVectorReplicate(static_cast<float>(j + 1) * 4.0f), rBody.vecDirection, rBody.vecPosition);
+			for (int64_t k = 0; k < 2; ++k)
+			{
+				float fWeight = 1.0f - static_cast<float>(j + k) * 0.1f;
+				float fSide = static_cast<float>(k + 1) * 2.0f;
+				fLeft += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
+				fRight += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(-fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
+				fTotalWeight += fWeight;
+			}
+		}
+		fLeft /= fTotalWeight;
+		fRight /= fTotalWeight;
+		if (fLeft > 0.5f || fRight > 0.5f)
+		{
+			float fPercent = std::clamp((std::max(fLeft, fRight) - 0.5f) / 2.5f, 0.0f, 1.0f);
+			float fAvoidTurn = std::lerp(16.0f, 32.0f, fPercent) * (fLeft > fRight ? -1.0f : 1.0f);
+			rBody.fDeltaRotation = 0.995f * rBody.fDeltaRotation + 0.005f * fAvoidTurn;
+		}
+	}
+	rBody.vecDirection = XMVector3Normalize(XMVector3TransformNormal(rBody.vecDirection, XMMatrixRotationZ(fDeltaTime * rBody.fDeltaRotation)));
+	rBody.vecVelocity = engine::ApplyMovement<true>(rBody.vecVelocity, rBody.vecDirection, fDeltaTime, 10.0f, 0.25f, 40.0f, 4.0f);
+	XMVECTOR vecNext = XMVectorSetZ(XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rBody.vecVelocity, rBody.vecPosition), fNextHeight);
+	// Sweep the disc against the inset cell before terrain so every accepted segment stays in the original cell.
+	static constexpr common::HexDirections kFlightCell = common::MakeHexDirections(engine::kfCellApothem - kfFlightRadius - 0.01f);
+	if (std::optional<float> optionalExit = common::TraceHexExit(rBody.vecPosition, vecNext, kFlightCell))
+	{
+		int64_t iEdge = common::HexExitDirection(vecNext, kFlightCell);
+		XMVECTOR vecNormal = XMVectorNegate(XMVector2Normalize(XMLoadFloat2(&kFlightCell.pEntries[iEdge].f2CenterOffset)));
+		float fDistance = XMVectorGetX(XMVector2Length(XMVectorSubtract(vecNext, rBody.vecPosition)));
+		vecNext = XMVectorSetZ(XMVectorLerp(rBody.vecPosition, vecNext, std::max(0.0f, *optionalExit - 0.001f / fDistance)), fNextHeight);
+		rBody.vecVelocity = XMVector3Reflect(rBody.vecVelocity, vecNormal);
+		rBody.vecDirection = XMVector3Reflect(rBody.vecDirection, vecNormal);
+		SelectDestination();
+	}
+	if (fNextHeight < engine::gpFlightPlanes->Highest().fHeightMeters)
+	{
+		engine::NavData navigation;
+		engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(mIslandCell, navigation, rBody.vecPosition, vecNext, kfFlightRadius, fNextHeight, false);
+		vecNext = result.vecPosition;
+		if (result.flags & engine::DiscTerrainFlags::kContact)
+		{
+			float fCrossZ = XMVectorGetZ(XMVector3Cross(rBody.vecDirection, result.vecNormal));
+			rBody.fDeltaRotation = fCrossZ > 0.0f ? 8.0f : -8.0f;
+			rBody.vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * 4.0f), result.vecNormal, XMVector3Reflect(rBody.vecVelocity, result.vecNormal));
+		}
+	}
+	rBody.vecPosition = XMVectorSetW(vecNext, 1.0f);
 }
 
 void ModelViewerApplication::CreateGraphicsResources()
@@ -332,17 +746,23 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 	for (int64_t i = 0; i < std::ssize(mPreviews); ++i)
 	{
 		const Preview& rPreview = mPreviews.at(i);
-		engine::ModelPipeline* pPipeline = engine::gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[engine::kDynamicModelPipelineModel].at(rPreview.crc);
 		if (i != miSelected)
 		{
-			pPipeline->WriteIndirectBuffer(iCommandBuffer, 0);
+			engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(rPreview.crc, iCommandBuffer, 0);
 			continue;
 		}
 		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
 		rLayout = {};
 		rLayout.f4Position = {0.0f, 0.0f, 0.0f, 1.0f};
-		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4Transform[0]), XMMatrixIdentity());
-		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixIdentity());
+		XMMATRIX matTransform = XMMatrixIdentity();
+		if (mFlags & ViewerFlags::kFlying)
+		{
+			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
+			matTransform = mMatModelAlignment * matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
+			XMStoreFloat4(&rLayout.f4Position, mFlightBody.vecPosition);
+		}
+		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4Transform[0]), matTransform);
+		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
 		if (!rPreview.meshData.empty())
 		{
 			const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
@@ -364,36 +784,68 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 			rLayout.uiMeshDataBase = static_cast<uint32_t>(reservation.iMeshDataBase);
 			rLayout.uiMaterialCount = static_cast<uint32_t>(reservation.iMaterialCount);
 		}
-		pPipeline->WriteIndirectBuffer(iCommandBuffer, 1);
+		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(rPreview.crc, iCommandBuffer, 1);
+		if (!(mFlags & ViewerFlags::kFlying))
+		{
+			engine::gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(rPreview.crc)->WriteIndirectBuffer(iCommandBuffer, 0);
+		}
 	}
 }
 
 bool ModelViewerApplication::Render()
 {
 	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerFrameUpdate);
-	if (engine::gpGraphics->mbSwapchainRecreateDeferred || engine::gpGraphics->meDestroyType >= engine::DestroyType::kSwapchain)
+	bool bDrawOverWorld = !(mFlags & ViewerFlags::kFlying);
+	if ((engine::gpGraphics->mFlags & engine::GraphicsFlags::kDrawModelsOverWorld) != bDrawOverWorld)
 	{
+		engine::gpGraphics->mFlags.Set(engine::GraphicsFlags::kDrawModelsOverWorld, bDrawOverWorld);
+		engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
+	}
+	engine::gpGraphics->Refresh();
+	if (engine::gpGraphics->mbSwapchainRecreateDeferred || engine::gpGraphics->meDestroyType != engine::DestroyType::kNone)
+	{
+		bool bAcquire = engine::gpGraphics->mbSwapchainRecreateDeferred || engine::gpGraphics->meDestroyType >= engine::DestroyType::kSwapchain;
 		engine::gpGraphics->Create();
+		ResetDisplayTime();
 		if (engine::gpGraphics->mbSwapchainRecreateDeferred)
 		{
 			engine::gpTextureUploadManager->SignalFrame();
 			return false;
 		}
-		engine::gpProfileManager->DiscardSkippedFrameSamples();
-		engine::gpSwapchainManager->AcquireNextImage();
-		engine::gpGraphics->mRenderFrameTimer.Reset();
+		if (bAcquire)
+		{
+			engine::gpSwapchainManager->AcquireNextImage();
+			ResetDisplayTime();
+		}
+		if (engine::gpGraphics->meDestroyType >= engine::DestroyType::kSwapchain)
+		{
+			engine::gpTextureUploadManager->SignalFrame();
+			return false;
+		}
 	}
+	float fDeltaTime = std::chrono::duration<float>(mDisplayTimer.GetDeltaNs(true)).count();
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
-	const XMFLOAT2& rf2Anchor = mIslandCell.islands.at(0).f2WorldPosition;
-	pCamera->mVecPosition = XMVectorSet(rf2Anchor.x, rf2Anchor.y, 0.0f, 1.0f);
 	if (!mPreviews.empty() && miFittedSelection != miSelected)
 	{
 		pCamera->Fit(mPreviews.at(miSelected).f3Center, mPreviews.at(miSelected).fRadius);
 		miFittedSelection = miSelected;
 	}
-	pCamera->Update();
+	if (mFlags & ViewerFlags::kFlying)
+	{
+		UpdateFlight(fDeltaTime);
+		mCameraFrame.iTick = miFrame;
+		// Zero presentation tick delta preserves the manually controlled sun.
+		mCameraFrame.fDeltaTime = 0.0f;
+		mCameraFrame.renderBasis = engine::MakeRenderBasis(engine::kOriginCoordinate, engine::kOriginCoordinate);
+		pCamera->UpdateFlight(mCameraFrame, mFlightBody.vecPosition, fDeltaTime);
+	}
+	else
+	{
+		pCamera->mVecPosition = mVecWaterAnchor;
+		pCamera->Update();
+	}
 	const engine::CellStaticData* pIslandCell = &mIslandCell;
-	engine::gpIslands->UpdateActiveIslands(std::span<const engine::CellStaticData* const>(&pIslandCell, mbWorldBackground ? 1 : 0));
+	engine::gpIslands->UpdateActiveIslands(std::span<const engine::CellStaticData* const>(&pIslandCell, WorldVisible() ? 1 : 0));
 	FrameInterpolate& rFrame = mRenderInterpolates.at(engine::kOriginCoordinate);
 	rFrame.iFrame = miFrame++;
 	std::chrono::duration<float> elapsedTime(mTimer.GetDeltaNs());
@@ -406,6 +858,10 @@ bool ModelViewerApplication::Render()
 		mAnimationTime = fDuration > 0.0f ? std::chrono::duration<float>(std::fmod((mAnimationTime + deltaTime).count(), fDuration)) : 0s;
 	}
 	engine::gpGraphics->RenderMainPresentAcquire(engine::gpSwapchainManager->miFramebufferIndex, mRenderInterpolates, mActiveCoordinates, engine::kOriginCoordinate, elapsedTime);
+	if (engine::gpGraphics->mFlags & engine::GraphicsFlags::kRecreated)
+	{
+		ResetDisplayTime();
+	}
 	return true;
 }
 
@@ -433,9 +889,11 @@ void ModelViewerApplication::RenderUi()
 	}
 	float fPanelsTop = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y + fMargin;
 	ImGui::End();
-	float fPanelHeight = std::max(1.0f, pViewport->Pos.y + pViewport->Size.y - fMargin - fPanelsTop);
-	float fPanelCenter = pViewport->Pos.y + 0.5f * pViewport->Size.y;
-	float fCenteredPanelHeight = std::max(1.0f, 2.0f * std::min(fPanelCenter - fPanelsTop, pViewport->Pos.y + pViewport->Size.y - fMargin - fPanelCenter));
+	float fFlightPanelHeight = (mFlags & ViewerFlags::kFlying) ? 290.0f * fScale : 0.0f;
+	float fPanelsBottom = pViewport->Pos.y + pViewport->Size.y - fMargin - ((mFlags & ViewerFlags::kFlying) ? fFlightPanelHeight + fMargin : 0.0f);
+	float fPanelHeight = std::max(1.0f, fPanelsBottom - fPanelsTop);
+	float fPanelCenter = (mFlags & ViewerFlags::kFlying) ? 0.5f * (fPanelsTop + fPanelsBottom) : pViewport->Pos.y + 0.5f * pViewport->Size.y;
+	float fCenteredPanelHeight = std::max(1.0f, 2.0f * std::min(fPanelCenter - fPanelsTop, fPanelsBottom - fPanelCenter));
 	float fCatalogWidth = std::min(460.0f * fScale, 0.4f * pViewport->Size.x);
 	float fAvailableWidth = std::max(1.0f, pViewport->Size.x - 2.0f * fMargin);
 	float fLightingTrackWidth = 2.0f * std::max(1.0f, std::min(340.0f * fScale, 0.4f * pViewport->Size.x) - 2.0f * ImGui::GetStyle().WindowPadding.x);
@@ -543,7 +1001,10 @@ void ModelViewerApplication::RenderUi()
 		ImGui::PopStyleVar();
 		ImGui::Separator();
 		ImGui::SeparatorText("Islands");
+		ImGui::TextUnformatted((mFlags & ViewerFlags::kFlying) ? "SPACE: orbit preview" : "SPACE: autonomous flight");
+		ImGui::BeginDisabled(mFlags & ViewerFlags::kFlying);
 		ImGui::Checkbox("World background", &mbWorldBackground);
+		ImGui::EndDisabled();
 		int piSeed[2] {mIslandSeed.iQ, mIslandSeed.iR};
 		if (ImGui::InputInt2("Seed", piSeed))
 		{
@@ -570,6 +1031,8 @@ void ModelViewerApplication::RenderUi()
 				miSelectedAnimation = -1;
 				mAnimationTime = 0s;
 				mFlags.Set(ViewerFlags::kPlaying, false);
+				LoadModelMetadata();
+				ResetFlight();
 			}
 		}
 		ImGui::Spacing();
@@ -631,6 +1094,76 @@ void ModelViewerApplication::RenderUi()
 		engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 	}
 	ImGui::End();
+	if (mFlags & ViewerFlags::kFlying)
+	{
+		ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + fMargin, fPanelsBottom + fMargin));
+		ImGui::SetNextWindowSize(ImVec2(fAvailableWidth, fFlightPanelHeight));
+		if (ImGui::Begin("Flight", nullptr, windowFlags))
+		{
+			bool bAlignmentChanged = false;
+			auto AlignmentSliders = [fScale, &bAlignmentChanged](const char* pcLabel, XMFLOAT3A& rf3Value, float fMin, float fMax)
+			{
+				ImGui::TableNextColumn();
+				ImGui::PushID(pcLabel);
+				ImGui::TextUnformatted(pcLabel);
+				float* pfValues[] {&rf3Value.x, &rf3Value.y, &rf3Value.z};
+				const char* ppcAxes[] {"X", "Y", "Z"};
+				for (const auto& [i, pfValue] : std::views::enumerate(pfValues))
+				{
+					ImGui::PushID(ppcAxes[i]);
+					ImGui::TextUnformatted(ppcAxes[i]);
+					ImGui::SameLine();
+					float fInputWidth = 65.0f * fScale;
+					ImGui::SetNextItemWidth(std::max(1.0f, ImGui::GetContentRegionAvail().x - fInputWidth - ImGui::GetStyle().ItemSpacing.x));
+					float fValue = std::isfinite(*pfValue) ? *pfValue : fMin;
+					if (ImGui::SliderFloat("##Slider", &fValue, fMin, fMax, "%.3f", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat))
+					{
+						*pfValue = fValue;
+						bAlignmentChanged = true;
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(fInputWidth);
+					bAlignmentChanged |= ImGui::InputFloat("##Exact", pfValue, 0.0f, 0.0f, "%.9g");
+					ImGui::PopID();
+				}
+				ImGui::PopID();
+			};
+			if (ImGui::BeginTable("Model alignment", 3, ImGuiTableFlags_SizingStretchSame))
+			{
+				AlignmentSliders("Scale", mf3ModelScale, 0.01f, 10.0f);
+				AlignmentSliders("Rotation (degrees)", mf3ModelRotation, -180.0f, 180.0f);
+				AlignmentSliders("Offset", mf3ModelOffset, -1.0f, 1.0f);
+				ImGui::EndTable();
+			}
+			if (bAlignmentChanged)
+			{
+				ValidateModelAlignment();
+				if (mFlags & ViewerFlags::kMetadataLoaded)
+				{
+					mModelMetadataStatus = "Unsaved source edits";
+				}
+			}
+			static constexpr const char* kpcPlanes[] {"6 m", "50 m", "100 m"};
+			ImGui::SetNextItemWidth(0.65f * fAvailableWidth);
+			ImGui::Combo("Altitude", &miFlightPlane, kpcPlanes, static_cast<int>(std::size(kpcPlanes)));
+			ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
+			ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
+			if (ImGui::Button("Save"))
+			{
+				SaveModelMetadata();
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			ImGui::TextWrapped("%s", mModelMetadataStatus.c_str());
+			if (!mModelAlignmentError.empty())
+			{
+				ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
+			}
+			ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
+			engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+		}
+		ImGui::End();
+	}
 	const ImGuiIO& rInputOutput = ImGui::GetIO();
 	bool bCaptureMouse = rInputOutput.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
@@ -671,12 +1204,12 @@ void ModelViewerApplication::RenderUi()
 				glm::vec2 increment = delta / static_cast<float>(iSteps);
 				for (int64_t i = 0; i < iSteps; ++i)
 				{
-					if (miDragButton == ImGuiMouseButton_Left)
+					if (miDragButton == ImGuiMouseButton_Left && !(mFlags & ViewerFlags::kFlying))
 					{
 						pCamera->mArcBall.beginDrag(anchor);
 						pCamera->mArcBall.drag(anchor + increment);
 					}
-					else
+					else if (miDragButton == ImGuiMouseButton_Right)
 					{
 						pCamera->RotateSun(anchor, anchor + increment);
 					}
@@ -684,10 +1217,11 @@ void ModelViewerApplication::RenderUi()
 			}
 		}
 	}
-	if (!bCaptureMouse && !mPreviews.empty())
+	if (!bCaptureMouse && !mPreviews.empty() && !(mFlags & ViewerFlags::kFlying))
 	{
 		pCamera->Zoom(rInputOutput.MouseWheel);
 	}
+	engine::gpGraphics->Refresh();
 }
 
 } // namespace game
@@ -699,7 +1233,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 {
 	engine::gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 	engine::RenderLightingMain(iCommandBuffer);
-	if (game::gpModelViewerApplication->mbWorldBackground)
+	if (game::gpModelViewerApplication->WorldVisible())
 	{
 		engine::RenderWaterMain(iCommandBuffer, currentTime);
 	}
@@ -717,10 +1251,13 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, pCamera->mVecModelEyePosition);
 	rMainLayout.iFrameNumber = static_cast<int32_t>(rRenderInterpolates.at(cameraCoordinate).iFrame);
 	rMainLayout.iRenderNumber = static_cast<int32_t>(engine::gpGraphics->miFrameCounter);
-	rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;
-	rMainLayout.fPhysicallyBasedRenderingLightingSpecular = 0.0f;
-	rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
-	rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
+	if (engine::gpGraphics->mFlags & engine::GraphicsFlags::kDrawModelsOverWorld)
+	{
+		rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;
+		rMainLayout.fPhysicallyBasedRenderingLightingSpecular = 0.0f;
+		rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
+		rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
+	}
 	game::gpModelViewerApplication->RenderModel(iCommandBuffer);
 }
 

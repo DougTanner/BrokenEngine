@@ -39,7 +39,7 @@ game state around the deterministic Frame tick.
   set, the clearance, and the blocked-episode logging. A Fighter launches from inside its fleet's
   Battleship: it spawns in that row's cell with its heading, velocity, and stored plane,
   `kfBattleshipRadius - kfFighterRadius` ahead of its position along the heading, so that Battleship's own pusher
-  pushes it out the front, with `ShipOrders::kSpawning` set (`../../Frame/Collections/Fighters/AGENTS.md`). At most
+  pushes it out the front under the [shared ship policy](../../Frame/Collections/Ships/AGENTS.md#ship-invariants). At most
   one Fighter launches per fleet per `kfShipSpawnInterval`, timed by `ServerClientManager::mNextFighterLaunchTicks`,
   which every load reset clears; a skipped Fighter stays dead and is tried again on the next tick.
 - Within `ServerSession::BuildAdvancingFrameInputs`, which the engine

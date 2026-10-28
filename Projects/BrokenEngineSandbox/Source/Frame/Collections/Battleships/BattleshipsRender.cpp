@@ -3,6 +3,7 @@
 #include "Battleships.h"
 
 #include "Data/Scene.h"
+#include "File/PackChunks.h"
 
 #include "Profile/ProfileRows.h"
 #include "Game.h"
@@ -10,20 +11,9 @@
 namespace game
 {
 
-// One model per ShipController, also used by Battleships.cpp for animation lookup. A scale of 2 / L, where L is the
-// model's longest horizontal extent in exported model space, makes the hull span the collision diameter. The
-// pre-rotation stands the Y-up model upright with its nose along +X.
+// One model per ShipController, also used for animation lookup.
 extern const common::crc_t kBattleshipFleetModel = data::kModelsBattleshipJesterz86scenegltfCrc;
-constexpr float kfBattleshipFleetModelScale = 1.000f; // L = 2.000
-constexpr XMFLOAT3 kf3BattleshipFleetModelOffset {0.0f, 0.0f, 0.0f};
-const XMMATRIX kmatBattleshipFleetModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceBattleshipAquamarinescenegltfCrc;
-// L = 0.9691 is the hull alone: the model's transparent AO_shadow_catcher quad is larger and sets its exported bounds.
-constexpr float kfBattleshipRandomModelScale = 2.064f;
-// The exported origin is the center of those bounds, which puts the hull center 0.0994 ahead of it along model Z (the
-// nose axis); the offset moves it back onto the ship position.
-constexpr XMFLOAT3 kf3BattleshipRandomModelOffset {0.0f, 0.0f, -0.0994f};
-const XMMATRIX kmatBattleshipRandomModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
 constexpr float kfRoll = 0.2f;
 
@@ -31,9 +21,6 @@ constexpr float kfRoll = 0.2f;
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"BattleshipsFleet", "BattleshipsRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("BattleshipsFleet"), common::CrcConsteval("BattleshipsRandom")};
-constexpr std::array<float, kiPipelineCount> kfModelScales {kfBattleshipFleetModelScale, kfBattleshipRandomModelScale};
-constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3BattleshipFleetModelOffset, kf3BattleshipRandomModelOffset};
-const std::array<XMMATRIX, kiPipelineCount> kmatModelPreRotates {kmatBattleshipFleetModelPreRotate, kmatBattleshipRandomModelPreRotate};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kBattleshipFleetModel, kBattleshipRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 256;
@@ -139,9 +126,12 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	}
 
 	int64_t iRenderedOffset = siRendered[iPipeline];
-	float fModelScale = kfModelScales[iPipeline];
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
-	XMMATRIX matPreRotate = kmatModelPreRotates[iPipeline];
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
+	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
+	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
+	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -150,17 +140,20 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		{
 			int64_t i = piVisibleIndices[j];
 
-			float fSize = kfBattleshipRadius * fModelScale;
+			XMFLOAT3A f3Size {kfBattleshipRadius * f3ModelScale.x, kfBattleshipRadius * f3ModelScale.y, kfBattleshipRadius * f3ModelScale.z};
 			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 			{
-				fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kBattleshipDestroyTime, 0.75f);
+				float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kBattleshipDestroyTime, 0.75f);
+				f3Size.x *= fDeathScale;
+				f3Size.y *= fDeathScale;
+				f3Size.z *= fDeathScale;
 			}
 
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 			XMFLOAT4A f4Position {};
 			XMStoreFloat4A(&f4Position, vecPosition);
 
-			XMMATRIX matScaling = XMMatrixScaling(fSize, fSize, fSize);
+			XMMATRIX matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);

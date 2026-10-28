@@ -8,6 +8,10 @@
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
+#if defined(BT_CLIENT)
+#include <Psapi.h>
+#endif
+
 namespace engine
 {
 
@@ -87,6 +91,37 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 }
 
 #if defined(BT_CLIENT)
+static void AppendProcessMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bReevaluate)
+{
+	static int64_t siPrivateCommitBytes = 0;
+	static int64_t siWorkingSetBytes = 0;
+	static bool sbAvailable = false;
+
+	if (bReevaluate)
+	{
+		PROCESS_MEMORY_COUNTERS_EX processMemoryCounters {};
+		sbAvailable = K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&processMemoryCounters), sizeof(processMemoryCounters)) != 0;
+		if (sbAvailable)
+		{
+			siPrivateCommitBytes = static_cast<int64_t>(processMemoryCounters.PrivateUsage);
+			siWorkingSetBytes = static_cast<int64_t>(processMemoryCounters.WorkingSetSize);
+		}
+	}
+
+	rWorkbuffer.Append("Process (2s samples)\nPrivate commit: ");
+	if (sbAvailable)
+	{
+		rWorkbuffer.AppendFloat(static_cast<float>(siPrivateCommitBytes) / (1'024.0f * 1'024.0f), 1);
+		rWorkbuffer.Append(" MiB\nWorking set: ");
+		rWorkbuffer.AppendFloat(static_cast<float>(siWorkingSetBytes) / (1'024.0f * 1'024.0f), 1);
+		rWorkbuffer.Append(" MiB\n\n");
+	}
+	else
+	{
+		rWorkbuffer.Append("unavailable\nWorking set: unavailable\n\n");
+	}
+}
+
 static void AppendMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bEager)
 {
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
@@ -98,7 +133,7 @@ static void AppendMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bEager)
 			rWorkbuffer.Append(data::kpcDataTypeNames[i]);
 			rWorkbuffer.Append(": ");
 			rWorkbuffer.AppendFloat(static_cast<float>(statistics.iBytes) / (1'024.0f * 1'024.0f), 1);
-			rWorkbuffer.Append(" MB (");
+			rWorkbuffer.Append(" MiB (");
 			rWorkbuffer.Append(statistics.iCount);
 			rWorkbuffer.Append(")\n");
 		}
@@ -209,22 +244,23 @@ static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 	rWorkbuffer.Append("\n");
 }
 
-static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
+static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	FormatCellReadout(rWorkbuffer);
-	rWorkbuffer.Append("GPU Memory\n");
+	AppendProcessMemoryStatistics(rWorkbuffer, bReevaluate);
+	rWorkbuffer.Append("GPU / VMA\nSeparate from process totals\n");
 
 	VmaTotalStatistics statistics {};
 	vmaCalculateStatistics(gpDeviceManager->mpAllocator, &statistics);
 
-	rWorkbuffer.Append("Allocated: ");
+	rWorkbuffer.Append("VMA blocks: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.blockBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB\nUsed: ");
+	rWorkbuffer.Append(" MiB\nVMA allocations: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB\nUnused: ");
+	rWorkbuffer.Append(" MiB\nVMA block slack: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.blockBytes - statistics.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB\nAllocations: ");
+	rWorkbuffer.Append(" MiB\nAllocations: ");
 	rWorkbuffer.Append(static_cast<int64_t>(statistics.total.statistics.allocationCount));
 	rWorkbuffer.Append("  Blocks: ");
 	rWorkbuffer.Append(static_cast<int64_t>(statistics.total.statistics.blockCount));
@@ -246,9 +282,9 @@ static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
 
 			rWorkbuffer.Append("  Budget: ");
 			rWorkbuffer.AppendFloat(static_cast<float>(pBudgets[i].budget) / (1'024.0f * 1'024.0f), 1);
-			rWorkbuffer.Append(" MB  Usage: ");
+			rWorkbuffer.Append(" MiB  Usage: ");
 			rWorkbuffer.AppendFloat(static_cast<float>(pBudgets[i].usage) / (1'024.0f * 1'024.0f), 1);
-			rWorkbuffer.Append(" MB");
+			rWorkbuffer.Append(" MiB");
 
 			if (pBudgets[i].budget > 0)
 			{
@@ -324,25 +360,26 @@ void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	FormatCellReadout(rWorkbuffer);
-	rWorkbuffer.Append("Data Memory\n");
+	AppendProcessMemoryStatistics(rWorkbuffer, bReevaluate);
+	rWorkbuffer.Append("Pack payload only\n");
 	rWorkbuffer.Append("Eager: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(eagerStatistics.iBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB (");
+	rWorkbuffer.Append(" MiB (");
 	rWorkbuffer.Append(eagerStatistics.iCount);
 	rWorkbuffer.Append(")\n");
 	AppendMemoryStatistics(rWorkbuffer, true);
 	rWorkbuffer.Append("Lazy: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB (");
+	rWorkbuffer.Append(" MiB (");
 	rWorkbuffer.Append(lazyStatistics.iCount);
 	rWorkbuffer.Append(")\n");
 	AppendMemoryStatistics(rWorkbuffer, false);
-	rWorkbuffer.Append("Total: ");
+	rWorkbuffer.Append("Payload total: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(iTotalBytes) / (1'024.0f * 1'024.0f), 1);
-	rWorkbuffer.Append(" MB (");
+	rWorkbuffer.Append(" MiB (");
 	rWorkbuffer.Append(iTotalCount);
 	rWorkbuffer.Append(")");
-	rWorkbuffer.Append("\nAllocations: ");
+	rWorkbuffer.Append("\nOther owners: unmeasured\nNew calls/frame: ");
 	rWorkbuffer.Append(gpProfileManager->mSmoothedAllocations.mSmoothedValue);
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
@@ -351,7 +388,7 @@ void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	FormatGpuGraphicsInfo(rWorkbuffer);
 	FormatGpuTimerRows(rWorkbuffer, bReevaluate);
-	FormatGpuMemoryStatistics(rWorkbuffer);
+	FormatGpuMemoryStatistics(rWorkbuffer, bReevaluate);
 }
 
 #endif // BT_CLIENT

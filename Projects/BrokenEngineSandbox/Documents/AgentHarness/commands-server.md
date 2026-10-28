@@ -36,7 +36,7 @@ adding the fields below; the other entries are its own commands. For the engine
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, 8 `kSpawning`, and the target
+  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, and the target
   flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
   lowest plane; a Fighter allows 0-2, an Omni 0-1, a Battleship 0), `flags` the
   integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
@@ -108,8 +108,8 @@ adding the fields below; the other entries are its own commands. For the engine
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
   `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
-  one-to-one pairing of fighter, omni, and battleship pusher handles with
-  Pushers rows, no lifecycle bit on a Pushers row, and every flying missile
+  [ship pusher ownership](../../Source/Frame/Collections/Ships/AGENTS.md),
+  no lifecycle bit on a Pushers row, and every flying missile
   exactly at a flight-plane height with velocity z 0) plus one more refusal: a changed
   `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
@@ -129,11 +129,11 @@ adding the fields below; the other entries are its own commands. For the engine
   | Collection | Writes that remove the row at the next tick | Normal staged death instead |
   |---|---|---|
   | `omnis` | `pLifecycleFlags:2` (`kDestroy`) | `pfArmors:0`: PostCollision starts the 0.7 s death sequence with its explosions |
-  | `fighters`, `battleships` | `pLifecycleFlags:2` (`kDestroy`) | `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.25`, `pDestroyedExplosionTimes:0.024`: the 0.25 s staged explosions, without the first full-size explosion and death sound a killing hit adds; missiles keep homing until removal. `pfHealths:0` alone changes nothing until the next hit, and a `RandomSpawn` ship's health regenerates while the nearest enemy ship is more than 60 m away |
+  | `fighters`, `battleships` | `pLifecycleFlags:2` (`kDestroy`) | Use a killing blaster hit or missile blast to start natural staged death. Directly setting `kDying` fails the ship pusher ownership check because identity and handle columns cannot be edited. `pfHealths:0` alone changes nothing until the next hit, and a `RandomSpawn` ship's health regenerates while the nearest enemy ship is more than 60 m away |
   | `missiles` | `pLifecycleFlags:2` (`kDestroy`) | none: `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
   | `blasters` | `pLifecycleFlags:2` (`kDestroy`) | none |
   | `explosions` | `pLifecycleFlags:2` (`kDestroy`); a row with trails takes its trails with it. Also `pLifecycleFlags:4` (`kDying`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pLifecycleFlags:4` on a row with trails: the row goes when its last trail ends. A row with neither bit, such as a `SpawnExplosion` injected without `lifecycleFlags`, is never removed unless one is written |
-  | `pushers` | removed with their owning ship only | |
+  | `pushers` | removed when their owning ship releases them or is removed | |
 
   - A `pFlags` or `pLifecycleFlags` write replaces the whole mask, so include
     any bit the scenario still needs (for ships, Update rebuilds the `pFlags`

@@ -18,16 +18,21 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 }
 
 // Requires the Pushers id map already rebuilt from the read ids; that rebuild rejects id 0, so the map lookup also
-// rejects a zero handle. A pusher leaves only with its owner and rests with no lifecycle bit, so a kTransfer or
-// kDestroy bit on one would let the next compaction fold remove it while its owner still holds the handle.
+// rejects a living ship's zero handle. Released pushers must be compacted before the frame is persisted.
 static void ValidatePusherOwners(const Frame& rFrame)
 {
 	const FrameInterpolate& rInterpolate = rFrame.interpolate;
 	const engine::PushersInterpolate& rPushers = rInterpolate.pushers;
 	int64_t iOwnerCount = 0;
-	ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
+	ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 	{
-		iOwnerCount += rShipInterpolate.iCount;
+		for (int64_t i = 0; i < rShipInterpolate.iCount; ++i)
+		{
+			if (!(rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
+			{
+				++iOwnerCount;
+			}
+		}
 	});
 	if (rPushers.iCount != iOwnerCount)
 	{
@@ -45,10 +50,19 @@ static void ValidatePusherOwners(const Frame& rFrame)
 	auto seenAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<bool*>(rPushers.iCount * static_cast<int64_t>(sizeof(bool)));
 	bool* pbSeen = seenAllocation.mpData;
 	std::fill_n(pbSeen, rPushers.iCount, false);
-	ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
+	ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 	{
-		for (engine::pusher_t pusher : std::span<const engine::pusher_t>(rShipInterpolate.pPushers, static_cast<size_t>(rShipInterpolate.iCount)))
+		for (int64_t i = 0; i < rShipInterpolate.iCount; ++i)
 		{
+			engine::pusher_t pusher = rShipInterpolate.pPushers[i];
+			if (rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+			{
+				if (pusher.uuid.iValue != 0)
+				{
+					throw std::ios_base::failure("Frame pusher owners");
+				}
+				continue;
+			}
 			auto it = rPushers.idToIndexMap.find(pusher);
 			if (it == rPushers.idToIndexMap.end() || pbSeen[it->second])
 			{

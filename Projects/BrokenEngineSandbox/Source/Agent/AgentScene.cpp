@@ -54,10 +54,6 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	{
 		names.push_back("kPendingUseMissiles");
 	}
-	if (orders & ShipOrders::kSpawning)
-	{
-		names.push_back("kSpawning");
-	}
 	if (flags & ShipFlags::kFireBlaster)
 	{
 		names.push_back("kFireBlaster");

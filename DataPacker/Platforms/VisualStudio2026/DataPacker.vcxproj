@@ -188,6 +188,7 @@
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <PreprocessorDefinitions>BT_DATA_PACKER;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FloatingPointModel>Strict</FloatingPointModel>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -224,6 +225,7 @@ if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <PreprocessorDefinitions>BT_DATA_PACKER;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FloatingPointModel>Strict</FloatingPointModel>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>

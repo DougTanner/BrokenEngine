@@ -3,14 +3,12 @@
 #include "Missiles.h"
 
 #include "Data/Scene.h"
+#include "File/PackChunks.h"
 
 #include "Profile/ProfileRows.h"
 
 namespace game
 {
-
-constexpr float kfMissileScale = 0.5f;
-constexpr float kfMissileWidth = 2.0f;
 
 constexpr common::crc_t kMissileModelCrc = data::kModelsaim9_missilescenegltfCrc;
 
@@ -76,8 +74,17 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 	MissilesRenderActiveGuard renderActiveGuard;
 
-	static XMMATRIX sMatPreMove = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-	static XMMATRIX sMatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationZ(XM_PIDIV2);
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const common::SceneHeader& rSceneHeader = rChunkMap.at(kMissileModelCrc).pHeader->sceneHeader;
+	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
+	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
+	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x);
+	if (rModelHeader.f3RotationRadians.y != 0.0f)
+	{
+		matPreRotate *= XMMatrixRotationY(rModelHeader.f3RotationRadians.y);
+	}
+	matPreRotate *= XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
@@ -104,16 +111,19 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 			continue;
 		}
 
-		float fScale = kfMissileScale;
+		XMFLOAT3A f3Scale {f3ModelScale.x, f3ModelScale.y, f3ModelScale.z};
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			fScale *= std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
+			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
+			f3Scale.x *= fDeathScale;
+			f3Scale.y *= fDeathScale;
+			f3Scale.z *= fDeathScale;
 		}
 
-		XMMATRIX matScaling = XMMatrixScaling(kfMissileWidth * fScale, fScale, fScale);
+		XMMATRIX matScaling = XMMatrixScaling(f3Scale.x, f3Scale.y, f3Scale.z);
 		XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-		XMMATRIX matTransform = sMatPreMove * matScaling * sMatPreRotate * matYaw * matTranslation;
+		XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matYaw * matTranslation;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
 		rModelLayout.f4Position = f4Position;

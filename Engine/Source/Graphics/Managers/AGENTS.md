@@ -74,8 +74,8 @@ Per-framebuffer command buffers and the submission graph. The Global and Main re
   transitions around dispatch; History includes the history copy, mip chain,
   and final transitions.
 - The image pass records a timed UI depth prepass before the debug-texture
-  branch. With `kbDrawModelsOverWorld` false, opaque models precede terrain,
-  water and shields. With it true, those world draws precede a depth clear,
+  branch. With `GraphicsFlags::kDrawModelsOverWorld` clear, opaque models precede
+  terrain, water and shields. With it set, those world draws precede a depth clear,
   an untimed UI depth prepass and opaque models. Transparent models follow in
   both cases. Only the first UI depth prepass writes its timer queries.
 - Submission workers publish work through `PersistentWorker` wake/wait edges: Main waits for Global, and UI waits for Main. Data read by a worker must be written before its wake.

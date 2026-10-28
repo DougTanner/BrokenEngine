@@ -183,6 +183,28 @@ Vertex colors are not part of the packed model format. Scene export warns with
 source path and primitive identity when `COLOR_0` is present and ignores that attribute
 without modifying the source.
 
+## Model Alignment
+
+`ExportModel` owns optional adjacent `<source-filename>.model.json` metadata:
+remove only the generated final `.MODEL` extension before appending
+`.model.json`, so `scene.gltf.MODEL` uses `scene.gltf.model.json`.
+Present metadata requires integer `version: 1` and complete `rotationDegrees`,
+`scale`, and `offset` arrays, each with exactly three numeric components that
+fit finite floats; every scale component must remain strictly positive after
+conversion. Invalid present metadata fails through the export aggregate;
+absence alone supplies zero rotation and offset with unit scale.
+
+Export converts degrees to radians once and stores rotation, scale, and offset
+separately in `ModelHeader`, leaving geometry and animation unchanged. Rotation
+composes X, then Y, then Z; offset is in exported model coordinates. Alignment
+describes the asset's visual basis, scale, and pivot; gameplay sizing and dynamic
+render transforms remain consumer-owned.
+
+The model job fingerprints both `.MODEL` content and metadata content or explicit
+absence, so metadata addition, editing, or removal dirties model packing without
+forcing scene pre-export. Runtime admission follows
+[Packed Assets](../../../Engine/Source/File/AGENTS.md#packed-assets).
+
 ## Cubemap Pre-pass
 
 Irradiance and prefiltered cubemaps are generated before ordinary export jobs.

@@ -197,6 +197,21 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 	{
 		return "chunk header data type mismatch";
 	}
+	if (eExpectedDataType == data::kDataTypeModel)
+	{
+		const common::ModelHeader& rModelHeader = rChunkHeader.modelHeader;
+		if (!std::isfinite(rModelHeader.f3RotationRadians.x) || !std::isfinite(rModelHeader.f3RotationRadians.y)
+		 || !std::isfinite(rModelHeader.f3RotationRadians.z) || !std::isfinite(rModelHeader.f3Scale.x)
+		 || !std::isfinite(rModelHeader.f3Scale.y) || !std::isfinite(rModelHeader.f3Scale.z) || !std::isfinite(rModelHeader.f3Offset.x)
+		 || !std::isfinite(rModelHeader.f3Offset.y) || !std::isfinite(rModelHeader.f3Offset.z))
+		{
+			return "model alignment is not finite";
+		}
+		if (rModelHeader.f3Scale.x <= 0.0f || rModelHeader.f3Scale.y <= 0.0f || rModelHeader.f3Scale.z <= 0.0f)
+		{
+			return "model alignment scale is not positive";
+		}
+	}
 	// Audio streaming reads payload ranges straight from the pack, so a chunk flagged audio must be stored uncompressed.
 	if ((rChunkHeader.flags & common::ChunkFlags::kChunkAudio) && common::IsCompressed(rChunkHeader.flags))
 	{

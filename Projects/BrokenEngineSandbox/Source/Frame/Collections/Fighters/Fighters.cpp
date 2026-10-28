@@ -545,27 +545,6 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	return true;
 }
 
-// The collision body's 3D sphere test against every other ship row of the previous frame, any alignment or lifecycle
-// state.
-static bool XM_CALLCONV OverlapsAnotherShip(const Frame& rPreviousFrame, int64_t iFighterRow, FXMVECTOR vecPosition)
-{
-	bool bOverlaps = false;
-	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
-	{
-		float fRadius = eType == ShipType::kFighter ? kfFighterRadius : eType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
-		float fCombinedRadius = kfFighterRadius + fRadius;
-		for (int64_t i = 0; i < rShipInterpolate.iCount && !bOverlaps; ++i)
-		{
-			if (eType == ShipType::kFighter && i == iFighterRow)
-			{
-				continue;
-			}
-			bOverlaps = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rShipInterpolate.pVecPositions[i]))) <= fCombinedRadius * fCombinedRadius;
-		}
-	});
-	return bOverlaps;
-}
-
 void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateFighters);
@@ -621,19 +600,20 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 #endif // BT_CLIENT
 
 		CountdownPendingOrders(iPendingFleetWantedCoordinateTicks);
+		float fPositionCorrectionX = 0.0f;
 
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			if (arrivalGracePeriod > std::chrono::duration<float>::zero())
 			{
-				ApplyPusherPush(rFrame, vecPosition, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity);
+				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 			else if (rPrevious.pController[i] == ShipController::kFleet)
 			{
 				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				SteerHeadingTowards(vecPosition, vecDirection, XMVectorAdd(vecPosition, vecAiDirection), true, kfFighterChaseTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
 				ApplyHeadingMovement(vecDirection, flags, deltaTime, kFighterMovement, vecVelocity);
-				ApplyPusherPush(rFrame, vecPosition, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity);
+				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 			else
 			{
@@ -646,12 +626,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfFighterFleeTurnRate : kfFighterChaseTurnRate;
 				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
 				ApplyHeadingMovement(vecDirection, flags, deltaTime, kFighterMovement, vecVelocity);
-				ApplyPusherPush(rFrame, vecPosition, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity);
-			}
-
-			if ((rPrevious.pOrders[i] & ShipOrders::kSpawning) && !OverlapsAnotherShip(rPreviousFrame, i, vecPosition))
-			{
-				rCurrent.pOrders[i].Set(ShipOrders::kSpawning, false);
+				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 		}
 		else
@@ -663,6 +638,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		{
 			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
 		}
+		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);

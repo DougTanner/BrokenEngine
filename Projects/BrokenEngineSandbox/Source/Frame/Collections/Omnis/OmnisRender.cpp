@@ -3,6 +3,7 @@
 #include "Omnis.h"
 
 #include "Data/Scene.h"
+#include "File/PackChunks.h"
 #include "Graphics/Debug/DebugRender.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
@@ -12,18 +13,9 @@
 namespace game
 {
 
-// One model per ShipController, also used by Omnis.cpp for animation lookup in OmnisInterpolate::Update. A scale
-// commented with its L is 2 / L, where L is the model's longest horizontal extent in exported model space, so the hull
-// spans the collision diameter. A nonzero model offset puts back the model's native origin as its rotation pivot. The
-// pre-rotation stands the Y-up model upright with its nose along -Y.
+// One model per ShipController, also used for animation lookup.
 extern const common::crc_t kOmniFleetModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfOmniFleetModelScale = 1.0927087f;
-constexpr XMFLOAT3 kf3OmniFleetModelOffset {0.0f, 0.1817180f, -0.1686860f};
-const XMMATRIX kmatOmniFleetModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f);
 extern const common::crc_t kOmniRandomModel = data::kModelsSpaceFighterscenegltfCrc;
-constexpr float kfOmniRandomModelScale = 1.000f; // L = 2.000
-constexpr XMFLOAT3 kf3OmniRandomModelOffset {0.0f, 0.0f, 0.0f};
-const XMMATRIX kmatOmniRandomModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f);
 
 constexpr float kfDeathShrinkPower = 2.0f;
 
@@ -31,9 +23,6 @@ constexpr float kfDeathShrinkPower = 2.0f;
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"OmnisFleet", "OmnisRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("OmnisFleet"), common::CrcConsteval("OmnisRandom")};
-constexpr std::array<float, kiPipelineCount> kfModelScales {kfOmniFleetModelScale, kfOmniRandomModelScale};
-constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3OmniFleetModelOffset, kf3OmniRandomModelOffset};
-const std::array<XMMATRIX, kiPipelineCount> kmatModelPreRotates {kmatOmniFleetModelPreRotate, kmatOmniRandomModelPreRotate};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kOmniFleetModel, kOmniRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 256;
@@ -154,8 +143,16 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iCount);
 	}
 
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
-	XMMATRIX matPreRotate = kmatModelPreRotates[iPipeline];
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
+	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
+	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
+	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y);
+	if (rModelHeader.f3RotationRadians.z != 0.0f)
+	{
+		matPreRotate *= XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
+	}
 
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -165,17 +162,20 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 			continue;
 		}
 
-		float fSize = kfOmniRadius * kfModelScales[iPipeline];
+		XMFLOAT3A f3Size {kfOmniRadius * f3ModelScale.x, kfOmniRadius * f3ModelScale.y, kfOmniRadius * f3ModelScale.z};
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
+			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
+			f3Size.x *= fDeathScale;
+			f3Size.y *= fDeathScale;
+			f3Size.z *= fDeathScale;
 		}
 
 		// The position is local to the rendered cell; one conversion into the camera cell's frame feeds both the
 		// model translation and the layout position.
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 
-		auto matScaling = XMMatrixScaling(fSize, fSize, fSize);
+		auto matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
 		auto matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);

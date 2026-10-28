@@ -25,7 +25,8 @@ Both use `$(ProjectName)` in `IntDir`, so client and server builds can run simul
   (C4100/C4101/C4189 unused names not silenced by a `(void)` discard, C4541 RTTI
   use with RTTI off).
   Compile settings are mirrored between the two vcxprojs: when changing one,
-  change the other.
+  change the other, except for their intentionally different compiler process
+  limits (ProcessorNumber).
 - Both projects directly compile
   `Engine/Source/Memory/Mimalloc.cpp` without PCH or forced includes. This vendor
   implementation retains its ThirdParty warning policy: compiler warnings and

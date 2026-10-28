@@ -241,3 +241,28 @@ Use [Documents/FreshMachineSetup.md](Documents/FreshMachineSetup.md) for
 new-machine bootstrap, [`/compile`](.agents/skills/compile/SKILL.md) for builds,
 and [`/agent-harness`](.agents/skills/agent-harness/SKILL.md) for live
 client/server verification.
+
+### Compiler concurrency limits
+
+The committed Visual Studio projects enable `/MP` with these compiler process
+limits in every configuration:
+
+| Project | Compiler processes |
+| --- | ---: |
+| BrokenEngineSandbox (client) | 8 |
+| BrokenEngineSandboxServer | 4 |
+| DataPacker | 8 |
+| ThirdParty | 8 |
+| ModelViewer | 8 |
+
+These per-project `ClCompile.ProcessorNumber` settings take precedence over
+`CL_MPCount`. To change a limit, edit that metadata in every configuration of
+the relevant `.vcxproj`, then reload the project or reopen its solution. These
+are repository build settings; changing them does not set Windows environment
+variables. Other unlisted projects retain their existing settings.
+
+Large precompiled headers (PCHs) and other compilation data multiply memory
+demand when many compilers run on high-core machines. These limits reduce
+compiler concurrency to help control memory use, potentially lengthening builds.
+Concurrent projects and separate Visual Studio instances add their individual
+process counts; these settings provide no shared aggregate limit.

@@ -6,6 +6,11 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 - Frames submit Global, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
 - Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
+- Model depth ordering is runtime host policy in `Graphics::mFlags`, initialized
+  from the host's `kbDrawModelsOverWorld` default. Change it only on the owning
+  main thread and request at least command-buffer recreation; complete that
+  recreation before publishing or submitting a frame for the new policy. Never
+  mutate the policy concurrently with command-buffer recording.
 - `RenderGlobal` waits only its own framebuffer fence, then pre-scans
   descriptor churn. When island eviction, lazy adoption, or restoration is
   pending, or that framebuffer has unapplied descriptor publications, it opens

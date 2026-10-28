@@ -3,6 +3,7 @@
 #include "Fighters.h"
 
 #include "Data/Scene.h"
+#include "File/PackChunks.h"
 
 #include "Profile/ProfileRows.h"
 #include "Game.h"
@@ -10,18 +11,9 @@
 namespace game
 {
 
-// One model per ShipController, also used by Fighters.cpp for animation lookup. A scale commented with its L is 2 / L,
-// where L is the model's longest horizontal extent in exported model space, so the hull spans the collision diameter.
-// A nonzero model offset puts back the model's native origin as its rotation pivot. The pre-rotation stands the Y-up
-// model upright with its nose along +X.
+// One model per ShipController, also used for animation lookup.
 extern const common::crc_t kFighterFleetModel = data::kModelsLightFighterSpaceshipscenegltfCrc;
-constexpr float kfFighterFleetModelScale = 1.000f; // L = 2.000
-constexpr XMFLOAT3 kf3FighterFleetModelOffset {0.0f, 0.0f, 0.0f};
-const XMMATRIX kmatFighterFleetModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 extern const common::crc_t kFighterRandomModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfFighterRandomModelScale = 0.6723890f;
-constexpr XMFLOAT3 kf3FighterRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
-const XMMATRIX kmatFighterRandomModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
 constexpr float kfRoll = 0.2f;
 
@@ -29,9 +21,6 @@ constexpr float kfRoll = 0.2f;
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"FightersFleet", "FightersRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("FightersFleet"), common::CrcConsteval("FightersRandom")};
-constexpr std::array<float, kiPipelineCount> kfModelScales {kfFighterFleetModelScale, kfFighterRandomModelScale};
-constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3FighterFleetModelOffset, kf3FighterRandomModelOffset};
-const std::array<XMMATRIX, kiPipelineCount> kmatModelPreRotates {kmatFighterFleetModelPreRotate, kmatFighterRandomModelPreRotate};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kFighterFleetModel, kFighterRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
@@ -141,9 +130,12 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	}
 
 	int64_t iRenderedOffset = siRendered[iPipeline];
-	float fModelScale = kfModelScales[iPipeline];
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
-	XMMATRIX matPreRotate = kmatModelPreRotates[iPipeline];
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
+	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
+	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
+	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -152,17 +144,20 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 		{
 			int64_t i = piVisibleIndices[j];
 
-			float fSize = kfFighterRadius * fModelScale;
+			XMFLOAT3A f3Size {kfFighterRadius * f3ModelScale.x, kfFighterRadius * f3ModelScale.y, kfFighterRadius * f3ModelScale.z};
 			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 			{
-				fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kFighterDestroyTime, 0.75f);
+				float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kFighterDestroyTime, 0.75f);
+				f3Size.x *= fDeathScale;
+				f3Size.y *= fDeathScale;
+				f3Size.z *= fDeathScale;
 			}
 
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 			XMFLOAT4A f4Position {};
 			XMStoreFloat4A(&f4Position, vecPosition);
 
-			XMMATRIX matScaling = XMMatrixScaling(fSize, fSize, fSize);
+			XMMATRIX matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			// Negated so a positive climb tilt raises the +X nose.
 			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);

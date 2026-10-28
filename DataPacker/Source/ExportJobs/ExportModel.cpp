@@ -1,9 +1,42 @@
 #include "ExportModel.h"
 
+#include "FileManager.h"
 #include "SourceReadValidation.h"
 
 
 constexpr const char* kpcContext = "ExportModel::Export";
+
+static std::filesystem::path GetModelMetadataPath(const std::filesystem::path& rModelPath)
+{
+	std::filesystem::path metadataPath = rModelPath;
+	metadataPath.replace_extension();
+	metadataPath += ".model.json";
+	return metadataPath;
+}
+
+static XMFLOAT3 ReadModelVector(const nlohmann::json& rMetadata, const char* pcName, const std::filesystem::path& rMetadataPath)
+{
+	const nlohmann::json& rValues = rMetadata.at(pcName);
+	if (!rValues.is_array() || rValues.size() != 3)
+	{
+		throw std::runtime_error(std::format("\"{}\" {} must contain exactly three numeric components", rMetadataPath.string(), pcName));
+	}
+	float pfValues[3] {};
+	for (int64_t i = 0; i < std::ssize(pfValues); ++i)
+	{
+		if (!rValues.at(static_cast<size_t>(i)).is_number())
+		{
+			throw std::runtime_error(std::format("\"{}\" {} component {} must be numeric", rMetadataPath.string(), pcName, i));
+		}
+		double fValue = rValues.at(static_cast<size_t>(i)).get<double>();
+		if (!std::isfinite(fValue) || std::abs(fValue) > std::numeric_limits<float>::max())
+		{
+			throw std::runtime_error(std::format("\"{}\" {} component {} must fit in a finite float", rMetadataPath.string(), pcName, i));
+		}
+		pfValues[i] = static_cast<float>(fValue);
+	}
+	return XMFLOAT3(pfValues[0], pfValues[1], pfValues[2]);
+}
 
 
 std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
@@ -13,6 +46,27 @@ std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::
 
 void ExportModel::Export()
 {
+	common::ModelHeader modelHeader {};
+	std::filesystem::path metadataPath = GetModelMetadataPath(mInputPath);
+	if (std::filesystem::exists(metadataPath))
+	{
+		std::vector<std::byte> metadataBytes = common::ReadEntireFile(metadataPath);
+		const char* pcMetadata = reinterpret_cast<const char*>(metadataBytes.data());
+		nlohmann::json metadata = nlohmann::json::parse(pcMetadata, pcMetadata + metadataBytes.size());
+		if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 1)
+		{
+			throw std::runtime_error(std::format("\"{}\" must contain model metadata version 1", metadataPath.string()));
+		}
+		XMFLOAT3 f3RotationDegrees = ReadModelVector(metadata, "rotationDegrees", metadataPath);
+		modelHeader.f3RotationRadians = XMFLOAT3(XMConvertToRadians(f3RotationDegrees.x), XMConvertToRadians(f3RotationDegrees.y), XMConvertToRadians(f3RotationDegrees.z));
+		modelHeader.f3Scale = ReadModelVector(metadata, "scale", metadataPath);
+		modelHeader.f3Offset = ReadModelVector(metadata, "offset", metadataPath);
+		if (modelHeader.f3Scale.x <= 0.0f || modelHeader.f3Scale.y <= 0.0f || modelHeader.f3Scale.z <= 0.0f)
+		{
+			throw std::runtime_error(std::format("\"{}\" scale components must be positive", metadataPath.string()));
+		}
+	}
+
 	int64_t iStride = sizeof(common::ModelVertex);
 	std::vector<uint32_t> materialIndexPositions;
 	std::vector<uint16_t> indices16;
@@ -105,9 +159,10 @@ void ExportModel::Export()
 	int64_t iDataSize = iIndicesSize + static_cast<int64_t>(uiVertexBytes);
 	ASSERT(iDataSize <= std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1));
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iDataSize);
-	pHeader->modelHeader.iIndexCount = iIndexCount;
-	pHeader->modelHeader.iVertexCount = static_cast<int64_t>(uiVertexCount);
-	pHeader->modelHeader.iStride = iStride;
+	modelHeader.iIndexCount = iIndexCount;
+	modelHeader.iVertexCount = static_cast<int64_t>(uiVertexCount);
+	modelHeader.iStride = iStride;
+	pHeader->modelHeader = modelHeader;
 	if (std::ssize(indices16) > 0)
 	{
 		std::memcpy(dataSpan.data(), indices16.data(), common::VectorByteSize(indices16));
@@ -117,4 +172,13 @@ void ExportModel::Export()
 		std::memcpy(dataSpan.data(), indices32.data(), common::VectorByteSize(indices32));
 	}
 	std::memcpy(dataSpan.data() + iIndicesSize, vertices.data(), common::VectorByteSize(vertices));
+}
+
+std::string ExportModel::GetInputFingerprint() const
+{
+	std::filesystem::path metadataPath = GetModelMetadataPath(mInputPath);
+	nlohmann::json fingerprint;
+	fingerprint["model"] = gpFileManager->mpInputFingerprintCache->Get(mInputPath);
+	fingerprint["metadata"] = std::filesystem::exists(metadataPath) ? nlohmann::json(gpFileManager->mpInputFingerprintCache->Get(metadataPath)) : nlohmann::json();
+	return fingerprint.dump();
 }

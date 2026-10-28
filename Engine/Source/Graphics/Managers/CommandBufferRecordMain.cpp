@@ -473,7 +473,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 
 	if (!bDebugTextureMode)
 	{
-		if constexpr (!kbDrawModelsOverWorld)
+		if (!(gpGraphics->mFlags & GraphicsFlags::kDrawModelsOverWorld))
 		{
 			RecordOpaqueModels();
 		}
@@ -505,7 +505,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
 
-		if constexpr (kbDrawModelsOverWorld)
+		if (gpGraphics->mFlags & GraphicsFlags::kDrawModelsOverWorld)
 		{
 			VkClearAttachment vkClearAttachment
 			{

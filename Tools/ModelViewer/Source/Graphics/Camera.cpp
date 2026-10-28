@@ -41,6 +41,14 @@ void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 	mfZoom = 1.0f;
 }
 
+void Camera::UpdateFlight(const engine::FrameInterpolateBase& rFrame, FXMVECTOR vecTarget, float fDeltaTime)
+{
+	engine::CameraBase::Update(rFrame, fDeltaTime, false, engine::CameraTarget::Tracked(vecTarget, XMVectorZero()));
+	mMatModelView = mMatView;
+	mMatModelPerspective = mMatPerspective;
+	mVecModelEyePosition = mVecEyePosition;
+}
+
 void Camera::Zoom(float fWheelDelta)
 {
 	mfZoom = std::clamp(mfZoom * std::exp(-0.15f * fWheelDelta), 0.5f, 5.0f);

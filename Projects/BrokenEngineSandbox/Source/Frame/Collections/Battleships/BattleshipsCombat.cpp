@@ -34,6 +34,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
 	rCurrentInterpolate.pDestroyedTimes[i] = kBattleshipDestroyTime;
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
 
@@ -68,7 +69,6 @@ void BattleshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFra
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfBattleshipRadius,
-		.fDamage = kfShipCollisionDamage,
 		.uiCategory = CollisionCategory::kuiBattleship,
 		.uiCollidesWith = CollidesWith::kuiBattleship,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -98,16 +98,11 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 			continue;
 		}
 
-		// Check collision results - battleships take damage from blasters and ship rams
+		// Check collision results - battleships take damage from blasters
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
-			// A contact with a spawning Fighter damages neither side; its own PostCollision drops the same contact.
-			if (rResult.uiOtherCategory == CollisionCategory::kuiFighter && (rFrame.postRender.pFighters->pOrders[rResult.iOtherIndex] & ShipOrders::kSpawning))
-			{
-				continue;
-			}
-			if (rResult.uiOtherCategory & (CollisionCategory::kuiBlaster | CollisionCategory::kuiShips))
+			if (rResult.uiOtherCategory & CollisionCategory::kuiBlaster)
 			{
 				rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
 

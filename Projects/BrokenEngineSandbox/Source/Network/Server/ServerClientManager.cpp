@@ -279,7 +279,6 @@ void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 			spawnInfo.vecDirection = vecBattleshipDirection;
 			spawnInfo.vecVelocity = rBattleshipFrame.postRender.pBattleships->pVecVelocities[iBattleshipRow];
 			spawnInfo.uiFlightPlane = rBattleshipsInterpolate.puiFlightPlanes[iBattleshipRow];
-			spawnOrders.Set(ShipOrders::kSpawning);
 			QueueFleetSpawn(flagshipCoordinate, spawnInfo);
 			mNextFighterLaunchTicks.insert_or_assign(rFleet.guid, iSpawnTick + static_cast<int64_t>(kfShipSpawnInterval * engine::kiTickRate));
 			break;

@@ -89,6 +89,7 @@
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <ExceptionHandling>Async</ExceptionHandling>
       <FloatingPointModel>Strict</FloatingPointModel>
@@ -110,6 +111,7 @@
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <ExceptionHandling>Async</ExceptionHandling>
       <FloatingPointModel>Strict</FloatingPointModel>
@@ -133,6 +135,7 @@
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <ExceptionHandling>Async</ExceptionHandling>
       <FloatingPointModel>Strict</FloatingPointModel>

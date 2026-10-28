@@ -23,9 +23,6 @@ inline constexpr float kfMissileGravity = 9.8f;
 
 inline constexpr float kfFighterHealth = 10.0f;
 inline constexpr float kfBattleshipHealth = 60.0f;
-// Every ship takes this from a ship collision, whatever the other ship's type; a contact with a spawning Fighter
-// (ShipOrders::kSpawning) deals none to either side.
-inline constexpr float kfShipCollisionDamage = 5.0f;
 
 namespace CollisionCategory
 {
@@ -48,12 +45,11 @@ inline constexpr uint16_t kuiBlaster = CollisionCategory::kuiShips;
 
 inline constexpr uint16_t kuiMissile = CollisionCategory::kuiShips;
 
-// No type collides with itself; Pushers keep same-type ships apart.
-inline constexpr uint16_t kuiFighter = CollisionCategory::kuiOmni | CollisionCategory::kuiBattleship | CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
+inline constexpr uint16_t kuiFighter = CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
 
-inline constexpr uint16_t kuiOmni = CollisionCategory::kuiFighter | CollisionCategory::kuiBattleship | CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
+inline constexpr uint16_t kuiOmni = CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
 
-inline constexpr uint16_t kuiBattleship = CollisionCategory::kuiFighter | CollisionCategory::kuiOmni | CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
+inline constexpr uint16_t kuiBattleship = CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
 } // namespace CollidesWith
 
 // engine::AreaDamage categories of a missile blast, tagged by the side that fired it. They share no space with

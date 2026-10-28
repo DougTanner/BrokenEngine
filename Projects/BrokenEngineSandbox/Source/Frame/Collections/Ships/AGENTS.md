@@ -4,6 +4,19 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 
 ## Ship Invariants
 
+- Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
+  separation across heights, including an immediate nudge for exact or near XY
+  overlap; blaster collision and missile explosion damage still apply.
+  The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
+  owns the distance, correction, and shared-snapshot rules.
+- Apply the pusher's X correction once to the current stored Interpolate
+  position after terrain resolution, preserving Y/Z/W and stored/target planes.
+  Tiny terrain intrusion from this correction is accepted; separation can
+  progress across ticks rather than fully resolving a stack in one tick.
+- A ship releases and clears its pusher when its natural explosion begins.
+  Zero handles skip Sync and push queries; final removal and transfer retain
+  ordinary owned-handle cleanup. Fleet Battleships follow their
+  [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants).
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows run the fleet navigation below and are the owned entities (`Frame::OwnedEntityCount`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
 - In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Spawn-phase weapon targeting reads the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.

@@ -92,9 +92,12 @@ void PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restri
 	}
 }
 
-XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate& rFrameInterpolate, FXMVECTOR vecPosition, id_t ignorePusher, PusherFlags_t includeFlags, PusherFlags_t excludeFlags)
+XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate& rFrameInterpolate, id_t selfPusher, float& rfPositionCorrectionX, PusherFlags_t includeFlags, PusherFlags_t excludeFlags)
 {
+	rfPositionCorrectionX = 0.0f;
 	const PushersInterpolate& rCurrent = rFrameInterpolate.pushers;
+	int64_t iSelfIndex = rCurrent.idToIndexMap.at(selfPusher);
+	auto vecPosition = rCurrent.pVecPositions[iSelfIndex];
 
 	XMFLOAT2A f2Position {};
 	XMStoreFloat2A(&f2Position, vecPosition);
@@ -104,22 +107,12 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	int16_t* piZone = spppiPusherZones[iZoneX][iZoneY];
 	int64_t iPushersInZone = sppiPushersPerZone[iZoneX][iZoneY];
 
-	int64_t iIgnoreIndex = -1;
-	if ((ignorePusher.uuid.iValue != 0))
-	{
-		auto it = rCurrent.idToIndexMap.find(ignorePusher);
-		if (it != rCurrent.idToIndexMap.end())
-		{
-			iIgnoreIndex = static_cast<int64_t>(it->second);
-		}
-	}
-
 	auto vecPush = XMVectorZero();
 	for (int64_t j = 0; j < iPushersInZone; ++j)
 	{
 		int64_t i = piZone[j];
 
-		if (i == iIgnoreIndex) [[unlikely]]
+		if (i == iSelfIndex) [[unlikely]]
 		{
 			continue;
 		}
@@ -137,12 +130,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 		}
 
 		auto vecPusherPosition = rCurrent.pVecPositions[i];
-		if (XMVector3NearEqual(vecPosition, vecPusherPosition, XMVectorReplicate(kfEpsilon))) [[unlikely]]
-		{
-			continue;
-		}
-
-		auto vecFromPusher = XMVectorSubtract(vecPosition, vecPusherPosition);
+		auto vecFromPusher = XMVectorSetZ(XMVectorSubtract(vecPosition, vecPusherPosition), 0.0f);
 		auto vecDistanceSquared = XMVector3LengthSq(vecFromPusher);
 		float fRadius = rCurrent.pfRadii[i];
 		if (XMVectorGetX(vecDistanceSquared) > fRadius * fRadius) [[likely]]
@@ -154,7 +142,17 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 		vecIntensity = XMVectorPow(vecIntensity, XMVectorReplicate(rCurrent.pfPowers[i]));
 		vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
 
-		auto vecFromPusherNormal = XMVector3Normalize(vecFromPusher);
+		XMVECTOR vecFromPusherNormal = XMVectorZero();
+		if (XMVectorGetX(vecDistanceSquared) <= 0.0001f * 0.0001f) [[unlikely]]
+		{
+			float fDirectionX = iSelfIndex < i ? -1.0f : 1.0f;
+			rfPositionCorrectionX += fDirectionX * 0.001f;
+			vecFromPusherNormal = XMVectorSet(fDirectionX, 0.0f, 0.0f, 0.0f);
+		}
+		else
+		{
+			vecFromPusherNormal = XMVector3Normalize(vecFromPusher);
+		}
 		vecPush = XMVectorMultiplyAdd(vecIntensity, vecFromPusherNormal, vecPush);
 	}
 
