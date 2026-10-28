@@ -203,6 +203,13 @@ void Lighting::RecordCaptureStage(std::string_view stage)
 		const Texture* pTexture = rTextureIdentity.second;
 		value["renderTargets"][rTextureIdentity.first] = {{"image", reinterpret_cast<uint64_t>(pTexture->mVkImage)}, {"generation", pTexture->miGeneration}};
 	}
+	// TEMP START matched memory cost
+	if (stage == "prepared" || stage == "composed" || stage == "exportComplete")
+	{
+		mpState->terrain.RecordMatchedCostReceipt(mpState->iFramebuffer, rFramebuffer.geometries, value["matchedMemoryCost"]);
+		value["matchedMemoryCost"]["cpuTerrainPrepare"] = {{"lastMs", rFramebuffer.fMatchedTerrainPrepareMs}, {"totalMs", rFramebuffer.fMatchedTerrainPrepareTotalMs}, {"calls", rFramebuffer.uiMatchedTerrainPrepareCalls}, {"scope", "exact LightingTerrain::Prepare call; excludes Write, RecordPreparation, receipt hashing/export; cumulative since framebuffer creation; Debug measurements"}};
+	}
+	// TEMP END matched memory cost
 	rComparison.manifest["stages"][stage] = std::move(value);
 }
 

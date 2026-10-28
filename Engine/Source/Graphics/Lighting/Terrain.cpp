@@ -5,6 +5,8 @@
 #include "../../../Data/Shaders/Lighting/LightingTerrainCommon.h"
 #include "Data/Shader.h"
 #include "Frame/IslandTerrain.h"
+#include "Frame/IslandTerrainResidency.h"
+#include "File/PackChunks.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Graphics/Islands.h"
 #include "LightingAccelerationStructure.h"
@@ -66,6 +68,9 @@ struct LightingTerrain::State
 		VkQueryPool vkQueryPool = VK_NULL_HANDLE;
 		uint32_t uiQueryCount = 0;
 		int64_t iElevationPlacements = 0;
+		// TEMP START matched memory cost
+		std::array<uint8_t, 32> matchedCommandDigest {};
+		// TEMP END matched memory cost
 		uint32_t uiFirstInstance = 0;
 		uint32_t uiFirstGeometry = 0;
 
@@ -588,6 +593,14 @@ void LightingTerrain::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t
 		rFramebuffer.uiRecordedPublication = rFramebuffer.pending.uiPublication;
 		return;
 	}
+	// TEMP START matched memory cost
+	std::optional<common::Sha256Hasher> commandHasher;
+	if (rFramebuffer.uiValidationSerial != 0) commandHasher.emplace();
+	auto HashCommand = [&]<typename T>(const T& rValue)
+	{
+		if (commandHasher.has_value()) commandHasher->Update(std::as_writable_bytes(std::span(const_cast<T*>(&rValue), 1)));
+	};
+	// TEMP END matched memory cost
 	bool bValidation = rFramebuffer.uiValidationSerial != 0;
 	LightingTerrainOperations& rProduction = rFramebuffer.pending.productionOperations;
 	LightingTerrainOperations& rValidation = rFramebuffer.pending.validationOperations;
@@ -616,6 +629,9 @@ void LightingTerrain::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t
 		{
 			int64_t iCount = std::min<int64_t>(rPlacement.uiVertexCount - iBase, iMaxGroups * shaders::kiLightingTerrainGroup);
 			XMFLOAT4 f4Push {std::bit_cast<float>(iOriginX), std::bit_cast<float>(iOriginY), std::bit_cast<float>(rPlacement.uiPlacement), std::bit_cast<float>(static_cast<uint32_t>(iBase))};
+			// TEMP START matched memory cost
+			HashCommand(f4Push.x); HashCommand(f4Push.y); HashCommand(f4Push.z); HashCommand(f4Push.w); HashCommand(iCount);
+			// TEMP END matched memory cost
 			mpState->vertexPipeline.RecordCompute(iFramebuffer, vkCommandBuffer, (iCount + shaders::kiLightingTerrainGroup - 1) / shaders::kiLightingTerrainGroup, 1, 1, f4Push);
 			++rProduction.iDispatches;
 			iBase += iCount;
@@ -630,6 +646,10 @@ void LightingTerrain::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t
 		{
 			int64_t iRun = std::min(iCount - iBase, iMaxGroups * shaders::kiLightingTerrainGroup);
 			shaders::LightingTerrainValidatePush push {.iOriginX = iOriginX, .iOriginY = iOriginY, .uiPlacement = rPlacement.uiPlacement, .uiBase = static_cast<uint32_t>(iBase), .uiMode = uiMode, .uiShift = uiShift, .uiTile = uiTile};
+			// TEMP START matched memory cost
+			HashCommand(push.iOriginX); HashCommand(push.iOriginY); HashCommand(push.uiPlacement); HashCommand(push.uiBase);
+			HashCommand(push.uiMode); HashCommand(push.uiShift); HashCommand(push.uiTile); HashCommand(iRun);
+			// TEMP END matched memory cost
 			vkCmdPushConstants(vkCommandBuffer, rPipeline.mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
 			vkCmdDispatch(vkCommandBuffer, static_cast<uint32_t>((iRun + shaders::kiLightingTerrainGroup - 1) / shaders::kiLightingTerrainGroup), 1, 1);
 			++rValidation.iDispatches;
@@ -639,6 +659,9 @@ void LightingTerrain::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t
 	auto DrawTile = [&](int32_t iOriginX, int32_t iOriginY, LightingTerrainOperations& rOperations)
 	{
 		Barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, rOperations);
+		// TEMP START matched memory cost
+		HashCommand(iOriginX); HashCommand(iOriginY); HashCommand(rFramebuffer.iElevationPlacements);
+		// TEMP END matched memory cost
 		rFramebuffer.scratch.RecordBeginRenderPass(vkCommandBuffer);
 		++rOperations.iRenderPasses;
 		mpState->rasterPipeline.RecordDraw(iFramebuffer, vkCommandBuffer, rFramebuffer.iElevationPlacements, 0, {std::bit_cast<float>(iOriginX), std::bit_cast<float>(iOriginY), 0.0f, 0.0f});
@@ -764,9 +787,201 @@ void LightingTerrain::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t
 		Timestamp(5, rValidation);
 	}
 	Timestamp(1, rProduction);
+	// TEMP START matched memory cost
+	if (commandHasher.has_value() && !commandHasher->Finish(rFramebuffer.matchedCommandDigest)) throw std::runtime_error("Matched command SHA256 failed");
+	// TEMP END matched memory cost
 	rFramebuffer.uiRecordedSerial = rFramebuffer.uiValidationSerial;
 	rFramebuffer.uiRecordedPublication = rFramebuffer.pending.uiPublication;
 }
+// TEMP START matched memory cost
+void LightingTerrain::RecordMatchedCostReceipt(int64_t iFramebuffer, const Buffer& rGeometry, nlohmann::json& rReceipt) const
+{
+	const State::Framebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
+	const Buffer& rQuads = gpIslands->mIslandsStorageBuffers.at(iFramebuffer);
+	const shaders::AxisAlignedQuadLayout* pQuads = reinterpret_cast<const shaders::AxisAlignedQuadLayout*>(rQuads.mpMappedMemory);
+	const VkDrawIndexedIndirectCommand* pDraws = gpIslands->mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(iFramebuffer);
+	const shaders::GlobalLayout& rGlobal = *reinterpret_cast<const shaders::GlobalLayout*>(gpBufferManager->mGlobalLayoutUniformBuffers.at(iFramebuffer).mpMappedMemory);
+	const shaders::MainLayout& rMain = *reinterpret_cast<const shaders::MainLayout*>(gpBufferManager->mMainLayoutUniformBuffers.at(iFramebuffer).mpMappedMemory);
+	common::Sha256Hasher hasher;
+	auto Hash = [&]<typename T>(const T& rValue)
+	{
+		hasher.Update(std::as_writable_bytes(std::span(const_cast<T*>(&rValue), 1)));
+	};
+	auto Hash4 = [&](const XMFLOAT4& rValue)
+	{
+		Hash(rValue.x); Hash(rValue.y); Hash(rValue.z); Hash(rValue.w);
+	};
+	rReceipt["schema"] = "TEMP matched-memory-cost-v1; little-endian raw fields in source order";
+	rReceipt["provenance"] = "Immutable pack/manifest plus validated upload ranges and CPU publication owners; not an independent GPU-byte or native descriptor hash";
+	rReceipt["activeQuads"] = rFramebuffer.iElevationPlacements;
+	Hash(rFramebuffer.iElevationPlacements);
+	bool bTailZero = true;
+	for (int64_t i = 0; i < kiMaxActivePlacements; ++i)
+	{
+		const shaders::AxisAlignedQuadLayout& rQuad = pQuads[i];
+		if (i < rFramebuffer.iElevationPlacements)
+		{
+			Hash4(rQuad.f4VertexRect); Hash4(rQuad.f4TextureRect);
+			Hash(rQuad.fRotation); Hash(rQuad.uiTextureSlot); Hash(rQuad.f4Parameters.x);
+		}
+		else
+		{
+			bTailZero &= rQuad.f4VertexRect.z == 0.0f && rQuad.f4VertexRect.w == 0.0f;
+		}
+	}
+	rReceipt["unusedQuadTail"] = {{"first", rFramebuffer.iElevationPlacements}, {"end", kiMaxActivePlacements}, {"zeroWidthAndHeight", bTailZero}, {"scope", "fixed-arena visible elevation prepass; scratch draws only activeQuads; no padding requirement"}};
+	Hash4(rGlobal.f4VisibleArea);
+	Hash(rGlobal.fSeaFloorElevation); Hash(rGlobal.fSeaFloorElevationInverse);
+	Hash(rGlobal.fUnderwaterMaskThreshold); Hash(rGlobal.fWaterUnderseaCompressionInverse);
+	Hash(rMain.f4x4ViewProjection);
+	auto Image = [&](std::string_view name, const Texture& rTexture)
+	{
+		const TextureInfo& rInfo = rTexture.mInfo;
+		Hash(rInfo.vkFormat); Hash(rInfo.vkExtent3D.width); Hash(rInfo.vkExtent3D.height); Hash(rInfo.vkExtent3D.depth);
+		Hash(rInfo.iMipLevels); Hash(rInfo.iArrayLayers); Hash(rInfo.vkImageAspectFlags); Hash(rInfo.vkSampleCountFlagBits);
+		rReceipt["images"][name] = {{"image", reinterpret_cast<uint64_t>(rTexture.mVkImage)}, {"view", reinterpret_cast<uint64_t>(rTexture.mVkImageView)}, {"generation", rTexture.miGeneration}, {"format", rInfo.vkFormat}, {"extent", {rInfo.vkExtent3D.width, rInfo.vkExtent3D.height, rInfo.vkExtent3D.depth}}, {"viewRange", {rInfo.vkImageAspectFlags, 0, rInfo.iMipLevels, 0, rInfo.iArrayLayers}}, {"real", rTexture.mVkImage != VK_NULL_HANDLE}};
+	};
+	Image("visibleElevation", gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture);
+	Image("scratch", rFramebuffer.scratch);
+	for (float fClear : rFramebuffer.scratch.mInfo.vkRenderPassClearColorValue.float32) Hash(fClear);
+	Hash(rFramebuffer.scratch.mInfo.vkRenderPassAttachmentLoadOp);
+	Hash(rFramebuffer.scratch.mInfo.vkRenderPassFinalImageLayout);
+	Hash(gpIslands->miTemplateCount);
+	for (int64_t i = 0; i < gpIslands->miTemplateCount; ++i)
+	{
+		common::crc_t crc = gpIslandTerrain->mIslandCrcsSorted.at(i);
+		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
+		const VkDrawIndexedIndirectCommand& rDraw = pDraws[i];
+		Hash(crc); Hash(rDraw.indexCount); Hash(rDraw.instanceCount); Hash(rDraw.firstIndex); Hash(rDraw.vertexOffset); Hash(rDraw.firstInstance);
+		int64_t iEnd = i + 1 < gpIslands->miTemplateCount ? pDraws[i + 1].firstInstance : rFramebuffer.iElevationPlacements;
+		rReceipt["runs"].push_back({{"template", crc}, {"first", rDraw.firstInstance}, {"end", iEnd}, {"indices", rDraw.indexCount}, {"meshVisible", rDraw.instanceCount}, {"firstIndex", rDraw.firstIndex}, {"vertexOffset", rDraw.vertexOffset}});
+		if (iEnd == rDraw.firstInstance) continue;
+		const LazyChunk& rChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
+		int64_t iHeightBytes = rTemplate.iHeightmapWidth * rTemplate.iHeightmapHeight * sizeof(uint16_t);
+		int64_t iXYBytes = rTemplate.iMeshVertexCount * sizeof(XMFLOAT2);
+		int64_t iIndexBytes = rTemplate.iMeshIndexCount * sizeof(uint32_t);
+		Hash(rTemplate.iTextureSlot); Hash(rTemplate.iHeightmapWidth); Hash(rTemplate.iHeightmapHeight);
+		Hash(rTemplate.iMeshVertexCount); Hash(rTemplate.iMeshIndexCount);
+		Hash(rChunk.location.contentCrc); Hash(rChunk.header.iSize);
+		Hash(rChunk.location.uiOffset); Hash(rChunk.location.uiSize);
+		Hash(rTemplate.iMeshVertexOffset); Hash(rTemplate.iMeshIndexOffset);
+		Image(std::format("heightSlot{}", rTemplate.iTextureSlot), *gpTextureManager->mRenderTargetTextures.mElevationTextures.at(rTemplate.iTextureSlot));
+		bool bSourceRanges = iHeightBytes <= rChunk.header.iSize && iXYBytes <= rChunk.header.iSize - iHeightBytes && iIndexBytes <= rChunk.header.iSize - iHeightBytes - iXYBytes;
+		bool bArenaRanges = rTemplate.iMeshVertexOffset >= 0 && iXYBytes <= gpIslands->mIslandMeshArena.mInfo.iDataSize - rTemplate.iMeshVertexOffset && rTemplate.iMeshIndexOffset >= 0 && iIndexBytes <= gpIslands->mIslandMeshArena.mInfo.iDataSize - rTemplate.iMeshIndexOffset;
+		rReceipt["contributors"].push_back({{"template", crc}, {"slot", rTemplate.iTextureSlot}, {"gpuResident", rTemplate.bGpuResident}, {"meshResidency", static_cast<int32_t>(rTemplate.eMeshResidency)}, {"sourceContentCrc", rChunk.location.contentCrc}, {"packOffset", rChunk.location.uiOffset}, {"packBytes", rChunk.location.uiSize}, {"heightPointerMatchesPayload", reinterpret_cast<const std::byte*>(rTemplate.puiHeightmapHalf) == rChunk.pData}, {"payloadBytes", rChunk.header.iSize}, {"heightRange", {0, iHeightBytes}}, {"xyRange", {iHeightBytes, iXYBytes}}, {"indexRange", {iHeightBytes + iXYBytes, iIndexBytes}}, {"sourceRangesValid", bSourceRanges}, {"arenaRangesValid", bArenaRanges}, {"xyStride", sizeof(XMFLOAT2)}, {"indexStride", sizeof(uint32_t)}});
+	}
+	const shaders::LightingTerrainWork* pWork = reinterpret_cast<const shaders::LightingTerrainWork*>(rFramebuffer.work.mpMappedMemory);
+	auto Address = [&](uint64_t uiAddress, const Buffer& rOwner, uint64_t uiBytes)
+	{
+		uint64_t uiBase = rOwner.GetDeviceAddress();
+		uint64_t uiOffset = uiAddress - uiBase;
+		bool bValid = uiAddress >= uiBase && uiOffset <= static_cast<uint64_t>(rOwner.mInfo.iDataSize) && uiBytes <= static_cast<uint64_t>(rOwner.mInfo.iDataSize) - uiOffset;
+		Hash(uiOffset); Hash(uiBytes);
+		return nlohmann::json{{"owner", rOwner.mInfo.name}, {"buffer", reinterpret_cast<uint64_t>(rOwner.GetBuffer())}, {"offset", uiOffset}, {"bytes", uiBytes}, {"valid", bValid}};
+	};
+	for (const State::Placement& rPlacement : rFramebuffer.placements)
+	{
+		const shaders::LightingTerrainWork& rWork = pWork[rPlacement.uiPlacement];
+		Hash(rPlacement.uiPlacement); Hash(rWork.uiTemplate); Hash(rWork.uiVertexCount); Hash(rWork.uiPrimitiveCount); Hash(rWork.uiValidation);
+		Hash(rWork.iFootprintMinTileX); Hash(rWork.iFootprintMinTileY); Hash(rWork.iFootprintMaxTileX); Hash(rWork.iFootprintMaxTileY);
+		Hash(rWork.uiBuildPrimitiveCount); Hash(rWork.uiBuildVertexCount);
+		Hash(rPlacement.iMinTileX); Hash(rPlacement.iMinTileY); Hash(rPlacement.iMaxTileX); Hash(rPlacement.iMaxTileY);
+		nlohmann::json work = {{"placement", rPlacement.uiPlacement}, {"template", rWork.uiTemplate}, {"serial", rWork.uiSerial}, {"tileBounds", {rPlacement.iMinTileX, rPlacement.iMinTileY, rPlacement.iMaxTileX, rPlacement.iMaxTileY}}};
+		work["xy"] = Address(rWork.uiXYAddress, gpIslands->mIslandMeshArena, rWork.uiVertexCount * sizeof(XMFLOAT2));
+		work["indices"] = Address(rWork.uiIndexAddress, gpIslands->mIslandMeshArena, rWork.uiPrimitiveCount * 3ull * sizeof(uint32_t));
+		work["xyz"] = Address(rWork.uiXYZAddress, rFramebuffer.vertices, rWork.uiVertexCount * 3ull * sizeof(float));
+		work["hitGeometry"] = Address(rWork.uiHitGeometryAddress, rGeometry, sizeof(shaders::LightingGeometry));
+		if (rWork.uiValidation != 0)
+		{
+			work["writes"] = Address(rWork.uiWritesAddress, rFramebuffer.writes, rWork.uiVertexCount * sizeof(uint32_t));
+			work["originals"] = Address(rWork.uiOriginalAddress, rFramebuffer.originals, rWork.uiVertexCount * sizeof(shaders::LightingTerrainOriginal));
+			work["summary"] = Address(rWork.uiSummaryAddress, rFramebuffer.summary, sizeof(shaders::LightingTerrainValidation));
+			work["baseTile"] = Address(rWork.uiBaseTileAddress, rFramebuffer.baseTile, rFramebuffer.baseTile.mInfo.iDataSize);
+			work["baseZ"] = Address(rWork.uiBaseZAddress, rFramebuffer.baseZ, rWork.uiVertexCount * sizeof(shaders::LightingTerrainBaseSample));
+			work["tiles"] = Address(rWork.uiTileResultsAddress, rFramebuffer.tileResults, rFramebuffer.counts.iTiles * sizeof(shaders::LightingTerrainTileResult));
+			work["evidence"] = Address(rWork.uiEvidenceAddress, rFramebuffer.evidence, sizeof(shaders::LightingTerrainEvidence));
+		}
+		rReceipt["work"].push_back(std::move(work));
+	}
+	Hash(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxComputeWorkGroupCount[0]);
+	Hash(shaders::kiLightingTerrainGroup); Hash(shaders::kiLightingTerrainTile); Hash(shaders::kiLightingTerrainHalo);
+	const TextureDescriptors& rDescriptors = gpTextureManager->mTextureDescriptors;
+	rReceipt["pending"] = {{"adoptions", gpTextureUploadManager->miPendingAdoptions.load()}, {"restoration", gpIslandTerrainResidency->AnyRestorationPending()}, {"eviction", gpIslandTerrainResidency->AnyEvictionPending()}, {"descriptorPublication", rDescriptors.HasUnappliedPublications(iFramebuffer)}};
+	for (int64_t iSlot = 0; iSlot < shaders::kiMaxIslands; ++iSlot)
+	{
+		auto it = rDescriptors.mIslandSlots.find(iSlot);
+		if (it == rDescriptors.mIslandSlots.end()) continue;
+		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(it->second.islandCrc);
+		const Texture& rHeight = *gpTextureManager->mRenderTargetTextures.mElevationTextures[iSlot];
+		rReceipt["retainedSlots"].push_back({{"slot", iSlot}, {"template", it->second.islandCrc}, {"resident", rTemplate.bGpuResident}, {"meshResidency", static_cast<int32_t>(rTemplate.eMeshResidency)}, {"image", reinterpret_cast<uint64_t>(rHeight.mVkImage)}, {"view", reinterpret_cast<uint64_t>(rHeight.mVkImageView)}, {"generation", rHeight.miGeneration}, {"ownedHeight", &rHeight == &rTemplate.elevationTexture && it->second.pElevationTexture == &rHeight}, {"real", rHeight.mVkImage != VK_NULL_HANDLE}});
+	}
+	for (DescriptorFlags flag : {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerElevation})
+	{
+		VkSampler vkSampler = gpTextureManager->GetSampler(flag);
+		for (int64_t i = 0; i < TextureManager::kSamplerSlotCount; ++i)
+		{
+			if (gpTextureManager->mpSamplersVkSampler[i] != vkSampler) continue;
+			const VkSamplerCreateInfo& rInfo = gpTextureManager->mpSamplerInfosVkSamplerCreateInfo[i];
+			Hash(rInfo.magFilter); Hash(rInfo.minFilter); Hash(rInfo.mipmapMode);
+			Hash(rInfo.addressModeU); Hash(rInfo.addressModeV); Hash(rInfo.addressModeW);
+			Hash(rInfo.mipLodBias); Hash(rInfo.anisotropyEnable); Hash(rInfo.maxAnisotropy);
+			Hash(rInfo.compareEnable); Hash(rInfo.compareOp); Hash(rInfo.minLod); Hash(rInfo.maxLod);
+			Hash(rInfo.borderColor); Hash(rInfo.unnormalizedCoordinates);
+		}
+	}
+	for (const Pipeline* pPipeline : {&gpPipelineManager->mpPipelines[kPipelineTerrainElevation], &mpState->rasterPipeline, &mpState->vertexPipeline, &mpState->validatePipeline, &mpState->witnessPipeline})
+	{
+		Hash(pPipeline->mInfo.flags.meFlags); Hash(pPipeline->mInfo.iPushConstantBytes);
+		Hash(pPipeline->mInfo.vkExtent3D.width); Hash(pPipeline->mInfo.vkExtent3D.height);
+		nlohmann::json pipeline = {{"name", pPipeline->mInfo.name}, {"set1", reinterpret_cast<uint64_t>(pPipeline->mVkDescriptorSets.at(iFramebuffer))}, {"pipeline", reinterpret_cast<uint64_t>(pPipeline->mVkPipeline)}, {"flags", std::to_underlying(pPipeline->mInfo.flags.meFlags)}, {"pushBytes", pPipeline->mInfo.iPushConstantBytes}};
+		for (const DescriptorInfo& rInfo : pPipeline->mInfo.descriptorInfos)
+		{
+			int64_t iBinding = rInfo.iExplicitBinding;
+			if (iBinding < 0) iBinding = &rInfo - pPipeline->mInfo.descriptorInfos.data();
+			if (!PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, iBinding)) continue;
+			nlohmann::json binding = {{"binding", iBinding}, {"setIndex", Pipeline::ResolveBindingSetIndex(pPipeline->mInfo, iBinding)}};
+			const Buffer* pBuffer = nullptr;
+			if (rInfo.flags & DescriptorFlags::kGlobalLayoutUniformBuffers) pBuffer = &gpBufferManager->mGlobalLayoutUniformBuffers.at(iFramebuffer);
+			else if (rInfo.flags & DescriptorFlags::kMainLayoutUniformBuffers) pBuffer = &gpBufferManager->mMainLayoutUniformBuffers.at(iFramebuffer);
+			else if (rInfo.flags & DescriptorFlags::kPerCommandBufferStorageBuffers) pBuffer = &rInfo.pBuffers[iFramebuffer];
+			else if (rInfo.flags & DescriptorFlags::kStorageBuffer) pBuffer = &rFramebuffer.work;
+			if (pBuffer != nullptr) binding["buffer"] = {{"handle", reinterpret_cast<uint64_t>(pBuffer->GetBuffer())}, {"offset", 0}, {"range", "VK_WHOLE_SIZE"}, {"bytes", pBuffer->mInfo.iDataSize}};
+			if (iBinding == 4 && pPipeline != &mpState->rasterPipeline)
+			{
+				const Texture& rImage = pPipeline == &mpState->witnessPipeline ? gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture : rFramebuffer.scratch;
+				binding["image"] = {{"view", reinterpret_cast<uint64_t>(rImage.mVkImageView)}, {"generation", rImage.miGeneration}, {"sampler", reinterpret_cast<uint64_t>(gpTextureManager->GetSampler(DescriptorFlags::kCombinedSamplers))}};
+			}
+			pipeline["bindings"].push_back(std::move(binding));
+		}
+		for (const auto& [crc, bindings] : rDescriptors.mTextureBindings)
+		{
+			for (const TextureDescriptors::TextureBinding& rBinding : bindings)
+			{
+				if (rBinding.pPipeline != pPipeline || rBinding.pTexture == nullptr) continue;
+				pipeline["publishedImages"].push_back({{"key", crc}, {"binding", rBinding.iBinding}, {"element", rBinding.iArrayIndex}, {"view", reinterpret_cast<uint64_t>(rBinding.pTexture->mVkImageView)}, {"writtenGeneration", rBinding.iTextureGeneration}, {"liveGeneration", rBinding.pTexture->miGeneration}, {"placeholder", rBinding.bTextureUsesPlaceholder}, {"sampler", reinterpret_cast<uint64_t>(gpTextureManager->GetSampler(rBinding.samplerFlags))}});
+			}
+		}
+		rReceipt["pipelines"].push_back(std::move(pipeline));
+	}
+	std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets {};
+	vmaGetHeapBudgets(gpDeviceManager->mpAllocator, budgets.data());
+	for (uint32_t i = 0; i < gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeapCount; ++i)
+	{
+		const VmaBudget& rBudget = budgets[i];
+		rReceipt["heapBudgets"].push_back({{"heap", i}, {"usage", rBudget.usage}, {"budget", rBudget.budget}, {"allocationBytes", rBudget.statistics.allocationBytes}, {"blockBytes", rBudget.statistics.blockBytes}});
+	}
+	std::array<uint8_t, 32> uiDigest {};
+	if (!hasher.Finish(uiDigest)) throw std::runtime_error("Matched memory cost SHA256 failed");
+	std::string digest;
+	for (uint8_t uiByte : uiDigest) digest += std::format("{:02x}", uiByte);
+	rReceipt["semanticSha256"] = digest;
+	std::string commands;
+	for (uint8_t uiByte : rFramebuffer.matchedCommandDigest) commands += std::format("{:02x}", uiByte);
+	rReceipt["recordedCommandSha256"] = commands;
+}
+// TEMP END matched memory cost
+
+
 LightingTerrainBytes LightingTerrain::GetResourceBytesDetail() const
 {
 	LightingTerrainBytes bytes;

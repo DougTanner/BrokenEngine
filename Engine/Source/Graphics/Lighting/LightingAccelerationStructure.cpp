@@ -22,6 +22,9 @@ LightingAccelerationStructure::~LightingAccelerationStructure()
 
 void LightingAccelerationStructure::Create(std::string_view name, VkAccelerationStructureTypeKHR vkType, std::span<const VkAccelerationStructureGeometryKHR> geometries, std::span<const uint32_t> primitiveCounts, VkBuildAccelerationStructureFlagsKHR vkFlags)
 {
+	// TEMP START matched memory cost
+	auto matchedCreateStart = std::chrono::steady_clock::now();
+	// TEMP END matched memory cost
 	Destroy();
 	mVkAccelerationStructureTypeKHR = vkType;
 	mVkBuildAccelerationStructureFlagsKHR = vkFlags;
@@ -63,6 +66,10 @@ void LightingAccelerationStructure::Create(std::string_view name, VkAcceleration
 	};
 	CHECK_VK(vkCreateAccelerationStructureKHR(gpDeviceManager->mVkDevice, &vkCreateInfo, nullptr, &mVkAccelerationStructureKHR));
 	VkName(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, mVkAccelerationStructureKHR, name.data());
+	// TEMP START matched memory cost
+	double fCreateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - matchedCreateStart).count();
+	LOG(kTemp, kInfo, "MATCHED_CPU AS_CREATE owner={} storageDestination={} storage={} scratchDestination={} scratch={} type={} ms={}", name, static_cast<const void*>(&mStorage.mDeviceLocalVkBuffer), reinterpret_cast<uint64_t>(mStorage.GetBuffer()), static_cast<const void*>(&mScratch.mDeviceLocalVkBuffer), reinterpret_cast<uint64_t>(mScratch.GetBuffer()), static_cast<int32_t>(vkType), fCreateMs);
+	// TEMP END matched memory cost
 }
 
 void LightingAccelerationStructure::Destroy() noexcept

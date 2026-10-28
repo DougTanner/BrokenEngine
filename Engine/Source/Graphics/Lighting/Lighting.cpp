@@ -340,7 +340,15 @@ void Lighting::EndRender()
 			PublishFixtureAnimation();
 		}
 		rFramebuffer.modelCounts = mpState->models->Prepare(mpState->iFramebuffer, rFramebuffer.modelRanges);
+		// TEMP START matched memory cost
+		auto matchedPrepareStart = std::chrono::steady_clock::now();
+		// TEMP END matched memory cost
 		rFramebuffer.terrainCounts = mpState->terrain.Prepare(mpState->iFramebuffer, mpState->uiValidationRequest, mpState->uiPublication + 1);
+		// TEMP START matched memory cost
+		rFramebuffer.fMatchedTerrainPrepareMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - matchedPrepareStart).count();
+		rFramebuffer.fMatchedTerrainPrepareTotalMs += rFramebuffer.fMatchedTerrainPrepareMs;
+		++rFramebuffer.uiMatchedTerrainPrepareCalls;
+		// TEMP END matched memory cost
 	}
 	int64_t iSolidCount = bActive && mpState->fixture != nullptr ? LightingFixture::kiSolidCount : 0;
 	rFramebuffer.uiFixtureFirstInstance = rFramebuffer.modelCounts.uiInstances + static_cast<uint32_t>(rFramebuffer.terrainCounts.iPlacements);
