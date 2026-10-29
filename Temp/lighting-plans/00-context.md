@@ -5,8 +5,8 @@ fresh session; each ends by updating `## Progress` below.
 
 ## Identity
 
-- Work in your own wrapper session worktree and branch (setup: `CODEX-HANDOFF.md` in this folder).
-  Identity values (worktree, branch, baseline) always come from `Get-AgentWorktreeSessionContext`.
+- Codex works directly in the primary checkout on branch `lighting-foundation-work` (user
+  direction; setup and per-session start/end steps: `CODEX-HANDOFF.md` in this folder).
 - The snapshot was authored on main `aa47e4a3e170a69b7dad971b94003f7ea30e5716`. Where a plan says
   `aa47e4a3…` as the diff base, use your session baseline if main has moved since (the foundation
   change is always session baseline → HEAD).

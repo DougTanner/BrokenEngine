@@ -1,40 +1,41 @@
 # Codex handoff: lighting foundation
 
-## Setup (user)
+The user runs Codex directly in the primary checkout `C:\Users\dougt\Documents\BrokenEngine`, with
+no session worktree. This user direction overrides the repository's own-worktree rule for this
+work. The primary checkout normally stays on `main`, where other sessions land, so each session
+switches to the work branch at the start and back to `main` at the end.
 
-From PowerShell 7 at the primary checkout root `C:\Users\dougt\Documents\BrokenEngine`:
-
-```powershell
-git fetch origin
-.\.codex\codex-worktree.ps1
-```
-
-The wrapper creates the session worktree and branch from current main and starts Codex there.
-Then give Codex the prompt below.
-
-## Prompt
+## Prompt for the first session
 
 ```text
-Resume the lighting foundation work from origin/lighting-foundation-handoff-20261029.
+Resume the lighting foundation work from origin/lighting-foundation-handoff-20261029, working
+directly in this primary checkout (user direction: no new worktree).
 
-Setup, in this wrapper session worktree (keep the wrapper's branch and session setup):
-1. git fetch origin
-2. git merge origin/lighting-foundation-handoff-20261029 — fast-forward when main has not moved
-   past aa47e4a3; otherwise resolve conflicts against current source, preserving both sides'
+Setup:
+1. Confirm `git status` is clean and the current branch is main; stop and report if not.
+2. git fetch origin
+3. git switch -c lighting-foundation-work
+4. git merge origin/lighting-foundation-handoff-20261029 — local main may be ahead of the
+   snapshot's base aa47e4a3; resolve any conflicts against current source, preserving both sides'
    intent, and report them.
-3. The commit force-adds Temp/lighting-plans/ and a few Temp/ evidence files (gitignored working
+5. The commit force-adds Temp/lighting-plans/ and a few Temp/ evidence files (gitignored working
    notes, not /next-plan Plans). Do not move them under Documents/Plans.
 
 Then read Temp/lighting-plans/00-context.md and run Temp/lighting-plans/01-build-and-static-checks.md
-only. Stop after 01, update 00-context.md ## Progress, and report what was built and verified and
-any residuals. The user will start a fresh session for each later plan (02, 03, ...).
+only. Wherever a plan or skill asks for the session worktree, branch or baseline, use this checkout,
+branch lighting-foundation-work, and baseline = `git merge-base main lighting-foundation-work`.
+No old Output binaries or packs count as verification; plan 01 builds them.
 
-No old Output binaries or packs in this new worktree count as verification; plan 01 builds them.
+At the end: commit the work on lighting-foundation-work (a WIP commit is fine), update
+Temp/lighting-plans/00-context.md ## Progress in that commit, then `git switch main` so other
+sessions can land, and report what was built and verified and any residuals.
 ```
 
-## Later sessions
+## Prompt for later sessions
 
-Each later session uses the same wrapper session worktree (reattach with
-`.\.codex\codex-worktree.ps1 -ReattachWorktree <worktree path>`) and the prompt:
-`Read Temp/lighting-plans/00-context.md, then run Temp/lighting-plans/0N-<name>.md only; stop after
-it and update ## Progress.`
+```text
+In this primary checkout: confirm `git status` is clean on main, then
+`git switch lighting-foundation-work`. Read Temp/lighting-plans/00-context.md and
+Temp/lighting-plans/CODEX-HANDOFF.md, then run Temp/lighting-plans/0N-<name>.md only.
+At the end commit on lighting-foundation-work, update ## Progress, `git switch main`, and report.
+```
