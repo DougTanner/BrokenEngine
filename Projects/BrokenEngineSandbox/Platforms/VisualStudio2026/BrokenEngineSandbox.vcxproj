@@ -24,38 +24,20 @@
     <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+  <PropertyGroup Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'!='Debug'">true</WholeProgramOptimization>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+  <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -69,37 +51,23 @@
     <GeneratedDataIncludeRoot Condition="'$(GeneratedDataIncludeRoot)'=='' and '$(GameDataDirectory)'!=''">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('$(GameDataDirectory)'))))</GeneratedDataIncludeRoot>
     <GameDataDirectoryIsAbsolute Condition="'$(GameDataDirectory)'!=''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GameDataDirectory)', '^(?:[A-Za-z]:[\\/]|[\\/]{2})'))</GameDataDirectoryIsAbsolute>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <PropertyGroup>
     <OutDir>$(ProjectDir)\Output\</OutDir>
     <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>$(ProjectName).$(Configuration)</TargetName>
-    <CustomBuildBeforeTargets>
-    </CustomBuildBeforeTargets>
+    <CustomBuildBeforeTargets />
     <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
     <LinkIncremental>false</LinkIncremental>
-    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
     <RunCodeAnalysis>false</RunCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis Condition="'$(Configuration)'!='Release'">false</EnableMicrosoftCodeAnalysis>
+    <TargetName Condition="'$(Configuration)'!='Release'">$(ProjectName).$(Configuration)</TargetName>
+    <TargetName Condition="'$(Configuration)'=='Release'">$(ProjectName)</TargetName>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
-    <OutDir>$(ProjectDir)\Output\</OutDir>
-    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>$(ProjectName).$(Configuration)</TargetName>
-    <CustomBuildBeforeTargets>
-    </CustomBuildBeforeTargets>
-    <LinkIncremental>false</LinkIncremental>
+  <PropertyGroup Condition="'$(Configuration)'=='Profile'">
     <CodeAnalysisRuleSet>NativeMinimumRules.ruleset</CodeAnalysisRuleSet>
-    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
-    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(ProjectDir)\Output\</OutDir>
-    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>$(ProjectName)</TargetName>
-    <CustomBuildBeforeTargets />
-    <LinkIncremental>false</LinkIncremental>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)BrokenEngineAnalysis.ruleset</CodeAnalysisRuleSet>
     <!-- Analysis diagnostics reach the post-link NativeCodeAnalysis task, not cl's console, so
          TreatWarningAsError never sees them; this is what makes them fail the build. It takes effect
@@ -109,208 +77,103 @@
          drops back to warnings. -->
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     <RunCodeAnalysis>true</RunCodeAnalysis>
-    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup>
     <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. DeadStores flags values whose only reads a compile-time log level or feature switch removes from this configuration. ArrayBound flags indexes bounded by invariants the analyzer cannot see, such as an ASSERT, which is not [[noreturn]]. -->
     <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ProcessorNumber>8</ProcessorNumber>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+)
+</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
       <Optimization>Disabled</Optimization>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <ProcessorNumber>8</ProcessorNumber>
-      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <FloatingPointModel>Strict</FloatingPointModel>
-      <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
-      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <ExceptionHandling>Async</ExceptionHandling>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
-      <EnableModules>false</EnableModules>
-      <BuildStlModules>false</BuildStlModules>
+      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <EntryPointSymbol>
-      </EntryPointSymbol>
-      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-    <CustomBuildStep>
-      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
-    </CustomBuildStep>
-    <PreBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
-if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'!='Debug'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <ProcessorNumber>8</ProcessorNumber>
-      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <FloatingPointModel>Strict</FloatingPointModel>
-      <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
-      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <EnablePREfast>false</EnablePREfast>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
       <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
       <DisableSpecificWarnings>4702</DisableSpecificWarnings>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
-      <ControlFlowGuard>false</ControlFlowGuard>
-      <ExceptionHandling>Async</ExceptionHandling>
-      <EnableModules>false</EnableModules>
-      <BuildStlModules>false</BuildStlModules>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <EntryPointSymbol>
-      </EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
-      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <CustomBuildStep>
-      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
-    </CustomBuildStep>
-    <PreBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
-if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-</Command>
-      <Message>
-      </Message>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Profile'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <ProcessorNumber>8</ProcessorNumber>
-      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <FloatingPointModel>Strict</FloatingPointModel>
-      <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
-      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <EnablePREfast>true</EnablePREfast>
-      <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at Release LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
-      <DisableSpecificWarnings>4702</DisableSpecificWarnings>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
-      <ControlFlowGuard>false</ControlFlowGuard>
-      <ExceptionHandling>Async</ExceptionHandling>
-      <EnableModules>false</EnableModules>
-      <BuildStlModules>false</BuildStlModules>
+      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <EnablePREfast>false</EnablePREfast>
     </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <EntryPointSymbol>
-      </EntryPointSymbol>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <OptimizeReferences>true</OptimizeReferences>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
-      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-    <CustomBuildStep>
-      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
-    </CustomBuildStep>
-    <PreBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
-if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
-    "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-)
-</Command>
-      <Message>
-      </Message>
-    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <EnablePREfast>true</EnablePREfast>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Common\Common.h" />
@@ -682,9 +545,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Input\Input.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Input\RawInputManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\CrashReport.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp" />

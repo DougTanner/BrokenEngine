@@ -57,7 +57,6 @@
     <Filter Include="Engine\Memory"><UniqueIdentifier>{fd6feaa9-5dad-4776-ae8c-f6fe5b184d91}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Network"><UniqueIdentifier>{e8a8859c-8861-4493-a3a0-804e334afa2e}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Network\Client"><UniqueIdentifier>{ac5eb397-210b-421b-b7bc-b13d3ceca503}</UniqueIdentifier></Filter>
-    <Filter Include="Engine\Network\Server"><UniqueIdentifier>{906bacf3-a9eb-4851-86cc-6b9489557900}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Profile"><UniqueIdentifier>{ce76bfae-2156-4cc4-ae3c-b899a867c67c}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Ui"><UniqueIdentifier>{624925c9-f935-4d65-992e-c4e8001940b4}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Ui\Screens"><UniqueIdentifier>{71754338-e16b-4eff-b3b5-a0720df29184}</UniqueIdentifier></Filter>
