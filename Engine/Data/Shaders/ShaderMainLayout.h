@@ -12,6 +12,10 @@ struct MainLayout
 	vec4 f4x4ViewProjection[4] INIT;
 
 	vec4 f4EyePosition INIT;
+	// The eye at framing height above the look-at; the water eye vector, reflected ray, and reflection Fresnel read it
+	// so they do not change with field of view or projection mode.
+	vec4 f4WaterEyePosition INIT;
+	// w is 1 under orthographic projection, where eye lines follow xyz (ToEyeLine); 0 otherwise.
 	vec4 f4ToEyeNormal INIT;
 	// MainUniforms.cpp derives right/up from f4ToEyeNormal using +Z when |z| < 0.999 and +X otherwise.
 	// DebugRenderBillboard.vert uses f4ToEyeNormal as forward; basis w components are unused.

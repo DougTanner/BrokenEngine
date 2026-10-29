@@ -24,6 +24,8 @@ extern Wrapper gMaximumAnisotropy;
 extern Wrapper gSampleShading;
 extern Wrapper gMinimumSampleShading;
 extern Wrapper gMipmapLevelOfDetailBias;
+extern Wrapper gOrthographicProjection;
+extern Wrapper gFieldOfView;
 extern Wrapper gWaterShapeDetail;
 extern Wrapper gWaterFoamSystemEnabled;
 extern Wrapper gSmokeSimulationPixels;

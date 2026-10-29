@@ -1140,9 +1140,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 	engine::RenderLightingSpreadIndirect(iCommandBuffer);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(engine::gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory);
-	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatProjection));
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
-	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, engine::gpCamera->mVecToEyeNormal);
+	XMStoreFloat4(&rMainLayout.f4WaterEyePosition, engine::gpCamera->mVecWaterEyePosition);
+	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, XMVectorSetW(engine::gpCamera->mVecToEyeNormal, engine::gpCamera->mbOrthographicProjection ? 1.0f : 0.0f));
 	game::Camera* pCamera = static_cast<game::Camera*>(engine::gpCamera);
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ModelViewProjection[0]), XMMatrixTranspose(pCamera->mMatModelView * pCamera->mMatModelPerspective));
 	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, pCamera->mVecModelEyePosition);

@@ -171,9 +171,10 @@ dummy cells, flags, sessions or reporting functions; the viewer constructs no
 engine profiling collection, Graphics lifecycle and local crash reporting
 without network upload.
 In orbit, the viewer's world camera is fixed top-down at the default engine
-height over the water anchor, with a separate model orbit pose used only for
-model draws. Flight uses the engine's tracked camera and world model matrices
-and eye position; retain orbit fitting and rotation across toggles. The seed
+framing under the shared projection settings over the water anchor, with a
+separate model orbit pose used only for model draws. Flight uses the engine's
+tracked camera and world model matrices and eye position; retain orbit fitting
+and rotation across toggles. The seed
 only selects the layout; its owning cell stays at the origin without a game
 session. Publish one cell when the world is effectively visible and an empty
 span otherwise, once per acquired framebuffer after camera update and before

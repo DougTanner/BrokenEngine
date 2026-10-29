@@ -299,12 +299,12 @@ XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position)
 
 static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
 {
-	// Shadow texels use a coverage-safe eye-height reference: outward zoom expands it immediately, inward zoom contracts it at the existing
-	// rate, and it never falls below live height. Derive texel size from the analytic straight-down gFieldOfView/aspect frustum, not the snapped render
-	// area, so the grid is bit-stable at settled height and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
+	// Shadow texels use a coverage-safe framing reference: outward zoom expands it immediately, inward zoom contracts it at the existing
+	// rate, and it never falls below live framing. Derive texel size from the framing's analytic straight-down reference-angle frustum, not the snapped
+	// render area, so the grid is bit-stable at settled framing and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
 	// pixels span that frustum; the headroom covers the live area throughout zoom transitions. Use the actual clamped extent for
 	// device-independent coverage and center the computed shadow area on the camera, snapped to the texel grid.
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelFraming, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, engine::gpCamera->mVecPosition);
 
 	// The shadow chain's current and previous world areas advance together on a refresh and are both held on a skip,
 	// so consumers keep sampling the texture through the area it was written with. A recreate makes the previous
@@ -491,7 +491,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 	// PopulateSunMoonDirection folds fTerrainSnowBlend into f4TerrainSnowSunNormal.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.mfCurrent;
-	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
+	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
 
 	rGlobalLayout.fTerrainRockSize = gTerrainRockSize.mfCurrent;
 	rGlobalLayout.fTerrainRockBlend = gTerrainRockBlend.mfCurrent;

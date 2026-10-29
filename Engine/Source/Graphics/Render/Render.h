@@ -15,24 +15,19 @@ namespace engine
 struct WorldSizedTexelArea
 {
 	XMFLOAT4 f4Area {};
-	float fAspect = 0.0f;
-	float fTangentHalfFieldOfView = 0.0f;
 	float fWorldTexelX = 0.0f;
 	float fWorldTexelY = 0.0f;
 	float fFullWidth = 0.0f;
 	float fFullHeight = 0.0f;
-
-	XMFLOAT2 ComputeVisibleArea(float fEyeHeight) const
-	{
-		return {2.0f * fEyeHeight * fAspect * fTangentHalfFieldOfView, 2.0f * fEyeHeight * fTangentHalfFieldOfView};
-	}
 };
 
-inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroomMultiplier, float fTexelEyeHeight, float fTextureWidth, float fTextureHeight, float fAspect, float fFieldOfView, FXMVECTOR vecCameraPosition)
+// The footprint is the framing's straight-down frustum at the reference angle, so field of view and projection never
+// move it.
+inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroomMultiplier, float fTexelFraming, float fTextureWidth, float fTextureHeight, float fAspect, FXMVECTOR vecCameraPosition)
 {
-	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(fFieldOfView / fAspect));
-	float fWorldTexelX = (2.0f * fHeadroomMultiplier * fAspect * fTangentHalfFieldOfView / fTextureWidth) * fTexelEyeHeight;
-	float fWorldTexelY = (2.0f * fHeadroomMultiplier * fTangentHalfFieldOfView / fTextureHeight) * fTexelEyeHeight;
+	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(CameraBase::kfFramingFieldOfView));
+	float fWorldTexelX = (2.0f * fHeadroomMultiplier * fAspect * fTangentHalfFieldOfView / fTextureWidth) * fTexelFraming;
+	float fWorldTexelY = (2.0f * fHeadroomMultiplier * fTangentHalfFieldOfView / fTextureHeight) * fTexelFraming;
 	float fFullWidth = fTextureWidth * fWorldTexelX;
 	float fFullHeight = fTextureHeight * fWorldTexelY;
 	XMFLOAT4A f4CameraPosition {};
@@ -44,8 +39,6 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 	return WorldSizedTexelArea
 	{
 		.f4Area = {fLeft, fTop, fLeft + fFullWidth, fTop - fFullHeight},
-		.fAspect = fAspect,
-		.fTangentHalfFieldOfView = fTangentHalfFieldOfView,
 		.fWorldTexelX = fWorldTexelX,
 		.fWorldTexelY = fWorldTexelY,
 		.fFullWidth = fFullWidth,

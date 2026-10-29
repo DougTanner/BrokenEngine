@@ -63,7 +63,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 - `engine::CameraBase` (`CameraBase.h`) owns the whole generic camera: matrices,
   world/screen projection, visible-area LOD, grid-snapped render extents, and
   the display-rate update — target resolution, jump/chase, Hermite zoom,
-  texel-height references, shake, and sun angle. `CameraBase` also holds the
+  texel-framing references, shake, and sun angle. `CameraBase` also holds the
   world-space model sun rotation, identity unless the host writes it. It affects
   only the model direction after Normal Tilt; world lighting and shadow products
   retain the ordinary direction. It registers and clears the single
@@ -85,7 +85,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   never moves the eye or the visible area; `PullTarget` supplies no height
   policy.
 - Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the render clock's per-frame advance the caller passes separately, so it stops whenever on-screen game time stops, and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
-- Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with camera height. Mouse-wheel input updates a persisted, clamped eye-height target, with height and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
+- Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with framing. Mouse-wheel input updates a persisted, clamped framing target, with framing and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame
@@ -95,12 +95,23 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   tracking caches. A new cached position must join
   that shift or it will describe a place in the previous cell.
 - Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
-- Shadow and lighting texel sizes track independent camera-height references
-  that expand immediately with outward zoom and contract at their existing rates
-  inward. The references never fall below live eye height, preserving
+- The zoom value is the framing (`mfCameraFraming`): the eye height above the
+  look-at that would show the current view at `kfFramingFieldOfView`, so every
+  field of view and projection shows the same look-at-plane extent.
+  `CalculateMatricesAndVisibleArea` derives the eye distance from framing and
+  the true vertical field of view; orthographic projection
+  (`mbOrthographicProjection`, latched there once per update) uses a virtual
+  eye at the default field of view. Readers that measure zoom — LOD, zoom
+  buckets, texel references, height-lerped tunables, audio blends — read
+  framing, never the eye distance. Field of view and projection mode join the
+  visible-area latch key because they move the ground area at a fixed framing
+  while the zoom bucket does not.
+- Shadow and lighting texel sizes track independent framing references that
+  expand immediately with outward zoom and contract at their existing rates
+  inward. The references never fall below live framing, preserving
   raw-frustum coverage without changing settled on-screen density. Lighting
   temporal history rejects newly exposed texels when their reprojected UV falls
-  outside the previous footprint, so outward live-eye movement follows the
+  outside the previous footprint, so outward zoom follows the
   configured lighting refresh cadence unless crop safety requires an earlier
   refresh; recreation still re-seeds history from current data only. Shadow uses
   the same per-texel rejection and follows the terrain shadow update cadence

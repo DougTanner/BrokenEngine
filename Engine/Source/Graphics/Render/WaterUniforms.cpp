@@ -59,7 +59,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor));
@@ -291,7 +291,7 @@ constexpr double kfWaveTwoPi = 2.0 * 3.14159265358979323846;
 // region into rMainLayout. Directions (pf4WavesOne), omega (pf4WavesTwo.x), phi (pf4WavesTwo.z), and
 // the clamped-but-unscaled base amplitude (pfBaseAmplitude) are frame-invariant — rebuilt only when
 // the consumed tunables change. The per-frame pass rewrites only pf4WavesTwo.y (base amplitude x the
-// eye-height fade scale) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
+// framing fade scale) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
 struct GerstnerWaveBandStaging
 {
 	XMFLOAT4 pf4WavesOne[256];
@@ -301,7 +301,7 @@ struct GerstnerWaveBandStaging
 
 // Consumed low/medium tunables snapshot; inequality vs last frame triggers an invariant rebuild.
 // iCount defaults to -1 (never a resolved count) so the first real frame always rebuilds. The
-// eye-height amplitude-fade scale is deliberately absent — it folds into the per-frame amplitude
+// framing amplitude-fade scale is deliberately absent — it folds into the per-frame amplitude
 // multiply, not a rebuild.
 struct LowWaveTunables
 {
@@ -490,7 +490,7 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double
 }
 
 // Wave phase reduction: fCurrentTime is the same elapsed time this frame's RenderFrameGlobal received.
-// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-eye-height
+// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-framing
 // fade clamps amplitude to zero they zero the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
 static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurrentTime, GraphicsQualityLevel eWaterLevel)
 {
@@ -512,14 +512,14 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	double fWaveCameraX = fWaveCellX + static_cast<double>(f4WaveCameraPosition.x);
 	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
 
-	// Camera eye height scales geometric wave amplitudes using each stack's Start and End settings.
-	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
+	// Camera framing scales geometric wave amplitudes using each stack's Start and End settings.
+	float fCameraFraming = engine::gpCamera->mfCameraFraming;
 	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
 	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
-	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraFraming) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
 	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent;
 	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
-	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraFraming) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
 
 	PopulateGerstnerLowWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
 
@@ -539,7 +539,7 @@ void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> curren
 
 	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
 	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
-	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from eye distance with 4×
+	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from framing with 4×
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
 	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;

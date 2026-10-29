@@ -68,7 +68,7 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		const BillboardsInterpolate::Type& rType = BillboardsInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
 		// Convert into the camera cell's frame, then project to clip space — the view matrix is built in that frame.
-		XMVECTOR vecProjection = XMVector4Transform(Rebase(rBasis, vecLocalPosition), XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));
+		XMVECTOR vecProjection = XMVector4Transform(Rebase(rBasis, vecLocalPosition), XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatProjection));
 
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecProjection);

@@ -43,10 +43,16 @@ vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, ve
 	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 }
 
+// Unnormalized direction from f3Position toward the world camera along its eye line.
+vec3 ToEyeLine(MainLayout mainLayout, vec3 f3Position)
+{
+	return mainLayout.f4ToEyeNormal.w > 0.5f ? mainLayout.f4ToEyeNormal.xyz : mainLayout.f4EyePosition.xyz - f3Position;
+}
+
 // The fragment-to-eye ray's XY at flight plane iPlane's height; a fragment above the plane reads at its own XY.
 vec2 FlightPlanePosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition, int iPlane)
 {
-	vec3 f3ToEyeNormal = normalize(mainLayout.f4EyePosition.xyz - f3InPosition);
+	vec3 f3ToEyeNormal = normalize(ToEyeLine(mainLayout, f3InPosition));
 	const float fPlaneHeight = globalLayout.pfFlightPlaneHeights[iPlane];
 	float fMult = (fPlaneHeight - f3InPosition.z) / f3ToEyeNormal.z;
 	return (f3InPosition + max(fMult, 0.0f) * f3ToEyeNormal).xy;

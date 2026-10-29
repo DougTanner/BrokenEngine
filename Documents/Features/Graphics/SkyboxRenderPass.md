@@ -123,7 +123,7 @@ Changes (11 files)
      {
          XMMATRIX matViewRotation = engine::gpCamera->mMatView;
          matViewRotation.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-         XMMATRIX matVP = XMMatrixMultiply(matViewRotation, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective));
+         XMMATRIX matVP = XMMatrixMultiply(matViewRotation, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatProjection));
          XMMATRIX matInvVP = XMMatrixInverse(nullptr, matVP);
          XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4InverseViewProjectionRotation[0]), XMMatrixTranspose(matInvVP));
      }

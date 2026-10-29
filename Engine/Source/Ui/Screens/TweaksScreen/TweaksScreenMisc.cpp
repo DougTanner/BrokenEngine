@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/MiscWrappersBase.h"
 #include "TweaksSliderMap.h"
 
@@ -11,6 +13,7 @@ namespace engine
 const TweaksSliderMapRegistrar gMiscellaneousRegistrar
 {
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
+	{"Vertical Field of View", &gFieldOfView},
 };
 
 void RenderMiscellaneousSection(TweaksScreen& rScreen)
@@ -19,6 +22,11 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 
 	rScreen.WrapperSeparatorText("Misc");
 	rScreen.WrapperSlider("Debug Texture Range", iSection);
+
+	WrapperToggle("Orthographic Projection", &gOrthographicProjection);
+	ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
+	rScreen.WrapperSlider("Vertical Field of View", iSection);
+	ImGui::EndDisabled();
 }
 
 } // namespace engine

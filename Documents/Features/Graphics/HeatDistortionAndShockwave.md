@@ -289,7 +289,7 @@ Changes (12 files)
              if (fAge > fMaxAge) continue;
 
              // Project world position to screen space
-             XMVECTOR vecClip = XMVector4Transform(rExplosions.pVecPositions[i], XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));
+             XMVECTOR vecClip = XMVector4Transform(rExplosions.pVecPositions[i], XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatProjection));
              XMFLOAT4 f4Clip;
              XMStoreFloat4(&f4Clip, vecClip);
              if (f4Clip.w <= 0.0f) continue;

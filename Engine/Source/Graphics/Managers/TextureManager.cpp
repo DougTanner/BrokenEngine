@@ -41,7 +41,7 @@ std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier
 std::tuple<int64_t, int64_t> TextureManager::LightingDetailTextureSize(float fMultiplier)
 {
 	// Pre-size every lighting deposit/spread/combine texture by CameraBase::kfLightingHeadroomMultiplier so the constant
-	// on-screen-pixel-size texel grid retains coverage margin while its camera-height reference expands immediately
+	// on-screen-pixel-size texel grid retains coverage margin while its framing reference expands immediately
 	// outward and contracts gradually inward. Centralized so all lighting consumers stay byte-consistent
 	// (deposit quads must land on the same texels the area math snaps to). Clamp AFTER the multiply (DetailTextureSize
 	// clamps pre-multiply); force width even so downstream half-width math stays integer.

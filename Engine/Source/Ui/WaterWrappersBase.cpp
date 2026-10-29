@@ -33,17 +33,17 @@ Wrapper gWaterDepthReflectionFeather(0.05f, 0.001f, 0.1f);
 Wrapper gWaterWaveNormalBlend(0.8f, 0.0f, 1.0f);
 
 // Specular - Skybox
-Wrapper gLightingWaterSkyboxSunBias(3.1f, 0.0f, 4.0f);
-Wrapper gLightingWaterSkyboxNormalSoftenSunrise(0.75f, 0.0f, 1.0f);
-Wrapper gLightingWaterSkyboxNormalSoftenNoon(0.5f, 0.0f, 1.0f);
-Wrapper gLightingWaterSkyboxNormalBlendWave(0.1f, 0.0f, 0.4f);
-Wrapper gLightingWaterSkyboxIntensity(0.0003f, 0.0001f, 0.002f);
-Wrapper gLightingWaterSkyboxAdd(1.5f, 0.0f, 4.0f);
-Wrapper gLightingWaterSkyboxOne(2'000.0f, 0.0f, 10'000.0f);
+Wrapper gLightingWaterSkyboxSunBias(2.0424f, 0.0f, 4.0f);
+Wrapper gLightingWaterSkyboxNormalSoftenSunrise(0.5323f, 0.0f, 1.0f);
+Wrapper gLightingWaterSkyboxNormalSoftenNoon(0.4586f, 0.0f, 1.0f);
+Wrapper gLightingWaterSkyboxNormalBlendWave(0.1216f, 0.0f, 0.4f);
+Wrapper gLightingWaterSkyboxIntensity(0.000289f, 0.0001f, 0.002f);
+Wrapper gLightingWaterSkyboxAdd(1.6619f, 0.0f, 4.0f);
+Wrapper gLightingWaterSkyboxOne(3'001.93f, 0.0f, 10'000.0f);
 Wrapper gLightingWaterSkyboxOnePower(200.0f, 50.0f, 400.0f);
-Wrapper gLightingWaterSkyboxTwo(3'000.0f, 0.0f, 5'000.0f);
-Wrapper gLightingWaterSkyboxTwoPower(30.0f, 1.0f, 100.0f);
-Wrapper gLightingWaterSkyboxThree(360.0f, 1.0f, 800.0f);
+Wrapper gLightingWaterSkyboxTwo(1'011.56f, 0.0f, 5'000.0f);
+Wrapper gLightingWaterSkyboxTwoPower(25.035f, 1.0f, 100.0f);
+Wrapper gLightingWaterSkyboxThree(405.89f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
 Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
 // Water.frag variance scales the specular filter kernel; mode 1 maps 0.25 to the exact pixel footprint.

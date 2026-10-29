@@ -13,10 +13,10 @@ struct HeightLerpWrapperQuartet
 	Wrapper high;
 };
 
-constexpr float LerpAtHeight(float fEyeHeight, float fStartHeight, float fEndHeight, float fLow, float fHigh)
+constexpr float LerpAtHeight(float fFraming, float fStartHeight, float fEndHeight, float fLow, float fHigh)
 {
 	float fSpan = std::max(fEndHeight - fStartHeight, 0.001f);
-	float fInterpolationFactor = std::clamp((fEyeHeight - fStartHeight) / fSpan, 0.0f, 1.0f);
+	float fInterpolationFactor = std::clamp((fFraming - fStartHeight) / fSpan, 0.0f, 1.0f);
 	return std::lerp(fLow, fHigh, fInterpolationFactor);
 }
 

@@ -215,7 +215,6 @@ private:
 };
 
 // Internal-only wrappers (not bound to any UI: not Tweaks, not GraphicsMenuScreen, not SoundMenuScreen).
-extern Wrapper gFieldOfView;
 extern Wrapper gWireframe;
 
 extern Wrapper gVisibleAreaExtraTop;

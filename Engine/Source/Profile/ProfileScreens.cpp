@@ -322,8 +322,8 @@ void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::m
 	rWorkbuffer.Append(" full ");
 	rWorkbuffer.Append(static_cast<int64_t>(gpProfileManager->mInterpolateUpdatesInTheLastSecond.Get()));
 	rWorkbuffer.Append(" interpolate");
-	rWorkbuffer.Append("   Camera height: ");
-	rWorkbuffer.Append(static_cast<int64_t>(engine::gpCamera->mfCameraEyeHeight));
+	rWorkbuffer.Append("   Camera framing: ");
+	rWorkbuffer.Append(static_cast<int64_t>(engine::gpCamera->mfCameraFraming));
 	rWorkbuffer.Append(" m");
 	gpImGuiManager->UpdateTextArea(kTextProfileFps, rWorkbuffer.View());
 }

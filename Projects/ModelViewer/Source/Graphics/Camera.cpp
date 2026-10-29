@@ -25,11 +25,9 @@ void Camera::Update()
 	mMatModelPerspective = XMMatrixPerspectiveFovRH(XM_PIDIV4, engine::gpSwapchainManager->mfAspectRatio, std::max(0.001f * mfRadius, fDistance - 1.5f * mfRadius), fDistance + 2.0f * mfRadius);
 
 	mVecPosition = XMVectorSetZ(mVecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
-	mfCameraEyeHeight = kfCameraEyeHeightDefault;
-	mfShadowTexelEyeHeight = mfCameraEyeHeight;
-	mfLightingTexelEyeHeight = mfCameraEyeHeight;
-	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, mfCameraEyeHeight, 0.0f));
+	mfCameraFraming = kfCameraFramingDefault;
+	mfShadowTexelFraming = mfCameraFraming;
+	mfLightingTexelFraming = mfCameraFraming;
 	CalculateMatricesAndVisibleArea();
 }
 
@@ -45,7 +43,7 @@ void Camera::UpdateFlight(const engine::FrameInterpolateBase& rFrame, FXMVECTOR 
 {
 	engine::CameraBase::Update(rFrame, fDeltaTime, 0.0f, false, engine::CameraTarget::Tracked(vecTarget, XMVectorZero()));
 	mMatModelView = mMatView;
-	mMatModelPerspective = mMatPerspective;
+	mMatModelPerspective = mMatProjection;
 	mVecModelEyePosition = mVecEyePosition;
 }
 

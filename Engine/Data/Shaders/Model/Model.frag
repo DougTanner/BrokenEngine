@@ -303,7 +303,7 @@ void main()
 	#if 1
 	// Sample lighting where this model's own lights deposit: the eye line through the model, continued down to the
 	// lowest flight plane. Zero height samples the raw XY exactly.
-	vec3 f3ToEye = mainLayout.f4EyePosition.xyz - f3InWorldPosition;
+	vec3 f3ToEye = ToEyeLine(mainLayout, f3InWorldPosition);
 	vec2 f2LightingWorldPosition = f3InWorldPosition.xy - (fInHeightAboveBase / f3ToEye.z) * f3ToEye.xy;
 	vec2 f2LightingTexcoord = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.f4LightingArea);
 	vec4 pf4Lighting[3];

@@ -24,7 +24,7 @@ vec2 ProjectWaterReflection(WaterNormalSamplingResult normalResult, vec2 f2World
 		vec3 f3ReflectedNormal = mix(normalResult.f3SampledNormal, f3InNormal, mainLayout.fLightingWaterReflectedNormalBlendWave);
 		f3ReflectedNormal = normalize(vec3(f3ReflectedNormal.xy * mainLayout.fLightingWaterReflectedDistortion, f3ReflectedNormal.z));
 		vec3 f3WaterWorld = vec3(f2WorldInitialPosition, 0.0f);
-		vec3 f3EyeToPoint = normalize(f3WaterWorld - mainLayout.f4EyePosition.xyz);
+		vec3 f3EyeToPoint = normalize(f3WaterWorld - mainLayout.f4WaterEyePosition.xyz);
 		vec3 f3ReflectedRay = reflect(f3EyeToPoint, f3ReflectedNormal);
 		// Guard grazing-normal divide: clamp z away from zero so fReflectedMultiplier can't overflow to +Inf
 		float fReflectedMultiplier = (globalLayout.fBaseHeight - f3WaterWorld.z) / max(f3ReflectedRay.z, 1.0e-4f);
@@ -42,7 +42,7 @@ vec2 ProjectWaterReflection(WaterNormalSamplingResult normalResult, vec2 f2World
 			fOffsetDistance = fNewDistance;
 		}
 
-		float fReflectedFresnel = mix(1.0f, Fresnel(mainLayout.f4EyePosition.xyz, f3WaterWorld, f3ReflectedNormal, 1.0f), mainLayout.fLightingWaterReflectedFresnel);
+		float fReflectedFresnel = mix(1.0f, Fresnel(mainLayout.f4WaterEyePosition.xyz, f3WaterWorld, f3ReflectedNormal, 1.0f), mainLayout.fLightingWaterReflectedFresnel);
 		float fReflectedAmount = clamp(fReflectedScale * fReflectedFresnel, 0.0f, 1.0f);
 		f2PositionAtBaseHeightFinal = mix(f2PositionAtBaseHeight, f2PositionAtBaseHeightReflected, fReflectedAmount);
 	}

@@ -88,7 +88,7 @@ void main()
 	else
 	{
 		// Eye-line / base-height intersection (mirrors CPU ToBaseHeight; unclamped, unlike BaseHeightPosition which is no-op for z > base)
-		vec3 f3ToEye = mainLayout.f4EyePosition.xyz - f3OutPosition;
+		vec3 f3ToEye = ToEyeLine(mainLayout, f3OutPosition);
 		float fT = (globalLayout.fBaseHeight - f3OutPosition.z) / f3ToEye.z;
 		vec3 f3BasePosition = f3OutPosition + fT * f3ToEye;
 		vec2 f2VisibleAreaPosition = WorldToVisibleArea(f3BasePosition, globalLayout.f4LightingArea);

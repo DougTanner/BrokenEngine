@@ -12,6 +12,8 @@ Wrapper gMaximumAnisotropy(16.0f, 1.0f, 16.0f);
 Wrapper gSampleShading(false);
 Wrapper gMinimumSampleShading(0.6f, 0.0f, 1.0f);
 Wrapper gMipmapLevelOfDetailBias(1.0f, 0.0f, 2.0f);
+Wrapper gOrthographicProjection(false);
+Wrapper gFieldOfView(15.0f, 5.0f, 25.0f); // True vertical angle in degrees
 Wrapper gWaterShapeDetail(1.0f / 4.0f, 1.0f / 8.0f, 1.0f / 2.0f); // Fixed WaterDetailTextureSize scale; not exposed or persisted
 Wrapper gWaterFoamSystemEnabled(true);
 Wrapper gSmokeSimulationPixels(1.0f, 0.5f, 1.5f);

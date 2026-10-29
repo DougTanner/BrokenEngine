@@ -43,11 +43,13 @@ is engine-owned here.
 - `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
-- `GraphicsSettings.bin` version 19 persists Water quality, Water Foam, the
-  Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Lighting
-  and Water Foam default on, and Defaults restores them. Older versions fail the
-  current-format gate and use defaults. Water Foam is a validated Boolean byte;
-  any value other than zero or one rejects the whole file before application.
+- `GraphicsSettings.bin` version 20 persists Water quality, Water Foam, the
+  Stagger Smoke Layer Updates flag, Terrain Shadow Update Cadence, Vertical
+  Field of View, and Orthographic Projection. Lighting and Water Foam default
+  on, and Defaults restores them. Older versions fail the current-format gate
+  and use defaults. Water Foam and Orthographic Projection are validated Boolean
+  bytes; any value other than zero or one rejects the whole file before
+  application.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
 - `TweaksSettings.cpp` persists the ImGui visibility toggle, the sun-angle override, and the Tweaks section state in `TweaksSettings.bin` version 14, versioned POD written through the engine versioned-file helpers, in `kbDebugInput` builds only.
