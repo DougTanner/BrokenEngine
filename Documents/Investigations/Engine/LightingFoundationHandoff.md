@@ -47,12 +47,14 @@ rebuilding them.
 ## Acceptance table
 
 This stage is complete when every row passes on one commit; the candidates start from that commit.
-Row 3's baseline is the unedited tree, recorded in the session worktree's machine-local
-`Temp/lighting-strip-baseline/` (replay steps `Temp/lighting-strip-baseline/temp-replay-steps.md`).
+Row 3's user-approved replacement baseline is exact rebased upstream
+`cd6d410c064a5a5f905bf68efaf28493ab6fc33a`, captured in the existing session worktree.
+Recipe and preserved inputs: `Temp/lighting-matched-reference/reference-recipe.md`.
+Historical `Temp/lighting-strip-baseline/` captures remain unchanged as historical evidence.
 
 Scenario for rows 3-9 (one `/agent-harness` session): Sandbox client and server Debug x64 launched
-with each process's `--log-file` and the row-3 app-data setup from `temp-replay-steps.md`
-`## After-run steps`; `window_state {"minimized":false}` restores the agent client, then `resize`
+with each process's `--log-file` and fresh app-data setup from the matched-reference recipe;
+`window_state {"minimized":false}` restores the agent client, then `resize`
 1920x1080 must return `{"width":1920,"height":1080}` (otherwise stop: rows 4-7 cannot run); server
 `load` of `lighting-strip-baseline-t400` with `pauseAfterLoad`; after row 3, client pause with `key`
 Space when `describe_scene` `gameFlags` lacks it; Tweaks Lighting `Comparison` tab controls; Capture
@@ -79,15 +81,17 @@ Checks:
    and
    `rg -n "LightingSpread|LightCombine|LightingBlur|LightingDeposit|LightingWrappersBase|CurveWidget|HexShieldLighting\.frag" Engine Projects/*/Source`
    return nothing.
-3. Comparison disabled, client and server paused on the same save: follow `temp-replay-steps.md`
-   `## After-run steps` against the stripped build (same save, `ClientGuid.bin`, fresh client app
-   data, close shot at client start + 60 s at eye height 156, wide shot at + 75 s at eye height
-   665.117), then compare each shot with `baseline-close.png` and `baseline-wide.png` using
-   `Compare.ps1` from the same directory. Pass: `over8` is at most 2% of pixels for each shot, and
-   side-by-side inspection shows the same islands, water, units, shadows and UI with no added or
-   missing local glow. If `over8` exceeds 2%, retake the timed pair once; if it still exceeds 2%,
-   the side-by-side inspection alone settles the row and the measured fractions are reported (the
-   sun angle advances with client wall time, `temp-replay-steps.md` `## Sun angle caveat`).
+3. Comparison disabled, client and server paused on the same patched version256 save and original
+   `ClientGuid.bin`: follow `Temp/lighting-matched-reference/reference-recipe.md` against exact
+   rebased upstream and foundation. Use fresh client app data independently on each side, FoV15
+   perspective, explicitly pinned sun1.8, 1920x1080, matching close/wide projected framing and
+   client prediction. Record settings, pose, ticks and subscribed-cell readiness before shots;
+   require all subscribed cells confirmed/rendered. Exact historical eye heights and timed sun
+   schedule are superseded. Compare each matched shot using the preserved `Compare.ps1`.
+   Pass: `over8` is at most 2% for each shot and side-by-side inspection shows the same islands,
+   water, units, shadows and UI with no added or missing local glow. If `over8` exceeds 2%, retake
+   the matched pair once; if it still exceeds 2%, side-by-side inspection alone settles the row
+   and the measured fractions are reported. Preserve historical captures and failed comparisons.
 4. Isolated point scenario, close camera, 256 samples, events 0 and 119: in `direct.rgba32f`, floor
    pixels inside the moving panel's geometric shadow are exactly 0, nearby unshadowed floor pixels
    are > 0, and the zero region moves between the two events. Skinned mesh: density 100, close

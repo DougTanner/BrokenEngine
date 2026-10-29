@@ -96,16 +96,17 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   `RunDataPacker=true`. Evidence:
   `Temp/AgentBuildEnvelopes/compile-20261029T192103385Z-5736.md`
   `## Camera fix Debug x64 builds`. Earlier build/runtime results below are historical.
-  Recheck static acceptance rows 2 and 9 against the new baseline before reuse.
-  Current grid-save version is 256 (main adds another pusher behavior version); the saved
-  version254 baseline remains incompatible. No replacement reference or acceptance revision is
-  approved. Conflict propagation/docs evidence: `Temp/rebase-propagation.md`.
+  Current row2 exact-pattern searches both returned no matches; row9 static examination PASS.
+  The user authorized the save-file header254-to-256 update; byte and backup proof:
+  `Temp/plan03-save-update.md` `## Recorded byte verification`.
+  The matched-reference approval below supersedes row3 historical setup.
+  Conflict propagation/docs evidence: `Temp/rebase-propagation.md`.
   Rebase verification index: `Temp/lighting-plans/rebase-20261029.md` `## Verification`.
   C++, shader, style/membership, DOC1 and comment reviews pass. Adversarial ADV001 was fixed;
   fresh independent C++/adversarial retest passes. Final rebase static checks pass:
   InvokeStaticChecks on cd6d410c passed 4 checks (2 packages, 93 links, 227 hygiene files,
   78 line-length files). Final acceptance review PASS: criteria 8/8, findings none. The index
-  records each scoped result. Plan03 rows2/9 remain pending; no runtime since rebase.
+  records each scoped result. Current plan03 runtime verification is in progress.
 - [x] Strip stage implemented (this session).
 - [x] 01 Build and static checks.
   DataPacker Release x64 and client/server/ModelViewer Debug x64 succeeded with zero diagnostics;
@@ -137,17 +138,24 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   `Temp/AgentBuildEnvelopes/compile-20261029T154650516Z-22496.md` `## Build envelopes`.
   Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
   Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
-- [ ] 03 Runtime acceptance (blocked checkpoint).
-  Current row 1 PASS uses the fresh rebase builds; historical row 2 PASS and row 9 static PASS
-  need revalidation. Current rows 2/9 static checks are pending; runtime rows 3-9 remain BLOCKED.
-  Retry acquired the harness and launched client/server; resize confirmed 1920x1080.
-  The authoritative version254 save was rejected by the required version255 build.
-  Diagnosis proved intentional merged pusher behavior versioning; no corruption or layout change.
-  User baseline/reference decision pending; no acceptance change approved.
-  Earlier lock block is history.
-  Retry released both processes and lock; no owned resources remain.
-  Terrain GPU timing unavailable; memory investigation and its handoff link retained.
-  Results and resume evidence: `Temp/lighting-plans/03-runtime-results.md` `## Acceptance results`
-  and `## Resume`; retry and diagnosis are indexed there. Do not advance to plans 04/05.
+- [ ] 03 Runtime acceptance (in progress; pre-switch preparation only).
+  Rows1/2 and row9 static PASS; runtime rows3-9 remain incomplete, with prior failures retained.
+  Latest shader-validation client/server/ModelViewer Debug x64 Local builds PASS:
+  `Temp/AgentBuildEnvelopes/compile-20261029T200004779Z-19644.md`
+  `## plan03 shader validation builds`; DataPacker Release evidence above remains applicable.
+  HARNESS-F-001 capture failure: subscribed-cell readiness gate required before retest.
+  HARNESS-F-002 validation/debug breaks: three shaders fixed, built and reviewed PASS in
+  `Temp/plan03-shader-review.md` `## Scope and verdict`; runtime/log retest pending.
+  User approved "Replace with matched current-main reference" at exact cd6d410c, same existing
+  worktree temporary reference branch only. Pinned sun1.8/FoV15 perspective and matched projected
+  framing replace old wall schedule/exact eye heights. Existing visual thresholds stay exact.
+  Preserved copied inputs and executable controls:
+  `Temp/lighting-matched-reference/reference-recipe.md`.
+  No switch/stage/commit/runtime performed by preparation; main must preserve pending work first.
+  Latest harness release PASS (no owned resources): `Temp/plan03-patched-runtime-evidence.md`
+  `## Release proof`. Old comparison/capture failures and full logs remain historical evidence.
+  Plan03 timing is 1920x1080, not an added4K requirement; memory document/link retained pending
+  disposition. Results/resume: `03-runtime-results.md` `## Acceptance results` and `## Resume`.
+  Do not advance04/05; build each selected branch before harness execution.
 - [ ] 04 Commit and create the `lighting-foundation` branch
 - [ ] 05 Stage 2 one-bounce reference (prepare only)

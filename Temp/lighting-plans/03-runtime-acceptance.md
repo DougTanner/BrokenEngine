@@ -11,11 +11,19 @@ Settle every row of `Documents/Investigations/Engine/LightingFoundationHandoff.m
 
 1. `implementer` runs `/agent-harness` for rows 3-9 in one client + server session, following the
    handoff's numbered checks. Notes:
-   - Row 3 baseline: `Temp/lighting-strip-baseline/` (`temp-replay-steps.md` `## After-run steps`,
-     `baseline-close.png`, `baseline-wide.png`, save `lighting-strip-baseline-t400`). Time of day
-     advances on the wall clock even when paused, so pixel equality is not expected: use the timed
-     schedule, then side-by-side inspection — same terrain, water, units, glows and shadows; no
-     effect missing or added; slight sun-angle drift allowed.
+   - Row 3: user approved replacing the historical baseline with a matched reference at exact
+     cd6d410c064a5a5f905bf68efaf28493ab6fc33a in this same existing worktree, temporarily on a
+     reference branch after main preserves the pending foundation checkpoint. No new worktree.
+     Execute `Temp/lighting-matched-reference/reference-recipe.md`; it survives the switch and
+     contains copied patched save/identity/comparator, controls, readiness gates and evidence.
+     Both sides use fresh app data, FoV15 perspective, sun1.8, matching projected close/wide view,
+     tick400 server pause and matching client prediction. Historical exact eye heights and wall
+     schedule are replaced; over8<=2%, one retake/fallback and no glow added/missing stay exact.
+     Reference then foundation each require a fresh branch-matched /compile before /agent-harness.
+   - HARNESS-F-001: enforce every subscribed cell confirmed/rendered before every capture;
+     preserve scene/profile timelines and the capture consistency guard. Quiet counts alone do
+     not certify completed GPU residency. HARNESS-F-002: three shader repairs built/reviewed,
+     but capture and full-log runtime retests remain pending. Historical failures remain retained.
    - Restore the minimized agent client with `window_state` and confirm `resize` returned 1920x1080
      before captures; captures advance only on rendered frames while paused (Space).
    - Rows 8-9 search each process's `--log-file`, not `get_logs`.
@@ -24,8 +32,9 @@ Settle every row of `Documents/Investigations/Engine/LightingFoundationHandoff.m
    - The comparison UI is the `Comparison` subtab of the Tweaks Lighting section.
 2. Row 1 is plan 01/02's build; row 2 is the `rg` in the handoff (main runs it).
 3. Memory-cost question: during the run, read the `gpuTimers` row whose name ends
-   `Lighting Terrain` with comparison mode enabled on a view with islands. If it is not far above the
-   15 ms order, delete `Documents/Investigations/Engine/LightingTerrainPreparationMemoryCost.md` (and
+   `Lighting Terrain` with comparison enabled on an island view. If it is not far above the
+   15 ms order at the required 1920x1080 (no added 4K gate), delete
+   `Documents/Investigations/Engine/LightingTerrainPreparationMemoryCost.md` (and
    its link in the handoff `## Decisions`); otherwise leave it and report the number to the user.
 4. Failures: diagnose with `/external-diagnose-bug` before any fix; fixes via `/resolve-findings`,
    then `/code-style-review` if C++ changed, `/compile`, re-review of the changed region, and rerun

@@ -2,65 +2,68 @@
 
 ## Workspace
 
-Use the existing lighting worktree and fixed baseline in
-`Temp/lighting-plans/00-context.md` `## Identity`. The user's latest correction
-supersedes the prior instructions to work in primary and switch it between branches.
-Do not create a new worktree or switch or modify the primary checkout.
+Use only C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad.
+Do not create another worktree or switch/modify C:/Users/dougt/Documents/BrokenEngine.
+Fixed current foundation baseline/reference: cd6d410c064a5a5f905bf68efaf28493ab6fc33a;
+main advanced independently, but no newer target is authorized.
 
 ## Resume the current plan
 
-```text
-Work in C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad.
-Confirm git status is clean and the branch is lighting-foundation-work; stop and report
-if either check fails. Plan03 session started at ee53a2c5986a363b94adc82789c634e1dbe312e3.
-Rebased source checkpoint: 1c3608533ba58d1a1327b51928ed4dced5426c53.
-Do not switch branches; use the saved checkpoint containing these notes.
+Resume plan03 only; read `00-context.md`, `03-runtime-acceptance.md` and
+`03-runtime-results.md` `## Resume` and `## Acceptance results` in this folder.
+Current branch lighting-foundation-work; HEAD a49b61276f424515ff80f746c58ac89f4e73f520.
+Preserve three pending shader repairs, patched baseline save and note edits before any switch.
+Main owns checkpoint preservation, temporary reference branch switch and eventual restoration.
+Preparation has not switched/staged/committed, built or run runtime. No primary changes authorized.
 
-Read Temp/lighting-plans/00-context.md and Temp/lighting-plans/CODEX-HANDOFF.md.
-Resume Temp/lighting-plans/03-runtime-acceptance.md only, using
-Temp/lighting-plans/03-runtime-results.md ## Resume and ## Acceptance results.
-For current foundation diffs use the authorized rebase baseline
-cd6d410c064a5a5f905bf68efaf28493ab6fc33a; historical reports retain their original baselines.
-Rebase record: Temp/lighting-rebase-evidence.md ## Conflicts and resolutions and ## Commit map.
-Current row1 PASS: DataPacker Release x64 and Sandbox client/server and ModelViewer Debug x64;
-all consumers used Local generation/RunDataPacker=true, with zero diagnostics. Build evidence:
-DataPacker: Temp/AgentBuildEnvelopes/compile-20261029T190055928Z-45844.md
-## Rebased lighting foundation builds. Latest client/server/ModelViewer after camera correction:
-Temp/AgentBuildEnvelopes/compile-20261029T192103385Z-5736.md ## Camera fix Debug x64 builds.
-Revalidate static rows2/9. Review index: Temp/lighting-plans/rebase-20261029.md ## Verification.
-C++, shader, style/membership, DOC1 and comments pass; ADV001 correction independently passes
-C++/adversarial retest. Final rebase static checks pass: InvokeStaticChecks on cd6d410c passed
-4 checks (2 packages, 93 links, 227 hygiene files, 78 line-length files). Final acceptance
-review PASS: criteria 8/8, findings none. Plan03 rows2/9 remain pending. No runtime was run
-since rebase. The authorized baseline stays pinned despite main advancing
-independently to 40b82adfe90b447ee848120b4a26bad546b83a49; do not chase it.
+User approved "Replace with matched current-main reference": use exact cd6d410c above in this
+same existing worktree on a temporary reference branch. Capture reference, then restore foundation
+and rebuild before candidate run. Do not depend on tracked lighting-plans files while on main.
+Ignored `Temp/lighting-matched-reference/reference-recipe.md` is the executable recipe and contains
+all preserved input hashes, app-data setup, exact controls/queries, evidence and build needs.
+Its `inputs/` holds copied version256 save and original ClientGuid; `Compare.ps1` is copied too.
+Originals remain unchanged by preparation; scratch survives ordinary branch switching, not cleaning.
+Both sides: fresh app data, same save/identity, tick400 paused server, matched client prediction,
+1920x1080, perspective FoV15, explicitly set actual sun1.8, matching projected close/wide framing,
+Tweaks hidden and comparison disabled. Set controls on each side, do not copy settings binaries
+(main20/foundation21). Historical wall schedule and exact eye heights are superseded by approval.
+Keep over8<=2%, single matched-pair retake/side-by-side fallback, no added/missing local glow.
+Old captures/failures/logs remain historical evidence, never overwrite or mark them passing.
 
-Plan02 is complete; retain its historical results. Plan03 retry checkpoint is
-429a5782767c920d620482aa032ea5b783779859. Harness launch and 1920x1080 resize succeeded;
-the authoritative version254 save was rejected by the required version255 build.
-Earlier foreign-lock failure is history. Retry released all owned processes and lock.
-Read Temp/plan03-runtime-retry-evidence.md ## Criterion results and ## Release proof,
-and Temp/plan03-save-diagnosis.md ## Version history and layout and
-## Recovery choices and acceptance. The bump intentionally versions merged pusher behavior;
-No persisted layout change or damaged copy was found. No compatible authoritative baseline exists.
-Current source requires version256 after main's next pusher behavior bump; version255 above
-describes the historical retry. The version254 baseline is still rejected by the version gate.
-Await the user's choice: matched current-version before/after reference or weaker fresh-scene
-visual acceptance. Neither is approved; do not implement either or waive a criterion.
-After approval and the chosen prerequisite, use /agent-harness for rows3-9 and terrain timing.
-Preserve exact original checks wherever unchanged by the user. Clean startup logs do not
-pass the full-scenario rows8-9. Retain prior row2/static9 as historical until revalidated;
-retain the memory-cost document/link. Current row1 uses the fresh build envelope above.
-Keep plan03 unchecked until all nine rows and the memory-cost question are settled.
-Plans04-05 remain unchecked; do not advance to them in this session.
-At the end update 00-context.md ## Progress and commit on lighting-foundation-work
-in this existing worktree. Leave that branch checked out here and report verification
-and residuals. Do not switch or modify C:/Users/dougt/Documents/BrokenEngine.
-Keep the working notes in Temp/; do not move them into Documents/Plans.
-```
+Rows1/2 and row9 static PASS. Runtime rows3-9 incomplete; last harness released owned resources.
+HARNESS-F-001: point capture failed due to changed publication. Diagnosis proves subscribed-cell
+readiness defect; require every subscribed cell confirmed/rendered and no pending full state before
+EACH capture. Preserve scene/profile timelines; quiet counts alone cannot certify GPU residency.
+Do not bypass capture consistency guard. Evidence: `Temp/plan03-capture-diagnosis.md`
+`## Existing settling signals and next check`.
+HARNESS-F-002: validation callbacks/debug breaks. Three shader repairs built and independently
+reviewed PASS; capture and full-log runtime retests pending. Evidence:
+`Temp/plan03-shader-review.md` `## Scope and verdict` and
+`Temp/AgentBuildEnvelopes/compile-20261029T200004779Z-19644.md`
+`## plan03 shader validation builds` (client/server/ModelViewer Debug x64 Local).
+DataPacker Release x64 PASS remains in compile-20261029T190055928Z-45844.md
+`## Rebased lighting foundation builds` under Temp/AgentBuildEnvelopes/.
+Build freshness must be re-established with /compile after each branch transition;
+request Sandbox client AND server Debug x64 Local, RunDataPacker=true, for /agent-harness.
+
+Last run evidence: `Temp/plan03-patched-runtime-evidence.md` `## Criterion results`,
+`## Log checks` and `## Release proof`: failures retained; release PASS, held:false.
+No owned harness remains from that run. Do not infer current runtime pass from build/review.
+Earlier save rejection/foreign-lock history remains in runtime-results; save update proof:
+`Temp/plan03-save-update.md` `## Recorded byte verification` (only offsets0,1 changed).
+Baseline drift diagnosis: `Temp/plan03-baseline-drift-diagnosis.md`
+`## Proposed acceptance check and decision points`; user approval now resolves reference choice.
+
+Preserve unchanged rows4-9. Run candidate row3 plus rows4-9 in one owned /agent-harness session
+with explicit full process logs and release proof. Capture at1920x1080. Read Lighting Terrain
+with comparison enabled and islands present at that same resolution; no added4K timing gate.
+Retain currentUs/averageUs/maxUs, then apply plan03 memory investigation disposition.
+Keep memory document/link until that decision. No runtime compatibility code is authorized.
+Keep plan03 unchecked until every row and memory question settle; plans04/05 remain unchecked.
+Update `00-context.md` `## Progress` and runtime-results with actual evidence at checkpoint.
+Keep working notes in Temp/, not Documents/Plans/; retain completed plan02 history.
 
 ## Later sessions
 
-Use the same workspace, branch checks, fixed baseline, and finish steps above.
-Read both shared documents and run only the next incomplete numbered plan per session.
-When a plan remains incomplete, resume it before advancing to the next.
+Use the same existing worktree and fixed baseline. Resume the incomplete numbered plan first.
+Plan04 later removes force-tracked Temp notes from index before the final foundation commit.
