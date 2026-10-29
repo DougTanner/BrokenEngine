@@ -43,7 +43,7 @@ void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 
 void Camera::UpdateFlight(const engine::FrameInterpolateBase& rFrame, FXMVECTOR vecTarget, float fDeltaTime)
 {
-	engine::CameraBase::Update(rFrame, fDeltaTime, false, engine::CameraTarget::Tracked(vecTarget, XMVectorZero()));
+	engine::CameraBase::Update(rFrame, fDeltaTime, 0.0f, false, engine::CameraTarget::Tracked(vecTarget, XMVectorZero()));
 	mMatModelView = mMatView;
 	mMatModelPerspective = mMatPerspective;
 	mVecModelEyePosition = mVecEyePosition;

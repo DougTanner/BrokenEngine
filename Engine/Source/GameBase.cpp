@@ -767,6 +767,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	// and none of mCells.at(cameraCoordinate) / RenderFrame(cameraCoordinate) / the clock math runs; the
 	// prune and per-coord interpolate below still run so mRenderInterpolates ends renderable-only.
 	float fDeltaTime = 0.0f;
+	float fSunDeltaTime = 0.0f;
 	if (bHaveRenderableCamera)
 	{
 		const Cell& rCameraCell = mCells.at(cameraCoordinate);
@@ -780,7 +781,11 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 
 		bool bPaused = mGameFlags & GameFlags::kPaused;
 
+		double fRenderTimeBefore = mfRenderTime;
 		fDeltaTime = AdvanceRenderClock(fWindowStartTime, bPaused, bHaveInterpolationWindow, fSimulationDeltaSeconds);
+		// The sun follows on-screen game time. The clamp keeps a seed, rebase, or restart jump from turning it backward
+		// or moving it more than this frame's sim delta.
+		fSunDeltaTime = static_cast<float>(std::clamp(mfRenderTime - fRenderTimeBefore, 0.0, fSimulationDeltaSeconds));
 	}
 	{
 		ScopedSuppressAllocationTracking suppress;
@@ -852,16 +857,16 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	// holds its last state and mRenderInterpolates.at(cameraCoordinate) would throw on the absent entry.
 	if (bHaveRenderableCamera)
 	{
-		UpdateCamera(cameraCoordinate);
+		UpdateCamera(cameraCoordinate, fSunDeltaTime);
 	}
 }
 
-void GameBase::UpdateCamera(GridCoord cameraCoordinate)
+void GameBase::UpdateCamera(GridCoord cameraCoordinate, float fSunDeltaTime)
 {
 	const game::FrameInterpolate& rFrameInterpolate = mRenderInterpolates.at(cameraCoordinate);
 	bool bMainMenuFrame = mGameFlags & GameFlags::kMainMenu;
 	CameraTarget pulledTarget = static_cast<game::Camera&>(*gpCamera).PullTarget(rFrameInterpolate);
-	gpCamera->Update(rFrameInterpolate, static_cast<float>(mfLastRenderFrameSeconds), bMainMenuFrame, pulledTarget);
+	gpCamera->Update(rFrameInterpolate, static_cast<float>(mfLastRenderFrameSeconds), fSunDeltaTime, bMainMenuFrame, pulledTarget);
 
 	// Vibration follows the shake Update just decayed.
 	float fVibration = std::pow(gpCamera->mfShake, 0.5f);

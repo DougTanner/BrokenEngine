@@ -735,8 +735,6 @@ bool ModelViewerApplication::Render()
 	{
 		UpdateFlight(fDeltaTime);
 		mCameraFrame.iTick = miFrame;
-		// Zero presentation tick delta preserves the manually controlled sun.
-		mCameraFrame.fDeltaTime = 0.0f;
 		mCameraFrame.renderBasis = engine::MakeRenderBasis(engine::kOriginCoordinate, engine::kOriginCoordinate);
 		pCamera->UpdateFlight(mCameraFrame, mFlightBody.vecPosition, fDeltaTime);
 	}

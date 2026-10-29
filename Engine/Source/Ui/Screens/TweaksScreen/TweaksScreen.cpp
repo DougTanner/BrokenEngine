@@ -308,11 +308,7 @@ void TweaksScreen::RenderToggleBar()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
 	ImGui::SetNextItemWidth(fContentWidth);
-	float fSunAngle = gSunAngleOverride.mfCurrent;
-	if (ImGui::SliderFloat("##Sun Angle", &fSunAngle, gSunAngleOverride.mfMin, gSunAngleOverride.mfMax, "%.6f"))
-	{
-		gSunAngleOverride.Set(fSunAngle);
-	}
+	ImGui::SliderFloat("##Sun Angle", &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
 	if (ImGui::IsItemActive())
 	{
 		mActiveSlider = "##Sun Angle";

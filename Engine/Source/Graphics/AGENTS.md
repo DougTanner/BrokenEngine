@@ -73,9 +73,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   non-virtual members the engine calls by name through a `static_cast` to
   `game::Camera`. `CameraBase::Update` names no game type: the gameplay host's
   `GameBase::UpdateCamera` reads the main menu from `GameBase::mGameFlags`,
-  pulls the target, and passes both with the interpolate frame and the
-  sim-scaled render delta. The camera also owns the reconciliation visual-error
-  offset, client render state outside the CRC: `AddVisualErrorOffset`
+  pulls the target, and passes both with the interpolate frame, the
+  sim-scaled render delta, and the render clock's advance for the sun. The
+  camera also owns the reconciliation visual-error offset, client render state
+  outside the CRC: `AddVisualErrorOffset`
   accumulates it, and the update decays it after `PullTarget` has read it. A
   tracked target's raw position updates the tracking velocity and last-known
   position; the offset is added only to the resolved target. The engine places
@@ -83,7 +84,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   lowest flight plane, so the look-at always lies on it and a target's height
   never moves the eye or the visible area; `PullTarget` supplies no height
   policy.
-- Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the interpolate frame's own delta and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
+- Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the render clock's per-frame advance the caller passes separately, so it stops whenever on-screen game time stops, and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
 - Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with camera height. Mouse-wheel input updates a persisted, clamped eye-height target, with height and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The

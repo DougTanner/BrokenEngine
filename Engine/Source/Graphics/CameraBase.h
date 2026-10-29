@@ -160,7 +160,7 @@ public:
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
 
-	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
+	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
 
 	void ResetForSession();
 	void RestoreEyeHeight(float fEyeHeight);

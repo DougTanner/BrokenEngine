@@ -109,7 +109,7 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 	mVecLastKnownTargetPosition = XMVectorAdd(mVecLastKnownTargetPosition, vecShift);
 }
 
-void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget)
+void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget)
 {
 	// fDeltaTime is the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
 	// ratio (equal to wall time at ratio 1.0). Driving camera blend, shake decay, and mfTime off the same source
@@ -131,11 +131,11 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		static constexpr float kfNightSpeedEnd = XM_2PI;
 		if (mfSunAngle >= kfNightSpeedStart && mfSunAngle < kfNightSpeedEnd)
 		{
-			mfSunAngle = mfSunAngle + rFrameInterpolate.fDeltaTime * 0.075f;
+			mfSunAngle = mfSunAngle + fSunDeltaTime * 0.075f;
 		}
 		else
 		{
-			mfSunAngle = mfSunAngle + rFrameInterpolate.fDeltaTime * 0.01f;
+			mfSunAngle = mfSunAngle + fSunDeltaTime * 0.01f;
 		}
 
 		if (mfSunAngle >= XM_2PI)

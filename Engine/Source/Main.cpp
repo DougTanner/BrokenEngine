@@ -335,7 +335,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 		ScopedSuppressAllocationTracking suppress;
 		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate);
 	}
-	pGame->UpdateCamera(kOriginCoordinate);
+	pGame->UpdateCamera(kOriginCoordinate, 0.0f);
 
 	// Render and present once per framebuffer, then show window. An iteration whose head check recreates or defers the
 	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
