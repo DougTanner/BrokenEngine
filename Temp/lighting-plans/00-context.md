@@ -114,6 +114,11 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   `Temp/AgentBuildEnvelopes/compile-20261029T154650516Z-22496.md` `## Build envelopes`.
   Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
   Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
-- [ ] 03 Runtime acceptance
+- [ ] 03 Runtime acceptance (blocked checkpoint).
+  Rows 1-2 PASS; row 9 static PASS, runtime BLOCKED; rows 3-8 BLOCKED.
+  Foreign normal-launch client/server and harness lock prevented a claim; no owned resources.
+  Terrain GPU timing unavailable; memory investigation and its handoff link retained.
+  Results and resume evidence: `Temp/lighting-plans/03-runtime-results.md` `## Acceptance results`
+  and `## Resume`. Plan 03 remains incomplete; do not advance to plans 04/05.
 - [ ] 04 Commit and create the `lighting-foundation` branch
 - [ ] 05 Stage 2 one-bounce reference (prepare only)
