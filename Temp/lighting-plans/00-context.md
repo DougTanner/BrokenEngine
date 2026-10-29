@@ -92,10 +92,10 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   DataPacker Release x64 PASS remains current in
   `Temp/AgentBuildEnvelopes/compile-20261029T190055928Z-45844.md`
   `## Rebased lighting foundation builds`. Latest client/server/ModelViewer Debug x64 builds
-  PASS with zero diagnostics after the camera correction; all three used Local generation and
+  PASS with zero diagnostics after the readiness correction; all three used Local generation and
   `RunDataPacker=true`. Evidence:
-  `Temp/AgentBuildEnvelopes/compile-20261029T192103385Z-5736.md`
-  `## Camera fix Debug x64 builds`. Earlier build/runtime results below are historical.
+  `Temp/AgentBuildEnvelopes/compile-20261029T204958125Z-36232.md`
+  `## Plan03 readiness build results`. Earlier build/runtime results below are historical.
   Current row2 exact-pattern searches both returned no matches; row9 static examination PASS.
   The user authorized the save-file header254-to-256 update; byte and backup proof:
   `Temp/plan03-save-update.md` `## Recorded byte verification`.
@@ -138,24 +138,25 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   `Temp/AgentBuildEnvelopes/compile-20261029T154650516Z-22496.md` `## Build envelopes`.
   Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
   Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
-- [ ] 03 Runtime acceptance (in progress; pre-switch preparation only).
-  Rows1/2 and row9 static PASS; runtime rows3-9 remain incomplete, with prior failures retained.
-  Latest shader-validation client/server/ModelViewer Debug x64 Local builds PASS:
-  `Temp/AgentBuildEnvelopes/compile-20261029T200004779Z-19644.md`
-  `## plan03 shader validation builds`; DataPacker Release evidence above remains applicable.
-  HARNESS-F-001 capture failure: subscribed-cell readiness gate required before retest.
-  HARNESS-F-002 validation/debug breaks: three shaders fixed, built and reviewed PASS in
-  `Temp/plan03-shader-review.md` `## Scope and verdict`; runtime/log retest pending.
-  User approved "Replace with matched current-main reference" at exact cd6d410c, same existing
-  worktree temporary reference branch only. Pinned sun1.8/FoV15 perspective and matched projected
-  framing replace old wall schedule/exact eye heights. Existing visual thresholds stay exact.
-  Preserved copied inputs and executable controls:
-  `Temp/lighting-matched-reference/reference-recipe.md`.
-  No switch/stage/commit/runtime performed by preparation; main must preserve pending work first.
-  Latest harness release PASS (no owned resources): `Temp/plan03-patched-runtime-evidence.md`
-  `## Release proof`. Old comparison/capture failures and full logs remain historical evidence.
-  Plan03 timing is 1920x1080, not an added4K requirement; memory document/link retained pending
-  disposition. Results/resume: `03-runtime-results.md` `## Acceptance results` and `## Resume`.
-  Do not advance04/05; build each selected branch before harness execution.
+- [ ] 03 Runtime acceptance (in progress).
+  Rows1/2 and row9 static PASS. Readiness-fix builds and scoped reviews PASS:
+  03-runtime-results.md ## Readiness correction verification indexes the evidence.
+  Rows8/9 runtime logs PASS for the whole attempted run; full fixture completion remains pending.
+  Historical rows4/7 failed at87->90 instances despite all cells ready: late terrain restoration.
+  Retest waited258s in receivers through geometry growth, then reached46920/129600 tiles at643s
+  without a publication-change error. Clean client exit interrupted rows4/6/7; no exports exist.
+  No shutdown cause is inferred. Row5 remains blocked; full runtime acceptance is incomplete.
+  Latest run/release: Temp/plan03-ready-runtime-evidence.md ## Readiness retest and capture,
+  ## Criterion results and ## Release.
+  No owned runtime resources remain.
+  Row3 pending: HARNESS-F-003 corrects reference setup to Graphics Lighting=false readback,
+  matching unchanged zero gameplay diffuse. Exact cd6d410c, sun1.8/FoV15, save/identity and
+  projected framing remain; no visual criterion or threshold changes. Recipe owns controls:
+  Temp/lighting-matched-reference/reference-recipe.md. Retain historical on captures; new off
+  pair may compare offline against existing foundation shots if full readbacks match.
+  Reference /compile may use valid Shared; foundation changed shaders require Local generation.
+  Lighting Terrain at1920x1080: current962.302ms / average983.944ms / max1018.556ms, far above15ms;
+  retain memory document/link. Results and resume: 03-runtime-results.md ## Resume.
+  Do not advance04/05; main preserves session changes before reference switch/restoration.
 - [ ] 04 Commit and create the `lighting-foundation` branch
 - [ ] 05 Stage 2 one-bounce reference (prepare only)

@@ -95,6 +95,7 @@ private:
 	void PublishFixtureAnimation();
 	void CreateComparisonResources();
 	void DestroyComparisonResources();
+	bool IsCaptureTerrainReady() const;
 	void PrepareComparisonPipelines();
 	void RecordReceivers(VkCommandBuffer vkCommandBuffer);
 	void RecordCapture(VkCommandBuffer vkCommandBuffer);

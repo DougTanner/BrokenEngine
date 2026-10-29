@@ -177,7 +177,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   require a fresh request after Tweaks becomes visible. During receivers,
   tracing and composing, Tweaks disables Sun Angle
   and non-Lighting section contents to preserve receiver inputs; Lighting
-  controls and navigation remain available. One frame renders the receivers,
+  controls and navigation remain available. The receivers phase waits until all
+  current terrain placements are prepared before snapshotting the publication
+  and rendering receivers together in one frame;
   each later preparation traces a fixed number of reference tiles,
   and only the frame that traces the last tiles enables the reference for its
   own Main composition. Each tracing frame must publish the receivers frame's

@@ -4,66 +4,53 @@
 
 Use only C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad.
 Do not create another worktree or switch/modify C:/Users/dougt/Documents/BrokenEngine.
-Fixed current foundation baseline/reference: cd6d410c064a5a5f905bf68efaf28493ab6fc33a;
-main advanced independently, but no newer target is authorized.
+Pinned baseline/reference cd6d410c064a5a5f905bf68efaf28493ab6fc33a; do not chase newer main.
+Current foundation checkpoint c1aa4847eb49a70ebb3df5c143fc7b300913c90b,
+branch lighting-foundation-work. Main preserves session changes before any temporary switch.
 
 ## Resume the current plan
 
-Resume plan03 only; read `00-context.md`, `03-runtime-acceptance.md` and
-`03-runtime-results.md` `## Resume` and `## Acceptance results` in this folder.
-Current branch lighting-foundation-work; HEAD a49b61276f424515ff80f746c58ac89f4e73f520.
-Preserve three pending shader repairs, patched baseline save and note edits before any switch.
-Main owns checkpoint preservation, temporary reference branch switch and eventual restoration.
-Preparation has not switched/staged/committed, built or run runtime. No primary changes authorized.
+Resume plan03 only. Read 00-context.md and 03-runtime-acceptance.md, plus
+03-runtime-results.md ## Current correction and disposition and ## Resume.
+Ignored Temp/lighting-matched-reference/reference-recipe.md owns executable reference setup;
+it survives normal branch switches. Preserve its copied save/identity/comparator and old images.
+No primary changes, runtime compatibility code or acceptance waiver authorized.
 
-User approved "Replace with matched current-main reference": use exact cd6d410c above in this
-same existing worktree on a temporary reference branch. Capture reference, then restore foundation
-and rebuild before candidate run. Do not depend on tracked lighting-plans files while on main.
-Ignored `Temp/lighting-matched-reference/reference-recipe.md` is the executable recipe and contains
-all preserved input hashes, app-data setup, exact controls/queries, evidence and build needs.
-Its `inputs/` holds copied version256 save and original ClientGuid; `Compare.ps1` is copied too.
-Originals remain unchanged by preparation; scratch survives ordinary branch switching, not cleaning.
-Both sides: fresh app data, same save/identity, tick400 paused server, matched client prediction,
-1920x1080, perspective FoV15, explicitly set actual sun1.8, matching projected close/wide framing,
-Tweaks hidden and comparison disabled. Set controls on each side, do not copy settings binaries
-(main20/foundation21). Historical wall schedule and exact eye heights are superseded by approval.
-Keep over8<=2%, single matched-pair retake/side-by-side fallback, no added/missing local glow.
-Old captures/failures/logs remain historical evidence, never overwrite or mark them passing.
+HARNESS-F-003: fresh main Lighting=true mismatches unchanged zero gameplay diffuse criterion.
+Main chose existing GraphicsMenu Lighting checkbox=false with returned readback, preserving
+ordinary sprites/shields. Foundation Comparison remains Disabled. Recipe gives controls/gates.
+Day/Night multipliers miss local specular. No user reapproval needed; thresholds stay unchanged.
+Retake reference close/wide in separate lighting-off directory; retain old on shots as history.
+No additional on capture. Existing foundation Temp/plan03-ready-runtime/{close,wide}.png may
+compare offline if full input/camera/readiness readbacks match; retake rule remains unchanged.
+Keep exact reference, save/identity, pinned sun1.8, FoV15 perspective, matched paused ticks,
+1920x1080 projected framing, ordinary UI hidden and subscribed-cell readiness.
 
-Rows1/2 and row9 static PASS. Runtime rows3-9 incomplete; last harness released owned resources.
-HARNESS-F-001: point capture failed due to changed publication. Diagnosis proves subscribed-cell
-readiness defect; require every subscribed cell confirmed/rendered and no pending full state before
-EACH capture. Preserve scene/profile timelines; quiet counts alone cannot certify GPU residency.
-Do not bypass capture consistency guard. Evidence: `Temp/plan03-capture-diagnosis.md`
-`## Existing settling signals and next check`.
-HARNESS-F-002: validation callbacks/debug breaks. Three shader repairs built and independently
-reviewed PASS; capture and full-log runtime retests pending. Evidence:
-`Temp/plan03-shader-review.md` `## Scope and verdict` and
-`Temp/AgentBuildEnvelopes/compile-20261029T200004779Z-19644.md`
-`## plan03 shader validation builds` (client/server/ModelViewer Debug x64 Local).
-DataPacker Release x64 PASS remains in compile-20261029T190055928Z-45844.md
-`## Rebased lighting foundation builds` under Temp/AgentBuildEnvelopes/.
-Build freshness must be re-established with /compile after each branch transition;
-request Sandbox client AND server Debug x64 Local, RunDataPacker=true, for /agent-harness.
+Reference /compile may resolve Shared with a valid stamp; retain envelope, stamp and launch guards.
+Foundation changed shaders require Local/RunDataPacker=true after restoration.
+Readiness-fix client/server/ModelViewer Debug x64 Local builds PASS with zero diagnostics:
+Temp/AgentBuildEnvelopes/compile-20261029T204958125Z-36232.md ## Plan03 readiness build results.
+DataPacker Release x64 remains current. Scoped reviews PASS; evidence index:
+03-runtime-results.md ## Readiness correction verification.
 
-Last run evidence: `Temp/plan03-patched-runtime-evidence.md` `## Criterion results`,
-`## Log checks` and `## Release proof`: failures retained; release PASS, held:false.
-No owned harness remains from that run. Do not infer current runtime pass from build/review.
-Earlier save rejection/foreign-lock history remains in runtime-results; save update proof:
-`Temp/plan03-save-update.md` `## Recorded byte verification` (only offsets0,1 changed).
-Baseline drift diagnosis: `Temp/plan03-baseline-drift-diagnosis.md`
-`## Proposed acceptance check and decision points`; user approval now resolves reference choice.
+Rows1/2 and row9 static PASS. Rows8/9 full attempted-run logs PASS; fixture completion pending.
+Historical rows4/7 publication failures at87->90 instances proved late terrain restoration.
+The reviewed readiness gate waited258s through geometry growth, then traced46920/129600 tiles
+at643s without a publication-change error. Clean client exit interrupted rows4/6/7; no exports.
+Shutdown cause is unproven; no crash is established. Row5 remains blocked.
+Evidence: Temp/plan03-ready-runtime-evidence.md ## Readiness retest and capture,
+## Criterion results and ## Release. All owned resources released; retain both capture guards.
+Row3 prior 53.884%/43.028% failures against Lighting=true remain historical failures.
 
-Preserve unchanged rows4-9. Run candidate row3 plus rows4-9 in one owned /agent-harness session
-with explicit full process logs and release proof. Capture at1920x1080. Read Lighting Terrain
-with comparison enabled and islands present at that same resolution; no added4K timing gate.
-Retain currentUs/averageUs/maxUs, then apply plan03 memory investigation disposition.
-Keep memory document/link until that decision. No runtime compatibility code is authorized.
-Keep plan03 unchecked until every row and memory question settle; plans04/05 remain unchecked.
-Update `00-context.md` `## Progress` and runtime-results with actual evidence at checkpoint.
-Keep working notes in Temp/, not Documents/Plans/; retain completed plan02 history.
+Lighting Terrain at1920x1080 comparison enabled with islands: current962.302ms /
+average983.944ms / max1018.556ms; retain memory investigation document/link, far above15ms.
+No added4K gate. Keep plan03 unchecked until every row and memory disposition settle.
+Plans04/05 remain unchecked. Main checkpoints all source and notes before the reference switch.
+Capture only corrected Lighting=off reference pair with full readbacks, compare offline against
+retained matching foundation images, then restore foundation and build Local before running
+all remaining fixtures in one fresh client/server session. Update notes with actual evidence.
 
 ## Later sessions
 
-Use the same existing worktree and fixed baseline. Resume the incomplete numbered plan first.
-Plan04 later removes force-tracked Temp notes from index before the final foundation commit.
+Use the same existing worktree and pinned baseline; resume the incomplete numbered plan first.
+Keep working notes in Temp/. Plan04 later removes force-tracked Temp notes before foundation commit.

@@ -83,7 +83,9 @@ Checks:
    return nothing.
 3. Comparison disabled, client and server paused on the same patched version256 save and original
    `ClientGuid.bin`: follow `Temp/lighting-matched-reference/reference-recipe.md` against exact
-   rebased upstream and foundation. Use fresh client app data independently on each side, FoV15
+   rebased upstream and foundation. Main GraphicsMenu Lighting must read checked:false, matching
+   foundation's zero gameplay local diffuse; preserve ordinary sprites/shields. Use fresh client
+   app data independently on each side, FoV15
    perspective, explicitly pinned sun1.8, 1920x1080, matching close/wide projected framing and
    client prediction. Record settings, pose, ticks and subscribed-cell readiness before shots;
    require all subscribed cells confirmed/rendered. Exact historical eye heights and timed sun

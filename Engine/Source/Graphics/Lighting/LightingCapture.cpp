@@ -28,6 +28,10 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 	State::Comparison& rComparison = *pState->comparison;
 	if (rDiagnostics.status == "receivers")
 	{
+		if (!IsCaptureTerrainReady())
+		{
+			return;
+		}
 		rComparison.reference.TransitionImageLayout(vkCommandBuffer, rComparison.eReferenceLayout, TextureLayout::kComputeReadWrite);
 		rComparison.eReferenceLayout = TextureLayout::kComputeReadWrite;
 		RecordReceivers(vkCommandBuffer);

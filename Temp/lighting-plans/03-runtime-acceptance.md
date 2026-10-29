@@ -19,11 +19,19 @@ Settle every row of `Documents/Investigations/Engine/LightingFoundationHandoff.m
      Both sides use fresh app data, FoV15 perspective, sun1.8, matching projected close/wide view,
      tick400 server pause and matching client prediction. Historical exact eye heights and wall
      schedule are replaced; over8<=2%, one retake/fallback and no glow added/missing stay exact.
-     Reference then foundation each require a fresh branch-matched /compile before /agent-harness.
+     Reference GraphicsMenu Lighting must read checked:false; foundation Comparison stays Disabled.
+     This restores zero diffuse without changing visual criteria. Retain historical Lighting=on
+     shots.
+     Reference /compile may resolve Shared with a valid stamp; foundation shaders require Local.
+     Each branch needs fresh branch-matched /compile before /agent-harness after switching.
    - HARNESS-F-001: enforce every subscribed cell confirmed/rendered before every capture;
      preserve scene/profile timelines and the capture consistency guard. Quiet counts alone do
-     not certify completed GPU residency. HARNESS-F-002: three shader repairs built/reviewed,
-     but capture and full-log runtime retests remain pending. Historical failures remain retained.
+     not certify completed GPU residency. Gated retest failed 87->90 instances; late terrain
+     restoration is proven. The shared receivers readiness gate is built/reviewed; retest waited
+     through restoration and traced before clean client exit interrupted capture, with no export.
+     Runtime completion remains pending: 03-runtime-results.md ## Readiness correction verification.
+     HARNESS-F-002 repairs pass attempted-scenario rows8/9 log checks;
+     full fixture completion remains pending. Historical failures remain retained.
    - Restore the minimized agent client with `window_state` and confirm `resize` returned 1920x1080
      before captures; captures advance only on rendered frames while paused (Space).
    - Rows 8-9 search each process's `--log-file`, not `get_logs`.

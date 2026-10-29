@@ -3,6 +3,7 @@
 #include "Data/Shader.h"
 #include "File/PackChunks.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
+#include "Graphics/Islands.h"
 #include "LightingState.h"
 
 namespace engine
@@ -178,6 +179,13 @@ static void LightingReceiverInfo(PipelineInfo& rInfo, VkRenderPass vkPass)
 	rInfo.iColorAttachmentCount = 4;
 }
 
+bool Lighting::IsCaptureTerrainReady() const
+{
+	const LightingFramebuffer& rFramebuffer = *pState->framebuffers.at(pState->iFramebuffer);
+	return rFramebuffer.terrainCounts.iPlacements ==
+		gpIslands->mLastWrittenCounts.at(pState->iFramebuffer);
+}
+
 void Lighting::PrepareComparisonPipelines()
 {
 	State::Comparison& rComparison = *pState->comparison;
@@ -208,6 +216,10 @@ void Lighting::PrepareComparisonPipelines()
 		return;
 	}
 	if (rDiagnostics.status != "receivers")
+	{
+		return;
+	}
+	if (!IsCaptureTerrainReady())
 	{
 		return;
 	}

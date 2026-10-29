@@ -10,16 +10,19 @@ Rebased source checkpoint: 1c3608533ba58d1a1327b51928ed4dced5426c53.
 Prior baseline b56f20fa44d0424c2fdf5003157563684ed747f5 and retry identities describe history.
 Rebase record: `Temp/lighting-rebase-evidence.md`
 `## Commit map` and `## Conflicts and resolutions`.
-User instruction: do plan03 only in this existing worktree. No runtime/source changes here.
+User instruction: do plan03 only in this existing worktree; approved diagnosis-driven fixes remain
+in scope. This checkpoint edits notes only.
 
 ## Acceptance results
 
 Plan03 is incomplete. No acceptance criterion was waived or marked complete without evidence.
 Current rows1/2 PASS; row9 static PASS against cd6d410c. Main's current exact check-2 searches
-both returned no matches. Runtime rows3-9 remain incomplete; the last harness session
+both returned no matches. Rows3-7 remain incomplete; rows8/9 runtime logs PASS for the attempted
+scenario, with full fixture completion pending. The last harness session
 released its owned resources.
-The current builds passed with zero diagnostics: DataPacker Release x64 and client/server/
-ModelViewer Debug x64, all consumers using Local generation/RunDataPacker=true.
+Latest readiness-fix client/server/ModelViewer Debug x64 builds pass with zero diagnostics,
+Local generation/RunDataPacker=true; DataPacker Release x64 remains current from the prior build.
+The readiness verification section below indexes current builds and scoped reviews.
 C++, shader, style/membership, DOC1 and comments pass; the camera ADV001 correction passes fresh
 independent C++/adversarial retest. Final rebase static checks pass: InvokeStaticChecks on
 cd6d410c passed 4 checks (2 packages, 93 links, 227 hygiene files, 78 line-length files).
@@ -32,12 +35,12 @@ The baseline remains pinned to the user-request target despite main independentl
 | 1 | PASS | Latest shader-validation build envelope indexed below. |
 | 2 | PASS | Main's current exact check-2 searches both returned no matches. |
 | 3 | PENDING | User approved matched cd6d410c reference; historical drift is not a pass. |
-| 4 | FAIL; retest pending | HARNESS-F-001; readiness gate required. |
+| 4 | INTERRUPTED | Readiness retest traced; client exit before skin/offscreen checks. |
 | 5 | PENDING | Current island speckle verification pending. |
-| 6 | PENDING | Current radiometry verification pending. |
-| 7 | FAIL; retest pending | HARNESS-F-001; capture did not export. |
-| 8 | FAIL; retest pending | HARNESS-F-002; shader repairs built/reviewed. |
-| 9 | Static PASS; runtime FAIL | HARNESS-F-002; complete-log retest pending. |
+| 6 | INTERRUPTED | Point capture interrupted; no raw three-pixel radiometry evidence. |
+| 7 | INTERRUPTED | Clean client exit before export; wide capture unrun. |
+| 8 | PASS attempted scenario | Clean full process logs; fixture completion pending. |
+| 9 | Static PASS; runtime logs PASS | Attempted scenario only; fixture completion pending. |
 
 Historical row2 searched Engine and explicit Projects/*/Source directories using both patterns from
 `Documents/Investigations/Engine/LightingFoundationHandoff.md` check 2, unchanged.
@@ -87,11 +90,11 @@ The later retry resolved this claim blocker; it is history, not the current obst
 
 ## Memory-cost question
 
-Prior patched-run final-profile recorded Lighting Terrain current675.723ms, average588.736ms
+Historical patched-run final-profile recorded Lighting Terrain current675.723ms, average588.736ms
 at1920x1080 with comparison active and islands present; this is retained measured evidence,
 not a completed capture or final memory disposition. The earlier worker's added4K gate is
 superseded by the plan03 timing contract, not an acceptance requirement. Keep the document/link
-until main applies that contract and records disposition alongside the completing runtime run.
+until disposition is recorded. The newer retained-document disposition is recorded below.
 Evidence: `Temp/plan03-patched-runtime-evidence.md` `## Terrain GPU timing` and
 `Temp/plan03-capture-diagnosis.md` `## Timing contract`.
 ## Evidence index
@@ -134,8 +137,9 @@ HARNESS-F-001: capture failed when publication changed; proven incomplete subscr
 Require all subscribed cells confirmed/rendered before every capture and keep scene/profile
 records through capture. Quiet publication counts alone do not prove GPU residency completion.
 Diagnosis: `Temp/plan03-capture-diagnosis.md` `## Existing settling signals and next check`.
-HARNESS-F-002: validation callbacks/debug breaks; three shader repairs built and independently
-reviewed PASS. Full runtime/log retest is pending, not a passed failure.
+Historical HARNESS-F-002: validation callbacks/debug breaks; three shader repairs built and
+independently
+reviewed PASS. Latest attempted-scenario log checks pass; full fixture completion remains pending.
 Latest build: `Temp/AgentBuildEnvelopes/compile-20261029T200004779Z-19644.md`
 `## plan03 shader validation builds`; review: `Temp/plan03-shader-review.md` `## Scope and verdict`.
 Historical failure/log/release evidence: `Temp/plan03-patched-runtime-evidence.md`
@@ -144,17 +148,67 @@ release PASS, held:false; no active owned harness remains from that run.
 Plan03 timing contract is 1920x1080, without an added4K gate; retain memory investigation pending
 plan03 disposition (`Temp/plan03-capture-diagnosis.md` `## Timing contract`).
 
+## Current correction and disposition
+
+HARNESS-F-003 accepted conformance correction: fresh main defaults Lighting=true, contrary to
+row3 zero diffuse. The user instruction to strip legacy lighting and unchanged zero-diffuse
+criterion control over the omitted recipe precondition. Main reference GraphicsMenu Lighting
+must return checked:false; foundation Comparison remains Disabled. Day/Night multipliers alone
+miss local specular. Recipe owns exact controls; thresholds and ordinary sprite/shield paths stay.
+
+Historical run: Temp/plan03-final-runtime-evidence.md ## Matched comparison row3 retains failed
+53.884% close / 43.028% wide comparisons against main Lighting=true, not valid zero-diffuse
+reference results. Preserve those images; acquire separately named Lighting=off close/wide shots.
+Existing foundation shots may be compared offline when all input/camera/readiness readbacks match.
+The criterion's one matched-pair retake and fallback remain unchanged.
+
+Historical rows4/7: same evidence ## Fixture gate and capture failure rows4 and7 proves all six
+cells ready, yet capture failed at87->90 instances. Proven late terrain restoration:
+Temp/plan03-restoration-diagnosis.md ## Proven cause and recorded signal.
+The shared receivers readiness gate is now built and reviewed; see verification below.
+Latest run: Temp/plan03-ready-runtime-evidence.md ## Readiness retest and capture records258s
+waiting through geometry growth, then46920/129600 traced tiles at643s with no publication error.
+Clean client exit interrupted capture; no crash or shutdown cause is established. No exports exist.
+Rows4/6/7 remain incomplete; skin/offscreen, radiometry, wide and other fixtures remain pending.
+`## Criterion results` records clean whole-run Vulkan/debug/desync/CRC logs for rows8/9;
+full fixture completion remains pending. `## Release` proves all owned resources released.
+Latest eligible1080p island comparison timer: current962.302ms / average983.944ms /
+max1018.556ms, far above15ms. Retain memory investigation/link; no memory policy change.
+Latest matched foundation close/wide images and full controls/readbacks are retained under
+Temp/plan03-ready-runtime/; `## Matched foundation shots` records their provenance.
+
+Pre-readiness-correction builds PASS: Temp/AgentBuildEnvelopes/compile-20261029T202606996Z-9240.md
+## Build envelopes (DataPacker Release x64; client/server/ModelViewer Debug x64).
+Reference Shared with valid stamp is permitted by /compile; the older recipe Local mandate was
+manager-derived and is superseded. Foundation changed shaders require Local generation.
+
+## Readiness correction verification
+
+Latest client/server/ModelViewer Debug x64 builds PASS, Local generation/RunDataPacker=true,
+zero diagnostics: Temp/AgentBuildEnvelopes/compile-20261029T204958125Z-36232.md
+`## Plan03 readiness build results`. DataPacker Release x64 remains current from the prior build.
+Scoped source reviews: Temp/plan03-ready-cpp-review.md ## Scope and result;
+Temp/plan03-ready-adversarial.md ## Scope and verdict;
+Temp/plan03-ready-overengineering.md ## Removal candidates;
+Temp/plan03-ready-style.md ## Style and ## Comments.
+Documentation correction retest: Temp/plan03-ready-doc-retest.md ## Verdict.
+These reviews precede this checkpoint note update; independent note coherence/final static checks
+remain manager-owned. No full runtime PASS follows from source review or the interrupted retest.
+Runtime evidence: Temp/plan03-ready-runtime-evidence.md ## Matched foundation shots,
+## Readiness retest and capture, ## Criterion results, ## Terrain timer and ## Release.
+
 ## Resume
 
-Pre-switch checkpoint: branch lighting-foundation-work,
-HEAD a49b61276f424515ff80f746c58ac89f4e73f520,
-three pending shader repairs, patched baseline save and session notes. Preserve them before switch.
-Preparation performed no switch, stage, commit, build or runtime and did not modify primary.
-Main owns checkpoint preservation and temporary branch transition. Next workers consume ignored
-`Temp/lighting-matched-reference/reference-recipe.md` without relying on lighting-plans on main.
-Build exact reference Sandbox client/server Debug x64 Local through /compile, capture matched
-reference through /agent-harness, release, restore foundation and rebuild before candidate run.
-Then settle row3 and unchanged rows4-9 plus 1920x1080 Lighting Terrain timing
-and memory disposition.
-Keep plan03 unchecked until every row passes; do not advance04/05. Update actual evidence here
-and in `00-context.md` `## Progress`. Never alter foreign processes or resources.
+Current checkpoint c1aa4847eb49a70ebb3df5c143fc7b300913c90b, branch lighting-foundation-work.
+Main preserves all session changes before any temporary reference switch and restores afterward.
+Use the ignored reference recipe for exact cd6d410c; reference /compile may resolve valid Shared.
+Foundation /compile needs Local changed shaders after restoration. No primary changes authorized.
+Retake reference only with Graphics Lighting=false readback, preserve historical on shots and
+compare to matching foundation shots. No extra Lighting=on capture is needed.
+Keep cell readiness and capture consistency gates. Build/review are complete; runtime export and
+full fixture verification remain incomplete. After corrected reference capture and offline
+comparison, restore foundation and build Local before a fresh client/server session for every
+remaining fixture; follow Temp/plan03-capture-ready-fix.md ## Required verification and builds.
+Keep plan03 unchecked until every row passes and memory disposition is recorded;
+do not advance04/05.
+Update this file and 00-context.md ## Progress with actual evidence.
