@@ -49,8 +49,9 @@ throughout the advertised range. Do not reorder plane indices, clamp to
 terrain or another plane, enable terrain avoidance for High, or rebuild a
 terrain-blocked High graph. Coincident physical heights do not merge plane
 identities: stored and target plane IDs still govern plane-specific targeting.
-Pushers, projectile collision, and explosion damage retain their existing
-physical-distance rules.
+Projectile collision and explosion damage retain their existing
+physical-distance rules; pushers keep theirs but act only within the
+flight-plane layer nearest each ship's height.
 
 ## Deterministic ownership
 
@@ -150,11 +151,12 @@ a general configuration/admin system for this slider.
 ## Related work and future verification
 
 Searches of Features, Plans, and Investigations found no existing owner for
-this slider. `Documents/Plans/Game/InvestigatePusherPlanePerformance.md`
-analyzes the current flight-plane spacing but does not add height controls.
+this slider. Pushers act only within the flight-plane layer nearest each ship's
+height (`Engine/Source/Frame/Collections/Pushers/AGENTS.md`), so a plane-height
+slider moves those layer boundaries.
 `Documents/Investigations/Engine/ShipForcesInThreeDimensions.md` discusses
-height/navigation assumptions; it does not own this feature. Keep both scopes
-separate and reassess any measured spacing assumptions when this lands.
+height/navigation assumptions; it does not own this feature. Keep its scope
+separate.
 
 Future implementation requires normal preparation and approval, client/server
 builds through `/compile`, and runtime/replay checks through `/agent-harness`.

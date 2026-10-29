@@ -5,10 +5,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 ## Ship Invariants
 
 - Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range, including an X position correction for
-  near-coincident XY; blaster collision and missile explosion damage still apply.
+  separation within their 3D range between ships on the same flight-plane
+  layer, including an X position
+  correction for near-coincident XY; blaster collision and missile explosion
+  damage still apply.
   The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
-  owns the distance, correction, and shared-snapshot rules.
+  owns the layer, distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate
   position after terrain resolution, preserving Y/Z/W and stored/target planes.
   Tiny terrain intrusion from this correction is accepted; separation can
@@ -49,8 +51,9 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   targeting; navigation and terrain contact still read height, and an Omni
   launches missiles only while exactly at its stored plane's height. Omni
   blasters alone fire on or between planes, pitched toward the target by the
-  wanted direction. Plane rules govern only target choice and aim; blaster and
-  missile collision, explosion damage, and pushers ignore planes.
+  wanted direction. These stored-plane rules govern only target choice and aim;
+  blaster and missile collision and explosion damage ignore planes, and pushers
+  follow their height-derived layer rule above.
 
 ## Fleet Navigation Invariants
 
