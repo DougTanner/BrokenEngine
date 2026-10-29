@@ -77,6 +77,9 @@ public:
 	// framing * tan(kfFramingFieldOfView / 2); the eye is derived from it.
 	static constexpr float kfFramingFieldOfView = 25.3125f;
 	static constexpr float kfCameraFramingDefault = 300.0f;
+	static constexpr float kfNearClipPerEyeDistance = 1.0f / 150.0f;
+	static constexpr float kfMinimumFarClip = 400.0f;
+	static constexpr float kfFarClipPerEyeDistance = 2.667f;
 	// Framing fade endpoint shared by water speed and lighting weights.
 	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
 	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow

@@ -1,5 +1,19 @@
 # Plan 03 runtime checkpoint
 
+## Current user correction: minimum/default zoom
+
+The latest bounded common-foundation request is complete: Lowest/Default gameplay camera,
+fresh Local builds and the short1920x1080 preset/save smoke check PASS. No prototype algorithm
+was added; kiTilesPerFrame remains120. Completion and evidence:
+Temp/foundation-zoom-results.md ## Bounded completion.
+The original exhaustive Plan03 matrix stays unchecked; exports/radiometry remain incomplete.
+The canceled6000m capture and its old deadline failure are historical. Memory investigation
+remains based on that old view; normal presets were not rebenchmarked. Row3 fallback PASS is
+retained without claiming a new-zoom comparison or numeric pixel match.
+Do not restart long captures or benchmarks. Wait for user direction for future prototype
+validation or the next plan; plans04/05 were not executed or claimed.
+History and limits: Temp/foundation-zoom-results.md ## Historical limits and next action.
+
 ## Identity
 
 Worktree: C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad.
@@ -17,12 +31,12 @@ in scope. This checkpoint edits notes only.
 
 Plan03 is incomplete. No acceptance criterion was waived or marked complete without evidence.
 Current rows1/2 PASS; row9 static PASS against cd6d410c. Main's current exact check-2 searches
-both returned no matches. Rows3-7 remain incomplete; rows8/9 runtime logs PASS for the attempted
-scenario, with full fixture completion pending. The last harness session
-released its owned resources.
-Latest readiness-fix client/server/ModelViewer Debug x64 builds pass with zero diagnostics,
+both returned no matches. Row3 PASS by the approved single-retake/side-by-side fallback;
+rows4-7 remain incomplete. Rows8/9 runtime logs PASS for the attempted scenario, with full
+fixture completion pending. Reference processes and lock are released; reference logs are clean.
+Historical readiness-fix client/server/ModelViewer Debug x64 builds passed with zero diagnostics,
 Local generation/RunDataPacker=true; DataPacker Release x64 remains current from the prior build.
-The readiness verification section below indexes current builds and scoped reviews.
+The readiness verification section below indexes historical builds and scoped reviews.
 C++, shader, style/membership, DOC1 and comments pass; the camera ADV001 correction passes fresh
 independent C++/adversarial retest. Final rebase static checks pass: InvokeStaticChecks on
 cd6d410c passed 4 checks (2 packages, 93 links, 227 hygiene files, 78 line-length files).
@@ -32,9 +46,9 @@ The baseline remains pinned to the user-request target despite main independentl
 
 | Row | Result | Evidence |
 | --- | --- | --- |
-| 1 | PASS | Latest shader-validation build envelope indexed below. |
+| 1 | PASS | Fresh camera builds: foundation-zoom-results.md completion index. |
 | 2 | PASS | Main's current exact check-2 searches both returned no matches. |
-| 3 | PENDING | User approved matched cd6d410c reference; historical drift is not a pass. |
+| 3 | PASS fallback | Corrected off reference; numeric pairs failed; visual fallback below. |
 | 4 | INTERRUPTED | Readiness retest traced; client exit before skin/offscreen checks. |
 | 5 | PENDING | Current island speckle verification pending. |
 | 6 | INTERRUPTED | Point capture interrupted; no raw three-pixel radiometry evidence. |
@@ -59,7 +73,7 @@ Both files are 2547 bytes; only offsets 0,1 changed and bytes 8:end remain ident
 Updated SHA256: 42DD5DA00A924D39B95D985ACD09D9F104972BBD0946DBEF2FFCB1154E0AAF55.
 Backup identity and byte proof: `Temp/plan03-save-update.md` `## Recorded byte verification`.
 The runtime worker reports resetToFresh:false, paused tick400, clientCount1, counts2/3/4/0/0.
-Latest owned release passed; runtime acceptance remains incomplete; no visual criterion settled.
+Latest owned release passed; runtime acceptance remains incomplete; row3 is settled below.
 
 ## Earlier save-version blocker history
 
@@ -148,7 +162,7 @@ release PASS, held:false; no active owned harness remains from that run.
 Plan03 timing contract is 1920x1080, without an added4K gate; retain memory investigation pending
 plan03 disposition (`Temp/plan03-capture-diagnosis.md` `## Timing contract`).
 
-## Current correction and disposition
+## Historical correction and disposition
 
 HARNESS-F-003 accepted conformance correction: fresh main defaults Lighting=true, contrary to
 row3 zero diffuse. The user instruction to strip legacy lighting and unchanged zero-diffuse
@@ -158,9 +172,15 @@ miss local specular. Recipe owns exact controls; thresholds and ordinary sprite/
 
 Historical run: Temp/plan03-final-runtime-evidence.md ## Matched comparison row3 retains failed
 53.884% close / 43.028% wide comparisons against main Lighting=true, not valid zero-diffuse
-reference results. Preserve those images; acquire separately named Lighting=off close/wide shots.
-Existing foundation shots may be compared offline when all input/camera/readiness readbacks match.
-The criterion's one matched-pair retake and fallback remain unchanged.
+reference results. Those images remain preserved as history.
+Corrected exact cd6d410c reference Lighting=false readbacks match the patched save/identity,
+sun1.8/FoV15, readiness and projected close/wide views against retained foundation shots.
+Row3 PASS through the already-approved side-by-side fallback after the single permitted retake.
+Numeric over8 failed both pairs: first close/wide38.343%/19.895%, retake39.650%/19.892%.
+No added or missing local glow was observed; this is not a pixel-match pass. Evidence:
+Temp/lighting-matched-reference/reference-off-runtime-evidence.md
+## Matched readbacks and images and ## Row3 comparison and visual verdict.
+Its ## Logs and release records clean full logs, exit0 quits and released processes/lock.
 
 Historical rows4/7: same evidence ## Fixture gate and capture failure rows4 and7 proves all six
 cells ready, yet capture failed at87->90 instances. Proven late terrain restoration:
@@ -199,16 +219,10 @@ Runtime evidence: Temp/plan03-ready-runtime-evidence.md ## Matched foundation sh
 
 ## Resume
 
-Current checkpoint c1aa4847eb49a70ebb3df5c143fc7b300913c90b, branch lighting-foundation-work.
-Main preserves all session changes before any temporary reference switch and restores afterward.
-Use the ignored reference recipe for exact cd6d410c; reference /compile may resolve valid Shared.
-Foundation /compile needs Local changed shaders after restoration. No primary changes authorized.
-Retake reference only with Graphics Lighting=false readback, preserve historical on shots and
-compare to matching foundation shots. No extra Lighting=on capture is needed.
-Keep cell readiness and capture consistency gates. Build/review are complete; runtime export and
-full fixture verification remain incomplete. After corrected reference capture and offline
-comparison, restore foundation and build Local before a fresh client/server session for every
-remaining fixture; follow Temp/plan03-capture-ready-fix.md ## Required verification and builds.
-Keep plan03 unchecked until every row passes and memory disposition is recorded;
-do not advance04/05.
-Update this file and 00-context.md ## Progress with actual evidence.
+The latest bounded user request is complete. Fresh builds and smoke PASS are indexed in
+Temp/foundation-zoom-results.md ## Bounded completion. No build or preset smoke remains pending.
+Final static checks and a fresh bounded acceptance review remain manager-owned.
+The original exhaustive matrix remains incomplete; historical results above do not pass it.
+Do not restart long captures, benchmarks or reference switching. Wait for user direction on
+future prototype validation or the next plan. Plans04/05 were not executed or claimed.
+Preserve historical inputs/images and the memory disposition; no primary changes are authorized.

@@ -374,9 +374,6 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 
 	// The near clip scales with eye distance so conventional-Z depth precision at the look-at stays bounded at narrow
 	// fields of view and wide framings.
-	static constexpr float kfNearClipPerEyeDistance = 1.0f / 150.0f;
-	static constexpr float kfMinimumFarClip = 400.0f;
-	static constexpr float kfFarClipPerEyeDistance = 2.667f;
 	float fNearClip = fEyeDistance * kfNearClipPerEyeDistance;
 	float fFarClip = std::max(kfMinimumFarClip, fEyeDistance * kfFarClipPerEyeDistance);
 	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
@@ -396,10 +393,10 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
 		mVecWaterEyePosition = mVecEyePosition;
 		mbOrthographicProjection = false;
-		fVisibleAreaFraming = comparisonPose.f3Eye.z;
+		fVisibleAreaFraming = comparisonPose.fFraming;
 		fComparisonEyeHeight = comparisonPose.f3Eye.z;
 		fProjectionFieldOfView = comparisonPose.fVerticalFieldOfView;
-		mfShadowTexelFraming = std::max(mfShadowTexelFraming, comparisonPose.f3Eye.z);
+		mfShadowTexelFraming = std::max(mfShadowTexelFraming, comparisonPose.fFraming);
 		mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMLoadFloat3A(&comparisonPose.f3Up));
 		mMatProjection = XMMatrixPerspectiveFovRH(comparisonPose.fVerticalFieldOfView, fAspectRatio, comparisonPose.fNear, comparisonPose.fFar);
 	}
@@ -534,7 +531,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 float CameraBase::GetRenderFraming() const
 {
 	LightingCameraPose pose;
-	return gpGraphics->mpLighting->GetComparisonCamera(pose) ? XMVectorGetZ(mVecEyePosition) - gpFlightPlanes->Lowest().fHeightMeters : mfCameraFraming;
+	return gpGraphics->mpLighting->GetComparisonCamera(pose) ? pose.fFraming : mfCameraFraming;
 }
 
 void CameraBase::UpdateComparisonCamera()

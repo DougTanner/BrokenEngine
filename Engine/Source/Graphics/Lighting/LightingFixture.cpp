@@ -4,6 +4,7 @@
 
 #include "File/PackChunks.h"
 #include "Graphics/AnimationData.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
 
 namespace engine
 {
@@ -52,8 +53,8 @@ LightingFixture::LightingFixture(GridCoord anchor)
 		{.f3Center = {-200.0f, -180.0f, 2.0f, }, .f3HalfExtent = {2.0f, 2.0f, 0.25f, }, },
 		{.f3Center = {-220.0f, -180.0f, 4.0f, }, .f3HalfExtent = {1.0f, 2.0f, 0.25f, }, },
 	}};
-	mCameras.at(0) = MakeCamera({0.0f, -600.0f, 900.0f, }, {0.0f, 0.0f, 6.0f, });
-	mCameras.at(1) = MakeCamera({0.0f, -4'000.0f, 6'000.0f, }, {0.0f, 0.0f, 6.0f, });
+	mCameras.at(0) = MakeCamera(kfMinimumFraming);
+	mCameras.at(1) = MakeCamera(CameraBase::kfCameraFramingDefault);
 	for (int64_t i = 0; i < kiEventCount; ++i)
 	{
 		float fTime = static_cast<float>(i) / 119.0f;
@@ -64,7 +65,7 @@ LightingFixture::LightingFixture(GridCoord anchor)
 			.fTime = fTime,
 			.fSourceHeight = 6.0f + 94.0f * fTime,
 			.fOccluderOffset = -20.0f + 40.0f * fTime,
-			.camera = MakeCamera({fPan, -600.0f - 3'400.0f * fZoom, 900.0f + 5'100.0f * fZoom, }, {fPan, 0.0f, 6.0f, }),
+			.camera = MakeCamera(kfMinimumFraming + (CameraBase::kfCameraFramingDefault - kfMinimumFraming) * fZoom, fPan),
 		};
 	}
 }
@@ -108,8 +109,13 @@ void LightingFixture::WriteAnimation(int64_t iEvent, std::span<common::MeshData>
 	gAnimationDataMap.at(mAnimation.sceneCrc).EvaluateAnimation(mAnimation.iClip, mEvents.at(iEvent).fTime, meshData, pJointMatrices, iJointOffset);
 }
 
-LightingCameraPose LightingFixture::MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Target) const
+LightingCameraPose LightingFixture::MakeCamera(float fFraming, float fPan) const
 {
+	float fFieldOfView = XMConvertToRadians(gFieldOfView.mfDefault);
+	float fFramingHalfHeight = fFraming * std::tan(0.5f * XMConvertToRadians(CameraBase::kfFramingFieldOfView));
+	float fEyeDistance = fFramingHalfHeight / std::tan(0.5f * fFieldOfView);
+	XMFLOAT3A f3Target {fPan, 0.0f, gpFlightPlanes->Lowest().fHeightMeters, };
+	XMFLOAT3A f3Eye {fPan, 0.0f, f3Target.z + fEyeDistance, };
 	GridCoord coordinate = mAnchor;
 	XMVECTOR vecTarget = XMVectorSetW(XMLoadFloat3A(&f3Target), 1.0f);
 	while (!IsInsideCell(vecTarget))
@@ -123,9 +129,11 @@ LightingCameraPose LightingFixture::MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Targ
 	pose.coordinate = coordinate;
 	XMStoreFloat3A(&pose.f3Eye, Rebase(MakeRenderBasis(mAnchor, coordinate), XMVectorSetW(XMLoadFloat3A(&f3Eye), 1.0f)));
 	XMStoreFloat3A(&pose.f3Target, vecTarget);
-	pose.fVerticalFieldOfView = XM_PIDIV4;
-	pose.fNear = 0.1f;
-	pose.fFar = 20'000.0f;
+	pose.f3Up = {0.0f, 1.0f, 0.0f, };
+	pose.fVerticalFieldOfView = fFieldOfView;
+	pose.fFraming = fFraming;
+	pose.fNear = fEyeDistance * CameraBase::kfNearClipPerEyeDistance;
+	pose.fFar = std::max(CameraBase::kfMinimumFarClip, fEyeDistance * CameraBase::kfFarClipPerEyeDistance);
 	return pose;
 }
 

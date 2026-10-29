@@ -25,9 +25,9 @@ void RenderLightingSection(TweaksScreen& rScreen)
 			bChanged |= ImGui::RadioButton("Fixture reference##LightingMode", &iMode, 2);
 			settings.eMode = static_cast<LightingComparisonMode>(iMode);
 			int iCamera = static_cast<int>(settings.eCamera);
-			bChanged |= ImGui::RadioButton("Close##LightingCamera", &iCamera, 0);
+			bChanged |= ImGui::RadioButton("Lowest zoom##LightingCamera", &iCamera, 0);
 			ImGui::SameLine();
-			bChanged |= ImGui::RadioButton("Wide##LightingCamera", &iCamera, 1);
+			bChanged |= ImGui::RadioButton("Default zoom##LightingCamera", &iCamera, 1);
 			ImGui::SameLine();
 			bChanged |= ImGui::RadioButton("Event##LightingCamera", &iCamera, 2);
 			settings.eCamera = static_cast<LightingComparisonCamera>(iCamera);

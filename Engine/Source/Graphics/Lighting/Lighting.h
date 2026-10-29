@@ -16,8 +16,8 @@ enum class LightingComparisonMode
 
 enum class LightingComparisonCamera
 {
-	kClose,
-	kWide,
+	kLowest,
+	kDefault,
 	kEvent,
 };
 
@@ -31,7 +31,7 @@ enum class LightingFixtureScenario
 struct LightingComparisonSettings
 {
 	LightingComparisonMode eMode = LightingComparisonMode::kDisabled;
-	LightingComparisonCamera eCamera = LightingComparisonCamera::kClose;
+	LightingComparisonCamera eCamera = LightingComparisonCamera::kLowest;
 	LightingFixtureScenario eScenario = LightingFixtureScenario::kDensity;
 	int64_t iSourceCount = 100;
 	int64_t iEvent = 0;
@@ -47,6 +47,7 @@ struct LightingCameraPose
 	XMFLOAT3A f3Target {};
 	XMFLOAT3A f3Up {0.0f, 0.0f, 1.0f};
 	float fVerticalFieldOfView = 0.0f;
+	float fFraming = 0.0f;
 	float fNear = 0.1f;
 	float fFar = 1'000.0f;
 };

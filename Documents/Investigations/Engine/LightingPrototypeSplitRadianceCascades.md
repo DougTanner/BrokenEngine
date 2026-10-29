@@ -96,8 +96,9 @@ uniformly over the square and Z cyclically at 6/50/100 m; give all sources the s
 power and 150 m range. Generation is deterministic, so every candidate built on the same foundation
 commit uses identical geometry, lights, and camera/events.
 
-Capture a close camera at (0,-600,900) looking at (0,0,6), and a wide camera at (0,-4000,6000) with
-the same look-at. Include isolated source/receiver pairs at the three heights. Over a fixed
+Use the Lowest zoom and Default zoom cameras defined by the
+[foundation fixture](LightingFoundationHandoff.md#what-the-foundation-provides).
+Include isolated source/receiver pairs at the three heights. Over a fixed
 120-frame sequence, move one source from Z=6 to 100 m, move one receiver through those heights, and
 move one opaque occluder between that pair; repeat a fixed pan/zoom path and a camera-cell boundary
 crossing. Record scene-relative positions via the normal cell conversion. Keep the fixture identical

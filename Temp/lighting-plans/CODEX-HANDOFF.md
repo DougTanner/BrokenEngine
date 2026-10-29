@@ -1,56 +1,43 @@
 # Codex handoff: lighting foundation
 
+## Current user correction: minimum/default zoom
+
+The latest bounded common-foundation request is complete: Lowest/Default gameplay camera,
+fresh Local builds and the short1920x1080 preset/save smoke check PASS. No prototype algorithm
+was added; kiTilesPerFrame remains120. Completion and evidence:
+Temp/foundation-zoom-results.md ## Bounded completion.
+The original exhaustive Plan03 matrix stays unchecked; exports/radiometry remain incomplete.
+The canceled6000m capture and its old deadline failure are historical. Memory investigation
+remains based on that old view; normal presets were not rebenchmarked. Row3 fallback PASS is
+retained without claiming a new-zoom comparison or numeric pixel match.
+Do not restart long captures or benchmarks. Wait for user direction for future prototype
+validation or the next plan; plans04/05 were not executed or claimed.
+History and limits: Temp/foundation-zoom-results.md ## Historical limits and next action.
+
 ## Workspace
 
 Use only C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad.
 Do not create another worktree or switch/modify C:/Users/dougt/Documents/BrokenEngine.
 Pinned baseline/reference cd6d410c064a5a5f905bf68efaf28493ab6fc33a; do not chase newer main.
-Current foundation checkpoint c1aa4847eb49a70ebb3df5c143fc7b300913c90b,
-branch lighting-foundation-work. Main preserves session changes before any temporary switch.
+Current foundation checkpoint a66da68abfd942591d92c9d69489e5e240b927e4,
+branch lighting-foundation-work. Foundation restored; no further reference switch is needed.
 
-## Resume the current plan
+## Current completion and next action
 
-Resume plan03 only. Read 00-context.md and 03-runtime-acceptance.md, plus
-03-runtime-results.md ## Current correction and disposition and ## Resume.
-Ignored Temp/lighting-matched-reference/reference-recipe.md owns executable reference setup;
-it survives normal branch switches. Preserve its copied save/identity/comparator and old images.
-No primary changes, runtime compatibility code or acceptance waiver authorized.
+The bounded minimum/default common-foundation work is complete; no build or smoke is pending.
+Evidence and outstanding manager review:
+Temp/foundation-zoom-results.md ## Bounded completion.
+Do not automatically restart long captures, benchmarks or reference switching. Wait for user
+direction on future prototype validation or the next plan. Plans04/05 were not executed or claimed.
+The original exhaustive Plan03 matrix remains unchecked. Historical results, including Row3's
+qualified fallback PASS, remain in 03-runtime-results.md ## Historical correction and disposition.
+Memory investigation is retained from historical wide-view timing; normal presets were not
+rebenchmarked. History: Temp/foundation-zoom-results.md ## Historical limits and next action.
 
-HARNESS-F-003: fresh main Lighting=true mismatches unchanged zero gameplay diffuse criterion.
-Main chose existing GraphicsMenu Lighting checkbox=false with returned readback, preserving
-ordinary sprites/shields. Foundation Comparison remains Disabled. Recipe gives controls/gates.
-Day/Night multipliers miss local specular. No user reapproval needed; thresholds stay unchanged.
-Retake reference close/wide in separate lighting-off directory; retain old on shots as history.
-No additional on capture. Existing foundation Temp/plan03-ready-runtime/{close,wide}.png may
-compare offline if full input/camera/readiness readbacks match; retake rule remains unchanged.
-Keep exact reference, save/identity, pinned sun1.8, FoV15 perspective, matched paused ticks,
-1920x1080 projected framing, ordinary UI hidden and subscribed-cell readiness.
-
-Reference /compile may resolve Shared with a valid stamp; retain envelope, stamp and launch guards.
-Foundation changed shaders require Local/RunDataPacker=true after restoration.
-Readiness-fix client/server/ModelViewer Debug x64 Local builds PASS with zero diagnostics:
-Temp/AgentBuildEnvelopes/compile-20261029T204958125Z-36232.md ## Plan03 readiness build results.
-DataPacker Release x64 remains current. Scoped reviews PASS; evidence index:
-03-runtime-results.md ## Readiness correction verification.
-
-Rows1/2 and row9 static PASS. Rows8/9 full attempted-run logs PASS; fixture completion pending.
-Historical rows4/7 publication failures at87->90 instances proved late terrain restoration.
-The reviewed readiness gate waited258s through geometry growth, then traced46920/129600 tiles
-at643s without a publication-change error. Clean client exit interrupted rows4/6/7; no exports.
-Shutdown cause is unproven; no crash is established. Row5 remains blocked.
-Evidence: Temp/plan03-ready-runtime-evidence.md ## Readiness retest and capture,
-## Criterion results and ## Release. All owned resources released; retain both capture guards.
-Row3 prior 53.884%/43.028% failures against Lighting=true remain historical failures.
-
-Lighting Terrain at1920x1080 comparison enabled with islands: current962.302ms /
-average983.944ms / max1018.556ms; retain memory investigation document/link, far above15ms.
-No added4K gate. Keep plan03 unchecked until every row and memory disposition settle.
-Plans04/05 remain unchecked. Main checkpoints all source and notes before the reference switch.
-Capture only corrected Lighting=off reference pair with full readbacks, compare offline against
-retained matching foundation images, then restore foundation and build Local before running
-all remaining fixtures in one fresh client/server session. Update notes with actual evidence.
+Preserve copied save/identity/comparator and historical images under
+Temp/lighting-matched-reference/. No primary changes or runtime compatibility code authorized.
 
 ## Later sessions
 
-Use the same existing worktree and pinned baseline; resume the incomplete numbered plan first.
-Keep working notes in Temp/. Plan04 later removes force-tracked Temp notes before foundation commit.
+Use the same existing worktree and pinned baseline; wait for the user's next direction.
+Keep working notes in Temp/. Plan04 has not been executed or claimed.

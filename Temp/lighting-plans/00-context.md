@@ -1,5 +1,19 @@
 # Lighting foundation: shared context for plans 01-05
 
+## Current user correction: minimum/default zoom
+
+The user replaced the excessive 6000 m fixture with actual gameplay minimum/default zoom.
+Current scope is that correction, targeted builds and a short fresh-binary smoke check of both
+presets, 1920x1080 restore, patched save load and readiness. No exhaustive benchmark campaign
+or prototype algorithm work is authorized. Keep kiTilesPerFrame=120 and the memory disposition.
+The old run reached 54960 tiles at 905.68 s, then the user canceled; all resources were released
+and logs had no errors. That is historical incomplete evidence, not a completed 15-minute test.
+Exports/radiometry and the old exhaustive acceptance rows remain incomplete. Keep plan03 unchecked.
+Row3 retains its ordinary-gameplay comparison fallback PASS; new presets receive smoke checks only.
+Bounded completion: Temp/foundation-zoom-results.md ## Bounded completion records the
+minimum/default correction builds and short smoke as verified; exhaustive Plan 03 remains
+unchecked under ## Progress.
+
 Every plan in `Temp/lighting-plans/` reads this file first. Run the plans in number order, one per
 fresh session; each ends by updating `## Progress` below.
 
@@ -106,7 +120,8 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   fresh independent C++/adversarial retest passes. Final rebase static checks pass:
   InvokeStaticChecks on cd6d410c passed 4 checks (2 packages, 93 links, 227 hygiene files,
   78 line-length files). Final acceptance review PASS: criteria 8/8, findings none. The index
-  records each scoped result. Current plan03 runtime verification is in progress.
+  records each scoped result. The bounded camera/smoke request is complete;
+  exhaustive plan03 remains incomplete.
 - [x] Strip stage implemented (this session).
 - [x] 01 Build and static checks.
   DataPacker Release x64 and client/server/ModelViewer Debug x64 succeeded with zero diagnostics;
@@ -138,25 +153,24 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   `Temp/AgentBuildEnvelopes/compile-20261029T154650516Z-22496.md` `## Build envelopes`.
   Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
   Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
-- [ ] 03 Runtime acceptance (in progress).
-  Rows1/2 and row9 static PASS. Readiness-fix builds and scoped reviews PASS:
-  03-runtime-results.md ## Readiness correction verification indexes the evidence.
-  Rows8/9 runtime logs PASS for the whole attempted run; full fixture completion remains pending.
-  Historical rows4/7 failed at87->90 instances despite all cells ready: late terrain restoration.
-  Retest waited258s in receivers through geometry growth, then reached46920/129600 tiles at643s
-  without a publication-change error. Clean client exit interrupted rows4/6/7; no exports exist.
-  No shutdown cause is inferred. Row5 remains blocked; full runtime acceptance is incomplete.
-  Latest run/release: Temp/plan03-ready-runtime-evidence.md ## Readiness retest and capture,
-  ## Criterion results and ## Release.
-  No owned runtime resources remain.
-  Row3 pending: HARNESS-F-003 corrects reference setup to Graphics Lighting=false readback,
-  matching unchanged zero gameplay diffuse. Exact cd6d410c, sun1.8/FoV15, save/identity and
-  projected framing remain; no visual criterion or threshold changes. Recipe owns controls:
-  Temp/lighting-matched-reference/reference-recipe.md. Retain historical on captures; new off
-  pair may compare offline against existing foundation shots if full readbacks match.
-  Reference /compile may use valid Shared; foundation changed shaders require Local generation.
-  Lighting Terrain at1920x1080: current962.302ms / average983.944ms / max1018.556ms, far above15ms;
-  retain memory document/link. Results and resume: 03-runtime-results.md ## Resume.
-  Do not advance04/05; main preserves session changes before reference switch/restoration.
+- [x] Latest bounded user request: minimum/default common-foundation camera and short smoke.
+  Fresh client/server/ModelViewer Debug x64 Local builds PASS; short smoke PASS6/6 in81s.
+  No pending build/smoke, prototype algorithm or throughput tuning. Completion evidence:
+  Temp/foundation-zoom-results.md ## Bounded completion.
+  Final static and fresh bounded acceptance review remain manager-owned.
+- [ ] 03 Original exhaustive runtime matrix (incomplete; not the current bounded request).
+  Rows1/2 and row9 static PASS; attempted-run logs clean. Row3 fallback PASS remains recorded:
+  exact cd6d410c Lighting=false reference matched save/identity, sun1.8/FoV15 and readiness.
+  Numeric over8 failed: first close/wide38.343%/19.895%, retake39.650%/19.892%.
+  No added or missing local glow was observed; no pixel-match pass is claimed. Evidence:
+  Temp/lighting-matched-reference/reference-off-runtime-evidence.md
+  ## Matched readbacks and images, ## Row3 comparison and visual verdict, ## Logs and release.
+  Historical captures did not complete exports/radiometry. The canceled6000m capture exceeded
+  its old deadline; keep that failure as history, not as a current bounded-scope failure.
+  Retain the memory document/link from historical wide-view GPU evidence; no normal-preset
+  performance conclusion is claimed. History: Temp/foundation-zoom-results.md
+  ## Historical limits and next action. All owned resources released.
+  Do not restart long captures or benchmarks. Wait for user direction on future validation
+  or the next plan; plans04/05 were not executed or claimed.
 - [ ] 04 Commit and create the `lighting-foundation` branch
 - [ ] 05 Stage 2 one-bounce reference (prepare only)

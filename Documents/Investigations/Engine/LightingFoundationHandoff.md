@@ -30,8 +30,11 @@ rebuilding them.
 - The fixed comparison fixture in
   [LightingFixture.cpp](../../../Engine/Source/Graphics/Lighting/LightingFixture.cpp): seed
   0x51A7, 1000 nested point and rectangle sources, panels, walls, overhang, colored wall, 120
-  events with a moving source, occluder and skinned mesh, a cell crossing, and close and wide
-  cameras. Generation is deterministic, so the commit identifies it.
+  events with a moving source, occluder and skinned mesh, a cell crossing, and Lowest zoom and
+  Default zoom cameras using gameplay minimum/default framing (150/300), default vertical FoV,
+  straight-down orientation, lowest-flight-plane look-at and gameplay clip math.
+  Capture camera indices 0/1 select those presets; 2 selects the event path between them.
+  Generation is deterministic, so the commit identifies it.
 - The exhaustive direct-diffuse reference
   ([LightingReference.comp](../../../Engine/Data/Shaders/Lighting/LightingReference.comp)) with 256
   or 512 Halton area samples, and its capture (see `## Decisions`), which writes position,
@@ -52,7 +55,13 @@ Row 3's user-approved replacement baseline is exact rebased upstream
 Recipe and preserved inputs: `Temp/lighting-matched-reference/reference-recipe.md`.
 Historical `Temp/lighting-strip-baseline/` captures remain unchanged as historical evidence.
 
-Scenario for rows 3-9 (one `/agent-harness` session): Sandbox client and server Debug x64 launched
+The user superseded the excessive wide fixture and its benchmark requirement with gameplay
+minimum/default zoom. Current verification is a build and short preset smoke check at 1920x1080,
+including the patched save load and readiness. The exhaustive exports, radiometry and former
+15-minute test remain incomplete; the historical recipe below does not authorize rerunning them.
+Plan03 remains unchecked, and row 3 retains its ordinary-gameplay visual fallback result.
+
+Historical scenario for rows 3-9 (superseded fixture cameras): Sandbox client and server Debug x64 launched
 with each process's `--log-file` and fresh app-data setup from the matched-reference recipe;
 `window_state {"minimized":false}` restores the agent client, then `resize`
 1920x1080 must return `{"width":1920,"height":1080}` (otherwise stop: rows 4-7 cannot run); server

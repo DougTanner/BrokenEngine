@@ -67,7 +67,7 @@ private:
 		uint32_t uiType = 0;
 	};
 
-	LightingCameraPose MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Target) const;
+	LightingCameraPose MakeCamera(float fFraming, float fPan = 0.0f) const;
 	std::array<Source, kiSourceCount> mSources {};
 	std::array<XMFLOAT2, kiSampleCount> mSamples {};
 	std::array<LightingFixtureSolid, kiSolidCount> mSolids {};

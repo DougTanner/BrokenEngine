@@ -108,10 +108,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   while the zoom bucket does not.
 - Comparison pose/projection is render-only and updates even without an
   interpolate frame. `GetRenderFraming` returns ordinary framing or the fixed
-  comparison camera's eye height; Main publishes comparison matrices with zero
+  comparison camera's framing; Main publishes comparison matrices with zero
   shake, including empty-frame paths. Comparison uses its explicit perspective
   projection and eye for water shading. Its visible-area LOD and zoom bucket
-  use its explicit eye height; that height also invalidates the visible-area
+  use its framing; the explicit eye height also invalidates the visible-area
   latch on entry, exit, and fixture zoom changes.
 - Shadow texel size tracks a framing reference that expands immediately with
   outward zoom and contracts at its existing rate inward. The reference never
