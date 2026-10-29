@@ -16,6 +16,11 @@ constexpr float kfPusherAreaMinimumY = -kfCellHalfHeight;
 constexpr float kfPusherZoneWidth = 2.0f * kfCellHalfWidth / static_cast<float>(kiPusherZones);
 constexpr float kfPusherZoneHeight = 2.0f * kfCellHalfHeight / static_cast<float>(kiPusherZones);
 
+// A peer within this XY distance gets no force, only the X correction. The correction must exceed the distance so a
+// coincident pair, corrected in opposite directions, leaves it on the next tick.
+constexpr float kfPusherCoincidentDistance = 0.0001f;
+constexpr float kfPusherCoincidentCorrection = 0.001f;
+
 void PushersInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
 {
 	PushersInterpolate& __restrict rCurrent = rFrameInterpolate.pushers;
@@ -94,7 +99,6 @@ void PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restri
 
 XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate& rFrameInterpolate, id_t selfPusher, float& rfPositionCorrectionX, PusherFlags_t includeFlags, PusherFlags_t excludeFlags)
 {
-	rfPositionCorrectionX = 0.0f;
 	const PushersInterpolate& rCurrent = rFrameInterpolate.pushers;
 	int64_t iSelfIndex = rCurrent.idToIndexMap.at(selfPusher);
 	auto vecPosition = rCurrent.pVecPositions[iSelfIndex];
@@ -138,21 +142,17 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 			continue;
 		}
 
+		if (XMVectorGetX(XMVector2LengthSq(vecFromPusher)) <= kfPusherCoincidentDistance * kfPusherCoincidentDistance) [[unlikely]]
+		{
+			rfPositionCorrectionX += iSelfIndex < i ? -kfPusherCoincidentCorrection : kfPusherCoincidentCorrection;
+			continue;
+		}
+
 		auto vecIntensity = XMVectorSubtract(XMVectorReplicate(1.0f), XMVectorDivide(vecDistanceSquared, XMVectorReplicate(fRadius * fRadius)));
 		vecIntensity = XMVectorPow(vecIntensity, XMVectorReplicate(rCurrent.pfPowers[i]));
 		vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
 
-		XMVECTOR vecFromPusherNormal = XMVectorZero();
-		if (XMVector2Equal(vecFromPusher, XMVectorZero())) [[unlikely]]
-		{
-			float fDirectionX = iSelfIndex < i ? -1.0f : 1.0f;
-			rfPositionCorrectionX += fDirectionX * 0.001f;
-			vecFromPusherNormal = XMVectorSet(fDirectionX, 0.0f, 0.0f, 0.0f);
-		}
-		else
-		{
-			vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));
-		}
+		auto vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));
 		vecPush = XMVectorMultiplyAdd(vecIntensity, vecFromPusherNormal, vecPush);
 	}
 

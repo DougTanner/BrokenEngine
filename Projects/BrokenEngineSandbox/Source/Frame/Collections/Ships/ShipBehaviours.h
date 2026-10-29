@@ -86,7 +86,7 @@ void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData
 // Hard contact at the height of rVecPosition: rVecPosition stops at the terrain and the heading bounces off it. An
 // overlapped start snaps on the NavigationFlightPlane graph.
 void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
-// Pass the row's own pusher; apply rfPositionCorrectionX after terrain resolution.
+// Pass the row's own pusher; adds to the caller-initialized rfPositionCorrectionX, applied after terrain resolution.
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX);
 
 // Firing and look targets from previous-frame data: sets kFireMissile for an enemy within fMissileTargetRange and

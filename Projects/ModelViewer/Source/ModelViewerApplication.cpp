@@ -2,11 +2,12 @@
 
 #include "File/PackChunks.h"
 #include "Frame/TerrainCollisionUtils.h"
-#include "Graphics/Camera.h"
-#include "Profile/ProfileRows.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
+
+#include "Graphics/Camera.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game
@@ -30,8 +31,6 @@ void ModelViewerApplication::ResetDisplayTime()
 void ModelViewerApplication::ToggleFlight()
 {
 	mFlags.Set(ViewerFlags::kFlying, !(mFlags & ViewerFlags::kFlying));
-	engine::gpGraphics->mFlags.Set(engine::GraphicsFlags::kDrawModelsOverWorld, !(mFlags & ViewerFlags::kFlying));
-	engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
 	miDragButton = -1;
 	ResetDisplayTime();
 }
@@ -122,62 +121,6 @@ static std::filesystem::path FindExecutableCheckout()
 	}
 }
 
-static void RequireContainedPath(const std::filesystem::path& rPath, const std::filesystem::path& rOwner)
-{
-	auto it = rPath.begin();
-	for (const std::filesystem::path& rPart : rOwner)
-	{
-		if (it == rPath.end() || _wcsicmp(it->c_str(), rPart.c_str()) != 0)
-		{
-			throw std::runtime_error(std::format("Source path outside {}: {}", rOwner.string(), rPath.string()));
-		}
-		++it;
-	}
-}
-
-static void CheckMetadataPaths(const std::filesystem::path& rCheckout, const std::filesystem::path& rData, const std::filesystem::path& rSource, const std::filesystem::path& rMetadata)
-{
-	std::filesystem::path dataPath = std::filesystem::canonical(rData);
-	RequireContainedPath(dataPath, rCheckout);
-	std::filesystem::path sourcePath = std::filesystem::canonical(rSource);
-	RequireContainedPath(sourcePath, dataPath);
-	if (!std::filesystem::is_regular_file(sourcePath))
-	{
-		throw std::runtime_error(std::format("Model source is not a regular file: {}", rSource.string()));
-	}
-	RequireContainedPath(std::filesystem::canonical(rMetadata.parent_path()), dataPath);
-	RequireContainedPath(std::filesystem::weakly_canonical(rMetadata), dataPath);
-	// A dangling link is present input too, not a missing identity sidecar.
-	if (std::filesystem::is_symlink(std::filesystem::symlink_status(rMetadata)) && !std::filesystem::exists(rMetadata))
-	{
-		throw std::runtime_error(std::format("Unreadable metadata link: {}", rMetadata.string()));
-	}
-}
-
-static XMFLOAT3A ReadMetadataVector(const nlohmann::json& rMetadata, std::string_view name)
-{
-	const nlohmann::json& rValues = rMetadata.at(name);
-	if (!rValues.is_array() || !std::cmp_equal(rValues.size(), 3))
-	{
-		throw std::runtime_error(std::format("{} must contain three finite float components", name));
-	}
-	float pfValues[3] {};
-	for (const auto& [i, rValue] : std::views::enumerate(rValues))
-	{
-		if (!rValue.is_number())
-		{
-			throw std::runtime_error(std::format("{} must be numeric", name));
-		}
-		double fValue = rValue.get<double>();
-		if (!std::isfinite(fValue) || std::abs(fValue) > std::numeric_limits<float>::max())
-		{
-			throw std::runtime_error(std::format("{} must fit in finite floats", name));
-		}
-		pfValues[i] = static_cast<float>(fValue);
-	}
-	return {pfValues[0], pfValues[1], pfValues[2]};
-}
-
 void ModelViewerApplication::ValidateModelAlignment()
 {
 	mFlags.Set(ViewerFlags::kMetadataValid, false);
@@ -195,13 +138,14 @@ void ModelViewerApplication::ValidateModelAlignment()
 		mModelAlignmentError = "Scale XYZ must be positive";
 		return;
 	}
-	XMFLOAT3A f3Radians {XMConvertToRadians(mf3ModelRotation.x), XMConvertToRadians(mf3ModelRotation.y), XMConvertToRadians(mf3ModelRotation.z)};
-	if (!std::isfinite(f3Radians.x) || !std::isfinite(f3Radians.y) || !std::isfinite(f3Radians.z))
+	common::ModelHeader modelHeader
 	{
-		mModelAlignmentError = "Rotation in radians must be finite";
-		return;
-	}
-	XMMATRIX matAlignment = XMMatrixTranslation(mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z) * XMMatrixScaling(kfFlightRadius * mf3ModelScale.x, kfFlightRadius * mf3ModelScale.y, kfFlightRadius * mf3ModelScale.z) * XMMatrixRotationX(f3Radians.x) * XMMatrixRotationY(f3Radians.y) * XMMatrixRotationZ(f3Radians.z);
+		.f3RotationRadians = {XMConvertToRadians(mf3ModelRotation.x), XMConvertToRadians(mf3ModelRotation.y), XMConvertToRadians(mf3ModelRotation.z)},
+		.f3Scale = mf3ModelScale,
+		.f3Offset = mf3ModelOffset,
+	};
+	engine::ModelAlignment alignment = engine::GetModelAlignment(modelHeader);
+	XMMATRIX matAlignment = alignment.matPreMove * XMMatrixScaling(kfFlightRadius * alignment.f3Scale.x, kfFlightRadius * alignment.f3Scale.y, kfFlightRadius * alignment.f3Scale.z) * alignment.matPreRotate;
 	XMVECTOR vecDeterminant;
 	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(&vecDeterminant, matAlignment));
 	float fDeterminant = XMVectorGetX(vecDeterminant);
@@ -226,52 +170,34 @@ void ModelViewerApplication::LoadModelMetadata()
 	mModelMetadataPath.clear();
 	try
 	{
-		mCheckoutPath = FindExecutableCheckout();
+		std::filesystem::path checkoutPath = FindExecutableCheckout();
 		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunks = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 		const common::SceneHeader& rScene = rChunks.at(mPreviews.at(miSelected).crc).pHeader->sceneHeader;
 		std::filesystem::path sourceRelativePath(rChunks.at(rScene.modelCrc).pHeader->pcPath);
-		if (!sourceRelativePath.is_relative() || sourceRelativePath.has_root_path() || sourceRelativePath.extension() != ".MODEL")
-		{
-			throw std::runtime_error(std::format("Invalid packed model identity: {}", sourceRelativePath.string()));
-		}
-		if (std::ranges::contains(sourceRelativePath, std::filesystem::path("..")))
-		{
-			throw std::runtime_error("Packed model identity contains parent traversal");
-		}
 		sourceRelativePath.replace_extension();
 		int64_t iMatches = 0;
-		for (const std::filesystem::path& rData : {mCheckoutPath / "Engine/Data", mCheckoutPath / "Projects/BrokenEngineSandbox/Data"})
+		std::filesystem::path sourcePath;
+		for (const std::filesystem::path& rData : {checkoutPath / "Engine/Data", checkoutPath / "Projects/BrokenEngineSandbox/Data"})
 		{
-			std::filesystem::path sourcePath = rData / sourceRelativePath;
-			if (std::filesystem::is_regular_file(sourcePath))
+			std::filesystem::path candidatePath = rData / sourceRelativePath;
+			if (std::filesystem::is_regular_file(candidatePath))
 			{
 				++iMatches;
-				mModelDataPath = rData;
-				mModelSourcePath = sourcePath;
+				sourcePath = candidatePath;
 			}
 		}
 		if (iMatches != 1)
 		{
-			throw std::runtime_error(std::format("Expected one source for {} under {}; found {}", sourceRelativePath.string(), mCheckoutPath.string(), iMatches));
+			throw std::runtime_error(std::format("Expected one source for {} under {}; found {}", sourceRelativePath.string(), checkoutPath.string(), iMatches));
 		}
-		mModelMetadataPath = mModelSourcePath;
+		mModelMetadataPath = sourcePath;
 		mModelMetadataPath += ".model.json";
-		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
 		if (std::filesystem::exists(mModelMetadataPath))
 		{
-			std::vector<std::byte> bytes = common::ReadEntireFile(mModelMetadataPath);
-			const char* pcBytes = reinterpret_cast<const char*>(bytes.data());
-			nlohmann::json metadata = nlohmann::json::parse(pcBytes, pcBytes + bytes.size());
-			if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 1)
-			{
-				throw std::runtime_error("Model metadata requires integer version 1");
-			}
-			XMFLOAT3A f3Scale = ReadMetadataVector(metadata, "scale");
-			XMFLOAT3A f3Rotation = ReadMetadataVector(metadata, "rotationDegrees");
-			XMFLOAT3A f3Offset = ReadMetadataVector(metadata, "offset");
-			mf3ModelScale = f3Scale;
-			mf3ModelRotation = f3Rotation;
-			mf3ModelOffset = f3Offset;
+			common::ModelMetadata metadata = common::ReadModelMetadata(mModelMetadataPath);
+			mf3ModelScale = metadata.f3Scale;
+			mf3ModelRotation = metadata.f3RotationDegrees;
+			mf3ModelOffset = metadata.f3Offset;
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
 			{
@@ -291,62 +217,34 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
 		ValidateModelAlignment();
-		mModelMetadataStatus = std::format("Load failed: {} ({})", rException.what(), mModelMetadataPath.string());
+		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
 }
 
 void ModelViewerApplication::SaveModelMetadata()
 {
-	// Heap: explicit source Save serializes JSON and resolves filesystem paths.
+	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
-	try
+	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
+	std::string content = std::format("{{\n\t\"version\": 1,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}]\n}}\n", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z);
+	std::filesystem::path stagingPath = mModelMetadataPath;
+	stagingPath += ".tmp";
+	std::ofstream stream(stagingPath, std::ios::binary);
+	stream.write(content.data(), std::ssize(content));
+	stream.close();
+	std::error_code errorCode;
+	if (!stream.fail())
 	{
-		nlohmann::json metadata
-		{
-			{"version", 1},
-			{"rotationDegrees", {mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z}},
-			{"scale", {mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z}},
-			{"offset", {mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z}},
-		};
-		std::string content = metadata.dump(2) + "\n";
-		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
-		std::filesystem::path stagingPath = mModelMetadataPath;
-		stagingPath += std::format(".{}.tmp", GetCurrentProcessId());
-		RequireContainedPath(std::filesystem::weakly_canonical(stagingPath), std::filesystem::canonical(mModelDataPath));
-		HANDLE handle = CreateFileW(stagingPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			throw std::runtime_error(std::format("Cannot create staging file {} (Windows error {})", stagingPath.string(), GetLastError()));
-		}
-		DWORD uiWritten = 0;
-		bool bWritten = WriteFile(handle, content.data(), static_cast<DWORD>(content.size()), &uiWritten, nullptr) != FALSE && uiWritten == content.size();
-		bool bClosed = CloseHandle(handle) != FALSE;
-		if (!bWritten || !bClosed)
-		{
-			DeleteFileW(stagingPath.c_str());
-			throw std::runtime_error("Cannot write complete metadata staging file");
-		}
-		try
-		{
-			CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
-		}
-		catch (...)
-		{
-			DeleteFileW(stagingPath.c_str());
-			throw;
-		}
-		if (!MoveFileExW(stagingPath.c_str(), mModelMetadataPath.c_str(), MOVEFILE_REPLACE_EXISTING))
-		{
-			int64_t iError = GetLastError();
-			DeleteFileW(stagingPath.c_str());
-			throw std::runtime_error(std::format("Cannot replace metadata (Windows error {})", iError));
-		}
-		mModelMetadataStatus = "Saved source metadata. Game packs update on the next data build.";
+		std::filesystem::rename(stagingPath, mModelMetadataPath, errorCode);
 	}
-	catch (const std::exception& rException)
+	if (stream.fail() || errorCode)
 	{
-		mModelMetadataStatus = std::format("Save failed: {} ({})", rException.what(), mModelMetadataPath.string());
+		std::error_code removeErrorCode;
+		std::filesystem::remove(stagingPath, removeErrorCode);
+		mModelMetadataStatus = std::format("Save failed: {}", errorCode ? errorCode.message() : "cannot write staging file");
+		return;
 	}
+	mModelMetadataStatus = "Saved source metadata. Game packs update on the next data build.";
 }
 
 struct LightingDescriptor
@@ -1143,9 +1041,15 @@ void ModelViewerApplication::RenderUi()
 					mModelMetadataStatus = "Unsaved source edits";
 				}
 			}
-			static constexpr const char* kpcPlanes[] {"6 m", "50 m", "100 m"};
+			std::array<std::array<char, 16>, engine::kiMaxFlightPlanes> planeLabels {};
+			std::array<const char*, engine::kiMaxFlightPlanes> ppcPlanes {};
+			for (int64_t i = 0; i < engine::gpFlightPlanes->Count(); ++i)
+			{
+				std::snprintf(planeLabels.at(i).data(), planeLabels.at(i).size(), "%g m", static_cast<double>(engine::gpFlightPlanes->Plane(i).fHeightMeters));
+				ppcPlanes.at(i) = planeLabels.at(i).data();
+			}
 			ImGui::SetNextItemWidth(0.65f * fAvailableWidth);
-			ImGui::Combo("Altitude", &miFlightPlane, kpcPlanes, static_cast<int>(std::size(kpcPlanes)));
+			ImGui::Combo("Altitude", &miFlightPlane, ppcPlanes.data(), static_cast<int>(engine::gpFlightPlanes->Count()));
 			ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
 			ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
 			if (ImGui::Button("Save"))

@@ -79,7 +79,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   accumulates it, and the update decays it after `PullTarget` has read it. A
   tracked target's raw position updates the tracking velocity and last-known
   position; the offset is added only to the resolved target. The engine places
-  the initial position and every resolved target, free camera included, on the
+  the initial position and every resolved target on the
   lowest flight plane, so the look-at always lies on it and a target's height
   never moves the eye or the visible area; `PullTarget` supplies no height
   policy.

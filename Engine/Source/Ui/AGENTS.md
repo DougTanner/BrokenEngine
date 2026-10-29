@@ -13,7 +13,7 @@ is engine-owned here.
 
 - `Wrapper` stores float, bool, or discrete values with one-consumer change tracking. `Changed<T>()` advances the previous-value state, so exactly one consumer may poll a wrapper each frame.
 - Mutate through `Set` or `Reset`, or restore defaults with `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
-- A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it; consumers clamp it. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
+- A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it, so every returned index is in range. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
 - One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
 - Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.

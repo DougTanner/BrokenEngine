@@ -14,30 +14,6 @@ static std::filesystem::path GetModelMetadataPath(const std::filesystem::path& r
 	return metadataPath;
 }
 
-static XMFLOAT3 ReadModelVector(const nlohmann::json& rMetadata, const char* pcName, const std::filesystem::path& rMetadataPath)
-{
-	const nlohmann::json& rValues = rMetadata.at(pcName);
-	if (!rValues.is_array() || rValues.size() != 3)
-	{
-		throw std::runtime_error(std::format("\"{}\" {} must contain exactly three numeric components", rMetadataPath.string(), pcName));
-	}
-	float pfValues[3] {};
-	for (int64_t i = 0; i < std::ssize(pfValues); ++i)
-	{
-		if (!rValues.at(static_cast<size_t>(i)).is_number())
-		{
-			throw std::runtime_error(std::format("\"{}\" {} component {} must be numeric", rMetadataPath.string(), pcName, i));
-		}
-		double fValue = rValues.at(static_cast<size_t>(i)).get<double>();
-		if (!std::isfinite(fValue) || std::abs(fValue) > std::numeric_limits<float>::max())
-		{
-			throw std::runtime_error(std::format("\"{}\" {} component {} must fit in a finite float", rMetadataPath.string(), pcName, i));
-		}
-		pfValues[i] = static_cast<float>(fValue);
-	}
-	return XMFLOAT3(pfValues[0], pfValues[1], pfValues[2]);
-}
-
 
 std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
@@ -50,21 +26,10 @@ void ExportModel::Export()
 	std::filesystem::path metadataPath = GetModelMetadataPath(mInputPath);
 	if (std::filesystem::exists(metadataPath))
 	{
-		std::vector<std::byte> metadataBytes = common::ReadEntireFile(metadataPath);
-		const char* pcMetadata = reinterpret_cast<const char*>(metadataBytes.data());
-		nlohmann::json metadata = nlohmann::json::parse(pcMetadata, pcMetadata + metadataBytes.size());
-		if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 1)
-		{
-			throw std::runtime_error(std::format("\"{}\" must contain model metadata version 1", metadataPath.string()));
-		}
-		XMFLOAT3 f3RotationDegrees = ReadModelVector(metadata, "rotationDegrees", metadataPath);
-		modelHeader.f3RotationRadians = XMFLOAT3(XMConvertToRadians(f3RotationDegrees.x), XMConvertToRadians(f3RotationDegrees.y), XMConvertToRadians(f3RotationDegrees.z));
-		modelHeader.f3Scale = ReadModelVector(metadata, "scale", metadataPath);
-		modelHeader.f3Offset = ReadModelVector(metadata, "offset", metadataPath);
-		if (modelHeader.f3Scale.x <= 0.0f || modelHeader.f3Scale.y <= 0.0f || modelHeader.f3Scale.z <= 0.0f)
-		{
-			throw std::runtime_error(std::format("\"{}\" scale components must be positive", metadataPath.string()));
-		}
+		common::ModelMetadata metadata = common::ReadModelMetadata(metadataPath);
+		modelHeader.f3RotationRadians = XMFLOAT3(XMConvertToRadians(metadata.f3RotationDegrees.x), XMConvertToRadians(metadata.f3RotationDegrees.y), XMConvertToRadians(metadata.f3RotationDegrees.z));
+		modelHeader.f3Scale = metadata.f3Scale;
+		modelHeader.f3Offset = metadata.f3Offset;
 	}
 
 	int64_t iStride = sizeof(common::ModelVertex);

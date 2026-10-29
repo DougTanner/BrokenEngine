@@ -604,7 +604,6 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX)
 {
-	rfPositionCorrectionX = 0.0f;
 	if (!(pusher.uuid.iValue != 0))
 	{
 		return;

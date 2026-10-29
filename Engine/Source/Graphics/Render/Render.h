@@ -125,9 +125,12 @@ struct TemporalAreaLatch
 	}
 };
 
-// Last published presentation state; rendering never reads it back. Each owner writes on the client main loop
-// during RenderFrameGlobal; presentation_continuity_probe exposes a subset. iPublishedFrames advances after all
-// owners publish; each iHistoryResets counts only multi-cell basis advances that discarded that owner's history.
+// What the last published frame actually sent, for the read-only presentation_continuity_probe agent command; nothing
+// in rendering reads it back. Every field is written on the client main loop thread inside RenderFrameGlobal, each by
+// its own owner: GlobalUniforms.cpp writes shadow, LightingUniforms.cpp writes lighting, SmokeUniforms.cpp writes
+// smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, and — because it is
+// populated last — iPublishedFrames, so the counter advances only for a frame whose whole snapshot is complete. Each
+// iHistoryResets counts only the multi-cell basis advances that discarded that owner's history.
 struct RetainedAreaReport
 {
 	XMFLOAT4 f4CurrentArea {};
@@ -142,16 +145,9 @@ struct PresentationContinuitySnapshot
 	XMFLOAT2 f2WaterOrigin {};
 	XMFLOAT2 f2ReducedNoiseOrigin {};
 	float fNoiseFrequency = 0.0f;
-	XMFLOAT2 f2FoamReducedTextureOrigin {};
-	float fFoamTextureInverseTileSize = 0.0f;
-	XMFLOAT2 f2FoamBreakupReducedTextureOrigin {};
-	float fFoamBreakupInverseTileSize = 0.0f;
-	XMFLOAT2 f2FoamSpawnNoiseReducedOrigin {};
-	float fFoamSpawnNoiseInverseTileSize = 0.0f;
 	RetainedAreaReport shadow {};
 	RetainedAreaReport lighting {};
 	RetainedAreaReport smoke {};
-	RetainedAreaReport waterFoam {};
 };
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
@@ -171,6 +167,8 @@ void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> curren
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 
 inline bool gbWaterFoamReset = true; // Re-armed when the retained foam textures are created.
+// Recorded foam commands and published foam uniforms must both follow this predicate.
+bool WaterFoamActive();
 
 inline bool gbSmokeClear = true;
 

@@ -25,6 +25,25 @@ struct AudioChunkReadEntry
 	std::array<std::byte, 16 * 1'024> data {};
 };
 
+// A packed model's asset alignment; each consumer fixes where matPreMove, its own scaling built from f3Scale, and
+// matPreRotate sit in its transform chain.
+struct ModelAlignment
+{
+	XMMATRIX matPreMove {};
+	XMMATRIX matPreRotate {};
+	XMFLOAT3A f3Scale {};
+};
+
+inline ModelAlignment GetModelAlignment(const common::ModelHeader& rModelHeader)
+{
+	return
+	{
+		.matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset)),
+		.matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z),
+		.f3Scale = {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z},
+	};
+}
+
 #endif // BT_CLIENT
 
 // The packed-asset chunk engine, owned by FileManager via std::unique_ptr.

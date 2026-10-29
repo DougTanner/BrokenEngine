@@ -5,8 +5,8 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 ## Ship Invariants
 
 - Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range, including an immediate nudge for exact XY
-  overlap; blaster collision and missile explosion damage still apply.
+  separation within their 3D range, including an X position correction for
+  near-coincident XY; blaster collision and missile explosion damage still apply.
   The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
   owns the distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate

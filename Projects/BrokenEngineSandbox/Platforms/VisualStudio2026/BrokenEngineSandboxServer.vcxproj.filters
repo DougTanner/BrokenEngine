@@ -645,6 +645,9 @@
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ModelMetadata.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">

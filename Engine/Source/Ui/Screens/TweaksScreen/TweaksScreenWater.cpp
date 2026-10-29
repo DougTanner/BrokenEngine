@@ -309,7 +309,6 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Foam Emission Rate", iSection);
 			rScreen.WrapperSlider("Foam J Start", iSection);
 			rScreen.WrapperSlider("Foam J Full", iSection);
-			gWaterFoamJFull.Set(std::min(gWaterFoamJFull.mfCurrent, gWaterFoamJStart.mfCurrent - 0.001f));
 			rScreen.WrapperSlider("Foam Half Life", iSection);
 			rScreen.ChevronIndexSelector("Foam Texture", gWaterFoamTextureIndex, TextureManager::kpWaterFoamNames);
 			rScreen.WrapperSlider("Foam Texture Tile Size", iSection);

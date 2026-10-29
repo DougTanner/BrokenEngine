@@ -193,6 +193,8 @@ Present metadata requires integer `version: 1` and complete `rotationDegrees`,
 fit finite floats; every scale component must remain strictly positive after
 conversion. Invalid present metadata fails through the export aggregate;
 absence alone supplies zero rotation and offset with unit scale.
+`common::ReadModelMetadata` (`Common/ModelMetadata.h`) is the one reader and
+validator, shared with ModelViewer authoring.
 
 Export converts degrees to radians once and stores rotation, scale, and offset
 separately in `ModelHeader`, leaving geometry and animation unchanged. Rotation

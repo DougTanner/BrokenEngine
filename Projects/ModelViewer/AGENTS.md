@@ -17,13 +17,14 @@ SPACE toggles orbit preview and autonomous flight once per tap outside text
 editing. Flight forces the world visible without changing the retained orbit
 background preference; returning to orbit restores that preference and pauses
 the body. Resuming flight preserves its position without a catch-up interval.
-One viewer-owned radius-1.5 body chooses random clear-water destinations inside
+One viewer-owned body chooses random clear-water destinations inside
 the original cell; it never transfers cells or enters deterministic game state.
-Altitude choices are 6, 50 and 100 meters. The lower planes use terrain collision
-at the actual height through transitions; 100 meters permits terrain overflight.
-Altitude changes run at 25 meters per second, with descent held until the whole
-footprint is over clear water and clear at the proposed lower height.
-Model selection resets the body to its water anchor at 6 meters in either mode,
+Altitude choices are the viewer's flight-plane table (`Source/Frame/FlightPlaneTable.h`).
+Planes below the highest use terrain collision at the actual height through
+transitions; the highest permits terrain overflight. Altitude changes run at a
+fixed rate, with descent held until the whole footprint is over clear water and
+clear at the proposed lower height.
+Model selection resets the body to its water anchor and the lowest plane in either mode,
 retaining the active mode. Seed edits and Reroll rebuild elevation and clear-water
 destinations before respawning, also retaining the mode.
 
@@ -36,7 +37,7 @@ Preserve ordinary Graphics ownership, upload acquisition, descriptor publication
 submission fences and resource retirement. Selected identity and viewer controls
 must survive Graphics recreation, with resources republished before use.
 
-Holding Q temporarily applies engine defaults to the 20 right-hand float
+Holding Q temporarily applies engine defaults to the right-hand lighting float
 sliders and disables their edits. Preserve the current tweaks across Graphics
 recreation and restore them on Q release, focus loss, or shutdown before saving
 settings. Preset selection or reset while Q is held updates what will be restored;
@@ -48,7 +49,7 @@ directly; sun/moon IBL specular remains independent. One ordered descriptor tabl
 owns both lighting UI and
 preset/comparison membership.
 
-W/E/R taps load independent presets for those same 20 sliders; edits auto-save
+W/E/R taps load independent presets for those same sliders; edits auto-save
 only the selected preset. Missing or invalid presets apply all compiled defaults,
 without writing on selection. Backspace applies compiled defaults and saves them
 to the selected preset, retaining selection. Startup loads ordinary graphics
@@ -58,7 +59,7 @@ shows Preset: followed by the selected key, with a stable ImGui window ID and no
 duplicate content header. Ignore slot/reset key repeats and apply taps in
 received order before rendering.
 
-Presets use separate viewer-owned v3 AppData files through the shared atomic
+Presets use separate viewer-owned versioned AppData files through the shared atomic
 file helpers. Unsupported versions are rejected without migration and use the
 same compiled-default fallback. Validate the complete payload before applying
 any value; participant order is part of the format and changes require its
@@ -122,9 +123,7 @@ The executable's containing checkout owns source reads and Save, in both main
 checkouts and linked worktrees, independently of working directory and packed
 Data root. Resolve the selected scene's model identity to exactly one actual
 source under this checkout's Engine or Sandbox Data root; a sidecar alone does
-not establish ownership. Keep source, sidecar and staging paths canonically
-inside that checkout and Data root, including through links, and recheck before
-Save. Never follow a worktree's `.git` pointer to source in another checkout.
+not establish ownership. Never follow a worktree's `.git` pointer to source in another checkout.
 Missing or ambiguous source ownership and unavailable checkout resolution show
 errors and disable Save.
 
@@ -136,9 +135,10 @@ last valid complete alignment remains in the flight preview. Validate derived
 alignment and its inverse-transpose normal matrix as finite and invertible
 before accepting edits; valid scalar fields alone are insufficient.
 
-Only explicit Save writes metadata. Replace the destination from a completely
-written and closed private same-directory staging file; failure preserves the
-previous sidecar and shows an error. Save never runs DataPacker: games consume
+Only explicit Save writes metadata, in the tracked sidecars' layout, so an
+unedited Save leaves a shortest-form sidecar byte-identical. Replace the
+destination from a completely written and closed same-directory staging file;
+failure preserves the previous sidecar and shows an error. Save never runs DataPacker: games consume
 the saved alignment after their next ordinary data build. A user can Save while
 agents work, mutating tracked source metadata in either main or session
 checkouts. Treat these changes as user-owned and preserve them; never assume

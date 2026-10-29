@@ -129,10 +129,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	int64_t iRenderedOffset = siRendered[iPipeline];
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
-	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
-	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
-	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
+	engine::ModelAlignment alignment = engine::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -141,7 +138,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 		{
 			int64_t i = piVisibleIndices[j];
 
-			XMFLOAT3A f3Size {kfFighterRadius * f3ModelScale.x, kfFighterRadius * f3ModelScale.y, kfFighterRadius * f3ModelScale.z};
+			XMFLOAT3A f3Size {kfFighterRadius * alignment.f3Scale.x, kfFighterRadius * alignment.f3Scale.y, kfFighterRadius * alignment.f3Scale.z};
 			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 			{
 				float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kFighterDestroyTime, 0.75f);
@@ -160,7 +157,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
+			XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;

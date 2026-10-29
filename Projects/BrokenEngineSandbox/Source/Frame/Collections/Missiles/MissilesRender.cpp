@@ -76,15 +76,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kMissileModelCrc).pHeader->sceneHeader;
-	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
-	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
-	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x);
-	if (rModelHeader.f3RotationRadians.y != 0.0f)
-	{
-		matPreRotate *= XMMatrixRotationY(rModelHeader.f3RotationRadians.y);
-	}
-	matPreRotate *= XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
+	engine::ModelAlignment alignment = engine::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
@@ -108,7 +100,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 			continue;
 		}
 
-		XMFLOAT3A f3Scale {f3ModelScale.x, f3ModelScale.y, f3ModelScale.z};
+		XMFLOAT3A f3Scale = alignment.f3Scale;
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
 			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
@@ -120,7 +112,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMMATRIX matScaling = XMMatrixScaling(f3Scale.x, f3Scale.y, f3Scale.z);
 		XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-		XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matYaw * matTranslation;
+		XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matYaw * matTranslation;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
 		rModelLayout.f4Position = f4Position;

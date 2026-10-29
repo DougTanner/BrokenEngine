@@ -29,10 +29,10 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   summed across the query's zone. Include/exclude masks on `PusherFlags_t`
   default to `kTypeDefault` and `kTypeMines`; new pusher types opt in/out through
   those flags.
-- At exactly coincident XY within the source sphere, each included peer
-  contributes a signed 0.001 m X position correction and uses the same unit-X
-  direction for force: negative
-  when the self row index is lower, positive otherwise. This avoids normalizing
-  zero without changing the true-distance falloff. Force has zero Z/W; the
-  correction is transient output for the caller, never a snapshot-position write.
+- An included peer within the source sphere whose XY distance is at most
+  0.0001 m contributes no force, only a signed 0.001 m X position correction:
+  negative when the self row index is lower, positive otherwise. Every other
+  peer's XY offset is safe to normalize. Force has zero Z/W; the correction is
+  added to the caller's value as transient output, never a snapshot-position
+  write.
 - ApplyClampedPush (`Pushers.h`): inline impulse that caps the velocity component in push direction, preventing stacking beyond caller-supplied max. General helper — game code also uses it for non-pusher impulses (terrain-normal push).

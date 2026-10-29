@@ -1,10 +1,11 @@
 #include "File/PackChunks.h"
-#include "Graphics/Camera.h"
 #include "Graphics/Screenshot.h"
 #include "Memory/GlobalAllocator.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "CrashReport.h"
+
+#include "Graphics/Camera.h"
 #include "Game.h"
 #include "ModelViewerApplication.h"
 

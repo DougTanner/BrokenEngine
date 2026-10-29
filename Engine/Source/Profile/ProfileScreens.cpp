@@ -95,31 +95,20 @@ static void AppendProcessMemoryStatistics(common::Workbuffer& rWorkbuffer, bool 
 {
 	static int64_t siPrivateCommitBytes = 0;
 	static int64_t siWorkingSetBytes = 0;
-	static bool sbAvailable = false;
 
 	if (bReevaluate)
 	{
 		PROCESS_MEMORY_COUNTERS_EX processMemoryCounters {};
-		sbAvailable = K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&processMemoryCounters), sizeof(processMemoryCounters)) != 0;
-		if (sbAvailable)
-		{
-			siPrivateCommitBytes = static_cast<int64_t>(processMemoryCounters.PrivateUsage);
-			siWorkingSetBytes = static_cast<int64_t>(processMemoryCounters.WorkingSetSize);
-		}
+		VERIFY_SUCCESS(K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&processMemoryCounters), sizeof(processMemoryCounters)) != 0);
+		siPrivateCommitBytes = static_cast<int64_t>(processMemoryCounters.PrivateUsage);
+		siWorkingSetBytes = static_cast<int64_t>(processMemoryCounters.WorkingSetSize);
 	}
 
 	rWorkbuffer.Append("Process (2s samples)\nPrivate commit: ");
-	if (sbAvailable)
-	{
-		rWorkbuffer.AppendFloat(static_cast<float>(siPrivateCommitBytes) / (1'024.0f * 1'024.0f), 1);
-		rWorkbuffer.Append(" MiB\nWorking set: ");
-		rWorkbuffer.AppendFloat(static_cast<float>(siWorkingSetBytes) / (1'024.0f * 1'024.0f), 1);
-		rWorkbuffer.Append(" MiB\n\n");
-	}
-	else
-	{
-		rWorkbuffer.Append("unavailable\nWorking set: unavailable\n\n");
-	}
+	rWorkbuffer.AppendFloat(static_cast<float>(siPrivateCommitBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.Append(" MiB\nWorking set: ");
+	rWorkbuffer.AppendFloat(static_cast<float>(siWorkingSetBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.Append(" MiB\n\n");
 }
 
 static void AppendMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bEager)

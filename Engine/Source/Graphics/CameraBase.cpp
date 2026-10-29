@@ -144,7 +144,7 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		}
 	}
 
-	// Main-menu WASD moves the camera when kbFreeCamera is enabled and uses its position as the target.
+	// Main-menu WASD moves the camera when kbFreeCamera is enabled and drives the pose directly, ignoring the pulled target.
 	// Movement has W=0 so it preserves the position's W=1.
 	bool bFreeCameraActive = false;
 	if constexpr (kbFreeCamera)
@@ -160,13 +160,11 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		}
 	}
 
-	// Free camera already is the target, so the caller's pulled target is ignored while it drives the pose.
-	// The look-at sits on the lowest flight plane whatever the target's height, so a climb neither raises the eye nor
-	// widens the Z = 0 visible area.
-	XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : rPulledTarget), gpFlightPlanes->Lowest().fHeightMeters);
-
 	if (!bFreeCameraActive)
 	{
+		// The look-at sits on the lowest flight plane whatever the target's height, so a climb neither raises the eye nor
+		// widens the Z = 0 visible area.
+		XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(rPulledTarget), gpFlightPlanes->Lowest().fHeightMeters);
 		UpdatePosition(vecTargetPosition, fDeltaTime);
 	}
 	UpdateEyeHeight();

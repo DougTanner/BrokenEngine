@@ -17,6 +17,7 @@ Focused implementation contracts live in Log (`Log/AGENTS.md`), Math (`Math/AGEN
 
 - `DataFile.h` defines `.pack` chunk headers, alignment, payload-offset helpers, texture-size metadata, and shared elevation thresholds. `DataHeader::kiVersion` incorporates `sizeof(ChunkHeader)`; payload sizes are also folded into owning export-job versions where applicable. Same-size layout or semantic changes still require the explicit version bump named by the nearby layout assertion.
 - Payload structs whose raw object representation is written into a chunk declare every alignment gap as an explicit zero-initialized pad member. A compiler-inserted gap holds indeterminate bytes that copies carry into the emitted chunk, so exports from identical inputs produce differing bytes and differing content CRCs; the accompanying offset `static_assert` locks the layout the pad establishes.
+- `ModelMetadata.h` implements the authored `.model.json` alignment sidecar format that ExportJobs owns (`../DataPacker/Source/ExportJobs/AGENTS.md` `## Model Alignment`); change the reader and that contract together.
 - Manifest integrity keeps asset-path identity separate from the CRC of the exact emitted chunk bytes. Changes to layout or digest semantics require regeneration of local packed data.
 - `Serialization.h` is the binary `Read`/`Write` surface, including `XMVECTOR`
   round-tripping through `XMFLOAT4`. Never hand-roll equivalent casts. A reader

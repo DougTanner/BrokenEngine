@@ -150,7 +150,7 @@ a general configuration/admin system for this slider.
 ## Related work and future verification
 
 Searches of Features, Plans, and Investigations found no existing owner for
-this slider. `Documents/Plans/Engine/InvestigatePusherPlanePerformance.md`
+this slider. `Documents/Plans/Game/InvestigatePusherPlanePerformance.md`
 analyzes the current flight-plane spacing but does not add height controls.
 `Documents/Investigations/Engine/ShipForcesInThreeDimensions.md` discusses
 height/navigation assumptions; it does not own this feature. Keep both scopes

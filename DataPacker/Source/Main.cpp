@@ -914,7 +914,8 @@ static std::vector<std::wstring> DiscoverGameProjects(const std::filesystem::pat
 	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rRepositoryRoot / "Projects"))
 	{
 		std::wstring projectName = rEntry.path().filename().native();
-		if (rEntry.is_directory() && std::filesystem::is_regular_file(rEntry.path() / "Platforms" / "VisualStudio2026" / (projectName + L".vcxproj")))
+		std::filesystem::path projectFiles = rEntry.path() / "Platforms" / "VisualStudio2026";
+		if (rEntry.is_directory() && std::filesystem::is_regular_file(projectFiles / (projectName + L".vcxproj")) && std::filesystem::is_regular_file(projectFiles / (projectName + L"Server.vcxproj")))
 		{
 			projectNames.push_back(std::move(projectName));
 		}
@@ -982,10 +983,6 @@ static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
 	for (const std::wstring& rProjectName : DiscoverGameProjects(repositoryRoot))
 	{
 		std::filesystem::path projectDirectory = repositoryRoot / "Projects" / rProjectName;
-		if (!std::filesystem::is_directory(projectDirectory / "Data"))
-		{
-			continue;
-		}
 		std::string projectDataDirectory = (projectDirectory / "Data").string();
 		std::string outputDirectory = (projectDirectory / "Platforms" / "VisualStudio2026" / "Output" / "Data").string();
 		std::array<char*, 4> projectArguments { ppcArguments[0], engineDataDirectory.data(), projectDataDirectory.data(), outputDirectory.data() };

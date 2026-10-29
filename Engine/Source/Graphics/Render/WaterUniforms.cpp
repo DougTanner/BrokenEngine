@@ -38,6 +38,11 @@ static void PopulateWaterDirectional(shaders::GlobalLayout& rGlobalLayout, float
 	rGlobalLayout.fWaterDirectional = std::pow(fDirectional, 2.0f);
 }
 
+bool WaterFoamActive()
+{
+	return gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
+}
+
 // Reduced-time accumulators require exactly one call per frame.
 static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
 {
@@ -150,37 +155,22 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
 	gPresentationContinuity.f2ReducedNoiseOrigin = f2ReducedNoiseOrigin;
 	gPresentationContinuity.fNoiseFrequency = static_cast<float>(fNoiseFrequency);
-	if (gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow))
+	if (WaterFoamActive())
 	{
-		double fFoamTextureInverseTileSize = 1.0 / static_cast<double>(gWaterFoamTextureTileSize.mfCurrent);
-		XMFLOAT2 f2FoamReducedTextureOrigin {static_cast<float>(std::fmod(fFoamTextureInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamTextureInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamReducedTextureOrigin.x = f2FoamReducedTextureOrigin.x;
-		rGlobalLayout.f2WaterFoamReducedTextureOrigin.y = f2FoamReducedTextureOrigin.y;
-		rGlobalLayout.fWaterFoamTextureInverseTileSize = static_cast<float>(fFoamTextureInverseTileSize);
+		auto ReduceFoamOrigin = [&](float fTileSize, shaders::vec2& rf2ReducedOrigin)
+		{
+			double fInverseTileSize = 1.0 / static_cast<double>(fTileSize);
+			rf2ReducedOrigin.x = static_cast<float>(std::fmod(fInverseTileSize * fCameraX, 2.0));
+			rf2ReducedOrigin.y = static_cast<float>(std::fmod(fInverseTileSize * fCameraY, 2.0));
+			return static_cast<float>(fInverseTileSize);
+		};
+		rGlobalLayout.fWaterFoamTextureInverseTileSize = ReduceFoamOrigin(gWaterFoamTextureTileSize.mfCurrent, rGlobalLayout.f2WaterFoamReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamTextureStrength = gWaterFoamEnabled.Get<bool>() ? gWaterFoamTextureStrength.mfCurrent : 0.0f;
-		gPresentationContinuity.f2FoamReducedTextureOrigin = f2FoamReducedTextureOrigin;
-		gPresentationContinuity.fFoamTextureInverseTileSize = static_cast<float>(fFoamTextureInverseTileSize);
-		double fFoamBreakupInverseTileSize = 1.0 / static_cast<double>(gWaterFoamBreakupTileSize.mfCurrent);
-		XMFLOAT2 f2FoamBreakupReducedTextureOrigin {static_cast<float>(std::fmod(fFoamBreakupInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamBreakupInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin.x = f2FoamBreakupReducedTextureOrigin.x;
-		rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin.y = f2FoamBreakupReducedTextureOrigin.y;
-		rGlobalLayout.fWaterFoamBreakupInverseTileSize = static_cast<float>(fFoamBreakupInverseTileSize);
+		rGlobalLayout.fWaterFoamBreakupInverseTileSize = ReduceFoamOrigin(gWaterFoamBreakupTileSize.mfCurrent, rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamBreakupAmount = gWaterFoamBreakupAmount.mfCurrent;
-		rGlobalLayout.uiWaterFoamTextureIndex = static_cast<uint32_t>(std::clamp(gWaterFoamTextureIndex.GetIndex(), 0i64, static_cast<int64_t>(shaders::kiWaterFoamTextureCount - 1)));
-		rGlobalLayout.uiWaterFoamBreakupTextureIndex = static_cast<uint32_t>(std::clamp(gWaterFoamBreakupTextureIndex.GetIndex(), 0i64, static_cast<int64_t>(shaders::kiWaterFoamBreakupTextureCount - 1)));
-		gPresentationContinuity.f2FoamBreakupReducedTextureOrigin = f2FoamBreakupReducedTextureOrigin;
-		gPresentationContinuity.fFoamBreakupInverseTileSize = static_cast<float>(fFoamBreakupInverseTileSize);
-		double fFoamSpawnNoiseInverseTileSize = 1.0 / static_cast<double>(gWaterFoamSpawnNoiseTileSize.mfCurrent);
-		XMFLOAT2 f2FoamSpawnNoiseReducedOrigin {static_cast<float>(std::fmod(fFoamSpawnNoiseInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamSpawnNoiseInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin.x = f2FoamSpawnNoiseReducedOrigin.x;
-		rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin.y = f2FoamSpawnNoiseReducedOrigin.y;
-		rGlobalLayout.fWaterFoamSpawnNoiseInverseTileSize = static_cast<float>(fFoamSpawnNoiseInverseTileSize);
-		gPresentationContinuity.f2FoamSpawnNoiseReducedOrigin = f2FoamSpawnNoiseReducedOrigin;
-		gPresentationContinuity.fFoamSpawnNoiseInverseTileSize = static_cast<float>(fFoamSpawnNoiseInverseTileSize);
-	}
-	else
-	{
-		rGlobalLayout.fWaterFoamTextureStrength = 0.0f;
+		rGlobalLayout.uiWaterFoamTextureIndex = static_cast<uint32_t>(gWaterFoamTextureIndex.GetIndex());
+		rGlobalLayout.uiWaterFoamBreakupTextureIndex = static_cast<uint32_t>(gWaterFoamBreakupTextureIndex.GetIndex());
+		rGlobalLayout.fWaterFoamSpawnNoiseInverseTileSize = ReduceFoamOrigin(gWaterFoamSpawnNoiseTileSize.mfCurrent, rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin);
 	}
 	++gPresentationContinuity.iPublishedFrames;
 }
@@ -188,19 +178,15 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
 {
 	static bool sbInitialized = false;
-	static bool sbWasActive = false;
 	static RetainedAreaBasis sRetainedBasis {};
 	static XMFLOAT4 sf4PreviousArea {};
 	static std::chrono::duration<float> sPreviousElapsedTime(0.0f);
 	static std::chrono::steady_clock::time_point sPreviousUpdate {};
 
-	bool bActive = gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
-	if (!bActive)
+	if (!WaterFoamActive())
 	{
 		rGlobalLayout.iWaterFoamEnabled = 0;
-		rGlobalLayout.iWaterFoamReset = 1;
 		sbInitialized = false;
-		sbWasActive = false;
 		return;
 	}
 
@@ -208,7 +194,7 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	std::optional<XMFLOAT2> optionalOffset = sRetainedBasis.Advance(engine::gpCamera->mBasisCoordinate);
 	bool bBasisReset = sbInitialized && !optionalOffset.has_value();
 	bool bClockReset = elapsedTime < sPreviousElapsedTime;
-	bool bReset = !sbInitialized || gbWaterFoamReset || bBasisReset || bClockReset || !sbWasActive;
+	bool bReset = !sbInitialized || gbWaterFoamReset || bBasisReset || bClockReset;
 	XMFLOAT4 f4Area = engine::gpCamera->mf4RenderVisibleArea;
 	XMFLOAT4 f4PreviousArea = sf4PreviousArea;
 	if (bReset)
@@ -238,18 +224,11 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	rGlobalLayout.fWaterFoamDecayRate = std::log(2.0f) / gWaterFoamHalfLife.mfCurrent;
 	rGlobalLayout.fWaterFoamDeltaTime = fDeltaTime;
 	rGlobalLayout.iWaterFoamReset = bReset ? 1 : 0;
-	rGlobalLayout.iWaterFoamEnabled = bActive ? 1 : 0;
-	gPresentationContinuity.waterFoam.f4CurrentArea = f4Area;
-	gPresentationContinuity.waterFoam.f4PreviousArea = f4PreviousArea;
-	if (bBasisReset)
-	{
-		++gPresentationContinuity.waterFoam.iHistoryResets;
-	}
+	rGlobalLayout.iWaterFoamEnabled = 1;
 	sf4PreviousArea = f4Area;
 	sPreviousElapsedTime = elapsedTime;
 	sPreviousUpdate = updateTime;
 	sbInitialized = true;
-	sbWasActive = bActive;
 	gbWaterFoamReset = false;
 }
 

@@ -4,7 +4,6 @@
 
 #include "Frame/IslandTerrain.h"
 #include "Graphics/Islands.h"
-#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "CommandBufferManager.h"
@@ -331,7 +330,7 @@ void CommandBufferRecordMain::RecordWaterDisplacement(VkCommandBuffer vkCommandB
 void CommandBufferRecordMain::RecordWaterFoam(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
 {
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoam);
-	bool bActive = gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
+	bool bActive = WaterFoamActive();
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoamCompute);
 	if (bActive)
 	{
@@ -366,15 +365,7 @@ void CommandBufferRecordMain::RecordWaterFoam(VkCommandBuffer vkCommandBuffer, i
 		};
 		static constexpr VkPipelineStageFlags kVkHistoryReadStages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		TransitionHistory(0, shaders::kiWaterFoamMipLevels, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, kVkHistoryReadStages, VK_PIPELINE_STAGE_TRANSFER_BIT);
-		VkImageCopy vkCopy
-		{
-			.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
-			.srcOffset = {},
-			.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
-			.dstOffset = {},
-			.extent = {.width = shaders::kiWaterFoamWidth, .height = shaders::kiWaterFoamHeight, .depth = 1},
-		};
-		vkCmdCopyImage(vkCommandBuffer, rCurrent.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rHistory.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkCopy);
+		rHistory.RecordCopyImageFrom(vkCommandBuffer, rCurrent);
 		int64_t iWidth = shaders::kiWaterFoamWidth;
 		int64_t iHeight = shaders::kiWaterFoamHeight;
 		for (int64_t i = 1; i < shaders::kiWaterFoamMipLevels; ++i)

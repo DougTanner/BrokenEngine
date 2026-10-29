@@ -44,8 +44,8 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 
 Asset alignment comes from the scene's referenced packed model header; its
 [metadata contract](../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment)
-is owned by DataPacker. Resolve alignment before per-entity work and worker
-dispatch. Preserve each collection's multiplication positions and grouping for
+is owned by DataPacker. Resolve alignment through `engine::GetModelAlignment`
+(`File/PackChunks.h`) before per-entity work and worker dispatch. Preserve each collection's multiplication positions and grouping for
 offset, scale, and pre-rotation among gameplay sizing, death scaling, steering,
 and translation: collapsing alignment into one matrix changes those results.
 

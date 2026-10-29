@@ -234,7 +234,6 @@ try {
 			$gameProjects = @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })
 		}
 		foreach ($gameProject in $gameProjects) {
-			if (-not (Test-Path -LiteralPath (Join-Path $root "Projects\$gameProject\Data") -PathType Container)) { continue }
 			$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
 			# The data stamp holds the primary commit this export ran from; a worktree game build uses this
 			# Shared data only when its data inputs equal that commit's. The old stamp goes before the export,

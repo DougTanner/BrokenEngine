@@ -84,9 +84,6 @@ private:
 	XMFLOAT3A mf3ModelOffset {};
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
-	std::filesystem::path mCheckoutPath;
-	std::filesystem::path mModelDataPath;
-	std::filesystem::path mModelSourcePath;
 	std::filesystem::path mModelMetadataPath;
 	std::string mModelMetadataStatus;
 	std::string mModelAlignmentError;

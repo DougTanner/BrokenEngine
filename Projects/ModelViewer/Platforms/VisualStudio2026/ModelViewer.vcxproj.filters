@@ -173,6 +173,7 @@
     <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h"><Filter>Common\Math</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Math\MathUtils.h"><Filter>Common\Math</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Math\Random.h"><Filter>Common\Math</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ModelMetadata.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Serialization.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h"><Filter>Common</Filter></ClInclude>
