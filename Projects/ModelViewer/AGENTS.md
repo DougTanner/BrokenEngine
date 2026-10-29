@@ -72,7 +72,10 @@ Alt-F4 retains native window handling.
 
 F9 permits one outstanding PNG capture. Successful completion is logged only
 from the matching engine capture result after the PNG write; queued requests
-survive Graphics replacement.
+survive Graphics replacement. Once per process, after a completed render, the
+viewer logs `ModelViewer initial streaming done` when no texture chunk is
+between load request and adoption and every referenced island template is GPU
+resident with its mesh resident.
 
 The catalog includes every packed scene with materials, sorted by packed path.
 The viewer owns clip selection, playback time and play/pause state; selected

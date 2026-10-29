@@ -116,6 +116,28 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	return DefWindowProc(hwnd, uiMessage, uiWordParameter, iLongParameter);
 }
 
+// Valid only after a Render that returned true: that call requested every initial texture and counted every placement.
+// The template elevation texture has no texture-map entry, so bGpuResident covers it.
+static bool IsInitialStreamingDone()
+{
+	for ([[maybe_unused]] const auto& [rCrc, rTexture] : engine::gpTextureManager->mTextureMap)
+	{
+		engine::ChunkState eState = engine::gpFileManager->mpPackChunks->mLazyChunkMap.at(rCrc).eState.value.load(std::memory_order_relaxed);
+		if (eState != engine::ChunkState::kNotLoaded && eState != engine::ChunkState::kReady)
+		{
+			return false;
+		}
+	}
+	for ([[maybe_unused]] const auto& [rCrc, rTemplate] : engine::gpIslandTerrain->mIslands)
+	{
+		if (rTemplate.iReferenceCount != 0 && (!rTemplate.bGpuResident || rTemplate.eMeshResidency != engine::IslandMeshResidency::kResident))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 int RunModelViewer(HINSTANCE hinstance)
 {
 	if (!XMVerifyCPUSupport() || _set_FMA3_enable(0) != 0)
@@ -224,6 +246,7 @@ int RunModelViewer(HINSTANCE hinstance)
 	});
 	gbAllocationTrackingReady.store(true, std::memory_order_relaxed);
 	int64_t iScreenshotSequence = 0;
+	bool bInitialStreamingLogged = false;
 	while (!sbQuit)
 	{
 		MSG message {};
@@ -272,6 +295,11 @@ int RunModelViewer(HINSTANCE hinstance)
 				{
 					throw std::runtime_error("ModelViewer message wait failed");
 				}
+			}
+			else if (!bInitialStreamingLogged && IsInitialStreamingDone())
+			{
+				bInitialStreamingLogged = true;
+				LOG(kGraphics, kInfo, "ModelViewer initial streaming done");
 			}
 		}
 		catch (const std::system_error& rException)
