@@ -16,7 +16,7 @@ The HUD and the game's Tweaks content stay in the game project. This document ow
   actions.
 - `StandardMenuModel` is a snapshot taken at entry, so a screen rereads the model after any action a later decision in the same render pass depends on; Main Menu does that after starting discovery and after connecting.
 - `StandardMenuModel::pcTitle` must point to storage that outlives the render pass; a workbuffer allocation would dangle.
-- Missing `StandardMenuFeature::kLocalServer` suppresses discovery, auto-connect, the scanning placeholder, and the Local Server entry; missing `kRemoteServer` hides its disabled placeholder. Button width is measured over the full label set either way, so a disabled feature never reflows the column.
+- Missing `StandardMenuFeature::kLocalServer` suppresses discovery, auto-connect, the scanning placeholder, and the Local Server entry; missing `kRemoteServer` hides its disabled placeholder.
 - Screen constructors stay implicit and inert: no body, game dereference, filesystem work, or allocation. Screens are constructed with `ImGuiManager`, which is built before `game::Game`, so only `Render` may assume a game exists.
 - Screens gate themselves from authoritative game/UI state; `RenderUiScreens` invokes main and modal surfaces independently of in-game screen gating.
 - Auto-connect keeps render-local state so a succeeded connection is not retried and a lost connection rearms it, while a deliberate return to the main menu does not; the model reports only what the session can observe.
@@ -38,9 +38,9 @@ The HUD and the game's Tweaks content stay in the game project. This document ow
   drawn. Every Enter in the box passes the text to `Client::SendChat`, which
   owns every send check, then clears and closes the box; deactivating the field
   without Enter (Esc or a click elsewhere) also clears and closes it. History
-  lines sit in the lower-left corner and fade out over `kChatFadeDuration` from
-  arrival, and are drawn unfaded while the box is open. The `Player N` label is
-  fixed mixed-case text, never routed through the translation table.
+  lines fade out over `kChatFadeDuration` from arrival and are drawn unfaded
+  while the box is open. The `Player N` label is fixed mixed-case text, never
+  routed through the translation table.
 
 ## Shared Authoring Rules
 
@@ -51,6 +51,11 @@ These apply to every ImGui screen, engine or game.
 - Control and header label text is the harness automation API and does not get renamed. A label whose visible text repeats within one window carries a hidden `##<section>` suffix, as the Graphics quality rows' `RadioRow` options carry their row header, so the harness names each item by its window and full label.
 - Menu font pushes must be balanced within the owning ImGui window. Construct scoped font helpers before `Begin` or entirely inside the window so `End` sees the expected stack.
 - Hover animation is caller-owned state and composes ImGui alpha, including disabled controls, without heap allocation.
+- Clicking a button never moves or resizes it; the layout contract section
+  `8. Every Menu Button Is Themed` owns how. The one exception is a click whose
+  purpose is to rescale or relocalize the whole UI: Font Size `+`/`-`, the Game
+  Settings language buttons, and Game Settings Defaults, which resets font scale
+  and language.
 - Settings controls bind through the shared menu helpers. Tweaks sliders instead follow the engine TweaksScreen contract (`TweaksScreen/AGENTS.md`).
 
 ## See Also

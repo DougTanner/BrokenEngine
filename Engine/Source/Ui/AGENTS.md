@@ -27,6 +27,7 @@ is engine-owned here.
 ## Menu and Panel Helpers
 
 - Engine UI owns reusable player-facing menu layout and interaction helpers, including workbuffer-backed localized text conversion, wrapper controls, common sizing, menu chrome, and slide-panel behavior. Game UI owns the HUD's composition, game-state gating, labels, and interaction flows.
+- Side-panel hover (`ComputeMouseOpennessTarget`) is the full-height strip on the panel's side, measured by horizontal distance only, per the layout contract (`../../../Documents/UserInterfaceDesign.txt` section `11. Verification`). Layout rule: any future top or bottom bar's hover is the full-width strip on its edge, measured by vertical distance only.
 
 ## Graphics Quality Levels
 

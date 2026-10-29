@@ -72,7 +72,7 @@ struct SlidePanelState
 	ImVec2 vLastSize {};
 };
 
-float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX);
+float ComputeMouseOpennessTarget(const SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign);
 float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign, float fTarget);
 
 // fScale multiplies the default Latin/CJK font's base size; gUiFontScale applies once on top.

@@ -5,7 +5,8 @@ player-facing menus are engine-owned
 (`../../../../../Engine/Source/Ui/Screens/AGENTS.md`), which also owns the
 shared authoring rules every screen follows — 2160-height scaling,
 workbuffer-backed localized text, opaque-rect registration,
-label-as-automation-API, font balance, panel fill, and hover animation. Visual
+label-as-automation-API, font balance, panel fill, hover animation, and
+buttons a click never moves. Visual
 placement and hierarchy follow
 `../../../../../Documents/UserInterfaceDesign.txt`; this document owns the
 runtime contracts of the screens that remain here.

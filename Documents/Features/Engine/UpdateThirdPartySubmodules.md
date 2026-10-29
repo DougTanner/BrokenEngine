@@ -45,7 +45,7 @@ The authoring agent records these as the user's choices from the 2026-10-15 sess
 - nlohmann/json: new submodule `ThirdParty/json` (`https://github.com/nlohmann/json.git`, branch `develop`), consumed only through `single_include/nlohmann/json.hpp`. The dependency is approved (`ThirdParty/AGENTS.md` `## License Policy` step 4), with the license review in `## License review`. The C5311 pragmas go away (`## API-break inventory`).
 - openexr `main`: the unity wrapper and config shims are reworked, the bundled libdeflate (MIT) is compiled, and OpenJPH and zstd are not. Link stubs cover all four entry points `compression.c` references.
 - mimalloc `dev3`: the startup-reserve check at `Engine/Source/Memory/GlobalAllocator.cpp:250-257` checks `mi_stats_get` reserved and committed against the effective `mi_option_reserve_os_memory` size, and keeps the warning path.
-- imgui `master`: `Engine/Source/Ui/MenuUtils.cpp:310` gets the new `AddRect` argument order, and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271` reserves ImGui's two samplers. If implot `master` does not build against imgui `master` (WIP), the executing session stops and asks the user.
+- imgui `master`: `Engine/Source/Ui/MenuUtils.cpp:320` gets the new `AddRect` argument order, and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271` reserves ImGui's two samplers. If implot `master` does not build against imgui `master` (WIP), the executing session stops and asks the user.
 - Upstream symbolic links: the openexr `main` head tracks
   `src/test/OpenEXRFuzzTest/oss-fuzz -> ../oss-fuzz` and the tinygltf `release`
   head tracks `attic/examples/saver/Makefile -> Makefile.dev` (mode `120000`);
@@ -205,10 +205,10 @@ Signatures were compared between the old-pin and new-head public headers in the 
   - Operator fork: the hand-maintained fork (`Engine/Source/Memory/AGENTS.md`) is diffed. The stock header changed only whitespace and an aligned-new guard that selects the same branch under C++23.
   - Comments: `GlobalAllocator.cpp:250` and `Engine/Source/Memory/AGENTS.md:11` ("verifies arena 0") are rewritten.
 - imgui 1.92.6 WIP to 1.93.1 WIP. The test-engine hooks are unchanged (`Engine/Source/Agent/AgentUiRegistry.cpp:282-308`, `AgentUiRegistryServerStubs.cpp:17-29`).
-  - `AddRect`: the order is now `(rounding, thickness, flags)`, so `MenuUtils.cpp:310` changes from `(rounding, 0, thickness)`.
+  - `AddRect`: the order is now `(rounding, thickness, flags)`, so `MenuUtils.cpp:320` changes from `(rounding, 0, thickness)`.
   - Samplers: the Vulkan backend allocates `IMGUI_IMPL_VULKAN_MINIMUM_SAMPLER_POOL_SIZE` (2) samplers from our pool (`Engine/Source/Graphics/Managers/ImGuiManager.cpp:127`), so the `VK_DESCRIPTOR_TYPE_SAMPLER` count at `DeviceManager.cpp:271` grows from 16 to 18, and the `:270` comment names them.
   - Fonts: `FontDataOwnedByAtlas = false` (`ImGuiManager.cpp:109`) now borrows the data until the atlas is destroyed. A code read confirms the eager font chunk outlives the context.
-  - Accepted visual-only changes: stroke and anti-aliasing (`MenuUtils.cpp:302-349`), 1 px `Separator()`, and typed slider input (`MenuUtils.cpp:64`, `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.cpp:240,347`, `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:330`).
+  - Accepted visual-only changes: stroke and anti-aliasing (`MenuUtils.cpp:315-366`), 1 px `Separator()`, and typed slider input (`MenuUtils.cpp:64`, `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.cpp:240,347`, `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:335`).
 - implot: every function and `ImPlotSpec` field we use is unchanged (`Engine/Source/Profile/NetworkGraphs.cpp:15-20`, `Engine/Source/Ui/CurveWidget.cpp:29-122`). Its head targets imgui 1.93.0, and `implot_items.cpp:168-169` uses obsolete `ImDrawListFlags_AntiAliasedLines*` names; if that fails to build, see `## Decisions`.
 - meshoptimizer 1.0 to 1.3: the five functions we call keep their signatures (`ExportScene.cpp:603,604,694`, `Scene/SceneVerticesLoader.cpp:201,204`, `Island/ProcessBakedRegion.cpp:248`). The new `remesher.cpp` and `tangentspace.cpp` stay out of `ThirdParty/Prebuilts/Source/DataPacker/meshoptimizer.cpp:5-23`.
 - No API change at our sites:
@@ -269,7 +269,7 @@ Every license file at the new heads was read. All match the old pins except zlib
 - `ThirdParty/Prebuilts/Source/DataPacker/tinygltf.cpp`: the define, the json include first, and the attic path.
 - `ThirdParty/Prebuilts/Source/DataPacker/openexr/`: the `openexr.c` file list, the four HT/zstd stubs with their comment, and reworked or new config shims. Plus their `ThirdParty.vcxproj`/`.filters` registration and any include-path change in all three ThirdParty configurations, through `/update-vcxproj`.
 - mimalloc: `Engine/Source/Memory/GlobalAllocator.cpp:250-271`, the reserve check through `mi_stats_get` and its comment, and the `Engine/Source/Memory/AGENTS.md:11` sentence that describes it.
-- imgui: `Engine/Source/Ui/MenuUtils.cpp:310` and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271`.
+- imgui: `Engine/Source/Ui/MenuUtils.cpp:320` and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271`.
 - `Documents/FreshMachineSetup.md` `## 3. Clone with symlinks and submodules`:
   after the clone, run the commands below so a fresh primary matches
   `## Decisions`. A setting change alone leaves an existing link on disk, and so
