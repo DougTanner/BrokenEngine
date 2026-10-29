@@ -30,7 +30,6 @@ struct LightingFramebuffer
 	Buffer fixtureMaterials;
 	LightingAccelerationStructure scene;
 	uint32_t uiInstanceCount = 0;
-	uint32_t uiGeometryCount = 0;
 	uint64_t uiGeneration = 0;
 	uint64_t uiPendingPublication = 0;
 	uint64_t uiRecordedPublication = 0;

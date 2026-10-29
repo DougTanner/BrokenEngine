@@ -1,0 +1,165 @@
+diff --git a/Engine/Source/Frame/IslandTerrain.h b/Engine/Source/Frame/IslandTerrain.h
+index b14540ee..20fc71c0 100644
+--- a/Engine/Source/Frame/IslandTerrain.h
++++ b/Engine/Source/Frame/IslandTerrain.h
+@@ -97,4 +96,0 @@ struct IslandTemplate
+-	float fMeshMinX = 0.0f;
+-	float fMeshMinY = 0.0f;
+-	float fMeshMaxX = 0.0f;
+-	float fMeshMaxY = 0.0f;
+diff --git a/Engine/Source/Frame/IslandTerrainResidency.cpp b/Engine/Source/Frame/IslandTerrainResidency.cpp
+index 2bb43b61..4779901e 100644
+--- a/Engine/Source/Frame/IslandTerrainResidency.cpp
++++ b/Engine/Source/Frame/IslandTerrainResidency.cpp
+@@ -273,4 +272,0 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
+-			rTemplate.fMeshMinX = 0.0f;
+-			rTemplate.fMeshMinY = 0.0f;
+-			rTemplate.fMeshMaxX = 0.0f;
+-			rTemplate.fMeshMaxY = 0.0f;
+@@ -453,9 +448,0 @@ void IslandTerrainResidency::RestorationSweep()
+-		rTemplate.fMeshMinX = rTemplate.fMeshMaxX = rTemplate.pfMeshPositions[0];
+-		rTemplate.fMeshMinY = rTemplate.fMeshMaxY = rTemplate.pfMeshPositions[1];
+-		for (int64_t i = 1; i < rTemplate.iMeshVertexCount; ++i)
+-		{
+-			rTemplate.fMeshMinX = std::min(rTemplate.fMeshMinX, rTemplate.pfMeshPositions[2 * i]);
+-			rTemplate.fMeshMinY = std::min(rTemplate.fMeshMinY, rTemplate.pfMeshPositions[2 * i + 1]);
+-			rTemplate.fMeshMaxX = std::max(rTemplate.fMeshMaxX, rTemplate.pfMeshPositions[2 * i]);
+-			rTemplate.fMeshMaxY = std::max(rTemplate.fMeshMaxY, rTemplate.pfMeshPositions[2 * i + 1]);
+-		}
+@@ -484,4 +470,0 @@ void IslandTerrainResidency::ReleaseGpuResources()
+-		rTemplate.fMeshMinX = 0.0f;
+-		rTemplate.fMeshMinY = 0.0f;
+-		rTemplate.fMeshMaxX = 0.0f;
+-		rTemplate.fMeshMaxY = 0.0f;
+diff --git a/Engine/Source/Graphics/Lighting/Lighting.cpp b/Engine/Source/Graphics/Lighting/Lighting.cpp
+index ffbedd2f..1bf13bc2 100644
+--- a/Engine/Source/Graphics/Lighting/Lighting.cpp
++++ b/Engine/Source/Graphics/Lighting/Lighting.cpp
+@@ -296 +295,0 @@ void Lighting::EndRender()
+-	rFramebuffer.uiGeometryCount = static_cast<uint32_t>(iGeometries);
+@@ -302 +301 @@ void Lighting::EndRender()
+-		mpState->models->Write(mpState->iFramebuffer, rFramebuffer.modelRanges, 0, 0, instances, geometries, accelerationInstances);
++		mpState->models->Write(mpState->iFramebuffer, rFramebuffer.modelRanges, instances, geometries, accelerationInstances);
+diff --git a/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.cpp b/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.cpp
+index b5656846..afe62739 100644
+--- a/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.cpp
++++ b/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.cpp
+@@ -12 +11,0 @@ LightingAccelerationStructure::LightingAccelerationStructure(LightingAcceleratio
+-	, mScratchSizeVkDeviceSize(rOther.mScratchSizeVkDeviceSize)
+@@ -48 +46,0 @@ void LightingAccelerationStructure::Create(std::string_view name, VkAcceleration
+-	mScratchSizeVkDeviceSize = vkSizes.buildScratchSize;
+@@ -54 +52 @@ void LightingAccelerationStructure::Create(std::string_view name, VkAcceleration
+-		.iDataSize = static_cast<int64_t>(mScratchSizeVkDeviceSize + vkAlignment),
++		.iDataSize = static_cast<int64_t>(vkSizes.buildScratchSize + vkAlignment),
+diff --git a/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.h b/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.h
+index 4bdeed3a..b309dc71 100644
+--- a/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.h
++++ b/Engine/Source/Graphics/Lighting/LightingAccelerationStructure.h
+@@ -30 +29,0 @@ public:
+-	VkDeviceSize mScratchSizeVkDeviceSize = 0;
+diff --git a/Engine/Source/Graphics/Lighting/LightingFixture.cpp b/Engine/Source/Graphics/Lighting/LightingFixture.cpp
+index c0e354a7..d7a80df0 100644
+--- a/Engine/Source/Graphics/Lighting/LightingFixture.cpp
++++ b/Engine/Source/Graphics/Lighting/LightingFixture.cpp
+@@ -74,2 +73,0 @@ bool LightingFixture::InitializeAnimation()
+-	// Heap: the fixed asset path and clip names are stored before fixture publication.
+-	ScopedSuppressAllocationTracking scopedSuppressAllocationTracking;
+@@ -105,4 +102,0 @@ bool LightingFixture::InitializeAnimation()
+-	mAnimation.iMaterialCount = rData.miMaterialCount;
+-	mAnimation.iJointsPerMaterial = rData.mHeader.skeleton.uiSkinJointCount;
+-	mAnimation.path = kPath;
+-	mAnimation.clip = kClip;
+diff --git a/Engine/Source/Graphics/Lighting/LightingFixture.h b/Engine/Source/Graphics/Lighting/LightingFixture.h
+index a3a825ae..abf9c019 100644
+--- a/Engine/Source/Graphics/Lighting/LightingFixture.h
++++ b/Engine/Source/Graphics/Lighting/LightingFixture.h
+@@ -32,2 +31,0 @@ struct LightingFixtureAnimation
+-	int64_t iMaterialCount = 0;
+-	int64_t iJointsPerMaterial = 0;
+@@ -36,2 +33,0 @@ struct LightingFixtureAnimation
+-	std::string path;
+-	std::string clip;
+diff --git a/Engine/Source/Graphics/Lighting/LightingModels.cpp b/Engine/Source/Graphics/Lighting/LightingModels.cpp
+index 330a6d95..d10de868 100644
+--- a/Engine/Source/Graphics/Lighting/LightingModels.cpp
++++ b/Engine/Source/Graphics/Lighting/LightingModels.cpp
+@@ -366 +366 @@ LightingModelCounts LightingModels::Prepare(int64_t iFramebuffer, std::span<cons
+-void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, uint32_t uiFirstInstance, uint32_t uiFirstGeometry, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances)
++void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances)
+@@ -368,2 +368,2 @@ void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRa
+-	uint32_t uiInstance = uiFirstInstance;
+-	uint32_t uiGeometry = uiFirstGeometry;
++	uint32_t uiInstance = 0;
++	uint32_t uiGeometry = 0;
+diff --git a/Engine/Source/Graphics/Lighting/LightingModels.h b/Engine/Source/Graphics/Lighting/LightingModels.h
+index 75a4e42b..953384b9 100644
+--- a/Engine/Source/Graphics/Lighting/LightingModels.h
++++ b/Engine/Source/Graphics/Lighting/LightingModels.h
+@@ -31 +31 @@ public:
+-	void Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, uint32_t uiFirstInstance, uint32_t uiFirstGeometry, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances);
++	void Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances);
+diff --git a/Engine/Source/Graphics/Lighting/LightingState.h b/Engine/Source/Graphics/Lighting/LightingState.h
+index 6671c161..3a18bc01 100644
+--- a/Engine/Source/Graphics/Lighting/LightingState.h
++++ b/Engine/Source/Graphics/Lighting/LightingState.h
+@@ -33 +32,0 @@ struct LightingFramebuffer
+-	uint32_t uiGeometryCount = 0;
+diff --git a/Engine/Source/Graphics/Managers/DeviceManager.cpp b/Engine/Source/Graphics/Managers/DeviceManager.cpp
+index 786ca9f0..105c5c78 100644
+--- a/Engine/Source/Graphics/Managers/DeviceManager.cpp
++++ b/Engine/Source/Graphics/Managers/DeviceManager.cpp
+@@ -227,8 +226,0 @@ DeviceManager::DeviceManager()
+-	mEnabledVkPhysicalDeviceFeatures = vkPhysicalDeviceFeatures;
+-	mEnabledVkPhysicalDeviceVulkan12Features = vkPhysicalDeviceVulkan12Features;
+-	mEnabledVkPhysicalDeviceVulkan12Features.pNext = nullptr;
+-	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR = vkAccelerationFeatures;
+-	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR.pNext = nullptr;
+-	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR = vkRayQueryFeatures;
+-	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR.pNext = nullptr;
+-	mEnabledExtensions = deviceExtensions;
+diff --git a/Engine/Source/Graphics/Managers/DeviceManager.h b/Engine/Source/Graphics/Managers/DeviceManager.h
+index dec60045..f9d8f819 100644
+--- a/Engine/Source/Graphics/Managers/DeviceManager.h
++++ b/Engine/Source/Graphics/Managers/DeviceManager.h
+@@ -26,5 +25,0 @@ public:
+-	VkPhysicalDeviceFeatures mEnabledVkPhysicalDeviceFeatures {};
+-	VkPhysicalDeviceVulkan12Features mEnabledVkPhysicalDeviceVulkan12Features {};
+-	VkPhysicalDeviceAccelerationStructureFeaturesKHR mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR {};
+-	VkPhysicalDeviceRayQueryFeaturesKHR mEnabledVkPhysicalDeviceRayQueryFeaturesKHR {};
+-	std::vector<const char*> mEnabledExtensions;
+diff --git a/Engine/Source/Graphics/Managers/TextureManager.cpp b/Engine/Source/Graphics/Managers/TextureManager.cpp
+index 00f6923a..ee4a4ce6 100644
+--- a/Engine/Source/Graphics/Managers/TextureManager.cpp
++++ b/Engine/Source/Graphics/Managers/TextureManager.cpp
+@@ -335 +334,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotSmoke] = vkSmokeSamplerCreateInfo;
+@@ -346 +344,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotWindClamp] = vkSmokeSamplerCreateInfo;
+@@ -371 +368,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotLinearClamp] = vkSamplerCreateInfo;
+@@ -378 +374,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotClamp] = vkSamplerCreateInfo;
+@@ -385 +380,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotElevation] = vkSamplerCreateInfo;
+@@ -392 +386,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotBorder] = vkSamplerCreateInfo;
+@@ -398 +391,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotBorderWhite] = vkSamplerCreateInfo;
+@@ -405 +397,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeat] = vkSamplerCreateInfo;
+@@ -412 +403,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeatModelData] = vkSamplerCreateInfo;
+@@ -420 +410,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeat] = vkSamplerCreateInfo;
+@@ -430 +419,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeatWater] = vkSamplerCreateInfo;
+@@ -437 +425,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeatLinear] = vkSamplerCreateInfo;
+@@ -444 +431,0 @@ void TextureManager::CreateSamplers()
+-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeatLinear] = vkSamplerCreateInfo;
+diff --git a/Engine/Source/Graphics/Managers/TextureManager.h b/Engine/Source/Graphics/Managers/TextureManager.h
+index 7cc98af3..ee44e638 100644
+--- a/Engine/Source/Graphics/Managers/TextureManager.h
++++ b/Engine/Source/Graphics/Managers/TextureManager.h
+@@ -181 +180,0 @@ public:
+-	VkSamplerCreateInfo mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotCount] {};

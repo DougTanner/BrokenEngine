@@ -293,13 +293,12 @@ void Lighting::EndRender()
 		rFramebuffer.uiGeneration = ++mpState->uiResourceGeneration;
 	}
 	rFramebuffer.uiInstanceCount = static_cast<uint32_t>(iInstances);
-	rFramebuffer.uiGeometryCount = static_cast<uint32_t>(iGeometries);
 	std::span instances(reinterpret_cast<shaders::LightingInstance*>(rFramebuffer.instances.mpMappedMemory), static_cast<size_t>(iInstances));
 	std::span geometries(reinterpret_cast<shaders::LightingGeometry*>(rFramebuffer.geometries.mpMappedMemory), static_cast<size_t>(iGeometries));
 	std::span accelerationInstances(reinterpret_cast<VkAccelerationStructureInstanceKHR*>(rFramebuffer.accelerationInstances.mpMappedMemory), static_cast<size_t>(iInstances));
 	if (bActive)
 	{
-		mpState->models->Write(mpState->iFramebuffer, rFramebuffer.modelRanges, 0, 0, instances, geometries, accelerationInstances);
+		mpState->models->Write(mpState->iFramebuffer, rFramebuffer.modelRanges, instances, geometries, accelerationInstances);
 		mpState->terrain.Write(mpState->iFramebuffer, rFramebuffer.modelCounts.uiInstances, rFramebuffer.modelCounts.uiGeometries, instances, geometries, accelerationInstances);
 		if (iSolidCount > 0)
 		{

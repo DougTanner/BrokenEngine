@@ -23,11 +23,6 @@ public:
 	~DeviceManager();
 
 	VkDevice mVkDevice = VK_NULL_HANDLE;
-	VkPhysicalDeviceFeatures mEnabledVkPhysicalDeviceFeatures {};
-	VkPhysicalDeviceVulkan12Features mEnabledVkPhysicalDeviceVulkan12Features {};
-	VkPhysicalDeviceAccelerationStructureFeaturesKHR mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR {};
-	VkPhysicalDeviceRayQueryFeaturesKHR mEnabledVkPhysicalDeviceRayQueryFeaturesKHR {};
-	std::vector<const char*> mEnabledExtensions;
 
 	VkQueue mGraphicsVkQueue = VK_NULL_HANDLE;
 	VkQueue mPresentVkQueue = VK_NULL_HANDLE;

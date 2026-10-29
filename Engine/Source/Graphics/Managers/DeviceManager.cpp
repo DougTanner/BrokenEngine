@@ -224,14 +224,6 @@ DeviceManager::DeviceManager()
 	}
 	vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 	CHECK_VK(vkCreateDevice(gpInstanceManager->mVkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &mVkDevice));
-	mEnabledVkPhysicalDeviceFeatures = vkPhysicalDeviceFeatures;
-	mEnabledVkPhysicalDeviceVulkan12Features = vkPhysicalDeviceVulkan12Features;
-	mEnabledVkPhysicalDeviceVulkan12Features.pNext = nullptr;
-	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR = vkAccelerationFeatures;
-	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR.pNext = nullptr;
-	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR = vkRayQueryFeatures;
-	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR.pNext = nullptr;
-	mEnabledExtensions = deviceExtensions;
 
 	volkLoadDevice(mVkDevice);
 	if (vkCreateAccelerationStructureKHR == nullptr || vkDestroyAccelerationStructureKHR == nullptr || vkGetAccelerationStructureBuildSizesKHR == nullptr || vkCmdBuildAccelerationStructuresKHR == nullptr || vkGetAccelerationStructureDeviceAddressKHR == nullptr || vkGetBufferDeviceAddress == nullptr)

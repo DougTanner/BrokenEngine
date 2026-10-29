@@ -178,7 +178,6 @@ public:
 		kSamplerSlotCount,
 	};
 	VkSampler mpSamplersVkSampler[kSamplerSlotCount] {};
-	VkSamplerCreateInfo mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotCount] {};
 
 	// Per-mip Toksvig variance tables for the water normal maps, copied from TextureHeader::pfMipVariance
 	// during the ctor chunk walk (headers are resident at startup; the lazy pixel data is not). Indexed by

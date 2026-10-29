@@ -29,12 +29,8 @@ struct LightingFixtureAnimation
 {
 	common::crc_t sceneCrc = 0;
 	int64_t iClip = 0;
-	int64_t iMaterialCount = 0;
-	int64_t iJointsPerMaterial = 0;
 	XMFLOAT3A f3Center {-160.0f, 160.0f, 16.0f, };
 	float fScale = 8.0f;
-	std::string path;
-	std::string clip;
 };
 
 class LightingFixture

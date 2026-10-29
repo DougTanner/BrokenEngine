@@ -270,10 +270,6 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 			rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
 			rTemplate.iMeshIndexOffset = 0;
 			rTemplate.iMeshVertexOffset = 0;
-			rTemplate.fMeshMinX = 0.0f;
-			rTemplate.fMeshMinY = 0.0f;
-			rTemplate.fMeshMaxX = 0.0f;
-			rTemplate.fMeshMaxY = 0.0f;
 			rTemplate.iMeshArenaBlockedGeneration = 0;
 			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
@@ -450,15 +446,6 @@ void IslandTerrainResidency::RestorationSweep()
 		ASSERT(rTemplate.puiMeshIndices != nullptr);
 		ASSERT(rTemplate.iMeshVertexCount > 0);
 		ASSERT(rTemplate.iMeshIndexCount > 0);
-		rTemplate.fMeshMinX = rTemplate.fMeshMaxX = rTemplate.pfMeshPositions[0];
-		rTemplate.fMeshMinY = rTemplate.fMeshMaxY = rTemplate.pfMeshPositions[1];
-		for (int64_t i = 1; i < rTemplate.iMeshVertexCount; ++i)
-		{
-			rTemplate.fMeshMinX = std::min(rTemplate.fMeshMinX, rTemplate.pfMeshPositions[2 * i]);
-			rTemplate.fMeshMinY = std::min(rTemplate.fMeshMinY, rTemplate.pfMeshPositions[2 * i + 1]);
-			rTemplate.fMeshMaxX = std::max(rTemplate.fMeshMaxX, rTemplate.pfMeshPositions[2 * i]);
-			rTemplate.fMeshMaxY = std::max(rTemplate.fMeshMaxY, rTemplate.pfMeshPositions[2 * i + 1]);
-		}
 		{
 			// Heap: the recorded upload allocates its staging buffer inside RenderGlobal's residency sweep.
 			ScopedSuppressAllocationTracking suppress;
@@ -481,10 +468,6 @@ void IslandTerrainResidency::ReleaseGpuResources()
 		rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
 		rTemplate.iMeshIndexOffset = 0;
 		rTemplate.iMeshVertexOffset = 0;
-		rTemplate.fMeshMinX = 0.0f;
-		rTemplate.fMeshMinY = 0.0f;
-		rTemplate.fMeshMaxX = 0.0f;
-		rTemplate.fMeshMaxY = 0.0f;
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kResident)
 		{
 			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;

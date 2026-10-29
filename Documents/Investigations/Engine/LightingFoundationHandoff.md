@@ -69,7 +69,7 @@ button; poll `query_profile` until `lighting.capture.status` is `failed`, or `co
 | 6 | Radiometry sanity | Three floor pixels within 0.1% of the hand-computed point value. |
 | 7 | Reference exports | The wide 1000-source 256-sample capture completes within 15 minutes; every capture writes all seven files. |
 | 8 | No Vulkan validation errors | No validation, `CheckVk` failure, device loss or debug break in the client log. |
-| 9 | Simulation/CRC unaffected | No Frame source change and no desync or CRC line in either log. |
+| 9 | Simulation/CRC unaffected | Merge-aware static examination confirms no simulation or CRC changes; neither log contains desync or CRC failures. |
 
 Checks:
 
@@ -115,8 +115,11 @@ Checks:
 8. Search the client's `--log-file` over the whole scenario (restore, resize, mode switches, all
    captures) for `DebugUtilsCallback`, `CheckVk failed`, `VK_ERROR_DEVICE_LOST` and
    `DEBUG_BREAK at`: no match.
-9. `git diff bc69eea5 -- Engine/Source/Frame Projects/BrokenEngineSandbox/Source/Frame` is empty,
-   and the client's and server's `--log-file`s over the scenario contain no `SendDesyncReport`,
+9. Examine `git diff b56f20fa44d0424c2fdf5003157563684ed747f5 -- Engine/Source/Frame Projects/BrokenEngineSandbox/Source/Frame`
+   against the session baseline, which includes the merged main changes. Only lighting-related
+   render, client-only residency and documentation changes are allowed; confirm no changes to
+   simulation behavior, shared state or CRC participation. The client's and server's `--log-file`s
+   over the scenario contain no `SendDesyncReport`,
    `RecoverFromDesync`, `LogDifferences CRC` or `DEBUG_BREAK at` line.
 
 ## Known omissions
@@ -143,8 +146,9 @@ Taken on 2026-10-29, when the foundation was cut down from its original L1-L14 c
   the reproducibility record.
 - Capture runs progressively inside ordinary frames while the client is paused: one frame renders
   the receivers, later frames trace reference tiles, and the last frame composes the reference
-  once before export. Nothing blocks the main thread, and unpausing or changing the scene fails the
-  capture.
+  once before export. Final export blocks the main thread while `FinishCapture` waits for the
+  framebuffer fence, reads back the images and writes the files. Unpausing or changing the scene
+  fails the capture.
 - The 512-sample convergence pair is not required: with 4x4 m emitters at least 2 m from every
   receiver plane, 256 Halton samples leave integration error far below the differences the
   comparison judges. The 512 control stays for a candidate that suspects area-sampling noise. The

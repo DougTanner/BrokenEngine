@@ -27,7 +27,6 @@ public:
 	VkAccelerationStructureKHR mVkAccelerationStructureKHR = VK_NULL_HANDLE;
 	Buffer mStorage;
 	Buffer mScratch;
-	VkDeviceSize mScratchSizeVkDeviceSize = 0;
 	VkAccelerationStructureTypeKHR mVkAccelerationStructureTypeKHR = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 	VkBuildAccelerationStructureFlagsKHR mVkBuildAccelerationStructureFlagsKHR = 0;
 };

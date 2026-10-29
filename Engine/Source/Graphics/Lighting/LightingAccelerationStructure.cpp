@@ -9,7 +9,6 @@ LightingAccelerationStructure::LightingAccelerationStructure(LightingAcceleratio
 	: mVkAccelerationStructureKHR(std::exchange(rOther.mVkAccelerationStructureKHR, VK_NULL_HANDLE))
 	, mStorage(std::move(rOther.mStorage))
 	, mScratch(std::move(rOther.mScratch))
-	, mScratchSizeVkDeviceSize(rOther.mScratchSizeVkDeviceSize)
 	, mVkAccelerationStructureTypeKHR(rOther.mVkAccelerationStructureTypeKHR)
 	, mVkBuildAccelerationStructureFlagsKHR(rOther.mVkBuildAccelerationStructureFlagsKHR)
 {
@@ -45,13 +44,12 @@ void LightingAccelerationStructure::Create(std::string_view name, VkAcceleration
 		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal, BufferFlags::kAccelerationStorage},
 		.iDataSize = static_cast<int64_t>(vkSizes.accelerationStructureSize),
 	});
-	mScratchSizeVkDeviceSize = vkSizes.buildScratchSize;
 	VkDeviceSize vkAlignment = gpInstanceManager->mVkPhysicalDeviceAccelerationStructurePropertiesKHR.minAccelerationStructureScratchOffsetAlignment;
 	mScratch.Create(
 	{
 		.name = name,
 		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal, BufferFlags::kDeviceAddress},
-		.iDataSize = static_cast<int64_t>(mScratchSizeVkDeviceSize + vkAlignment),
+		.iDataSize = static_cast<int64_t>(vkSizes.buildScratchSize + vkAlignment),
 		.eMemoryPlacement = BufferMemoryPlacement::kOrdinaryRam,
 	});
 	VkAccelerationStructureCreateInfoKHR vkCreateInfo

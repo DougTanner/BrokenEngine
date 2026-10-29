@@ -332,7 +332,6 @@ void TextureManager::CreateSamplers()
 		.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotSmoke] = vkSmokeSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSmokeSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotSmoke]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotSmoke], "Smoke");
 
@@ -343,7 +342,6 @@ void TextureManager::CreateSamplers()
 	vkSmokeSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	vkSmokeSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	vkSmokeSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotWindClamp] = vkSmokeSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSmokeSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotWindClamp]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotWindClamp], "WindClamp");
 
@@ -368,48 +366,41 @@ void TextureManager::CreateSamplers()
 		.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotLinearClamp] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotLinearClamp]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotLinearClamp], "LinearClamp");
 
 	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = gAnisotropy.Get<bool>() ? VK_TRUE : VK_FALSE;
 	vkSamplerCreateInfo.maxAnisotropy = gMaximumAnisotropy.mfCurrent;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotClamp] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotClamp]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotClamp], "Clamp");
 
 	// Dedicated sampler for the per-island R16_SFLOAT heightmap (IslandTerrain bindless elevation array).
 	// Mirrors mpSamplersVkSampler[kSamplerSlotClamp]; R16_SFLOAT linear filtering is spec-mandated (16-bit-float family),
 	// so this stays LINEAR unconditionally.
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotElevation] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotElevation]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotElevation], "Elevation");
 
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotBorder] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotBorder]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotBorder], "Border");
 	// White border (opaque 1.0): the shadow texture is inverse (1.0 = fully lit / no shadow), so any sample beyond the
 	// texture extent reads "no shadow" instead of smearing the edge.
 	vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotBorderWhite] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotBorderWhite]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotBorderWhite], "BorderWhite");
 	vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeat] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeat]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeat], "Repeat");
 
 	// Model normal and metallic-roughness textures carry data rather than color. Apply their dedicated
 	// bias directly so negative sharpens, positive blurs, and zero is unbiased.
 	vkSamplerCreateInfo.mipLodBias = std::clamp(gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeatModelData] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatModelData]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatModelData], "RepeatModelData");
 
@@ -417,7 +408,6 @@ void TextureManager::CreateSamplers()
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeat] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeat]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeat], "MirroredRepeat");
 
@@ -427,21 +417,18 @@ void TextureManager::CreateSamplers()
 	// (the slider value is also uploaded as fWaterNormalMipmapBias). Applied directly, not negated:
 	// negative = sharpen, positive = blur.
 	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipmapBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeatWater] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");
 
 	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
 	vkSamplerCreateInfo.maxAnisotropy = 1.0f;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotMirroredRepeatLinear] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear], "MirroredRepeatLinear");
 
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	mpSamplerInfosVkSamplerCreateInfo[kSamplerSlotRepeatLinear] = vkSamplerCreateInfo;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatLinear]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatLinear], "RepeatLinear");
 }

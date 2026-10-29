@@ -71,8 +71,6 @@ LightingFixture::LightingFixture(GridCoord anchor)
 
 bool LightingFixture::InitializeAnimation()
 {
-	// Heap: the fixed asset path and clip names are stored before fixture publication.
-	ScopedSuppressAllocationTracking scopedSuppressAllocationTracking;
 	static constexpr std::string_view kPath = R"(Models\AlienCreatureTake3\scene.gltf)";
 	static constexpr std::string_view kClip = "Animation.001";
 	static constexpr common::crc_t kSceneCrc = common::CrcConsteval(kPath);
@@ -102,10 +100,6 @@ bool LightingFixture::InitializeAnimation()
 	}
 	mAnimation.sceneCrc = kSceneCrc;
 	mAnimation.iClip = 0;
-	mAnimation.iMaterialCount = rData.miMaterialCount;
-	mAnimation.iJointsPerMaterial = rData.mHeader.skeleton.uiSkinJointCount;
-	mAnimation.path = kPath;
-	mAnimation.clip = kClip;
 	return true;
 }
 

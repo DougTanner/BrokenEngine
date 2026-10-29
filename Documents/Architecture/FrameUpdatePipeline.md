@@ -98,15 +98,16 @@ both preparation and image availability; ImGui joins the Main worker and submits
 the framebuffer fence. Main also signals particle synchronization for the next
 Global submission.
 
-A Lighting comparison capture adds no submission and never blocks the main loop.
-While the client is paused, ordinary frames carry it inside preparation: the
-first frame records the receiver pass, each later frame dispatches a fixed number
-of reference tiles, and the frame that dispatches the last tiles moves the
+While the client is paused, ordinary frames carry Lighting comparison capture
+tracing inside preparation: the first frame records the receiver pass, each later
+frame dispatches a fixed number of reference tiles, and the frame that dispatches
+the last tiles moves the
 reference to shader-read and enables it for that frame's Main composition.
 [`LightingCapture`](../../Engine/Source/Graphics/Lighting/LightingCapture.cpp)
 `FinishCapture` runs on that framebuffer after ImGui submission and before
-present, waits its fence, exports the raw images and the finished PNG, then
-disables the reference.
+present. Final export blocks the main thread while it waits for the framebuffer
+fence, performs readbacks through separate one-shot submissions, and writes the
+raw images, finished PNG and metadata; it then disables the reference.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

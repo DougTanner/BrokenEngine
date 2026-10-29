@@ -363,10 +363,10 @@ LightingModelCounts LightingModels::Prepare(int64_t iFramebuffer, std::span<cons
 	return counts;
 }
 
-void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, uint32_t uiFirstInstance, uint32_t uiFirstGeometry, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances)
+void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRange> ranges, std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances)
 {
-	uint32_t uiInstance = uiFirstInstance;
-	uint32_t uiGeometry = uiFirstGeometry;
+	uint32_t uiInstance = 0;
+	uint32_t uiGeometry = 0;
 	for (const LightingModelRange& rRange : ranges)
 	{
 		const State::Asset& rAsset = mpState->assets.at(rRange.modelCrc);

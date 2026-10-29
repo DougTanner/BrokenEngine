@@ -94,10 +94,6 @@ struct IslandTemplate
 	VmaVirtualAllocation meshVertexAllocation = VK_NULL_HANDLE;
 	int64_t iMeshIndexOffset = 0;
 	int64_t iMeshVertexOffset = 0;
-	float fMeshMinX = 0.0f;
-	float fMeshMinY = 0.0f;
-	float fMeshMaxX = 0.0f;
-	float fMeshMaxY = 0.0f;
 	IslandMeshResidency eMeshResidency = IslandMeshResidency::kNonresident;
 	int64_t iMeshArenaBlockedGeneration = 0;
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
