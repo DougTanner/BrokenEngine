@@ -16,7 +16,6 @@
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h"><Filter>Engine\Data\Shaders</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h"><Filter>Game\Data\Shaders</Filter></ClInclude>
     <ClInclude Include="$(ProjectDir)Build\ModelViewerDataRoot.h"><Filter>DataFiles</Filter></ClInclude>
@@ -110,7 +109,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingSceneDiagnostics.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>

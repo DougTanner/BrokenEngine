@@ -17,8 +17,8 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 - Buffer memory properties remain mandatory except that ordinary-RAM placement
   removes `DEVICE_LOCAL` and requires coherent, persistently mapped host memory
   from a heap without `VK_MEMORY_HEAP_DEVICE_LOCAL_BIT`; BAR-visible local heaps
-  do not qualify. Staging, readback, upload mirrors, acceleration-structure
-  scratch and diagnostic work request ordinary RAM explicitly, with no retry
+  do not qualify. Staging, readback, upload mirrors and acceleration-structure
+  scratch request ordinary RAM explicitly, with no retry
   into local memory. Other buffer requests retain their requested properties
   on the first allocation attempt.
 - For every default `DEVICE_LOCAL` request through `Buffer::CreateBuffer`, only

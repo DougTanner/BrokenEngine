@@ -22,15 +22,12 @@ with point and one-sided rectangle sources in the camera cell's frame.
   control enables it. Opaque models, terrain, water and fixture draws add that
   result at their local diffuse seam before smoke; BLEND receives zero. Do not
   apply albedo/pi again. CPU validity and fallback lifetime belong to Graphics.
-- Terrain production rasterizes the original elevation expression into reusable
-  R16 scratch with sea-floor clear and MAX blending. Keep implicit sampling;
-  compute reproduction or trace-domain border clamp is not equivalent. Tile
-  coverage follows retained topology bounds, including vertices beyond the
-  authored footprint. Original-output, raw-tap, four-shift, and coverage
-  diagnostics must establish the required 0.001 m XYZ agreement on the device.
-- Original-output terrain diagnostics use point-list draws over every retained
-  vertex so incomplete triangle tails still publish evidence. Preserve that
-  coverage independently of terrain raster topology.
+- Terrain production computes each drawn placement's vertex XYZ with the
+  terrain vertex expressions, sampling the visible composite elevation. Vertices
+  outside the visible elevation texture take the sea-floor elevation, so terrain
+  beyond the drawn area is not traced. Traced terrain agrees with drawn terrain
+  only within the shared ray offset `kfLightingRayOffset`, which both the
+  reference and candidates use; no exact raster equivalence is claimed.
 
 CPU publication and resource ownership belong to
 [Graphics](../../../Source/Graphics/AGENTS.md#lighting-publication).

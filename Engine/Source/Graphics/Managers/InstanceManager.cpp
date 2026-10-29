@@ -486,9 +486,9 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	};
 	for (const char* pcExtension : pRequiredExtensions)
 	{
-		if (!std::ranges::any_of(extensions, [pcExtension](const VkExtensionProperties& rExtension)
+		if (!std::ranges::any_of(extensions, [pcExtension](const VkExtensionProperties& rVkExtension)
 		{
-			return std::strcmp(pcExtension, rExtension.extensionName) == 0;
+			return std::strcmp(pcExtension, rVkExtension.extensionName) == 0;
 		}))
 		{
 			LOG(kGraphics, kError, "Required lighting extension {} not supported", pcExtension);

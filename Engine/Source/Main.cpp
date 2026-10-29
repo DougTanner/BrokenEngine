@@ -647,20 +647,6 @@ static bool ProcessMessages()
 	return !sbHasFocus;
 }
 
-#if defined(BT_CLIENT)
-void DrainLightingCaptureCommands()
-{
-	if (gpClient != nullptr && !gpClient->ServiceCaptureTransport())
-	{
-		gpGraphics->mpLighting->CancelCapture();
-	}
-	if (gpAgentCommandServer != nullptr)
-	{
-		gpAgentCommandServer->Drain();
-	}
-}
-#endif
-
 static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWordParameter, LPARAM iLongParameter)
 {
 #if defined(BT_CLIENT)

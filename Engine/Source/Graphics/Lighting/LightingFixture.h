@@ -7,16 +7,6 @@
 namespace engine
 {
 
-enum class LightingFixtureBlob
-{
-	kSources,
-	kSamples,
-	kGeometry,
-	kCameras,
-	kEvents,
-	kAnimation,
-};
-
 struct LightingFixtureSolid
 {
 	XMFLOAT3A f3Center {};
@@ -33,12 +23,6 @@ struct LightingFixtureEvent
 	float fSourceHeight = 6.0f;
 	float fOccluderOffset = -20.0f;
 	LightingCameraPose camera;
-};
-
-struct LightingFixtureBlobIdentity
-{
-	uint64_t uiBytes = 0;
-	std::array<uint8_t, 32> sha256 {};
 };
 
 struct LightingFixtureAnimation
@@ -64,7 +48,6 @@ public:
 	static constexpr int64_t kiIndicesPerSolid = 36;
 	static constexpr int64_t kiMovingPanel = 11;
 	static constexpr int64_t kiMovingOccluder = 12;
-	static constexpr uint32_t kuiSchema = 1;
 	static constexpr uint32_t kuiSeed = 0x51A7;
 
 	explicit LightingFixture(GridCoord anchor);
@@ -79,9 +62,6 @@ public:
 	static void WriteSolidGeometry(const LightingFixtureSolid& rSolid, std::span<common::ModelVertex> vertices, std::span<uint32_t> indices);
 	void WriteSources(std::span<shaders::LightingSource> sources, int64_t iEvent, GridCoord cameraCoordinate, LightingFixtureScenario eScenario) const;
 	void WriteSamples(std::span<XMFLOAT2> samples) const;
-	std::span<const std::byte> GetBlob(LightingFixtureBlob eBlob) const;
-	const LightingFixtureBlobIdentity& GetIdentity(LightingFixtureBlob eBlob) const;
-	std::array<uint8_t, 32> GetInputHash(const LightingComparisonSettings& rSettings, LightingFixtureScenario eScenario, bool bEventCamera) const;
 
 private:
 	struct Source
@@ -91,7 +71,6 @@ private:
 	};
 
 	LightingCameraPose MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Target) const;
-	void FreezeBlob(LightingFixtureBlob eBlob);
 	GridCoord mAnchor {};
 	std::array<Source, kiSourceCount> mSources {};
 	std::array<XMFLOAT2, kiSampleCount> mSamples {};
@@ -99,8 +78,6 @@ private:
 	std::array<LightingCameraPose, 2> mCameras {};
 	std::array<LightingFixtureEvent, kiEventCount> mEvents {};
 	LightingFixtureAnimation mAnimation;
-	std::array<std::vector<std::byte>, 6> mBlobs;
-	std::array<LightingFixtureBlobIdentity, 6> mIdentities {};
 };
 
 } // namespace engine

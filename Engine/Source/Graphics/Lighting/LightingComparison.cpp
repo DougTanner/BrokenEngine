@@ -34,17 +34,6 @@ void Lighting::CreateComparisonResources()
 	}
 	mpState->comparison = std::make_unique<State::Comparison>();
 	State::Comparison& rComparison = *mpState->comparison;
-	if (!mpState->pendingResume.empty())
-	{
-		rComparison.manifest = std::move(mpState->pendingResume);
-		rComparison.directory = std::move(mpState->pendingResumeDirectory);
-		rComparison.uiResumePublication = 1;
-		rComparison.uiSequence = rComparison.manifest.value("releaseSequence", static_cast<uint64_t>(0));
-		rComparison.uiRequest = rComparison.manifest.value("request", static_cast<uint64_t>(0));
-		rComparison.status = rComparison.manifest.value("status", std::string("complete"));
-		rComparison.manifestPath = common::ToString((rComparison.directory / "manifest.json").native());
-		rComparison.manifestHash = mpState->lastCaptureReport["capture"].value("manifestSha256", std::string());
-	}
 	PipelineInfo solid
 	{
 		.name = "LightingFixtureForward",
@@ -81,33 +70,25 @@ void Lighting::CreateComparisonResources()
 	}
 }
 
+static bool IsCaptureRunning(std::string_view status)
+{
+	return status == "receivers" || status == "tracing" || status == "composing";
+}
+
 void Lighting::DestroyComparisonResources()
 {
-	// TEMP START original native request capture
-	mpState->nativeCapture.Abandon();
-	// TEMP END original native request capture
+	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	if (IsCaptureRunning(rDiagnostics.status))
+	{
+		rDiagnostics.status = "failed";
+		rDiagnostics.error = "Graphics recreated during capture";
+	}
 	if (mpState->comparison == nullptr)
 	{
 		return;
 	}
 	State::Comparison& rComparison = *mpState->comparison;
-	if (!std::cmp_equal(rComparison.uiHeldPublication, 0))
-	{
-		rComparison.flags.Set(State::CaptureFlags::kReferenceValid, false);
-		rComparison.status = "aborted";
-		rComparison.error = "Graphics recreation abandoned the drained capture";
-		rComparison.manifest["exportComplete"] = false;
-		rComparison.manifest["invalidationSequence"] = ++rComparison.uiSequence;
-		ReleasePublication(mpState->iFramebuffer, rComparison.uiHeldPublication);
-		rComparison.uiHeldPublication = 0;
-		WriteProfile(mpState->lastCaptureReport);
-	}
 	for (int64_t i = 0; i < std::ssize(gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets); ++i) gpTextureManager->mTextureDescriptors.SetLightingReference(i, nullptr, false);
-	if (!std::cmp_equal(rComparison.uiResumePublication, 0))
-	{
-		mpState->pendingResume = std::move(rComparison.manifest);
-		mpState->pendingResumeDirectory = std::move(rComparison.directory);
-	}
 	if (rComparison.vkFramebuffer != VK_NULL_HANDLE)
 	{
 		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, rComparison.vkFramebuffer, nullptr);
@@ -116,33 +97,24 @@ void Lighting::DestroyComparisonResources()
 	{
 		vkDestroyRenderPass(gpDeviceManager->mVkDevice, rComparison.vkRenderPass, nullptr);
 	}
-	if (rComparison.vkFence != VK_NULL_HANDLE)
-	{
-		vkDestroyFence(gpDeviceManager->mVkDevice, rComparison.vkFence, nullptr);
-	}
-	if (rComparison.vkQueryPool != VK_NULL_HANDLE)
-	{
-		vkDestroyQueryPool(gpDeviceManager->mVkDevice, rComparison.vkQueryPool, nullptr);
-	}
-	if (rComparison.vkCommandPool != VK_NULL_HANDLE)
-	{
-		vkDestroyCommandPool(gpDeviceManager->mVkDevice, rComparison.vkCommandPool, nullptr);
-	}
 	mpState->comparison.reset();
 }
 
-void Lighting::ApplyComparisonSettings()
+void Lighting::ApplyComparisonSettings(bool bScenePaused)
 {
-	const LightingComparisonSettings& requested = mRequestedComparisonSettings;
-	if (requested == mpState->settings)
+	// Heap: capture errors, fixture inputs and comparison pipelines persist across ordinary render publications.
+	ScopedSuppressAllocationTracking suppress;
+	const LightingComparisonSettings& rRequested = mRequestedComparisonSettings;
+	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	if (IsCaptureRunning(rDiagnostics.status) && (!bScenePaused || rRequested != mpState->settings))
+	{
+		rDiagnostics.status = "failed";
+		rDiagnostics.error = bScenePaused ? "Comparison settings changed during capture" : "Client unpaused during capture";
+	}
+	if (rRequested == mpState->settings)
 	{
 		return;
 	}
-	// TEMP START original native request capture
-	mpState->nativeCapture.Abandon();
-	// TEMP END original native request capture
-	// Heap: fixture blobs and comparison pipelines persist across ordinary render publications.
-	ScopedSuppressAllocationTracking suppress;
 	if (gpCommandBufferManager == nullptr)
 	{
 		return;
@@ -152,11 +124,11 @@ void Lighting::ApplyComparisonSettings()
 	gpSwapchainManager->mPresent.Wait();
 	gpTextureUploadManager->WaitIdle();
 	CHECK_VK(vkDeviceWaitIdle(gpDeviceManager->mVkDevice));
-	if (requested.eMode != LightingComparisonMode::kDisabled && mpState->comparison->animationForward == nullptr)
+	if (rRequested.eMode != LightingComparisonMode::kDisabled && mpState->comparison->animationForward == nullptr)
 	{
 		throw std::runtime_error("Lighting fixture requires the packed Animation.001 scene");
 	}
-	if (requested.eMode != LightingComparisonMode::kDisabled && mpState->settings.eMode == LightingComparisonMode::kDisabled)
+	if (rRequested.eMode != LightingComparisonMode::kDisabled && mpState->settings.eMode == LightingComparisonMode::kDisabled)
 	{
 		mpState->fixture = std::make_unique<LightingFixture>(gpCamera->mBasisCoordinate);
 		if (!mpState->fixture->InitializeAnimation())
@@ -164,45 +136,36 @@ void Lighting::ApplyComparisonSettings()
 			throw std::runtime_error("Lighting fixture animation initialization failed");
 		}
 	}
-	mpState->settings = requested;
-	mpState->eScenario = requested.eScenario;
-	mpState->uiValidationRequest = requested.uiValidationRequest;
-	// TEMP START original native request capture
-	State::NativeCapture& rNative = mpState->nativeCapture;
-	if (requested.eMode != LightingComparisonMode::kDisabled && requested.uiValidationRequest != 0 && requested.uiValidationRequest != mpState->uiServicedValidation && gpInstanceManager->mpRenderDocApi != nullptr)
+	mpState->settings = rRequested;
+	mpState->eScenario = rRequested.eScenario;
+	if (rRequested.uiCaptureRequest == mpState->uiServicedCapture)
 	{
-		if (rNative.flags & State::NativeCapture::Flags::kCleanupFailed)
-		{
-			throw std::runtime_error("Owned RenderDoc capture cleanup failed; further acquisition blocked");
-		}
-		rNative = {};
-		rNative.uiRequest = requested.uiValidationRequest;
-		rNative.pApi = gpInstanceManager->mpRenderDocApi;
-		rNative.iBeforeActive = rNative.pApi->IsFrameCapturing();
-		if (requested.uiCaptureRequest != 0 && requested.uiCaptureRequest != mpState->uiServicedCapture)
-		{
-			rNative.pcStatus = "reference-overlap";
-		}
-		else if (mpState->comparison->uiResumePublication != 0)
-		{
-			rNative.pcStatus = "resume-pending";
-		}
-		else if (rNative.iBeforeActive != 0)
-		{
-			rNative.pcStatus = "foreign-capture";
-		}
-		else
-		{
-			rNative.pDevice = RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(gpInstanceManager->mVkInstance);
-			rNative.pWindow = gpGraphics->mHwnd;
-			rNative.iBaselineCount = rNative.pApi->GetNumCaptures();
-			rNative.pApi->StartFrameCapture(rNative.pDevice, rNative.pWindow);
-			rNative.iStartActive = rNative.pApi->IsFrameCapturing();
-			rNative.flags.Set(State::NativeCapture::Flags::kActive, rNative.iStartActive != 0);
-			rNative.pcStatus = rNative.iStartActive != 0 ? "active" : "start-failed";
-		}
+		return;
 	}
-	// TEMP END original native request capture
+	mpState->uiServicedCapture = rRequested.uiCaptureRequest;
+	rDiagnostics.error.clear();
+	rDiagnostics.directory.clear();
+	rDiagnostics.iCompletedTiles = 0;
+	rDiagnostics.iTotalTiles = 0;
+	rDiagnostics.status = "failed";
+	if (rRequested.eMode != LightingComparisonMode::kFixtureReference)
+	{
+		rDiagnostics.error = "Lighting capture requires fixture reference mode";
+	}
+	else if (!bScenePaused)
+	{
+		rDiagnostics.error = "Lighting capture requires the client to be paused";
+	}
+	else if (std::cmp_not_equal(gpGraphics->mFramebufferVkExtent2D.width, State::Comparison::kVkExtent.width) || std::cmp_not_equal(gpGraphics->mFramebufferVkExtent2D.height, State::Comparison::kVkExtent.height))
+	{
+		rDiagnostics.error = "Lighting capture requires a 1920x1080 framebuffer";
+	}
+	else
+	{
+		rDiagnostics.status = "receivers";
+		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount;
+		mpState->captureStart = std::chrono::steady_clock::now();
+	}
 }
 
 static void LightingReceiverInfo(PipelineInfo& rInfo, VkRenderPass vkPass)
@@ -220,10 +183,10 @@ void Lighting::PrepareComparisonPipelines()
 {
 	State::Comparison& rComparison = *mpState->comparison;
 	int64_t iFramebuffer = mpState->iFramebuffer;
-	LightingFramebuffer& rFrame = *mpState->framebuffers.at(iFramebuffer);
+	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
 	bool bActive = mpState->settings.eMode != LightingComparisonMode::kDisabled;
 	VkDrawIndirectCommand& rVkDrawIndirectCommand = reinterpret_cast<VkDrawIndirectCommand*>(rComparison.solidDraws.mpMappedMemory)[iFramebuffer];
-	rVkDrawIndirectCommand = {.vertexCount = 36, .instanceCount = bActive ? static_cast<uint32_t>(LightingFixture::kiSolidCount) : 0, .firstVertex = 0, .firstInstance = rFrame.uiFixtureFirstInstance};
+	rVkDrawIndirectCommand = {.vertexCount = 36, .instanceCount = bActive ? static_cast<uint32_t>(LightingFixture::kiSolidCount) : 0, .firstVertex = 0, .firstInstance = rFramebuffer.uiFixtureFirstInstance};
 	BindQueryDescriptors(rComparison.solidForward, iFramebuffer);
 	if (rComparison.animationForward != nullptr)
 	{
@@ -231,23 +194,31 @@ void Lighting::PrepareComparisonPipelines()
 		rComparison.animationForward->UpdateStorageBufferDescriptors(iFramebuffer, shaders::kiModelBindingMeshData, &gpBufferManager->mMeshDataStorageBuffers.at(iFramebuffer));
 		rComparison.animationForward->UpdateStorageBufferDescriptors(iFramebuffer, shaders::kiModelBindingJointMatrix, &gpBufferManager->mJointMatrixStorageBuffers.at(iFramebuffer));
 	}
-	if (!bActive || std::cmp_equal(mpState->settings.uiCaptureRequest, 0) || mpState->settings.uiCaptureRequest == mpState->uiServicedCapture)
+	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	const shaders::LightingPublication& rPublication = *reinterpret_cast<const shaders::LightingPublication*>(rFramebuffer.publication.mpMappedMemory);
+	if (rDiagnostics.status == "tracing")
+	{
+		// A paused scene republishes identical counts every frame; any difference means the traced scene changed.
+		if (std::memcmp(&rPublication, &mpState->capturePublication, sizeof(rPublication)) != 0)
+		{
+			rDiagnostics.status = "failed";
+			rDiagnostics.error = "Published scene changed during capture";
+			return;
+		}
+		BindQueryDescriptors(rComparison.compute, iFramebuffer);
+		return;
+	}
+	if (rDiagnostics.status != "receivers")
 	{
 		return;
 	}
-	if (std::cmp_equal(gpInstanceManager->mVkQueueFamilyProperties.at(gpInstanceManager->miGraphicsQueueFamilyIndex).timestampValidBits, 0))
-	{
-		rComparison.status = "failed";
-		rComparison.error = "Lighting reference requires graphics queue GPU timestamp support";
-		mpState->uiServicedCapture = mpState->settings.uiCaptureRequest;
-		return;
-	}
+	mpState->capturePublication = rPublication;
 	gpCommandBufferManager->mSubmitGlobal.Wait();
 	if (rComparison.vkRenderPass == VK_NULL_HANDLE)
 	{
-		for (Texture& rTexture : rComparison.receivers) rTexture.Create({.name = "LightingReceiver", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kColorAttachment});
-		rComparison.depth.Create({.name = "LightingReceiverDepth", .vkFormat = gpInstanceManager->mDepthVkFormat, .vkExtent3D = State::Comparison::kExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, .vkImageAspectFlags = gpSwapchainManager->mDepthTexture.mInfo.vkImageAspectFlags, .eTextureLayout = TextureLayout::kUndefined});
-		rComparison.reference.Create({.name = "LightingReference", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kGeneral});
+		for (Texture& rTexture : rComparison.receivers) rTexture.Create({.name = "LightingReceiver", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kColorAttachment});
+		rComparison.depth.Create({.name = "LightingReceiverDepth", .vkFormat = gpInstanceManager->mDepthVkFormat, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, .vkImageAspectFlags = gpSwapchainManager->mDepthTexture.mInfo.vkImageAspectFlags, .eTextureLayout = TextureLayout::kUndefined});
+		rComparison.reference.Create({.name = "LightingReference", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kGeneral});
 		std::array<VkAttachmentDescription, 5> attachments {};
 		std::array<VkAttachmentReference, 4> colors {};
 		std::array<VkImageView, 5> views {};
@@ -270,17 +241,6 @@ void Lighting::PrepareComparisonPipelines()
 		CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &rComparison.vkRenderPass));
 		VkFramebufferCreateInfo vkFramebufferCreateInfo {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, .renderPass = rComparison.vkRenderPass, .attachmentCount = 5, .pAttachments = views.data(), .width = 1'920, .height = 1'080, .layers = 1};
 		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &rComparison.vkFramebuffer));
-		VkCommandPoolCreateInfo vkCommandPoolCreateInfo {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, .queueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex)};
-		CHECK_VK(vkCreateCommandPool(gpDeviceManager->mVkDevice, &vkCommandPoolCreateInfo, nullptr, &rComparison.vkCommandPool));
-		VkCommandBufferAllocateInfo vkCommandBufferAllocateInfo {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = rComparison.vkCommandPool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1};
-		CHECK_VK(vkAllocateCommandBuffers(gpDeviceManager->mVkDevice, &vkCommandBufferAllocateInfo, &rComparison.vkCommandBuffer));
-		VkFenceCreateInfo vkFenceCreateInfo {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-		if (rComparison.vkFence == VK_NULL_HANDLE)
-		{
-			CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &rComparison.vkFence));
-		}
-		VkQueryPoolCreateInfo vkQueryPoolCreateInfo {.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2};
-		CHECK_VK(vkCreateQueryPool(gpDeviceManager->mVkDevice, &vkQueryPoolCreateInfo, nullptr, &rComparison.vkQueryPool));
 		PipelineInfo terrain = gpPipelineManager->mpPipelines[kPipelineTerrain].mInfo;
 		terrain.ppShaders[1] = &gpPipelineManager->mShaders.at(data::kShadersLightingLightingTerrainReceiverfragCrc);
 		LightingReceiverInfo(terrain, rComparison.vkRenderPass);
@@ -293,9 +253,14 @@ void Lighting::PrepareComparisonPipelines()
 		solid.ppShaders[1] = &gpPipelineManager->mShaders.at(data::kShadersLightingLightingFixtureReceiverfragCrc);
 		LightingReceiverInfo(solid, rComparison.vkRenderPass);
 		rComparison.solidReceiver.Create(solid);
+		PipelineInfo compute {.name = "LightingReference", .flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants}, .ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingReferencecompCrc)}};
+		AddQueryDescriptorInfos(compute, iFramebuffer);
+		compute.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 2, .pTexture = &rComparison.reference});
+		for (int64_t i = 0; i < 4; ++i) compute.descriptorInfos.push_back({.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .iExplicitBinding = std::array<int64_t, 4> {18, 19, 27, 28}[i], .pTexture = &rComparison.receivers[i]});
+		rComparison.compute.Create(compute);
 	}
-	rComparison.models.clear();
-	for (const LightingModelRange& rRange : rFrame.modelRanges)
+	// Receiver model pipelines persist until comparison teardown: an earlier capture's receiver pass may still be pending.
+	for (const LightingModelRange& rRange : rFramebuffer.modelRanges)
 	{
 		std::tuple<common::crc_t, common::crc_t, int64_t> key(rRange.modelCrc, rRange.instanceBufferCrc, rRange.iFirstInstance);
 		if (!rComparison.models.contains(key))
@@ -317,12 +282,6 @@ void Lighting::PrepareComparisonPipelines()
 			rModel.UpdateStorageBufferDescriptors(iFramebuffer, shaders::kiModelBindingJointMatrix, &gpBufferManager->mJointMatrixStorageBuffers.at(iFramebuffer));
 		}
 	}
-	PipelineInfo compute {.name = "LightingReference", .flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants}, .ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingReferencecompCrc)}};
-	AddQueryDescriptorInfos(compute, iFramebuffer);
-	compute.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 2, .pTexture = &rComparison.reference});
-	for (int64_t i = 0; i < 4; ++i) compute.descriptorInfos.push_back({.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .iExplicitBinding = std::array<int64_t, 4> {18, 19, 27, 28}[i], .pTexture = &rComparison.receivers[i]});
-	rComparison.compute.Create(compute);
-	BindQueryDescriptors(rComparison.compute, iFramebuffer);
 	BindQueryDescriptors(rComparison.solidReceiver, iFramebuffer);
 }
 
@@ -345,21 +304,12 @@ void Lighting::RecordReceivers(VkCommandBuffer vkCommandBuffer)
 	clears[4].depthStencil.depth = kfMaxDepth;
 	VkRenderPassBeginInfo vkRenderPassBeginInfo {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = rComparison.vkRenderPass, .framebuffer = rComparison.vkFramebuffer, .renderArea = {.extent = {1'920, 1'080}}, .clearValueCount = 5, .pClearValues = clears.data()};
 	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	rComparison.receiverOperations = {};
-	++rComparison.receiverOperations.iRenderPasses;
 	for (const LightingModelRange& rRange : mpState->framebuffers.at(iFramebuffer)->modelRanges)
 	{
 		ModelPipeline& rModel = *rComparison.models.at(std::tuple(rRange.modelCrc, rRange.instanceBufferCrc, rRange.iFirstInstance));
 		rModel.WriteIndirectBuffer(iFramebuffer, rRange.iInstanceCount);
 		for (Pipeline& rPipeline : rModel.mpPipelines) rPipeline.mpIndirectVkDrawIndexedIndirectCommand[iFramebuffer].firstInstance = static_cast<uint32_t>(rRange.iFirstInstance);
 		rModel.RecordDrawIndirect(iFramebuffer, vkCommandBuffer, {}, ModelDrawPass::kOpaque);
-		for (bool bTransparent : rModel.mpbTransparentMaterials)
-		{
-			if (!bTransparent)
-			{
-				++rComparison.receiverOperations.iDraws;
-			}
-		}
 	}
 	rComparison.terrain.RecordBindPipelineAndDescriptors(iFramebuffer, vkCommandBuffer);
 	vkCmdBindIndexBuffer(vkCommandBuffer, gpIslands->mIslandMeshArena.mDeviceLocalVkBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -368,14 +318,11 @@ void Lighting::RecordReceivers(VkCommandBuffer vkCommandBuffer)
 	for (int64_t i = 0; i < gpIslands->miTemplateCount; ++i)
 	{
 		vkCmdDrawIndexedIndirect(vkCommandBuffer, gpIslands->mIslandsIndirectVkBuffers.at(iFramebuffer), static_cast<VkDeviceSize>(i) * sizeof(VkDrawIndexedIndirectCommand), 1, sizeof(VkDrawIndexedIndirectCommand));
-		++rComparison.receiverOperations.iDraws;
 	}
 	std::memcpy(&rComparison.water.mpIndirectVkDrawIndexedIndirectCommand[iFramebuffer], &gpPipelineManager->mpPipelines[kPipelineWater].mpIndirectVkDrawIndexedIndirectCommand[iFramebuffer], sizeof(VkDrawIndexedIndirectCommand));
 	rComparison.water.RecordDrawIndirect(iFramebuffer, vkCommandBuffer);
-	++rComparison.receiverOperations.iDraws;
 	rComparison.solidReceiver.RecordBindPipelineAndDescriptors(iFramebuffer, vkCommandBuffer);
 	vkCmdDraw(vkCommandBuffer, 36, LightingFixture::kiSolidCount, 0, mpState->framebuffers.at(iFramebuffer)->uiFixtureFirstInstance);
-	++rComparison.receiverOperations.iDraws;
 	vkCmdEndRenderPass(vkCommandBuffer);
 }
 

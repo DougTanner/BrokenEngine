@@ -5,55 +5,6 @@
 namespace engine
 {
 
-// TEMP START memory allocation observation
-static PFN_vkAllocateMemory spOriginalAllocateMemory = nullptr;
-static std::atomic<uint64_t> suiMemoryAttempt = 0;
-static bool sbMemoryBudgetAvailable = false;
-
-static VKAPI_ATTR VkResult VKAPI_CALL ObserveAllocateMemory(VkDevice vkDevice, const VkMemoryAllocateInfo* pVkInfo, const VkAllocationCallbacks* pVkCallbacks, VkDeviceMemory* pVkMemory)
-{
-	uint64_t uiAttempt = suiMemoryAttempt.fetch_add(1, std::memory_order_relaxed) + 1;
-	int64_t iThread = GetCurrentThreadId();
-	VkPhysicalDeviceMemoryBudgetPropertiesEXT vkBudget {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT};
-	VkPhysicalDeviceMemoryProperties2 vkProperties {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, .pNext = sbMemoryBudgetAvailable ? &vkBudget : nullptr};
-	vkGetPhysicalDeviceMemoryProperties2(gpInstanceManager->mVkPhysicalDevice, &vkProperties);
-	const VkMemoryType& rVkType = vkProperties.memoryProperties.memoryTypes[pVkInfo->memoryTypeIndex];
-	const VkMemoryHeap& rVkHeap = vkProperties.memoryProperties.memoryHeaps[rVkType.heapIndex];
-	LOG(kTemp, kInfo, "MEMORY ATTEMPT_BEGIN attempt={} thread={} bytes={} type={} heap={} properties={} heapSize={} heapFlags={} pNext={}", uiAttempt, iThread, pVkInfo->allocationSize, pVkInfo->memoryTypeIndex, rVkType.heapIndex, rVkType.propertyFlags, rVkHeap.size, rVkHeap.flags, pVkInfo->pNext);
-	for (const VkBaseInStructure* pVkNext = static_cast<const VkBaseInStructure*>(pVkInfo->pNext); pVkNext != nullptr; pVkNext = pVkNext->pNext)
-	{
-		LOG(kTemp, kInfo, "MEMORY PNEXT attempt={} thread={} sType={}", uiAttempt, iThread, static_cast<int32_t>(pVkNext->sType));
-		if (pVkNext->sType == VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO)
-		{
-			const VkMemoryAllocateFlagsInfo& rVkFlags = *reinterpret_cast<const VkMemoryAllocateFlagsInfo*>(pVkNext);
-			LOG(kTemp, kInfo, "MEMORY FLAGS attempt={} flags={} deviceMask={}", uiAttempt, rVkFlags.flags, rVkFlags.deviceMask);
-		}
-		if (pVkNext->sType == VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO)
-		{
-			const VkMemoryDedicatedAllocateInfo& rVkDedicated = *reinterpret_cast<const VkMemoryDedicatedAllocateInfo*>(pVkNext);
-			LOG(kTemp, kInfo, "MEMORY DEDICATED attempt={} buffer={} image={}", uiAttempt, reinterpret_cast<uint64_t>(rVkDedicated.buffer), reinterpret_cast<uint64_t>(rVkDedicated.image));
-		}
-	}
-	if (sbMemoryBudgetAvailable)
-	{
-		for (int64_t i = 0; i < vkProperties.memoryProperties.memoryHeapCount; ++i)
-		{
-			LOG(kTemp, kInfo, "MEMORY BUDGET attempt={} phase=pre heap={} attempted={} usage={} budget={}", uiAttempt, i, i == rVkType.heapIndex, vkBudget.heapUsage[i], vkBudget.heapBudget[i]);
-		}
-	}
-	else
-	{
-		LOG(kTemp, kInfo, "MEMORY BUDGET attempt={} phase=pre budgetUnavailable=true", uiAttempt);
-	}
-	VkResult vkResult = spOriginalAllocateMemory(vkDevice, pVkInfo, pVkCallbacks, pVkMemory);
-	LOG(kTemp, kInfo, "MEMORY ATTEMPT_END attempt={} thread={} result={}", uiAttempt, iThread, static_cast<int32_t>(vkResult));
-	if (vkResult == VK_SUCCESS)
-	{
-		LOG(kTemp, kInfo, "MEMORY ALLOCATED attempt={} memory={}", uiAttempt, reinterpret_cast<uint64_t>(*pVkMemory));
-	}
-	return vkResult;
-}
-// TEMP END memory allocation observation
 DeviceManager::DeviceManager()
 : common::Singleton<DeviceManager>(gpDeviceManager, this)
 {
@@ -84,9 +35,7 @@ DeviceManager::DeviceManager()
 
 	std::vector<const char*> deviceExtensions;
 	deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-	deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-	deviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-	deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+	deviceExtensions.insert(deviceExtensions.end(), {VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME});
 	if constexpr (kbDebugPrintf)
 	{
 		deviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
@@ -369,19 +318,10 @@ DeviceManager::DeviceManager()
 		vkDescriptorPoolCreateInfo.maxSets += rVkDescriptorPoolSize.descriptorCount;
 	}
 	CHECK_VK(vkCreateDescriptorPool(mVkDevice, &vkDescriptorPoolCreateInfo, nullptr, &mVkDescriptorPool));
-	// TEMP START descriptor census
-	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS pool={} maxSets={}", reinterpret_cast<uint64_t>(mVkDescriptorPool), vkDescriptorPoolCreateInfo.maxSets);
-	for (const VkDescriptorPoolSize& rSize : pVkDescriptorPoolSizes) LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS budget pool={} type={} count={}", reinterpret_cast<uint64_t>(mVkDescriptorPool), static_cast<int32_t>(rSize.type), rSize.descriptorCount);
-	// TEMP END descriptor census
 	VkName(VK_OBJECT_TYPE_DESCRIPTOR_POOL, mVkDescriptorPool, "Global");
 
 	mVmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 	mVmaFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
-	// TEMP START memory allocation observation
-	spOriginalAllocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(vkGetDeviceProcAddr(mVkDevice, "vkAllocateMemory"));
-	sbMemoryBudgetAvailable = (mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable) != 0;
-	mVmaFunctions.vkAllocateMemory = ObserveAllocateMemory;
-	// TEMP END memory allocation observation
 
 	VmaAllocatorCreateInfo allocatorCreateInfo =
 	{
@@ -436,9 +376,6 @@ DeviceManager::~DeviceManager()
 	mpAllocator = nullptr;
 
 	// All descriptor sets freed explicitly in Pipeline::Destroy() before reaching here
-	// TEMP START descriptor census
-	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS destroy pool={}", reinterpret_cast<uint64_t>(mVkDescriptorPool));
-	// TEMP END descriptor census
 	vkDestroyDescriptorPool(mVkDevice, mVkDescriptorPool, nullptr);
 
 	vkDestroyFence(mVkDevice, mOneShotVkFence, nullptr);

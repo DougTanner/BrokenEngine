@@ -8,15 +8,6 @@
 #include "Game.h"
 #include "ModelViewerApplication.h"
 
-namespace engine
-{
-
-void DrainLightingCaptureCommands()
-{
-}
-
-} // namespace engine
-
 namespace game
 {
 

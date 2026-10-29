@@ -29,7 +29,7 @@ TextureDescriptors::ScopedBindlessWriteEpoch::~ScopedBindlessWriteEpoch()
 
 void TextureDescriptors::Create()
 {
-	mLightingFallback.Create({.name = "LightingFallback", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = {1, 1, 1}, .vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT}, [](std::span<std::byte> bytes, int64_t) { std::memset(bytes.data(), 0, bytes.size()); });
+	mLightingFallback.Create({.name = "LightingFallback", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = {1, 1, 1}, .vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT}, [](std::span<std::byte> bytes, [[maybe_unused]] int64_t iPosition) { std::memset(bytes.data(), 0, bytes.size()); });
 	mLightingControls = std::vector<Buffer>(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
 	for (Buffer& rControl : mLightingControls)
 	{
@@ -79,10 +79,6 @@ void TextureDescriptors::Create()
 	};
 
 	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &vkLayoutCreateInfo, nullptr, &mGlobalVkDescriptorSetLayout));
-	// TEMP START descriptor census
-	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS layout={} owner=GlobalSet0 bindings={}", reinterpret_cast<uint64_t>(mGlobalVkDescriptorSetLayout), vkLayoutCreateInfo.bindingCount);
-	for (const VkDescriptorSetLayoutBinding& rBinding : pVkBindings) LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS binding layout={} binding={} type={} count={}", reinterpret_cast<uint64_t>(mGlobalVkDescriptorSetLayout), rBinding.binding, static_cast<int32_t>(rBinding.descriptorType), rBinding.descriptorCount);
-	// TEMP END descriptor census
 	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, mGlobalVkDescriptorSetLayout, "GlobalSet0");
 
 	int64_t iFramebufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
@@ -98,9 +94,6 @@ void TextureDescriptors::Create()
 			.pSetLayouts = &mGlobalVkDescriptorSetLayout,
 		};
 		CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkAllocateInfo, &mGlobalDescriptorSets.at(i)));
-		// TEMP START descriptor census
-		LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS alloc pool={} set={} layout={} owner=GlobalSet0 slot={} setIndex=0 variable=none", reinterpret_cast<uint64_t>(gpDeviceManager->mVkDescriptorPool), reinterpret_cast<uint64_t>(mGlobalDescriptorSets.at(i)), reinterpret_cast<uint64_t>(mGlobalVkDescriptorSetLayout), i);
-		// TEMP END descriptor census
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, mGlobalDescriptorSets.at(i), std::format("GlobalSet0{}", i).c_str());
 	}
 	mAppliedPublicationCursors.assign(static_cast<size_t>(iFramebufferCount), 0);
@@ -112,9 +105,6 @@ void TextureDescriptors::Destroy()
 {
 	if (mGlobalVkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
-		// TEMP START descriptor census
-		for (VkDescriptorSet vkSet : mGlobalDescriptorSets) LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS free pool={} set={}", reinterpret_cast<uint64_t>(gpDeviceManager->mVkDescriptorPool), reinterpret_cast<uint64_t>(vkSet));
-		// TEMP END descriptor census
 		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, gpDeviceManager->mVkDescriptorPool, static_cast<uint32_t>(std::ssize(mGlobalDescriptorSets)), mGlobalDescriptorSets.data());
 		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mGlobalVkDescriptorSetLayout, nullptr);
 		mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;

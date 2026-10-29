@@ -128,7 +128,7 @@ void CommandBufferManager::SubmitGlobalCommandBuffer(int64_t iFramebufferIndex)
 	}
 }
 
-void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex, bool bPreparationSubmitted)
+void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 	VkPipelineStageFlags vkPreparationWaitStages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -143,10 +143,7 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex, bool bPr
 		.signalSemaphoreCount = 1,
 		.pSignalSemaphores = &rCommandBuffers.mPreparationFinishedVkSemaphore,
 	};
-	if (!bPreparationSubmitted)
-	{
-		CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkPreparationSubmit, VK_NULL_HANDLE));
-	}
+	CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkPreparationSubmit, VK_NULL_HANDLE));
 
 	VkSemaphore pVkSemaphores[]
 	{
@@ -204,19 +201,18 @@ void CommandBufferManager::SubmitMainCommandBuffer(int64_t iFramebufferIndex)
 	CHECK_VK(vkBeginCommandBuffer(rCommandBuffers.mPreparationVkCommandBuffer, &vkBeginInfo));
 	gpGraphics->mpLighting->RecordPreparation(rCommandBuffers.mPreparationVkCommandBuffer);
 	CHECK_VK(vkEndCommandBuffer(rCommandBuffers.mPreparationVkCommandBuffer));
-	bool bPreparationSubmitted = gpGraphics->mpLighting->CapturePreparation(rCommandBuffers.mPreparationVkCommandBuffer, rCommandBuffers.mGlobalFinishedVkSemaphore, rCommandBuffers.mPreparationFinishedVkSemaphore);
 
 	if constexpr (kbRenderThread)
 	{
-		mSubmitMain.Wake([this, iFramebufferIndex, bPreparationSubmitted]()
+		mSubmitMain.Wake([this, iFramebufferIndex]()
 		{
 			mSubmitGlobal.Wait();
-			SubmitMainToQueue(iFramebufferIndex, bPreparationSubmitted);
+			SubmitMainToQueue(iFramebufferIndex);
 		});
 	}
 	else
 	{
-		SubmitMainToQueue(iFramebufferIndex, bPreparationSubmitted);
+		SubmitMainToQueue(iFramebufferIndex);
 	}
 }
 

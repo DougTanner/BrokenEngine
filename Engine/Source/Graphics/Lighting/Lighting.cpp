@@ -16,29 +16,15 @@ static VkAccelerationStructureGeometryKHR LightingSceneGeometry(const LightingFr
 	{
 		.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
 		.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-		.geometry = {.instances =
+		.geometry =
 		{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-			.data = {.deviceAddress = rFramebuffer.accelerationInstances.GetDeviceAddress()},
-		}},
+			.instances =
+			{
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+				.data = {.deviceAddress = rFramebuffer.accelerationInstances.GetDeviceAddress()},
+			},
+		},
 	};
-}
-
-LightingAllocation Lighting::GetBufferAllocation(const Buffer& rBuffer)
-{
-	LightingAllocation bytes;
-	for (VmaAllocation allocation : {rBuffer.mHostVisibleVmaAllocation, rBuffer.mDeviceLocalVmaAllocation})
-	{
-		if (allocation == VK_NULL_HANDLE)
-		{
-			continue;
-		}
-		VmaAllocationInfo info {};
-		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, allocation, &info);
-		bytes.uiPayload += rBuffer.mInfo.iDataSize;
-		bytes.uiAllocated += info.size;
-	}
-	return bytes;
 }
 
 static bool LightingReserve(Buffer& rBuffer, std::string_view name, int64_t iBytes, BufferFlags_t flags)
@@ -57,16 +43,19 @@ static VkAccelerationStructureGeometryKHR LightingSolidGeometry(const Buffer& rV
 	{
 		.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
 		.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
-		.geometry = {.triangles =
+		.geometry =
 		{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
-			.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
-			.vertexData = {.deviceAddress = rVertices.GetDeviceAddress()},
-			.vertexStride = sizeof(common::ModelVertex),
-			.maxVertex = LightingFixture::kiVerticesPerSolid - 1,
-			.indexType = VK_INDEX_TYPE_UINT32,
-			.indexData = {.deviceAddress = rIndices.GetDeviceAddress()},
-		}},
+			.triangles =
+			{
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+				.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
+				.vertexData = {.deviceAddress = rVertices.GetDeviceAddress()},
+				.vertexStride = sizeof(common::ModelVertex),
+				.maxVertex = LightingFixture::kiVerticesPerSolid - 1,
+				.indexType = VK_INDEX_TYPE_UINT32,
+				.indexData = {.deviceAddress = rIndices.GetDeviceAddress()},
+			},
+		},
 		.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
 	};
 }
@@ -85,9 +74,9 @@ void Lighting::CreateFixtureResources()
 		LightingReserve(pSolid->vertices, "LightingFixtureVertices", LightingFixture::kiVerticesPerSolid * sizeof(common::ModelVertex), {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kAccelerationInput});
 		LightingReserve(pSolid->indices, "LightingFixtureIndices", LightingFixture::kiIndicesPerSolid * sizeof(uint32_t), {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kAccelerationInput});
 		LightingFixture::WriteSolidGeometry(mpState->fixture->GetSolid(i, 0, mpState->eScenario), std::span<common::ModelVertex>(reinterpret_cast<common::ModelVertex*>(pSolid->vertices.mpMappedMemory), LightingFixture::kiVerticesPerSolid), std::span<uint32_t>(reinterpret_cast<uint32_t*>(pSolid->indices.mpMappedMemory), LightingFixture::kiIndicesPerSolid));
-		VkAccelerationStructureGeometryKHR geometry = LightingSolidGeometry(pSolid->vertices, pSolid->indices);
+		VkAccelerationStructureGeometryKHR vkGeometry = LightingSolidGeometry(pSolid->vertices, pSolid->indices);
 		uint32_t uiTriangles = LightingFixture::kiIndicesPerSolid / 3;
-		pSolid->acceleration.Create("LightingFixtureBLAS", VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, std::span(&geometry, 1), std::span(&uiTriangles, 1), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+		pSolid->acceleration.Create("LightingFixtureBLAS", VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, std::span(&vkGeometry, 1), std::span(&uiTriangles, 1), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 		mpState->fixtureSolids.push_back(std::move(pSolid));
 	}
 }
@@ -134,13 +123,13 @@ void Lighting::WriteFixtureSolids(std::span<shaders::LightingInstance> instances
 		rInstance.uiGeometryCount = 1;
 		rInstance.uiIdentity = uiInstance;
 		geometries[uiGeometry] = {.uiPositionAddress = rResource.vertices.GetDeviceAddress(), .uiAttributeAddress = rResource.vertices.GetDeviceAddress(), .uiIndexAddress = rResource.indices.GetDeviceAddress(), .uiPositionStride = sizeof(common::ModelVertex), .uiAttributeStride = sizeof(common::ModelVertex), .uiIndexBytes = 4, .uiPrimitiveCount = LightingFixture::kiIndicesPerSolid / 3, .uiMaterial = solid.uiMaterial, .uiKind = shaders::kiLightingGeometryFixture};
-		VkAccelerationStructureInstanceKHR& rAcceleration = accelerationInstances[uiInstance];
-		rAcceleration = {};
-		std::ignore = std::memcpy(rAcceleration.transform.matrix, rInstance.pf4ObjectToWorld, sizeof(rAcceleration.transform));
-		rAcceleration.instanceCustomIndex = uiInstance;
-		rAcceleration.mask = 0xff;
-		rAcceleration.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		rAcceleration.accelerationStructureReference = rResource.acceleration.GetDeviceAddress();
+		VkAccelerationStructureInstanceKHR& rVkAccelerationInstance = accelerationInstances[uiInstance];
+		rVkAccelerationInstance = {};
+		std::ignore = std::memcpy(rVkAccelerationInstance.transform.matrix, rInstance.pf4ObjectToWorld, sizeof(rVkAccelerationInstance.transform));
+		rVkAccelerationInstance.instanceCustomIndex = uiInstance;
+		rVkAccelerationInstance.mask = 0xff;
+		rVkAccelerationInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		rVkAccelerationInstance.accelerationStructureReference = rResource.acceleration.GetDeviceAddress();
 	}
 }
 
@@ -152,7 +141,6 @@ Lighting::Lighting()
 
 void Lighting::CreateResources()
 {
-	mpState->uiPersistentBytes = 0;
 	mpState->framebuffers.resize(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
 	for (std::unique_ptr<LightingFramebuffer>& rpFramebuffer : mpState->framebuffers)
 	{
@@ -186,21 +174,12 @@ void Lighting::CreateResources()
 		uint32_t uiCount = 0;
 		rFramebuffer.scene.Create("LightingScene", VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, std::span(&vkGeometry, 1), std::span(&uiCount, 1), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 		rFramebuffer.modelRanges.reserve(256);
-		VmaAllocationInfo sourceAllocationInfo {};
-		VmaAllocationInfo publicationAllocationInfo {};
-		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, rFramebuffer.sources.mHostVisibleVmaAllocation, &sourceAllocationInfo);
-		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, rFramebuffer.publication.mHostVisibleVmaAllocation, &publicationAllocationInfo);
-		mpState->uiPersistentBytes += sourceAllocationInfo.size + publicationAllocationInfo.size;
 	}
 	mpState->terrain.CreateResources();
 	mpState->terrain.CreatePipelines();
 	mpState->models = std::make_unique<LightingModels>();
-	CreateSceneDiagnosticResources();
 	mpState->models->Create(gpPipelineManager->mShaders.at(data::kShadersLightingLightingModelscompCrc));
-	CreateSceneDiagnosticPipelines();
 	CreateComparisonResources();
-	mpState->uiPersistentBytes += mpState->terrain.GetResourceBytes();
-	mpState->uiPeakBytes = std::max(mpState->uiPeakBytes, mpState->uiPersistentBytes);
 }
 
 Lighting::~Lighting() = default;
@@ -208,20 +187,16 @@ Lighting::~Lighting() = default;
 void Lighting::DestroyResources()
 {
 	DestroyComparisonResources();
-	DestroySceneDiagnosticPipelines();
 	mpState->terrain.DestroyResources();
 	mpState->models.reset();
 	mpState->fixtureSolids.clear();
 	mpState->framebuffers.clear();
-	mpState->completedDiagnostics = {};
-	mpState->uiPersistentBytes = 0;
 }
 
 void Lighting::CreateTerrainPipelines()
 {
 	mpState->terrain.CreatePipelines();
 	mpState->models->Create(gpPipelineManager->mShaders.at(data::kShadersLightingLightingModelscompCrc));
-	CreateSceneDiagnosticPipelines();
 	CreateComparisonResources();
 }
 
@@ -230,79 +205,24 @@ void Lighting::DestroyTerrainPipelines()
 	DestroyComparisonResources();
 	mpState->terrain.DestroyPipelines();
 	mpState->models->DestroyPipeline();
-	DestroySceneDiagnosticPipelines();
 }
 
 void Lighting::BeginRender(int64_t iFramebuffer)
 {
 	mpState->iFramebuffer = iFramebuffer;
 	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	if (rFramebuffer.uiHeldPublication != 0)
+	// Runs after this framebuffer's fence wait, so its previously recorded publication has completed on the GPU.
+	if (rFramebuffer.uiRecordedPublication != 0 && rFramebuffer.uiRecordedPublication == rFramebuffer.uiPendingPublication)
 	{
-		throw std::runtime_error("Lighting capture holds this framebuffer publication");
+		LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+		const LightingDiagnostics& rPending = rFramebuffer.pendingDiagnostics;
+		rDiagnostics.iSources = rPending.iSources;
+		rDiagnostics.iInstances = rPending.iInstances;
+		rDiagnostics.iTraceOnlyInstances = rPending.iTraceOnlyInstances;
+		rDiagnostics.iTriangles = rPending.iTriangles;
 	}
-	CompletePreparation(iFramebuffer);
-	mpState->uiValidationRequest = mpState->settings.uiValidationRequest != mpState->uiServicedValidation ? mpState->settings.uiValidationRequest : 0;
 	rFramebuffer.modelRanges.clear();
-	rFramebuffer.frameIdentities.clear();
 	*reinterpret_cast<shaders::LightingPublication*>(rFramebuffer.publication.mpMappedMemory) = {};
-}
-
-void Lighting::CompletePreparation(int64_t iFramebuffer)
-{
-	const LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	if (rFramebuffer.uiRecordedPublication != 0 && rFramebuffer.uiRecordedPublication == rFramebuffer.pendingDiagnostics.uiPublication)
-	{
-		mpState->completedDiagnostics = rFramebuffer.pendingDiagnostics;
-		const LightingTerrainCompletion& rTerrain = mpState->terrain.Complete(iFramebuffer);
-		if (rTerrain.uiPublication == rFramebuffer.pendingDiagnostics.uiPublication)
-		{
-			LightingDiagnostics& rCompleted = mpState->completedDiagnostics;
-			rCompleted.uiValidationRequested = rTerrain.validation.uiRequestedSerial;
-			rCompleted.uiValidationCompleted = rTerrain.validation.uiCompletedSerial;
-			rCompleted.iTerrainWrittenOnce = rTerrain.validation.uiOnce;
-			rCompleted.iTerrainUntouched = rTerrain.validation.uiUntouched;
-			rCompleted.iTerrainDuplicate = rTerrain.validation.uiDuplicate;
-			rCompleted.iTerrainMismatches = static_cast<int64_t>(rTerrain.validation.uiBaseMismatches) + rTerrain.validation.uiBaseXYZMismatches + rTerrain.validation.uiGlobalMismatches + rTerrain.validation.uiOriginalMismatches + rTerrain.validation.uiOriginalMissing + rTerrain.validation.uiInvalidIndices + rTerrain.validation.uiMappingMismatches + rTerrain.validation.uiAdjacentMismatches + rTerrain.validation.uiNonfinite;
-			for (const shaders::LightingTerrainTileResult& rTile : rTerrain.tiles)
-			{
-				for (int64_t i = 0; i < 4; ++i) rCompleted.iTerrainMismatches += static_cast<int64_t>(rTile.puiRawMismatches[i]) + rTile.puiXYZMismatches[i];
-			}
-			rCompleted.durationTerrain = rTerrain.durationPreparation;
-			rCompleted.durationWorstTerrainTile = rTerrain.durationWorstTile;
-			rCompleted.durationTerrainValidation = rTerrain.durationValidation;
-		}
-	}
-	CompleteSceneDiagnostics(iFramebuffer);
-}
-
-void Lighting::AddFrame(const FrameInterpolateBase& rFrame)
-{
-	// Heap: compact identity rows persist until the acquired publication is reused.
-	ScopedSuppressAllocationTracking suppress;
-	mpState->framebuffers.at(mpState->iFramebuffer)->frameIdentities.emplace_back(rFrame.renderBasis.coordinate, rFrame.iTick, rFrame.fDeltaTime);
-}
-
-uint64_t Lighting::HoldPublication(int64_t iFramebuffer)
-{
-	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	uint64_t uiPublication = rFramebuffer.pendingDiagnostics.uiPublication;
-	if (uiPublication == 0 || rFramebuffer.uiRecordedPublication != uiPublication || rFramebuffer.uiHeldPublication != 0)
-	{
-		throw std::runtime_error("Lighting capture cannot hold an unrecorded or already held publication");
-	}
-	rFramebuffer.uiHeldPublication = uiPublication;
-	return uiPublication;
-}
-
-void Lighting::ReleasePublication(int64_t iFramebuffer, uint64_t uiPublication)
-{
-	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	if (uiPublication == 0 || rFramebuffer.uiHeldPublication != uiPublication)
-	{
-		throw std::runtime_error("Lighting capture release publication mismatch");
-	}
-	rFramebuffer.uiHeldPublication = 0;
 }
 
 void Lighting::AddModels(common::crc_t modelCrc, common::crc_t instanceBufferCrc, int64_t iFirstInstance, int64_t iInstanceCount)
@@ -325,7 +245,6 @@ void Lighting::AddModels(common::crc_t modelCrc, common::crc_t instanceBufferCrc
 
 void Lighting::EndRender()
 {
-	std::chrono::steady_clock::time_point preparationStart = std::chrono::steady_clock::now();
 	// Heap: only the acquired framebuffer grows after its fence, before any addresses are published.
 	ScopedSuppressAllocationTracking suppress;
 	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(mpState->iFramebuffer);
@@ -340,14 +259,22 @@ void Lighting::EndRender()
 			PublishFixtureAnimation();
 		}
 		rFramebuffer.modelCounts = mpState->models->Prepare(mpState->iFramebuffer, rFramebuffer.modelRanges);
-		rFramebuffer.terrainCounts = mpState->terrain.Prepare(mpState->iFramebuffer, mpState->uiValidationRequest, mpState->uiPublication + 1);
+		rFramebuffer.terrainCounts = mpState->terrain.Prepare(mpState->iFramebuffer);
 	}
 	int64_t iSolidCount = bActive && mpState->fixture != nullptr ? LightingFixture::kiSolidCount : 0;
 	rFramebuffer.uiFixtureFirstInstance = rFramebuffer.modelCounts.uiInstances + static_cast<uint32_t>(rFramebuffer.terrainCounts.iPlacements);
 	rFramebuffer.uiFixtureFirstGeometry = rFramebuffer.modelCounts.uiGeometries + static_cast<uint32_t>(rFramebuffer.terrainCounts.iPlacements);
 	int64_t iInstances = rFramebuffer.uiFixtureFirstInstance + iSolidCount;
 	int64_t iGeometries = rFramebuffer.uiFixtureFirstGeometry + iSolidCount;
-	if (iInstances > 0xffffff || std::cmp_greater(iInstances, gpInstanceManager->mVkPhysicalDeviceAccelerationStructurePropertiesKHR.maxInstanceCount) || !std::in_range<uint32_t>(iGeometries))
+	if (iInstances > 0xffffff)
+	{
+		throw std::runtime_error("Lighting scene exceeds acceleration structure limits");
+	}
+	if (std::cmp_greater(iInstances, gpInstanceManager->mVkPhysicalDeviceAccelerationStructurePropertiesKHR.maxInstanceCount))
+	{
+		throw std::runtime_error("Lighting scene exceeds acceleration structure limits");
+	}
+	if (!std::in_range<uint32_t>(iGeometries))
 	{
 		throw std::runtime_error("Lighting scene exceeds acceleration structure limits");
 	}
@@ -356,9 +283,9 @@ void Lighting::EndRender()
 	bGrowth |= LightingReserve(rFramebuffer.accelerationInstances, "LightingAccelerationInstances", std::max<int64_t>(1, iInstances) * sizeof(VkAccelerationStructureInstanceKHR), {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kAccelerationInput});
 	if (std::cmp_not_equal(rFramebuffer.uiInstanceCount, iInstances))
 	{
-		VkAccelerationStructureGeometryKHR geometry = LightingSceneGeometry(rFramebuffer);
+		VkAccelerationStructureGeometryKHR vkGeometry = LightingSceneGeometry(rFramebuffer);
 		uint32_t uiCount = static_cast<uint32_t>(iInstances);
-		rFramebuffer.scene.Create("LightingScene", VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, std::span(&geometry, 1), std::span(&uiCount, 1), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+		rFramebuffer.scene.Create("LightingScene", VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, std::span(&vkGeometry, 1), std::span(&uiCount, 1), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 		bGrowth = true;
 	}
 	if (bGrowth)
@@ -373,7 +300,7 @@ void Lighting::EndRender()
 	if (bActive)
 	{
 		mpState->models->Write(mpState->iFramebuffer, rFramebuffer.modelRanges, 0, 0, instances, geometries, accelerationInstances);
-		mpState->terrain.Write(mpState->iFramebuffer, rFramebuffer.modelCounts.uiInstances, rFramebuffer.modelCounts.uiGeometries, instances, geometries, accelerationInstances, rFramebuffer.geometries.GetDeviceAddress());
+		mpState->terrain.Write(mpState->iFramebuffer, rFramebuffer.modelCounts.uiInstances, rFramebuffer.modelCounts.uiGeometries, instances, geometries, accelerationInstances);
 		if (iSolidCount > 0)
 		{
 			rFramebuffer.uiFixtureAnimationInstance = rFramebuffer.modelCounts.uiInstances - 1;
@@ -395,32 +322,12 @@ void Lighting::EndRender()
 		throw std::runtime_error("Lighting publication count overflow");
 	}
 	*reinterpret_cast<shaders::LightingPublication*>(rFramebuffer.publication.mpMappedMemory) = {.uiSourceCount = uiSourceCount, .uiInstanceCount = static_cast<uint32_t>(iInstances), .uiTriangleCount = static_cast<uint32_t>(iTriangles), .uiMaterialCount = static_cast<uint32_t>(iMaterials)};
-	mpState->uiPersistentBytes = mpState->terrain.GetResourceBytes() + mpState->models->GetResourceBytes();
-	for (const std::unique_ptr<State::FixtureSolid>& rpSolid : mpState->fixtureSolids)
-	{
-		for (const Buffer* pBuffer : {&rpSolid->vertices, &rpSolid->indices, &rpSolid->acceleration.mStorage, &rpSolid->acceleration.mScratch}) mpState->uiPersistentBytes += GetBufferAllocation(*pBuffer).uiAllocated;
-	}
-	for (const std::unique_ptr<LightingFramebuffer>& rpFramebuffer : mpState->framebuffers)
-	{
-		const LightingFramebuffer& rOther = *rpFramebuffer;
-		for (const Buffer* pBuffer : {&rOther.sources, &rOther.publication, &rOther.instances, &rOther.geometries, &rOther.accelerationInstances, &rOther.samples, &rOther.fixtureMaterials, &rOther.diagnosticParameters, &rOther.diagnosticResult, &rOther.scene.mStorage, &rOther.scene.mScratch}) mpState->uiPersistentBytes += GetBufferAllocation(*pBuffer).uiAllocated;
-		VmaAllocationInfo diagnosticAllocation {};
-		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, rOther.diagnosticReadback->vmaAllocation, &diagnosticAllocation);
-		mpState->uiPersistentBytes += diagnosticAllocation.size;
-	}
-	mpState->uiPeakBytes = std::max(mpState->uiPeakBytes, mpState->uiPersistentBytes);
+	rFramebuffer.uiPendingPublication = ++mpState->uiPublication;
 	rFramebuffer.pendingDiagnostics = {};
-	rFramebuffer.pendingDiagnostics.uiPublication = ++mpState->uiPublication;
-	rFramebuffer.pendingDiagnostics.uiValidationRequested = mpState->uiValidationRequest;
-	rFramebuffer.pendingDiagnostics.uiPersistentBytes = mpState->uiPersistentBytes;
-	rFramebuffer.pendingDiagnostics.uiPeakBytes = mpState->uiPeakBytes;
-	rFramebuffer.pendingDiagnostics.uiResourceGeneration = rFramebuffer.uiGeneration;
-	rFramebuffer.pendingDiagnostics.iFramebuffer = mpState->iFramebuffer;
 	rFramebuffer.pendingDiagnostics.iSources = uiSourceCount;
 	rFramebuffer.pendingDiagnostics.iInstances = iInstances;
+	rFramebuffer.pendingDiagnostics.iTraceOnlyInstances = rFramebuffer.modelCounts.uiTraceOnlyInstances;
 	rFramebuffer.pendingDiagnostics.iTriangles = iTriangles;
-	rFramebuffer.pendingDiagnostics.iMaterials = iMaterials;
-	rFramebuffer.pendingDiagnostics.durationPreparation = std::chrono::steady_clock::now() - preparationStart;
 	PrepareComparisonPipelines();
 }
 
@@ -434,42 +341,37 @@ void Lighting::RecordPreparation(VkCommandBuffer vkCommandBuffer)
 	gpProfileManager->GpuStop(iFramebuffer, vkCommandBuffer, kGpuTimerMainUniformCopy);
 	CommandBufferRecordMain::RecordWaterDisplacement(vkCommandBuffer, iFramebuffer);
 	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	rFramebuffer.modelOperations = {};
-	rFramebuffer.sceneOperations = {};
 	if (mpState->settings.eMode != LightingComparisonMode::kDisabled)
 	{
-		mpState->models->RecordPreparation(vkCommandBuffer, iFramebuffer, rFramebuffer.modelRanges, rFramebuffer.modelOperations);
+		mpState->models->RecordPreparation(vkCommandBuffer, iFramebuffer, rFramebuffer.modelRanges);
+		gpProfileManager->GpuStart(iFramebuffer, vkCommandBuffer, kGpuTimerLightingTerrain);
 		mpState->terrain.RecordPreparation(vkCommandBuffer, iFramebuffer);
+		gpProfileManager->GpuStop(iFramebuffer, vkCommandBuffer, kGpuTimerLightingTerrain);
 		for (const std::unique_ptr<State::FixtureSolid>& rpSolid : mpState->fixtureSolids)
 		{
 			if (rpSolid->bBuilt)
 			{
 				continue;
 			}
-			VkAccelerationStructureGeometryKHR geometry = LightingSolidGeometry(rpSolid->vertices, rpSolid->indices);
-			VkAccelerationStructureBuildRangeInfoKHR range {.primitiveCount = LightingFixture::kiIndicesPerSolid / 3};
-			rpSolid->acceleration.RecordBuild(vkCommandBuffer, std::span(&geometry, 1), std::span(&range, 1));
-			++rFramebuffer.sceneOperations.iBuilds;
+			VkAccelerationStructureGeometryKHR vkGeometry = LightingSolidGeometry(rpSolid->vertices, rpSolid->indices);
+			VkAccelerationStructureBuildRangeInfoKHR vkRange {.primitiveCount = LightingFixture::kiIndicesPerSolid / 3};
+			rpSolid->acceleration.RecordBuild(vkCommandBuffer, std::span(&vkGeometry, 1), std::span(&vkRange, 1));
 			rpSolid->bBuilt = true;
 		}
 		LightingAccelerationStructure::RecordBuildBarrier(vkCommandBuffer);
-		++rFramebuffer.sceneOperations.iBarriers;
 	}
 	if (mpState->settings.eMode != LightingComparisonMode::kDisabled || rFramebuffer.uiBuiltSceneGeneration != rFramebuffer.uiGeneration)
 	{
 		LightingAccelerationStructure::RecordInputBarrier(vkCommandBuffer);
-		++rFramebuffer.sceneOperations.iBarriers;
 		VkAccelerationStructureGeometryKHR vkGeometry = LightingSceneGeometry(rFramebuffer);
 		VkAccelerationStructureBuildRangeInfoKHR vkRange {.primitiveCount = rFramebuffer.uiInstanceCount};
 		rFramebuffer.scene.RecordBuild(vkCommandBuffer, std::span(&vkGeometry, 1), std::span(&vkRange, 1));
-		++rFramebuffer.sceneOperations.iBuilds;
 		LightingAccelerationStructure::RecordQueryBarrier(vkCommandBuffer);
-		++rFramebuffer.sceneOperations.iBarriers;
 		rFramebuffer.uiBuiltSceneGeneration = rFramebuffer.uiGeneration;
 	}
-	RecordSceneDiagnostics(vkCommandBuffer);
 	CommandBufferRecordMain::RecordEnvironment(vkCommandBuffer, iFramebuffer);
-	rFramebuffer.uiRecordedPublication = rFramebuffer.pendingDiagnostics.uiPublication;
+	RecordCapture(vkCommandBuffer);
+	rFramebuffer.uiRecordedPublication = rFramebuffer.uiPendingPublication;
 }
 
 void Lighting::BindQueryDescriptors(const Pipeline& rPipeline, int64_t iFramebuffer) const
@@ -486,14 +388,6 @@ void Lighting::BindQueryDescriptors(const Pipeline& rPipeline, int64_t iFramebuf
 	{
 		PipelineDescriptorWriter::UpdateAccelerationStructure(rPipeline, iFramebuffer, shaders::kiLightingBindingScene, rFramebuffer.scene.mVkAccelerationStructureKHR);
 	}
-	// TEMP START descriptor owner evidence
-	static uint32_t suiOwnerEvidence = 0;
-	if ((mpState->uiValidationRequest != 0 || mpState->settings.uiCaptureRequest != mpState->uiServicedCapture) && suiOwnerEvidence < 48)
-	{
-		++suiOwnerEvidence;
-		LOG(kTemp, kInfo, "DESCRIPTOR_OWNER query owner={} framebuffer={} sources20={} publication21={} scene22={} instances23={} geometry24={} materials25={} samples26={}", rPipeline.mInfo.name, iFramebuffer, reinterpret_cast<uint64_t>(rFramebuffer.sources.GetBuffer()), reinterpret_cast<uint64_t>(rFramebuffer.publication.GetBuffer()), reinterpret_cast<uint64_t>(rFramebuffer.scene.mVkAccelerationStructureKHR), reinterpret_cast<uint64_t>(rFramebuffer.instances.GetBuffer()), reinterpret_cast<uint64_t>(rFramebuffer.geometries.GetBuffer()), reinterpret_cast<uint64_t>(rFramebuffer.fixtureMaterials.GetBuffer()), reinterpret_cast<uint64_t>(rFramebuffer.samples.GetBuffer()));
-	}
-	// TEMP END descriptor owner evidence
 }
 
 void Lighting::AddQueryDescriptorInfos(PipelineInfo& rInfo, int64_t iFramebuffer) const
@@ -518,7 +412,6 @@ void Lighting::AddQueryDescriptorInfos(PipelineInfo& rInfo, int64_t iFramebuffer
 
 void Lighting::SetComparison(const LightingComparisonSettings& rSettings)
 {
-	CancelCapture();
 	mRequestedComparisonSettings = rSettings;
 }
 
@@ -534,7 +427,7 @@ bool Lighting::GetComparisonCamera(LightingCameraPose& rPose) const
 
 const LightingDiagnostics& Lighting::GetDiagnostics() const
 {
-	return mpState->completedDiagnostics;
+	return mpState->diagnostics;
 }
 
 } // namespace engine

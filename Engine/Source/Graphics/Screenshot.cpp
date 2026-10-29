@@ -36,16 +36,15 @@ static void ReportCaptureFailure(std::string_view error, bool bPublishResult, in
 
 static constexpr bool IsBlueGreenRedAlpha(VkFormat vkFormat);
 
-nlohmann::json SaveFinishedPng(int64_t iFramebufferIndex, const std::filesystem::path& rPath)
+void SaveFinishedPng(int64_t iFramebufferIndex, const std::filesystem::path& rPath)
 {
-	// Heap: the frozen finished image is encoded before its capture epoch is released.
+	// Heap: readback and PNG encode run on the main thread once per completed lighting capture.
 	ScopedSuppressAllocationTracking suppress;
 	VkFence vkFence = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex).mVkFence;
 	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 	VkExtent2D vkExtent = gpGraphics->mFramebufferVkExtent2D;
 	std::vector<std::byte> bytes;
-	LightingAllocation readback;
-	TextureCache::CopyImageToHostMemory(gpSwapchainManager->mFramebuffers.at(iFramebufferIndex).vkPresentImage, {vkExtent.width, vkExtent.height, 1}, gpInstanceManager->mFramebufferVkFormat, 1, 1, true, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, bytes, &readback);
+	TextureCache::CopyImageToHostMemory(gpSwapchainManager->mFramebuffers.at(iFramebufferIndex).vkPresentImage, {vkExtent.width, vkExtent.height, 1}, gpInstanceManager->mFramebufferVkFormat, 1, 1, true, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, bytes);
 	uint32_t* puiPixels = reinterpret_cast<uint32_t*>(bytes.data());
 	for (int64_t i = 0; i < static_cast<int64_t>(vkExtent.width) * vkExtent.height; ++i)
 	{
@@ -57,7 +56,6 @@ nlohmann::json SaveFinishedPng(int64_t iFramebufferIndex, const std::filesystem:
 	{
 		throw std::runtime_error("Lighting finished PNG write failed");
 	}
-	return {{"path", path}, {"width", vkExtent.width}, {"height", vkExtent.height}, {"readbackPayload", readback.uiPayload}, {"readbackAllocated", readback.uiAllocated}};
 }
 
 int64_t ResetCaptureResult()

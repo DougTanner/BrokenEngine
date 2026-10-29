@@ -70,11 +70,6 @@ Main stops that timer before Image timing. The per-framebuffer recorded flag is
 an idempotence guard, not a runtime re-record mechanism.
 
 - Global may prepend the texture manager's acquire command buffer, then signals preparation. Preparation signals Main; Main also waits on swapchain image availability, so acquisition gates Main rather than Global.
-- A capture intercepts preparation before the Main worker wakes. It consumes
-  Global-finished once, fences preparation and its private receiver/reference
-  submissions, then signals Preparation-finished once. Main skips its ordinary
-  preparation submit for that frame and retains both waits. Capture lifecycle
-  belongs to [Lighting Publication](../AGENTS.md#lighting-publication).
 - Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute, retained water foam, or rendering order.
 - Foam activation follows [Render's history policy](../Render/AGENTS.md#precision-and-history).
   Changes to Graphics Water Foam or water quality request command-buffer

@@ -126,7 +126,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h" />
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h" />
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h" />
     <ClInclude Include="$(ProjectDir)Build\ModelViewerDataRoot.h" />
@@ -181,7 +180,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingSceneDiagnostics.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.cpp" />

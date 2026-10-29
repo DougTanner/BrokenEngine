@@ -62,20 +62,14 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				++settings.uiCaptureRequest;
 				bChanged = true;
 			}
-			ImGui::SameLine();
-			if (ImGui::Button("Validate terrain##LightingValidate"))
-			{
-				++settings.uiValidationRequest;
-				bChanged = true;
-			}
 			ImGui::EndDisabled();
 			if (bChanged)
 			{
 				gpGraphics->mpLighting->SetComparison(settings);
 			}
 			const LightingDiagnostics& rDiagnostics = gpGraphics->mpLighting->GetDiagnostics();
-			ImGui::Text("Completed publication: %llu; sources: %lld; triangles: %lld", rDiagnostics.uiPublication, rDiagnostics.iSources, rDiagnostics.iTriangles);
-			ImGui::Text("Terrain requested/completed: %llu/%llu; mismatches: %lld", rDiagnostics.uiValidationRequested, rDiagnostics.uiValidationCompleted, rDiagnostics.iTerrainMismatches);
+			ImGui::Text("Sources: %lld; triangles: %lld", rDiagnostics.iSources, rDiagnostics.iTriangles);
+			ImGui::Text("Capture: %.*s; tiles: %lld/%lld", static_cast<int>(rDiagnostics.status.size()), rDiagnostics.status.data(), rDiagnostics.iCompletedTiles, rDiagnostics.iTotalTiles);
 			ImGui::EndTabItem();
 		}
 		game::RenderLightingTweakExtensions(rScreen, iSection, 1);

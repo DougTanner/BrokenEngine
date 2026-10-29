@@ -164,9 +164,7 @@ dummy cells, flags, sessions or reporting functions; the viewer constructs no
 `GameBase` or network session. By project membership it defines
 `engine::RenderFrameMain` for Main uniforms and the three UI functions
 `ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
-`CreateUiScreens` and `DestroyUiScreens` are empty.
-`DrainLightingCaptureCommands` is also an empty viewer-owned host hook; it must
-not introduce generic agent or Client transport dependencies. The viewer `Pch.h` sets
+`CreateUiScreens` and `DestroyUiScreens` are empty. The viewer `Pch.h` sets
 `kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false` and
 `kbDrawModelsOverWorld` to `true`. Keep ordinary
 engine profiling collection, Graphics lifecycle and local crash reporting

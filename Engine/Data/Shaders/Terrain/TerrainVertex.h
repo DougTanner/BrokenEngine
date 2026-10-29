@@ -6,12 +6,6 @@
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
 
-#ifdef LIGHTING_TERRAIN_VALIDATE
-#include "Lighting/LightingTerrainCommon.h"
-#include "Lighting/LightingTerrainValidation.h"
-layout(scalar, set = 1, binding = 5) readonly buffer lightingTerrainWorkBuffer { LightingTerrainWork pWork[]; };
-#endif
-
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
@@ -52,13 +46,6 @@ layout (set = 1, binding = 19) uniform sampler2D ownHeightmapSamplers[kiMaxIslan
 // re-derived below from the composite elevation G-buffer (see fVertexZ below).
 layout (location = 0) in vec2 f2InPosition;
 
-#ifdef LIGHTING_TERRAIN_VALIDATE
-vec2 f2OutTexcoord;
-vec2 f2OutIslandTexcoord;
-uint uiOutTextureSlot;
-vec2 f2OutRotationCosSin;
-vec3 f3OutLightingPosition;
-#else
 // Output 0: visible-area UV for Terrain.frag to sample the composite elevation G-buffer plus
 //           the shadow / object-shadow / smoke samplers that all live in
 //           that coordinate space. Color / normal / AO instead sample location 1.
@@ -79,7 +66,6 @@ layout (location = 2) out flat uint uiOutTextureSlot;
 //           tangent to match the per-island rotation.
 layout (location = 3) out flat vec2 f2OutRotationCosSin;
 layout (location = 4) out vec3 f3OutLightingPosition;
-#endif
 
 void main()
 {
@@ -90,38 +76,16 @@ void main()
 
 	// f4VertexRect.{x,y} is the rect's top-left corner (Islands::UpdateActiveIslands packs x = worldX - 0.5*w,
 	// y = worldY + 0.5*h, w = footprintX, h = -footprintY), so the island center is at corner + half-extent.
-#ifdef LIGHTING_TERRAIN_VALIDATE
-	// TEMP START original operand acquisition
-	float fEvidenceCenterProductX = 0.5f * f4VertexRect.z;
-	float fEvidenceCenterProductY = 0.5f * f4VertexRect.w;
-	float fCenterX = f4VertexRect.x + fEvidenceCenterProductX;
-	float fCenterY = f4VertexRect.y + fEvidenceCenterProductY;
-	// TEMP END original operand acquisition
-#else
 	float fCenterX = f4VertexRect.x + 0.5f * f4VertexRect.z;
 	float fCenterY = f4VertexRect.y + 0.5f * f4VertexRect.w;
-#endif
 
 	// Rotate island-local XY into world space; Z is rotation-invariant. Matches the per-instance
 	// rotation that QuadsAxisAlignedVisibleArea.vert still applies for the elevation prepass.
 	float fCos = cos(fRotation);
 	float fSin = sin(fRotation);
 	f2OutRotationCosSin = vec2(fCos, fSin);
-#ifdef LIGHTING_TERRAIN_VALIDATE
-	// TEMP START original operand acquisition
-	float fEvidenceXC = f2InPosition.x * fCos;
-	float fEvidenceYS = f2InPosition.y * fSin;
-	float fEvidenceXS = f2InPosition.x * fSin;
-	float fEvidenceYC = f2InPosition.y * fCos;
-	float fEvidencePartialX = fCenterX + fEvidenceXC;
-	float fEvidencePartialY = fCenterY + fEvidenceXS;
-	float fWorldX = fEvidencePartialX - fEvidenceYS;
-	float fWorldY = fEvidencePartialY + fEvidenceYC;
-	// TEMP END original operand acquisition
-#else
 	float fWorldX = fCenterX + f2InPosition.x * fCos - f2InPosition.y * fSin;
 	float fWorldY = fCenterY + f2InPosition.x * fSin + f2InPosition.y * fCos;
-#endif
 
 	// Per-island texture UV from raw (pre-rotation) island-local mesh XY. Matches the prepass
 	// convention exactly: at f2InPosition == (-w/2, -|h|/2 with h<0 → +|h|/2) we hit (u, v) = (0, 0),
@@ -134,18 +98,10 @@ void main()
 	// (mTerrainElevationTexture etc., rendered earlier this frame by the per-island G-buffer prepass).
 	// Convention matches the original Terrain.vert: u in [0,1] maps to [minX, maxX]; v in [0,1] maps
 	// to [maxY, minY] (image-space Y down). f4VisibleArea = {minX, maxY, maxX, minY}.
-#ifdef LIGHTING_TERRAIN_VALIDATE
-	// TEMP START original operand acquisition
-	vec2 f2EvidenceNumerator = vec2(fWorldX - globalLayout.f4VisibleArea.x, fWorldY - globalLayout.f4VisibleArea.y);
-	vec2 f2EvidenceDenominator = vec2(globalLayout.f4VisibleArea.z - globalLayout.f4VisibleArea.x, globalLayout.f4VisibleArea.w - globalLayout.f4VisibleArea.y);
-	f2OutTexcoord = vec2(f2EvidenceNumerator.x / f2EvidenceDenominator.x, f2EvidenceNumerator.y / f2EvidenceDenominator.y);
-	// TEMP END original operand acquisition
-#else
 	f2OutTexcoord = vec2(
 		(fWorldX - globalLayout.f4VisibleArea.x) / (globalLayout.f4VisibleArea.z - globalLayout.f4VisibleArea.x),
 		(fWorldY - globalLayout.f4VisibleArea.y) / (globalLayout.f4VisibleArea.w - globalLayout.f4VisibleArea.y)
 	);
-#endif
 
 	// Vertex Z starts from the composite elevation G-buffer (same per-island heightmap that Shadow.comp
 	// and Water.frag read), then is sunk to the sea floor below the zero-out line (see below). The Gaea
@@ -154,11 +110,6 @@ void main()
 	// pixel-perfect alignment at the shoreline. textureLod required in vertex shaders (no implicit
 	// derivatives).
 	float fVertexZ = textureLod(elevationTextureSampler, f2OutTexcoord, 0.0f).x;
-#ifdef LIGHTING_TERRAIN_VALIDATE
-	// TEMP START bounded terrain evidence
-	float fEvidenceSampledZ = fVertexZ;
-	// TEMP END bounded terrain evidence
-#endif
 
 	// Sink this island's own submerged verts to the flat sea floor. fVertexZ above is the MAX composite across
 	// overlapping islands, so without this an island's underwater mesh would be lifted to a taller neighbor's
@@ -170,91 +121,6 @@ void main()
 		fVertexZ = globalLayout.fSeaFloorElevation;
 	}
 
-#ifdef LIGHTING_TERRAIN_VALIDATE
-	gl_PointSize = 1.0;
-	LightingTerrainWork work = pWork[gl_InstanceIndex];
-	uint vertex = uint(gl_VertexIndex);
-	if (vertex < work.uiVertexCount)
-	{
-		LightingTerrainOriginals originals = LightingTerrainOriginals(work.uiOriginalAddress);
-		// TEMP START bounded terrain evidence
-		atomicAdd(originals.pOriginals[vertex].uiInvocations, 1u);
-		// TEMP START original operand acquisition
-		bool bEvidenceTarget = work.uiValidation != 0u && uint(gl_InstanceIndex) == 0u && work.uiTemplate == uint64_t(188901052726349361ul) && vertex == 24356u;
-		if (bEvidenceTarget) atomicAdd(TerrainEvidence(work.uiEvidenceAddress).data.puiCounts[16], 1u);
-		// TEMP END original operand acquisition
-		// TEMP END bounded terrain evidence
-		if (atomicCompSwap(originals.pOriginals[vertex].uiWritten, 0u, 1u) == 0u)
-		{
-			originals.pOriginals[vertex].f3Position = vec3(fWorldX, fWorldY, fVertexZ);
-			originals.pOriginals[vertex].fOwn = fOwnElevation;
-			originals.pOriginals[vertex].uiCutoff = fOwnElevation < globalLayout.fUnderwaterMaskThreshold ? 1u : 0u;
-			// TEMP START bounded terrain evidence
-			originals.pOriginals[vertex].f2UV = f2OutTexcoord;
-			originals.pOriginals[vertex].f2OwnUV = f2OutIslandTexcoord;
-			originals.pOriginals[vertex].fSampledZ = fEvidenceSampledZ;
-			// TEMP START original operand acquisition
-			if (bEvidenceTarget)
-			{
-				TerrainEvidence e = TerrainEvidence(work.uiEvidenceAddress);
-				if (atomicCompSwap(e.data.puiClaims[16], 0u, 1u) == 0u)
-				{
-					for (uint i = 0u; i < 128u; ++i) e.data.pClasses[16].puiWords[i] = 0u;
-					e.data.pClasses[16].puiWords[0] = 0u;
-					e.data.pClasses[16].puiWords[1] = uint(gl_InstanceIndex);
-					e.data.pClasses[16].puiWords[2] = vertex;
-					e.data.pClasses[16].puiWords[3] = uint(work.uiTemplate);
-					e.data.pClasses[16].puiWords[4] = uint(work.uiTemplate >> 32);
-					e.data.pClasses[16].puiWords[5] = floatBitsToUint(f2InPosition.x);
-					e.data.pClasses[16].puiWords[6] = floatBitsToUint(f2InPosition.y);
-					e.data.pClasses[16].puiWords[7] = floatBitsToUint(f4VertexRect.x);
-					e.data.pClasses[16].puiWords[8] = floatBitsToUint(f4VertexRect.y);
-					e.data.pClasses[16].puiWords[9] = floatBitsToUint(f4VertexRect.z);
-					e.data.pClasses[16].puiWords[10] = floatBitsToUint(f4VertexRect.w);
-					e.data.pClasses[16].puiWords[11] = floatBitsToUint(fRotation);
-					e.data.pClasses[16].puiWords[12] = floatBitsToUint(globalLayout.f4VisibleArea.x);
-					e.data.pClasses[16].puiWords[13] = floatBitsToUint(globalLayout.f4VisibleArea.y);
-					e.data.pClasses[16].puiWords[14] = floatBitsToUint(globalLayout.f4VisibleArea.z);
-					e.data.pClasses[16].puiWords[15] = floatBitsToUint(globalLayout.f4VisibleArea.w);
-					e.data.pClasses[16].puiWords[16] = floatBitsToUint(fCos);
-					e.data.pClasses[16].puiWords[17] = floatBitsToUint(fSin);
-					e.data.pClasses[16].puiWords[18] = floatBitsToUint(fEvidenceCenterProductX);
-					e.data.pClasses[16].puiWords[19] = floatBitsToUint(fEvidenceCenterProductY);
-					e.data.pClasses[16].puiWords[20] = floatBitsToUint(fCenterX);
-					e.data.pClasses[16].puiWords[21] = floatBitsToUint(fCenterY);
-					e.data.pClasses[16].puiWords[22] = floatBitsToUint(fEvidenceXC);
-					e.data.pClasses[16].puiWords[23] = floatBitsToUint(fEvidenceYS);
-					e.data.pClasses[16].puiWords[24] = floatBitsToUint(fEvidenceXS);
-					e.data.pClasses[16].puiWords[25] = floatBitsToUint(fEvidenceYC);
-					e.data.pClasses[16].puiWords[26] = floatBitsToUint(fEvidencePartialX);
-					e.data.pClasses[16].puiWords[27] = floatBitsToUint(fEvidencePartialY);
-					e.data.pClasses[16].puiWords[28] = floatBitsToUint(fWorldX);
-					e.data.pClasses[16].puiWords[29] = floatBitsToUint(fWorldY);
-					e.data.pClasses[16].puiWords[30] = floatBitsToUint(f2EvidenceNumerator.x);
-					e.data.pClasses[16].puiWords[31] = floatBitsToUint(f2EvidenceNumerator.y);
-					e.data.pClasses[16].puiWords[32] = floatBitsToUint(f2EvidenceDenominator.x);
-					e.data.pClasses[16].puiWords[33] = floatBitsToUint(f2EvidenceDenominator.y);
-					e.data.pClasses[16].puiWords[34] = floatBitsToUint(f2OutTexcoord.x);
-					e.data.pClasses[16].puiWords[35] = floatBitsToUint(f2OutTexcoord.y);
-					e.data.pClasses[16].puiWords[36] = floatBitsToUint(f2OutTexcoord.x);
-					e.data.pClasses[16].puiWords[37] = floatBitsToUint(f2OutTexcoord.y);
-					e.data.pClasses[16].puiWords[38] = floatBitsToUint(fEvidenceSampledZ);
-					e.data.pClasses[16].puiWords[39] = floatBitsToUint(fVertexZ);
-					e.data.pClasses[16].puiWords[40] = floatBitsToUint(fOwnElevation);
-					e.data.pClasses[16].puiWords[41] = floatBitsToUint(globalLayout.fUnderwaterMaskThreshold);
-					e.data.pClasses[16].puiWords[42] = floatBitsToUint(globalLayout.fSeaFloorElevation);
-					e.data.pClasses[16].puiWords[43] = fOwnElevation < globalLayout.fUnderwaterMaskThreshold ? 1u : 0u;
-					e.data.pClasses[16].puiWords[44] = uiOutTextureSlot;
-					e.data.pClasses[16].puiWords[45] = 0u;
-					memoryBarrierBuffer();
-					atomicExchange(e.data.puiClaims[16], 2u);
-				}
-			}
-			// TEMP END original operand acquisition
-			// TEMP END bounded terrain evidence
-		}
-	}
-#endif
 	f3OutLightingPosition = vec3(fWorldX, fWorldY, fVertexZ);
 	gl_Position = Transform(vec4(fWorldX, fWorldY, fVertexZ, 1.0f), mainLayout.f4x4ViewProjection);
 }

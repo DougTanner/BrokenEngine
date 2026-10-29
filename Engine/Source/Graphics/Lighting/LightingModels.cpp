@@ -223,7 +223,15 @@ LightingModels::State::Asset& LightingModels::State::GetAsset(common::crc_t scen
 			pOutput[i].uiPhysicalTexture = static_cast<uint32_t>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[rMaterial.uiPhysicalDescriptorTextureIndex]));
 		}
 		uint32_t uiEnd = std::cmp_less(i + 1, rScene.uiMaterialCount) ? puiStarts[i + 1] : static_cast<uint32_t>(rModel.iIndexCount);
-		if (puiStarts[i] > uiEnd || std::cmp_greater(uiEnd, rModel.iIndexCount) || (uiEnd - puiStarts[i]) % 3 != 0)
+		if (puiStarts[i] > uiEnd)
+		{
+			throw std::ios_base::failure("LightingModels primitive range");
+		}
+		if (std::cmp_greater(uiEnd, rModel.iIndexCount))
+		{
+			throw std::ios_base::failure("LightingModels primitive range");
+		}
+		if ((uiEnd - puiStarts[i]) % 3 != 0)
 		{
 			throw std::ios_base::failure("LightingModels primitive range");
 		}
@@ -275,16 +283,19 @@ void LightingModels::State::GetBuildGeometry(const Asset& rAsset, const Deformed
 		{
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
 			.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
-			.geometry = {.triangles =
+			.geometry =
 			{
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
-				.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
-				.vertexData = {.deviceAddress = pDeformed == nullptr ? vkVertices : pDeformed->vertices.GetDeviceAddress()},
-				.vertexStride = pDeformed == nullptr ? static_cast<VkDeviceSize>(rBuffer.mInfo.iVertexStride) : sizeof(shaders::LightingModelVertex),
-				.maxVertex = rAsset.uiVertexCount - 1,
-				.indexType = rBuffer.mInfo.vkIndexType,
-				.indexData = {.deviceAddress = vkAddress},
-			}},
+				.triangles =
+				{
+					.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+					.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
+					.vertexData = {.deviceAddress = pDeformed == nullptr ? vkVertices : pDeformed->vertices.GetDeviceAddress()},
+					.vertexStride = pDeformed == nullptr ? static_cast<VkDeviceSize>(rBuffer.mInfo.iVertexStride) : sizeof(shaders::LightingModelVertex),
+					.maxVertex = rAsset.uiVertexCount - 1,
+					.indexType = rBuffer.mInfo.vkIndexType,
+					.indexData = {.deviceAddress = vkAddress},
+				},
+			},
 			.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
 		};
 		ranges[i] = {.primitiveCount = rPrimitive.uiIndexCount / 3, .primitiveOffset = rPrimitive.uiFirstIndex * static_cast<uint32_t>(iIndexBytes)};
@@ -316,6 +327,11 @@ LightingModelCounts LightingModels::Prepare(int64_t iFramebuffer, std::span<cons
 			continue;
 		}
 		counts.uiInstances += static_cast<uint32_t>(rRange.iInstanceCount);
+		// Visible ranges start at instance 0; a trace-only range is the off-screen capacity tail.
+		if (rRange.iFirstInstance > 0)
+		{
+			counts.uiTraceOnlyInstances += static_cast<uint32_t>(rRange.iInstanceCount);
+		}
 		counts.uiGeometries += static_cast<uint32_t>(rRange.iInstanceCount * std::ssize(rAsset.primitives));
 		std::span previousRanges = ranges.first(static_cast<size_t>(&rRange - ranges.data()));
 		if (std::ranges::none_of(previousRanges, [&](const LightingModelRange& rPrevious) { return rPrevious.modelCrc == rRange.modelCrc; }))
@@ -403,10 +419,9 @@ void LightingModels::Write(int64_t iFramebuffer, std::span<const LightingModelRa
 	}
 }
 
-void LightingModels::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer, std::span<const LightingModelRange> ranges, LightingTerrainOperations& rOperations)
+void LightingModels::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer, std::span<const LightingModelRange> ranges)
 {
 	LightingAccelerationStructure::RecordInputBarrier(vkCommandBuffer);
-	++rOperations.iBarriers;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mpState->vkPipeline);
 	for (const LightingModelRange& rRange : ranges)
 	{
@@ -437,11 +452,9 @@ void LightingModels::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t 
 			};
 			vkCmdPushConstants(vkCommandBuffer, mpState->vkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(deform), &deform);
 			vkCmdDispatch(vkCommandBuffer, common::RoundUp<uint32_t, 64>(deform.uiVertexCount) / 64, 1, 1);
-			++rOperations.iDispatches;
 		}
 	}
 	LightingAccelerationStructure::RecordInputBarrier(vkCommandBuffer);
-	++rOperations.iBarriers;
 	for (const LightingModelRange& rRange : ranges)
 	{
 		State::Asset& rAsset = mpState->assets.at(rRange.modelCrc);
@@ -463,54 +476,10 @@ void LightingModels::RecordPreparation(VkCommandBuffer vkCommandBuffer, int64_t 
 			mpState->GetBuildGeometry(rAsset, pDeformed, std::span(pVkGeometries, static_cast<size_t>(iCount)), std::span(pVkRanges, static_cast<size_t>(iCount)));
 			LightingAccelerationStructure& rAcceleration = pDeformed == nullptr ? rAsset.acceleration : pDeformed->acceleration;
 			rAcceleration.RecordBuild(vkCommandBuffer, std::span(pVkGeometries, static_cast<size_t>(iCount)), std::span(pVkRanges, static_cast<size_t>(iCount)));
-			++rOperations.iBuilds;
 		}
 		rAsset.flags.Set(State::Asset::Flags::kBuilt);
 	}
 	LightingAccelerationStructure::RecordBuildBarrier(vkCommandBuffer);
-	++rOperations.iBarriers;
-}
-
-LightingModelBytes LightingModels::GetResourceBytesDetail() const
-{
-	LightingModelBytes bytes;
-	auto AddBuffer = [&](LightingAllocation& rTotal, const Buffer& rBuffer)
-	{
-		for (VmaAllocation allocation : {rBuffer.mHostVisibleVmaAllocation, rBuffer.mDeviceLocalVmaAllocation})
-		{
-			if (allocation == VK_NULL_HANDLE)
-			{
-				continue;
-			}
-			VmaAllocationInfo info {};
-			vmaGetAllocationInfo(gpDeviceManager->mpAllocator, allocation, &info);
-			rTotal.uiPayload += rBuffer.mInfo.iDataSize;
-			rTotal.uiAllocated += info.size;
-		}
-	};
-	for ([[maybe_unused]] const auto& [rCrc, rAsset] : mpState->assets)
-	{
-		AddBuffer(bytes.materials, rAsset.materials);
-		AddBuffer(bytes.vertexMaterials, rAsset.vertexMaterials);
-		AddBuffer(bytes.blas, rAsset.acceleration.mStorage);
-		AddBuffer(bytes.accelerationScratch, rAsset.acceleration.mScratch);
-	}
-	for (const std::unique_ptr<State::Framebuffer>& rpFramebuffer : mpState->framebuffers)
-	{
-		for ([[maybe_unused]] const auto& [rKey, rDeformed] : *rpFramebuffer)
-		{
-			AddBuffer(bytes.xyz, rDeformed.vertices);
-			AddBuffer(bytes.blas, rDeformed.acceleration.mStorage);
-			AddBuffer(bytes.accelerationScratch, rDeformed.acceleration.mScratch);
-		}
-	}
-	return bytes;
-}
-
-uint64_t LightingModels::GetResourceBytes() const
-{
-	LightingModelBytes bytes = GetResourceBytesDetail();
-	return bytes.materials.uiAllocated + bytes.vertexMaterials.uiAllocated + bytes.xyz.uiAllocated + bytes.blas.uiAllocated + bytes.accelerationScratch.uiAllocated;
 }
 
 } // namespace engine

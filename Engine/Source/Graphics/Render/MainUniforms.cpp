@@ -239,9 +239,9 @@ static void PopulateMainCamera(shaders::MainLayout& rMainLayout, int64_t iTick)
 	static constexpr float kfMaxPitch = 0.005f;
 	static constexpr float kfMaxYaw = 0.01f;
 	// Fixed-seed permutation tables are identical every frame — construct once (each ctor reshuffles a 256-entry table).
-	static const siv::BasicPerlinNoise<float> sPerlinRoll(0);
-	static const siv::BasicPerlinNoise<float> sPerlinPitch(1);
-	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
+	static siv::BasicPerlinNoise<float> sPerlinRoll(0);
+	static siv::BasicPerlinNoise<float> sPerlinPitch(1);
+	static siv::BasicPerlinNoise<float> sPerlinYaw(2);
 	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(iTick).time_since_epoch());
 	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
 
@@ -298,7 +298,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 			return;
 		}
 		const game::FrameInterpolate& rFrameInterpolate = it->second;
-		gpGraphics->mpLighting->AddFrame(rFrameInterpolate);
 		// Automatically dispatched main collections
 		ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
 		ForEachInterpolateRender(InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);

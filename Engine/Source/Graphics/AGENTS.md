@@ -143,50 +143,38 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   Resolve current GPU handles after capacity growth and reuse final mesh/joint
   ranges. Resident terrain/model geometry, material tables, and acceleration
   structures remain tied to the framebuffer's publication and resource lifetime.
-- Terrain and scene diagnostics each share one pipeline instance per kind across
-  framebuffers, with descriptor sets indexed by framebuffer; backing resources
-  and completion ownership remain per framebuffer. After its fence completes,
-  refresh only the selected framebuffer's sets with its current scratch, work,
-  query and diagnostic resources after growth and before use. Terrain scratch
-  bindings bypass texture-descriptor registration so callbacks cannot publish
-  one framebuffer's image into every set; resolve the current sampler when
-  binding scratch, including after sampler recreation. Destroy and unregister
-  shared pipelines before their backing resources in both explicit teardown
-  and member destruction.
+- The terrain producer shares one compute pipeline across framebuffers, with
+  descriptor sets indexed by framebuffer; its buffers and acceleration
+  structures remain per framebuffer. Each frame refreshes only the current
+  framebuffer's work-buffer binding, after growth and before use. Destroy the
+  shared pipeline before its backing resources in both explicit teardown and
+  member destruction.
 - Preparation completes lighting and environmental updates before receivers or Main.
-  A recorded publication is not completed GPU evidence: latch diagnostic
-  readback only after its covering fence completes. Submission ownership belongs
-  to [CommandBufferManager](Managers/AGENTS.md#commandbuffermanager).
-- Lighting owns comparison capture. Apply settings only after draining render,
-  present and upload workers and device work, before the next CPU publication.
-  Its publication hold alone prevents only framebuffer reuse; the controller
-  also withholds the ordinary update/render/adoption/retirement loop through
-  receiver, tiled reference, original-frame composition and export. Retain all
-  geometry, animation, water, material and residency inputs throughout.
-- Before Main is committed, a queued mutation cancels comparison and Main uses
-  zero local diffuse. After commitment, mutations wait through export. Disable
-  composition, bind the zero fallback and fence restoration before releasing
-  the publication or dispatching pending input. The first ordinary Main/UI
-  fence records zero diffuse; another capture waits for that receipt. Recreation
-  preserves that obligation; device-loss teardown records abort, not success.
-- The capture pump dispatches only safe lifecycle messages and the host's narrow
-  service hook; ordinary input and synthetic frame-stepped scripts stay pending.
-  Sandbox's hook owns agent and non-dispatching transport service; ModelViewer
-  supplies an empty hook. Command gating belongs to [Agent](../Agent/AGENTS.md#architecture),
-  and transport limits to [Client](../Network/Client/AGENTS.md#receive-paths).
+  A recorded publication is not completed GPU work: `BeginRender` latches the
+  published counts only after that framebuffer's covering fence completes.
+  Submission ownership belongs to
+  [CommandBufferManager](Managers/AGENTS.md#commandbuffermanager).
+- Lighting owns comparison capture. Settings changes apply only after draining
+  render, present and upload workers and device work, before the next CPU
+  publication. A capture advances inside ordinary frames while the client is
+  paused, which keeps every published input unchanged: one frame renders the
+  receivers, each later preparation traces a fixed number of reference tiles,
+  and only the frame that traces the last tiles enables the reference for its
+  own Main composition. Each tracing frame must publish the receivers frame's
+  counts. Unpause, a settings change, a changed publication or Graphics
+  recreation sets capture status `failed` with a reason, and recreation never
+  resets that status.
 - The fixed client fixture supplies immutable sources, samples, geometry and
   events without consuming simulation IDs or RNG. Physical emission is authored
   independently of visible sprites, shield colors, and smoke appearance.
 
 ## Assets and Capture
 
-Comparison export waits for the original Main/UI fence and completes raw
-readbacks and the finished PNG write before export-complete. Capture manifests
-and `query_profile.lighting` distinguish submitted work, completed GPU diagnostics
-and completed export; none by itself establishes acceptance. Link the final
-emitted manifest hash to an immutable external build receipt and source-tree
-snapshot, with the executable, pack and shader hashes. Runtime supplies no
-repository revision constant; never invent one or edit a hashed emitted manifest.
+Comparison export runs after the composing frame's UI submission and waits that
+framebuffer's fence before reading back the raw receivers and reference and
+writing the finished PNG. It then disables the reference, so later frames
+compose zero local diffuse. `capture.json` records only the capture settings,
+wall time and device; the source commit identifies the fixture and code.
 
 - Animation aliases initialize before Graphics creation so record-once fixture draws can resolve them. They alias eagerly loaded pack memory and therefore cannot outlive `FileManager`. Validate all pack-derived ranges and indices before constructing aliases; temporary transforms use the workbuffer.
 - DirectXMath matrices are uploaded without an extra transpose. Animation nodes remain parent-before-child, enabling a single forward world-transform pass.

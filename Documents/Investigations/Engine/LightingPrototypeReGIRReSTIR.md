@@ -5,13 +5,12 @@
 The user requested isolated, quality-first lighting prototypes and a plan per technique. Can resampled direct lighting preserve quality and temporal stability with hundreds of dynamic lights? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
 All five independent candidates must start from the same verified commit on the reusable
-`lighting-foundation` branch, with no dependency on another candidate. The common foundation is
-being completed; its verified commit and final runtime/capture evidence are not yet available.
-Do not begin candidate implementation or comparison runs until that commit and evidence are
-recorded. Create experiment worktrees through the supported wrapper, then establish the common
-foundation ancestry through the repository workflow; the wrapper's current-primary starting point
-is not the comparison baseline. Record the actual foundation/candidate commits and executable/pack
-byte hashes. Do not adopt or delete worktrees to force a match. The historical
+`lighting-foundation` branch, with no dependency on another candidate. Do not begin candidate
+implementation or comparison runs until a foundation commit passes the
+[foundation acceptance table](LightingFoundationHandoff.md#acceptance-table). Create experiment worktrees through
+the supported wrapper, then establish the common foundation ancestry through the repository
+workflow; the wrapper's current-primary starting point is not the comparison baseline. Record the
+actual foundation and candidate commits. Do not adopt or delete worktrees to force a match. The historical
 [per-flight-plane investigation](LightingPerFlightPlane.md) is context, not authority for gameplay.
 
 The foundation removes projected local-light deposits and preserves gameplay with exactly zero
@@ -38,7 +37,7 @@ ReGIR stores candidate light distributions, not finished radiance. ReSTIR DI est
 ## Implementation prerequisite
 
 Use the verified foundation's Vulkan ray-query backend, resident terrain and rigid/skinned model
-producers, material evaluation, fixed fixture, exhaustive direct reference and capture evidence.
+producers, material evaluation, fixed fixture, exhaustive direct reference and capture.
 Do not rebuild those common mechanisms inside this candidate. Confirm the selected physical GPU's
 required features/extensions/formats and retain its capability evidence; unsupported hardware
 blocks comparison rather than selecting a heightfield or screen-space substitute.
@@ -47,7 +46,9 @@ Trace resident terrain, opaque models and overhangs under the foundation's mater
 MASK is opaque; BLEND, water, smoke, sprites and shields do not occlude rays. Water remains a
 diffuse receiver. Preserve synchronous Frame borrowing, final GPU geometry/ranges, camera-cell
 coordinates, resource retirement and capture input lifetimes without asset/pack format changes.
-Verify static, moving and off-screen occluders before judging the candidate algorithm. A missing
+The foundation traces off-screen models but not off-screen terrain, which sits at the sea floor
+([known omissions](LightingFoundationHandoff.md#known-omissions)). Verify static, moving and off-screen model
+occluders before judging the candidate algorithm. A missing
 producer or failed foundation gate requires plan revision rather than an unrecorded substitute.
 
 ## Critical files
@@ -62,9 +63,9 @@ producer or failed foundation gate requires plan revision rather than an unrecor
 ## In scope
 
 - The critical-file regions above, their required headers/project membership, and candidate resources needed by this single technique; reuse foundation ray-query ownership. Add `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp` for cell candidates, receiver reservoirs, temporal/spatial reuse, and visibility; `ShaderFunctions.h` for final full-normal direct contribution.
-- Reuse the foundation fixture/light stream and capture manifest through supported debug/harness controls; no new simulation fields or network commands.
+- Reuse the foundation fixture/light stream and capture exports (`capture.json` plus raw images) through supported debug/harness controls; no new simulation fields or network commands.
 - A debug selector for foundation zero diffuse versus this one candidate, plus reference/diagnostic outputs. Preserve the zero path and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
-- Reuse the foundation exhaustive shadowed direct-diffuse reference using all lights and its verified 256/512-area-sample convergence evidence. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
+- Reuse the foundation exhaustive shadowed direct-diffuse reference using all lights at 256 area samples; the foundation records no 256/512 convergence evidence and keeps its 512-sample control for suspected area-sampling noise. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
 - Client-only timers, resource-byte accounting, source/settings manifest, comparison screenshots and motion sequences. Integrate model/terrain/water local diffuse lighting; retain existing smoke/billboard policy and report its mismatch separately.
 
 ## Out of scope
@@ -79,15 +80,15 @@ Preserve cell-local positions; convert to the camera cell only at publication/us
 
 ## Comparison fixture
 
-Reuse the foundation fixture and its recorded exact blobs/hashes. Its specification is centered at
+Reuse the foundation fixture; its generation code at the foundation commit identifies it. Its specification is centered at
 camera-cell XY (0,0): a 512 m square neutral diffuse receiving
 surface, test receivers at Z=6/50/100 m, a vertical wall, a thin wall, an overhang, and a colored
 bounce wall. Keep Lambertian albedo at 0.5 (bounce wall RGB 0.8/0.1/0.1), existing specular
 parameters, and seed 0x51A7. Reuse the ordered 1000-light set generated by the fixture-owned fixed-seed RNG;
 take its first 100/300/1000 entries, with every fifth light a 4 m square area emitter. Distribute XY
 uniformly over the square and Z cyclically at 6/50/100 m; give all sources the same recorded linear
-power and 150 m range. Freeze the full generated geometry, lights, and camera/event manifest before
-collecting results and reuse its exact bytes across candidates.
+power and 150 m range. Generation is deterministic, so every candidate built on the same foundation
+commit uses identical geometry, lights, and camera/events.
 
 Capture a close camera at (0,-600,900) looking at (0,0,6), and a wide camera at (0,-4000,6000) with
 the same look-at. Include isolated source/receiver pairs at the three heights. Over a fixed

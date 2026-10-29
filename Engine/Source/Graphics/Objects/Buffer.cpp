@@ -57,13 +57,6 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDevic
 	VmaAllocationCreateInfo vmaAllocationCreateInfo = eMemoryPlacement == BufferMemoryPlacement::kOrdinaryRam ? vmaRamAllocationCreateInfo : MakeAllocationInfo(vkMemoryPropertyFlags, 0);
 
 	VmaAllocationInfo vmaAllocationInfo {};
-	// TEMP START memory allocation observation
-	int64_t iMemoryThread = GetCurrentThreadId();
-	LOG(kTemp, kInfo, "MEMORY CREATE_BEGIN thread={} site=Buffer.cpp owner={} destination={}", iMemoryThread, name, static_cast<const void*>(&rVkBuffer));
-	LOG(kTemp, kInfo, "MEMORY BUFFER_OWNER thread={} requested={} rounded={} terrainValidationObserver={} addedOperandObserver={}", iMemoryThread, iDeviceSize, iRoundedDeviceSize, name == "LightingTerrainWriteCounts" || name == "LightingTerrainOriginalXYZ" || name == "LightingTerrainBaseFilteredZ" || name == "LightingTerrainEvidence" || name == "LightingTerrainEvidenceReadback" || name == "LightingTerrainSavedR16" || name == "LightingTerrainValidationSummary" || name == "LightingTerrainValidationTiles" || name == "LightingTerrainSummaryReadback" || name == "LightingTerrainTileReadback", name == "LightingTerrainBaseFilteredZ" || name == "LightingTerrainEvidence" || name == "LightingTerrainEvidenceReadback");
-	LOG(kTemp, kInfo, "MEMORY BUFFER_REQUEST thread={} flags={} size={} usage={} sharing={} queueCount={} pNext={}", iMemoryThread, vkBufferCreateInfo.flags, vkBufferCreateInfo.size, vkBufferCreateInfo.usage, static_cast<int32_t>(vkBufferCreateInfo.sharingMode), vkBufferCreateInfo.queueFamilyIndexCount, vkBufferCreateInfo.pNext);
-	LOG(kTemp, kInfo, "MEMORY VMA_REQUEST thread={} flags={} usage={} required={} preferred={} typeBits={} pool={}", iMemoryThread, vmaAllocationCreateInfo.flags, static_cast<int32_t>(vmaAllocationCreateInfo.usage), vmaAllocationCreateInfo.requiredFlags, vmaAllocationCreateInfo.preferredFlags, vmaAllocationCreateInfo.memoryTypeBits, reinterpret_cast<uint64_t>(vmaAllocationCreateInfo.pool));
-	// TEMP END memory allocation observation
 	VkBuffer vkBuffer = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
 	VkResult vkMemoryCreateResult = VK_ERROR_FEATURE_NOT_PRESENT;
@@ -91,13 +84,6 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDevic
 			}
 		}
 	}
-	// TEMP START memory allocation observation
-	LOG(kTemp, kInfo, "MEMORY CREATE_END thread={} site=Buffer.cpp destination={} result={}", iMemoryThread, static_cast<const void*>(&rVkBuffer), static_cast<int32_t>(vkMemoryCreateResult));
-	if (vkMemoryCreateResult == VK_SUCCESS)
-	{
-		LOG(kTemp, kInfo, "MEMORY CREATE_ALLOCATION thread={} destination={} resource={} allocation={} type={} memory={} offset={} size={}", iMemoryThread, static_cast<const void*>(&rVkBuffer), reinterpret_cast<uint64_t>(vkBuffer), reinterpret_cast<uint64_t>(vmaAllocation), vmaAllocationInfo.memoryType, reinterpret_cast<uint64_t>(vmaAllocationInfo.deviceMemory), vmaAllocationInfo.offset, vmaAllocationInfo.size);
-	}
-	// TEMP END memory allocation observation
 	CHECK_VK(vkMemoryCreateResult);
 	rVkBuffer = vkBuffer;
 	rVmaAllocation = vmaAllocation;

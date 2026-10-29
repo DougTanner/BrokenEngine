@@ -552,7 +552,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h" />
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -804,7 +803,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingSceneDiagnostics.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingCapture.cpp" />
   </ItemGroup>
@@ -870,7 +868,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModels.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelHit.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrain.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainTile.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\TerrainElevation.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Quads\QuadsAxisAligned.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReference.comp" />
@@ -888,11 +885,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterMaterial.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingQuery.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingRadiometry.h" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainValidate.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainValidation.h" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainWitness.vert" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainWitness.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainVertex.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainMaterial.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCompose.h" />

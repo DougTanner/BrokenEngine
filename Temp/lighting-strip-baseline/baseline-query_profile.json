@@ -1,0 +1,752 @@
+{
+  "clock": {
+    "errorTicks": 3,
+    "offsetTicks": -1,
+    "targetBehindTicks": 4
+  },
+  "counters": [
+    {
+      "count": 0,
+      "index": 0,
+      "name": "Billboards"
+    },
+    {
+      "count": 0,
+      "index": 1,
+      "name": "    Rendered"
+    },
+    {
+      "count": 3,
+      "index": 2,
+      "name": "HexShields"
+    },
+    {
+      "count": 3,
+      "index": 3,
+      "name": "    Rendered"
+    },
+    {
+      "count": 1,
+      "index": 4,
+      "name": "AreaLights"
+    },
+    {
+      "count": 1,
+      "index": 5,
+      "name": "    Rendered"
+    },
+    {
+      "count": 13,
+      "index": 6,
+      "name": "PointLights"
+    },
+    {
+      "count": 12,
+      "index": 7,
+      "name": "    Rendered"
+    },
+    {
+      "count": 1,
+      "index": 8,
+      "name": "Puffs"
+    },
+    {
+      "count": 1,
+      "index": 9,
+      "name": "    Rendered"
+    },
+    {
+      "count": 0,
+      "index": 10,
+      "name": "SmokeTrails"
+    },
+    {
+      "count": 0,
+      "index": 11,
+      "name": "    Rendered"
+    },
+    {
+      "count": 0,
+      "index": 12,
+      "name": "Explosions"
+    },
+    {
+      "count": 5,
+      "index": 13,
+      "name": "Pushers"
+    },
+    {
+      "count": 0,
+      "index": 14,
+      "name": "Sounds"
+    },
+    {
+      "count": 0,
+      "index": 15,
+      "name": "Streams"
+    },
+    {
+      "count": 3,
+      "index": 16,
+      "name": "Omnis"
+    },
+    {
+      "count": 4,
+      "index": 17,
+      "name": "Blasters"
+    },
+    {
+      "count": 4,
+      "index": 18,
+      "name": "    Rendered"
+    },
+    {
+      "count": 0,
+      "index": 19,
+      "name": "Missiles"
+    },
+    {
+      "count": 0,
+      "index": 20,
+      "name": "    Rendered"
+    },
+    {
+      "count": 0,
+      "index": 21,
+      "name": "Fighters"
+    },
+    {
+      "count": 0,
+      "index": 22,
+      "name": "    Rendered"
+    },
+    {
+      "count": 2,
+      "index": 23,
+      "name": "Battleships"
+    },
+    {
+      "count": 2,
+      "index": 24,
+      "name": "    Rendered"
+    }
+  ],
+  "cpuTimerText": "",
+  "cpuTimers": [
+    {
+      "displayAllocations": 7,
+      "displayUs": 590,
+      "index": 0,
+      "name": "Acquire to global",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 14,
+      "index": 1,
+      "name": "Render global",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 2,
+      "name": "Reduce input lag fence",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 3,
+      "name": "Audio",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 7,
+      "displayUs": 18,
+      "index": 4,
+      "name": "Messages and input",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 5,
+      "name": "Wait fence",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 198,
+      "index": 6,
+      "name": "Render main",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 38,
+      "index": 7,
+      "name": "Profile text",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 261,
+      "index": 8,
+      "name": "Wait present future",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 313,
+      "index": 9,
+      "name": "    Submit global",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 317,
+      "index": 10,
+      "name": "    Submit image",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 289,
+      "index": 11,
+      "name": "    Present",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 4648,
+      "index": 12,
+      "name": "Acquire image",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 4567,
+      "index": 13,
+      "name": "    Fence",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 31,
+      "index": 14,
+      "name": "Network poll+reconcile",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 9,
+      "index": 15,
+      "name": "Network send",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 160,
+      "index": 16,
+      "name": "Frame update",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 126,
+      "index": 17,
+      "name": "    Interpolate",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 103,
+      "index": 18,
+      "name": "        AllocateAndCopy",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 19,
+      "name": "            Fighters",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 20,
+      "name": "            Battleships",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 19,
+      "index": 21,
+      "name": "        Update",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 22,
+      "name": "            Fighters",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 23,
+      "name": "            Battleships",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 24,
+      "name": "    PostRender",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 25,
+      "name": "        AllocateAndCopy",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 26,
+      "name": "        Update",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 27,
+      "name": "            NavQuery",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 28,
+      "name": "            Fighters",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 29,
+      "name": "            Battleships",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 30,
+      "name": "        PreCollision",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 31,
+      "name": "        Collide",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 32,
+      "name": "        PostCollision",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 33,
+      "name": "        AreaDamage",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 34,
+      "name": "        Destroy",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 35,
+      "name": "        Spawn",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 58,
+      "index": 36,
+      "name": "Render",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 6,
+      "index": 37,
+      "name": "    Omnis",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 38,
+      "name": "    Fighters",
+      "threads": 1,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 0,
+      "index": 39,
+      "name": "        Animate",
+      "threads": 0,
+      "visible": false
+    },
+    {
+      "displayAllocations": 0,
+      "displayUs": 46,
+      "index": 40,
+      "name": "    Battleships",
+      "threads": 15,
+      "visible": false
+    }
+  ],
+  "fps": 120,
+  "gpuTimers": [
+    {
+      "averageUs": 118,
+      "currentUs": 108,
+      "index": 0,
+      "maxUs": 153,
+      "name": "Global render"
+    },
+    {
+      "averageUs": 2,
+      "currentUs": 2,
+      "index": 1,
+      "maxUs": 3,
+      "name": "    Uniform Copy"
+    },
+    {
+      "averageUs": 20,
+      "currentUs": 10,
+      "index": 2,
+      "maxUs": 55,
+      "name": "    Shadow"
+    },
+    {
+      "averageUs": 16,
+      "currentUs": 16,
+      "index": 3,
+      "maxUs": 17,
+      "name": "    Terrain Elevation"
+    },
+    {
+      "averageUs": 73,
+      "currentUs": 74,
+      "index": 4,
+      "maxUs": 75,
+      "name": "    Spread"
+    },
+    {
+      "averageUs": 16,
+      "currentUs": 17,
+      "index": 5,
+      "maxUs": 17,
+      "name": "        Wind Spread"
+    },
+    {
+      "averageUs": 56,
+      "currentUs": 57,
+      "index": 6,
+      "maxUs": 58,
+      "name": "        Smoke Spread"
+    },
+    {
+      "averageUs": 3,
+      "currentUs": 3,
+      "index": 7,
+      "maxUs": 3,
+      "name": "    Particles"
+    },
+    {
+      "averageUs": 1,
+      "currentUs": 1,
+      "index": 8,
+      "maxUs": 1,
+      "name": "        Particles Spawn"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 9,
+      "maxUs": 0,
+      "name": "        Long Particles Update"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 10,
+      "maxUs": 0,
+      "name": "        Square Particles Update"
+    },
+    {
+      "averageUs": 5272,
+      "currentUs": 5583,
+      "index": 11,
+      "maxUs": 6531,
+      "name": "Main render"
+    },
+    {
+      "averageUs": 2,
+      "currentUs": 2,
+      "index": 12,
+      "maxUs": 3,
+      "name": "    Uniform Copy"
+    },
+    {
+      "averageUs": 9,
+      "currentUs": 10,
+      "index": 13,
+      "maxUs": 10,
+      "name": "    Smoke Emit"
+    },
+    {
+      "averageUs": 1,
+      "currentUs": 1,
+      "index": 14,
+      "maxUs": 1,
+      "name": "    Wind Deposit"
+    },
+    {
+      "averageUs": 38,
+      "currentUs": 38,
+      "index": 15,
+      "maxUs": 45,
+      "name": "    Object Shadows"
+    },
+    {
+      "averageUs": 42,
+      "currentUs": 43,
+      "index": 16,
+      "maxUs": 43,
+      "name": "    Object Shadows blur"
+    },
+    {
+      "averageUs": 5,
+      "currentUs": 6,
+      "index": 17,
+      "maxUs": 6,
+      "name": "    Water Displacement"
+    },
+    {
+      "averageUs": 49,
+      "currentUs": 50,
+      "index": 18,
+      "maxUs": 51,
+      "name": "    Water Foam"
+    },
+    {
+      "averageUs": 27,
+      "currentUs": 28,
+      "index": 19,
+      "maxUs": 28,
+      "name": "        Water Foam Compute"
+    },
+    {
+      "averageUs": 21,
+      "currentUs": 21,
+      "index": 20,
+      "maxUs": 22,
+      "name": "        Water Foam History"
+    },
+    {
+      "averageUs": 710,
+      "currentUs": 707,
+      "index": 21,
+      "maxUs": 969,
+      "name": "Image render"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 22,
+      "maxUs": 0,
+      "name": "    Ui Depth"
+    },
+    {
+      "averageUs": 34,
+      "currentUs": 34,
+      "index": 23,
+      "maxUs": 36,
+      "name": "    Objects"
+    },
+    {
+      "averageUs": 3,
+      "currentUs": 3,
+      "index": 24,
+      "maxUs": 4,
+      "name": "    Transparent Objects"
+    },
+    {
+      "averageUs": 270,
+      "currentUs": 272,
+      "index": 25,
+      "maxUs": 274,
+      "name": "    Terrain"
+    },
+    {
+      "averageUs": 348,
+      "currentUs": 346,
+      "index": 26,
+      "maxUs": 351,
+      "name": "    Water"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 27,
+      "maxUs": 42,
+      "name": "    Hex Shields"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 28,
+      "maxUs": 0,
+      "name": "    Long Particles Render"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 29,
+      "maxUs": 0,
+      "name": "    Square Particles Render"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 30,
+      "maxUs": 0,
+      "name": "    VisibleLights"
+    },
+    {
+      "averageUs": 0,
+      "currentUs": 0,
+      "index": 31,
+      "maxUs": 0,
+      "name": "    Billboards"
+    },
+    {
+      "averageUs": 35,
+      "currentUs": 33,
+      "index": 32,
+      "maxUs": 290,
+      "name": "    HDR Resolve"
+    },
+    {
+      "averageUs": 2,
+      "currentUs": 3,
+      "index": 33,
+      "maxUs": 3,
+      "name": "Ui Render"
+    }
+  ],
+  "lighting": {
+    "badSamples": 0,
+    "badSources": 0,
+    "capture": {
+      "completedTiles": 0,
+      "error": "",
+      "exportComplete": false,
+      "firstTileGpuMs": 0.0,
+      "heldPublication": 0,
+      "manifest": "",
+      "manifestSha256": "",
+      "queuedMutation": false,
+      "referenceValid": false,
+      "referenceWallMs": 0.0,
+      "request": 0,
+      "status": "not-run",
+      "totalTiles": 0,
+      "validationCompleted": 0
+    },
+    "captureRequested": 0,
+    "framebuffer": 1,
+    "generation": 8,
+    "instances": 0,
+    "materials": 0,
+    "peakBytes": 783360,
+    "persistentBytes": 783360,
+    "publication": 7797,
+    "residentPolicy": "Resident active-cell opaque models and terrain; MASK opaque; BLEND, water, smoke, sprites and shields omitted",
+    "sceneDiagnosticPublication": 0,
+    "sources": 0,
+    "terrainDuplicate": 0,
+    "terrainMismatches": 0,
+    "terrainMs": 0.0,
+    "terrainUntouched": 0,
+    "terrainValidationMs": 0.0,
+    "terrainWrittenOnce": 0,
+    "triangles": 0,
+    "validationCompleted": 0,
+    "validationRequested": 0,
+    "validationRequestedSetting": 0,
+    "worstTerrainTileMs": 0.0
+  },
+  "shadowSample": {
+    "currentUs": 10,
+    "sequence": 7742
+  }
+}

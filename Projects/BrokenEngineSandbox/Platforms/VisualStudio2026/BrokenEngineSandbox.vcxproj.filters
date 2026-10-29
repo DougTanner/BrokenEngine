@@ -936,9 +936,6 @@
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h">
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.h">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -1659,9 +1656,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp">
       <Filter>Engine\Graphics\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingSceneDiagnostics.cpp">
-      <Filter>Engine\Graphics\Lighting</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp">
       <Filter>Engine\Graphics\Lighting</Filter>
     </ClCompile>
@@ -1853,9 +1847,6 @@
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrain.comp">
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainTile.vert">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\TerrainElevation.h">
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
@@ -1905,21 +1896,6 @@
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingRadiometry.h">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSceneDiagnostics.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainValidate.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainValidation.h">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainWitness.vert">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainWitness.frag">
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainVertex.h">

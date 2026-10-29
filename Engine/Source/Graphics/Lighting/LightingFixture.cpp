@@ -7,44 +7,6 @@
 
 namespace engine
 {
-static void AppendU32(std::vector<std::byte>& rBytes, uint32_t uiValue)
-{
-	for (int64_t i = 0; i < 4; ++i)
-	{
-		rBytes.push_back(static_cast<std::byte>((uiValue >> (8 * i)) & 0xFF));
-	}
-}
-
-static void AppendU64(std::vector<std::byte>& rBytes, uint64_t uiValue)
-{
-	AppendU32(rBytes, static_cast<uint32_t>(uiValue));
-	AppendU32(rBytes, static_cast<uint32_t>(uiValue >> 32));
-}
-
-static void AppendFloat(std::vector<std::byte>& rBytes, float fValue)
-{
-	AppendU32(rBytes, std::bit_cast<uint32_t>(fValue));
-}
-
-static void AppendVector(std::vector<std::byte>& rBytes, const XMFLOAT3A& rValue)
-{
-	AppendFloat(rBytes, rValue.x);
-	AppendFloat(rBytes, rValue.y);
-	AppendFloat(rBytes, rValue.z);
-}
-
-static void AppendCamera(std::vector<std::byte>& rBytes, const LightingCameraPose& rCamera)
-{
-	AppendU32(rBytes, static_cast<uint32_t>(rCamera.coordinate.iQ));
-	AppendU32(rBytes, static_cast<uint32_t>(rCamera.coordinate.iR));
-	AppendVector(rBytes, rCamera.f3Eye);
-	AppendVector(rBytes, rCamera.f3Target);
-	AppendVector(rBytes, rCamera.f3Up);
-	AppendFloat(rBytes, rCamera.fVerticalFieldOfView);
-	AppendFloat(rBytes, rCamera.fNear);
-	AppendFloat(rBytes, rCamera.fFar);
-}
-
 static float RadicalInverse(int64_t iValue, int64_t iBase)
 {
 	float fValue = 0.0f;
@@ -56,28 +18,6 @@ static float RadicalInverse(int64_t iValue, int64_t iBase)
 		fWeight /= static_cast<float>(iBase);
 	}
 	return fValue;
-}
-
-static std::array<uint8_t, 32> HashBytes(std::span<const std::byte> bytes)
-{
-	common::Sha256Hasher hasher;
-	// CNG's input pointer is mutable in its API; hashing does not write the bytes.
-	hasher.Update(std::span(const_cast<std::byte*>(bytes.data()), bytes.size()));
-	std::array<uint8_t, 32> digest {};
-	if (!hasher.Finish(digest))
-	{
-		throw std::runtime_error("Lighting fixture SHA-256 failed");
-	}
-	return digest;
-}
-
-static void AppendString(std::vector<std::byte>& rBytes, std::string_view text)
-{
-	AppendU32(rBytes, static_cast<uint32_t>(text.size()));
-	for (char cChar : text)
-	{
-		rBytes.push_back(static_cast<std::byte>(cChar));
-	}
 }
 
 LightingFixture::LightingFixture(GridCoord anchor)
@@ -127,112 +67,11 @@ LightingFixture::LightingFixture(GridCoord anchor)
 			.camera = MakeCamera({fPan, -600.0f - 3'400.0f * fZoom, 900.0f + 5'100.0f * fZoom, }, {fPan, 0.0f, 6.0f, }),
 		};
 	}
-	const std::array<size_t, 6> blobSizes
-	{
-		4 * (17 + 4 * kiSourceCount),
-		4 * (3 + 2 * kiSampleCount),
-		4 * (13 + kiSolidCount * (17 + 25 * kiVerticesPerSolid + kiIndicesPerSolid)),
-		4 * (4 + 14 * mCameras.size()),
-		4 * (3 + 18 * kiEventCount),
-		8,
-	};
-	for (int64_t i = 0; i < 6; ++i)
-	{
-		std::vector<std::byte>& rBytes = mBlobs.at(i);
-		rBytes.reserve(blobSizes.at(i));
-		AppendU32(rBytes, kuiSchema);
-		AppendU32(rBytes, static_cast<uint32_t>(i));
-	}
-	std::vector<std::byte>& rSources = mBlobs.at(0);
-	AppendU32(rSources, kuiSeed);
-	AppendU32(rSources, kiSourceCount);
-	for (const Source& rSource : mSources)
-	{
-		AppendFloat(rSources, rSource.f3Center.x);
-		AppendFloat(rSources, rSource.f3Center.y);
-		AppendFloat(rSources, rSource.f3Center.z);
-		AppendU32(rSources, rSource.uiType);
-	}
-	AppendFloat(rSources, 1'000.0f);
-	AppendFloat(rSources, shaders::kfLightingSourceRange);
-	AppendVector(rSources, {2.0f, 0.0f, 0.0f, });
-	AppendVector(rSources, {0.0f, -2.0f, 0.0f, });
-	AppendFloat(rSources, shaders::kfLightingDistanceFloor);
-	AppendFloat(rSources, shaders::kfLightingRayOffset);
-	AppendVector(rSources, {-200.0f, -180.0f, 6.0f, });
-	std::vector<std::byte>& rSamples = mBlobs.at(1);
-	AppendU32(rSamples, kiSampleCount);
-	for (const XMFLOAT2& rSample : mSamples)
-	{
-		AppendFloat(rSamples, rSample.x);
-		AppendFloat(rSamples, rSample.y);
-	}
-	std::vector<std::byte>& rGeometry = mBlobs.at(2);
-	AppendU32(rGeometry, kiSolidCount);
-	for (const LightingFixtureSolid& rSolid : mSolids)
-	{
-		AppendVector(rGeometry, rSolid.f3Center);
-		AppendVector(rGeometry, rSolid.f3HalfExtent);
-		AppendVector(rGeometry, rSolid.f3AxisX);
-		AppendVector(rGeometry, rSolid.f3AxisY);
-		AppendVector(rGeometry, rSolid.f3AxisZ);
-		AppendU32(rGeometry, rSolid.uiMaterial);
-		AppendU32(rGeometry, 0);
-		std::array<common::ModelVertex, kiVerticesPerSolid> vertices {};
-		std::array<uint32_t, kiIndicesPerSolid> indices {};
-		WriteSolidGeometry(rSolid, vertices, indices);
-		for (const common::ModelVertex& rVertex : vertices)
-		{
-			AppendFloat(rGeometry, rVertex.f3Pos.x);
-			AppendFloat(rGeometry, rVertex.f3Pos.y);
-			AppendFloat(rGeometry, rVertex.f3Pos.z);
-			AppendFloat(rGeometry, rVertex.f3Normal.x);
-			AppendFloat(rGeometry, rVertex.f3Normal.y);
-			AppendFloat(rGeometry, rVertex.f3Normal.z);
-			AppendFloat(rGeometry, rVertex.f2Uv.x);
-			AppendFloat(rGeometry, rVertex.f2Uv.y);
-			for (int64_t i = 0; i < 17; ++i)
-			{
-				AppendU32(rGeometry, 0);
-			}
-		}
-		for (uint32_t uiIndex : indices)
-		{
-			AppendU32(rGeometry, uiIndex);
-		}
-	}
-	AppendVector(rGeometry, GetAlbedo(0));
-	AppendVector(rGeometry, GetAlbedo(1));
-	AppendU32(rGeometry, kiMovingPanel);
-	AppendU32(rGeometry, kiMovingOccluder);
-	AppendFloat(rGeometry, -4.0f);
-	AppendFloat(rGeometry, -2.0f);
-	std::vector<std::byte>& rCameras = mBlobs.at(3);
-	AppendU32(rCameras, static_cast<uint32_t>(anchor.iQ));
-	AppendU32(rCameras, static_cast<uint32_t>(anchor.iR));
-	for (const LightingCameraPose& rCamera : mCameras)
-	{
-		AppendCamera(rCameras, rCamera);
-	}
-	std::vector<std::byte>& rEvents = mBlobs.at(4);
-	AppendU32(rEvents, kiEventCount);
-	for (const LightingFixtureEvent& rEvent : mEvents)
-	{
-		AppendFloat(rEvents, rEvent.fTime);
-		AppendFloat(rEvents, rEvent.fSourceHeight);
-		AppendFloat(rEvents, rEvent.fOccluderOffset);
-		AppendU32(rEvents, 0);
-		AppendCamera(rEvents, rEvent.camera);
-	}
-	for (int64_t i = 0; i < 5; ++i)
-	{
-		FreezeBlob(static_cast<LightingFixtureBlob>(i));
-	}
 }
 
 bool LightingFixture::InitializeAnimation()
 {
-	// Heap: the fixed asset identity is serialized before fixture publication.
+	// Heap: the fixed asset path and clip names are stored before fixture publication.
 	ScopedSuppressAllocationTracking scopedSuppressAllocationTracking;
 	static constexpr std::string_view kPath = R"(Models\AlienCreatureTake3\scene.gltf)";
 	static constexpr std::string_view kClip = "Animation.001";
@@ -267,29 +106,6 @@ bool LightingFixture::InitializeAnimation()
 	mAnimation.iJointsPerMaterial = rData.mHeader.skeleton.uiSkinJointCount;
 	mAnimation.path = kPath;
 	mAnimation.clip = kClip;
-	std::vector<std::byte>& rBytes = mBlobs.at(5);
-	rBytes.reserve(128 + mAnimation.path.size() + mAnimation.clip.size());
-	rBytes.resize(8);
-	AppendU64(rBytes, kSceneCrc);
-	AppendU64(rBytes, modelCrc);
-	AppendU32(rBytes, 0);
-	AppendU32(rBytes, static_cast<uint32_t>(mAnimation.iMaterialCount));
-	AppendU32(rBytes, static_cast<uint32_t>(mAnimation.iJointsPerMaterial));
-	AppendU32(rBytes, 0);
-	AppendVector(rBytes, mAnimation.f3Center);
-	AppendFloat(rBytes, mAnimation.fScale);
-	AppendString(rBytes, mAnimation.path);
-	AppendString(rBytes, mAnimation.clip);
-	const EagerChunk& rModel = rChunks.at(modelCrc);
-	for (const EagerChunk* pChunk : {&rScene, &rModel, })
-	{
-		std::array<uint8_t, 32> digest = HashBytes(std::span(pChunk->pData, static_cast<size_t>(pChunk->iDataSize)));
-		for (uint8_t uiByte : digest)
-		{
-			rBytes.push_back(static_cast<std::byte>(uiByte));
-		}
-	}
-	FreezeBlob(LightingFixtureBlob::kAnimation);
 	return true;
 }
 
@@ -421,43 +237,6 @@ void LightingFixture::WriteSources(std::span<shaders::LightingSource> sources, i
 void LightingFixture::WriteSamples(std::span<XMFLOAT2> samples) const
 {
 	std::copy_n(mSamples.begin(), std::ssize(samples), samples.begin());
-}
-
-void LightingFixture::FreezeBlob(LightingFixtureBlob eBlob)
-{
-	int64_t i = static_cast<int64_t>(eBlob);
-	mIdentities.at(i) = {.uiBytes = static_cast<uint64_t>(std::ssize(mBlobs.at(i))), .sha256 = HashBytes(mBlobs.at(i)), };
-}
-
-std::span<const std::byte> LightingFixture::GetBlob(LightingFixtureBlob eBlob) const
-{
-	return mBlobs.at(static_cast<int64_t>(eBlob));
-}
-
-const LightingFixtureBlobIdentity& LightingFixture::GetIdentity(LightingFixtureBlob eBlob) const
-{
-	return mIdentities.at(static_cast<int64_t>(eBlob));
-}
-
-std::array<uint8_t, 32> LightingFixture::GetInputHash(const LightingComparisonSettings& rSettings, LightingFixtureScenario eScenario, bool bEventCamera) const
-{
-	std::array<std::byte, 232> bytes {};
-	int64_t iOffset = 0;
-	for (const LightingFixtureBlobIdentity& rIdentity : mIdentities)
-	{
-		std::memcpy(bytes.data() + iOffset, rIdentity.sha256.data(), rIdentity.sha256.size());
-		iOffset += 32;
-	}
-	uint32_t uiSources = eScenario == LightingFixtureScenario::kDensity ? static_cast<uint32_t>(rSettings.iSourceCount) : 1;
-	uint32_t puiFields[10] {kuiSchema, static_cast<uint32_t>(eScenario), uiSources, static_cast<uint32_t>(rSettings.eCamera), static_cast<uint32_t>(rSettings.iEvent), static_cast<uint32_t>(rSettings.iAreaSamples), static_cast<uint32_t>(bEventCamera), static_cast<uint32_t>(rSettings.eMode), 0, 0, };
-	for (uint32_t uiField : puiFields)
-	{
-		for (int64_t i = 0; i < 4; ++i)
-		{
-			bytes.at(iOffset++) = static_cast<std::byte>((uiField >> (8 * i)) & 0xFF);
-		}
-	}
-	return HashBytes(bytes);
 }
 
 } // namespace engine

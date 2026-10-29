@@ -68,14 +68,6 @@ static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rVkLa
 	ConfigureUpdateAfterBind(rVkLayoutCreateInfo, bindings, pVkBindingFlags, vkBindingFlagsCreateInfo, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 
 	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rVkLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
-	// TEMP START descriptor census
-	LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS layout={} owner={} bindings={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rPipeline.mInfo.name, rVkLayoutCreateInfo.bindingCount);
-	for (uint32_t uiBinding = 0; uiBinding < rVkLayoutCreateInfo.bindingCount; ++uiBinding)
-	{
-		const VkDescriptorSetLayoutBinding& rBinding = rVkLayoutCreateInfo.pBindings[uiBinding];
-		LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS binding layout={} binding={} type={} count={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rBinding.binding, static_cast<int32_t>(rBinding.descriptorType), rBinding.descriptorCount);
-	}
-	// TEMP END descriptor census
 	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 
 	rVkPipelineLayoutCreateInfo.pSetLayouts = &rPipeline.mVkDescriptorSetLayout;
@@ -193,14 +185,6 @@ static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLay
 		VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfoSet1 {};
 		ConfigureUpdateAfterBind(rVkLayoutCreateInfo, set1Bindings, pVkBindingFlagsSet1, vkBindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rVkLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
-		// TEMP START descriptor census
-		LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS layout={} owner={} bindings={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rPipeline.mInfo.name, rVkLayoutCreateInfo.bindingCount);
-		for (uint32_t uiBinding = 0; uiBinding < rVkLayoutCreateInfo.bindingCount; ++uiBinding)
-		{
-			const VkDescriptorSetLayoutBinding& rBinding = rVkLayoutCreateInfo.pBindings[uiBinding];
-			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS binding layout={} binding={} type={} count={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rBinding.binding, static_cast<int32_t>(rBinding.descriptorType), rBinding.descriptorCount);
-		}
-		// TEMP END descriptor census
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 	}
 
@@ -213,14 +197,6 @@ static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLay
 		VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfoSet2 {};
 		ConfigureUpdateAfterBind(rVkLayoutCreateInfo, set2Bindings, pVkBindingFlagsSet2, vkBindingFlagsCreateInfoSet2, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rVkLayoutCreateInfo, nullptr, &rPipeline.mSet2VkDescriptorSetLayout));
-		// TEMP START descriptor census
-		LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS layout={} owner={} bindings={}", reinterpret_cast<uint64_t>(rPipeline.mSet2VkDescriptorSetLayout), rPipeline.mInfo.name, rVkLayoutCreateInfo.bindingCount);
-		for (uint32_t uiBinding = 0; uiBinding < rVkLayoutCreateInfo.bindingCount; ++uiBinding)
-		{
-			const VkDescriptorSetLayoutBinding& rBinding = rVkLayoutCreateInfo.pBindings[uiBinding];
-			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS binding layout={} binding={} type={} count={}", reinterpret_cast<uint64_t>(rPipeline.mSet2VkDescriptorSetLayout), rBinding.binding, static_cast<int32_t>(rBinding.descriptorType), rBinding.descriptorCount);
-		}
-		// TEMP END descriptor census
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mSet2VkDescriptorSetLayout, rPipeline.mInfo.name.data());
 	}
 
@@ -559,7 +535,7 @@ void PipelineCreator::CreateGraphicsPipeline(Pipeline& rPipeline)
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.topology = rPipeline.mInfo.flags & PipelineFlags::kPointList ? VK_PRIMITIVE_TOPOLOGY_POINT_LIST : rPipeline.mInfo.flags & PipelineFlags::kLineList ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.topology = rPipeline.mInfo.flags & PipelineFlags::kLineList ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		.primitiveRestartEnable = VK_FALSE,
 	};
 	state.vkPipelineDepthStencilStateCreateInfo = VkPipelineDepthStencilStateCreateInfo
@@ -698,14 +674,6 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfoSet1 {};
 		ConfigureUpdateAfterBind(vkUniformTextureDescriptorSetLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), pVkBindingFlagsSet1, vkBindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
 		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &vkUniformTextureDescriptorSetLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
-		// TEMP START descriptor census
-		LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS layout={} owner={} bindings={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rPipeline.mInfo.name, vkUniformTextureDescriptorSetLayoutCreateInfo.bindingCount);
-		for (uint32_t uiBinding = 0; uiBinding < vkUniformTextureDescriptorSetLayoutCreateInfo.bindingCount; ++uiBinding)
-		{
-			const VkDescriptorSetLayoutBinding& rBinding = vkUniformTextureDescriptorSetLayoutCreateInfo.pBindings[uiBinding];
-			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS binding layout={} binding={} type={} count={}", reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetLayout), rBinding.binding, static_cast<int32_t>(rBinding.descriptorType), rBinding.descriptorCount);
-		}
-		// TEMP END descriptor census
 		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
 
 		VkDescriptorSetLayout pVkSetLayouts[2] =

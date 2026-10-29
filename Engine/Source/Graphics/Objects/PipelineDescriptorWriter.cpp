@@ -425,9 +425,6 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 				.pSetLayouts = &rPipeline.mVkDescriptorSetLayout,
 			};
 			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfo, &rPipeline.mVkDescriptorSets.at(j)));
-			// TEMP START descriptor census
-			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS alloc pool={} set={} layout={} owner={} slot={} setIndex=1 variable=none", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSets.at(j)), reinterpret_cast<uint64_t>(*vkDescriptorSetAllocateInfo.pSetLayouts), rPipeline.mInfo.name, j);
-			// TEMP END descriptor census
 			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSets.at(j), std::format("{}{}", rPipeline.mInfo.name.data(), j).c_str());
 			vkDescriptorSet = rPipeline.mVkDescriptorSets.at(j);
 		}
@@ -445,9 +442,6 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 				.pSetLayouts = &rPipeline.mSet2VkDescriptorSetLayout,
 			};
 			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfoSet2, &rPipeline.mVkDescriptorSetsSet2.at(j)));
-			// TEMP START descriptor census
-			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS alloc pool={} set={} layout={} owner={} slot={} setIndex=2 variable=none", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetsSet2.at(j)), reinterpret_cast<uint64_t>(*vkDescriptorSetAllocateInfoSet2.pSetLayouts), rPipeline.mInfo.name, j);
-			// TEMP END descriptor census
 			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSetsSet2.at(j), std::format("{}Set2{}", rPipeline.mInfo.name.data(), j).c_str());
 			vkDestinationSet2 = rPipeline.mVkDescriptorSetsSet2.at(j);
 		}
