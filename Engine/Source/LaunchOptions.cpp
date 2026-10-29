@@ -2,6 +2,8 @@
 
 #include "LaunchOptions.h"
 
+#include "Game.h"
+
 #pragma comment(lib, "Shell32.lib") // CommandLineToArgvW
 
 namespace engine
@@ -175,5 +177,16 @@ bool ParseLaunchOptions()
 	LocalFree(pArgumentValues);
 	return bSuccess;
 }
+
+#if defined(BT_CLIENT)
+void ShowStartupError(const char* pcText)
+{
+	if (gLaunchOptions.iAgentPort != 0)
+	{
+		return;
+	}
+	MessageBox(nullptr, pcText, game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+}
+#endif
 
 } // namespace engine

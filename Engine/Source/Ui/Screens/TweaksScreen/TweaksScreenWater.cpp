@@ -3,6 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Graphics/Managers/TextureManager.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/WaterWrappersBase.h"
 #include "TweaksSliderMap.h"
 
@@ -301,11 +302,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 		}
 		if (rScreen.BeginSubtab("Foam", iSection, 5))
 		{
-			bool bEnabled = gWaterFoamEnabled.Get<bool>();
-			if (ImGui::Checkbox("Foam Enabled", &bEnabled))
-			{
-				gWaterFoamEnabled.Set(bEnabled);
-			}
+			WrapperToggle("Foam Enabled", &gWaterFoamEnabled);
 			rScreen.WrapperSlider("Foam Emission Rate", iSection);
 			rScreen.WrapperSlider("Foam J Start", iSection);
 			rScreen.WrapperSlider("Foam J Full", iSection);

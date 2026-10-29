@@ -341,6 +341,16 @@ void PromptCrashReportDesktopCopy()
 	CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
 }
 
+void HandleProcessMainException(std::optional<const std::exception*> optionalException)
+{
+	if (IsDebuggerPresent() != 0) [[unlikely]]
+	{
+		throw;
+	}
+	HandleException(optionalException);
+	PromptCrashReportDesktopCopy();
+}
+
 #if defined(BT_SERVER)
 
 // A report counts as posted only when it ends with this trailer, appended once GitHub has created its issue.

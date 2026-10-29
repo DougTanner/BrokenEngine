@@ -33,7 +33,7 @@ private:
 	};
 	struct FlightBody
 	{
-		XMVECTOR vecPosition {0.0f, 0.0f, 6.0f, 1.0f};
+		XMVECTOR vecPosition {};
 		XMVECTOR vecDirection {1.0f, 0.0f, 0.0f, 0.0f};
 		XMVECTOR vecVelocity {};
 		XMVECTOR vecDestination {};

@@ -142,10 +142,7 @@ int RunModelViewer(HINSTANCE hinstance)
 	catch (const std::runtime_error& rException)
 	{
 		LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-		if (engine::gLaunchOptions.iAgentPort == 0)
-		{
-			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
-		}
+		engine::ShowStartupError(rException.what());
 		return 1;
 	}
 	engine::gpIslandTerrain->WaitForElevationMaps();
@@ -326,13 +323,9 @@ static int ProcessMain(HINSTANCE hinstance)
 		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
 	}
 	engine::ResolveCrashReportPaths();
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		std::ignore = CloseHandle(handle);
-	})>;
 	HANDLE handleMutex = CreateMutex(nullptr, TRUE, "Broken Engine Sandbox");
 	DWORD uiMutexError = GetLastError();
-	ScopedHandle pMutex(handleMutex);
+	common::ScopedHandle pMutex(handleMutex);
 	if (handleMutex == nullptr)
 	{
 		LOG(kDefault, kError, "ModelViewer CreateMutex failed: {}", uiMutexError);
@@ -341,21 +334,13 @@ static int ProcessMain(HINSTANCE hinstance)
 	if (uiMutexError == ERROR_ALREADY_EXISTS)
 	{
 		LOG(kDefault, kError, "Another instance is already running");
-		if (engine::gLaunchOptions.iAgentPort == 0)
-		{
-			std::ignore = MessageBox(nullptr, "Another instance is already running", kGameName.data(), MB_OK | MB_ICONERROR);
-		}
+		engine::ShowStartupError("Another instance is already running");
 		return 1;
 	}
 	auto pUploads = std::make_unique<engine::TextureUploadManager>();
 	std::unique_ptr<engine::FileManager> pFiles;
 	try
 	{
-		CHECK_HRESULT(Windows::Foundation::Initialize(RO_INIT_MULTITHREADED));
-		common::ScopedLambda uninitializeFoundation([]()
-		{
-			Windows::Foundation::Uninitialize();
-		});
 		try
 		{
 			pFiles = std::make_unique<engine::FileManager>();
@@ -367,31 +352,18 @@ static int ProcessMain(HINSTANCE hinstance)
 		catch (const std::runtime_error& rException)
 		{
 			LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-			if (engine::gLaunchOptions.iAgentPort == 0)
-			{
-			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
-			}
+			engine::ShowStartupError(rException.what());
 			return 1;
 		}
 		return RunModelViewer(hinstance);
 	}
 	catch (const std::exception& rException)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException(&rException);
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException(&rException);
 	}
 	catch (...)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException();
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException();
 	}
 	return 1;
 }

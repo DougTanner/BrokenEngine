@@ -293,7 +293,7 @@ try {
 	}
 	# Each game project's files resolve through its client project, Platforms/VisualStudio2026/<Name>.vcxproj.
 	# Engine/ and Common/ resolve through the first one's include list, which differs from its server
-	# project's only by the RenderDoc directory.
+	# project's only by the RenderDoc and glm directories.
 	$gameProjects = [Collections.Generic.List[hashtable]]::new()
 	foreach ($name in @(Get-AgentGameProjects $script:Root)) {
 		$project = "Projects/$name/Platforms/VisualStudio2026/$name.vcxproj"

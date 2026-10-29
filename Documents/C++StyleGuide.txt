@@ -63,13 +63,13 @@ Use the following rules for C++ code
 		~ScopedSuppressAllocationTracking();
 	};
 
-	A std::unique_ptr custom deleter is a captureless lambda type, constructed from the handle alone. Keep it to .cpp files and function scope, because each translation unit gets a distinct closure type:
+	A HANDLE is owned by common::ScopedHandle (Common/WindowsUtils.h). For any other handle type, a std::unique_ptr custom deleter is a captureless lambda type, constructed from the handle alone. Keep it to .cpp files and function scope, because each translation unit gets a distinct closure type:
 
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
+	using ScopedInternetHandle = std::unique_ptr<void, decltype([](HINTERNET hinternet) noexcept
 	{
-		CloseHandle(handle);
+		WinHttpCloseHandle(hinternet);
 	})>;
-	ScopedHandle pProcess(processInformation.hProcess);
+	ScopedInternetHandle pSession(WinHttpOpen(pcUserAgent, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
 
 6. Features are toggled via `inline constexpr bool kb*` variables in a project's Pch.h or Engine/Source/EngineSwitches.h, which the game Pch.h includes (e.g., kbLogging, kbRecording). Use `if constexpr` for conditional compilation. Avoid using configuration differences directly (BT_DEBUG vs. BT_RELEASE):
 

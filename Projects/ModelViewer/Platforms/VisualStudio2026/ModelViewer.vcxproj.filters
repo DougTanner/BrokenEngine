@@ -142,6 +142,7 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -301,6 +302,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h"><Filter>Engine\Ui</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>

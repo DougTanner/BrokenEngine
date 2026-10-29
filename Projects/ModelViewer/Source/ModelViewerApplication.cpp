@@ -3,6 +3,7 @@
 #include "File/PackChunks.h"
 #include "Frame/TerrainCollisionUtils.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
@@ -492,11 +493,12 @@ void ModelViewerApplication::GenerateIslands()
 	mWaterDestinations.clear();
 	const XMFLOAT2& rf2Island = mIslandCell.islands.at(0).f2WorldPosition;
 	float fBestScore = std::numeric_limits<float>::max();
+	float fLowestHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
 	for (float fY = -engine::kfCellHalfHeight; fY < engine::kfCellHalfHeight; fY += 8.0f)
 	{
 		for (float fX = -engine::kfCellHalfWidth; fX < engine::kfCellHalfWidth; fX += 8.0f)
 		{
-			XMVECTOR vecCandidate = XMVectorSet(fX, fY, 6.0f, 1.0f);
+			XMVECTOR vecCandidate = XMVectorSet(fX, fY, fLowestHeight, 1.0f);
 			if (!DiscClear(vecCandidate, 0.0f))
 			{
 				continue;
@@ -570,6 +572,7 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 	if (fNextHeight < engine::gpFlightPlanes->Highest().fHeightMeters)
 	{
 		engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(mIslandCell);
+		float fLowestHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
 		XMVECTOR vecLeft = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rBody.vecDirection);
 		float fLeft = 0.0f;
 		float fRight = 0.0f;
@@ -581,8 +584,8 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 			{
 				float fWeight = 1.0f - static_cast<float>(j + k) * 0.1f;
 				float fSide = static_cast<float>(k + 1) * 2.0f;
-				fLeft += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
-				fRight += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(-fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
+				fLeft += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(fSide), vecLeft, vecAhead)) - (fNextHeight - fLowestHeight));
+				fRight += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(-fSide), vecLeft, vecAhead)) - (fNextHeight - fLowestHeight));
 				fTotalWeight += fWeight;
 			}
 		}
@@ -859,15 +862,7 @@ void ModelViewerApplication::RenderUi()
 			ImGui::PopID();
 		};
 		ImGui::SeparatorText("Render quality");
-		auto QualityToggle = [](const char* pcLabel, engine::Wrapper& rWrapper)
-		{
-			bool bValue = rWrapper.Get<bool>();
-			if (ImGui::Checkbox(pcLabel, &bValue))
-			{
-				rWrapper.Set(bValue);
-			}
-		};
-		QualityToggle("Multisampling", engine::gMultisampling);
+		engine::WrapperToggle("Multisampling", &engine::gMultisampling);
 		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
 		ImGui::TextUnformatted("Sample count");
 		ImGui::SetNextItemWidth(fQualityTrackWidth);
@@ -886,12 +881,12 @@ void ModelViewerApplication::RenderUi()
 			}
 			ImGui::EndCombo();
 		}
-		QualityToggle("Sample Shading", engine::gSampleShading);
+		engine::WrapperToggle("Sample Shading", &engine::gSampleShading);
 		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
 		QualitySlider("Min Sample Shading", engine::gMinimumSampleShading);
 		ImGui::EndDisabled();
 		ImGui::EndDisabled();
-		QualityToggle("Anisotropy", engine::gAnisotropy);
+		engine::WrapperToggle("Anisotropy", &engine::gAnisotropy);
 		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
 		QualitySlider("Max Anisotropy", engine::gMaximumAnisotropy);
 		ImGui::EndDisabled();

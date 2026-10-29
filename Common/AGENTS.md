@@ -97,7 +97,7 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
   its base address never moves and growth past the reservation asserts), and the
   `StringUtils.h` / `FileUtils.h` helpers. `Common.h` is the full index.
 - `ThreadLocal` installs per-thread exception handlers and process-wide handlers through one-time initialization. Stack walking is serialized through the shared DbgHelp mutex; do not call DbgHelp independently. `ScopedExpectedThrows` suppresses designed C++-throw diagnostics, not the handling of Windows structured exceptions — crashes such as access violations.
-- `WindowsUtils.h` is the shared Win32 wrapper surface. Prefer its error, file-time, processor-topology, and child-process helpers over parallel wrappers.
+- `WindowsUtils.h` is the shared Win32 wrapper surface. Prefer its error, file-time, processor-topology, and child-process helpers and its `ScopedHandle` `HANDLE` owner over parallel wrappers.
 
 ## See Also
 

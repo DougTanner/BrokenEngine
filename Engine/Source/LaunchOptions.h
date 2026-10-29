@@ -41,6 +41,9 @@ inline bool PhysicalInputSuppressed()
 #if defined(BT_CLIENT)
 // std::nullopt keeps launch behavior; a set value overrides --windowed and the saved fullscreen preference without changing it.
 inline std::optional<bool> gOptionalAgentFullscreenOverride = std::nullopt;
+
+// Shows a modal startup-error dialog titled with the game name; an agent launch shows nothing.
+void ShowStartupError(const char* pcText);
 #endif
 
 } // namespace engine

@@ -54,7 +54,13 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
   receives WM_ENDSESSION only; Ctrl+C, Ctrl+Break and console close request quit
   and wait for the main thread's final autosave and monitor worker shutdown.
 
-- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `ProcessMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
+- `LaunchOptions` owns command-line parsing. `--loopback-only` is independent
+  of `--agent-port`; `--data-directory` and `--app-data-directory` must each
+  resolve to an existing absolute directory; port values are validated before
+  conversion. The `--log-file` sink opens in `ProcessMain` immediately after a
+  successful parse, so `FileManager`-constructor diagnostics reach the file
+  while parse rejections do not. It also owns `ShowStartupError`, the client
+  and ModelViewer startup-error dialog, which an agent launch never shows.
 - Agent launches stay minimized and suppress physical client input, except IME result characters on a focused agent window (`Input/AGENTS.md` `## Focus and Agent Input`), while preserving the close/Alt+F4 escape path. Synthetic input and command transport live in Agent (`Agent/AGENTS.md`).
 - `FileManager` directory-setup failures during construction and required-asset failures at eager-load completion log their full diagnostic at `kError`. At those two startup boundaries, a normal client launch shows that same detail once, an agent launch shows no modal, and both return nonzero through ordinary cleanup without writing a crash report. Other exceptions are rethrown to an attached debugger and otherwise retain the crash-report path.
 - Client sound settings load before `Game` construction. A checked `Mute in background` setting suspends audio on focus loss and focus gain always resumes it; agent launches suspend audio before `Game` construction regardless of the setting so harness clients boot silent.
