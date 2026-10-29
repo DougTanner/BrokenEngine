@@ -12,10 +12,15 @@ fresh session; each ends by updating `## Progress` below.
 - The user's latest correction supersedes the earlier primary-checkout instructions.
   Primary `C:/Users/dougt/Documents/BrokenEngine` is clean on `main` and available to
   another agent; do not switch or modify it.
-- The fixed foundation diff baseline is `b56f20fa44d0424c2fdf5003157563684ed747f5`,
-  even if main advances. Use this baseline in place of older diff-base instructions.
-- Current checkpoint: `b01f2286` saves source changes and review evidence through the
-  partial plan 02 work; remaining verification is recorded in `## Progress`.
+- The current foundation diff baseline is `cd6d410c064a5a5f905bf68efaf28493ab6fc33a`.
+  The user's rebase-from-main instruction replaces the prior fixed baseline
+  `b56f20fa44d0424c2fdf5003157563684ed747f5` for current diffs;
+  historical evidence keeps its inputs. This is the pinned user-request target; main later
+  advanced independently to `40b82adfe90b447ee848120b4a26bad546b83a49`. Do not chase it.
+- Rebased source checkpoint: `1c3608533ba58d1a1327b51928ed4dced5426c53`.
+  Prior tip `d170b18b843a3a96af227cef467b824b4aa214c5` remains at safety ref
+  `safety/lighting-foundation-pre-rebase-20261029`. Rebase decisions and commit map:
+  `Temp/lighting-rebase-evidence.md` `## Conflicts and resolutions` and `## Commit map`.
 - The snapshot was authored on main `aa47e4a3e170a69b7dad971b94003f7ea30e5716`.
   Snapshot history: foundation WIP, memory-cost experiment, handoff doc, revert of the
   experiment, then the strip-stage snapshot.
@@ -43,8 +48,8 @@ fresh session; each ends by updating `## Progress` below.
 - "Just strip out things that are over-engineered or not useful for a possibly-discarded quick
   prototype, no need for my approval." Main decides strip and review-finding questions; YAGNI wins.
 - Terrain accuracy: "way overkill, definitely Option 2 or even looser" — shared ray start offset
-  `kfLightingRayOffset = 0.05f` (5 cm); traced terrain need only agree within it; no exact-equivalence
-  proofs.
+  `kfLightingRayOffset = 0.05f` (5 cm); traced terrain need only agree within it;
+  no exact-equivalence proofs.
 - One-bounce indirect reference is a second foundation stage (plan 05), not part of this stage.
 - The memory-cost experiment stays reverted; its question is
   `Documents/Investigations/Engine/LightingTerrainPreparationMemoryCost.md` (settled in plan 03).
@@ -71,7 +76,7 @@ parameter of `LightingTerrain::Write`.
   `Documents/Architecture/FrameUpdatePipeline.md`, agent-harness command reference).
 - `/code-style-review` applied 25 fixes (`Temp/temp-style-review-detail.md`).
 
-Not yet done: no build since the strip (the pre-strip tree built cleanly — envelope
+Historical strip checkpoint: no build then (the pre-strip tree built cleanly — envelope
 `Temp/AgentBuildEnvelopes/compile-20261029T115329564Z-21120.md`), no Step 6 reviews, no runtime
 acceptance.
 
@@ -83,6 +88,24 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
 
 ## Progress
 
+- Rebase from pinned main completed at the Identity checkpoint, followed by review corrections.
+  DataPacker Release x64 PASS remains current in
+  `Temp/AgentBuildEnvelopes/compile-20261029T190055928Z-45844.md`
+  `## Rebased lighting foundation builds`. Latest client/server/ModelViewer Debug x64 builds
+  PASS with zero diagnostics after the camera correction; all three used Local generation and
+  `RunDataPacker=true`. Evidence:
+  `Temp/AgentBuildEnvelopes/compile-20261029T192103385Z-5736.md`
+  `## Camera fix Debug x64 builds`. Earlier build/runtime results below are historical.
+  Recheck static acceptance rows 2 and 9 against the new baseline before reuse.
+  Current grid-save version is 256 (main adds another pusher behavior version); the saved
+  version254 baseline remains incompatible. No replacement reference or acceptance revision is
+  approved. Conflict propagation/docs evidence: `Temp/rebase-propagation.md`.
+  Rebase verification index: `Temp/lighting-plans/rebase-20261029.md` `## Verification`.
+  C++, shader, style/membership, DOC1 and comment reviews pass. Adversarial ADV001 was fixed;
+  fresh independent C++/adversarial retest passes. Final rebase static checks pass:
+  InvokeStaticChecks on cd6d410c passed 4 checks (2 packages, 93 links, 227 hygiene files,
+  78 line-length files). Final acceptance review PASS: criteria 8/8, findings none. The index
+  records each scoped result. Plan03 rows2/9 remain pending; no runtime since rebase.
 - [x] Strip stage implemented (this session).
 - [x] 01 Build and static checks.
   DataPacker Release x64 and client/server/ModelViewer Debug x64 succeeded with zero diagnostics;
@@ -115,7 +138,8 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
   Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
 - [ ] 03 Runtime acceptance (blocked checkpoint).
-  Rows 1-2 PASS; row 9 static PASS, runtime BLOCKED; rows 3-8 BLOCKED.
+  Current row 1 PASS uses the fresh rebase builds; historical row 2 PASS and row 9 static PASS
+  need revalidation. Current rows 2/9 static checks are pending; runtime rows 3-9 remain BLOCKED.
   Retry acquired the harness and launched client/server; resize confirmed 1920x1080.
   The authoritative version254 save was rejected by the required version255 build.
   Diagnosis proved intentional merged pusher behavior versioning; no corruption or layout change.

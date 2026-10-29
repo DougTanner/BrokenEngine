@@ -384,6 +384,9 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
 	mMatProjection = mbOrthographicProjection ? XMMatrixOrthographicRH(2.0f * fFramingHalfHeight * fAspectRatio, 2.0f * fFramingHalfHeight, fNearClip, fFarClip) : XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent), fAspectRatio, fNearClip, fFarClip);
 
+	float fVisibleAreaFraming = mfCameraFraming;
+	float fComparisonEyeHeight = 0.0f;
+	float fProjectionFieldOfView = XMConvertToRadians(gFieldOfView.mfCurrent);
 	LightingCameraPose comparisonPose;
 	if (gpGraphics->mpLighting != nullptr && gpGraphics->mpLighting->GetComparisonCamera(comparisonPose))
 	{
@@ -393,6 +396,9 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
 		mVecWaterEyePosition = mVecEyePosition;
 		mbOrthographicProjection = false;
+		fVisibleAreaFraming = comparisonPose.f3Eye.z;
+		fComparisonEyeHeight = comparisonPose.f3Eye.z;
+		fProjectionFieldOfView = comparisonPose.fVerticalFieldOfView;
 		mfShadowTexelFraming = std::max(mfShadowTexelFraming, comparisonPose.f3Eye.z);
 		mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMLoadFloat3A(&comparisonPose.f3Up));
 		mMatProjection = XMMatrixPerspectiveFovRH(comparisonPose.fVerticalFieldOfView, fAspectRatio, comparisonPose.fNear, comparisonPose.fFar);
@@ -464,7 +470,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// floor(area / quadSize) amplifies quad-size jitter by approximately area / quadSize, so quad size must stay stable while the latch key is unchanged.
 	[[maybe_unused]] XMFLOAT4 f4RawInputArea = mf4RenderVisibleArea;
 
-	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(mfCameraFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
+	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fVisibleAreaFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
 	// LOD hysteresis: refuse to flip back across the shared boundary if framing is still
 	// near it. Boundaries are at kfMinimumFraming * 4^L; 5% band absorbs FP rounding around
 	// asymptotic settling.
@@ -472,7 +478,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	if (iLevelOfDetail == miVisibleAreaLevelOfDetail - 1)
 	{
 		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail));
-		if (mfCameraFraming > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
+		if (fVisibleAreaFraming > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
@@ -480,7 +486,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	else if (iLevelOfDetail == miVisibleAreaLevelOfDetail + 1)
 	{
 		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail + 1));
-		if (mfCameraFraming < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
+		if (fVisibleAreaFraming < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
@@ -492,20 +498,22 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fQuadsX = static_cast<float>(rLevelOfDetailMesh.iQuadCountX);
 	float fQuadsY = static_cast<float>(rLevelOfDetailMesh.iQuadCountY);
 
-	int64_t iZoomBucket = static_cast<int64_t>(std::floor(mfCameraFraming));
+	int64_t iZoomBucket = static_cast<int64_t>(std::floor(fVisibleAreaFraming));
 	static constexpr float kfZoomBucketHysteresis = 0.1f;
-	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && mfCameraFraming > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
+	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && fVisibleAreaFraming > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
 	{
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
-	else if (iZoomBucket == miVisibleAreaZoomBucket + 1 && mfCameraFraming < static_cast<float>(miVisibleAreaZoomBucket + 1) + kfZoomBucketHysteresis)
+	else if (iZoomBucket == miVisibleAreaZoomBucket + 1 && fVisibleAreaFraming < static_cast<float>(miVisibleAreaZoomBucket + 1) + kfZoomBucketHysteresis)
 	{
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
 
 	// Field of view and projection move the Z = 0 area at a fixed framing without moving the bucket, so they re-latch
 	// the quad size through the key; otherwise the snapped span could fall short of the raw area.
-	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(gFieldOfView.mfCurrent) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
+	uint64_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(fProjectionFieldOfView) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
+	// Fixture zoom changes both height and tilt; fixed-height event pans only translate the footprint.
+	uiLatchKey |= static_cast<uint64_t>(std::bit_cast<uint32_t>(fComparisonEyeHeight)) << 32;
 
 	if (iZoomBucket != miVisibleAreaZoomBucket || uiLatchKey != muiVisibleAreaLatchKey || iLevelOfDetail != miVisibleAreaLevelOfDetail)
 	{

@@ -101,7 +101,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   `CalculateMatricesAndVisibleArea` derives the eye distance from framing and
   the true vertical field of view; orthographic projection
   (`mbOrthographicProjection`, latched there once per update) uses a virtual
-  eye at the default field of view. Readers that measure zoom — LOD, zoom
+  eye at the default field of view. Ordinary readers that measure zoom — LOD, zoom
   buckets, texel references, height-lerped tunables, audio blends — read
   framing, never the eye distance. Field of view and projection mode join the
   visible-area latch key because they move the ground area at a fixed framing
@@ -110,7 +110,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   interpolate frame. `GetRenderFraming` returns ordinary framing or the fixed
   comparison camera's eye height; Main publishes comparison matrices with zero
   shake, including empty-frame paths. Comparison uses its explicit perspective
-  projection and eye for water shading.
+  projection and eye for water shading. Its visible-area LOD and zoom bucket
+  use its explicit eye height; that height also invalidates the visible-area
+  latch on entry, exit, and fixture zoom changes.
 - Shadow texel size tracks a framing reference that expands immediately with
   outward zoom and contracts at its existing rate inward. The reference never
   falls below live framing. Shadow history rejects reprojected texels outside

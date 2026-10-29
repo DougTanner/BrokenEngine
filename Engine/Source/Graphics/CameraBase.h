@@ -77,8 +77,7 @@ public:
 	// framing * tan(kfFramingFieldOfView / 2); the eye is derived from it.
 	static constexpr float kfFramingFieldOfView = 25.3125f;
 	static constexpr float kfCameraFramingDefault = 300.0f;
-	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
-	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
+	// Framing fade endpoint shared by water speed and lighting weights.
 	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
 	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow
 	// texel grids hold a constant on-screen pixel size at any framing (the texels coarsen with zoom instead of cropping
@@ -211,7 +210,7 @@ private:
 	XMFLOAT2 mf2LatchedQuadSize {};
 	// Zero is below every real framing bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.
 	int64_t miVisibleAreaZoomBucket = 0;
-	uint32_t muiVisibleAreaLatchKey = 0;
+	uint64_t muiVisibleAreaLatchKey = 0;
 };
 
 inline CameraBase* gpCamera = nullptr;

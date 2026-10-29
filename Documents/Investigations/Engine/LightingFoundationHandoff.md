@@ -13,7 +13,7 @@ rebuilding them.
 ## What the foundation provides
 
 - The legacy projected local-light system (deposit, spread, combine, history, blur, their settings
-  and UI) is removed; graphics settings are version 20. Gameplay local diffuse is exactly zero and
+  and UI) is removed; graphics settings are version 21. Gameplay local diffuse is exactly zero and
   gameplay light collections publish no physical sources. Sprites, shields, sun/IBL, shadows, smoke
   and water keep their ordinary paths.
 - A Vulkan ray-query backend: capability enablement in `DeviceManager`/`InstanceManager` and
@@ -115,7 +115,7 @@ Checks:
 8. Search the client's `--log-file` over the whole scenario (restore, resize, mode switches, all
    captures) for `DebugUtilsCallback`, `CheckVk failed`, `VK_ERROR_DEVICE_LOST` and
    `DEBUG_BREAK at`: no match.
-9. Examine `git diff b56f20fa44d0424c2fdf5003157563684ed747f5 -- Engine/Source/Frame Projects/BrokenEngineSandbox/Source/Frame`
+9. Examine `git diff cd6d410c064a5a5f905bf68efaf28493ab6fc33a -- Engine/Source/Frame Projects/BrokenEngineSandbox/Source/Frame`
    against the session baseline, which includes the merged main changes. Only lighting-related
    render, client-only residency and documentation changes are allowed; confirm no changes to
    simulation behavior, shared state or CRC participation. The client's and server's `--log-file`s

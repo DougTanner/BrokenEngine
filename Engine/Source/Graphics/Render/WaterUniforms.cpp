@@ -58,7 +58,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseOne = static_cast<double>(gLightingSampledNormalsOneSize.mfCurrent);
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
-	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
+	// Framing-driven speed lerp.
 	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->GetRenderFraming(), engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
