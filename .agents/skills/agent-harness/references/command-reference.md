@@ -270,7 +270,7 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns
   `{"publishedFrames":int,"basisCoord":[q,r],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
-  plus a `shadow`, `lighting`, and `smoke` object each shaped
+  plus `shadow` and `smoke` objects each shaped
   `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`;
   `smoke` reports flight plane 0's area pair, the pair wind reads. Take
   every sample with the client restored (`window_state {"minimized":false}`): a

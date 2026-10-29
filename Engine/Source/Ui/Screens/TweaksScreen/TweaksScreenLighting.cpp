@@ -15,7 +15,7 @@ void RenderLightingSection(TweaksScreen& rScreen)
 	{
 		if (rScreen.BeginSubtab("Comparison", iSection, 0))
 		{
-			LightingComparisonSettings settings = gpGraphics->mpLighting->mRequestedComparisonSettings;
+			LightingComparisonSettings settings = gpGraphics->mpLighting->requestedComparisonSettings;
 			bool bChanged = false;
 			int iMode = static_cast<int>(settings.eMode);
 			bChanged |= ImGui::RadioButton("Disabled##LightingMode", &iMode, 0);
@@ -65,9 +65,9 @@ void RenderLightingSection(TweaksScreen& rScreen)
 			ImGui::EndDisabled();
 			if (bChanged)
 			{
-				gpGraphics->mpLighting->SetComparison(settings);
+				gpGraphics->mpLighting->requestedComparisonSettings = settings;
 			}
-			const LightingDiagnostics& rDiagnostics = gpGraphics->mpLighting->GetDiagnostics();
+			const LightingDiagnostics& rDiagnostics = gpGraphics->mpLighting->diagnostics;
 			ImGui::Text("Sources: %lld; triangles: %lld", rDiagnostics.iSources, rDiagnostics.iTriangles);
 			ImGui::Text("Capture: %.*s; tiles: %lld/%lld", static_cast<int>(rDiagnostics.status.size()), rDiagnostics.status.data(), rDiagnostics.iCompletedTiles, rDiagnostics.iTotalTiles);
 			ImGui::EndTabItem();

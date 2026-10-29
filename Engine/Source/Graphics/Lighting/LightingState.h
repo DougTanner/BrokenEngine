@@ -90,11 +90,8 @@ struct Lighting::State
 	std::unique_ptr<LightingModels> models;
 	std::unique_ptr<LightingFixture> fixture;
 	std::vector<std::unique_ptr<LightingFramebuffer>> framebuffers;
-	LightingFixtureScenario eScenario = LightingFixtureScenario::kDensity;
 	int64_t iFramebuffer = 0;
 	LightingComparisonSettings settings;
-	// Latched counts plus the capture status, error, tiles and directory; capture status survives Graphics recreation.
-	LightingDiagnostics diagnostics;
 	uint64_t uiPublication = 0;
 	uint64_t uiResourceGeneration = 0;
 	uint64_t uiServicedCapture = 0;

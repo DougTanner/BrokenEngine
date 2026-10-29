@@ -28,12 +28,12 @@ static PipelineInfo LightingModelPipelineInfo(common::crc_t uiSceneCrc, common::
 
 void Lighting::CreateComparisonResources()
 {
-	if (mpState->comparison != nullptr)
+	if (pState->comparison != nullptr)
 	{
 		return;
 	}
-	mpState->comparison = std::make_unique<State::Comparison>();
-	State::Comparison& rComparison = *mpState->comparison;
+	pState->comparison = std::make_unique<State::Comparison>();
+	State::Comparison& rComparison = *pState->comparison;
 	PipelineInfo solid
 	{
 		.name = "LightingFixtureForward",
@@ -46,27 +46,27 @@ void Lighting::CreateComparisonResources()
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .iExplicitBinding = 2, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .iExplicitBinding = 3, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .iExplicitBinding = 4, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
-			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingInstances, .pBuffers = &mpState->framebuffers.front()->instances},
-			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingGeometry, .pBuffers = &mpState->framebuffers.front()->geometries},
-			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingMaterials, .pBuffers = &mpState->framebuffers.front()->fixtureMaterials},
+			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingInstances, .pBuffers = &pState->framebuffers.front()->instances},
+			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingGeometry, .pBuffers = &pState->framebuffers.front()->geometries},
+			{.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiLightingBindingMaterials, .pBuffers = &pState->framebuffers.front()->fixtureMaterials},
 		},
 	};
 	rComparison.solidForward.Create(solid);
-	rComparison.solidDraws.mInfo = {.name = "LightingFixtureDraws", .flags = BufferFlags::kHostVisible, .iDataSize = std::ssize(mpState->framebuffers) * static_cast<int64_t>(sizeof(VkDrawIndirectCommand))};
+	rComparison.solidDraws.mInfo = {.name = "LightingFixtureDraws", .flags = BufferFlags::kHostVisible, .iDataSize = std::ssize(pState->framebuffers) * static_cast<int64_t>(sizeof(VkDrawIndirectCommand))};
 	VmaAllocationInfo allocation;
 	Buffer::CreateBuffer("LightingFixtureDraws", rComparison.solidDraws.mInfo.iDataSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, rComparison.solidDraws.mHostVisibleVkBuffer, rComparison.solidDraws.mHostVisibleVmaAllocation, &allocation);
 	rComparison.solidDraws.mpMappedMemory = static_cast<char*>(allocation.pMappedData);
 	std::memset(rComparison.solidDraws.mpMappedMemory, 0, static_cast<size_t>(rComparison.solidDraws.mInfo.iDataSize));
-	if (mpState->fixture == nullptr)
+	if (pState->fixture == nullptr)
 	{
-		mpState->fixture = std::make_unique<LightingFixture>(GridCoord {});
+		pState->fixture = std::make_unique<LightingFixture>(GridCoord {});
 	}
-	if (mpState->fixture->InitializeAnimation())
+	if (pState->fixture->InitializeAnimation())
 	{
 		gpBufferManager->CreateDynamicBuffer(State::kFixtureAnimationBuffer, kBufferMain, "LightingFixtureAnimation", sizeof(shaders::ModelLayout), 1);
 		rComparison.animationForward = std::make_unique<ModelPipeline>();
-		rComparison.animationForward->Create(mpState->fixture->GetAnimation().sceneCrc, LightingModelPipelineInfo(mpState->fixture->GetAnimation().sceneCrc, State::kFixtureAnimationBuffer, data::kShadersLightingLightingNeutralModelfragCrc));
-		for (int64_t i = 0; i < std::ssize(mpState->framebuffers); ++i) rComparison.animationForward->WriteIndirectBuffer(i, 0);
+		rComparison.animationForward->Create(pState->fixture->mAnimation.sceneCrc, LightingModelPipelineInfo(pState->fixture->mAnimation.sceneCrc, State::kFixtureAnimationBuffer, data::kShadersLightingLightingNeutralModelfragCrc));
+		for (int64_t i = 0; i < std::ssize(pState->framebuffers); ++i) rComparison.animationForward->WriteIndirectBuffer(i, 0);
 	}
 }
 
@@ -77,17 +77,17 @@ static bool IsCaptureRunning(std::string_view status)
 
 void Lighting::DestroyComparisonResources()
 {
-	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	LightingDiagnostics& rDiagnostics = diagnostics;
 	if (IsCaptureRunning(rDiagnostics.status))
 	{
 		rDiagnostics.status = "failed";
 		rDiagnostics.error = "Graphics recreated during capture";
 	}
-	if (mpState->comparison == nullptr)
+	if (pState->comparison == nullptr)
 	{
 		return;
 	}
-	State::Comparison& rComparison = *mpState->comparison;
+	State::Comparison& rComparison = *pState->comparison;
 	for (int64_t i = 0; i < std::ssize(gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets); ++i) gpTextureManager->mTextureDescriptors.SetLightingReference(i, nullptr, false);
 	if (rComparison.vkFramebuffer != VK_NULL_HANDLE)
 	{
@@ -97,21 +97,21 @@ void Lighting::DestroyComparisonResources()
 	{
 		vkDestroyRenderPass(gpDeviceManager->mVkDevice, rComparison.vkRenderPass, nullptr);
 	}
-	mpState->comparison.reset();
+	pState->comparison.reset();
 }
 
-void Lighting::ApplyComparisonSettings(bool bScenePaused)
+void Lighting::ApplyComparisonSettings(bool bCaptureAllowed)
 {
 	// Heap: capture errors, fixture inputs and comparison pipelines persist across ordinary render publications.
 	ScopedSuppressAllocationTracking suppress;
-	const LightingComparisonSettings& rRequested = mRequestedComparisonSettings;
-	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
-	if (IsCaptureRunning(rDiagnostics.status) && (!bScenePaused || rRequested != mpState->settings))
+	const LightingComparisonSettings& rRequested = requestedComparisonSettings;
+	LightingDiagnostics& rDiagnostics = diagnostics;
+	if (IsCaptureRunning(rDiagnostics.status) && (!bCaptureAllowed || rRequested != pState->settings))
 	{
 		rDiagnostics.status = "failed";
-		rDiagnostics.error = bScenePaused ? "Comparison settings changed during capture" : "Client unpaused during capture";
+		rDiagnostics.error = bCaptureAllowed ? "Comparison settings changed during capture" : "Lighting capture requires a paused client with visible Tweaks";
 	}
-	if (rRequested == mpState->settings)
+	if (rRequested == pState->settings)
 	{
 		return;
 	}
@@ -124,25 +124,24 @@ void Lighting::ApplyComparisonSettings(bool bScenePaused)
 	gpSwapchainManager->mPresent.Wait();
 	gpTextureUploadManager->WaitIdle();
 	CHECK_VK(vkDeviceWaitIdle(gpDeviceManager->mVkDevice));
-	if (rRequested.eMode != LightingComparisonMode::kDisabled && mpState->comparison->animationForward == nullptr)
+	if (rRequested.eMode != LightingComparisonMode::kDisabled && pState->comparison->animationForward == nullptr)
 	{
 		throw std::runtime_error("Lighting fixture requires the packed Animation.001 scene");
 	}
-	if (rRequested.eMode != LightingComparisonMode::kDisabled && mpState->settings.eMode == LightingComparisonMode::kDisabled)
+	if (rRequested.eMode != LightingComparisonMode::kDisabled && pState->settings.eMode == LightingComparisonMode::kDisabled)
 	{
-		mpState->fixture = std::make_unique<LightingFixture>(gpCamera->mBasisCoordinate);
-		if (!mpState->fixture->InitializeAnimation())
+		pState->fixture = std::make_unique<LightingFixture>(gpCamera->mBasisCoordinate);
+		if (!pState->fixture->InitializeAnimation())
 		{
 			throw std::runtime_error("Lighting fixture animation initialization failed");
 		}
 	}
-	mpState->settings = rRequested;
-	mpState->eScenario = rRequested.eScenario;
-	if (rRequested.uiCaptureRequest == mpState->uiServicedCapture)
+	pState->settings = rRequested;
+	if (rRequested.uiCaptureRequest == pState->uiServicedCapture)
 	{
 		return;
 	}
-	mpState->uiServicedCapture = rRequested.uiCaptureRequest;
+	pState->uiServicedCapture = rRequested.uiCaptureRequest;
 	rDiagnostics.error.clear();
 	rDiagnostics.directory.clear();
 	rDiagnostics.iCompletedTiles = 0;
@@ -152,9 +151,9 @@ void Lighting::ApplyComparisonSettings(bool bScenePaused)
 	{
 		rDiagnostics.error = "Lighting capture requires fixture reference mode";
 	}
-	else if (!bScenePaused)
+	else if (!bCaptureAllowed)
 	{
-		rDiagnostics.error = "Lighting capture requires the client to be paused";
+		rDiagnostics.error = "Lighting capture requires a paused client with visible Tweaks";
 	}
 	else if (std::cmp_not_equal(gpGraphics->mFramebufferVkExtent2D.width, State::Comparison::kVkExtent.width) || std::cmp_not_equal(gpGraphics->mFramebufferVkExtent2D.height, State::Comparison::kVkExtent.height))
 	{
@@ -164,7 +163,7 @@ void Lighting::ApplyComparisonSettings(bool bScenePaused)
 	{
 		rDiagnostics.status = "receivers";
 		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount;
-		mpState->captureStart = std::chrono::steady_clock::now();
+		pState->captureStart = std::chrono::steady_clock::now();
 	}
 }
 
@@ -181,10 +180,10 @@ static void LightingReceiverInfo(PipelineInfo& rInfo, VkRenderPass vkPass)
 
 void Lighting::PrepareComparisonPipelines()
 {
-	State::Comparison& rComparison = *mpState->comparison;
-	int64_t iFramebuffer = mpState->iFramebuffer;
-	LightingFramebuffer& rFramebuffer = *mpState->framebuffers.at(iFramebuffer);
-	bool bActive = mpState->settings.eMode != LightingComparisonMode::kDisabled;
+	State::Comparison& rComparison = *pState->comparison;
+	int64_t iFramebuffer = pState->iFramebuffer;
+	LightingFramebuffer& rFramebuffer = *pState->framebuffers.at(iFramebuffer);
+	bool bActive = pState->settings.eMode != LightingComparisonMode::kDisabled;
 	VkDrawIndirectCommand& rVkDrawIndirectCommand = reinterpret_cast<VkDrawIndirectCommand*>(rComparison.solidDraws.mpMappedMemory)[iFramebuffer];
 	rVkDrawIndirectCommand = {.vertexCount = 36, .instanceCount = bActive ? static_cast<uint32_t>(LightingFixture::kiSolidCount) : 0, .firstVertex = 0, .firstInstance = rFramebuffer.uiFixtureFirstInstance};
 	BindQueryDescriptors(rComparison.solidForward, iFramebuffer);
@@ -194,12 +193,12 @@ void Lighting::PrepareComparisonPipelines()
 		rComparison.animationForward->UpdateStorageBufferDescriptors(iFramebuffer, shaders::kiModelBindingMeshData, &gpBufferManager->mMeshDataStorageBuffers.at(iFramebuffer));
 		rComparison.animationForward->UpdateStorageBufferDescriptors(iFramebuffer, shaders::kiModelBindingJointMatrix, &gpBufferManager->mJointMatrixStorageBuffers.at(iFramebuffer));
 	}
-	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	LightingDiagnostics& rDiagnostics = diagnostics;
 	const shaders::LightingPublication& rPublication = *reinterpret_cast<const shaders::LightingPublication*>(rFramebuffer.publication.mpMappedMemory);
 	if (rDiagnostics.status == "tracing")
 	{
 		// A paused scene republishes identical counts every frame; any difference means the traced scene changed.
-		if (std::memcmp(&rPublication, &mpState->capturePublication, sizeof(rPublication)) != 0)
+		if (std::memcmp(&rPublication, &pState->capturePublication, sizeof(rPublication)) != 0)
 		{
 			rDiagnostics.status = "failed";
 			rDiagnostics.error = "Published scene changed during capture";
@@ -212,7 +211,7 @@ void Lighting::PrepareComparisonPipelines()
 	{
 		return;
 	}
-	mpState->capturePublication = rPublication;
+	pState->capturePublication = rPublication;
 	gpCommandBufferManager->mSubmitGlobal.Wait();
 	if (rComparison.vkRenderPass == VK_NULL_HANDLE)
 	{
@@ -287,7 +286,7 @@ void Lighting::PrepareComparisonPipelines()
 
 void Lighting::RecordFixtureDraws(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer)
 {
-	State::Comparison& rComparison = *mpState->comparison;
+	State::Comparison& rComparison = *pState->comparison;
 	rComparison.solidForward.RecordBindPipelineAndDescriptors(iFramebuffer, vkCommandBuffer);
 	vkCmdDrawIndirect(vkCommandBuffer, rComparison.solidDraws.GetBuffer(), static_cast<VkDeviceSize>(iFramebuffer) * sizeof(VkDrawIndirectCommand), 1, sizeof(VkDrawIndirectCommand));
 	if (rComparison.animationForward != nullptr)
@@ -298,13 +297,13 @@ void Lighting::RecordFixtureDraws(VkCommandBuffer vkCommandBuffer, int64_t iFram
 
 void Lighting::RecordReceivers(VkCommandBuffer vkCommandBuffer)
 {
-	State::Comparison& rComparison = *mpState->comparison;
-	int64_t iFramebuffer = mpState->iFramebuffer;
+	State::Comparison& rComparison = *pState->comparison;
+	int64_t iFramebuffer = pState->iFramebuffer;
 	std::array<VkClearValue, 5> clears {};
 	clears[4].depthStencil.depth = kfMaxDepth;
 	VkRenderPassBeginInfo vkRenderPassBeginInfo {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = rComparison.vkRenderPass, .framebuffer = rComparison.vkFramebuffer, .renderArea = {.extent = {1'920, 1'080}}, .clearValueCount = 5, .pClearValues = clears.data()};
 	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	for (const LightingModelRange& rRange : mpState->framebuffers.at(iFramebuffer)->modelRanges)
+	for (const LightingModelRange& rRange : pState->framebuffers.at(iFramebuffer)->modelRanges)
 	{
 		ModelPipeline& rModel = *rComparison.models.at(std::tuple(rRange.modelCrc, rRange.instanceBufferCrc, rRange.iFirstInstance));
 		rModel.WriteIndirectBuffer(iFramebuffer, rRange.iInstanceCount);
@@ -322,7 +321,7 @@ void Lighting::RecordReceivers(VkCommandBuffer vkCommandBuffer)
 	std::memcpy(&rComparison.water.mpIndirectVkDrawIndexedIndirectCommand[iFramebuffer], &gpPipelineManager->mpPipelines[kPipelineWater].mpIndirectVkDrawIndexedIndirectCommand[iFramebuffer], sizeof(VkDrawIndexedIndirectCommand));
 	rComparison.water.RecordDrawIndirect(iFramebuffer, vkCommandBuffer);
 	rComparison.solidReceiver.RecordBindPipelineAndDescriptors(iFramebuffer, vkCommandBuffer);
-	vkCmdDraw(vkCommandBuffer, 36, LightingFixture::kiSolidCount, 0, mpState->framebuffers.at(iFramebuffer)->uiFixtureFirstInstance);
+	vkCmdDraw(vkCommandBuffer, 36, LightingFixture::kiSolidCount, 0, pState->framebuffers.at(iFramebuffer)->uiFixtureFirstInstance);
 	vkCmdEndRenderPass(vkCommandBuffer);
 }
 

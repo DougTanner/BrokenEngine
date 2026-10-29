@@ -5,17 +5,24 @@ fresh session; each ends by updating `## Progress` below.
 
 ## Identity
 
-- Codex works directly in the primary checkout on branch `lighting-foundation-work` (user
-  direction; setup and per-session start/end steps: `CODEX-HANDOFF.md` in this folder).
-- The snapshot was authored on main `aa47e4a3e170a69b7dad971b94003f7ea30e5716`. Where a plan says
-  `aa47e4a3…` as the diff base, use your session baseline if main has moved since (the foundation
-  change is always session baseline → HEAD).
-- Snapshot history on top of `aa47e4a3`: foundation WIP, memory-cost experiment, handoff doc,
-  revert of the experiment, then the strip-stage snapshot.
-- The strip stage (below) is committed as a WIP snapshot on the session branch and pushed to origin
-  as `lighting-foundation-handoff-20261029`. That commit force-adds this plan folder and the `Temp/`
-  files the plans cite (gitignored working notes, not `/next-plan` Plans); plan 04 removes them from
-  the index before the foundation commit.
+- Use the existing lighting worktree
+  `C:/Users/dougt/.claude/worktrees/BrokenEngine/0cb8b7b1-9695-4b87-ab78-8bf06eceacad`
+  on branch `lighting-foundation-work`; do not create another worktree. Session steps:
+  `CODEX-HANDOFF.md` in this folder.
+- The user's latest correction supersedes the earlier primary-checkout instructions.
+  Primary `C:/Users/dougt/Documents/BrokenEngine` is clean on `main` and available to
+  another agent; do not switch or modify it.
+- The fixed foundation diff baseline is `b56f20fa44d0424c2fdf5003157563684ed747f5`,
+  even if main advances. Use this baseline in place of older diff-base instructions.
+- Current checkpoint: `b01f2286` saves source changes and review evidence through the
+  partial plan 02 work; remaining verification is recorded in `## Progress`.
+- The snapshot was authored on main `aa47e4a3e170a69b7dad971b94003f7ea30e5716`.
+  Snapshot history: foundation WIP, memory-cost experiment, handoff doc, revert of the
+  experiment, then the strip-stage snapshot.
+- The strip-stage snapshot was pushed as `lighting-foundation-handoff-20261029`.
+  It force-adds this plan folder and the cited `Temp/` evidence (gitignored working notes,
+  not `/next-plan` Plans); plan 04 removes them from the index before the foundation commit.
+  Keep these notes in `Temp/`, not `Documents/Plans/`.
 - Origin keeps the untouched pre-strip snapshot on `lighting-foundation-handoff-20261028`.
 
 ## Goal and authority
@@ -89,7 +96,24 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
   client/server projects retain main ModelMetadata plus foundation headers; ModelViewer retains
   main MenuUtils and removes deleted LightingWrappersBase.
   Reviews and runtime acceptance remain plans 02/03; no plan 01 residuals.
-- [ ] 02 Reviews and cleanup
+- [x] 02 Reviews and cleanup.
+  Seven overengineering removals proved; shared TerrainVertexCoordinates extracted and
+  retested. Full C++ review covered 102 paths; GLSL review covered 51 paths.
+  CXX001-004, naming, coherence C1-3 and comments F1-3 resolved and retested.
+  ADV001/CXX005 capture lifecycle and CXX006 single-predicate correction independently pass;
+  ADV002 obsolete probe schema corrected and skill retest passes. Final style, comments,
+  propagation/docs, membership, skill-package, progressive-disclosure and coherence checks pass.
+  Rejected: converting Lighting to class/merging its .cpp files; struct/private coupled state
+  is valid and the implementation split is exempt.
+  Rejected: renaming historical plan/review snapshot identifiers; they record original evidence,
+  while live code/docs use the current names.
+  DataPacker Release x64 succeeded in this worktree:
+  `Temp/AgentBuildEnvelopes/compile-20261029T150823266Z-41536.md` `## Build envelopes`.
+  Latest client/server/ModelViewer Debug x64 succeeded with zero diagnostics, Local generation
+  and `RunDataPacker=true`:
+  `Temp/AgentBuildEnvelopes/compile-20261029T154650516Z-22496.md` `## Build envelopes`.
+  Static checks pass; no confirmed residuals. Runtime acceptance was not run (plan 03).
+  Dispositions and evidence index: `Temp/lighting-plans/02-review-results.md` `## Review results`.
 - [ ] 03 Runtime acceptance
 - [ ] 04 Commit and create the `lighting-foundation` branch
 - [ ] 05 Stage 2 one-bounce reference (prepare only)

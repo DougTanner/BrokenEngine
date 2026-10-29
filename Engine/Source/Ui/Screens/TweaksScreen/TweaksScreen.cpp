@@ -308,12 +308,15 @@ void TweaksScreen::RenderToggleBar()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
 	ImGui::SetNextItemWidth(fContentWidth);
+	std::string_view captureStatus = gpGraphics->mpLighting->diagnostics.status;
+	ImGui::BeginDisabled(captureStatus == "receivers" || captureStatus == "tracing" || captureStatus == "composing");
 	ImGui::SliderFloat("##Sun Angle", &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
 	if (ImGui::IsItemActive())
 	{
 		mActiveSlider = "##Sun Angle";
 		miActiveSliderSection = -1;
 	}
+	ImGui::EndDisabled();
 	ImGui::PopStyleVar();
 
 	mfToggleBarBottom = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y;
@@ -399,7 +402,10 @@ void TweaksScreen::RenderSectionWindow(int64_t iSection)
 		mSectionVisible.Set(SectionFlag(iSection), bSectionVisible);
 	}
 
+	std::string_view captureStatus = gpGraphics->mpLighting->diagnostics.status;
+	ImGui::BeginDisabled(iSection != giTweakSectionLighting && (captureStatus == "receivers" || captureStatus == "tracing" || captureStatus == "composing"));
 	mspSectionDescriptions[iSection].pRender(*this);
+	ImGui::EndDisabled();
 
 	ImGui::PopFont();
 	ImGui::End();

@@ -48,16 +48,17 @@ public:
 
 	explicit LightingFixture(GridCoord anchor);
 	bool InitializeAnimation();
-	const LightingFixtureAnimation& GetAnimation() const;
 	void WriteAnimation(int64_t iEvent, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointOffset) const;
-	GridCoord GetAnchor() const;
-	LightingCameraPose GetCamera(LightingComparisonCamera eCamera) const;
-	const LightingFixtureEvent& GetEvent(int64_t iEvent) const;
 	LightingFixtureSolid GetSolid(int64_t iSolid, int64_t iEvent, LightingFixtureScenario eScenario) const;
 	static XMFLOAT3A GetAlbedo(int64_t iMaterial);
 	static void WriteSolidGeometry(const LightingFixtureSolid& rSolid, std::span<common::ModelVertex> vertices, std::span<uint32_t> indices);
 	void WriteSources(std::span<shaders::LightingSource> sources, int64_t iEvent, GridCoord cameraCoordinate, LightingFixtureScenario eScenario) const;
 	void WriteSamples(std::span<XMFLOAT2> samples) const;
+
+	GridCoord mAnchor {};
+	std::array<LightingCameraPose, 2> mCameras {};
+	std::array<LightingFixtureEvent, kiEventCount> mEvents {};
+	LightingFixtureAnimation mAnimation;
 
 private:
 	struct Source
@@ -67,13 +68,9 @@ private:
 	};
 
 	LightingCameraPose MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Target) const;
-	GridCoord mAnchor {};
 	std::array<Source, kiSourceCount> mSources {};
 	std::array<XMFLOAT2, kiSampleCount> mSamples {};
 	std::array<LightingFixtureSolid, kiSolidCount> mSolids {};
-	std::array<LightingCameraPose, 2> mCameras {};
-	std::array<LightingFixtureEvent, kiEventCount> mEvents {};
-	LightingFixtureAnimation mAnimation;
 };
 
 } // namespace engine

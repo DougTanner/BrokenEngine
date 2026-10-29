@@ -169,9 +169,14 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   [CommandBufferManager](Managers/AGENTS.md#commandbuffermanager).
 - Lighting owns comparison capture. Settings changes apply only after draining
   render, present and upload workers and device work, before the next CPU
-  publication. A capture advances inside ordinary frames while the client is
-  paused, which keeps every published input unchanged: one frame renders the
-  receivers, each later preparation traces a fixed number of reference tiles,
+  publication. A capture requires visible Tweaks and advances inside ordinary
+  frames while the client is paused. Hiding Tweaks fails an active capture
+  before publication; queued requests consumed while hidden are rejected and
+  require a fresh request after Tweaks becomes visible. During receivers,
+  tracing and composing, Tweaks disables Sun Angle
+  and non-Lighting section contents to preserve receiver inputs; Lighting
+  controls and navigation remain available. One frame renders the receivers,
+  each later preparation traces a fixed number of reference tiles,
   and only the frame that traces the last tiles enables the reference for its
   own Main composition. Each tracing frame must publish the receivers frame's
   counts. Unpause, a settings change, a changed publication or Graphics

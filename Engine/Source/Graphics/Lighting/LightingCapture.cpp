@@ -20,12 +20,12 @@ static void LightingWriteFile(const std::filesystem::path& rPath, std::span<cons
 
 void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 {
-	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	LightingDiagnostics& rDiagnostics = diagnostics;
 	if (rDiagnostics.status != "receivers" && rDiagnostics.status != "tracing")
 	{
 		return;
 	}
-	State::Comparison& rComparison = *mpState->comparison;
+	State::Comparison& rComparison = *pState->comparison;
 	if (rDiagnostics.status == "receivers")
 	{
 		rComparison.reference.TransitionImageLayout(vkCommandBuffer, rComparison.eReferenceLayout, TextureLayout::kComputeReadWrite);
@@ -37,7 +37,7 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 	int64_t iEnd = std::min(rDiagnostics.iCompletedTiles + State::Comparison::kiTilesPerFrame, rDiagnostics.iTotalTiles);
 	for (int64_t i = rDiagnostics.iCompletedTiles; i < iEnd; ++i)
 	{
-		rComparison.compute.RecordCompute(mpState->iFramebuffer, vkCommandBuffer, 1, 1, 1, {static_cast<float>((i % State::Comparison::kiTileColumns) * 4), static_cast<float>((i / State::Comparison::kiTileColumns) * 4), static_cast<float>(mpState->settings.iAreaSamples), 0.0f});
+		rComparison.compute.RecordCompute(pState->iFramebuffer, vkCommandBuffer, 1, 1, 1, {static_cast<float>((i % State::Comparison::kiTileColumns) * 4), static_cast<float>((i / State::Comparison::kiTileColumns) * 4), static_cast<float>(pState->settings.iAreaSamples), 0.0f});
 	}
 	rDiagnostics.iCompletedTiles = iEnd;
 	if (iEnd < rDiagnostics.iTotalTiles)
@@ -47,13 +47,13 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 	// Every earlier frame's tiles precede this barrier on the graphics queue, so Main composes the whole reference.
 	rComparison.reference.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	rComparison.eReferenceLayout = TextureLayout::kShaderReadOnly;
-	gpTextureManager->mTextureDescriptors.SetLightingReference(mpState->iFramebuffer, &rComparison.reference, true);
+	gpTextureManager->mTextureDescriptors.SetLightingReference(pState->iFramebuffer, &rComparison.reference, true);
 	rDiagnostics.status = "composing";
 }
 
 void Lighting::FinishCapture(int64_t iFramebuffer)
 {
-	LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	LightingDiagnostics& rDiagnostics = diagnostics;
 	if (rDiagnostics.status != "composing")
 	{
 		return;
@@ -63,11 +63,11 @@ void Lighting::FinishCapture(int64_t iFramebuffer)
 	// The composing frame's UI submit signals this fence; the reference descriptor changes only after Main has read it.
 	VkFence vkFence = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebuffer).mVkFence;
 	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
-	const State::Comparison& rComparison = *mpState->comparison;
-	const LightingComparisonSettings& rSettings = mpState->settings;
+	const State::Comparison& rComparison = *pState->comparison;
+	const LightingComparisonSettings& rSettings = pState->settings;
 	try
 	{
-		rDiagnostics.directory = gpFileManager->mTempDirectory / "Lighting" / std::format("capture-{}-{}", mpState->uiServicedCapture, mpState->captureStart.time_since_epoch().count());
+		rDiagnostics.directory = gpFileManager->mTempDirectory / "Lighting" / std::format("capture-{}-{}", pState->uiServicedCapture, pState->captureStart.time_since_epoch().count());
 		std::filesystem::create_directories(rDiagnostics.directory);
 		SaveFinishedPng(iFramebuffer, rDiagnostics.directory / "finished.png");
 		static constexpr std::array<std::string_view, 5> kNames {"position.rgba32f", "shading-normal.rgba32f", "geometric-normal.rgba32f", "albedo.rgba32f", "direct.rgba32f"};
@@ -80,15 +80,15 @@ void Lighting::FinishCapture(int64_t iFramebuffer)
 		}
 		nlohmann::json capture
 		{
-			{"request", mpState->uiServicedCapture},
-			{"sourceCount", mpState->capturePublication.uiSourceCount},
+			{"request", pState->uiServicedCapture},
+			{"sourceCount", pState->capturePublication.uiSourceCount},
 			{"samples", rSettings.iAreaSamples},
 			{"event", rSettings.iEvent},
 			{"camera", static_cast<int>(rSettings.eCamera)},
 			{"scenario", static_cast<int>(rSettings.eScenario)},
 			{"width", State::Comparison::kVkExtent.width},
 			{"height", State::Comparison::kVkExtent.height},
-			{"wallMs", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - mpState->captureStart).count()},
+			{"wallMs", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - pState->captureStart).count()},
 			{"device", std::string_view(gpInstanceManager->mVkPhysicalDeviceProperties.deviceName)},
 		};
 		std::string text = capture.dump(2);
@@ -114,7 +114,7 @@ void Lighting::FinishCapture(int64_t iFramebuffer)
 
 void Lighting::WriteProfile(nlohmann::json& rResult) const
 {
-	const LightingDiagnostics& rDiagnostics = mpState->diagnostics;
+	const LightingDiagnostics& rDiagnostics = diagnostics;
 	rResult = {{"sources", rDiagnostics.iSources}, {"instances", rDiagnostics.iInstances}, {"traceOnlyInstances", rDiagnostics.iTraceOnlyInstances}, {"triangles", rDiagnostics.iTriangles}};
 	rResult["capture"] = {{"status", rDiagnostics.status}, {"completedTiles", rDiagnostics.iCompletedTiles}, {"totalTiles", rDiagnostics.iTotalTiles}, {"error", rDiagnostics.error}, {"directory", common::ToString(rDiagnostics.directory.native())}};
 }

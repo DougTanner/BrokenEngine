@@ -103,11 +103,6 @@ bool LightingFixture::InitializeAnimation()
 	return true;
 }
 
-const LightingFixtureAnimation& LightingFixture::GetAnimation() const
-{
-	return mAnimation;
-}
-
 void LightingFixture::WriteAnimation(int64_t iEvent, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointOffset) const
 {
 	gAnimationDataMap.at(mAnimation.sceneCrc).EvaluateAnimation(mAnimation.iClip, mEvents.at(iEvent).fTime, meshData, pJointMatrices, iJointOffset);
@@ -132,21 +127,6 @@ LightingCameraPose LightingFixture::MakeCamera(XMFLOAT3A f3Eye, XMFLOAT3A f3Targ
 	pose.fNear = 0.1f;
 	pose.fFar = 20'000.0f;
 	return pose;
-}
-
-GridCoord LightingFixture::GetAnchor() const
-{
-	return mAnchor;
-}
-
-LightingCameraPose LightingFixture::GetCamera(LightingComparisonCamera eCamera) const
-{
-	return mCameras.at(static_cast<int64_t>(eCamera));
-}
-
-const LightingFixtureEvent& LightingFixture::GetEvent(int64_t iEvent) const
-{
-	return mEvents.at(iEvent);
 }
 
 LightingFixtureSolid LightingFixture::GetSolid(int64_t iSolid, int64_t iEvent, LightingFixtureScenario eScenario) const

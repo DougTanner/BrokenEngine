@@ -944,7 +944,7 @@ void GameBase::Render()
 	std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>((TickToSimulationTime(miTickCounter) + std::max(0ns, mTimeStep.mTickRemainderNanoseconds)).time_since_epoch()));
 
 	GridCoord cameraCoordinate = mClientGridCoordinate;
-	gpGraphics->mpLighting->ApplyComparisonSettings(mGameFlags & GameFlags::kPaused);
+	gpGraphics->mpLighting->ApplyComparisonSettings((mGameFlags & GameFlags::kPaused) && mbShowImGui);
 	bool bHaveRenderableCamera = false;
 	SelectRenderCamera(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
 	UpdateRenderInterpolation(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);

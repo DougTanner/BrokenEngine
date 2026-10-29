@@ -208,7 +208,6 @@ DeviceManager::DeviceManager()
 		.shaderInt64 = VK_TRUE,
 	};
 	vkPhysicalDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
-	vkPhysicalDeviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
 	if (mCapabilities & DeviceCapabilityFlags::kWideLinesEnabled)
 	{
 		vkPhysicalDeviceFeatures.wideLines = VK_TRUE;

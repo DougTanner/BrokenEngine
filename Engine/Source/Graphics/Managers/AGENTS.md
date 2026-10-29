@@ -28,7 +28,7 @@ Renderer-wide frame and recreation ordering stays in Graphics; the contracts bel
 
 ### InstanceManager
 
-Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here. Resident lighting queries require acceleration structures, ray queries, buffer device addresses, and vertex pipeline stores/atomics; unsupported devices fail startup.
+Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here. Resident lighting queries require acceleration structures, ray queries, and buffer device addresses; unsupported devices fail startup.
 
 Water foam requires optimal-tiling R16_SFLOAT storage, sampled linear filtering,
 and blit source/destination support; unsupported devices fail startup.

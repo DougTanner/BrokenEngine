@@ -2,16 +2,28 @@
 
 ## Authorization and scope
 
-Baseline b56f20fa44d0424c2fdf5003157563684ed747f5; starting HEAD f713d7cf526dafca00ffead328751ccaeadec13e; C:/Users/dougt/Documents/BrokenEngine, branch lighting-foundation-work. Reused Temp/over-engineering-review-inventory.json (status pass) and Temp/over-engineering-review-candidates.md ## Removal candidates. User's whole-foundation prototype stripping instruction authorizes OE01-OE07. Main explicitly overrides the older Frame exclusion for OE06 only, preserving simulation/CRC and serialized layout. All changed original lines were mechanically checked against inventory regions before any writes. No new format, wire, pack, GPU, save, replay or Collection layout changes.
+Baseline b56f20fa44d0424c2fdf5003157563684ed747f5; starting HEAD f713d7cf526dafca00ffead328751ccaeadec13e; C:/Users/dougt/Documents/BrokenEngine,
+branch lighting-foundation-work. Reused Temp/over-engineering-review-inventory.json (status pass) and Temp/over-engineering-review-candidates.md ##
+Removal candidates. User's whole-foundation prototype stripping instruction authorizes OE01-OE07. Main explicitly overrides the older Frame exclusion
+for OE06 only, preserving simulation/CRC and serialized layout. All changed original lines were mechanically checked against inventory regions before
+any writes. No new format, wire, pack, GPU, save, replay or Collection layout changes.
 
 ## Candidate verdicts
 
-- OE01 applied. Repository-wide symbol searches and direct reads of InitializeAnimation, WriteAnimation, PublishFixtureAnimation and LightingComparison's animation pipeline creation establish that the four fields are assigned only and never read. LightingFixtureAnimation is ordinary private runtime state, with no raw serialization or upload. sceneCrc, iClip, center and scale stay; every asset/name validation stays. Removing the string assignments also removes their now-unused ScopedSuppressAllocationTracking and associated Heap comment; the remaining function performs only lookups, comparisons and scalar assignments.
+- OE01 applied. Repository-wide symbol searches and direct reads of InitializeAnimation, WriteAnimation, PublishFixtureAnimation and
+  LightingComparison's animation pipeline creation establish that the four fields are assigned only and never read. LightingFixtureAnimation is
+  ordinary private runtime state, with no raw serialization or upload. sceneCrc, iClip, center and scale stay; every asset/name validation stays.
+  Removing the string assignments also removes their now-unused ScopedSuppressAllocationTracking and associated Heap comment; the remaining function
+  performs only lookups, comparisons and scalar assignments.
 - OE02 applied. All five snapshot members occur only at declaration and post-vkCreateDevice assignments. The VkDeviceCreateInfo uses local feature objects and deviceExtensions directly. No validation, feature enabling, CHECK_VK, capabilities or allocation policy changed.
 - OE03 applied. The stored sampler-create-info array has exactly 13 assignments and no reads. Each sampler is created from its local vkSamplerCreateInfo/vkSmokeSamplerCreateInfo; all 13 CHECK_VK(vkCreateSampler(...)) lines match starting HEAD exactly after removal.
 - OE04 applied. The CPU LightingFramebuffer geometry-count member occurs only in its declaration and assignment. EndRender retains local iGeometries for buffer sizes/spans and validation. Shader LightingInstance::uiGeometryCount fields and all their assignments stay unchanged; this is not a GPU record.
 - OE05 applied. Repository-wide LightingModels/Write searches find one declaration, one definition and one call, with literal 0,0 offsets. Parameters only initialized the two cursors; both now initialize to zero. Terrain::Write still receives the model counts as offsets and is unchanged.
-- OE06 applied. The four client-only IslandTemplate bounds are declared, reset, and reduced by a self-contained loop with no external reader. IslandTemplate is runtime terrain metadata, not a Collection, and its packed data pointers are populated from chunk payloads rather than deserializing the object. The declarations lie inside BT_CLIENT, the residency implementation is wholly BT_CLIENT, and shared terrain sampling and CRC logic are untouched. Main's newer authorization supersedes the old strip-plan Frame exclusion and old Frame/AGENTS.md tile-coverage instruction; the parallel documentation worker removed the latter during this pass.
+- OE06 applied. The four client-only IslandTemplate bounds are declared, reset, and reduced by a self-contained loop with no external reader.
+  IslandTemplate is runtime terrain metadata, not a Collection, and its packed data pointers are populated from chunk payloads rather than
+  deserializing the object. The declarations lie inside BT_CLIENT, the residency implementation is wholly BT_CLIENT, and shared terrain sampling and
+  CRC logic are untouched. Main's newer authorization supersedes the old strip-plan Frame exclusion and old Frame/AGENTS.md tile-coverage instruction;
+  the parallel documentation worker removed the latter during this pass.
 - OE07 applied. The scratch-size member had only a write in Create, immediate allocation use, and move copy. Buffer size now uses the identical vkSizes.buildScratchSize + vkAlignment expression directly; RecordBuild continues deriving its aligned address from mScratch. Ordinary-RAM placement remains unchanged.
 
 ## Modified ranges

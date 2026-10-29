@@ -74,14 +74,14 @@ public:
 	void AddModels(common::crc_t modelCrc, common::crc_t instanceBufferCrc, int64_t iFirstInstance, int64_t iInstanceCount);
 	void EndRender();
 	void RecordPreparation(VkCommandBuffer vkCommandBuffer);
-	void SetComparison(const LightingComparisonSettings& rSettings);
-	LightingComparisonSettings mRequestedComparisonSettings;
-	void ApplyComparisonSettings(bool bScenePaused);
+	LightingComparisonSettings requestedComparisonSettings;
+	void ApplyComparisonSettings(bool bCaptureAllowed);
 	void FinishCapture(int64_t iFramebuffer);
 	void WriteProfile(nlohmann::json& rResult) const;
 	void RecordFixtureDraws(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer);
 	bool GetComparisonCamera(LightingCameraPose& rPose) const;
-	const LightingDiagnostics& GetDiagnostics() const;
+	// Latched counts plus capture progress; capture status survives Graphics resource recreation.
+	LightingDiagnostics diagnostics;
 
 private:
 	friend class Graphics;
@@ -100,7 +100,7 @@ private:
 	void RecordCapture(VkCommandBuffer vkCommandBuffer);
 	void WriteFixtureSolids(std::span<shaders::LightingInstance> instances, std::span<shaders::LightingGeometry> geometries, std::span<VkAccelerationStructureInstanceKHR> accelerationInstances);
 	struct State;
-	std::unique_ptr<State> mpState = nullptr;
+	std::unique_ptr<State> pState = nullptr;
 };
 
 } // namespace engine

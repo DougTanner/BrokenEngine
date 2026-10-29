@@ -519,7 +519,6 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	};
 	const RequiredFeature pRequiredFeatures[]
 	{
-		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.vertexPipelineStoresAndAtomics, .pcName = "vertexPipelineStoresAndAtomics", .pcReason = "original terrain vertex-output validation"},
 		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderInt64, .pcName = "shaderInt64", .pcReason = "lighting resident buffer addresses"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.bufferDeviceAddress, .pcName = "bufferDeviceAddress", .pcReason = "lighting geometry and acceleration scratch"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.scalarBlockLayout, .pcName = "scalarBlockLayout", .pcReason = "shared lighting GPU records"},
