@@ -22,11 +22,6 @@ struct LightingModelRange
 
 struct LightingFramebuffer
 {
-	// TEMP START matched memory cost
-	double fMatchedTerrainPrepareMs = 0.0;
-	double fMatchedTerrainPrepareTotalMs = 0.0;
-	uint64_t uiMatchedTerrainPrepareCalls = 0;
-	// TEMP END matched memory cost
 	Buffer sources;
 	Buffer publication;
 	Buffer instances;
