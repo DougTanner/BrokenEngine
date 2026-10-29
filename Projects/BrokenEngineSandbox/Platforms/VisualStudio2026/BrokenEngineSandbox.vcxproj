@@ -329,14 +329,11 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveWidget.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\NetworkUiControl.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WrapperBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
@@ -410,6 +407,15 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.h" />
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h" />
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingState.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -526,7 +532,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\InstanceManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\SwapchainManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTexturesLighting.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureCache.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureDescriptors.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureManager.cpp" />
@@ -575,12 +580,10 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSound.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSmoke.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWind.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
@@ -603,7 +606,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsLighting.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenParticles.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSmokeDeposits.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSoundEffects.cpp" />
@@ -658,10 +660,15 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientCrashReport.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingCapture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingHistoryCopy.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\Billboards.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\Billboards.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Clear.frag" />
@@ -672,17 +679,10 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\HdrResolve.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Objects\HexShield.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Objects\HexShield.vert" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\HexShieldLighting.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesRender.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\LongParticlesRender.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesSpawn.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesUpdate.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\PointLight.frag" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSpread.frag" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightCombine.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTemporal.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlurH.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlurV.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Log.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Shadow\ObjectShadowsBlurH.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Shadow\ObjectShadowsBlurV.comp" />
@@ -722,12 +722,34 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\Water.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterNormalSampling.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterSpecular.h" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterReflectionProjection.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\Water.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterDisplacement.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilate.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModels.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelHit.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrain.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\TerrainElevation.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Quads\QuadsAxisAligned.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReference.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixture.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixtureReceiver.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelReceiver.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingNeutralModel.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingNeutralModelReceiver.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReceiver.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainReceiver.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingWaterReceiver.frag" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelDiffuse.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelForward.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelMaterial.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterMaterial.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingQuery.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingRadiometry.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainVertex.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainMaterial.h" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCompose.h" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

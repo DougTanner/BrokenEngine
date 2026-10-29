@@ -37,7 +37,6 @@ extern Wrapper gUiTheme;
 extern Wrapper gSmokeEnabled;
 extern Wrapper gSmokeLayerStagger;
 extern Wrapper gWindEnabled;
-extern Wrapper gLightingEnabled;
 extern Wrapper gSunAngleOverride;
 
 // Clamps because the backing value crosses a trust boundary (persisted GameSettings.bin) and Wrapper::Set<T> soft-falls without clamping

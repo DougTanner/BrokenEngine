@@ -18,7 +18,6 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Smoke Edge Decay Distance", &gSmokeEdgeDecayDistance},
 	{"Smoke Color Min", &gSmokeColorMinimum},
 	{"Smoke Color Multiplier", &gSmokeColorMultiplier},
-	{"Smoke Lighting Multiplier", &gSmokeLightingMultiplier},
 	{"Smoke Noise Scale One", &gSmokeNoiseScaleOne},
 	{"Smoke Noise Scale Two", &gSmokeNoiseScaleTwo},
 	{"Smoke Wind Noise Scale", &gSmokeWindNoiseScale},
@@ -65,7 +64,6 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				rScreen.WrapperSeparatorText("Color");
 				rScreen.WrapperSlider("Smoke Color Min", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Color Multiplier", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Lighting Multiplier", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Noise");
 				rScreen.WrapperSlider("Smoke Noise Scale One", iSection, 1.0f);

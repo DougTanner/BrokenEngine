@@ -118,6 +118,9 @@
     <Filter Include="Game\Ui\Screens">
       <UniqueIdentifier>{212658d4-68e3-46eb-b66e-07fd431eb65e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Data\Shaders\Lighting">
+      <UniqueIdentifier>{779ab5a8-cadb-454a-87b5-51ad2bf41ba3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderGlobalLayout.h">
@@ -337,9 +340,6 @@
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h">
@@ -605,6 +605,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -904,9 +907,6 @@
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp">

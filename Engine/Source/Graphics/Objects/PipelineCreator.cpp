@@ -421,7 +421,7 @@ static void ConfigureMultisampling(GraphicsPipelineState& rState, const Pipeline
 }
 
 // Builds the color-blend state: per-attachment blend factors from the blend-mode flags, then replicates
-// the attachment across all MRT targets (the lighting pass auto-upgrades a single attachment to 3).
+// the attachment across all MRT targets.
 static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& rPipeline)
 {
 	rState.vkPipelineColorBlendAttachmentState = VkPipelineColorBlendAttachmentState
@@ -471,10 +471,6 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 	}
 
 	int64_t iColorAttachmentCount = rPipeline.mInfo.iColorAttachmentCount;
-	if (iColorAttachmentCount == 1 && rPipeline.mInfo.vkTargetRenderPass == gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass)
-	{
-		iColorAttachmentCount = 3;
-	}
 	ASSERT(iColorAttachmentCount <= kiMaxColorAttachments);
 	if (iColorAttachmentCount > 1)
 	{

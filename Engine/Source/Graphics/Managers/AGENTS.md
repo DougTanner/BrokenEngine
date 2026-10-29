@@ -10,12 +10,12 @@ Vulkan services exposed through `gp*` globals. `Graphics` constructs its manager
 - Queue synchronization depends on selected queue families: uploads may transfer ownership to graphics, and present waits for graphics when present uses a distinct queue. Do not assume all queues alias or that every transition is cross-queue.
 - The shared descriptor pool serves graphics and compute pipelines. Most pipelines consume global Set 0, but legacy standalone compute pipelines retain their own layouts and do not. Pipeline-specific sets and bindless arrays must remain valid through partial recreation.
 - The texture-descriptor registry owns island bindless-slot metadata and descriptor registrations. Fixed bindless-array storage addresses and slot indices are registry identity. Inside the bindless write epoch, eviction redirects all five island channels to slot-0 placeholders and removes their registrations before any view is retired; the slot is reusable at once because each framebuffer republishes it from live state. Restoration exposes elevation only after the four lazy channels are ready.
-- Texture adoption, island restoration and eviction, and a first lighting blur update only live registry state and queue a publication entry. Publishing writes each entry a framebuffer has not applied into that framebuffer's sets only, reading live state so a replay is idempotent, and every entry reaches each framebuffer before its next submission. The epoch records which framebuffer's sets are writable.
+- Texture adoption, island restoration and eviction update only live registry state and queue a publication entry. Publishing writes each entry a framebuffer has not applied into that framebuffer's sets only, reading live state so a replay is idempotent, and every entry reaches each framebuffer before its next submission. The epoch records which framebuffer's sets are writable.
 - A pipeline rebuild clears raw pipeline registrations but preserves live island-slot metadata. Registering a rebuilt bindless consumer must recreate its live per-slot descriptors so an in-flight lazy adoption still reaches that pipeline.
 - Boot fails loud when the device does not advertise
   `VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT` (the device's promise that it
   can blend into a given pixel format) for every special-format render target
-  the MAX/ADD-blended prepasses write: elevation, lighting, smoke, and wind.
+  the MAX/ADD-blended prepasses write: elevation, smoke, and wind.
   Blending without it is silent undefined behavior at pipeline creation, so this
   device dependency is hard, unlike the sampler linear-filter probe that
   downgrades gracefully. Adding a blended prepass on a new format must extend
@@ -28,7 +28,7 @@ Renderer-wide frame and recreation ordering stays in Graphics; the contracts bel
 
 ### InstanceManager
 
-Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here.
+Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here. Resident lighting queries require acceleration structures, ray queries, buffer device addresses, and vertex pipeline stores/atomics; unsupported devices fail startup.
 
 Water foam requires optimal-tiling R16_SFLOAT storage, sampled linear filtering,
 and blit source/destination support; unsupported devices fail startup.
@@ -48,7 +48,7 @@ instance creation at the cost of validation layers.
 
 ### DeviceManager
 
-Logical device, queues, and GPU memory allocation. Creates the device enabling every core and Vulkan 1.2 feature `InstanceManager` validated. Initializes VMA and the Global descriptor pool with both `FREE_DESCRIPTOR_SET_BIT` and `UPDATE_AFTER_BIND_BIT`. Graphics, presentation, and transfer queue handles are deduplicated. Queries `VK_KHR_maintenance9` for optional queue-family ownership transfer.
+Logical device, queues, and GPU memory allocation. Creates the device enabling every required extension, core and Vulkan 1.2 feature `InstanceManager` validated. Initializes VMA and the Global descriptor pool with both `FREE_DESCRIPTOR_SET_BIT` and `UPDATE_AFTER_BIND_BIT`. Graphics, presentation, and transfer queue handles are deduplicated. Queries `VK_KHR_maintenance9` for optional queue-family ownership transfer.
 
 Owns the one command pool and fence shared by every `OneShotCommandBuffer`. Because they are shared, two such lifetimes must never overlap; an in-use flag asserts on overlap rather than letting the two silently corrupt each other's recording.
 
@@ -62,9 +62,14 @@ The HDR attachments (color, depth, MSAA) are single images reused every frame in
 
 ### CommandBufferManager
 
-Per-framebuffer command buffers and the submission graph. The Global and Main record helpers own compute/world preparation and scene rendering respectively. The per-framebuffer recorded flag is an idempotence guard, not a runtime re-record mechanism.
+Per-framebuffer command buffers and the submission graph. Global owns its world
+prepasses; preparation owns the current Main upload, water displacement, lighting
+producers, smoke/wind emission, object shadows/blur and water foam before Main
+scene rendering. Preparation resets its timer range and starts Main timing;
+Main stops that timer before Image timing. The per-framebuffer recorded flag is
+an idempotence guard, not a runtime re-record mechanism.
 
-- Global may prepend the texture manager's acquire command buffer, then signals Main. Main waits on both Global completion and swapchain image availability; swapchain acquisition therefore gates Main rather than Global.
+- Global may prepend the texture manager's acquire command buffer, then signals preparation. Preparation signals Main; Main also waits on swapchain image availability, so acquisition gates Main rather than Global.
 - Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute, retained water foam, or rendering order.
 - Foam activation follows [Render's history policy](../Render/AGENTS.md#precision-and-history).
   Changes to Graphics Water Foam or water quality request command-buffer
@@ -124,14 +129,14 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
   which zero-fill its occupancy, so it survives pipeline-only rebuilds together
   with the retained texture contents; smoke hierarchy storage is pipeline-owned.
   Replacing smoke hierarchy storage also re-arms the one-frame smoke clear:
-  Global first observes the zeroed occupancy, Main then clears every plane's
+  Global first observes the zeroed occupancy, preparation then clears every plane's
   retained ping-pong images, and fresh `SmokeOne` deposits after that clear
   must mark their plane's occupancy A.
 - Swapchain recreation tears down and rebuilds only per-framebuffer buffers, preserving static geometry.
 
 ### TextureManager
 
-Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, priority textures request at boot, and `InitializeBootTextures` replays every registered lighting-texture CRC so a device recreation does not strand them on the placeholder.
+Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, priority textures request at boot, and `InitializeBootTextures` replays every registered collection-texture CRC so a device recreation does not strand them on the placeholder.
 
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
 - Water foam has independent primary and breakup catalogs. Each keeps picker
@@ -140,25 +145,16 @@ Loaded textures, global texture descriptors, cached generated textures, and rend
   PipelineManager-owned stable pointer storage and the texture-descriptor
   registry for adoption and sampler recreation; picker changes publish indices
   without rebuilding descriptors.
-- Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged render-target reads such as object shadows and terrain elevation stay non-anisotropic; the border samplers follow the player's anisotropy setting. Format-specific elevation, model-material, and water-normal variants remain separate.
-- Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
+- Explicit repeat/clamp samplers cover authored lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged render-target reads such as object shadows and terrain elevation stay non-anisotropic; the border samplers follow the player's anisotropy setting. Format-specific elevation, model-material, and water-normal variants remain separate.
 - Adoption records into the current framebuffer's acquire command buffer: queue-family acquire barriers, whose destination stages cover vertex, fragment, and compute shader reads because island elevation is sampled in the vertex shader; the same-queue fallback upload, whose staging it retires; and completed island elevation uploads, which do not count against the per-frame adoption limit.
-- A lighting texture's pre-blurred result is found under its own CRC salted
-  with `kBlurSalt`, so the blur write site and every read site agree without a
-  second lookup table. Adoption records the blur through the blur pipelines'
-  framebuffer-indexed sets, at most one blur per acquire command buffer,
-  because a second would rewrite a set that command buffer already binds; a
-  lighting texture adopted after it waits for a later frame.
-  `ReblurAllLightingTextures` runs only in a drained context, one executed
-  one-shot per texture, after a change that invalidates the results.
 - Three owned-by-value units carry the detail: `TextureDescriptors` (global descriptor Set 0, the bindless texture array, per-pipeline binding tracking, deferred descriptor updates), `TextureCache` (GPU-to-CPU readback, the on-disk cache of generated textures, PBR BRDF lookup tables), and `RenderTargetTextures` (creation and sizing of effect render targets).
 - The on-disk cache is versioned: a cached file is reused only when its shared version header (`../../File/AGENTS.md`) validates and its format, extent, mip count, and layer count all match the request; the payload size is derived from that request, not read from the file. Any newly generated texture reuses this cache rather than regenerating every boot or adding a second caching path.
 
 Water foam owns a fixed current image and a mipmapped history/presentation image,
 recreated with water targets under the drained Graphics lifecycle; replacement
 re-arms history reset before descriptors rebuild. Images and pipelines remain
-resident while foam is inactive. Active Main recordings run full coverage
-compute after displacement, copy mip 0, and generate every history mip. Local
+resident while foam is inactive. Active preparation recordings run full coverage
+compute after water displacement, copy mip 0, and generate every history mip. Local
 per-mip barriers return all levels to shader-read for compute and fragment
 consumers; do not substitute whole-image transitions during the mip chain.
 Coverage history and presentation share that completed image.
@@ -187,13 +183,16 @@ present family, so concurrent submissions do not share that queue.
   upload failures leave active ownership intact for that path.
 - Island elevation, requested only on a distinct transfer queue, is an upload job too: a dequeued chunk without the texture flag uploads its resident heightmap with dimensions from the island header, leaves the island chunk's state untouched, and hands its CRC to main-thread adoption through a completed-elevation list.
 - The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. It counts adoptable texture chunks plus completed, unadopted elevation uploads; keep file-state rearming, the completed-elevation list, teardown, and adoption completion synchronized with it.
-- The registered lighting-texture CRC set belongs to this manager for the same reason: startup registration happens once, so a set owned by `TextureManager` would come back empty from every device recreation. Unlike the counter, it is main-thread-only and unsynchronized — written by startup registration, read by adoption and reblur — so the upload thread must never touch it.
+- The registered collection-texture CRC set belongs to this manager because
+  startup registration happens once and TextureManager is replaced during device
+  recreation. Main-thread registration and boot requests preserve original
+  sprite textures; the upload thread never mutates that set.
 
 ### PipelineManager
 
 Loads SPIR-V from pack chunks and owns fixed engine pipelines plus CRC-keyed dynamic collection pipelines. Pipelines retain pointers into the manager's stable shader map.
 
-- Fixed pipelines implement renderer passes and utility compute work. Lighting follows deposit, spread, combine, then temporal accumulation; separable blur pipelines pre-process registered light textures.
+- Fixed pipelines implement renderer passes and utility compute work. Lighting owns its private scene-query resources and pipelines.
 - Collections register dynamic pipelines by behavior and model role; these maps repopulate lazily after pipeline-tier recreation, so a new renderable collection must use the established idempotent registration path rather than requiring command-buffer re-recording per scene CRC.
 - Pipeline construction registers texture consumers with the texture-descriptor registry, which owns descriptor-generation verification.
 

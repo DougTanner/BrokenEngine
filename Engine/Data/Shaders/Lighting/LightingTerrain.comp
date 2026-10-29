@@ -1,0 +1,50 @@
+#version 460
+
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+#include "Lighting/LightingTerrainCommon.h"
+
+layout(local_size_x = kiLightingTerrainGroup) in;
+layout(push_constant) uniform pushConstants { PushConstantsLayout pushConstantsLayout; };
+layout(set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform { GlobalLayout globalLayout; };
+layout(scalar, set = 1, binding = 1) readonly buffer quadsBuffer { AxisAlignedQuadLayout pQuads[]; };
+layout(set = 1, binding = 2) uniform sampler2D ownHeightmaps[kiMaxIslands];
+layout(set = 1, binding = 3) uniform sampler2D visibleElevation;
+layout(scalar, set = 1, binding = 5) readonly buffer workBuffer { LightingTerrainWork pWork[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer XY { vec2 pXY[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) writeonly buffer XYZ { vec3 pXYZ[]; };
+
+void main()
+{
+	uint uiPlacement = floatBitsToUint(pushConstantsLayout.f4Pipeline.z);
+	uint uiVertex = floatBitsToUint(pushConstantsLayout.f4Pipeline.w) + gl_GlobalInvocationID.x;
+	LightingTerrainWork work = pWork[uiPlacement];
+	if (uiVertex >= work.uiVertexCount) return;
+	vec2 f2Local = XY(work.uiXYAddress).pXY[uiVertex];
+	vec4 f4Rect = pQuads[uiPlacement].f4VertexRect;
+	float fRotation = pQuads[uiPlacement].fRotation;
+	float fCenterX = f4Rect.x + 0.5f * f4Rect.z;
+	float fCenterY = f4Rect.y + 0.5f * f4Rect.w;
+	float fCos = cos(fRotation);
+	float fSin = sin(fRotation);
+	float fWorldX = fCenterX + f2Local.x * fCos - f2Local.y * fSin;
+	float fWorldY = fCenterY + f2Local.x * fSin + f2Local.y * fCos;
+	vec2 f2UV = vec2(
+		(fWorldX - globalLayout.f4VisibleArea.x) / (globalLayout.f4VisibleArea.z - globalLayout.f4VisibleArea.x),
+		(fWorldY - globalLayout.f4VisibleArea.y) / (globalLayout.f4VisibleArea.w - globalLayout.f4VisibleArea.y)
+	);
+	ivec2 i2Size = textureSize(visibleElevation, 0);
+	vec2 f2Pixel = f2UV * vec2(i2Size);
+	vec2 f2Lower = floor(f2Pixel - 0.5f);
+	bool bCovered = all(greaterThanEqual(f2Lower, vec2(0.0f))) && all(lessThan(f2Lower + 1.0f, vec2(i2Size)));
+	// Terrain outside the visible elevation texture is not drawn, so it is traced at the sea floor.
+	float fZ = bCovered ? textureLod(visibleElevation, f2UV, 0.0f).r : globalLayout.fSeaFloorElevation;
+	vec2 f2OwnUV = vec2(0.5f + f2Local.x / f4Rect.z, 0.5f + f2Local.y / f4Rect.w);
+	float fOwn = textureLod(ownHeightmaps[nonuniformEXT(pQuads[uiPlacement].uiTextureSlot)], f2OwnUV, 0.0f).r;
+	if (fOwn < globalLayout.fUnderwaterMaskThreshold) fZ = globalLayout.fSeaFloorElevation;
+	XYZ(work.uiXYZAddress).pXYZ[uiVertex] = vec3(fWorldX, fWorldY, fZ);
+}

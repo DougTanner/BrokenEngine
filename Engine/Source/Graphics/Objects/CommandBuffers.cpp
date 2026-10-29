@@ -31,6 +31,9 @@ CommandBuffers::CommandBuffers(int64_t iFramebuffer)
 	CHECK_VK(vkAllocateCommandBuffers(gpDeviceManager->mVkDevice, &vkCommandBufferAllocateInfo, &mMainVkCommandBuffer));
 	VkName(VK_OBJECT_TYPE_COMMAND_BUFFER, mMainVkCommandBuffer, std::format("Main_{}", iFramebuffer).c_str());
 
+	CHECK_VK(vkAllocateCommandBuffers(gpDeviceManager->mVkDevice, &vkCommandBufferAllocateInfo, &mPreparationVkCommandBuffer));
+	VkName(VK_OBJECT_TYPE_COMMAND_BUFFER, mPreparationVkCommandBuffer, std::format("Preparation_{}", iFramebuffer).c_str());
+
 	VkSemaphoreCreateInfo vkSemaphoreCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -41,6 +44,9 @@ CommandBuffers::CommandBuffers(int64_t iFramebuffer)
 	VkName(VK_OBJECT_TYPE_SEMAPHORE, mGlobalFinishedVkSemaphore, std::format("GlobalFinished_{}", iFramebuffer).c_str());
 	CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &mMainFinishedVkSemaphore));
 	VkName(VK_OBJECT_TYPE_SEMAPHORE, mMainFinishedVkSemaphore, std::format("MainFinished_{}", iFramebuffer).c_str());
+
+	CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &mPreparationFinishedVkSemaphore));
+	VkName(VK_OBJECT_TYPE_SEMAPHORE, mPreparationFinishedVkSemaphore, std::format("PreparationFinished_{}", iFramebuffer).c_str());
 
 	VkFenceCreateInfo vkFenceCreateInfo
 	{
@@ -64,8 +70,10 @@ CommandBuffers::CommandBuffers(CommandBuffers&& rOther) noexcept
 	, mVkCommandPool(std::exchange(rOther.mVkCommandPool, VK_NULL_HANDLE))
 	, mGlobalVkCommandBuffer(std::exchange(rOther.mGlobalVkCommandBuffer, VK_NULL_HANDLE))
 	, mMainVkCommandBuffer(std::exchange(rOther.mMainVkCommandBuffer, VK_NULL_HANDLE))
+	, mPreparationVkCommandBuffer(std::exchange(rOther.mPreparationVkCommandBuffer, VK_NULL_HANDLE))
 	, mGlobalFinishedVkSemaphore(std::exchange(rOther.mGlobalFinishedVkSemaphore, VK_NULL_HANDLE))
 	, mMainFinishedVkSemaphore(std::exchange(rOther.mMainFinishedVkSemaphore, VK_NULL_HANDLE))
+	, mPreparationFinishedVkSemaphore(std::exchange(rOther.mPreparationFinishedVkSemaphore, VK_NULL_HANDLE))
 	, mImGuiVkCommandBuffer(std::exchange(rOther.mImGuiVkCommandBuffer, VK_NULL_HANDLE))
 	, mImGuiFinishedVkSemaphore(std::exchange(rOther.mImGuiFinishedVkSemaphore, VK_NULL_HANDLE))
 	, mVkFence(std::exchange(rOther.mVkFence, VK_NULL_HANDLE))
@@ -86,10 +94,12 @@ CommandBuffers::~CommandBuffers()
 	vkFreeCommandBuffers(gpDeviceManager->mVkDevice, mVkCommandPool, 1, &mGlobalVkCommandBuffer);
 	vkFreeCommandBuffers(gpDeviceManager->mVkDevice, mVkCommandPool, 1, &mMainVkCommandBuffer);
 	vkFreeCommandBuffers(gpDeviceManager->mVkDevice, mVkCommandPool, 1, &mImGuiVkCommandBuffer);
+	vkFreeCommandBuffers(gpDeviceManager->mVkDevice, mVkCommandPool, 1, &mPreparationVkCommandBuffer);
 	vkDestroyCommandPool(gpDeviceManager->mVkDevice, mVkCommandPool, nullptr);
 
 	vkDestroySemaphore(gpDeviceManager->mVkDevice, mGlobalFinishedVkSemaphore, nullptr);
 	vkDestroySemaphore(gpDeviceManager->mVkDevice, mMainFinishedVkSemaphore, nullptr);
+	vkDestroySemaphore(gpDeviceManager->mVkDevice, mPreparationFinishedVkSemaphore, nullptr);
 
 	vkDestroyFence(gpDeviceManager->mVkDevice, mVkFence, nullptr);
 }

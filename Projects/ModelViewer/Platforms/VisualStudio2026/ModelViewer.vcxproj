@@ -124,6 +124,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h" />
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h" />
     <ClInclude Include="$(ProjectDir)Build\ModelViewerDataRoot.h" />
     <ClInclude Include="$(GameDataDirectory)\Data.h" />
@@ -170,6 +173,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Graphics.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Islands.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingCapture.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.cpp" />
@@ -181,7 +191,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\ParticleManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\PipelineManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTexturesLighting.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\SwapchainManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureCache.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureDescriptors.cpp" />
@@ -218,7 +227,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
@@ -326,6 +334,12 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Graphics.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Islands.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingState.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.h" />
@@ -371,13 +385,11 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />

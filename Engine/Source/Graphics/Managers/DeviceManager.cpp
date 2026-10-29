@@ -35,6 +35,7 @@ DeviceManager::DeviceManager()
 
 	std::vector<const char*> deviceExtensions;
 	deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+	deviceExtensions.insert(deviceExtensions.end(), {VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME});
 	if constexpr (kbDebugPrintf)
 	{
 		deviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
@@ -131,10 +132,22 @@ DeviceManager::DeviceManager()
 		pFeatureChainTail = &vkPhysicalDeviceLineRasterizationFeaturesEXT;
 	}
 
+	VkPhysicalDeviceRayQueryFeaturesKHR vkRayQueryFeatures
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+		.pNext = pFeatureChainTail,
+		.rayQuery = VK_TRUE,
+	};
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR vkAccelerationFeatures
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+		.pNext = &vkRayQueryFeatures,
+		.accelerationStructure = VK_TRUE,
+	};
 	VkPhysicalDeviceVulkan12Features vkPhysicalDeviceVulkan12Features
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.pNext = pFeatureChainTail,
+		.pNext = &vkAccelerationFeatures,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
 		.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE,
@@ -142,6 +155,7 @@ DeviceManager::DeviceManager()
 		.runtimeDescriptorArray = VK_TRUE,
 		.scalarBlockLayout = VK_TRUE,
 		.hostQueryReset = VK_TRUE,
+		.bufferDeviceAddress = VK_TRUE,
 	};
 	if constexpr (kbGraphicsProcessingUnitAssistedValidation || kbDebugPrintf)
 	{
@@ -191,9 +205,10 @@ DeviceManager::DeviceManager()
 		.textureCompressionBC = VK_TRUE,
 		.shaderStorageImageExtendedFormats = VK_TRUE,
 		.shaderSampledImageArrayDynamicIndexing = VK_TRUE,
-		.shaderInt64 = kbShaderRealtimeClock ? VK_TRUE : VK_FALSE,
+		.shaderInt64 = VK_TRUE,
 	};
 	vkPhysicalDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
+	vkPhysicalDeviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
 	if (mCapabilities & DeviceCapabilityFlags::kWideLinesEnabled)
 	{
 		vkPhysicalDeviceFeatures.wideLines = VK_TRUE;
@@ -209,8 +224,21 @@ DeviceManager::DeviceManager()
 	}
 	vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 	CHECK_VK(vkCreateDevice(gpInstanceManager->mVkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &mVkDevice));
+	mEnabledVkPhysicalDeviceFeatures = vkPhysicalDeviceFeatures;
+	mEnabledVkPhysicalDeviceVulkan12Features = vkPhysicalDeviceVulkan12Features;
+	mEnabledVkPhysicalDeviceVulkan12Features.pNext = nullptr;
+	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR = vkAccelerationFeatures;
+	mEnabledVkPhysicalDeviceAccelerationStructureFeaturesKHR.pNext = nullptr;
+	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR = vkRayQueryFeatures;
+	mEnabledVkPhysicalDeviceRayQueryFeaturesKHR.pNext = nullptr;
+	mEnabledExtensions = deviceExtensions;
 
 	volkLoadDevice(mVkDevice);
+	if (vkCreateAccelerationStructureKHR == nullptr || vkDestroyAccelerationStructureKHR == nullptr || vkGetAccelerationStructureBuildSizesKHR == nullptr || vkCmdBuildAccelerationStructuresKHR == nullptr || vkGetAccelerationStructureDeviceAddressKHR == nullptr || vkGetBufferDeviceAddress == nullptr)
+	{
+		throw std::runtime_error("Required lighting acceleration device functions unavailable");
+	}
+	LOG(kGraphics, kInfo, "Lighting enabled: bufferDeviceAddress, accelerationStructure, rayQuery, deferredHostOperations");
 
 	VkName(VK_OBJECT_TYPE_DEVICE, mVkDevice, "Logical");
 
@@ -261,6 +289,7 @@ DeviceManager::DeviceManager()
 
 	VkDescriptorPoolSize pVkDescriptorPoolSizes[]
 	{
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, .descriptorCount = 256},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 256},
 		// Dominated by the per-island bindless arrays, each kiMaxIslands wide and allocated per-framebuffer:
 		// color/normals/AO/masks/elevation = 5 * 128 * up-to-kiMaxFramebuffers (4) = 2560, plus every other
@@ -270,7 +299,7 @@ DeviceManager::DeviceManager()
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 4'096},
 		// Only global Set 0 declares samplers: three per set * up to four framebuffers = 12; reserve 16.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 16},
-		// Only global Set 0's bindless array is a sampled image: (texture chunks + kiLightingBlurSlots) per set * up to
+		// Only global Set 0's bindless array is a sampled image: texture chunks per set * up to
 		// four framebuffers; reserve 4 * 1,024.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4 * 1'024},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1'024},
@@ -296,7 +325,7 @@ DeviceManager::DeviceManager()
 
 	VmaAllocatorCreateInfo allocatorCreateInfo =
 	{
-		.flags = (mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable) ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT : static_cast<VmaAllocatorCreateFlags>(0),
+		.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT | ((mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable) ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT : static_cast<VmaAllocatorCreateFlags>(0)),
 		.physicalDevice = gpInstanceManager->mVkPhysicalDevice,
 		.device = mVkDevice,
 		.pVulkanFunctions = &mVmaFunctions,

@@ -208,6 +208,9 @@
     <Filter Include="Game\Ui\Screens\TweaksScreen">
       <UniqueIdentifier>{c6f9c4a8-4aa3-46fe-969d-6ef9398ec1be}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Graphics\Lighting">
+      <UniqueIdentifier>{c71dc7ac-2af9-4ec4-8918-9a9eaa172f99}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.h">
@@ -462,13 +465,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.h">
       <Filter>Engine\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveWidget.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\NetworkUiControl.h">
@@ -484,9 +481,6 @@
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h">
-      <Filter>Engine\Ui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h">
@@ -912,6 +906,33 @@
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingState.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.h">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -930,9 +951,6 @@
       <Filter>Engine\Graphics\Managers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.cpp">
-      <Filter>Engine\Graphics\Managers</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTexturesLighting.cpp">
       <Filter>Engine\Graphics\Managers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureCache.cpp">
@@ -1476,9 +1494,6 @@
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsLighting.cpp">
-      <Filter>Game\Ui\Screens\TweaksScreen</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenParticles.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
@@ -1506,9 +1521,6 @@
     <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp">
       <Filter>Game\Ui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
@@ -1519,9 +1531,6 @@
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp">
@@ -1629,6 +1638,27 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp">
       <Filter>Engine\Ui\Screens</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingCapture.cpp">
+      <Filter>Engine\Graphics\Lighting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\Terrain.frag">
@@ -1647,9 +1677,6 @@
       <Filter>Engine\Data\Shaders\Water</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterSpecular.h">
-      <Filter>Engine\Data\Shaders\Water</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterReflectionProjection.h">
       <Filter>Engine\Data\Shaders\Water</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\Water.vert">
@@ -1672,27 +1699,6 @@
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Shadow\ShadowTemporal.comp">
       <Filter>Engine\Data\Shaders\Shadow</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\PointLight.frag">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingHistoryCopy.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSpread.frag">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightCombine.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTemporal.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlurH.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlurV.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Shadow\ObjectShadowsBlurH.comp">
       <Filter>Engine\Data\Shaders\Shadow</Filter>
@@ -1754,9 +1760,6 @@
     <None Include="..\..\..\..\Engine\Data\Shaders\HdrResolve.frag">
       <Filter>Engine\Data\Shaders</Filter>
     </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesRender.frag">
       <Filter>Engine\Data\Shaders\Particles</Filter>
     </None>
@@ -1788,9 +1791,6 @@
       <Filter>Engine\Data\Shaders\Objects</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Objects\HexShield.vert">
-      <Filter>Engine\Data\Shaders\Objects</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\HexShieldLighting.frag">
       <Filter>Engine\Data\Shaders\Objects</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelShadow.frag">
@@ -1834,6 +1834,75 @@
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp">
       <Filter>Engine\Data\Shaders\Water</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModels.comp">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelHit.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrain.comp">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\TerrainElevation.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Quads\QuadsAxisAligned.h">
+      <Filter>Engine\Data\Shaders\Quads</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReference.comp">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixture.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixtureReceiver.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelReceiver.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingNeutralModel.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingNeutralModelReceiver.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReceiver.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainReceiver.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingWaterReceiver.frag">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelDiffuse.h">
+      <Filter>Engine\Data\Shaders\Model</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelForward.h">
+      <Filter>Engine\Data\Shaders\Model</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Model\ModelMaterial.h">
+      <Filter>Engine\Data\Shaders\Model</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterMaterial.h">
+      <Filter>Engine\Data\Shaders\Water</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingQuery.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingRadiometry.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainVertex.h">
+      <Filter>Engine\Data\Shaders\Terrain</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\TerrainMaterial.h">
+      <Filter>Engine\Data\Shaders\Terrain</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCompose.h">
+      <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
   </ItemGroup>
 </Project>

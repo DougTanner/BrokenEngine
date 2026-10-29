@@ -10,7 +10,6 @@ Wrapper gSmokeEdgeDecayDistance(0.05f, 0.0f, 0.1f);
 
 Wrapper gSmokeColorMinimum(0.2f, 0.0f, 1.0f);
 Wrapper gSmokeColorMultiplier(2.0f, 0.1f, 4.0f);
-Wrapper gSmokeLightingMultiplier(1.0f, 0.0f, 2.0f);
 
 Wrapper gSmokeNoiseScaleOne(3.0f, 0.1f, 8.0f);
 Wrapper gSmokeNoiseScaleTwo(0.2f, 0.01f, 1.0f);

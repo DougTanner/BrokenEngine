@@ -5,6 +5,7 @@
     <Filter Include="DataFiles"><UniqueIdentifier>{4D13CA9A-745E-4D36-9F8C-0304801D1AE7}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Data"><UniqueIdentifier>{413aa4d9-53a2-49d7-9b3b-359559762975}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Data\Shaders"><UniqueIdentifier>{56f07a30-390b-4f89-aedf-705f80a20823}</UniqueIdentifier></Filter>
+    <Filter Include="Engine\Data\Shaders\Lighting"><UniqueIdentifier>{8e1779ce-106f-484a-bffc-493d768431b4}</UniqueIdentifier></Filter>
     <Filter Include="Game"><UniqueIdentifier>{a0dc0845-f2b4-46a6-8faf-e300873ce7b1}</UniqueIdentifier></Filter>
     <Filter Include="Game\Data"><UniqueIdentifier>{dd3b4e41-1366-44a1-8de9-bf913c69376d}</UniqueIdentifier></Filter>
     <Filter Include="Game\Data\Shaders"><UniqueIdentifier>{781063cd-4b26-44ba-b092-a6e59309bbca}</UniqueIdentifier></Filter>
@@ -13,6 +14,9 @@
     <ClCompile Include="..\..\Source\Pch.cpp"><Filter>Viewer</Filter></ClCompile>
     <ClInclude Include="..\..\Source\Pch.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h"><Filter>Engine\Data\Shaders</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelsCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTerrainCommon.h"><Filter>Engine\Data\Shaders\Lighting</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h"><Filter>Game\Data\Shaders</Filter></ClInclude>
     <ClInclude Include="$(ProjectDir)Build\ModelViewerDataRoot.h"><Filter>DataFiles</Filter></ClInclude>
     <ClInclude Include="$(GameDataDirectory)\Data.h"><Filter>DataFiles</Filter></ClInclude>
@@ -49,6 +53,7 @@
     <Filter Include="Engine\Frame\Collections\WindRadials"><UniqueIdentifier>{0d067671-a875-4ba4-895c-abd4c4a62182}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Frame\Collections\WindTrails"><UniqueIdentifier>{d662866a-f5fc-4c68-b1b2-cbab71d9bda1}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Graphics"><UniqueIdentifier>{5de5c53c-6108-4c0d-a986-c256f9ee87b8}</UniqueIdentifier></Filter>
+    <Filter Include="Engine\Graphics\Lighting"><UniqueIdentifier>{ca4333b7-b360-4ce5-ac3b-780a7f9c0b00}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Graphics\Debug"><UniqueIdentifier>{6343cc5c-ee70-4e9b-9a9e-6e31c4a609d1}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Graphics\Managers"><UniqueIdentifier>{bcc4f52c-80c8-4322-af6e-664365c31f4e}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Graphics\Objects"><UniqueIdentifier>{bc543f4e-83a3-4292-be5f-730a59e3b284}</UniqueIdentifier></Filter>
@@ -96,6 +101,13 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Graphics.cpp"><Filter>Engine\Graphics</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp"><Filter>Engine\Graphics</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Islands.cpp"><Filter>Engine\Graphics</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingCapture.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingComparison.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.cpp"><Filter>Engine\Graphics\Lighting</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
@@ -107,7 +119,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\ParticleManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\PipelineManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\RenderTargetTexturesLighting.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\SwapchainManager.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureCache.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\TextureDescriptors.cpp"><Filter>Engine\Graphics\Managers</Filter></ClCompile>
@@ -140,7 +151,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -248,6 +258,12 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Graphics.h"><Filter>Engine\Graphics</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.h"><Filter>Engine\Graphics</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Islands.h"><Filter>Engine\Graphics</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Lighting.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\Terrain.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingAccelerationStructure.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingFixture.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingModels.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Lighting\LightingState.h"><Filter>Engine\Graphics\Lighting</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\BufferManager.h"><Filter>Engine\Graphics\Managers</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.h"><Filter>Engine\Graphics\Managers</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.h"><Filter>Engine\Graphics\Managers</Filter></ClInclude>
@@ -293,13 +309,11 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h"><Filter>Engine\Network</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h"><Filter>Engine\Profile</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h"><Filter>Engine\Ui</Filter></ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>

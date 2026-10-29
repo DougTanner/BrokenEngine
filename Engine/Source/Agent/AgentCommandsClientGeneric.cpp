@@ -628,7 +628,7 @@ static void CommandAudioResume([[maybe_unused]] const nlohmann::json& rParameter
 }
 
 // dump_render_target: read back an offscreen render target and encode it (normalized grayscale PNG for
-// single-channel, direct PNG for 4x8-bit, optional raw .bin). Schema: {"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}.
+// single-channel, direct PNG for 4x8-bit, optional raw .bin). Schema: {"name","index"?:0,"path"?,"raw"?:false}.
 static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// As CommandScreenshot: the readback consume site is compiled out under !kbScreenshots, so fail fast.
@@ -649,10 +649,6 @@ static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_u
 	if (rParameters.contains("index"))
 	{
 		request.iIndex = rParameters.at("index").get<int64_t>();
-	}
-	if (rParameters.contains("channel"))
-	{
-		request.iChannel = rParameters.at("channel").get<int64_t>();
 	}
 	if (rParameters.contains("path"))
 	{
@@ -1018,6 +1014,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 	{
 		throw std::runtime_error("query_profile requires empty params");
 	}
+	gpGraphics->mpLighting->WriteProfile(rResult["lighting"]);
 
 	nlohmann::json cpuTimers = nlohmann::json::array();
 	{

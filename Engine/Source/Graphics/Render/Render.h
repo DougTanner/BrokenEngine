@@ -46,7 +46,7 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 	};
 }
 
-// Retained world rectangles (shadow and lighting history, and the held visible area) are expressed in the camera
+// Retained world rectangles (shadow history and the held visible area) are expressed in the camera
 // cell's frame, so they follow the camera when it changes cell. The whole-cell step keeps GPU history usable for the
 // edge-neighbour step the subscription ring allows; a larger step leaves no overlap, so the owner resets instead.
 struct RetainedAreaBasis
@@ -139,7 +139,6 @@ struct PresentationContinuitySnapshot
 	XMFLOAT2 f2ReducedNoiseOrigin {};
 	float fNoiseFrequency = 0.0f;
 	RetainedAreaReport shadow {};
-	RetainedAreaReport lighting {};
 	RetainedAreaReport smoke {};
 };
 
@@ -152,12 +151,8 @@ inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-ar
 
 XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position);
 
-// Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
-inline bool gbLightingTemporalReset = false;
-void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
 void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
-void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 
 inline bool gbWaterFoamReset = true; // Re-armed when the retained foam textures are created.
 // Recorded foam commands and published foam uniforms must both follow this predicate.

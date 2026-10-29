@@ -539,6 +539,27 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 	}
 }
 
+void PipelineDescriptorWriter::UpdateAccelerationStructure(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, VkAccelerationStructureKHR vkAccelerationStructure)
+{
+	ASSERT(BindingExistsInShaderLayout(rPipeline, iBinding));
+	VkWriteDescriptorSetAccelerationStructureKHR vkAccelerationWrite
+	{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+		.accelerationStructureCount = 1,
+		.pAccelerationStructures = &vkAccelerationStructure,
+	};
+	VkWriteDescriptorSet vkWrite
+	{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.pNext = &vkAccelerationWrite,
+		.dstSet = rPipeline.mVkDescriptorSets.at(iFramebuffer),
+		.dstBinding = static_cast<uint32_t>(iBinding),
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+	};
+	vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, 1, &vkWrite, 0, nullptr);
+}
+
 void PipelineDescriptorWriter::UpdateStorageBuffer(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, const Buffer* pBuffer)
 {
 	// Guards against deferred-update callers (TextureDescriptors::Rewrite*) passing a binding

@@ -52,7 +52,7 @@ void TextureUploadManager::InitializeTransferResources()
 	VkName(VK_OBJECT_TYPE_FENCE, mTransferVkFence, "Transfer");
 
 	VmaAllocationInfo stagingVmaAllocationInfo {};
-	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo);
+	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo, BufferMemoryPlacement::kOrdinaryRam);
 	miStagingSize = kiByteBudgetPerFrame;
 	mpStagingMappedData = stagingVmaAllocationInfo.pMappedData;
 }

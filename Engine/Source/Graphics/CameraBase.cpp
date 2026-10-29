@@ -3,7 +3,6 @@
 #include "CameraBase.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -171,11 +170,10 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	}
 	UpdateFraming();
 
-	// Keep each world-texel reference at or above the live framing: zero initialization and outward zoom snap
-	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
-	// density change remains gradual. At a settled framing both references converge to the live framing.
+	// Keep the shadow texel reference at or above the live framing: zero initialization and outward zoom snap
+	// immediately for full viewport coverage, while inward zoom contracts at the existing rate so the
+	// density change remains gradual. At a settled framing the reference converges to the live framing.
 	UpdateTexelFramingReference(mfCameraFraming, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelFraming);
-	UpdateTexelFramingReference(mfCameraFraming, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelFraming);
 
 	CalculateMatricesAndVisibleArea();
 
@@ -322,7 +320,7 @@ void CameraBase::ResetForSession()
 	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
 	// contraction across sessions.
 	mfShadowTexelFraming = 0.0f;
-	mfLightingTexelFraming = 0.0f;
+
 	mVecVisualErrorOffset = {};
 }
 
@@ -385,6 +383,20 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
 	mMatProjection = mbOrthographicProjection ? XMMatrixOrthographicRH(2.0f * fFramingHalfHeight * fAspectRatio, 2.0f * fFramingHalfHeight, fNearClip, fFarClip) : XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent), fAspectRatio, fNearClip, fFarClip);
+
+	LightingCameraPose comparisonPose;
+	if (gpGraphics->mpLighting != nullptr && gpGraphics->mpLighting->GetComparisonCamera(comparisonPose))
+	{
+		RenderBasis basis = MakeRenderBasis(comparisonPose.coordinate, mBasisCoordinate);
+		mVecEyePosition = Rebase(basis, XMVectorSetW(XMLoadFloat3A(&comparisonPose.f3Eye), 1.0f));
+		mVecPosition = Rebase(basis, XMVectorSetW(XMLoadFloat3A(&comparisonPose.f3Target), 1.0f));
+		mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
+		mVecWaterEyePosition = mVecEyePosition;
+		mbOrthographicProjection = false;
+		mfShadowTexelFraming = std::max(mfShadowTexelFraming, comparisonPose.f3Eye.z);
+		mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMLoadFloat3A(&comparisonPose.f3Up));
+		mMatProjection = XMMatrixPerspectiveFovRH(comparisonPose.fVerticalFieldOfView, fAspectRatio, comparisonPose.fNear, comparisonPose.fFar);
+	}
 
 	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorZero(), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
 
@@ -509,6 +521,21 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	mf4RenderVisibleArea.y = common::RoundDown(mf4RenderVisibleArea.y + mf2VisibleAreaQuadSize.y, mf2VisibleAreaQuadSize.y);
 	mf4RenderVisibleArea.z = mf4RenderVisibleArea.x + fQuadsX * mf2VisibleAreaQuadSize.x;
 	mf4RenderVisibleArea.w = mf4RenderVisibleArea.y - fQuadsY * mf2VisibleAreaQuadSize.y;
+}
+
+float CameraBase::GetRenderFraming() const
+{
+	LightingCameraPose pose;
+	return gpGraphics->mpLighting->GetComparisonCamera(pose) ? XMVectorGetZ(mVecEyePosition) - gpFlightPlanes->Lowest().fHeightMeters : mfCameraFraming;
+}
+
+void CameraBase::UpdateComparisonCamera()
+{
+	LightingCameraPose pose;
+	if (gpGraphics->mpLighting->GetComparisonCamera(pose))
+	{
+		CalculateMatricesAndVisibleArea();
+	}
 }
 
 } // namespace engine

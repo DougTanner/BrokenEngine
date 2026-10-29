@@ -298,7 +298,7 @@ function Get-PairMatches
 function Get-Games
 {
 	$games = [System.Collections.Generic.List[object]]::new()
-	foreach ($name in (Get-AgentGameProjects $script:Root))
+	foreach ($name in @(Get-AgentGameProjects $script:Root | Where-Object { $_ -cne 'ModelViewer' }))
 	{
 		$directory = Join-Path $script:Root "Projects\$name\Platforms\VisualStudio2026"
 		$clientPath = Join-Path $directory "$name.vcxproj"

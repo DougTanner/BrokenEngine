@@ -289,6 +289,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 	CollectBindings(shaderResources.storage_images, "Storage images:", VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, spirvCrossCompiler, bindingTable, ArrayCount);
 	CollectBindings(shaderResources.separate_images, "Separate images:", VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, spirvCrossCompiler, bindingTable, RuntimeArrayCount);
 	CollectBindings(shaderResources.separate_samplers, "Separate samplers:", VK_DESCRIPTOR_TYPE_SAMPLER, spirvCrossCompiler, bindingTable, ConstantOne);
+	CollectBindings(shaderResources.acceleration_structures, "Acceleration structures:", VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, spirvCrossCompiler, bindingTable, ArrayCount);
 
 	// Allocate data span: [bindings ALIGN16] [setIndices ALIGN16] [attrs ALIGN16] [SPIR-V]
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(common::ShaderHeader::SpirvOffset(iBindingCount, iAttributeCount) + iSpirvFileBytes);

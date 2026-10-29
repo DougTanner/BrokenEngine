@@ -2,6 +2,7 @@
 
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
+#include "Quads/QuadsAxisAligned.h"
 
 // Push constants
 layout(push_constant) uniform pushConstants
@@ -37,8 +38,7 @@ void main()
 	f4OutParams = pQuads[gl_InstanceIndex].f4Parameters;
 	uiOutTextureSlot = pQuads[gl_InstanceIndex].uiTextureSlot;
 
-	f2OutTexcoord = vec2((1.0f - f2InQuadVertex.x) * pQuads[gl_InstanceIndex].f4TextureRect.x + f2InQuadVertex.x * pQuads[gl_InstanceIndex].f4TextureRect.z,
-	                     (1.0f - f2InQuadVertex.y) * pQuads[gl_InstanceIndex].f4TextureRect.y + f2InQuadVertex.y * pQuads[gl_InstanceIndex].f4TextureRect.w);
+	f2OutTexcoord = AxisAlignedQuadTexcoord(pQuads[gl_InstanceIndex], f2InQuadVertex);
 
 	vec4 f4VisibleArea;
 	if (int(pushConstantsLayout.f4Pipeline.x) == 0)
@@ -49,26 +49,16 @@ void main()
 	{
 		f4VisibleArea = globalLayout.f4ShadowAreaExtra;
 	}
-	else if (int(pushConstantsLayout.f4Pipeline.x) == 2)
+	else
 	{
 		f4VisibleArea = globalLayout.pf4SmokeAreas[int(pushConstantsLayout.f4Pipeline.y)];
 	}
-	else
-	{
-		f4VisibleArea = globalLayout.f4LightingArea;
-	}
-
 	// fRotation is per-quad angle in radians; 0 (default) = identity (no rotation).
-	float fCos = cos(pQuads[gl_InstanceIndex].fRotation);
-	float fSin = sin(pQuads[gl_InstanceIndex].fRotation);
-	float fLocalX = (f2InQuadVertex.x - 0.5f) * pQuads[gl_InstanceIndex].f4VertexRect.z;
-	float fLocalY = (f2InQuadVertex.y - 0.5f) * pQuads[gl_InstanceIndex].f4VertexRect.w;
-	float fRotX = fLocalX * fCos - fLocalY * fSin;
-	float fRotY = fLocalX * fSin + fLocalY * fCos;
-	float fCenterX = pQuads[gl_InstanceIndex].f4VertexRect.x + pQuads[gl_InstanceIndex].f4VertexRect.z * 0.5f;
-	float fCenterY = pQuads[gl_InstanceIndex].f4VertexRect.y + pQuads[gl_InstanceIndex].f4VertexRect.w * 0.5f;
-	float fWorldX = fCenterX + fRotX;
-	float fWorldY = fCenterY + fRotY;
+	vec4 f4World = AxisAlignedQuadWorld(pQuads[gl_InstanceIndex], f2InQuadVertex);
+	float fWorldX = f4World.x;
+	float fWorldY = f4World.y;
+	float fCenterX = f4World.z;
+	float fCenterY = f4World.w;
 	gl_Position = vec4(-1.0f + 2.0f * (fWorldX - f4VisibleArea.x) / (f4VisibleArea.z - f4VisibleArea.x),
 	                    1.0f - 2.0f * (fWorldY - f4VisibleArea.y) / (f4VisibleArea.w - f4VisibleArea.y),
 	                    0.0f,

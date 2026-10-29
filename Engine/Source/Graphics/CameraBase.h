@@ -80,7 +80,7 @@ public:
 	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
 	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
-	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow/lighting
+	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow
 	// texel grids hold a constant on-screen pixel size at any framing (the texels coarsen with zoom instead of cropping
 	// coverage), so this is purely the gameplay limit on how far the camera can pull back.
 	static constexpr float kfFramingMaximumRelease = 600.0f;
@@ -89,12 +89,11 @@ public:
 #else
 	static constexpr float kfFramingMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
 #endif
-	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
-	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing,
+	// Headroom multiplier: the shadow textures are allocated this much larger
+	// than the wanted on-screen pixel size. Because the texel-framing reference never falls below live framing,
 	// this margin keeps the raw live-frustum footprints inside their textures throughout zoom transitions. At settled
 	// framing, the raw live-frustum window equals the wanted pixel size regardless of this value.
 	static constexpr float kfShadowHeadroomMultiplier = 1.5f;
-	static constexpr float kfLightingHeadroomMultiplier = 1.5f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
 	// zoom range either way. WHEEL_DELTA (120) * kfFramingPerWheelTick (0.1) = 12 units per click.
 	static constexpr float kfCameraFramingInitial = kfCameraFramingDefault + 48.0f;
@@ -166,10 +165,6 @@ public:
 	// at the shadow rate inward. 0 = uninitialized (snap directly to live framing on first frame).
 	float mfShadowTexelFraming = 0.0f;
 
-	// Framing reference that sizes the lighting texel grid. Expands immediately with outward zoom and contracts
-	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live framing on first frame).
-	float mfLightingTexelFraming = 0.0f;
-
 	explicit CameraBase(const CameraSetup& rCameraSetup);
 
 	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
@@ -186,6 +181,8 @@ public:
 	glm::quat mModelSunRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
 	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPosition) const;
+	float GetRenderFraming() const;
+	void UpdateComparisonCamera();
 
 	inline bool XM_CALLCONV InVisibleArea(XMFLOAT4 f4VisibleArea, XMFLOAT4 f4Position, float fAdjustLeft = 0.0f, float fAdjustRight = 0.0f, float fAdjustTop = 0.0f, float fAdjustBottom = 0.0f)
 	{

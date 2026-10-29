@@ -279,7 +279,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
@@ -336,6 +335,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\FrameEdit.h" />
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h" />
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h" />
+    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -419,7 +419,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />

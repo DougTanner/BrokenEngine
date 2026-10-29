@@ -37,13 +37,9 @@ public:
 	// acquire/release, or mUploadMutex for elevations, carries that); the worst case is one frame of adoption latency.
 	std::atomic<int64_t> miPendingAdoptions = 0;
 
-	// Registered pre-blur lighting-texture CRCs. Lives here for the same reason as the counter above: this manager
-	// outlives every Graphics recreation, while TextureManager — which registration would otherwise write and which
-	// never re-registers, because registration runs once at startup — is destroyed and rebuilt empty by one.
-	// Unlike the counter, this is main-thread-only and unsynchronized, not an atomic: it is written only by startup
-	// registration (RegisterLightingTextureCrc) and read only from main-thread adoption and reblur, so the upload
-	// thread must never touch it.
-	std::unordered_set<common::crc_t> mLightingTextureCrcs;
+	// Startup-only registrations survive Graphics recreation so source textures are requested again at boot.
+	// Main-thread-only; the upload thread never accesses this set.
+	std::unordered_set<common::crc_t> mRegisteredTextureCrcs;
 
 	std::binary_semaphore mFrameSignal = std::binary_semaphore(0);
 

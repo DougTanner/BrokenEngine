@@ -229,8 +229,19 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   state, and again after a resync reset, and `tailTick` is the newest snapshot
   tick, or -1 with no snapshot.
 - `query_profile`: no params (only an empty object is accepted). Client-only
-  profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for
-  every timer row, including zeros, frame-coherent
+  profile query returns
+  `lighting{sources,instances,traceOnlyInstances,triangles,capture{status,completedTiles,totalTiles,error,directory}}`:
+  counts from the latest fence-completed publication, and capture `status` one of
+  `not-run`, `receivers`, `tracing`, `composing`, `complete` or `failed` (with
+  `error`). The Tweaks Lighting `Comparison` tab selects
+  mode/camera/scenario/count/samples/event and requests Capture, which needs
+  Fixture reference mode, a paused client and a 1920x1080 framebuffer, and
+  advances over ordinary frames. A `complete` capture's `directory` holds
+  `position`, `shading-normal`, `geometric-normal`, `albedo` and `direct`
+  `.rgba32f` raws, `finished.png` and `capture.json`. Other fields include
+  `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for every timer row
+  (Lighting terrain preparation is the row whose `name` ends `Lighting Terrain`),
+  including zeros, frame-coherent
   `shadowSample{sequence,currentUs}`,
   `clock{offsetTicks,targetBehindTicks,errorTicks}`, integer `fps`, and
   `counters[{index,name,count}]` for every CPU counter, including zero rows

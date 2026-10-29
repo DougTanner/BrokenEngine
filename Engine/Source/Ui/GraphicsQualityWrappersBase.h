@@ -21,7 +21,6 @@ enum class GraphicsQualityLevel : uint8_t
 extern engine::Wrapper gWaterLevel;
 extern engine::Wrapper gTerrainShadowsLevel;
 extern engine::Wrapper gObjectShadowsLevel;
-extern engine::Wrapper gLightingLevel;
 extern engine::Wrapper gSmokeDetailLevel;
 
 // Write the underlying engine wrappers for one feature from its current level. Call right after the level
@@ -29,7 +28,6 @@ extern engine::Wrapper gSmokeDetailLevel;
 // change on its next poll, and these never call Changed<T>() (that single poll belongs to Refresh).
 void ApplyTerrainShadowsLevel();
 void ApplyObjectShadowsLevel();
-void ApplyLightingLevel();
 void ApplySmokeDetailLevel();
 
 void ApplyAllGraphicsQualityLevels();

@@ -27,7 +27,7 @@ void Camera::Update()
 	mVecPosition = XMVectorSetZ(mVecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
 	mfCameraFraming = kfCameraFramingDefault;
 	mfShadowTexelFraming = mfCameraFraming;
-	mfLightingTexelFraming = mfCameraFraming;
+
 	CalculateMatricesAndVisibleArea();
 }
 

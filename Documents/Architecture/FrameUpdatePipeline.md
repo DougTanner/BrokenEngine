@@ -86,6 +86,42 @@ flowchart LR
     beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> gameInput["Game::ProcessGameMenuInput"] --> completePoll["Input::previous-snapshot assignment"] --> clientUpdate["GameBase::ClientUpdate"]
 ```
 
+## Client Rendering and Comparison Capture
+
+[`Graphics`](../../Engine/Source/Graphics/Graphics.cpp) and
+[`CommandBufferManager`](../../Engine/Source/Graphics/Managers/CommandBufferManager.cpp)
+submit Global, preparation, Main and ImGui before present. Global and Main are
+recorded once between recreation events. Preparation uploads current Main data,
+displaces water, builds Lighting inputs, and updates smoke/wind emission, object
+shadows/blur and water foam. Main renders the image and HDR resolve. It waits for
+both preparation and image availability; ImGui joins the Main worker and submits
+the framebuffer fence. Main also signals particle synchronization for the next
+Global submission.
+
+A Lighting comparison capture adds no submission and never blocks the main loop.
+While the client is paused, ordinary frames carry it inside preparation: the
+first frame records the receiver pass, each later frame dispatches a fixed number
+of reference tiles, and the frame that dispatches the last tiles moves the
+reference to shader-read and enables it for that frame's Main composition.
+[`LightingCapture`](../../Engine/Source/Graphics/Lighting/LightingCapture.cpp)
+`FinishCapture` runs on that framebuffer after ImGui submission and before
+present, waits its fence, exports the raw images and the finished PNG, then
+disables the reference.
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+flowchart LR
+    global["Global"] --> preparation["Preparation: Lighting inputs + receivers or reference tiles"]
+    preparation --> main["Main + HDR resolve"]
+    acquired["Image available"] --> main
+    main --> ui["ImGui + framebuffer fence"]
+    ui --> export["FinishCapture on the composing frame"] --> present["Present"]
+```
+
+[Graphics](../../Engine/Source/Graphics/AGENTS.md#lighting-publication) owns the
+capture states and failure rules. These submission paths do not advance Frame
+simulation or add state to its CRC.
+
 ## Server Main Loop
 
 The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls

@@ -15,6 +15,9 @@ enum class BufferFlags : uint64_t
 	kHostVisible                 = 0x10,
 
 	kCopyToDeviceLocalEveryFrame = 0x20,
+	kDeviceAddress              = 0x40,
+	kAccelerationInput          = 0x80,
+	kAccelerationStorage        = 0x100,
 };
 using BufferFlags_t = common::Flags<BufferFlags>;
 
@@ -31,6 +34,12 @@ struct BarrierInfo
 	VkBuffer vkBarrierBuffer = VK_NULL_HANDLE;
 };
 
+enum class BufferMemoryPlacement
+{
+	kDefault,
+	kOrdinaryRam,
+};
+
 struct BufferInfo
 {
 	std::string_view name;
@@ -41,6 +50,7 @@ struct BufferInfo
 	int64_t iVertexStride = 0;
 	int64_t iDataSize = 0;
 	int64_t iElementSize = 0;
+	BufferMemoryPlacement eMemoryPlacement = BufferMemoryPlacement::kDefault;
 };
 
 struct StagingBuffer;
@@ -56,7 +66,7 @@ class Buffer
 {
 public:
 
-	static void CreateBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr);
+	static void CreateBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr, BufferMemoryPlacement eMemoryPlacement = BufferMemoryPlacement::kDefault);
 	// Records the staged copies plus a transfer-to-vertex-input barrier (index/vertex buffer destinations) into vkCommandBuffer.
 	// The caller keeps the returned staging buffer alive until that command buffer's execution completes.
 	static std::unique_ptr<StagingBuffer> RecordUploadToDeviceLocal(VkCommandBuffer vkCommandBuffer, VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
@@ -74,6 +84,7 @@ public:
 	void Destroy() noexcept;
 
 	VkBuffer GetBuffer() const;
+	VkDeviceAddress GetDeviceAddress() const;
 
 	void RecordBindVertexBuffer(VkCommandBuffer vkCommandBuffer);
 	void RecordCopy(VkCommandBuffer vkCommandBuffer);

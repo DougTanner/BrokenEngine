@@ -116,6 +116,8 @@ public:
 	int64_t AllocateMeshData(int64_t iCommandBuffer, int64_t iCount);
 	int64_t AllocateJointMatrices(int64_t iCommandBuffer, int64_t iCount);
 	void ResetSkinningAllocations(int64_t iCommandBuffer);
+	int64_t mpiMeshDataOffset[kiMaxFramebuffers] {};
+	int64_t mpiJointMatrixOffset[kiMaxFramebuffers] {};
 
 	std::unordered_map<common::crc_t, std::vector<Buffer>> mpDynamicStorageBuffers[kBufferTypeCount];
 	std::optional<Buffer> mOptionalPreviousBuffer;
@@ -129,8 +131,6 @@ private:
 	void GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCount);
 	void GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValidCount);
 
-	int64_t mpiMeshDataOffset[kiMaxFramebuffers] {};
-	int64_t mpiJointMatrixOffset[kiMaxFramebuffers] {};
 	int64_t mpiMeshDataCapacity[kiMaxFramebuffers] {};
 	int64_t mpiJointMatrixCapacity[kiMaxFramebuffers] {};
 	// Skinning buffers remain parked until the next ResetSkinningAllocations call;

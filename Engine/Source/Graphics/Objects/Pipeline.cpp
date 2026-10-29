@@ -123,7 +123,7 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 		ASSERT(mInfo.vkExtent3D.width != 0 && mInfo.vkExtent3D.height != 0);
 	}
 
-	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible || mInfo.flags & kPerCommandBuffer;
+	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
 	mbPerCommandBuffer = std::ranges::any_of(mInfo.descriptorInfos, [](const DescriptorInfo& rDescriptorInfo)
 	{
 		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers || IsPublishedTextureDescriptor(rDescriptorInfo);

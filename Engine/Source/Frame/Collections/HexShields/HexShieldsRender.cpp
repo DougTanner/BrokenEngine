@@ -3,7 +3,6 @@
 #if defined(BT_CLIENT)
 
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Profile/ProfileRows.h"
 
@@ -17,7 +16,6 @@ void HexShieldsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), kiDynamicBufferInitialCapacity);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShields(kuiCrc, kpcName);
-	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShieldsLighting(kuiCrc, kpcName);
 }
 
 static int64_t siRendered = 0;
@@ -41,7 +39,6 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
 		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc), iCommandBuffer, 2, pBuffer);
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -88,12 +85,6 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		rLayout.f4Color.z = static_cast<float>((uiColor >> 16) & 0xFF) / 255.0f;
 		rLayout.f4Color.w = static_cast<float>((uiColor >> 24) & 0xFF) / 255.0f;
 
-		uint32_t uiLightingColor = rType.uiLightingColor;
-		rLayout.f4LightingColor.x = static_cast<float>((uiLightingColor >> 0) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.y = static_cast<float>((uiLightingColor >> 8) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.z = static_cast<float>((uiLightingColor >> 16) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.w = static_cast<float>((uiLightingColor >> 24) & 0xFF) / 255.0f;
-
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
 			rLayout.pf4Directions[j] = rCurrent.pf4Directions[j][i];
@@ -101,7 +92,6 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			rLayout.pfFragmentIntensities[j] = rCurrent.pfFragmentIntensities[j][i];
 		}
 
-		rLayout.fLightingIntensity = rCurrent.pfLightingIntensities[i];
 		rLayout.fSize = rCurrent.pfSizes[i];
 		rLayout.fColorMix = rCurrent.pfColorMixes[i];
 		rLayout.fMinimumIntensity = rType.fMinimumIntensity;
@@ -121,7 +111,6 @@ void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = siRendered;
 	}
 	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 }
 
 } // namespace engine

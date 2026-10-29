@@ -14,8 +14,6 @@ struct ModelPipelineSpec
 
 enum DynamicPipelineType
 {
-	kDynamicPipelineLighting,
-	kDynamicPipelineAxisAlignedLighting,
 	kDynamicPipelineVisibleLights,
 	kDynamicPipelineBillboards,
 	kDynamicPipelineSmokeAxisAligned,
@@ -25,7 +23,6 @@ enum DynamicPipelineType
 	kDynamicPipelineWindDepositAxisAlignedA,
 	kDynamicPipelineWindDepositAxisAlignedB,
 	kDynamicPipelineHexShields,
-	kDynamicPipelineHexShieldsLighting,
 
 	kDynamicPipelineCount,
 };
@@ -51,7 +48,6 @@ public:
 	void CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers);
 	void CreatePipelineBillboards(common::crc_t crc, std::string_view name);
 	void CreatePipelineHexShields(common::crc_t crc, std::string_view name);
-	void CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name);
 	void UpdateAllModelPipelineDescriptors(int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
 
 	std::vector<std::unique_ptr<Pipeline>> mPipelines;
@@ -60,7 +56,6 @@ public:
 	std::unordered_map<common::crc_t, ModelPipeline*> mpModelPipelineMaps[kDynamicModelPipelineCount];
 	std::unordered_map<common::crc_t, std::string> mShadowPipelineNames; // Owns shadow pipeline name strings
 
-	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
 	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer);
 	// Pipeline-map and dynamic-buffer key of one smoke collection's deposit into flight plane iPlane.
 	static common::crc_t SmokeDepositKey(common::crc_t crc, int64_t iPlane);

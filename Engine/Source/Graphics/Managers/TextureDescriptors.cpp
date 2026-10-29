@@ -29,6 +29,13 @@ TextureDescriptors::ScopedBindlessWriteEpoch::~ScopedBindlessWriteEpoch()
 
 void TextureDescriptors::Create()
 {
+	mLightingFallback.Create({.name = "LightingFallback", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = {1, 1, 1}, .vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT}, [](std::span<std::byte> bytes, [[maybe_unused]] int64_t iPosition) { std::memset(bytes.data(), 0, bytes.size()); });
+	mLightingControls = std::vector<Buffer>(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
+	for (Buffer& rControl : mLightingControls)
+	{
+		rControl.Create({.name = "LightingControl", .flags = {BufferFlags::kStorage, BufferFlags::kHostVisible}, .iDataSize = 16});
+		std::memset(rControl.mpMappedMemory, 0, 16);
+	}
 	// Set 0 is shared by graphics and compute pipelines.
 	VkDescriptorSetLayoutBinding pVkBindings[]
 	{
@@ -38,6 +45,8 @@ void TextureDescriptors::Create()
 		{.binding = shaders::kiGlobalBindingSamplerRepeat, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 		{.binding = shaders::kiGlobalBindingBindlessTextures, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = static_cast<uint32_t>(std::ssize(mImageInfos)), .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 		{.binding = shaders::kiGlobalBindingSamplerClamp, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
+		{.binding = shaders::kiGlobalBindingLightingReference, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
+		{.binding = shaders::kiGlobalBindingLightingControl, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
 	};
 
 	VkDescriptorBindingFlags pVkBindingFlags[]
@@ -48,6 +57,8 @@ void TextureDescriptors::Create()
 		0,
 		VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
 		0,
+		VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+		VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
 	};
 
 	VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfo
@@ -98,6 +109,8 @@ void TextureDescriptors::Destroy()
 		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mGlobalVkDescriptorSetLayout, nullptr);
 		mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 		mGlobalDescriptorSets.clear();
+		mLightingControls.clear();
+		mLightingFallback.Destroy();
 		// Create rewrites the new Global sets from live state, and every tier that destroys them also rebuilds the pipelines.
 		mPendingPublications.clear();
 		mAppliedPublicationCursors.clear();
@@ -125,7 +138,21 @@ void TextureDescriptors::WriteGlobalDescriptorSets()
 		};
 
 		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(std::size(pVkWrites)), pVkWrites, 0, nullptr);
+		SetLightingReference(i, nullptr, false);
 	}
+}
+
+void TextureDescriptors::SetLightingReference(int64_t iFramebuffer, const Texture* pTexture, bool bEnabled)
+{
+	*reinterpret_cast<uint32_t*>(mLightingControls.at(iFramebuffer).mpMappedMemory) = bEnabled ? 1ui32 : 0ui32;
+	VkDescriptorImageInfo vkDescriptorImageInfo {.sampler = mrTextureManager.mpSamplersVkSampler[TextureManager::kSamplerSlotClamp], .imageView = (pTexture != nullptr ? pTexture : &mLightingFallback)->mVkImageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+	VkDescriptorBufferInfo vkDescriptorBufferInfo {.buffer = mLightingControls.at(iFramebuffer).GetBuffer(), .range = 16};
+	VkWriteDescriptorSet pVkWriteDescriptorSets[]
+	{
+		{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(iFramebuffer), .dstBinding = shaders::kiGlobalBindingLightingReference, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &vkDescriptorImageInfo},
+		{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(iFramebuffer), .dstBinding = shaders::kiGlobalBindingLightingControl, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &vkDescriptorBufferInfo},
+	};
+	vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(std::size(pVkWriteDescriptorSets)), pVkWriteDescriptorSets, 0, nullptr);
 }
 
 void TextureDescriptors::AppendPublication(common::crc_t bindingKey, int64_t iSlot)
@@ -694,7 +721,7 @@ void TextureDescriptors::ClearTextureBindings()
 int64_t TextureDescriptors::CrcToIndex(common::crc_t crc)
 {
 	// Phase exclusion protects mImageInfosMap and miNextTextureIndex: ParticleManager::Spawn serializes worker writes with mSpawnMutex during
-	// RunFrameTick dispatch, which fully joins before render writes. UpdateDescriptorsForTexture and BlurLightingTexture assert !mbInFrameTick.
+	// RunFrameTick dispatch, which fully joins before render writes. UpdateDescriptorsForTexture assert !mbInFrameTick.
 	auto it = mImageInfosMap.find(crc);
 	if (it != mImageInfosMap.end())
 	{
@@ -708,17 +735,6 @@ int64_t TextureDescriptors::CrcToIndex(common::crc_t crc)
 	ASSERT(iIndex < std::ssize(mImageInfos));
 	mImageInfosMap.emplace(crc, iIndex);
 	return iIndex;
-}
-
-float TextureDescriptors::CrcToBlurredIndex(common::crc_t crc)
-{
-	common::crc_t blurredCrc = crc ^ kBlurSalt;
-	auto it = mImageInfosMap.find(blurredCrc);
-	if (it != mImageInfosMap.end())
-	{
-		return static_cast<float>(it->second);
-	}
-	return static_cast<float>(CrcToIndex(crc));
 }
 
 } // namespace engine

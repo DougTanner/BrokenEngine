@@ -4,7 +4,6 @@
 
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
@@ -19,13 +18,12 @@ enum class GraphicsSettingsFlags : uint8_t
 	kSampleShading     = 1 << 3,
 	kSmoke             = 1 << 4,
 	kWind              = 1 << 5,
-	kLighting          = 1 << 6,
 	kSmokeLayerStagger = 1 << 7,
 };
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 20;
+	static constexpr int64_t kiVersion = 21;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -36,18 +34,16 @@ struct GraphicsSettings
 	float fMipmapLevelOfDetailBias = 0.0f;
 	float fSmokeSimulationArea = 0.0f;
 	float fMinimumAmbient = 0.0f;
-	float fLightingUpdateCadence = 1.0f;
 	float fShadowUpdateCadence = 4.0f;
 	// The quality levels are the single source of truth for the wrappers they drive; those wrapper values are
 	// never persisted directly. uint8_t, not the enum: the file layout must not follow GraphicsQualityLevel.
 	uint8_t uiWaterLevel = 0;
 	uint8_t uiTerrainShadowsLevel = 0;
 	uint8_t uiObjectShadowsLevel = 0;
-	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
 	uint8_t uiWaterFoamEnabled = 1;
 	uint8_t uiOrthographicProjection = 0;
-	uint8_t puiProjectionPadding[1] {};
+	uint8_t puiProjectionPadding[2] {};
 	float fFieldOfView = 15.0f;
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
@@ -61,18 +57,16 @@ static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumSampleShading) == 16, "Graph
 static_assert(BT_OFFSETOF(GraphicsSettings, fMipmapLevelOfDetailBias) == 20, "GraphicsSettings::fMipmapLevelOfDetailBias offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeSimulationArea) == 24, "GraphicsSettings::fSmokeSimulationArea offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumAmbient) == 28, "GraphicsSettings::fMinimumAmbient offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, fLightingUpdateCadence) == 32, "GraphicsSettings::fLightingUpdateCadence offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, fShadowUpdateCadence) == 36, "GraphicsSettings::fShadowUpdateCadence offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterLevel) == 40, "GraphicsSettings::uiWaterLevel offset changed — the quality bytes are appended after the floats");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 41, "GraphicsSettings::uiTerrainShadowsLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 42, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 43, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 44, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterFoamEnabled) == 45, "GraphicsSettings::uiWaterFoamEnabled offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiOrthographicProjection) == 46, "GraphicsSettings::uiOrthographicProjection offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 47, "GraphicsSettings padding changed — fFieldOfView must stay four-byte aligned");
-static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 48, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
-static_assert(sizeof(GraphicsSettings) == 52, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, fShadowUpdateCadence) == 32, "GraphicsSettings::fShadowUpdateCadence offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterLevel) == 36, "GraphicsSettings::uiWaterLevel offset changed — the quality bytes are appended after the floats");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 37, "GraphicsSettings::uiTerrainShadowsLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 38, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 39, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterFoamEnabled) == 40, "GraphicsSettings::uiWaterFoamEnabled offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiOrthographicProjection) == 41, "GraphicsSettings::uiOrthographicProjection offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 42, "GraphicsSettings padding changed — fFieldOfView must stay four-byte aligned");
+static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 44, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
+static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -89,12 +83,10 @@ void SaveGraphicsSettings()
 		.fMipmapLevelOfDetailBias = gMipmapLevelOfDetailBias.mfCurrent,
 		.fSmokeSimulationArea = gSmokeSimulationArea.mfCurrent,
 		.fMinimumAmbient = gSunMoonMinimumAmbient.mfCurrent,
-		.fLightingUpdateCadence = gLightingUpdateCadence.mfCurrent,
 		.fShadowUpdateCadence = gShadowUpdateCadence.mfCurrent,
 		.uiWaterLevel = static_cast<uint8_t>(gWaterLevel.Get<int64_t>()),
 		.uiTerrainShadowsLevel = static_cast<uint8_t>(gTerrainShadowsLevel.Get<int64_t>()),
 		.uiObjectShadowsLevel = static_cast<uint8_t>(gObjectShadowsLevel.Get<int64_t>()),
-		.uiLightingLevel = static_cast<uint8_t>(gLightingLevel.Get<int64_t>()),
 		.uiSmokeDetailLevel = static_cast<uint8_t>(gSmokeDetailLevel.Get<int64_t>()),
 		.uiWaterFoamEnabled = static_cast<uint8_t>(gWaterFoamSystemEnabled.Get<bool>()),
 		.uiOrthographicProjection = static_cast<uint8_t>(gOrthographicProjection.Get<bool>()),
@@ -108,7 +100,6 @@ void SaveGraphicsSettings()
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSmoke, gSmokeEnabled.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kSmokeLayerStagger, gSmokeLayerStagger.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kWind, gWindEnabled.Get<bool>());
-	graphicsSettings.flags.Set(GraphicsSettingsFlags::kLighting, gLightingEnabled.Get<bool>());
 
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
 }
@@ -151,11 +142,6 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "fMinimumAmbient";
 	}
 
-	if (!gLightingUpdateCadence.IsInRange(rGraphicsSettings.fLightingUpdateCadence))
-	{
-		return "fLightingUpdateCadence";
-	}
-
 	if (!gShadowUpdateCadence.IsInRange(rGraphicsSettings.fShadowUpdateCadence))
 	{
 		return "fShadowUpdateCadence";
@@ -174,11 +160,6 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiObjectShadowsLevel))
 	{
 		return "uiObjectShadowsLevel";
-	}
-
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiLightingLevel))
-	{
-		return "uiLightingLevel";
 	}
 
 	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiSmokeDetailLevel))
@@ -243,15 +224,12 @@ bool LoadGraphicsSettings()
 		gSmokeLayerStagger.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmokeLayerStagger);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
 		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
-		gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
 		gShadowUpdateCadence.Set(graphicsSettings.fShadowUpdateCadence);
 		gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
-		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
 		gWaterFoamSystemEnabled.Set(graphicsSettings.uiWaterFoamEnabled != 0);
 		LoadGraphicsQualityLevel(gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
 		LoadGraphicsQualityLevel(gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
-		LoadGraphicsQualityLevel(gLightingLevel, graphicsSettings.uiLightingLevel);
 		LoadGraphicsQualityLevel(gSmokeDetailLevel, graphicsSettings.uiSmokeDetailLevel);
 	}
 
@@ -281,15 +259,12 @@ void ResetGraphicsSettings()
 	gSmokeLayerStagger.mfCurrent = gSmokeLayerStagger.mfDefault;
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
 	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;
-	gLightingUpdateCadence.mfCurrent = gLightingUpdateCadence.mfDefault;
 	gShadowUpdateCadence.mfCurrent = gShadowUpdateCadence.mfDefault;
 	gWindEnabled.mfCurrent = gWindEnabled.mfDefault;
-	gLightingEnabled.mfCurrent = gLightingEnabled.mfDefault;
 
 	gWaterLevel.mfCurrent = gWaterLevel.mfDefault;
 	gTerrainShadowsLevel.mfCurrent = gTerrainShadowsLevel.mfDefault;
 	gObjectShadowsLevel.mfCurrent = gObjectShadowsLevel.mfDefault;
-	gLightingLevel.mfCurrent = gLightingLevel.mfDefault;
 	gSmokeDetailLevel.mfCurrent = gSmokeDetailLevel.mfDefault;
 	ApplyAllGraphicsQualityLevels();
 

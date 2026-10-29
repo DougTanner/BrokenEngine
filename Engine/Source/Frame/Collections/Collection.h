@@ -117,8 +117,8 @@ enum class CollectionFlags : uint32_t
 using CollectionFlags_t = common::Flags<CollectionFlags>;
 
 #if defined(BT_CLIENT)
-// Request the CRC's chunk load and register it for pre-blur (implemented in TextureManager.cpp)
-void RegisterLightingTextureCrc(common::crc_t uiCrc);
+// Request collection source textures again after Graphics recreation.
+void RegisterCollectionTextureCrc(common::crc_t uiCrc);
 #endif
 
 // Define TYPE before its collection and register types single-threaded before Dispatch() starts workers.
@@ -141,7 +141,7 @@ struct TypeRegistry
 			if (rType.uiCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				RegisterLightingTextureCrc(rType.uiCrc);
+				RegisterCollectionTextureCrc(rType.uiCrc);
 #endif
 			}
 		}
@@ -151,7 +151,7 @@ struct TypeRegistry
 			if (rType.particleCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				RegisterLightingTextureCrc(rType.particleCrc);
+				RegisterCollectionTextureCrc(rType.particleCrc);
 #endif
 			}
 		}

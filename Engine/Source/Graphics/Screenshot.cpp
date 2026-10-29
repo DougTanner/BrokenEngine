@@ -36,6 +36,28 @@ static void ReportCaptureFailure(std::string_view error, bool bPublishResult, in
 
 static constexpr bool IsBlueGreenRedAlpha(VkFormat vkFormat);
 
+void SaveFinishedPng(int64_t iFramebufferIndex, const std::filesystem::path& rPath)
+{
+	// Heap: readback and PNG encode run on the main thread once per completed lighting capture.
+	ScopedSuppressAllocationTracking suppress;
+	VkFence vkFence = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex).mVkFence;
+	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
+	VkExtent2D vkExtent = gpGraphics->mFramebufferVkExtent2D;
+	std::vector<std::byte> bytes;
+	TextureCache::CopyImageToHostMemory(gpSwapchainManager->mFramebuffers.at(iFramebufferIndex).vkPresentImage, {vkExtent.width, vkExtent.height, 1}, gpInstanceManager->mFramebufferVkFormat, 1, 1, true, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, bytes);
+	uint32_t* puiPixels = reinterpret_cast<uint32_t*>(bytes.data());
+	for (int64_t i = 0; i < static_cast<int64_t>(vkExtent.width) * vkExtent.height; ++i)
+	{
+		uint32_t uiPixel = puiPixels[i];
+		puiPixels[i] = IsBlueGreenRedAlpha(gpInstanceManager->mFramebufferVkFormat) ? ((uiPixel & 0x00ff0000) >> 16) | (uiPixel & 0x0000ff00) | ((uiPixel & 0x000000ff) << 16) | 0xff000000 : uiPixel | 0xff000000;
+	}
+	std::string path = PathToString(rPath);
+	if (stbi_write_png(path.c_str(), static_cast<int>(vkExtent.width), static_cast<int>(vkExtent.height), 4, bytes.data(), static_cast<int>(vkExtent.width * 4)) == 0)
+	{
+		throw std::runtime_error("Lighting finished PNG write failed");
+	}
+}
+
 int64_t ResetCaptureResult()
 {
 	std::unique_lock lock(sCaptureResultMutex);
@@ -210,14 +232,12 @@ static int64_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view n
 
 constexpr const char* kpcValidDumpNames =
 	"Log, TerrainElevation, SmokeGradient, SmokeOne[0-N], SmokeTwo[0-N], WindOne, WindTwo, "
-	"Lighting[0-2], Combine[0-2], AmbientCombine, LightingHistory[0-2], AmbientHistory, "
-	"Spread[0-N][0-2], SpreadOnly[0-N][0-2], "
 	"ShadowElevation, Shadow, ShadowBlur, ShadowBlurIntermediate, ShadowHistory, "
 	"ObjectShadows, ObjectShadowsBlur, ObjectShadowsBlurIntermediate, WaterDisplacement, WaterDisplacementNormal";
 
 // Resolve a dump name (+ indices) to a live RenderTargetTextures member. Throws std::runtime_error listing valid
 // names on an unknown name, or on an out-of-range index (both surfaced to the agent).
-static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64_t iChannel)
+static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex)
 {
 	RenderTargetTextures& rRenderTargetTextures = gpTextureManager->mRenderTargetTextures;
 
@@ -248,14 +268,6 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	if (name == "WindTwo")
 	{
 		return &rRenderTargetTextures.mWindTextureTwo;
-	}
-	if (name == "AmbientCombine")
-	{
-		return &rRenderTargetTextures.mAmbientCombineTexture;
-	}
-	if (name == "AmbientHistory")
-	{
-		return &rRenderTargetTextures.mAmbientHistoryTexture;
 	}
 	if (name == "ShadowElevation")
 	{
@@ -296,28 +308,6 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	if (name == "WaterDisplacementNormal")
 	{
 		return &rRenderTargetTextures.mWaterDisplacementNormalTexture;
-	}
-
-	if (name == "Lighting")
-	{
-		return &rRenderTargetTextures.mpLightingTextures[CheckDumpIndex(iIndex, 3, name)];
-	}
-	if (name == "Combine")
-	{
-		return &rRenderTargetTextures.mpCombineTextures[CheckDumpIndex(iIndex, 3, name)];
-	}
-	if (name == "LightingHistory")
-	{
-		return &rRenderTargetTextures.mpLightingHistoryTextures[CheckDumpIndex(iIndex, 3, name)];
-	}
-
-	if (name == "Spread")
-	{
-		return &rRenderTargetTextures.mpSpreadTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, name)][CheckDumpIndex(iChannel, 3, name)];
-	}
-	if (name == "SpreadOnly")
-	{
-		return &rRenderTargetTextures.mpSpreadOnlyTextures[CheckDumpIndex(iIndex, shaders::kiMaxSpreadPasses, name)][CheckDumpIndex(iChannel, 3, name)];
 	}
 
 	throw std::runtime_error("unknown render target '" + std::string(name) + "'; valid names: " + kpcValidDumpNames);
@@ -509,7 +499,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 
 void ValidateDumpRenderTargetRequest(const DumpRenderTargetRequest& rRequest)
 {
-	Texture* pTexture = ResolveRenderTarget(rRequest.name, rRequest.iIndex, rRequest.iChannel);
+	Texture* pTexture = ResolveRenderTarget(rRequest.name, rRequest.iIndex);
 
 	// Readback requires the source image carry TRANSFER_SRC usage (CopyImageToHostMemory issues a transfer read).
 	if ((pTexture->mInfo.vkImageUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
@@ -528,18 +518,15 @@ void DumpRenderTarget(int64_t iFramebufferIndex, const DumpRenderTargetRequest& 
 {
 	LOG(kGraphics, kDebug, "DumpRenderTarget({})", rRequest.name);
 
-	// Wait the per-framebuffer fence exactly as SaveScreenshot does (same precondition: the UI submit that signals
-	// mVkFence is already enqueued at this capture site, never a fresh reset depending on this caller returning).
-	// This fully drains the frame's compute/transfer/graphics work, so the readback below is safe regardless of the
-	// target's last-access scope — CopyImageToHostMemory's vkSourceStage (FRAGMENT_SHADER on the non-swapchain path)
-	// cannot chain from a compute/transfer final transition (Shadow at GENERAL, Combine and ShadowHistory written by
-	// compute, lighting-history transfer copies), so the fence wait is what serializes them, not the barrier.
+	// The UI submit signaling mVkFence must already be enqueued before this wait.
+	// The fence orders compute/transfer writes before readback; CopyImageToHostMemory's fragment-stage barrier
+	// cannot chain from their final transitions.
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 
 	// Re-resolve (request was validated when queued). The fence wait above guarantees all passes writing this
 	// target have completed.
-	Texture* pTexture = ResolveRenderTarget(rRequest.name, rRequest.iIndex, rRequest.iChannel);
+	Texture* pTexture = ResolveRenderTarget(rRequest.name, rRequest.iIndex);
 
 	VkExtent3D vkExtent3D = pTexture->mInfo.vkExtent3D;
 	VkFormat vkFormat = pTexture->mInfo.vkFormat;

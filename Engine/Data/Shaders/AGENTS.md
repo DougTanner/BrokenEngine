@@ -19,14 +19,15 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
 
 ## Lighting and Vector Invariants
 
-- EWNS is one 4-float vector holding four directional values in slot order east, west, north, south. The consuming helpers in `ShaderFunctions.h` read them that way: slot 0 is weighted by a surface normal pointing +x (east), slot 1 by -x (west), slot 2 by +y (north), and slot 3 by -y (south).
-- Every depositor packs the direction the light arrives from, so slot 0 fills when the light source lies east of the receiving texel. Offset-based depositors (`Lighting/AreaLight.frag`, `Lighting/PointLight.frag`) pack the light-center-to-fragment offset as `(-x, +x, -y, +y)`; the surface-normal depositor (`Objects/HexShieldLighting.frag`) packs its projected blended normal the same way.
-- Directional lighting uses four EWNS channels. Light-source deposits derive directional weights from world-space source offsets; surface-normal deposits use the projected blended normal. Keep the documented epsilon fallbacks at family leaves.
+- Local diffuse sources and material-aware ray queries belong to Lighting
+  (`Lighting/AGENTS.md`). Gameplay source policy belongs to Graphics'
+  [Lighting Publication](../../Source/Graphics/AGENTS.md#lighting-publication).
+  Sun/moon, IBL, shadows, and smoke retain their own shading paths.
 - Model direct sun/moon lighting reads its own normalized direction; world
   lighting uses the world direction and its derived products. Camera rotation
   ownership belongs to Graphics (`../../Source/Graphics/AGENTS.md`
   `## World and Camera Contracts`).
-- Final lighting and shadow helpers are plain texture reads: every pass writes its whole texture, so the border samplers (transparent black for lighting, white for shadow) own rejection outside the footprint. Keep those sampler flags on every consumer pipeline.
+- Final shadow helpers are plain texture reads: every pass writes its whole texture, so the white border sampler owns rejection outside the footprint. Keep that sampler flag on every consumer pipeline.
 - Skip redundant normalization only where the identity is proven: `reflect(I, N)` preserves length for unit inputs, and `cross(a, b)` is unit only for unit orthogonal inputs.
 - Never call GLSL `inverse()` on a `mat3` or `mat4`: NVIDIA's shader compiler
   hangs forever while the pipeline is being created, and reports nothing. This
@@ -44,11 +45,11 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
   covers hold the program's HDR clear color (`game::kVkHdrClearColor`), graded
   with the scene. Presentation formats belong to
   [InstanceManager](../../Source/Graphics/Managers/AGENTS.md#instancemanager).
-- Debug texture display decodes renderer targets, including EWNS views.
+- Debug texture display decodes renderer targets.
 - The UI depth prepass is self-contained and expands opaque ImGui rectangles to populate depth before world rendering.
 
 ## Family Documentation
 
 - Debug (`Debug/AGENTS.md`), Lighting (`Lighting/AGENTS.md`), Model (`Model/AGENTS.md`), Objects (`Objects/AGENTS.md`), Particles (`Particles/AGENTS.md`), Quads (`Quads/AGENTS.md`), Shadow (`Shadow/AGENTS.md`), Smoke (`Smoke/AGENTS.md`), Terrain (`Terrain/AGENTS.md`), Water (`Water/AGENTS.md`), Wind (`Wind/AGENTS.md`)
 
-Family documents own algorithms and local correctness constraints; they do not repeat layouts, bindings, EWNS, or the `inverse()` rule.
+Family documents own algorithms and local correctness constraints; they do not repeat layouts, bindings, or the `inverse()` rule.
