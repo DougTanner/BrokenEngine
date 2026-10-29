@@ -329,6 +329,20 @@ Agent, Network and Main, and a nine-row acceptance table they can run with exist
 - Goal: a buildable stripped foundation passing the nine-row acceptance table, with the handoff doc rewritten around it.
 - Out of scope: stage 2 one-bounce reference, candidate algorithms, off-screen terrain tracing, Buffer.cpp memory policy, producer rewrites, legacy-removal content, new harness commands, unit tests, Frame/simulation files.
 - Tier trigger: Tier 3 — spans independently owned subsystems (Graphics, Agent `AgentCommandServer.cpp:301-356`, Network/Client `Client.cpp:16-20`, Main loop `Main.cpp:650-662`, `GameBase.cpp:942-958`, Profile `ProfileManager.h`, ModelViewer) and changes CPU/GPU data layout (`LightingTerrainCommon.h:14-41`).
-- Interfaces and invariants: public interfaces fixed in `## Public interface after the strip`; preparation submits before Main every frame with unchanged semaphore chain; descriptor writes only to the current or fence-waited framebuffer (the terrain work-buffer binding is refreshed every frame for the current framebuffer); diagnostics latch only after the covering fence; capture status survives Graphics recreation; gameplay local diffuse exactly zero; no Frame/CRC/RNG/pack change; RAM placement policy unchanged; ray offset 0.05 m shared by reference and candidates.
+- Interfaces and invariants: public interfaces fixed in `## Public interface after the strip`;
+  preparation submits before Main every frame with unchanged semaphore chain; descriptor writes only
+  to the current or fence-waited framebuffer (the terrain work-buffer binding is refreshed every
+  frame for the current framebuffer); diagnostics latch only after the covering fence; capture
+  status survives Graphics recreation; gameplay local diffuse exactly zero; no Frame/CRC/RNG/pack
+  change; RAM placement policy unchanged; ray offset 0.05 m shared by reference and candidates.
 - Acceptance checks: rows 1-9 of `## Acceptance table`; row 3 compares against the unedited-tree screenshots in `Temp/lighting-strip-baseline/`; rows 2 and 7 are checks the unedited tree cannot pass; row 9 is settled by the diff plus logs.
-- Roles: implementer per slice via `/implement-plan` (slices 1-4 parallel, then 5 with `/update-vcxproj`, then 6); `/update-affected-code` after slices 1-4; mechanic `/code-style-review`; builder `/compile` (DataPacker Release x64 Local data, Sandbox client and server Debug x64, ModelViewer Debug x64); Step 6 `/repo-code-review` (C++ and the shared CPU/GLSL headers `LightingTerrainCommon.h` and `LightingCommon.h`), `/glsl-review` (`LightingTerrain.comp`, `TerrainVertex.h`, the deleted shaders' includes, and the same shared headers), `/comment-review`, `/over-engineering-review`, `/coherence-review` for documents only, `/adversarial-review` (Tier 3), `/external-skill-creator` validation for the command-reference edit, `/update-claude-docs` and `/progressive-disclosure-review` for AGENTS.md and skill-reference edits; `/agent-harness` for rows 3-9.
+- Roles: implementer per slice via `/implement-plan` (slices 1-4 parallel, then 5 with
+  `/update-vcxproj`, then 6); `/update-affected-code` after slices 1-4; mechanic
+  `/code-style-review`; builder `/compile` (DataPacker Release x64 Local data, Sandbox client and
+  server Debug x64, ModelViewer Debug x64); Step 6 `/repo-code-review` (C++ and the shared CPU/GLSL
+  headers `LightingTerrainCommon.h` and `LightingCommon.h`), `/glsl-review` (`LightingTerrain.comp`,
+  `TerrainVertex.h`, the deleted shaders' includes, and the same shared headers), `/comment-review`,
+  `/over-engineering-review`, `/coherence-review` for documents only, `/adversarial-review` (Tier
+  3), `/external-skill-creator` validation for the command-reference edit, `/update-claude-docs` and
+  `/progressive-disclosure-review` for AGENTS.md and skill-reference edits; `/agent-harness` for
+  rows 3-9.

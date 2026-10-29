@@ -2,11 +2,46 @@
 
 ## Changed files
 
-- `Engine/Source/Graphics/Lighting/Lighting.h` — deleted `DrainLightingCaptureCommands`, `FrameInterpolateBase` forward declaration, `LightingAllocation`, `uiValidationRequest`; `LightingDiagnostics` reduced to `iSources, iInstances, iTraceOnlyInstances, iTriangles, status ("not-run"), iCompletedTiles, iTotalTiles, error, directory`; public members per plan `## Public interface after the strip` (`ApplyComparisonSettings(bool bScenePaused)`; `AddFrame`, `CapturePreparation`, `IsCaptureHeld`, `CancelCapture` gone); private scene-diagnostic, hold/release, `CompletePreparation`, manifest, `GetBufferAllocation` declarations gone; new private `RecordCapture(VkCommandBuffer)`.
-- `Engine/Source/Graphics/Lighting/LightingState.h` — dropped `LightingSceneDiagnostics.h` include; `LightingFramebuffer` loses diagnostic buffers/readback/operation counters/`uiHeldPublication`/`frameIdentities`, gains `uiPendingPublication`; `State::Comparison` keeps only GPU resources plus `eReferenceLayout` and tile constants (`kiTileColumns`, `kiTileCount`, `kiTilesPerFrame`=120); `NativeCapture` deleted; `State` holds `diagnostics` (latched counts + capture status), `uiServicedCapture`, `captureStart`, `capturePublication`.
-- `Engine/Source/Graphics/Lighting/Lighting.cpp` — `GetBufferAllocation` and byte accounting deleted; `CreateResources`/`DestroyResources`/`CreateTerrainPipelines`/`DestroyTerrainPipelines` drop scene diagnostics and the `completedDiagnostics` reset; `BeginRender` = framebuffer select + completed-after-fence latch + range/publication clear; `CompletePreparation`, `AddFrame`, `HoldPublication`, `ReleasePublication` deleted; `EndRender` uses `terrain.Prepare(iFramebuffer)` and stores serial + four pending counts (incl. `uiTraceOnlyInstances`); `RecordPreparation` calls the 3-argument `models->RecordPreparation`, wraps `terrain.RecordPreparation` in `kGpuTimerLightingTerrain`, drops operation counters and `RecordSceneDiagnostics`, calls `RecordCapture` after `RecordEnvironment`; TEMP block in `BindQueryDescriptors` removed; `SetComparison` no longer cancels.
-- `Engine/Source/Graphics/Lighting/LightingComparison.cpp` — resume stash removed; `IsCaptureRunning` file-local helper; `DestroyComparisonResources` fails a running capture ("Graphics recreated during capture") and no longer owns fence/query pool/command pool; `ApplyComparisonSettings(bool)` fails on unpause/settings change and starts a capture (reference mode + paused + 1920x1080, else `failed` with reason); `PrepareComparisonPipelines` keeps the per-frame fixture-draw part, compares publications in tracing frames and binds the reference compute set, and in the receivers frame records the publication, creates capture textures/render pass/framebuffer/receiver pipelines/reference compute once, and adds missing receiver model pipelines (map no longer cleared); `RecordReceivers` loses operation counting.
-- `Engine/Source/Graphics/Lighting/LightingCapture.cpp` — rewritten: `LightingWriteFile`, `RecordCapture` (receivers stage: reference to GENERAL compute layout + receiver pass; tracing: 120 tile dispatches; last batch: compute-to-shader-read transition, `SetLightingReference(iFramebuffer, &reference, true)`, status `composing`), `FinishCapture` (fence wait, finished.png, five `.rgba32f`, `capture.json`, descriptor reset), `WriteProfile` (`sources, instances, traceOnlyInstances, triangles, capture{status, completedTiles, totalTiles, error, directory}`). All pump/hash/manifest/TEMP code gone.
+- `Engine/Source/Graphics/Lighting/Lighting.h` — deleted `DrainLightingCaptureCommands`,
+  `FrameInterpolateBase` forward declaration, `LightingAllocation`, `uiValidationRequest`;
+  `LightingDiagnostics` reduced to `iSources, iInstances, iTraceOnlyInstances, iTriangles, status
+  ("not-run"), iCompletedTiles, iTotalTiles, error, directory`; public members per plan `## Public
+  interface after the strip` (`ApplyComparisonSettings(bool bScenePaused)`; `AddFrame`,
+  `CapturePreparation`, `IsCaptureHeld`, `CancelCapture` gone); private scene-diagnostic,
+  hold/release, `CompletePreparation`, manifest, `GetBufferAllocation` declarations gone; new
+  private `RecordCapture(VkCommandBuffer)`.
+- `Engine/Source/Graphics/Lighting/LightingState.h` — dropped `LightingSceneDiagnostics.h` include;
+  `LightingFramebuffer` loses diagnostic buffers/readback/operation
+  counters/`uiHeldPublication`/`frameIdentities`, gains `uiPendingPublication`; `State::Comparison`
+  keeps only GPU resources plus `eReferenceLayout` and tile constants (`kiTileColumns`,
+  `kiTileCount`, `kiTilesPerFrame`=120); `NativeCapture` deleted; `State` holds `diagnostics`
+  (latched counts + capture status), `uiServicedCapture`, `captureStart`, `capturePublication`.
+- `Engine/Source/Graphics/Lighting/Lighting.cpp` — `GetBufferAllocation` and byte accounting
+  deleted; `CreateResources`/`DestroyResources`/`CreateTerrainPipelines`/`DestroyTerrainPipelines`
+  drop scene diagnostics and the `completedDiagnostics` reset; `BeginRender` = framebuffer select +
+  completed-after-fence latch + range/publication clear; `CompletePreparation`, `AddFrame`,
+  `HoldPublication`, `ReleasePublication` deleted; `EndRender` uses `terrain.Prepare(iFramebuffer)`
+  and stores serial + four pending counts (incl. `uiTraceOnlyInstances`); `RecordPreparation` calls
+  the 3-argument `models->RecordPreparation`, wraps `terrain.RecordPreparation` in
+  `kGpuTimerLightingTerrain`, drops operation counters and `RecordSceneDiagnostics`, calls
+  `RecordCapture` after `RecordEnvironment`; TEMP block in `BindQueryDescriptors` removed;
+  `SetComparison` no longer cancels.
+- `Engine/Source/Graphics/Lighting/LightingComparison.cpp` — resume stash removed;
+  `IsCaptureRunning` file-local helper; `DestroyComparisonResources` fails a running capture
+  ("Graphics recreated during capture") and no longer owns fence/query pool/command pool;
+  `ApplyComparisonSettings(bool)` fails on unpause/settings change and starts a capture (reference
+  mode + paused + 1920x1080, else `failed` with reason); `PrepareComparisonPipelines` keeps the
+  per-frame fixture-draw part, compares publications in tracing frames and binds the reference
+  compute set, and in the receivers frame records the publication, creates capture textures/render
+  pass/framebuffer/receiver pipelines/reference compute once, and adds missing receiver model
+  pipelines (map no longer cleared); `RecordReceivers` loses operation counting.
+- `Engine/Source/Graphics/Lighting/LightingCapture.cpp` — rewritten: `LightingWriteFile`,
+  `RecordCapture` (receivers stage: reference to GENERAL compute layout + receiver pass; tracing:
+  120 tile dispatches; last batch: compute-to-shader-read transition,
+  `SetLightingReference(iFramebuffer, &reference, true)`, status `composing`), `FinishCapture`
+  (fence wait, finished.png, five `.rgba32f`, `capture.json`, descriptor reset), `WriteProfile`
+  (`sources, instances, traceOnlyInstances, triangles, capture{status, completedTiles, totalTiles,
+  error, directory}`). All pump/hash/manifest/TEMP code gone.
 - `Engine/Source/Graphics/Lighting/LightingFixture.h` / `.cpp` — blob enum, blob identity, `kuiSchema`, `GetBlob`/`GetIdentity`/`GetInputHash`/`FreezeBlob`, `mBlobs`/`mIdentities`, Append*/HashBytes helpers and blob construction deleted; `InitializeAnimation` heap comment reworded.
 - `Engine/Data/Shaders/Lighting/LightingCommon.h` — `kfLightingRayOffset` 0.001f -> 0.05f.
 - `Engine/Source/Profile/ProfileManager.h` — `kGpuTimerLightingTerrain` after `kGpuTimerWaterDisplacement`; `"    Lighting Terrain"` at the same index.

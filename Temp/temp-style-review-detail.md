@@ -32,7 +32,14 @@ Rule 47 script (`Invoke-IncludeOrderCheck.ps1 -Fix`, 94 files): status pass, 0 v
 
 ## Routed Findings
 
-- Engine/Source/Graphics/Lighting/Lighting.h:68 (Lighting.cpp, LightingCapture.cpp, LightingComparison.cpp) — `struct Lighting` carries `m`-prefixed members (`mpState`, `mRequestedComparisonSettings`) and a `private:` section, which Rule 3 reserves for classes, and splits its member definitions across three .cpp files, which Rule 67 forbids for a `class`. Either it is a `class` (Rule 67 violated) or the members drop `m` and the access labels go (Rule 3 / Rule 49). Needs a class-versus-struct decision and a repo-wide rename of `mpState` and `mRequestedComparisonSettings` (TweaksScreenLighting.cpp:18 uses the latter) — routes to the caller; not auto-fixed because it changes class access and layout.
+- Engine/Source/Graphics/Lighting/Lighting.h:68 (Lighting.cpp, LightingCapture.cpp,
+  LightingComparison.cpp) — `struct Lighting` carries `m`-prefixed members (`mpState`,
+  `mRequestedComparisonSettings`) and a `private:` section, which Rule 3 reserves for classes, and
+  splits its member definitions across three .cpp files, which Rule 67 forbids for a `class`. Either
+  it is a `class` (Rule 67 violated) or the members drop `m` and the access labels go (Rule 3 / Rule
+  49). Needs a class-versus-struct decision and a repo-wide rename of `mpState` and
+  `mRequestedComparisonSettings` (TweaksScreenLighting.cpp:18 uses the latter) — routes to the
+  caller; not auto-fixed because it changes class access and layout.
 - Engine/Source/Graphics/Lighting/Lighting.cpp:413 (`Lighting::SetComparison`) — Rule 49: the body is one assignment to the public `mRequestedComparisonSettings`; the caller (TweaksScreenLighting.cpp:68) could assign it directly. Public API change — `/repo-code-review` Rule 49 route.
 - Engine/Source/Graphics/Lighting/Lighting.cpp:428 (`Lighting::GetDiagnostics`) — Rule 49: returns `mpState->diagnostics` only; `State` is a private incomplete type, so removal needs the diagnostics moved into a public member — `/repo-code-review` Rule 49 route.
 - Engine/Source/Graphics/Lighting/LightingFixture.cpp:112, :143, :148, :153 (`GetAnimation`, `GetAnchor`, `GetCamera`, `GetEvent`) — Rule 49: each returns one private member or one indexed element (`mAnimation`, `mAnchor`, `mCameras.at`, `mEvents.at`); the `private:` section protects no multi-member invariant. Public API change — `/repo-code-review` Rule 49 route.

@@ -77,7 +77,18 @@ work with the roles the workflow names. Briefs follow `.agents/references/subage
 ## Progress
 
 - [x] Strip stage implemented (this session).
-- [ ] 01 Build and static checks
+- [x] 01 Build and static checks.
+  DataPacker Release x64 and client/server/ModelViewer Debug x64 succeeded with zero diagnostics;
+  all three consumers used Local generation with `RunDataPacker=true`.
+  Build evidence: `Temp/AgentBuildEnvelopes/compile-20261029T135736358Z-8248.md`
+  `## Build envelopes`.
+  All static checks pass after whitespace-only rewrap of eight lines across
+  `Temp/lighting-foundation-strip-plan.md`, `Temp/temp-slice2-handoff.md`, and
+  `Temp/temp-style-review-detail.md`; no source fixes were needed.
+  Setup merge `b50c0621` resolved seven conflicts: render docs match the merged snapshot;
+  client/server projects retain main ModelMetadata plus foundation headers; ModelViewer retains
+  main MenuUtils and removes deleted LightingWrappersBase.
+  Reviews and runtime acceptance remain plans 02/03; no plan 01 residuals.
 - [ ] 02 Reviews and cleanup
 - [ ] 03 Runtime acceptance
 - [ ] 04 Commit and create the `lighting-foundation` branch
