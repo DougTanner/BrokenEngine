@@ -116,12 +116,7 @@ template <typename T, typename... TS>
 consteval int64_t CollectionTupleIndex([[maybe_unused]] std::type_identity<std::tuple<TS...>> typeIdentity)
 {
 	std::array<bool, sizeof...(TS)> bMatches {std::is_same_v<T, std::remove_reference_t<TS>>...};
-	int64_t iIndex = 0;
-	while (iIndex < std::ssize(bMatches) && !bMatches[static_cast<size_t>(iIndex)])
-	{
-		++iIndex;
-	}
-	return iIndex;
+	return std::ranges::find(bMatches, true) - bMatches.begin();
 }
 
 // Releases an owner's handle if it holds one: marks the named row kDestroy for the Destroy-phase compaction fold,

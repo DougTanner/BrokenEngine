@@ -61,12 +61,7 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
   without resetting retained coverage. Threshold resolution preserves a positive
   J range.
-- Each publishing frame copies its camera basis, water origins, and retained
-  area reports into `gPresentationContinuity` in `Render.h`; skipped rendering
-  leaves it untouched. New values covered by continuity guarantees join this
-  snapshot. The agent probe exposes water origins and shadow, lighting, and
-  smoke reports (`../../Agent/AGENTS.md`); foam history and foam texture phase
-  remain internal to the snapshot.
+- Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
 - Each flight plane's smoke keeps its own held area, step count, and decay.
   With `gSmokeLayerStagger` on, a frame without a forced refresh refreshes only

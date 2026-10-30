@@ -108,8 +108,8 @@ They can diagnose a layout, but only the rendered result can validate it.
 
 Files:
   Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (consumer; links here, where the standard is owned)
-  Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(...)  (text-driven width precedent)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:152  float HudScreen::PanelWidth()
+  Engine/Source/Ui/MenuUtils.cpp:289  float MenuButtonsWidth(...)  (text-driven width precedent)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:134  float HudScreen::PanelWidth()
 
 
 4. Shared Layout Constants
@@ -131,8 +131,8 @@ Files:
     kfPrimaryButtonMinimumWidthPixels = 760, kfModalButtonMinimumWidthPixels = 380
     kfMainMenuHeadingScale = 1.3, kfLanguageMenuFontScale = 1.0
     kfLanguageMenuGeometryScale = 0.5
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:14-16
-    kfHudEdgeMarginFraction = 0.05f, kfHudPanelTopFraction = 0.125f, kfHudPanelMaximumHeightFraction = 0.75f
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:15-17
+    kfHudEdgeMarginFraction = 0.05f, kfHudPanelTopFraction = 0.2f, kfHudPanelHeightFraction = 0.6f
   Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp
     responsive width/font curve, heading scale, and semantic column gutter
   Engine/Source/Ui/Screens/SoundMenuScreen.cpp
@@ -157,7 +157,8 @@ x-line and vertical midpoint. A screenshot-derived upward optical offset then
 centers the visible title/action composition; the offset scales with both
 UiScale() and FontScaleMain so it tracks resolution and the Font Size setting.
 Its title and every action also share one visible content keyline. HUD panels
-edge-anchor via the named margin fractions.
+edge-anchor horizontally via the named margin fraction and center vertically
+via the named top and height fractions.
 
 Pause, Audio, and Game Settings center via the pivot convention. Modal uses
 the same horizontal pivot and seats its vertical pivot slightly above screen
@@ -178,22 +179,23 @@ use AlwaysAutoResize (or an auto axis) and let the window hug its widgets. When
 an auto-sized window needs a ceiling, cap it with SetNextWindowSizeConstraints
 rather than a fixed fraction. Display-relative fractions are permitted only
 where content churn would otherwise jitter the layout frame-to-frame — the HUD
-panels, whose templated width is intentionally fixed — as a text-wrap width
-(Modal), or as a bounded responsive constraint required to keep supported
-content usable (Graphics).
+panels, whose templated width and height fraction are intentionally fixed — as
+a text-wrap width (Modal), or as a bounded responsive constraint required to
+keep supported content usable (Graphics).
 Graphics keeps a stable width for each Font Size setting but grows responsively
 from 0.5 to 0.9 of the display width across the supported preference range so
 its two-column panel remains usable at the largest setting.
 
-The HUD panels are the canonical "hug content" example: their height auto-sizes
-to the fleet member list, capped at kfHudPanelMaximumHeightFraction of the screen
-(long lists scroll). The right FocusedOwnedEntity panel then matches the left panel's
-live height for symmetry rather than hugging its own smaller content.
+The HUD panels are the stated fixed-size exception: both share one size,
+PanelWidth() wide and kfHudPanelHeightFraction of the screen tall, rather than
+hugging their content. The fleet member list fills from the top of the left
+panel and scrolls when long.
 
 Files:
-  Engine/Source/Ui/Screens/PauseMenuScreen.cpp:34  ImGuiWindowFlags_AlwaysAutoResize
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:182-187  (content-driven height, capped via SetNextWindowSizeConstraints)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:16  kfHudPanelMaximumHeightFraction (height cap)
+  Engine/Source/Ui/Screens/PauseMenuScreen.cpp:32  ImGuiWindowFlags_AlwaysAutoResize
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:165  (left panel fixed size)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:306  (right panel fixed size)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:17  kfHudPanelHeightFraction (fixed height)
 
 
 7. Layout Primitives
@@ -222,11 +224,16 @@ per-screen minimum. That max-plus-padding measurement is the MenuButtonsWidth
 helper; the minimum floors are the k*ButtonMinWidthPixels constants
 (kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels).
 
+A button whose label or availability can change — by a click, a missing
+feature, or live state such as the Main Menu's "SCANNING..." placeholder —
+takes its width from its full label set, so no such change reflows its column.
+A button sits above any list that grows.
+
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:289  bool MenuButton(...)
-  Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
-  Engine/Source/Ui/MenuUtils.h:30-31  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
-  Engine/Source/Ui/Screens/ModalScreen.cpp:54  MenuButton("OK", ...)  (themed button)
+  Engine/Source/Ui/MenuUtils.cpp:324  bool MenuButton(...)
+  Engine/Source/Ui/MenuUtils.cpp:289  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
+  Engine/Source/Ui/MenuUtils.h:29-30  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
+  Engine/Source/Ui/Screens/ModalScreen.cpp:49  MenuButton("OK", ...)  (themed button)
 
 
 9. Vertical Rhythm
@@ -241,9 +248,9 @@ local density curve. All gaps are named 4K-pixel constants times UiScale(); no
 screen emits Dummy(DisplaySize.y * <magic fraction>).
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:266  void MenuHeading(const char* pcLabel, float fHeadingScale)
-  Engine/Source/Ui/MenuUtils.h:10  kfMenuHeadingScale = 1.6f
-  Engine/Source/Ui/MenuUtils.h:28  kfHeadingGapPixels
+  Engine/Source/Ui/MenuUtils.cpp:301  void MenuHeading(const char* pcLabel, float fHeadingScale)
+  Engine/Source/Ui/MenuUtils.h:9  kfMenuHeadingScale = 1.6f
+  Engine/Source/Ui/MenuUtils.h:27  kfHeadingGapPixels
 
 
 10. Harness Addressability
@@ -300,14 +307,16 @@ alignment, scale ratios, whitespace, and whether every visible element earns
 its space.
 
 Screen-specific commitments this contract makes, each verified visually:
-  - HUD: left and right panels are symmetric — the right FocusedOwnedEntity panel
-    matches the left Fleet panel's live size rather than hugging its own
-    (smaller) content; symmetry beats content-hugging on the right.
-  - HUD: the mouse-proximity activation zone is a fixed-extent strip
-    (kfHudPanelMaximumHeightFraction of the screen at the anchor), decoupled from
-    the live panel size, so hover behavior is unchanged as panels shrink.
+  - HUD: left and right panels are symmetric — both share one fixed size,
+    centered vertically, rather than hugging their own content.
+  - HUD: the mouse-proximity activation zone is each panel's full-height
+    strip, from the screen edge on its side to the panel's fully open inner
+    edge (its anchor offset inward by its last measured width), whatever
+    its slide position. Only horizontal distance to that strip counts, so a
+    mouse above, below, or past the panel toward that edge counts as over it,
+    and the target fades only toward the screen center.
   - HUD: the focused owned-entity weapon action is centered within the right panel's
-    live content area while the panel continues to match the left panel's size.
+    live content area.
   - Pause: the title and uniform-width primary actions float directly over the
     full-screen dim; the transparent layout window has no decorative panel.
   - Audio: centered via the pivot convention (section 5), not the top-left
@@ -317,6 +326,10 @@ Screen-specific commitments this contract makes, each verified visually:
     shared width for the Defaults and Back actions.
   - Modal: the compact text-wrap surface uses a restrained message/action gap
     and keeps its single themed action centered.
+  - Chat: the input box and the history above it are centered horizontally at
+    the bottom edge, with history lines left-aligned in the column. Each
+    history line carries a dark drop shadow, offset down-right and fading with
+    the line, so it stays readable over bright water.
   - Graphics: the two-column split is semantic — display/sampling/filtering
     settings left, Effects & UI settings right — not arbitrary, though the
     columns no longer carry equal row counts; the header keeps FPS, localized
@@ -341,8 +354,8 @@ Screen-specific commitments this contract makes, each verified visually:
     The three option labels repeat verbatim down the column.
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:204  ComputeMouseOpennessTarget (fixed-extent hover zone)
-  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:138-139  (left/right hover targets)
+  Engine/Source/Ui/MenuUtils.cpp:242  ComputeMouseOpennessTarget (full-height edge strip hover zone)
+  Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:120-121  (left/right hover targets)
   Engine/Source/Ui/Screens/AGENTS.md  (consumer; links to this document for layout)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (HUD layout notes)
 

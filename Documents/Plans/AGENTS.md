@@ -1,6 +1,6 @@
 # Plans
 
-Tracked refactor and bugfix plans. Ideas saved for another day in `../Features/` (see `../Features/AGENTS.md`) are manually executed and are never scheduler inputs.
+Tracked tasks ready to be picked up by another session through `/next-plan`. Ideas saved for another day in `../Features/` (see `../Features/AGENTS.md`) are manually executed and are never scheduler inputs.
 
 ## Authorship
 
@@ -60,8 +60,18 @@ folder through it too.
 
 An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
+A Plan for a proven, reproducible problem whose root cause is not yet confirmed
+carries an investigation portion, the one place a Plan states what is still
+open: `## Context` records the observed symptom and its evidence; `## In scope`
+names the root-cause investigation and the region that bounds the fix;
+`## Design` has the executing session first confirm the root cause by the route
+it names (`/external-diagnose-bug` for a defect), then make the smallest fix
+inside that region, surfacing a fix outside it for re-planning instead of
+widening scope; and an acceptance criterion states that the recorded symptom no
+longer reproduces.
+
 Work that splits into stages (the term as `.agents/references/change-workflow.md` `## IMPORTANT: Change Workflow` defines it), each ending at a cut after which the tree builds and that stage's acceptance criteria can pass, is written as one Plan per stage, whether or not the stages edit the same files.
 
 The two scope sections are the control the finished change is measured against (`.agents/references/scope-authorization.md`), so write each boundary precisely enough to enforce.
 
-A document presenting options rather than a decision-complete implementation belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.
+Whether a document belongs here follows the deciding test in `../AGENTS.md` `## Planning Trees`. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.

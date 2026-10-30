@@ -84,7 +84,8 @@ static std::optional<XMFLOAT2> FindFleetSpawnPoint(const std::vector<XMFLOAT2>& 
 		{
 			return IsClear(XMLoadFloat2(&rTakenSpawnPoint));
 		});
-		// Every row counts, whatever its controller, plane, or lifecycle: pushers ignore planes, and a dying row is still there.
+		// Every row counts, whatever its controller, plane, or lifecycle: horizontal clearance from every row also clears
+		// each pusher's 3D range, with no plane or lifecycle test.
 		ForEachShipType(rOriginFrame, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender)
 		{
 			for (int64_t i = 0; i < rInterpolate.iCount && bClear; ++i)

@@ -363,9 +363,9 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
 			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamCurrentTexture},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iExplicitBinding = shaders::kiWaterFoamBindingSpawnNoise, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
 		},
@@ -398,7 +398,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			// unused.
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .iExplicitBinding = shaders::kiWaterBindingFoam, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingFoam, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamColor, .ppTextures = mppWaterFoamTextures},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamBreakupTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamBreakup, .ppTextures = mppWaterFoamBreakupTextures},
 		},

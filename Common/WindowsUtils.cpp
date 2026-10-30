@@ -128,13 +128,6 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 
 std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExecutableFile, std::wstring& rCommandLine)
 {
-	// RAII so each launch-failure early return below releases the handles / attribute list already acquired. Pipe and
-	// process handles use a nullptr sentinel, so unique_ptr<void> (which skips the deleter on nullptr) fits.
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		CloseHandle(handle);
-	})>;
-
 	SECURITY_ATTRIBUTES securityAttributes
 	{
 		.nLength = sizeof(SECURITY_ATTRIBUTES),

@@ -239,17 +239,15 @@ static ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
 	return ImGui::GetColorU32(ImVec4(rf4Color.x, rf4Color.y, rf4Color.z, rf4Color.w * fAlphaScale));
 }
 
-float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
+float ComputeMouseOpennessTarget(const SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign)
 {
-	float fRectangleMinimumX = vAnchor.x - fPivotX * vFixedExtent.x;
-	float fRectangleMaximumX = fRectangleMinimumX + vFixedExtent.x;
-	float fRectangleMinimumY = vAnchor.y;
-	float fRectangleMaximumY = vAnchor.y + vFixedExtent.y;
+	const ImGuiIO& rInputOutput = ImGui::GetIO();
 
-	ImVec2 vMouse = ImGui::GetIO().MousePos;
-	float fDistanceX = std::max({fRectangleMinimumX - vMouse.x, 0.0f, vMouse.x - fRectangleMaximumX});
-	float fDistanceY = std::max({fRectangleMinimumY - vMouse.y, 0.0f, vMouse.y - fRectangleMaximumY});
-	float fDistance = std::sqrt(fDistanceX * fDistanceX + fDistanceY * fDistanceY);
+	float fRectangleMinimumX = (fSidePivotSign > 0.0f) ? (vAnchor.x - rState.vLastSize.x) : 0.0f;
+	float fRectangleMaximumX = (fSidePivotSign > 0.0f) ? rInputOutput.DisplaySize.x : (vAnchor.x + rState.vLastSize.x);
+
+	ImVec2 vMouse = rInputOutput.MousePos;
+	float fDistance = std::max({fRectangleMinimumX - vMouse.x, 0.0f, vMouse.x - fRectangleMaximumX});
 
 	return 1.0f - std::clamp(fDistance / (kfActivationDistancePixels * engine::UiScale()), 0.0f, 1.0f);
 }

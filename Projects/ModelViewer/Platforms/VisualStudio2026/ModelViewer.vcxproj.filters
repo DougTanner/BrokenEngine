@@ -57,7 +57,6 @@
     <Filter Include="Engine\Memory"><UniqueIdentifier>{fd6feaa9-5dad-4776-ae8c-f6fe5b184d91}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Network"><UniqueIdentifier>{e8a8859c-8861-4493-a3a0-804e334afa2e}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Network\Client"><UniqueIdentifier>{ac5eb397-210b-421b-b7bc-b13d3ceca503}</UniqueIdentifier></Filter>
-    <Filter Include="Engine\Network\Server"><UniqueIdentifier>{906bacf3-a9eb-4851-86cc-6b9489557900}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Profile"><UniqueIdentifier>{ce76bfae-2156-4cc4-ae3c-b899a867c67c}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Ui"><UniqueIdentifier>{624925c9-f935-4d65-992e-c4e8001940b4}</UniqueIdentifier></Filter>
     <Filter Include="Engine\Ui\Screens"><UniqueIdentifier>{71754338-e16b-4eff-b3b5-a0720df29184}</UniqueIdentifier></Filter>
@@ -142,6 +141,7 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -173,6 +173,7 @@
     <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h"><Filter>Common\Math</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Math\MathUtils.h"><Filter>Common\Math</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Math\Random.h"><Filter>Common\Math</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ModelMetadata.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Serialization.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h"><Filter>Common</Filter></ClInclude>
@@ -300,6 +301,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h"><Filter>Engine\Ui</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>

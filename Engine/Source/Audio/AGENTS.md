@@ -19,7 +19,7 @@ Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManage
 - Audio is presentation-only. One-shot emission and persistent-voice lifecycle skip reconciliation replay and never enter deterministic Frame state or CRCs.
 - Fades and crossfades use wall-clock time. Pitch variation uses a time-seeded audio-only random stream.
 - Static voice capacity is scarce: prioritize by audible attenuation, cull inaudible one-shots, and use hysteresis plus fades for persistent voice eviction and reacquisition. Apply final 3D mix before playback and route near-unity pitch ratios through `SnapFrequencyRatio` to avoid unnecessary resampling.
-- Camera-eye distance to the full emitter position drives manual fade while the camera look-at drives pan and Doppler; each emitter is flattened to the look-at's height for pan. Keep these listener roles separate when changing spatialization.
+- Distance to the full emitter position from a listener above the look-at, at 1.1 times the highest flight plane's height, drives manual fade while the camera look-at drives pan and Doppler; each emitter is flattened to the look-at's height for pan. Keep these listener roles separate when changing spatialization.
 - An emitter position arrives local to its own cell, paired with that cell's coordinate, and is converted once into the listener's cell (`StaticVoices.cpp`); spatialization works only in that listener frame.
 
 ## Asset and Thread Ownership

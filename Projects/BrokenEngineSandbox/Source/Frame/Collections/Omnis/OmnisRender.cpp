@@ -145,14 +145,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
-	const common::ModelHeader& rModelHeader = rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader;
-	XMFLOAT3A f3ModelScale {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z};
-	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
-	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y);
-	if (rModelHeader.f3RotationRadians.z != 0.0f)
-	{
-		matPreRotate *= XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
-	}
+	engine::ModelAlignment alignment = engine::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -162,7 +155,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 			continue;
 		}
 
-		XMFLOAT3A f3Size {kfOmniRadius * f3ModelScale.x, kfOmniRadius * f3ModelScale.y, kfOmniRadius * f3ModelScale.z};
+		XMFLOAT3A f3Size {kfOmniRadius * alignment.f3Scale.x, kfOmniRadius * alignment.f3Scale.y, kfOmniRadius * alignment.f3Scale.z};
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
 			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
@@ -180,7 +173,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
-		auto matTransform = XMMatrixMultiply(matPreMove, XMMatrixMultiply(matPreRotate, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
+		auto matTransform = XMMatrixMultiply(alignment.matPreMove, XMMatrixMultiply(alignment.matPreRotate, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
 
 		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
 		XMStoreFloat4(&rOmniLayout.f4Position, vecPosition);

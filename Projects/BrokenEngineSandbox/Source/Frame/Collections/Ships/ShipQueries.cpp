@@ -30,44 +30,13 @@ bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, en
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	bool bFound = false;
-	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
-		if (optionalFlightPlane && ShipFlightPlane(rFrame.interpolate, locator) != *optionalFlightPlane)
+		if (optionalFlightPlane && NearestFlightPlane(vecPosition) != *optionalFlightPlane)
 		{
 			return;
 		}
 		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFrom)));
-		if (fDistanceSquared < fClosestDistanceSquared)
-		{
-			fClosestDistanceSquared = fDistanceSquared;
-			rVecResult = vecPosition;
-			bFound = true;
-		}
-	});
-	return bFound;
-}
-
-bool XM_CALLCONV FindNearestEnemyShipInArc(const Frame& rFrame, FXMVECTOR vecFrom, FXMVECTOR vecAxisNormal, float fHalfAngle, engine::AlignmentIdentifier alignment, int64_t iFlightPlane, XMVECTOR& rVecResult)
-{
-	float fClosestDistanceSquared = std::numeric_limits<float>::max();
-	bool bFound = false;
-	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
-	{
-		if (!FrameInterpolate::IsVisible(vecPosition, vecFrom))
-		{
-			return;
-		}
-		if (ShipFlightPlane(rFrame.interpolate, locator) != iFlightPlane)
-		{
-			return;
-		}
-		XMVECTOR vecToCandidate = XMVectorSetZ(XMVectorSubtract(vecPosition, vecFrom), 0.0f);
-		float fAngle = XMVectorGetX(XMVector3AngleBetweenNormals(vecAxisNormal, XMVector3Normalize(vecToCandidate)));
-		if (!(fAngle <= fHalfAngle))
-		{
-			return;
-		}
-		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(vecToCandidate));
 		if (fDistanceSquared < fClosestDistanceSquared)
 		{
 			fClosestDistanceSquared = fDistanceSquared;
@@ -108,19 +77,6 @@ XMVECTOR ShipPosition(const FrameInterpolate& rInterpolate, ShipLocator locator)
 	std::unreachable();
 }
 
-int64_t ShipFlightPlane(const FrameInterpolate& rInterpolate, ShipLocator locator)
-{
-	switch (locator.eType)
-	{
-		case ShipType::kFighter:    return rInterpolate.pFighters->puiFlightPlanes[locator.iRow];
-		case ShipType::kOmni:       return rInterpolate.pOmnis->puiFlightPlanes[locator.iRow];
-		case ShipType::kBattleship: return rInterpolate.pBattleships->puiFlightPlanes[locator.iRow];
-		case ShipType::kCount:      break;
-	}
-	ASSERT(false);
-	std::unreachable();
-}
-
 float ShipHull(const Frame& rFrame, ShipLocator locator)
 {
 	return VisitShip(rFrame, locator, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
@@ -155,10 +111,9 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPrevio
 		iAscendingCount = std::max(iAscendingCount, rInterpolate.iCount);
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 		{
-			uint8_t uiPlane = rInterpolate.puiFlightPlanes[i];
-			if (uiPlane != kuiNoFlightPlane && IsEligible(rInterpolate, rGracePostRender, i))
+			if (IsEligible(rInterpolate, rGracePostRender, i))
 			{
-				++eligibleCounts[uiPlane];
+				++eligibleCounts[NearestFlightPlane(rInterpolate.pVecPositions[i])];
 			}
 		}
 	});
@@ -199,10 +154,10 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPrevio
 		std::array<int64_t, kiPlaneCount> layerFirstRows = filledCounts;
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 		{
-			uint8_t uiPlane = rInterpolate.puiFlightPlanes[i];
-			if (uiPlane != kuiNoFlightPlane && IsEligible(rInterpolate, rGracePostRender, i))
+			if (IsEligible(rInterpolate, rGracePostRender, i))
 			{
-				eligibleRows[uiPlane][filledCounts[uiPlane]++] = i;
+				int64_t iPlane = NearestFlightPlane(rInterpolate.pVecPositions[i]);
+				eligibleRows[iPlane][filledCounts[iPlane]++] = i;
 			}
 		}
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v9';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v10';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
@@ -35,6 +35,18 @@ function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 		$matchingDiagnostics=@($diagnostics|Where-Object{$_.PSObject.Properties.Name -ccontains 'plan' -and [string]$_.plan -ceq $RequestedPlan})
 		if($matchingDiagnostics.Count -eq 1 -and $matchingDiagnostics[0].PSObject.Properties.Name -ccontains 'message' -and -not [string]::IsNullOrWhiteSpace([string]$matchingDiagnostics[0].message)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$matchingDiagnostics[0].message)."}
 		if($matchingDiagnostics.Count -gt 0){return $fallback}
+		if($result.Contains('sync')){
+			# Each NUL-delimited rename record is three fields: status with similarity score, source path, destination path.
+			$renames=Invoke-NextPlanProcess 'git.exe' @('-C',$Context.Worktree,'diff','--name-status','-z','-M','--diff-filter=R',$result.sync.from,$result.sync.to,'--','Documents/Plans') $Context.Worktree
+			if($renames.ExitCode -ne 0){return $fallback}
+			$fields=@($renames.Stdout -split "`0")
+			for($index=0;$index+2 -lt $fields.Count;$index+=3){
+				if($fields[$index+1] -ceq $RequestedPlan){
+					$result.moved=[ordered]@{from=$RequestedPlan;to=$fields[$index+2]}
+					return "The requested Plan '$RequestedPlan' was renamed to '$($result.moved.to)' by the fast-forward $($result.sync.from)..$($result.sync.to); no Plan was claimed. Report this to the user, who decides whether to claim the Plan at its new path by rerunning this command with -Plan '$($result.moved.to)'."
+				}
+			}
+		}
 		return "The requested Plan '$RequestedPlan' is absent from the session tree."
 	} catch {return $fallback}
 }
@@ -69,15 +81,15 @@ try {
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
  if($dirty.Count -ne 0){
-  # Uncommitted scheduler input must never reach selection or healing. A run whose early lookup reported the held claim
-  # is exempt whatever is dirty: healing reads only primary-tip Plans, and plan claim-next targets the held Plan,
-  # returning the claim before selection while it is still live at the primary tip, and otherwise claiming that same
-  # Plan afresh while it is eligible and unclaimed or returning none, never claiming another Plan; the overlap check
-  # below protects retained work.
+  # Uncommitted scheduler input must never reach selection or healing. plan claim-next reads only committed trees
+  # (session HEAD and the primary tip) and with --plan claims only that Plan, and healing reads the primary tip, so two
+  # runs that pass --plan are exempt: a run whose early lookup reported the held claim, whatever is dirty, and an exact
+  # -Plan request whose every dirty path is under Documents/Plans/ and none is the requested Plan. The overlap
+  # check below protects retained work.
   $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
-  $claimHeld=$null -ne $heldClaim
-  if($schedulerPaths.Count -ne 0 -and -not $claimHeld){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
-  if(-not $ResumeRetained -and -not $claimHeld){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
+  $exempt=($null -ne $heldClaim) -or ($targeted -and $null -eq $pattern -and $schedulerPaths.Count -eq $dirty.Count -and $dirty -cnotcontains $Plan)
+  if($schedulerPaths.Count -ne 0 -and -not $exempt){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
+  if(-not $ResumeRetained -and -not $exempt){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
    # NUL-delimited output keeps both sides of the comparison in the same raw path form.
@@ -144,6 +156,7 @@ try {
   $code=[string]$claim.code
   if($code -cne 'none'){break}
   $message=if($targeted){Get-TargetedNoneMessage $context $Plan}elseif($null -ne $heldClaim){Get-TargetedNoneMessage $context ([string]$heldClaim.plan)}else{'No eligible Plan is available.'}
+  if($result.Contains('moved')){Complete-Claim 2 'blocked' 'claim.plan-moved' $message 'stop-report-to-user'}
   if(-not $takeover -or -not $result.Contains('holder') -or [string]$result.holder.session -ceq $context.Session){Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
   $takeover=$false
   # Every scheduler claim is created by this script with owner and session both set to the session ID, and plan unclaim

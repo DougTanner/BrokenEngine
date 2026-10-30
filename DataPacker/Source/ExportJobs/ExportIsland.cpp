@@ -28,6 +28,9 @@ struct ExportedIsland
 	float fWorldFootprintXMeters = 0.0f;
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
+	float fPeakHeightMeters = 0.0f;
+	int64_t iPeakTexelX = 0;
+	int64_t iPeakTexelY = 0;
 };
 
 constexpr int64_t kiJpegSidecarQuality = 90;
@@ -387,6 +390,21 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	rOut.iHeightmapWidth = iElevationWidth;
 	rOut.iHeightmapHeight = iElevationHeight;
 
+	// max_element compares with '<', so a NaN first sample is never replaced and an infinite sample wins; both fail here.
+	auto peakIterator = std::ranges::max_element(rOut.cpuHeightmapData);
+	int64_t iPeakIndex = peakIterator - rOut.cpuHeightmapData.begin();
+	rOut.fPeakHeightMeters = *peakIterator;
+	rOut.iPeakTexelX = iPeakIndex % iElevationWidth;
+	rOut.iPeakTexelY = iPeakIndex / iElevationWidth;
+	if (!std::isfinite(rOut.fPeakHeightMeters))
+	{
+		throw std::runtime_error(std::format("Island leaf \"{}\" elevation peak {} at texel ({}, {}) is not finite.", rInputPath.string(), rOut.fPeakHeightMeters, rOut.iPeakTexelX, rOut.iPeakTexelY));
+	}
+	if (!std::in_range<uint16_t>(rOut.iPeakTexelX) || !std::in_range<uint16_t>(rOut.iPeakTexelY))
+	{
+		throw std::runtime_error(std::format("Island leaf \"{}\" elevation peak texel ({}, {}) does not fit 16 bits.", rInputPath.string(), rOut.iPeakTexelX, rOut.iPeakTexelY));
+	}
+
 	// Convex hull of the valid (above-threshold) region — same heightmap + threshold as the texture
 	// masking. Packed into the chunk payload after the mesh (see Export()); debug render draws it.
 	BuildValidAreaHull(rOut);
@@ -661,6 +679,9 @@ void ExportIsland::Export()
 	pHeader->islandHeader.iMeshVertexCount = static_cast<int32_t>(exported.iMeshVertexCount);
 	pHeader->islandHeader.iMeshIndexCount = static_cast<int32_t>(exported.iMeshIndexCount);
 	pHeader->islandHeader.iValidAreaVertexCount = static_cast<int32_t>(exported.iValidAreaVertexCount);
+	pHeader->islandHeader.fPeakHeightMeters = exported.fPeakHeightMeters;
+	pHeader->islandHeader.uiPeakTexelX = static_cast<uint16_t>(exported.iPeakTexelX);
+	pHeader->islandHeader.uiPeakTexelY = static_cast<uint16_t>(exported.iPeakTexelY);
 
 	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][valid-area hull verts]. Runtime
 	// IslandTerrain slices these contiguously using IslandHeader's count fields.

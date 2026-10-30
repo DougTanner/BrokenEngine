@@ -303,7 +303,7 @@ function Get-Games
 		$directory = Join-Path $script:Root "Projects\$name\Platforms\VisualStudio2026"
 		$clientPath = Join-Path $directory "$name.vcxproj"
 		$serverPath = Join-Path $directory "${name}Server.vcxproj"
-		foreach ($required in @("$clientPath.filters", $serverPath, "$serverPath.filters"))
+		foreach ($required in @("$clientPath.filters", "$serverPath.filters"))
 		{
 			if (-not [IO.File]::Exists($required))
 			{
@@ -318,7 +318,7 @@ function Get-Games
 	}
 	if ($games.Count -eq 0)
 	{
-		Stop-EngineVcxprojItem 'layout.no-game' 'No Projects/<Name>/Platforms/VisualStudio2026/<Name>.vcxproj game project was found.'
+		Stop-EngineVcxprojItem 'layout.no-game' 'No Projects/<Name>/Platforms/VisualStudio2026/<Name>.vcxproj and <Name>Server.vcxproj game project was found.'
 	}
 
 	return ,$games

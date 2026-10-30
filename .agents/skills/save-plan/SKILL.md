@@ -33,9 +33,12 @@ Resolve the explicitly supplied complete proposal as follows:
      executes it verbatim.
    - So the body must be the final actionable plan — self-contained, with no
      unresolved options, TBDs, or decisions deferred to the implementer beyond
-     trivial naming and local detail.
+     trivial naming and local detail, apart from an investigation portion
+     (`Documents/Plans/AGENTS.md` `## Plan files`), which must state everything
+     still open.
 
-   Done when the body carries each of those and leaves no unresolved option.
+   Done when the body carries each of those, states anything still open in its
+   investigation portion, and leaves no other unresolved option.
 3. Keep the body picking exactly one design.
 
    - Phrase an agent-made choice in the supplied body as the author's
@@ -99,7 +102,10 @@ Resolve the explicitly supplied complete proposal as follows:
 10. Select the owning area and a concise PascalCase filename matching
     `^[A-Z][A-Za-z0-9]*\.md$`. Done when the area and filename are chosen.
 11. Search live Plans for duplicate root cause and implementation boundary
-    before writing. Done when the duplicate search has run.
+    before writing; for a Plan with an investigation portion, key the search on
+    its proven symptom instead of root cause, as the investigation portion
+    (`Documents/Plans/AGENTS.md` `## Plan files`) carries no confirmed root
+    cause. Done when the duplicate search has run.
 12. For an executable Plan, write the plan body to a file. Done when that body
     file exists.
 13. Create the Plan with the repository-owned `.agents/scripts/New-PlanFile.ps1`:

@@ -46,6 +46,11 @@ struct IslandTemplate
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
 
+	// Highest full-precision elevation sample and its heightmap texel, copied from the chunk header in ctor.
+	float fPeakHeightMeters = 0.0f;
+	int64_t iPeakTexelX = 0;
+	int64_t iPeakTexelY = 0;
+
 	// Anisotropic quad footprint in engine units (islands use 1 m = 1 engine unit), so a
 	// direct copy of fWorldFootprint{X,Y}Meters; set in ctor.
 	float fQuadFootprintX = 0.0f;
@@ -147,6 +152,12 @@ public:
 	// Centered cell-local grids cover the cell's bounding rectangle, with sea floor outside its hexagon; overlapping island
 	// footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
+
+#if defined(BT_CLIENT)
+	// Cell-local XY of the placement's template peak texel, the inverse of the sampling transform; valid after
+	// WaitForElevationMaps.
+	[[nodiscard]] XMFLOAT2 PlacementPeakPosition(const IslandPlacement& rPlacement) const;
+#endif
 
 	std::unordered_map<common::crc_t, IslandTemplate> mIslands;
 	std::vector<common::crc_t> mIslandCrcsSorted;

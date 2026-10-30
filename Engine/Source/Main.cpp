@@ -92,10 +92,7 @@ static int64_t HandleEagerLoadCompletion()
 	catch ([[maybe_unused]] const std::runtime_error& rException)
 	{
 #if defined(BT_CLIENT)
-		if ((gLaunchOptions.iAgentPort == 0))
-		{
-			MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-		}
+		ShowStartupError(rException.what());
 #endif
 		return 1;
 	}
@@ -338,7 +335,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 		ScopedSuppressAllocationTracking suppress;
 		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate);
 	}
-	pGame->UpdateCamera(kOriginCoordinate);
+	pGame->UpdateCamera(kOriginCoordinate, 0.0f);
 
 	// Render and present once per framebuffer, then show window. An iteration whose head check recreates or defers the
 	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
@@ -843,21 +840,14 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 	// as the launch options allow.
 	engine::ResolveCrashReportPaths();
 
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		CloseHandle(handle);
-	})>;
-	ScopedHandle pMutex(nullptr);
+	common::ScopedHandle pMutex(nullptr);
 	HANDLE handleMutex = CreateMutex(nullptr, TRUE, game::kGameName.data());
 	pMutex.reset(handleMutex);
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
 #if defined(BT_CLIENT)
 		LOG(kDefault, kError, "Another instance is already running");
-		if (engine::gLaunchOptions.iAgentPort == 0)
-		{
-			MessageBox(nullptr, "Another instance is already running", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-		}
+		engine::ShowStartupError("Another instance is already running");
 #else
 		// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.
 		LOG(kDefault, kError, "Another instance is already running");
@@ -904,10 +894,7 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 		catch ([[maybe_unused]] const std::runtime_error& rException)
 		{
 #if defined(BT_CLIENT)
-			if ((engine::gLaunchOptions.iAgentPort == 0))
-			{
-				MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-			}
+			engine::ShowStartupError(rException.what());
 #endif
 			iResult = 1;
 		}
@@ -919,21 +906,11 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 	}
 	catch (const std::exception& rException)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException(&rException);
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException(&rException);
 	}
 	catch (...)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException();
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException();
 	}
 
 #if defined(BT_CLIENT)

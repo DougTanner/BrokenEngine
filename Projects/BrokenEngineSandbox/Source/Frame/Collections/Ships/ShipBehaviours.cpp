@@ -70,6 +70,11 @@ std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
 	return std::nullopt;
 }
 
+int64_t XM_CALLCONV NearestFlightPlane(FXMVECTOR vecPosition)
+{
+	return engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
+}
+
 int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane)
 {
 	// Heights ascend, and a ship's Z never drops below the lowest plane, so plane 0 is the floor.
@@ -604,7 +609,6 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX)
 {
-	rfPositionCorrectionX = 0.0f;
 	if (!(pusher.uuid.iValue != 0))
 	{
 		return;

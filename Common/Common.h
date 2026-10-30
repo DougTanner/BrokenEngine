@@ -14,6 +14,7 @@
 #include "TextureFormat.h"
 
 #include "DataFile.h"
+#include "ModelMetadata.h"
 #include "Log/DiagnosticLog.h"
 #include "Flags.h"
 #include "Log/Log.h"

@@ -104,18 +104,14 @@ static void EstablishOutputDestinationParent(const std::filesystem::path& rDesti
 
 static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesystem::path& rExpected)
 {
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		CloseHandle(handle);
-	})>;
-	ScopedHandle link(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
-	if (link.get() == nullptr || link.get() == INVALID_HANDLE_VALUE)
+	common::ScopedHandle pLink(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+	if (pLink.get() == nullptr || pLink.get() == INVALID_HANDLE_VALUE)
 	{
 		return false;
 	}
 	std::vector<uint8_t> bytes(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
 	DWORD uiReturned = 0;
-	if (DeviceIoControl(link.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(std::ssize(bytes)), &uiReturned, nullptr) == FALSE)
+	if (DeviceIoControl(pLink.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(std::ssize(bytes)), &uiReturned, nullptr) == FALSE)
 	{
 		return false;
 	}

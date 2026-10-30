@@ -42,19 +42,19 @@ constexpr float kfExplosionSmoke = 0.25f;
 constexpr float kfDeathRadialPower = 0.3f;
 constexpr int64_t kiDeathTrailCount = 2;
 
-// Missile aim searches current-frame data for the nearest visible enemy within missile range that stores iFlightPlane;
-// AcquireTarget selects firing and look targets from previous-frame data.
+// Missile aim searches current-frame data for the nearest visible enemy within missile range whose nearest flight plane
+// is iFlightPlane; AcquireTarget selects firing and look targets from previous-frame data.
 static bool XM_CALLCONV FindMissileAimTarget(const Frame& rFrame, FXMVECTOR vecOmniPosition, engine::AlignmentIdentifier alignment, int64_t iFlightPlane, XMVECTOR& rVecTarget)
 {
 	float fClosestDistance = kfMissileTargetRange;
 	bool bFound = false;
-	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecTargetPosition, [[maybe_unused]] FXMVECTOR vecTargetVelocity)
+	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecTargetPosition, [[maybe_unused]] FXMVECTOR vecTargetVelocity)
 	{
 		if (!FrameInterpolate::IsVisible(vecOmniPosition, vecTargetPosition))
 		{
 			return;
 		}
-		if (ShipFlightPlane(rFrame.interpolate, locator) != iFlightPlane)
+		if (NearestFlightPlane(vecTargetPosition) != iFlightPlane)
 		{
 			return;
 		}
@@ -177,6 +177,19 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 			// Entity candidates at or beyond cell exit were filtered during PreCollision.
 			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
 		}
+	}
+}
+
+void XM_CALLCONV OmnisPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition)
+{
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
+
+	ApplyDamage(rFrame, emitterCoordinate, rCurrentInterpolate, rCurrentPostRender, i, kfBeamDamage, vecShooterPosition);
+
+	if (rCurrentPostRender.pfArmors[i] <= 0.0f)
+	{
+		BeginExplosion(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 	}
 }
 
@@ -331,7 +344,7 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 		}
 
 		// Missiles launch only while the omni is exactly at its stored flight plane's height, so every flying missile
-		// starts on a plane, and only at a target storing the same plane.
+		// starts on a plane, and only at a target whose nearest flight plane is that plane.
 		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
 		if (FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) != uiFlightPlane)
 		{

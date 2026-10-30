@@ -29,6 +29,8 @@ public:
 	[[nodiscard]] const FlightPlane& Plane(int64_t iIndex) const;
 	[[nodiscard]] const FlightPlane& Lowest() const;
 	[[nodiscard]] const FlightPlane& Highest() const;
+	// The index of the plane nearest fHeight; a height equally near two planes takes the lower one.
+	[[nodiscard]] int64_t NearestPlaneIndex(float fHeight) const;
 
 private:
 

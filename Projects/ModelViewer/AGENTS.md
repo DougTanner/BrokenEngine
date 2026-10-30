@@ -8,24 +8,29 @@ draws over a seeded terrain and water background centered on a verified clear-wa
 footprint near island context by default. In orbit, disabling World
 background switches to the original HDR gray clear color, graded by current controls
 ([Top-Level Shaders](../../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
-World background, Seed and Reroll are viewer-owned, unsaved controls outside
-presets and Q comparison. Seed edits and Reroll remain usable with the world
-hidden; enabling it restores that layout. Startup uses the origin seed with
-World background enabled.
+World background and Reroll are viewer-owned, unsaved controls outside
+presets and Q comparison. Reroll remains usable with the world hidden; enabling
+World background restores that layout. At load the viewer picks the template with the tallest
+stored peak (`IslandHeader`). Startup steps the seed forward from the origin,
+and Reroll from a random seed, until the generated layout holds that template
+and another placement. Startup enables World background.
 
 SPACE toggles orbit preview and autonomous flight once per tap outside text
 editing. Flight forces the world visible without changing the retained orbit
 background preference; returning to orbit restores that preference and pauses
 the body. Resuming flight preserves its position without a catch-up interval.
-One viewer-owned radius-1.5 body chooses random clear-water destinations inside
-the original cell; it never transfers cells or enters deterministic game state.
-Altitude choices are 6, 50 and 100 meters. The lower planes use terrain collision
-at the actual height through transitions; 100 meters permits terrain overflight.
-Altitude changes run at 25 meters per second, with descent held until the whole
-footprint is over clear water and clear at the proposed lower height.
-Model selection resets the body to its water anchor at 6 meters in either mode,
-retaining the active mode. Seed edits and Reroll rebuild elevation and clear-water
-destinations before respawning, also retaining the mode.
+One viewer-owned body loops between peaks: the tallest template's peak, then a
+random other placement's peak, then the tallest again. The body stays inside
+the original cell, never transfers cells, and never enters deterministic game
+state. Peaks are horizontal
+destinations only: the body flies at the exact, unbounded Height (m) entry,
+which accepts only finite values and is reached at a fixed rate, with no
+terrain collision, island avoidance or descent hold. Flight planes are not a
+viewer control; the table stays supplied for engine files
+([Engine integration](#engine-integration)).
+Model selection resets the body to its water anchor and the Height (m) entry to
+its default height in either mode, retaining the active mode. Reroll rebuilds elevation before the
+same reset, also retaining the mode.
 
 Startup shares the Sandbox client's native instance mutex under
 [Engine single-instance policy](../../Engine/Source/AGENTS.md#crash-reporting).
@@ -36,7 +41,7 @@ Preserve ordinary Graphics ownership, upload acquisition, descriptor publication
 submission fences and resource retirement. Selected identity and viewer controls
 must survive Graphics recreation, with resources republished before use.
 
-Holding Q temporarily applies engine defaults to the 20 right-hand float
+Holding Q temporarily applies engine defaults to the right-hand lighting float
 sliders and disables their edits. Preserve the current tweaks across Graphics
 recreation and restore them on Q release, focus loss, or shutdown before saving
 settings. Preset selection or reset while Q is held updates what will be restored;
@@ -48,7 +53,7 @@ directly; sun/moon IBL specular remains independent. One ordered descriptor tabl
 owns both lighting UI and
 preset/comparison membership.
 
-W/E/R taps load independent presets for those same 20 sliders; edits auto-save
+W/E/R taps load independent presets for those same sliders; edits auto-save
 only the selected preset. Missing or invalid presets apply all compiled defaults,
 without writing on selection. Backspace applies compiled defaults and saves them
 to the selected preset, retaining selection. Startup loads ordinary graphics
@@ -58,7 +63,7 @@ shows Preset: followed by the selected key, with a stable ImGui window ID and no
 duplicate content header. Ignore slot/reset key repeats and apply taps in
 received order before rendering.
 
-Presets use separate viewer-owned v3 AppData files through the shared atomic
+Presets use separate viewer-owned versioned AppData files through the shared atomic
 file helpers. Unsupported versions are rejected without migration and use the
 same compiled-default fallback. Validate the complete payload before applying
 any value; participant order is part of the format and changes require its
@@ -71,7 +76,10 @@ Alt-F4 retains native window handling.
 
 F9 permits one outstanding PNG capture. Successful completion is logged only
 from the matching engine capture result after the PNG write; queued requests
-survive Graphics replacement.
+survive Graphics replacement. Once per process, after a completed render, the
+viewer logs `ModelViewer initial streaming done` when no texture chunk is
+between load request and adoption and every referenced island template is GPU
+resident with its mesh resident.
 
 The catalog includes every packed scene with materials, sorted by packed path.
 The viewer owns clip selection, playback time and play/pause state; selected
@@ -115,16 +123,14 @@ explicit Save to the selected source's adjacent `.model.json`. The
 Geometry and animation still come from packs; alignment always comes from this
 checkout's source metadata on startup and actual model selection, with no packed
 alignment fallback. Selection discards unsaved edits; reselecting or restarting
-reloads saved values without packing. Mode changes, Seed/Reroll and Graphics
+reloads saved values without packing. Mode changes, Reroll and Graphics
 recreation retain active edits. There is no source watcher.
 
 The executable's containing checkout owns source reads and Save, in both main
 checkouts and linked worktrees, independently of working directory and packed
 Data root. Resolve the selected scene's model identity to exactly one actual
 source under this checkout's Engine or Sandbox Data root; a sidecar alone does
-not establish ownership. Keep source, sidecar and staging paths canonically
-inside that checkout and Data root, including through links, and recheck before
-Save. Never follow a worktree's `.git` pointer to source in another checkout.
+not establish ownership. Never follow a worktree's `.git` pointer to source in another checkout.
 Missing or ambiguous source ownership and unavailable checkout resolution show
 errors and disable Save.
 
@@ -136,16 +142,17 @@ last valid complete alignment remains in the flight preview. Validate derived
 alignment and its inverse-transpose normal matrix as finite and invertible
 before accepting edits; valid scalar fields alone are insufficient.
 
-Only explicit Save writes metadata. Replace the destination from a completely
-written and closed private same-directory staging file; failure preserves the
-previous sidecar and shows an error. Save never runs DataPacker: games consume
+Only explicit Save writes metadata, in the tracked sidecars' layout, so an
+unedited Save leaves a shortest-form sidecar byte-identical. Replace the
+destination from a completely written and closed same-directory staging file;
+failure preserves the previous sidecar and shows an error. Save never runs DataPacker: games consume
 the saved alignment after their next ordinary data build. A user can Save while
 agents work, mutating tracked source metadata in either main or session
 checkouts. Treat these changes as user-owned and preserve them; never assume
 every dirty sidecar is agent-authored or silently revert it.
 
 Authored alignment affects flight presentation only, leaving body movement,
-collision, camera tracking, raw rest bounds and animation evaluation unchanged.
+camera tracking, raw rest bounds and animation evaluation unchanged.
 Compose offset, authored XYZ scale times the existing flight radius, XYZ
 rotation, then flight orientation and body translation, matching Fighter order.
 Save only authored scale, excluding the radius multiplier. Keep the shadow
@@ -168,9 +175,10 @@ dummy cells, flags, sessions or reporting functions; the viewer constructs no
 engine profiling collection, Graphics lifecycle and local crash reporting
 without network upload.
 In orbit, the viewer's world camera is fixed top-down at the default engine
-height over the water anchor, with a separate model orbit pose used only for
-model draws. Flight uses the engine's tracked camera and world model matrices
-and eye position; retain orbit fitting and rotation across toggles. The seed
+framing under the shared projection settings over the water anchor, with a
+separate model orbit pose used only for model draws. Flight uses the engine's
+tracked camera and world model matrices and eye position; retain orbit fitting
+and rotation across toggles. The seed
 only selects the layout; its owning cell stays at the origin without a game
 session. Publish one cell when the world is effectively visible and an empty
 span otherwise, once per acquired framebuffer after camera update and before

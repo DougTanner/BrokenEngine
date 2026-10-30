@@ -49,4 +49,21 @@ const FlightPlane& FlightPlanes::Highest() const
 	return mPlanes.back();
 }
 
+int64_t FlightPlanes::NearestPlaneIndex(float fHeight) const
+{
+	int64_t iNearest = 0;
+	float fNearestDistance = std::abs(fHeight - Plane(0).fHeightMeters);
+	for (int64_t i = 1; i < Count(); ++i)
+	{
+		float fDistance = std::abs(fHeight - Plane(i).fHeightMeters);
+		if (fDistance < fNearestDistance)
+		{
+			iNearest = i;
+			fNearestDistance = fDistance;
+		}
+	}
+
+	return iNearest;
+}
+
 } // namespace engine

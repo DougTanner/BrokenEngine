@@ -17,7 +17,7 @@ No sanitizer configuration exists today: nothing in the tree outside `ThirdParty
   `operator new`/`delete` with mimalloc, `<mimalloc-override.h>` in
   `Common/ExternalHeaders.h` replaces the C `malloc` family (including
   `_aligned_malloc`, which `common::MakeAligned` uses), and
-  `ThirdParty/Prebuilts/Source/Engine/Mimalloc.cpp` reserves a 10 GiB arena at
+  `Engine/Source/Memory/Mimalloc.cpp` reserves each executable's startup arena at
   process init. ASan only guards allocations made through the CRT allocator it
   intercepts. The existing `ENABLE_CRT_DEBUG_HEAP` switch already routes all of
   these to the CRT and compiles out every mimalloc call (including the
@@ -26,7 +26,7 @@ No sanitizer configuration exists today: nothing in the tree outside `ThirdParty
   configuration reuses that routing. Check: whether its CRT debug-heap pieces
   (`_CRTDBG_MAP_ALLOC`, `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with
   ASan; if not, the ASan configuration selects the same CRT operators without
-  them. The ASan ThirdParty build also drops the `Mimalloc.cpp` unit so the
+  them. The ASan executable builds also drop the `Mimalloc.cpp` unit so the
   arena reserve never runs.
 - **Sub-allocators hide interior bounds.** ASan sees only the outer edges of a block:
   - A collection's SoA storage is one `common::MakeAligned` block that `AllocateAndAssign` (`Engine/Source/Frame/Collections/CollectionMemory.h`) carves into member arrays, each start rounded up to 64 bytes. A read past one member's capacity lands in the padding or the next member, and rows in `[iCount, iCapacity)` are allocated, so neither is reported.

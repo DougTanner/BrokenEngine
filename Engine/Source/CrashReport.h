@@ -17,6 +17,8 @@ void RenamePreviousCrashReport();
 // Returns true only for the call that wrote the report; every later call returns false at once.
 bool HandleException(std::optional<const std::exception*> optionalException = std::nullopt);
 void PromptCrashReportDesktopCopy();
+// Call only from a catch handler: an attached debugger gets the handled exception back through a bare rethrow.
+void HandleProcessMainException(std::optional<const std::exception*> optionalException = std::nullopt);
 std::optional<CrashReportHeader> ParseCrashReportHeader(std::string_view report);
 const wchar_t* ReportPath();
 const wchar_t* PendingReportPath();

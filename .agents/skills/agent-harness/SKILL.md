@@ -51,8 +51,11 @@ A ModelViewer scenario instead requires the latest `/compile` ModelViewer Debug
 result and no game project build.
 A release-only recovery (`## When to use`) needs no `/compile` result; its
 brief names the stopped dispatch's game and configuration instead.
-A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
-it; [`replay.md`](references/replay.md) owns that rule. The brief may state a
+Every game-project scenario requests the `Debug` build. Request `Profile` or
+`Release` only when an acceptance criterion needs that configuration's own
+behavior; such a scenario cannot use anything a command reference limits to
+Debug or to `kbDebugInput` builds, or run a replay determinism check
+([`replay.md`](references/replay.md)). The brief may state a
 wall-clock budget for the run; otherwise a 20-minute default applies.
 
 ## Handoff

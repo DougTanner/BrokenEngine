@@ -1,10 +1,11 @@
 #include "File/PackChunks.h"
-#include "Graphics/Camera.h"
 #include "Graphics/Screenshot.h"
 #include "Memory/GlobalAllocator.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "CrashReport.h"
+
+#include "Graphics/Camera.h"
 #include "Game.h"
 #include "ModelViewerApplication.h"
 
@@ -115,6 +116,28 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	return DefWindowProc(hwnd, uiMessage, uiWordParameter, iLongParameter);
 }
 
+// Valid only after a Render that returned true: that call requested every initial texture and counted every placement.
+// The template elevation texture has no texture-map entry, so bGpuResident covers it.
+static bool IsInitialStreamingDone()
+{
+	for ([[maybe_unused]] const auto& [rCrc, rTexture] : engine::gpTextureManager->mTextureMap)
+	{
+		engine::ChunkState eState = engine::gpFileManager->mpPackChunks->mLazyChunkMap.at(rCrc).eState.value.load(std::memory_order_relaxed);
+		if (eState != engine::ChunkState::kNotLoaded && eState != engine::ChunkState::kReady)
+		{
+			return false;
+		}
+	}
+	for ([[maybe_unused]] const auto& [rCrc, rTemplate] : engine::gpIslandTerrain->mIslands)
+	{
+		if (rTemplate.iReferenceCount != 0 && (!rTemplate.bGpuResident || rTemplate.eMeshResidency != engine::IslandMeshResidency::kResident))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 int RunModelViewer(HINSTANCE hinstance)
 {
 	if (!XMVerifyCPUSupport() || _set_FMA3_enable(0) != 0)
@@ -141,10 +164,7 @@ int RunModelViewer(HINSTANCE hinstance)
 	catch (const std::runtime_error& rException)
 	{
 		LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-		if (engine::gLaunchOptions.iAgentPort == 0)
-		{
-			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
-		}
+		engine::ShowStartupError(rException.what());
 		return 1;
 	}
 	engine::gpIslandTerrain->WaitForElevationMaps();
@@ -226,6 +246,7 @@ int RunModelViewer(HINSTANCE hinstance)
 	});
 	gbAllocationTrackingReady.store(true, std::memory_order_relaxed);
 	int64_t iScreenshotSequence = 0;
+	bool bInitialStreamingLogged = false;
 	while (!sbQuit)
 	{
 		MSG message {};
@@ -274,6 +295,11 @@ int RunModelViewer(HINSTANCE hinstance)
 				{
 					throw std::runtime_error("ModelViewer message wait failed");
 				}
+			}
+			else if (!bInitialStreamingLogged && IsInitialStreamingDone())
+			{
+				bInitialStreamingLogged = true;
+				LOG(kGraphics, kInfo, "ModelViewer initial streaming done");
 			}
 		}
 		catch (const std::system_error& rException)
@@ -325,13 +351,9 @@ static int ProcessMain(HINSTANCE hinstance)
 		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
 	}
 	engine::ResolveCrashReportPaths();
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		std::ignore = CloseHandle(handle);
-	})>;
 	HANDLE handleMutex = CreateMutex(nullptr, TRUE, "Broken Engine Sandbox");
 	DWORD uiMutexError = GetLastError();
-	ScopedHandle pMutex(handleMutex);
+	common::ScopedHandle pMutex(handleMutex);
 	if (handleMutex == nullptr)
 	{
 		LOG(kDefault, kError, "ModelViewer CreateMutex failed: {}", uiMutexError);
@@ -340,21 +362,13 @@ static int ProcessMain(HINSTANCE hinstance)
 	if (uiMutexError == ERROR_ALREADY_EXISTS)
 	{
 		LOG(kDefault, kError, "Another instance is already running");
-		if (engine::gLaunchOptions.iAgentPort == 0)
-		{
-			std::ignore = MessageBox(nullptr, "Another instance is already running", kGameName.data(), MB_OK | MB_ICONERROR);
-		}
+		engine::ShowStartupError("Another instance is already running");
 		return 1;
 	}
 	auto pUploads = std::make_unique<engine::TextureUploadManager>();
 	std::unique_ptr<engine::FileManager> pFiles;
 	try
 	{
-		CHECK_HRESULT(Windows::Foundation::Initialize(RO_INIT_MULTITHREADED));
-		common::ScopedLambda uninitializeFoundation([]()
-		{
-			Windows::Foundation::Uninitialize();
-		});
 		try
 		{
 			pFiles = std::make_unique<engine::FileManager>();
@@ -366,31 +380,18 @@ static int ProcessMain(HINSTANCE hinstance)
 		catch (const std::runtime_error& rException)
 		{
 			LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-			if (engine::gLaunchOptions.iAgentPort == 0)
-			{
-			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
-			}
+			engine::ShowStartupError(rException.what());
 			return 1;
 		}
 		return RunModelViewer(hinstance);
 	}
 	catch (const std::exception& rException)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException(&rException);
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException(&rException);
 	}
 	catch (...)
 	{
-		if (IsDebuggerPresent() != 0) [[unlikely]]
-		{
-			throw;
-		}
-		engine::HandleException();
-		engine::PromptCrashReportDesktopCopy();
+		engine::HandleProcessMainException();
 	}
 	return 1;
 }

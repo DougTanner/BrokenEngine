@@ -130,6 +130,20 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 	}
 }
 
+void XM_CALLCONV FightersPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition)
+{
+	FightersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pFighters;
+	FightersPostRender& rCurrentPostRender = *rFrame.postRender.pFighters;
+
+	rCurrentPostRender.pfHealths[i] -= kfBeamDamage;
+
+	if (rCurrentPostRender.pfHealths[i] <= 0.0f)
+	{
+		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecShooterPosition, rCurrentInterpolate.pVecPositions[i]));
+		BeginExplosion(rFrame, emitterCoordinate, i, vecDamageDirection);
+	}
+}
+
 void FightersPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	FightersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pFighters;

@@ -45,8 +45,10 @@ Resuming retained work, on the user instruction [`../SKILL.md`](../SKILL.md)
 `## Rules` requires, uses the targeted claim with `-ResumeRetained` appended:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
 That switch is valid only with `-Plan` and changes no file. A retained-work
-resume is the one exception to [the `/next-plan` steps](../SKILL.md#steps)
-step 1's clean wrapper-created worktree.
+resume and the exact `-Plan` dirty-gate exemption in
+[claim-results.md](claim-results.md) `## Session baseline and the sync object`
+are the two exceptions to [the `/next-plan` steps](../SKILL.md#steps) step 1's
+clean wrapper-created worktree.
 
 ## Takeover
 

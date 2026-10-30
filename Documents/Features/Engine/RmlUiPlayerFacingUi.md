@@ -41,7 +41,7 @@ cannot replace.
 
 ## Out of scope
 
-- TweaksScreen family (`engine::TweaksScreenBase` + game override) — stays ImGui permanently
+- TweaksScreen family (`engine::TweaksScreen` + game override) — stays ImGui permanently
 - ImPlot consumers (curve editor `CurveWidget`, profiler graphs) — stays ImGui/ImPlot
 - Removing the ImGui dependency or its Vulkan backend — both UI systems coexist
 - Lua or any scripting plugin for RmlUi documents

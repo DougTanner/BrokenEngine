@@ -77,15 +77,10 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	return engine::CameraTarget::Extrapolate();
 }
 
-// Return sun angle, applying UI slider override when in Graphics or ImGui mode
+// Return sun angle, applying the Time of Day slider override while the Graphics settings screen is up
 float Camera::SunAngle() const
 {
-	bool bUseOverride = (game::gpGame->meUiState == engine::UiState::kGraphicsSettings);
-	if constexpr (kbDebugInput)
-	{
-		bUseOverride = bUseOverride || game::gpGame->mbShowImGui;
-	}
-	if (bUseOverride)
+	if (game::gpGame->meUiState == engine::UiState::kGraphicsSettings)
 	{
 		return engine::gSunAngleOverride.mfCurrent;
 	}

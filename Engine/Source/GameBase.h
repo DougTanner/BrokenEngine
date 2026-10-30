@@ -285,8 +285,10 @@ public:
 	bool HandleDeferredSwapchain();
 
 	// Pulls the game camera's target, runs the display-rate camera update for the coord the camera renders, and sets
-	// controller vibration from the decayed shake; shared by Render() and the Main.cpp boot render.
-	void UpdateCamera(GridCoord cameraCoordinate);
+	// controller vibration from the decayed shake; shared by Render() and the Main.cpp boot render. fSunDeltaTime is the
+	// render clock's advance this frame limited to [0, this frame's sim delta], so the sun stops whenever on-screen game
+	// time stops.
+	void UpdateCamera(GridCoord cameraCoordinate, float fSunDeltaTime);
 
 private:
 

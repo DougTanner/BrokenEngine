@@ -21,8 +21,9 @@ game opens exactly two windows for it through `BuildShipRegistryWindow` in
 Each window holds one registry context per flight plane, built once when the
 window opens and reused for the rest of its phase; each context binds one source
 layer per ship type (Fighters, Omnis, Battleships) holding only the ships whose
-current Interpolate row stores that plane, so a ship storing no plane while it
-climbs between planes is in no context. The Missile-Update window opens inside
+current Interpolate position is nearest that plane, so every eligible ship is in
+exactly one context and a ship climbing between planes joins its nearest
+plane's. The Missile-Update window opens inside
 the Update phase before the ship Updates run. A ship of any type is eligible
 while it still publishes a valid registry id and its previous-frame arrival
 grace has run out, and the window binds both

@@ -2,8 +2,9 @@
 
 Read this reference only for a scenario that targets the ModelViewer. It owns
 the one-call use of `../scripts/Invoke-ModelViewerCapture.ps1`, which starts the
-ModelViewer Debug executable hidden in its agent mode, captures PNGs through the
-viewer's own F9 path by message to its window, and closes it by exact PID; the
+ModelViewer Debug executable hidden in its agent mode, waits for the viewer's
+initial streaming done line, captures one PNG through the viewer's own F9 path
+by message to its window, and closes it by exact PID; the
 script owns that sequence, its result codes, and its fixed capture timeout.
 
 ## Capture
@@ -18,12 +19,11 @@ Before capture, apply the pre-launch wait policy in [`launch.md`](launch.md)
 call.
 
 Run one call from the session worktree root, with a fresh app-data path under
-`Temp` stamped with the current UTC time. `-RequireStable` captures until two
-consecutive captures are identical; drop it only when one unsettled capture
-suffices:
+`Temp` stamped with the current UTC time. The script waits until the viewer
+logs `ModelViewer initial streaming done`, then takes one capture:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCapture.ps1 -RepositoryRoot '<absolute adopted worktree>' -AppDataDirectory '<absolute adopted worktree>\Temp\ModelViewerCapture-<UTC stamp>' -RequireStable
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCapture.ps1 -RepositoryRoot '<absolute adopted worktree>' -AppDataDirectory '<absolute adopted worktree>\Temp\ModelViewerCapture-<UTC stamp>'
 ```
 
 - Optionally pass `-ModelPath '<exact packed scene path>'` to select a scene
@@ -47,20 +47,19 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCap
   hands a still-running call back to be polled, as Codex's `exec_command`
   does, has not moved it to the background: keep polling it in-turn.
 
-The script prints one compact `broken-engine-model-viewer-capture/v1` JSON
-object: `status`, `code`, `message`, `pid`, `exitCode`, `captures` (each
-`{path, width, height, sha256}` in order), `stable` (`null` without
-`-RequireStable`), `windowVisible`, `logFile`, and `crashReports` (the existing
-crash reports in the fresh app-data directory, so each is this run's).
+The script prints one compact `broken-engine-model-viewer-capture/v2` JSON
+object: `status`, `code`, `message`, `pid`, `exitCode`, `captures` (one
+`{path, width, height, sha256}` entry on success), `windowVisible`, `logFile`,
+and `crashReports` (the existing crash reports in the fresh app-data directory,
+so each is this run's).
 
-- Classify by `code`, never by `status`. Code `ok` means the captures finished
-  and the viewer closed after `WM_CLOSE`; the last `captures` entry is the
-  result image.
+- Classify by `code`, never by `status`. Code `ok` means the capture finished
+  and the viewer closed after `WM_CLOSE`; the `captures` entry is the result
+  image.
 - Classify every other code under [`../SKILL.md`](../SKILL.md) `## Handoff`.
   `capture.executable-missing` and `internal.error` are setup limitations that
   leave the criterion `BLOCKED`. `capture.failed`, `capture.timeout`,
-  `capture.unstable`, `process.unexpected-exit`, and `close.forced` are observed
-  failures.
+  `process.unexpected-exit`, and `close.forced` are observed failures.
 - Any result with a non-null `pid`, meaning the viewer started, that has a
   nonzero `exitCode` or any `crashReports` entry is also an observed failure,
   whatever its code, including `ok` and `internal.error`.
@@ -71,8 +70,9 @@ crash reports in the fresh app-data directory, so each is this run's).
 - Search the result's `logFile` for `DEBUG_BREAK at` under
   [`worker.md`](worker.md) step 42's rule; this run opened that log, so it holds
   only this run's lines.
-- The viewer's `ModelViewer screenshot complete` log line is the capture's
-  result channel, not criterion state, so the rule against log scraping in
-  `../SKILL.md` `## Handoff` does not apply to it.
+- The viewer's `ModelViewer initial streaming done` and
+  `ModelViewer screenshot complete` log lines are the capture's result channel,
+  not criterion state, so the rule against log scraping in `../SKILL.md`
+  `## Handoff` does not apply to them.
 - Settle pixel assertions with a script under `Temp`, per the image rule in
   [`worker.md`](worker.md) `## Rules`, rather than loading the PNG into context.

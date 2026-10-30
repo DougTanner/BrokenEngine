@@ -106,5 +106,4 @@ Filter paths mirror the on-disk directory structure under three roots:
 Exception: generated `$(GameDataDirectory)\*.h` headers live in a flat `DataFiles`
 filter. New filters need
 a `<Filter Include>` entry with a unique GUID, and every ancestor filter must
-exist. The server filters file has an empty leftover filter (`Engine\Graphics`)
-— cruft, not a signal that such files belong in the server project.
+exist.

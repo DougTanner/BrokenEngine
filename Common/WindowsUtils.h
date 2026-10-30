@@ -3,6 +3,16 @@
 namespace common
 {
 
+struct HandleDeleter
+{
+	void operator()(HANDLE handle) const noexcept
+	{
+		CloseHandle(handle);
+	}
+};
+
+using ScopedHandle = std::unique_ptr<void, HandleDeleter>;
+
 std::string LastErrorString();
 
 std::string HresultToString(HRESULT hresult);

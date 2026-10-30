@@ -76,12 +76,12 @@ void main()
 	vec2 f2WorldInitialPosition = f2InInitialPosition + f2WaterOrigin;
 
 	// Bias eye normal up a bit for skybox. Compute eye-to-water in camera-relative space rather than
-	// reconstructing world position and subtracting f4EyePosition: at large camera coords, the world
+	// reconstructing world position and subtracting f4WaterEyePosition: at large camera coords, the world
 	// round-trip drops low bits from f2InInitialPosition (small + large then subtract large), and the
 	// lost bits shift with camera motion — visible as a velocity-correlated specular darkening at
-	// intermediate fLightingWaterSkyboxNormalSoften. Top-down camera: f4EyePosition.xy == fWaterOrigin
-	// by construction (Camera.cpp sets eye directly above target), so eye - waterWorld = -f2InInitial.
-	vec3 f3ToEyeNormal = normalize(vec3(-f2InInitialPosition, mainLayout.f4EyePosition.z));
+	// intermediate fLightingWaterSkyboxNormalSoften. Top-down camera: f4WaterEyePosition.xy == fWaterOrigin
+	// by construction (CameraBase.cpp sets it directly above the look-at), so eye - waterWorld = -f2InInitial.
+	vec3 f3ToEyeNormal = normalize(vec3(-f2InInitialPosition, mainLayout.f4WaterEyePosition.z));
 	f3ToEyeNormal = normalize(mix(f3ToEyeNormal, mainLayout.f4ToEyeNormal.xyz, globalLayout.fLightingWaterSkyboxNormalSoften));
 
 	WaterNormalSamplingResult normalResult = SampleWaterNormals();

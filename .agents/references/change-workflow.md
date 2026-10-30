@@ -258,9 +258,12 @@ deleted from the worktree, and its support folder through
 `Remove-PlanSupportFolder.ps1` (`Documents/Plans/AGENTS.md` `## Plan files`),
 instead of landing, so nothing is claimed or completed. Every other proven
 out-of-scope leftover, including one the user directs to defer, goes through
-`/create-follow-up-plans`. One proven before the Step 6 dispatch is authored
-first, with the Plan path and its support-folder files recorded as approved
-scope, so that round's reviews cover it; one proven later routes here unchanged.
+`/create-follow-up-plans`; one whose root cause is not yet confirmed need not be
+diagnosed first but becomes a Plan whose investigation portion
+(`Documents/Plans/AGENTS.md` `## Plan files`) leaves diagnosis to the session
+executing it. One proven before the Step 6 dispatch is authored first, with the
+Plan path and its support-folder files recorded as approved scope, so that
+round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land
 

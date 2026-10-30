@@ -219,6 +219,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
@@ -250,6 +251,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h" />
     <ClInclude Include="..\..\..\..\Common\Math\MathUtils.h" />
     <ClInclude Include="..\..\..\..\Common\Math\Random.h" />
+    <ClInclude Include="..\..\..\..\Common\ModelMetadata.h" />
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h" />
     <ClInclude Include="..\..\..\..\Common\Serialization.h" />
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h" />
@@ -377,6 +379,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.h" />

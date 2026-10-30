@@ -33,7 +33,7 @@ Wrapper gSunMoonMoonsetEnd(XM_PIDIV32, 0.0f, XM_PIDIV2);
 Wrapper gSunMoonMinimumAmbient(0.02f, 0.0f, 0.1f);
 Wrapper gSunMoonAmbientMultiplier(1.212f, 0.0f, 4.0f);
 
-// Tilt in radians affects f4SunMoonNormal, derived terrain/water lighting, and shadow-stretch translation.
+// Tilt in radians affects f4SunMoonNormal, derived terrain/water lighting, and the object-shadow away-from-light direction.
 Wrapper gSunMoonNormalTilt(-0.45f, -XM_PIDIV2, XM_PIDIV2);
 
 // Shadow night multiplier is dimensionless; timing boundaries are in radians.

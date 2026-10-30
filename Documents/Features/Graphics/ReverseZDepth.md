@@ -6,9 +6,11 @@ Revisit When: depth fighting is visible between ships, hex shields, water, or te
 
 `CameraBase::CalculateMatricesAndVisibleArea`
 (`Engine/Source/Graphics/CameraBase.cpp`) builds the projection with
-`XMMatrixPerspectiveFovRH`. The near clip is `kfNearClip` (1 m) and the far clip
-is `max(kfMinimumFarClip, eye distance * kfFarClipPerEyeDistance)`, which is
-`max(400, eye distance * 2.667)`. Depth uses the conventional mapping: near maps
+`XMMatrixPerspectiveFovRH`, or `XMMatrixOrthographicRH` when orthographic
+projection is selected. The near clip is
+`eye distance * kfNearClipPerEyeDistance`, which is eye distance / 150, and the
+far clip is `max(kfMinimumFarClip, eye distance * kfFarClipPerEyeDistance)`,
+which is `max(400, eye distance * 2.667)`. Depth uses the conventional mapping: near maps
 to 0 and far to 1. The viewport range (`ConfigureViewportScissor` in
 `Engine/Source/Graphics/Objects/PipelineCreator.cpp`) and the depth clear value
 (`Texture::RecordBeginRenderPass` in
@@ -29,9 +31,9 @@ The depth buffer is `SwapchainManager::mDepthTexture`. It is created with only `
 
 ## Design
 
-Reverse the mapping so near maps to 1 and far maps to 0, and keep a 32-bit float depth format. The float exponent then offsets the projection's uneven distribution, giving nearly uniform precision over distance (Reed).
+Reverse the mapping so near maps to 1 and far maps to 0, and keep a 32-bit float depth format. The float exponent then offsets the projection's uneven distribution, giving nearly uniform precision over distance (Reed). This precision rationale applies only to the perspective projection; orthographic depth is linear in distance.
 
-- **Projection.** Pass the near and far clips to `XMMatrixPerspectiveFovRH` in swapped order, or build a reversed-Z matrix directly. The projection matrix itself must do the reversal. Vulkan allows `minDepth` greater than `maxDepth` within [0, 1], but flipping only the viewport range computes `1 - z` after z has already been rounded, so it gains no precision.
+- **Projection.** Pass the near and far clips in swapped order to both `XMMatrixPerspectiveFovRH` and `XMMatrixOrthographicRH` at the one site that selects between them, or build the reversed-Z matrices directly. The projection matrix itself must do the reversal. Vulkan allows `minDepth` greater than `maxDepth` within [0, 1], but flipping only the viewport range computes `1 - z` after z has already been rounded, so it gains no precision.
 - **Clear and compare.** Clear depth to 0 and compare with `VK_COMPARE_OP_GREATER` or `GREATER_OR_EQUAL`. This is the standard reversed-Z convention but was not verified against a source; confirm it from the references during implementation. Today `kfMaxDepth` sets both the viewport `maxDepth` and the clear value. Afterward the viewport stays [0, 1] while the clear becomes 0, so the clear can no longer use `kfMaxDepth`.
 - **Format.** `D24_UNORM_S8_UINT`, `D16_UNORM`, and `D16_UNORM_S8_UINT` have evenly spaced depth values, so reverse-Z gains nothing on them; they still render correctly. The recommendation is to require a float format (`D32_SFLOAT` or `D32_SFLOAT_S8_UINT`) and remove the UNORM fallbacks. The alternative is to keep the fallbacks and document that devices using them keep today's precision.
 
@@ -39,7 +41,7 @@ Reverse the mapping so near maps to 1 and far maps to 0, and keep a 32-bit float
 
 A grep of the current code found these sites. Re-run the inventory before implementing.
 
-- `CameraBase::CalculateMatricesAndVisibleArea` sets the projection. It also finds the visible-area corners by passing screen z 0 and 1 to `XMVector3Unproject` as the ray start and end. Under reverse-Z the two ends swap but the line stays the same, so the intersection with the Z=0 plane should not change. Verify this.
+- `CameraBase::CalculateMatricesAndVisibleArea` sets the projection in one expression that selects the perspective or orthographic matrix; both branches must reverse. It also finds the visible-area corners by passing screen z 0 and 1 to `XMVector3Unproject` as the ray start and end. Under reverse-Z the two ends swap but the line stays the same, so the intersection with the Z=0 plane should not change. Verify this.
 - `CameraBase::WorldToScreen` returns projected depth in Z from `XMVector3Project`, and that value reverses meaning. Its only callers, in `Projects/BrokenEngineSandbox/Source/Agent/AgentScene.cpp`, read only X and Y.
 - `PipelineCreator.cpp` sets `depthCompareOp` and calls `ConfigureViewportScissor`.
 - `Texture::RecordBeginRenderPass` sets the depth clear value.

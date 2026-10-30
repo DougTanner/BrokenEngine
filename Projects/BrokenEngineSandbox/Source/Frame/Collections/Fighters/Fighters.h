@@ -198,6 +198,9 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
+	// A Battleship beam hit from vecShooterPosition, applied during PostCollision.
+	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition);
+
 	fighter_t* __restrict pIds = nullptr;
 	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	ShipController* __restrict pController = nullptr;

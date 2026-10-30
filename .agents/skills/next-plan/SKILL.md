@@ -98,6 +98,17 @@ The `argument-hint` value selects the Plan:
    unvalidated. That is an expectation of the dispatch, not a gate the Done
    condition tests.
 
+   When that handoff returns, in place of the snapshot, the
+   `/external-diagnose-bug` inputs
+   [preparation-brief.md](references/preparation-brief.md)
+   `## Investigation portion` names for an unconfirmed root cause, main
+   dispatches one `implementer` for `/external-diagnose-bug` on them, then a
+   fresh preparation `implementer` whose continuation capsule carries that
+   diagnosis handoff, unless that handoff returns without a proven root cause,
+   which main reports to the user as a blocker under the approval-refused row of
+   `### Post-checkpoint outcomes` with the claim held; the handoff that
+   preparation worker returns is the one the rest of this step uses.
+
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires and presents per that
    skill's `### User presentation`; step 5 runs only on the approach the user
@@ -120,20 +131,29 @@ The `argument-hint` value selects the Plan:
    reviewer is reported as a blocker.
 6. Unless step 10 already ran (the changes-requested row in
    `### Post-checkpoint outcomes`), invoke step 3's claim script idempotently
-   immediately before the final preparation handoff.
+   with `-Plan '<claimed Plan path>'`, never bare, immediately before the final
+   preparation handoff: another session's `plan validate` or `plan claim-next`
+   can release this session's claim, and a bare run would then claim a
+   different Plan the user never confirmed.
 
-   When that result carries a `sync` object, the tree moved under the
-   preparation evidence: main never lists or reads that range itself, and
-   dispatches one `researcher` on the sync brief in
+   On a `claim.plan-moved` result, main asks the user whether to claim
+   `moved.to`; a yes reruns step 3's claim with `-Plan '<moved.to>'`, from then
+   on the claimed Plan path, and continues this step; a no ends the run on the
+   `### Post-checkpoint outcomes` row for an authoritative result that
+   explicitly reports no claim is held.
+
+   When this step has a sync range, as
    [claim-results.md](references/claim-results.md)
-   `## Final-refresh sync brief`.
+   `## Final-refresh sync brief` defines it, the tree moved under the
+   preparation evidence: main never lists or reads that range itself, and
+   dispatches one `researcher` on the sync brief in that section.
 
    When any row of that `researcher`'s handoff reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;
    reuse review evidence whose inputs did not change.
 
-   Done when the claim result reports the held claim and either the claim
-   result carries no `sync` object or no row reports a touch.
+   Done when the claim result reports the held claim and either this step has
+   no sync range or no row reports a touch.
 7. Present for approval per this file's `### Implementation approval`, unless
    that section sends the run to implementation on an earlier user choice. Done
    when the user's decision arrives or that earlier choice stands.
@@ -323,7 +343,11 @@ to land — never prints that line.
 - The preparation worker must never run the mutation-capable claim script.
 - Every result is acted on per its `nextAction`, never by reconstructing a
   script's transitions, and for a `-Plan`-targeted invocation the manager never
-  selects or claims a different candidate in that run.
+  selects or claims a different candidate in that run, except for a
+  `claim.plan-moved` result in step 6: there `stop-report-to-user` means
+  reporting the move to the user and waiting for the answer, a yes continues
+  step 6 with the user-confirmed `-Plan '<moved.to>'` rerun instead of
+  stopping, and a no ends the run as step 6 states.
 - Never create or adopt a worktree, or inspect machine-local claims directly.
 - When the preparation handoff reports an empty realized change, or that the
   problem the Plan describes is gone, the run goes from preparation straight to

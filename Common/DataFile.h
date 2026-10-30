@@ -300,8 +300,13 @@ struct IslandHeader
 	int32_t iMeshVertexCount = 0;
 	int32_t iMeshIndexCount = 0;
 	int32_t iValidAreaVertexCount = 0;
+	// Highest full-precision elevation sample, before half-float quantization, and its first row-major
+	// heightmap texel.
+	float fPeakHeightMeters = 0.0f;
+	uint16_t uiPeakTexelX = 0;
+	uint16_t uiPeakTexelY = 0;
 };
-static_assert(sizeof(IslandHeader) == 64, "IslandHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportIsland::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(sizeof(IslandHeader) == 72, "IslandHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportIsland::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
 
 struct ModelHeader
 {
@@ -371,8 +376,8 @@ struct TextureHeader
 	// Per-mip Toksvig slope variance mean((1 - |avgN|) / |avgN|), baked by ExportTexture for BC5
 	// normal maps on the regular export path (zeros for every other format/path). Entries past the
 	// real mip chain are padded with the last real value at write time, so readers index by any
-	// clamped LOD without a count. Sized so TextureHeader is the largest ChunkHeader union member at
-	// 72 bytes, which fixes the union footprint — real BC5 chains max out at 9 mips (1024^2).
+	// clamped LOD without a count. Sized to 72 bytes, tying IslandHeader as the largest ChunkHeader
+	// union member — real BC5 chains max out at 9 mips (1024^2).
 	static constexpr int64_t kiMipVarianceCount = 10;
 
 	int64_t iTextureWidth = 0;
@@ -414,7 +419,7 @@ struct ChunkHeader
 };
 // The engine read path reinterpret_casts mapped pack bytes to ChunkHeader* and copies it by value
 // (PackChunks.cpp), so the byte representation must be trivially copyable. The per-union-member
-// sizeof asserts above lock the union footprint; a change to the largest member also shifts
+// sizeof asserts above lock the union footprint; growing a largest member also shifts
 // sizeof(ChunkHeader) and so auto-bumps DataHeader::kiVersion.
 static_assert(std::is_trivially_copyable_v<ChunkHeader>, "ChunkHeader must be trivially copyable for the reinterpret_cast/memcpy read path");
 static_assert(BT_OFFSETOF(ChunkHeader, iMagic) == 0, "ChunkHeader::iMagic offset changed — bump DataHeader::kiVersion");
@@ -437,7 +442,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 56 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 57 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

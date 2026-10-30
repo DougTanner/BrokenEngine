@@ -157,11 +157,6 @@ static bool PromptRetryPublish(std::string_view message)
 	return diagnostic::Report(record) != diagnostic::ButtonResult::kCancelled;
 }
 
-using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-{
-	CloseHandle(handle);
-})>;
-
 // The pack step is one POSIX replace-if-exists rename, which replaces the pack's name even while the caller's lock from
 // CheckPendingPacksUnlocked or a lazy-pack holder, both sharing delete, has the existing pack open; each such handle
 // keeps reading the replaced file. Any failure of the pack step, which runs after the manifest publishes, prompts to
@@ -210,7 +205,7 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 		}
 
 		HANDLE handleOpened = CreateFileW(rTemporaryPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
-		ScopedHandle pTemporaryPack(handleOpened != INVALID_HANDLE_VALUE ? handleOpened : nullptr);
+		common::ScopedHandle pTemporaryPack(handleOpened != INVALID_HANDLE_VALUE ? handleOpened : nullptr);
 		bool bRenamed = pTemporaryPack != nullptr && SetFileInformationByHandle(pTemporaryPack.get(), FileRenameInfoEx, pRenameInfo, static_cast<DWORD>(std::ssize(renameInfoBytes))) != FALSE;
 		int64_t iError = GetLastError();
 		if (bRenamed)
@@ -649,7 +644,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunAllMainExports(Dat
 // share delete stops the run with nothing replaced. Fills rPackLocks with one entry per pending type, in order, null
 // where the pack does not exist or failed to open for another cause. Returns false when the user cancels, after removing
 // every pending temporary manifest, pack, and header.
-static bool CheckPendingPacksUnlocked(std::vector<ScopedHandle>& rPackLocks)
+static bool CheckPendingPacksUnlocked(std::vector<common::ScopedHandle>& rPackLocks)
 {
 	rPackLocks.reserve(static_cast<size_t>(std::ssize(sPendingPublishes)));
 	while (true)
@@ -687,7 +682,7 @@ static bool CheckPendingPacksUnlocked(std::vector<ScopedHandle>& rPackLocks)
 
 // Publishes each pending type in export order, closing its pack lock from rPackLocks right after its pack step. Returns
 // false when any type's publish is cancelled at its retry prompt, after removing that type's temporary manifest and pack.
-static bool PublishPendingExports(std::vector<ScopedHandle>& rPackLocks)
+static bool PublishPendingExports(std::vector<common::ScopedHandle>& rPackLocks)
 {
 	bool bSuccess = true;
 	for (int64_t i = 0; i < std::ssize(sPendingPublishes); ++i)
@@ -833,7 +828,7 @@ bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSumma
 	}
 	bSuccess &= *exportResult;
 
-	std::vector<ScopedHandle> packLocks;
+	std::vector<common::ScopedHandle> packLocks;
 	if (!CheckPendingPacksUnlocked(packLocks))
 	{
 		return false;
@@ -914,7 +909,8 @@ static std::vector<std::wstring> DiscoverGameProjects(const std::filesystem::pat
 	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rRepositoryRoot / "Projects"))
 	{
 		std::wstring projectName = rEntry.path().filename().native();
-		if (rEntry.is_directory() && std::filesystem::is_regular_file(rEntry.path() / "Platforms" / "VisualStudio2026" / (projectName + L".vcxproj")))
+		std::filesystem::path projectFiles = rEntry.path() / "Platforms" / "VisualStudio2026";
+		if (rEntry.is_directory() && std::filesystem::is_regular_file(projectFiles / (projectName + L".vcxproj")) && std::filesystem::is_regular_file(projectFiles / (projectName + L"Server.vcxproj")))
 		{
 			projectNames.push_back(std::move(projectName));
 		}
@@ -982,10 +978,6 @@ static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
 	for (const std::wstring& rProjectName : DiscoverGameProjects(repositoryRoot))
 	{
 		std::filesystem::path projectDirectory = repositoryRoot / "Projects" / rProjectName;
-		if (!std::filesystem::is_directory(projectDirectory / "Data"))
-		{
-			continue;
-		}
 		std::string projectDataDirectory = (projectDirectory / "Data").string();
 		std::string outputDirectory = (projectDirectory / "Platforms" / "VisualStudio2026" / "Output" / "Data").string();
 		std::array<char*, 4> projectArguments { ppcArguments[0], engineDataDirectory.data(), projectDataDirectory.data(), outputDirectory.data() };

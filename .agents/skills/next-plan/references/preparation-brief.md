@@ -31,6 +31,20 @@ condition; every other record it carries, including a `citations.items` entry
 with `pathExists` or `lineExists` false, is an advisory lead, never a defect to
 clear and rerun.
 
+## Investigation portion
+
+When the claimed Plan carries an investigation portion
+(`Documents/Plans/AGENTS.md` `## Plan files`), confirm its root cause from
+current code and the supplied evidence, including any diagnosis handoff the
+continuation capsule carries, before writing the snapshot, and record that root
+cause with its evidence in the snapshot. Then bound the card's scope by the fix
+that root cause requires inside the Plan's named region: a fix outside it
+returns as a scope-widened `Verification` row, and a choice between fixes that
+only the user can make becomes an `## Unresolved decisions` entry with its
+`unresolved decision` row. When current code and the supplied evidence cannot
+confirm the root cause, stop before writing the snapshot and return, as the one
+`Residuals` row, the inputs `/external-diagnose-bug` `## Inputs` requires.
+
 ## Leftovers
 
 Apply the Change Workflow Verify the acceptance table step's Leftovers rule in

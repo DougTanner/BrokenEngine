@@ -570,12 +570,14 @@ void StaticVoices::UpdateListenerPosition()
 		mListenerCoordinate = engine::gpCamera->mBasisCoordinate;
 	}
 
-	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
+	// mVecListenerPosition sits above the camera look-at at a fixed height just over the highest flight plane, so
+	// emitter altitude contributes to manual fade distance while field of view and projection do not move the listener.
 	// mX3dAudioListener.Position is the camera look-at, which the camera keeps on the lowest flight plane, for pan/Doppler.
 	// ApplyThreeDimensionalVolume flattens every emitter to its Z, so the XY-only vector keeps screen-left audible on the
 	// left rather than collapsed toward center by altitude or emitter height. Listener velocity is zero because RTS
 	// camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
-	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
+	static constexpr float kfListenerHeightPerHighestPlane = 1.1f;
+	mVecListenerPosition = XMVectorSetZ(engine::gpCamera->mVecPosition, gpFlightPlanes->Highest().fHeightMeters * kfListenerHeightPerHighestPlane);
 	XMFLOAT3A f3PanPosition {};
 	XMStoreFloat3A(&f3PanPosition, engine::gpCamera->mVecPosition);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};
@@ -587,13 +589,13 @@ void StaticVoices::UpdateListenerPosition()
 	// Conditional Uniforms" pattern. Each
 	// quantity owns four wrappers (startHeight, endHeight, low, high) in SoundSettingsWrappersBase
 	// and is exposed in the Sound > Tweaks sub-tab. Distances on the consumer side
-	// (ApplyThreeDimensionalVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (camera
-	// eye), so altitude naturally pushes ground emitters into the fade band as the camera climbs.
-	float fEyeHeight = engine::gpCamera->mfCameraEyeHeight;
-	mfEffectiveFadeStart = engine::LerpAtHeight(fEyeHeight, gListenerDistanceStart.startHeight.mfCurrent, gListenerDistanceStart.endHeight.mfCurrent, gListenerDistanceStart.low.mfCurrent, gListenerDistanceStart.high.mfCurrent);
-	mfEffectiveFadeEnd = engine::LerpAtHeight(fEyeHeight, gListenerDistanceEnd.startHeight.mfCurrent, gListenerDistanceEnd.endHeight.mfCurrent, gListenerDistanceEnd.low.mfCurrent, gListenerDistanceEnd.high.mfCurrent);
-	mfCurveDistanceScaler = engine::LerpAtHeight(fEyeHeight, gListenerCurve.startHeight.mfCurrent, gListenerCurve.endHeight.mfCurrent, gListenerCurve.low.mfCurrent, gListenerCurve.high.mfCurrent);
-	mfManualFadeVolume = engine::LerpAtHeight(fEyeHeight, gListenerAudibleFloor.startHeight.mfCurrent, gListenerAudibleFloor.endHeight.mfCurrent, gListenerAudibleFloor.low.mfCurrent, gListenerAudibleFloor.high.mfCurrent);
+	// (ApplyThreeDimensionalVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (above the
+	// highest flight plane); the bands widen with framing as the camera zooms out.
+	float fFraming = engine::gpCamera->mfCameraFraming;
+	mfEffectiveFadeStart = engine::LerpAtHeight(fFraming, gListenerDistanceStart.startHeight.mfCurrent, gListenerDistanceStart.endHeight.mfCurrent, gListenerDistanceStart.low.mfCurrent, gListenerDistanceStart.high.mfCurrent);
+	mfEffectiveFadeEnd = engine::LerpAtHeight(fFraming, gListenerDistanceEnd.startHeight.mfCurrent, gListenerDistanceEnd.endHeight.mfCurrent, gListenerDistanceEnd.low.mfCurrent, gListenerDistanceEnd.high.mfCurrent);
+	mfCurveDistanceScaler = engine::LerpAtHeight(fFraming, gListenerCurve.startHeight.mfCurrent, gListenerCurve.endHeight.mfCurrent, gListenerCurve.low.mfCurrent, gListenerCurve.high.mfCurrent);
+	mfManualFadeVolume = engine::LerpAtHeight(fFraming, gListenerAudibleFloor.startHeight.mfCurrent, gListenerAudibleFloor.endHeight.mfCurrent, gListenerAudibleFloor.low.mfCurrent, gListenerAudibleFloor.high.mfCurrent);
 }
 
 void StaticVoices::UpdateVolumes()

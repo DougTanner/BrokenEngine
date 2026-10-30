@@ -35,7 +35,7 @@ WaterNormalSamplingResult SampleWaterNormals()
 	result.f2LocalDx = dFdx(f2InInitialPosition);
 	result.f2LocalDy = dFdy(f2InInitialPosition);
 
-	// Per-sample weights resolved CPU-side by camera eye height (LightingUniforms.cpp), then weighted-sum-then-normalize.
+	// Per-sample weights resolved CPU-side by camera framing (LightingUniforms.cpp), then weighted-sum-then-normalize.
 	// normalize() is scale-invariant so absolute weight magnitudes don't matter; only ratios do. Weight 0 disables a
 	// sample group entirely — the weight is a uniform (warp-coherent branch), so a faded-out band skips its 3 fetches.
 	result.fWeightOne = mainLayout.fWaterNormalWeightOne;

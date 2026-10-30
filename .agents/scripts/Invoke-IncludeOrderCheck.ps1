@@ -42,7 +42,7 @@ $script:SourceRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
 # joins them once the projects are discovered.
 $script:ExcludedFiles = @(
 	'DataPacker/Source/Pch.h'
-	'Tools/ModelViewer/Source/Pch.h'
+	'Projects/ModelViewer/Source/Pch.h'
 	'Common/ExternalHeaders.h'
 	'Common/Common.h'
 	'Engine/Source/Engine.h'
@@ -50,7 +50,7 @@ $script:ExcludedFiles = @(
 $script:ProjectFiles = @(
 	@{ Prefix = '^Tools/ServerMonitor/'; Project = 'Tools/ServerMonitor/Platforms/VisualStudio2026/ServerMonitor.vcxproj' }
 	@{ Prefix = '^DataPacker/'; Project = 'DataPacker/Platforms/VisualStudio2026/DataPacker.vcxproj' }
-	@{ Prefix = '^Tools/ModelViewer/Source/'; Project = 'Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj' }
+	@{ Prefix = '^Projects/ModelViewer/Source/'; Project = 'Projects/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj' }
 	@{ Prefix = '^Tools/(?:AgentHarness|ToolCommon)/'; Project = 'Tools/AgentHarness/Platforms/VisualStudio2026/AgentHarness.vcxproj' }
 	@{ Prefix = '^Tools/WorktreeCli/'; Project = 'Tools/WorktreeCli/Platforms/VisualStudio2026/WorktreeCli.vcxproj' }
 )
@@ -291,9 +291,9 @@ try {
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-IncludeOrder 2 'error' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	# A game project is a Projects/<Name> directory holding Platforms/VisualStudio2026/<Name>.vcxproj, its
-	# client project. Engine/ and Common/ resolve through the first one's include list, which differs from
-	# its server project's only by the RenderDoc directory.
+	# Each game project's files resolve through its client project, Platforms/VisualStudio2026/<Name>.vcxproj.
+	# Engine/ and Common/ resolve through the first one's include list, which differs from its server
+	# project's only by the RenderDoc and glm directories.
 	$gameProjects = [Collections.Generic.List[hashtable]]::new()
 	foreach ($name in @(Get-AgentGameProjects $script:Root)) {
 		$project = "Projects/$name/Platforms/VisualStudio2026/$name.vcxproj"

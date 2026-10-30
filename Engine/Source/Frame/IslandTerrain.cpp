@@ -39,6 +39,13 @@ IslandTerrain::IslandTerrain()
 		rTemplate.fWorldElevationMeters = rLazyChunk.header.islandHeader.fWorldElevationMeters;
 		ASSERT(rTemplate.fWorldFootprintXMeters > 0.0f);
 		ASSERT(rTemplate.fWorldFootprintYMeters > 0.0f);
+		const common::IslandHeader& rIslandHeader = rLazyChunk.header.islandHeader;
+		rTemplate.fPeakHeightMeters = rIslandHeader.fPeakHeightMeters;
+		rTemplate.iPeakTexelX = rIslandHeader.uiPeakTexelX;
+		rTemplate.iPeakTexelY = rIslandHeader.uiPeakTexelY;
+		ASSERT(std::isfinite(rTemplate.fPeakHeightMeters));
+		ASSERT(rTemplate.iPeakTexelX < rIslandHeader.iHeightmapWidth);
+		ASSERT(rTemplate.iPeakTexelY < rIslandHeader.iHeightmapHeight);
 		rTemplate.fQuadFootprintX = rTemplate.fWorldFootprintXMeters;
 		rTemplate.fQuadFootprintY = rTemplate.fWorldFootprintYMeters;
 	}
@@ -424,6 +431,21 @@ void XM_CALLCONV IslandTerrain::BuildElevationGrid(const std::vector<IslandPlace
 		BlendPlacementIntoGrid(rPlacement, mIslands.at(rPlacement.islandCrc), rOutGrid);
 	}
 }
+
+#if defined(BT_CLIENT)
+XMFLOAT2 IslandTerrain::PlacementPeakPosition(const IslandPlacement& rPlacement) const
+{
+	const IslandTemplate& rTemplate = mIslands.at(rPlacement.islandCrc);
+	float fLocalX = (static_cast<float>(rTemplate.iPeakTexelX) / static_cast<float>(rTemplate.iHeightmapWidth - 1) - 0.5f) * rTemplate.fQuadFootprintX;
+	float fLocalY = (0.5f - static_cast<float>(rTemplate.iPeakTexelY) / static_cast<float>(rTemplate.iHeightmapHeight - 1)) * rTemplate.fQuadFootprintY;
+
+	// Transpose of the sampling rotation, which maps cell-local deltas into the island's local frame.
+	common::SinCos rotation = common::DeterministicSinCos(-rPlacement.fRotation);
+	float fDeltaX = fLocalX * rotation.fCos + fLocalY * rotation.fSin;
+	float fDeltaY = fLocalY * rotation.fCos - fLocalX * rotation.fSin;
+	return XMFLOAT2 {rPlacement.f2WorldPosition.x + fDeltaX, rPlacement.f2WorldPosition.y + fDeltaY};
+}
+#endif
 
 CellElevationSampler XM_CALLCONV IslandTerrain::MakeCellElevationSampler(const CellStaticData& rStaticData) const
 {

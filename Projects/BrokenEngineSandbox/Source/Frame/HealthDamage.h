@@ -15,6 +15,11 @@ inline constexpr float kfOmniEnergy = 25.0f;
 inline constexpr std::chrono::duration<float> kArrivalGracePeriod(1.0f);
 
 inline constexpr float kfBlasterDamage = 6.0f;
+inline constexpr float kfBeamDamage = 10.0f * kfBlasterDamage;
+// The beam is the only damage a missile takes, so a constant health is enough.
+inline constexpr float kfMissileHealth = kfBlasterDamage;
+// Every beam hit destroys the missile it hits.
+static_assert(kfBeamDamage >= kfMissileHealth);
 inline constexpr float kfMissileCollisionRadius = 0.5f;
 inline constexpr float kfMissileDamageRadius = 7.0f;
 inline constexpr float kfMissileDamage = 30.0f;

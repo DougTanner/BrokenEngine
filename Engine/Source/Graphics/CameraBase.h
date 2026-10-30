@@ -21,9 +21,9 @@ inline RenderBasis MakeRenderBasis(GridCoord coordinate, GridCoord cameraCoordin
 	return basis;
 }
 
-// Minimum eye height (LOD pivot floor). Single source for both the engine LOD-bucket math in
-// CameraBase::CalculateMatricesAndVisibleArea and the zoom-clamp floor in CameraBase::UpdateEyeHeight.
-inline constexpr float kfMinimumEyeHeight = 150.0f;
+// Minimum framing (LOD pivot floor). Single source for both the engine LOD-bucket math in
+// CameraBase::CalculateMatricesAndVisibleArea and the zoom-clamp floor in CameraBase::UpdateFraming.
+inline constexpr float kfMinimumFraming = 150.0f;
 
 // Camera (display-rate, client-only, continuous)
 struct CameraInput
@@ -72,31 +72,35 @@ class CameraBase : public common::Singleton<CameraBase>
 public:
 
 	static constexpr float kfDefaultSunAngle = 1.8f;
-	static constexpr float kfCameraEyeHeightDefault = 300.0f;
-	// Camera-height zoom-factor fade endpoint (2x default eye height = fully zoomed out). Single-sources the water
+	// The zoom value is the framing: the eye height above the look-at that would show the current view at this vertical
+	// field of view, in degrees. Every projection and field of view shows the same look-at-plane half-height,
+	// framing * tan(kfFramingFieldOfView / 2); the eye is derived from it.
+	static constexpr float kfFramingFieldOfView = 25.3125f;
+	static constexpr float kfCameraFramingDefault = 300.0f;
+	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
-	static constexpr float kfWaveFadeEndHeight = 2.0f * kfCameraEyeHeightDefault;
-	// Release zoom-out ceiling (dev builds zoom further; see kfEyeHeightMaximum). NOT a texel reference: the shadow/lighting
-	// texel grids hold a constant on-screen pixel size at any height (the texels coarsen with zoom instead of cropping
+	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
+	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow/lighting
+	// texel grids hold a constant on-screen pixel size at any framing (the texels coarsen with zoom instead of cropping
 	// coverage), so this is purely the gameplay limit on how far the camera can pull back.
-	static constexpr float kfEyeHeightMaximumRelease = 600.0f;
+	static constexpr float kfFramingMaximumRelease = 600.0f;
 #if defined(BT_RELEASE)
-	static constexpr float kfEyeHeightMaximum = kfEyeHeightMaximumRelease; // Shipping: gameplay zoom-out ceiling
+	static constexpr float kfFramingMaximum = kfFramingMaximumRelease; // Shipping: gameplay zoom-out ceiling
 #else
-	static constexpr float kfEyeHeightMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
+	static constexpr float kfFramingMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
 #endif
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
-	// than the wanted on-screen pixel size. Because their texel-height references never fall below live eye height,
+	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing,
 	// this margin keeps the raw live-frustum footprints inside their textures throughout zoom transitions. At settled
-	// height, the raw live-frustum window equals the wanted pixel size regardless of this value.
+	// framing, the raw live-frustum window equals the wanted pixel size regardless of this value.
 	static constexpr float kfShadowHeadroomMultiplier = 1.5f;
 	static constexpr float kfLightingHeadroomMultiplier = 1.5f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
-	// zoom range either way. WHEEL_DELTA (120) * kfEyeHeightPerWheelTick (0.1) = 12 units per click.
-	static constexpr float kfCameraEyeHeightInitial = kfCameraEyeHeightDefault + 48.0f;
+	// zoom range either way. WHEEL_DELTA (120) * kfFramingPerWheelTick (0.1) = 12 units per click.
+	static constexpr float kfCameraFramingInitial = kfCameraFramingDefault + 48.0f;
 
 	XMMATRIX mMatView {};
-	XMMATRIX mMatPerspective {};
+	XMMATRIX mMatProjection {};
 
 	XMFLOAT2 mf2VisibleAreaQuadSize {};
 	XMFLOAT4 mf4RenderVisibleArea {};
@@ -109,7 +113,15 @@ public:
 
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
+	// The eye at kfFramingFieldOfView (framing above the look-at); the water eye vector, reflected ray, and reflection
+	// Fresnel read it so they do not change with field of view or projection mode.
+	XMVECTOR mVecWaterEyePosition {};
 	XMVECTOR mVecToEyeNormal {};
+
+	// gOrthographicProjection latched by CalculateMatricesAndVisibleArea; per-frame readers use this, never the wrapper.
+	// Under orthographic projection the eye is a virtual eye at the default field of view and eye lines follow
+	// mVecToEyeNormal.
+	bool mbOrthographicProjection = false;
 
 	// The cell every cached camera position, and every basis built for this render, is local to. Update follows the
 	// rendered camera coord: on a one-cell step it shifts the cached positions so the flight stays continuous, on a
@@ -125,7 +137,7 @@ public:
 	static constexpr float kfVisualErrorMinDistance = 0.001f;
 
 	// Visible-area LOD (read by renderer to pick which mesh-LOD region to draw). Equation:
-	// floor(log4(eyeDistance / kfMinimumEyeHeight)) clamped to BufferManager::kiVisibleAreaLodCount-1.
+	// floor(log4(framing / kfMinimumFraming)) clamped to BufferManager::kiVisibleAreaLodCount-1.
 	// Higher LOD = fewer mesh quads (each dim halved per LOD; total quads /4 per LOD).
 	int64_t miVisibleAreaLevelOfDetail = 0;
 
@@ -133,8 +145,8 @@ public:
 
 	float mfTime = 0.0f;
 
-	float mfCameraEyeHeight = kfCameraEyeHeightInitial;
-	float mfCameraEyeHeightTarget = kfCameraEyeHeightInitial;
+	float mfCameraFraming = kfCameraFramingInitial;
+	float mfCameraFramingTarget = kfCameraFramingInitial;
 	XMVECTOR mVecLastKnownTargetPosition {};
 	XMVECTOR mVecLastKnownTargetVelocity {};
 	float mfLastKnownTargetTime = 0.0f;
@@ -144,26 +156,26 @@ public:
 	float mfJumpStartTime = 0.0f;
 	bool mbJumping = false;
 
-	float mfEyeStartHeight = 0.0f;
-	float mfEyeStartVelocity = 0.0f;
-	float mfEyeStartTime = 0.0f;
-	float mfEyeVelocity = 0.0f;
-	bool mbEyeZooming = false;
+	float mfFramingStart = 0.0f;
+	float mfFramingStartVelocity = 0.0f;
+	float mfFramingStartTime = 0.0f;
+	float mfFramingVelocity = 0.0f;
+	bool mbZooming = false;
 
-	// Eye-height reference that sizes the shadow texel grid. Expands immediately with outward zoom and contracts
-	// at the shadow rate inward. 0 = uninitialized (snap directly to live height on first frame).
-	float mfShadowTexelEyeHeight = 0.0f;
+	// Framing reference that sizes the shadow texel grid. Expands immediately with outward zoom and contracts
+	// at the shadow rate inward. 0 = uninitialized (snap directly to live framing on first frame).
+	float mfShadowTexelFraming = 0.0f;
 
-	// Eye-height reference that sizes the lighting texel grid. Expands immediately with outward zoom and contracts
-	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live height on first frame).
-	float mfLightingTexelEyeHeight = 0.0f;
+	// Framing reference that sizes the lighting texel grid. Expands immediately with outward zoom and contracts
+	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live framing on first frame).
+	float mfLightingTexelFraming = 0.0f;
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
 
-	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
+	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
 
 	void ResetForSession();
-	void RestoreEyeHeight(float fEyeHeight);
+	void RestoreFraming(float fFraming);
 
 	// Adds the error to the offset, or zeroes the offset when the sum is longer than kfVisualErrorMaxDistance. Returns
 	// the sum's length either way.
@@ -197,10 +209,10 @@ private:
 	void ShiftToRenderedCell(GridCoord cameraCoordinate);
 	XMVECTOR ResolveTarget(const CameraTarget& rCameraTarget);
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);
-	void UpdateEyeHeight();
+	void UpdateFraming();
 
 	XMFLOAT2 mf2LatchedQuadSize {};
-	// Zero is below every real eye-distance bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.
+	// Zero is below every real framing bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.
 	int64_t miVisibleAreaZoomBucket = 0;
 	uint32_t muiVisibleAreaLatchKey = 0;
 };

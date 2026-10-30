@@ -38,6 +38,11 @@ static void PopulateWaterDirectional(shaders::GlobalLayout& rGlobalLayout, float
 	rGlobalLayout.fWaterDirectional = std::pow(fDirectional, 2.0f);
 }
 
+bool WaterFoamActive()
+{
+	return gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
+}
+
 // Reduced-time accumulators require exactly one call per frame.
 static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
 {
@@ -54,7 +59,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor));
@@ -150,37 +155,22 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
 	gPresentationContinuity.f2ReducedNoiseOrigin = f2ReducedNoiseOrigin;
 	gPresentationContinuity.fNoiseFrequency = static_cast<float>(fNoiseFrequency);
-	if (gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow))
+	if (WaterFoamActive())
 	{
-		double fFoamTextureInverseTileSize = 1.0 / static_cast<double>(gWaterFoamTextureTileSize.mfCurrent);
-		XMFLOAT2 f2FoamReducedTextureOrigin {static_cast<float>(std::fmod(fFoamTextureInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamTextureInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamReducedTextureOrigin.x = f2FoamReducedTextureOrigin.x;
-		rGlobalLayout.f2WaterFoamReducedTextureOrigin.y = f2FoamReducedTextureOrigin.y;
-		rGlobalLayout.fWaterFoamTextureInverseTileSize = static_cast<float>(fFoamTextureInverseTileSize);
+		auto ReduceFoamOrigin = [&](float fTileSize, shaders::vec2& rf2ReducedOrigin)
+		{
+			double fInverseTileSize = 1.0 / static_cast<double>(fTileSize);
+			rf2ReducedOrigin.x = static_cast<float>(std::fmod(fInverseTileSize * fCameraX, 2.0));
+			rf2ReducedOrigin.y = static_cast<float>(std::fmod(fInverseTileSize * fCameraY, 2.0));
+			return static_cast<float>(fInverseTileSize);
+		};
+		rGlobalLayout.fWaterFoamTextureInverseTileSize = ReduceFoamOrigin(gWaterFoamTextureTileSize.mfCurrent, rGlobalLayout.f2WaterFoamReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamTextureStrength = gWaterFoamEnabled.Get<bool>() ? gWaterFoamTextureStrength.mfCurrent : 0.0f;
-		gPresentationContinuity.f2FoamReducedTextureOrigin = f2FoamReducedTextureOrigin;
-		gPresentationContinuity.fFoamTextureInverseTileSize = static_cast<float>(fFoamTextureInverseTileSize);
-		double fFoamBreakupInverseTileSize = 1.0 / static_cast<double>(gWaterFoamBreakupTileSize.mfCurrent);
-		XMFLOAT2 f2FoamBreakupReducedTextureOrigin {static_cast<float>(std::fmod(fFoamBreakupInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamBreakupInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin.x = f2FoamBreakupReducedTextureOrigin.x;
-		rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin.y = f2FoamBreakupReducedTextureOrigin.y;
-		rGlobalLayout.fWaterFoamBreakupInverseTileSize = static_cast<float>(fFoamBreakupInverseTileSize);
+		rGlobalLayout.fWaterFoamBreakupInverseTileSize = ReduceFoamOrigin(gWaterFoamBreakupTileSize.mfCurrent, rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamBreakupAmount = gWaterFoamBreakupAmount.mfCurrent;
-		rGlobalLayout.uiWaterFoamTextureIndex = static_cast<uint32_t>(std::clamp(gWaterFoamTextureIndex.GetIndex(), 0i64, static_cast<int64_t>(shaders::kiWaterFoamTextureCount - 1)));
-		rGlobalLayout.uiWaterFoamBreakupTextureIndex = static_cast<uint32_t>(std::clamp(gWaterFoamBreakupTextureIndex.GetIndex(), 0i64, static_cast<int64_t>(shaders::kiWaterFoamBreakupTextureCount - 1)));
-		gPresentationContinuity.f2FoamBreakupReducedTextureOrigin = f2FoamBreakupReducedTextureOrigin;
-		gPresentationContinuity.fFoamBreakupInverseTileSize = static_cast<float>(fFoamBreakupInverseTileSize);
-		double fFoamSpawnNoiseInverseTileSize = 1.0 / static_cast<double>(gWaterFoamSpawnNoiseTileSize.mfCurrent);
-		XMFLOAT2 f2FoamSpawnNoiseReducedOrigin {static_cast<float>(std::fmod(fFoamSpawnNoiseInverseTileSize * fCameraX, 2.0)), static_cast<float>(std::fmod(fFoamSpawnNoiseInverseTileSize * fCameraY, 2.0))};
-		rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin.x = f2FoamSpawnNoiseReducedOrigin.x;
-		rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin.y = f2FoamSpawnNoiseReducedOrigin.y;
-		rGlobalLayout.fWaterFoamSpawnNoiseInverseTileSize = static_cast<float>(fFoamSpawnNoiseInverseTileSize);
-		gPresentationContinuity.f2FoamSpawnNoiseReducedOrigin = f2FoamSpawnNoiseReducedOrigin;
-		gPresentationContinuity.fFoamSpawnNoiseInverseTileSize = static_cast<float>(fFoamSpawnNoiseInverseTileSize);
-	}
-	else
-	{
-		rGlobalLayout.fWaterFoamTextureStrength = 0.0f;
+		rGlobalLayout.uiWaterFoamTextureIndex = static_cast<uint32_t>(gWaterFoamTextureIndex.GetIndex());
+		rGlobalLayout.uiWaterFoamBreakupTextureIndex = static_cast<uint32_t>(gWaterFoamBreakupTextureIndex.GetIndex());
+		rGlobalLayout.fWaterFoamSpawnNoiseInverseTileSize = ReduceFoamOrigin(gWaterFoamSpawnNoiseTileSize.mfCurrent, rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin);
 	}
 	++gPresentationContinuity.iPublishedFrames;
 }
@@ -188,19 +178,15 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
 {
 	static bool sbInitialized = false;
-	static bool sbWasActive = false;
 	static RetainedAreaBasis sRetainedBasis {};
 	static XMFLOAT4 sf4PreviousArea {};
 	static std::chrono::duration<float> sPreviousElapsedTime(0.0f);
 	static std::chrono::steady_clock::time_point sPreviousUpdate {};
 
-	bool bActive = gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
-	if (!bActive)
+	if (!WaterFoamActive())
 	{
 		rGlobalLayout.iWaterFoamEnabled = 0;
-		rGlobalLayout.iWaterFoamReset = 1;
 		sbInitialized = false;
-		sbWasActive = false;
 		return;
 	}
 
@@ -208,7 +194,7 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	std::optional<XMFLOAT2> optionalOffset = sRetainedBasis.Advance(engine::gpCamera->mBasisCoordinate);
 	bool bBasisReset = sbInitialized && !optionalOffset.has_value();
 	bool bClockReset = elapsedTime < sPreviousElapsedTime;
-	bool bReset = !sbInitialized || gbWaterFoamReset || bBasisReset || bClockReset || !sbWasActive;
+	bool bReset = !sbInitialized || gbWaterFoamReset || bBasisReset || bClockReset;
 	XMFLOAT4 f4Area = engine::gpCamera->mf4RenderVisibleArea;
 	XMFLOAT4 f4PreviousArea = sf4PreviousArea;
 	if (bReset)
@@ -238,18 +224,11 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	rGlobalLayout.fWaterFoamDecayRate = std::log(2.0f) / gWaterFoamHalfLife.mfCurrent;
 	rGlobalLayout.fWaterFoamDeltaTime = fDeltaTime;
 	rGlobalLayout.iWaterFoamReset = bReset ? 1 : 0;
-	rGlobalLayout.iWaterFoamEnabled = bActive ? 1 : 0;
-	gPresentationContinuity.waterFoam.f4CurrentArea = f4Area;
-	gPresentationContinuity.waterFoam.f4PreviousArea = f4PreviousArea;
-	if (bBasisReset)
-	{
-		++gPresentationContinuity.waterFoam.iHistoryResets;
-	}
+	rGlobalLayout.iWaterFoamEnabled = 1;
 	sf4PreviousArea = f4Area;
 	sPreviousElapsedTime = elapsedTime;
 	sPreviousUpdate = updateTime;
 	sbInitialized = true;
-	sbWasActive = bActive;
 	gbWaterFoamReset = false;
 }
 
@@ -312,7 +291,7 @@ constexpr double kfWaveTwoPi = 2.0 * 3.14159265358979323846;
 // region into rMainLayout. Directions (pf4WavesOne), omega (pf4WavesTwo.x), phi (pf4WavesTwo.z), and
 // the clamped-but-unscaled base amplitude (pfBaseAmplitude) are frame-invariant — rebuilt only when
 // the consumed tunables change. The per-frame pass rewrites only pf4WavesTwo.y (base amplitude x the
-// eye-height fade scale) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
+// framing fade scale) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
 struct GerstnerWaveBandStaging
 {
 	XMFLOAT4 pf4WavesOne[256];
@@ -322,7 +301,7 @@ struct GerstnerWaveBandStaging
 
 // Consumed low/medium tunables snapshot; inequality vs last frame triggers an invariant rebuild.
 // iCount defaults to -1 (never a resolved count) so the first real frame always rebuilds. The
-// eye-height amplitude-fade scale is deliberately absent — it folds into the per-frame amplitude
+// framing amplitude-fade scale is deliberately absent — it folds into the per-frame amplitude
 // multiply, not a rebuild.
 struct LowWaveTunables
 {
@@ -511,7 +490,7 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double
 }
 
 // Wave phase reduction: fCurrentTime is the same elapsed time this frame's RenderFrameGlobal received.
-// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-eye-height
+// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-framing
 // fade clamps amplitude to zero they zero the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
 static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurrentTime, GraphicsQualityLevel eWaterLevel)
 {
@@ -533,14 +512,14 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	double fWaveCameraX = fWaveCellX + static_cast<double>(f4WaveCameraPosition.x);
 	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
 
-	// Camera eye height scales geometric wave amplitudes using each stack's Start and End settings.
-	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
+	// Camera framing scales geometric wave amplitudes using each stack's Start and End settings.
+	float fCameraFraming = engine::gpCamera->mfCameraFraming;
 	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
 	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
-	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraFraming) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
 	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent;
 	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
-	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraFraming) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
 
 	PopulateGerstnerLowWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
 
@@ -560,7 +539,7 @@ void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> curren
 
 	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
 	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
-	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from eye distance with 4×
+	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from framing with 4×
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
 	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;

@@ -85,7 +85,14 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   `Collision::GetOutcome` in `Collision.h`). Per-pair collision masks must be
   bi-directional and same-layer collision is unsupported; both are asserted.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
-- `FlightPlanes` reads the game's immutable flight-plane table directly at boot on both builds; its lowest plane is the base height every simulation and render consumer reads. Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes with positive, strictly ascending heights, then that every island template's header elevation ceiling stays below the highest plane, so it follows `IslandTerrain` construction.
+- `FlightPlanes` reads the game's immutable flight-plane table directly at boot
+  on both builds; its lowest plane is the base height every simulation and
+  render consumer reads, and `NearestPlaneIndex` is the one rule for which
+  plane a height is nearest (an exact midpoint takes the lower plane).
+  Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes
+  with positive, strictly ascending heights, then that every island template's
+  header elevation ceiling stays below the highest plane, so it follows
+  `IslandTerrain` construction.
 
 ## Frame Registry
 

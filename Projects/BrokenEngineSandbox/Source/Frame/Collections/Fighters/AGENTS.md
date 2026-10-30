@@ -14,7 +14,8 @@ Fighters combine heading-based steering, health and damage, a fixed forward blas
   regenerate health.
 - Steering turn rate crosses cell boundaries with the ship rather than restarting on arrival.
 - Direct blaster hits arrive through collision; missile splash damage arrives
-  through the area-damage phase. Destruction applies horizontal knockback and a
+  through the area-damage phase; a Battleship beam hit arrives in the
+  Battleships PostCollision hook (`../Battleships/AGENTS.md`). Destruction applies horizontal knockback and a
   staged explosion sequence. Separation and pusher death ownership follow the
   [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The nose climb tilt is client-only render state: Interpolate Update derives it from the tick's height change and Render pitches the model by it, while the simulated heading stays yaw-only.

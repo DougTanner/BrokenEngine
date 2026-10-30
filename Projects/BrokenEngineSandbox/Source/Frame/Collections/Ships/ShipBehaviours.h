@@ -48,6 +48,8 @@ inline constexpr uint8_t kuiNoFlightPlane = 255;
 [[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
 // The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height.
 [[nodiscard]] std::optional<int64_t> FlightPlaneAtHeight(float fHeight);
+// The plane nearest the position's height, which target choice treats the position as on.
+[[nodiscard]] int64_t XM_CALLCONV NearestFlightPlane(FXMVECTOR vecPosition);
 // The plane whose graph a ship paths and steers on: min(highest plane at or below its height, target plane).
 [[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
 // True on a plane without kTerrainCollision.
@@ -86,7 +88,7 @@ void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData
 // Hard contact at the height of rVecPosition: rVecPosition stops at the terrain and the heading bounces off it. An
 // overlapped start snaps on the NavigationFlightPlane graph.
 void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
-// Pass the row's own pusher; apply rfPositionCorrectionX after terrain resolution.
+// Pass the row's own pusher; adds to the caller-initialized rfPositionCorrectionX, applied after terrain resolution.
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX);
 
 // Firing and look targets from previous-frame data: sets kFireMissile for an enemy within fMissileTargetRange and

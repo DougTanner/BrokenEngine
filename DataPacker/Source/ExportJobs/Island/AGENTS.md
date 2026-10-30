@@ -66,6 +66,9 @@ out of step with the shader.
 
 The island payload stores the quantized elevation field, XY mesh data, indices, and valid-area hull. Runtime terrain reconstructs Z from elevation. The hull must have at least three vertices and remain convex and counter-clockwise because deterministic client/server island placement consumes it through `common::ConvexHullsOverlap` with no substitute shape; producer checks enforce those properties before serialization, so a leaf whose hull has fewer than three vertices fails its export.
 
+`IslandHeader` also carries the leaf's peak height and texel, defined in its
+`Common/DataFile.h` field comment.
+
 Large shared route inputs use persistent fingerprints rather than repeated content reads. JPEG diagnostics belong only in the parallel `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/.../Gaea/Diagnostics/` tree, never the source checkout.
 
 ## Versioning

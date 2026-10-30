@@ -182,11 +182,15 @@ function Compare-AgentModelVersion([string] $Left, [string] $Right) {
 	return 0
 }
 
-# The game projects under Root: each Projects/<Name> directory holding Platforms/VisualStudio2026/<Name>.vcxproj,
-# read from the filesystem so an untracked project counts. Names are in ordinal order.
+# The game projects under Root: each Projects/<Name> directory holding the client/server pair
+# Platforms/VisualStudio2026/<Name>.vcxproj and <Name>Server.vcxproj, read from the filesystem so an untracked project
+# counts. A client-only application such as ModelViewer is not a game project. Names are in ordinal order.
 function Get-AgentGameProjects([string] $Root) {
 	[string[]] $names = @([IO.Directory]::GetDirectories((Join-Path $Root 'Projects')) | ForEach-Object { [IO.Path]::GetFileName($_) } |
-		Where-Object { [IO.File]::Exists((Join-Path $Root "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj")) })
+		Where-Object {
+			[IO.File]::Exists((Join-Path $Root "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj")) -and
+			[IO.File]::Exists((Join-Path $Root "Projects/$_/Platforms/VisualStudio2026/${_}Server.vcxproj"))
+		})
 	[Array]::Sort($names, [StringComparer]::Ordinal)
 	return $names
 }

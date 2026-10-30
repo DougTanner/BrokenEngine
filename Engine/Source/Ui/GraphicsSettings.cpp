@@ -25,7 +25,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 19;
+	static constexpr int64_t kiVersion = 20;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -46,7 +46,9 @@ struct GraphicsSettings
 	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
 	uint8_t uiWaterFoamEnabled = 1;
-	uint8_t puiQualityPadding[2] {};
+	uint8_t uiOrthographicProjection = 0;
+	uint8_t puiProjectionPadding[1] {};
+	float fFieldOfView = 15.0f;
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -67,8 +69,10 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 42, "Graphi
 static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 43, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 44, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterFoamEnabled) == 45, "GraphicsSettings::uiWaterFoamEnabled offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, puiQualityPadding) == 46, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
-static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiOrthographicProjection) == 46, "GraphicsSettings::uiOrthographicProjection offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 47, "GraphicsSettings padding changed — fFieldOfView must stay four-byte aligned");
+static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 48, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
+static_assert(sizeof(GraphicsSettings) == 52, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -93,6 +97,8 @@ void SaveGraphicsSettings()
 		.uiLightingLevel = static_cast<uint8_t>(gLightingLevel.Get<int64_t>()),
 		.uiSmokeDetailLevel = static_cast<uint8_t>(gSmokeDetailLevel.Get<int64_t>()),
 		.uiWaterFoamEnabled = static_cast<uint8_t>(gWaterFoamSystemEnabled.Get<bool>()),
+		.uiOrthographicProjection = static_cast<uint8_t>(gOrthographicProjection.Get<bool>()),
+		.fFieldOfView = gFieldOfView.mfCurrent,
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -185,6 +191,16 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "uiWaterFoamEnabled";
 	}
 
+	if (rGraphicsSettings.uiOrthographicProjection > 1)
+	{
+		return "uiOrthographicProjection";
+	}
+
+	if (!gFieldOfView.IsInRange(rGraphicsSettings.fFieldOfView))
+	{
+		return "fFieldOfView";
+	}
+
 	return nullptr;
 }
 
@@ -221,6 +237,8 @@ bool LoadGraphicsSettings()
 		gSampleShading.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSampleShading);
 		gMinimumSampleShading.Set(graphicsSettings.fMinimumSampleShading);
 		gMipmapLevelOfDetailBias.Set(graphicsSettings.fMipmapLevelOfDetailBias);
+		gOrthographicProjection.Set(graphicsSettings.uiOrthographicProjection != 0);
+		gFieldOfView.Set(graphicsSettings.fFieldOfView);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
 		gSmokeLayerStagger.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmokeLayerStagger);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
@@ -255,6 +273,8 @@ void ResetGraphicsSettings()
 	gSampleShading.mfCurrent = gSampleShading.mfDefault;
 	gMinimumSampleShading.mfCurrent = gMinimumSampleShading.mfDefault;
 	gMipmapLevelOfDetailBias.mfCurrent = gMipmapLevelOfDetailBias.mfDefault;
+	gOrthographicProjection.mfCurrent = gOrthographicProjection.mfDefault;
+	gFieldOfView.mfCurrent = gFieldOfView.mfDefault;
 	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
 	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;

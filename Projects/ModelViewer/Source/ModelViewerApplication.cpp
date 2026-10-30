@@ -2,11 +2,13 @@
 
 #include "File/PackChunks.h"
 #include "Frame/TerrainCollisionUtils.h"
-#include "Graphics/Camera.h"
-#include "Profile/ProfileRows.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/MenuUtils.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
+
+#include "Graphics/Camera.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game
@@ -14,6 +16,7 @@ namespace game
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1;
 constexpr float kfFlightRadius = 1.5f;
+constexpr float kfDefaultFlightHeight = 6.0f;
 
 bool ModelViewerApplication::WorldVisible() const
 {
@@ -30,8 +33,6 @@ void ModelViewerApplication::ResetDisplayTime()
 void ModelViewerApplication::ToggleFlight()
 {
 	mFlags.Set(ViewerFlags::kFlying, !(mFlags & ViewerFlags::kFlying));
-	engine::gpGraphics->mFlags.Set(engine::GraphicsFlags::kDrawModelsOverWorld, !(mFlags & ViewerFlags::kFlying));
-	engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
 	miDragButton = -1;
 	ResetDisplayTime();
 }
@@ -51,6 +52,17 @@ ModelViewerApplication::ModelViewerApplication()
 : common::Singleton<ModelViewerApplication>(gpModelViewerApplication, this)
 {
 	mSeedRandomEngine.TimeSeed();
+	// Strict comparison over the CRC-sorted list keeps the lowest CRC on a tie.
+	float fTallestHeight = -std::numeric_limits<float>::infinity();
+	for (common::crc_t islandCrc : engine::gpIslandTerrain->mIslandCrcsSorted)
+	{
+		float fPeakHeight = engine::gpIslandTerrain->mIslands.at(islandCrc).fPeakHeightMeters;
+		if (fPeakHeight > fTallestHeight)
+		{
+			fTallestHeight = fPeakHeight;
+			mTallestIslandCrc = islandCrc;
+		}
+	}
 	GenerateIslands();
 	mRenderInterpolates.try_emplace(engine::kOriginCoordinate);
 	mActiveCoordinates.push_back(engine::kOriginCoordinate);
@@ -122,62 +134,6 @@ static std::filesystem::path FindExecutableCheckout()
 	}
 }
 
-static void RequireContainedPath(const std::filesystem::path& rPath, const std::filesystem::path& rOwner)
-{
-	auto it = rPath.begin();
-	for (const std::filesystem::path& rPart : rOwner)
-	{
-		if (it == rPath.end() || _wcsicmp(it->c_str(), rPart.c_str()) != 0)
-		{
-			throw std::runtime_error(std::format("Source path outside {}: {}", rOwner.string(), rPath.string()));
-		}
-		++it;
-	}
-}
-
-static void CheckMetadataPaths(const std::filesystem::path& rCheckout, const std::filesystem::path& rData, const std::filesystem::path& rSource, const std::filesystem::path& rMetadata)
-{
-	std::filesystem::path dataPath = std::filesystem::canonical(rData);
-	RequireContainedPath(dataPath, rCheckout);
-	std::filesystem::path sourcePath = std::filesystem::canonical(rSource);
-	RequireContainedPath(sourcePath, dataPath);
-	if (!std::filesystem::is_regular_file(sourcePath))
-	{
-		throw std::runtime_error(std::format("Model source is not a regular file: {}", rSource.string()));
-	}
-	RequireContainedPath(std::filesystem::canonical(rMetadata.parent_path()), dataPath);
-	RequireContainedPath(std::filesystem::weakly_canonical(rMetadata), dataPath);
-	// A dangling link is present input too, not a missing identity sidecar.
-	if (std::filesystem::is_symlink(std::filesystem::symlink_status(rMetadata)) && !std::filesystem::exists(rMetadata))
-	{
-		throw std::runtime_error(std::format("Unreadable metadata link: {}", rMetadata.string()));
-	}
-}
-
-static XMFLOAT3A ReadMetadataVector(const nlohmann::json& rMetadata, std::string_view name)
-{
-	const nlohmann::json& rValues = rMetadata.at(name);
-	if (!rValues.is_array() || !std::cmp_equal(rValues.size(), 3))
-	{
-		throw std::runtime_error(std::format("{} must contain three finite float components", name));
-	}
-	float pfValues[3] {};
-	for (const auto& [i, rValue] : std::views::enumerate(rValues))
-	{
-		if (!rValue.is_number())
-		{
-			throw std::runtime_error(std::format("{} must be numeric", name));
-		}
-		double fValue = rValue.get<double>();
-		if (!std::isfinite(fValue) || std::abs(fValue) > std::numeric_limits<float>::max())
-		{
-			throw std::runtime_error(std::format("{} must fit in finite floats", name));
-		}
-		pfValues[i] = static_cast<float>(fValue);
-	}
-	return {pfValues[0], pfValues[1], pfValues[2]};
-}
-
 void ModelViewerApplication::ValidateModelAlignment()
 {
 	mFlags.Set(ViewerFlags::kMetadataValid, false);
@@ -195,13 +151,14 @@ void ModelViewerApplication::ValidateModelAlignment()
 		mModelAlignmentError = "Scale XYZ must be positive";
 		return;
 	}
-	XMFLOAT3A f3Radians {XMConvertToRadians(mf3ModelRotation.x), XMConvertToRadians(mf3ModelRotation.y), XMConvertToRadians(mf3ModelRotation.z)};
-	if (!std::isfinite(f3Radians.x) || !std::isfinite(f3Radians.y) || !std::isfinite(f3Radians.z))
+	common::ModelHeader modelHeader
 	{
-		mModelAlignmentError = "Rotation in radians must be finite";
-		return;
-	}
-	XMMATRIX matAlignment = XMMatrixTranslation(mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z) * XMMatrixScaling(kfFlightRadius * mf3ModelScale.x, kfFlightRadius * mf3ModelScale.y, kfFlightRadius * mf3ModelScale.z) * XMMatrixRotationX(f3Radians.x) * XMMatrixRotationY(f3Radians.y) * XMMatrixRotationZ(f3Radians.z);
+		.f3RotationRadians = {XMConvertToRadians(mf3ModelRotation.x), XMConvertToRadians(mf3ModelRotation.y), XMConvertToRadians(mf3ModelRotation.z)},
+		.f3Scale = mf3ModelScale,
+		.f3Offset = mf3ModelOffset,
+	};
+	engine::ModelAlignment alignment = engine::GetModelAlignment(modelHeader);
+	XMMATRIX matAlignment = alignment.matPreMove * XMMatrixScaling(kfFlightRadius * alignment.f3Scale.x, kfFlightRadius * alignment.f3Scale.y, kfFlightRadius * alignment.f3Scale.z) * alignment.matPreRotate;
 	XMVECTOR vecDeterminant;
 	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(&vecDeterminant, matAlignment));
 	float fDeterminant = XMVectorGetX(vecDeterminant);
@@ -226,52 +183,34 @@ void ModelViewerApplication::LoadModelMetadata()
 	mModelMetadataPath.clear();
 	try
 	{
-		mCheckoutPath = FindExecutableCheckout();
+		std::filesystem::path checkoutPath = FindExecutableCheckout();
 		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunks = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 		const common::SceneHeader& rScene = rChunks.at(mPreviews.at(miSelected).crc).pHeader->sceneHeader;
 		std::filesystem::path sourceRelativePath(rChunks.at(rScene.modelCrc).pHeader->pcPath);
-		if (!sourceRelativePath.is_relative() || sourceRelativePath.has_root_path() || sourceRelativePath.extension() != ".MODEL")
-		{
-			throw std::runtime_error(std::format("Invalid packed model identity: {}", sourceRelativePath.string()));
-		}
-		if (std::ranges::contains(sourceRelativePath, std::filesystem::path("..")))
-		{
-			throw std::runtime_error("Packed model identity contains parent traversal");
-		}
 		sourceRelativePath.replace_extension();
 		int64_t iMatches = 0;
-		for (const std::filesystem::path& rData : {mCheckoutPath / "Engine/Data", mCheckoutPath / "Projects/BrokenEngineSandbox/Data"})
+		std::filesystem::path sourcePath;
+		for (const std::filesystem::path& rData : {checkoutPath / "Engine/Data", checkoutPath / "Projects/BrokenEngineSandbox/Data"})
 		{
-			std::filesystem::path sourcePath = rData / sourceRelativePath;
-			if (std::filesystem::is_regular_file(sourcePath))
+			std::filesystem::path candidatePath = rData / sourceRelativePath;
+			if (std::filesystem::is_regular_file(candidatePath))
 			{
 				++iMatches;
-				mModelDataPath = rData;
-				mModelSourcePath = sourcePath;
+				sourcePath = candidatePath;
 			}
 		}
 		if (iMatches != 1)
 		{
-			throw std::runtime_error(std::format("Expected one source for {} under {}; found {}", sourceRelativePath.string(), mCheckoutPath.string(), iMatches));
+			throw std::runtime_error(std::format("Expected one source for {} under {}; found {}", sourceRelativePath.string(), checkoutPath.string(), iMatches));
 		}
-		mModelMetadataPath = mModelSourcePath;
+		mModelMetadataPath = sourcePath;
 		mModelMetadataPath += ".model.json";
-		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
 		if (std::filesystem::exists(mModelMetadataPath))
 		{
-			std::vector<std::byte> bytes = common::ReadEntireFile(mModelMetadataPath);
-			const char* pcBytes = reinterpret_cast<const char*>(bytes.data());
-			nlohmann::json metadata = nlohmann::json::parse(pcBytes, pcBytes + bytes.size());
-			if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 1)
-			{
-				throw std::runtime_error("Model metadata requires integer version 1");
-			}
-			XMFLOAT3A f3Scale = ReadMetadataVector(metadata, "scale");
-			XMFLOAT3A f3Rotation = ReadMetadataVector(metadata, "rotationDegrees");
-			XMFLOAT3A f3Offset = ReadMetadataVector(metadata, "offset");
-			mf3ModelScale = f3Scale;
-			mf3ModelRotation = f3Rotation;
-			mf3ModelOffset = f3Offset;
+			common::ModelMetadata metadata = common::ReadModelMetadata(mModelMetadataPath);
+			mf3ModelScale = metadata.f3Scale;
+			mf3ModelRotation = metadata.f3RotationDegrees;
+			mf3ModelOffset = metadata.f3Offset;
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
 			{
@@ -291,62 +230,34 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
 		ValidateModelAlignment();
-		mModelMetadataStatus = std::format("Load failed: {} ({})", rException.what(), mModelMetadataPath.string());
+		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
 }
 
 void ModelViewerApplication::SaveModelMetadata()
 {
-	// Heap: explicit source Save serializes JSON and resolves filesystem paths.
+	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
-	try
+	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
+	std::string content = std::format("{{\n\t\"version\": 1,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}]\n}}\n", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z);
+	std::filesystem::path stagingPath = mModelMetadataPath;
+	stagingPath += ".tmp";
+	std::ofstream stream(stagingPath, std::ios::binary);
+	stream.write(content.data(), std::ssize(content));
+	stream.close();
+	std::error_code errorCode;
+	if (!stream.fail())
 	{
-		nlohmann::json metadata
-		{
-			{"version", 1},
-			{"rotationDegrees", {mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z}},
-			{"scale", {mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z}},
-			{"offset", {mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z}},
-		};
-		std::string content = metadata.dump(2) + "\n";
-		CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
-		std::filesystem::path stagingPath = mModelMetadataPath;
-		stagingPath += std::format(".{}.tmp", GetCurrentProcessId());
-		RequireContainedPath(std::filesystem::weakly_canonical(stagingPath), std::filesystem::canonical(mModelDataPath));
-		HANDLE handle = CreateFileW(stagingPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			throw std::runtime_error(std::format("Cannot create staging file {} (Windows error {})", stagingPath.string(), GetLastError()));
-		}
-		DWORD uiWritten = 0;
-		bool bWritten = WriteFile(handle, content.data(), static_cast<DWORD>(content.size()), &uiWritten, nullptr) != FALSE && uiWritten == content.size();
-		bool bClosed = CloseHandle(handle) != FALSE;
-		if (!bWritten || !bClosed)
-		{
-			DeleteFileW(stagingPath.c_str());
-			throw std::runtime_error("Cannot write complete metadata staging file");
-		}
-		try
-		{
-			CheckMetadataPaths(mCheckoutPath, mModelDataPath, mModelSourcePath, mModelMetadataPath);
-		}
-		catch (...)
-		{
-			DeleteFileW(stagingPath.c_str());
-			throw;
-		}
-		if (!MoveFileExW(stagingPath.c_str(), mModelMetadataPath.c_str(), MOVEFILE_REPLACE_EXISTING))
-		{
-			int64_t iError = GetLastError();
-			DeleteFileW(stagingPath.c_str());
-			throw std::runtime_error(std::format("Cannot replace metadata (Windows error {})", iError));
-		}
-		mModelMetadataStatus = "Saved source metadata. Game packs update on the next data build.";
+		std::filesystem::rename(stagingPath, mModelMetadataPath, errorCode);
 	}
-	catch (const std::exception& rException)
+	if (stream.fail() || errorCode)
 	{
-		mModelMetadataStatus = std::format("Save failed: {} ({})", rException.what(), mModelMetadataPath.string());
+		std::error_code removeErrorCode;
+		std::filesystem::remove(stagingPath, removeErrorCode);
+		mModelMetadataStatus = std::format("Save failed: {}", errorCode ? errorCode.message() : "cannot write staging file");
+		return;
 	}
+	mModelMetadataStatus = "Saved source metadata. Game packs update on the next data build.";
 }
 
 struct LightingDescriptor
@@ -589,21 +500,32 @@ void ModelViewerApplication::GenerateIslands()
 {
 	// Heap: island generation builds placement and hull vectors on seed changes.
 	ScopedSuppressAllocationTracking suppress;
-	engine::GenerateIslandChain(mIslandSeed, mIslandCell.islands);
+	// Steps the seed forward until the layout holds the tallest template and another placement to alternate with. It
+	// ends by probability, not guarantee: the generator may draw the tallest template for a link that does not fit.
+	while (true)
+	{
+		engine::GenerateIslandChain(mIslandSeed, mIslandCell.islands);
+		auto it = std::ranges::find(mIslandCell.islands, mTallestIslandCrc, &engine::IslandPlacement::islandCrc);
+		if (std::ssize(mIslandCell.islands) > 1 && it != mIslandCell.islands.end())
+		{
+			miTallestPlacement = it - mIslandCell.islands.begin();
+			break;
+		}
+		mIslandSeed = engine::GridCoord::FromKey(mIslandSeed.ToKey() + 1);
+	}
 	engine::gpIslandTerrain->BuildElevationGrid(mIslandCell.islands, mIslandCell.elevationGrid);
-	mWaterDestinations.clear();
 	const XMFLOAT2& rf2Island = mIslandCell.islands.at(0).f2WorldPosition;
 	float fBestScore = std::numeric_limits<float>::max();
+	float fLowestHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
 	for (float fY = -engine::kfCellHalfHeight; fY < engine::kfCellHalfHeight; fY += 8.0f)
 	{
 		for (float fX = -engine::kfCellHalfWidth; fX < engine::kfCellHalfWidth; fX += 8.0f)
 		{
-			XMVECTOR vecCandidate = XMVectorSet(fX, fY, 6.0f, 1.0f);
+			XMVECTOR vecCandidate = XMVectorSet(fX, fY, fLowestHeight, 1.0f);
 			if (!DiscClear(vecCandidate, 0.0f))
 			{
 				continue;
 			}
-			mWaterDestinations.emplace_back(fX, fY);
 			float fDistance = std::hypot(fX - rf2Island.x, fY - rf2Island.y);
 			float fScore = std::abs(fDistance - 140.0f);
 			if (fScore < fBestScore)
@@ -613,7 +535,7 @@ void ModelViewerApplication::GenerateIslands()
 			}
 		}
 	}
-	if (mWaterDestinations.empty())
+	if (fBestScore == std::numeric_limits<float>::max())
 	{
 		throw std::runtime_error("ModelViewer generated cell has no clear-water flight anchor");
 	}
@@ -633,16 +555,30 @@ bool ModelViewerApplication::DiscClear(FXMVECTOR vecPosition, float fHeight) con
 
 void ModelViewerApplication::ResetFlight()
 {
-	mFlightBody = {.vecPosition = mVecWaterAnchor};
-	miFlightPlane = 0;
+	mfFlightHeight = kfDefaultFlightHeight;
+	mFlightBody = {.vecPosition = XMVectorSetZ(mVecWaterAnchor, mfFlightHeight)};
+	miDestinationPlacement = -1;
 	SelectDestination();
 	mDisplayTimer.Reset();
 }
 
 void ModelViewerApplication::SelectDestination()
 {
-	const XMFLOAT2& rf2Destination = mWaterDestinations.at(common::Random(std::ssize(mWaterDestinations), mSeedRandomEngine));
-	mFlightBody.vecDestination = XMVectorSet(rf2Destination.x, rf2Destination.y, 0.0f, 1.0f);
+	if (miDestinationPlacement == miTallestPlacement)
+	{
+		// Random is inclusive, so size - 2 draws one of the other placements, skipping past the tallest.
+		miDestinationPlacement = common::Random(std::ssize(mIslandCell.islands) - 2, mSeedRandomEngine);
+		if (miDestinationPlacement >= miTallestPlacement)
+		{
+			++miDestinationPlacement;
+		}
+	}
+	else
+	{
+		miDestinationPlacement = miTallestPlacement;
+	}
+	XMFLOAT2 f2Destination = engine::gpIslandTerrain->PlacementPeakPosition(mIslandCell.islands.at(miDestinationPlacement));
+	mFlightBody.vecDestination = XMVectorSet(f2Destination.x, f2Destination.y, 0.0f, 1.0f);
 }
 
 void ModelViewerApplication::UpdateFlight(float fDeltaTime)
@@ -656,51 +592,20 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 	}
 	if (XMVectorGetX(XMVector3LengthSq(vecToDestination)) > 0.0f)
 	{
-		float fCrossZ = XMVectorGetZ(XMVector3Cross(rBody.vecDirection, XMVector3Normalize(vecToDestination)));
-		float fWantedTurn = fCrossZ > 0.0f ? 4.0f : -4.0f;
-		rBody.fDeltaRotation = std::lerp(fWantedTurn, rBody.fDeltaRotation, common::ExponentialDecay(0.064f, fDeltaTime));
+		// Turning in proportion to the heading error keeps small errors from chattering; gain 6 critically damps the 6/s
+		// response and decay.
+		float fHeadingError = std::atan2(XMVectorGetZ(XMVector3Cross(rBody.vecDirection, vecToDestination)), XMVectorGetX(XMVector3Dot(rBody.vecDirection, vecToDestination)));
+		float fWantedTurn = std::clamp(6.0f * fHeadingError, -4.0f, 4.0f);
+		rBody.fDeltaRotation = std::lerp(fWantedTurn, rBody.fDeltaRotation, common::ExponentialDecay(6.0f, fDeltaTime));
 	}
 	rBody.fDeltaRotation *= common::ExponentialDecay(6.0f, fDeltaTime);
 	float fHeight = XMVectorGetZ(rBody.vecPosition);
-	float fTargetHeight = engine::gpFlightPlanes->Plane(miFlightPlane).fHeightMeters;
-	float fNextHeight = fHeight + std::clamp(fTargetHeight - fHeight, -25.0f * fDeltaTime, 25.0f * fDeltaTime);
-	if (fNextHeight < fHeight && (!DiscClear(rBody.vecPosition, 0.0f) || !DiscClear(rBody.vecPosition, fNextHeight)))
-	{
-		fNextHeight = fHeight;
-	}
+	float fNextHeight = fHeight + std::clamp(mfFlightHeight - fHeight, -25.0f * fDeltaTime, 25.0f * fDeltaTime);
 	rBody.fClimbTilt = fDeltaTime > 0.0f ? 0.35f * (fNextHeight - fHeight) / (25.0f * fDeltaTime) : rBody.fClimbTilt;
-	if (fNextHeight < engine::gpFlightPlanes->Highest().fHeightMeters)
-	{
-		engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(mIslandCell);
-		XMVECTOR vecLeft = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rBody.vecDirection);
-		float fLeft = 0.0f;
-		float fRight = 0.0f;
-		float fTotalWeight = 0.0f;
-		for (int64_t j = 0; j < 4; ++j)
-		{
-			XMVECTOR vecAhead = XMVectorMultiplyAdd(XMVectorReplicate(static_cast<float>(j + 1) * 4.0f), rBody.vecDirection, rBody.vecPosition);
-			for (int64_t k = 0; k < 2; ++k)
-			{
-				float fWeight = 1.0f - static_cast<float>(j + k) * 0.1f;
-				float fSide = static_cast<float>(k + 1) * 2.0f;
-				fLeft += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
-				fRight += fWeight * (sampler.Sample(XMVectorMultiplyAdd(XMVectorReplicate(-fSide), vecLeft, vecAhead)) - (fNextHeight - 6.0f));
-				fTotalWeight += fWeight;
-			}
-		}
-		fLeft /= fTotalWeight;
-		fRight /= fTotalWeight;
-		if (fLeft > 0.5f || fRight > 0.5f)
-		{
-			float fPercent = std::clamp((std::max(fLeft, fRight) - 0.5f) / 2.5f, 0.0f, 1.0f);
-			float fAvoidTurn = std::lerp(16.0f, 32.0f, fPercent) * (fLeft > fRight ? -1.0f : 1.0f);
-			rBody.fDeltaRotation = 0.995f * rBody.fDeltaRotation + 0.005f * fAvoidTurn;
-		}
-	}
 	rBody.vecDirection = XMVector3Normalize(XMVector3TransformNormal(rBody.vecDirection, XMMatrixRotationZ(fDeltaTime * rBody.fDeltaRotation)));
 	rBody.vecVelocity = engine::ApplyMovement<true>(rBody.vecVelocity, rBody.vecDirection, fDeltaTime, 10.0f, 0.25f, 40.0f, 4.0f);
 	XMVECTOR vecNext = XMVectorSetZ(XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rBody.vecVelocity, rBody.vecPosition), fNextHeight);
-	// Sweep the disc against the inset cell before terrain so every accepted segment stays in the original cell.
+	// Sweep the disc against the inset cell so every accepted segment stays in the original cell.
 	static constexpr common::HexDirections kFlightCell = common::MakeHexDirections(engine::kfCellApothem - kfFlightRadius - 0.01f);
 	if (std::optional<float> optionalExit = common::TraceHexExit(rBody.vecPosition, vecNext, kFlightCell))
 	{
@@ -710,19 +615,6 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 		vecNext = XMVectorSetZ(XMVectorLerp(rBody.vecPosition, vecNext, std::max(0.0f, *optionalExit - 0.001f / fDistance)), fNextHeight);
 		rBody.vecVelocity = XMVector3Reflect(rBody.vecVelocity, vecNormal);
 		rBody.vecDirection = XMVector3Reflect(rBody.vecDirection, vecNormal);
-		SelectDestination();
-	}
-	if (fNextHeight < engine::gpFlightPlanes->Highest().fHeightMeters)
-	{
-		engine::NavData navigation;
-		engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(mIslandCell, navigation, rBody.vecPosition, vecNext, kfFlightRadius, fNextHeight, false);
-		vecNext = result.vecPosition;
-		if (result.flags & engine::DiscTerrainFlags::kContact)
-		{
-			float fCrossZ = XMVectorGetZ(XMVector3Cross(rBody.vecDirection, result.vecNormal));
-			rBody.fDeltaRotation = fCrossZ > 0.0f ? 8.0f : -8.0f;
-			rBody.vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * 4.0f), result.vecNormal, XMVector3Reflect(rBody.vecVelocity, result.vecNormal));
-		}
 	}
 	rBody.vecPosition = XMVectorSetW(vecNext, 1.0f);
 }
@@ -834,8 +726,6 @@ bool ModelViewerApplication::Render()
 	{
 		UpdateFlight(fDeltaTime);
 		mCameraFrame.iTick = miFrame;
-		// Zero presentation tick delta preserves the manually controlled sun.
-		mCameraFrame.fDeltaTime = 0.0f;
 		mCameraFrame.renderBasis = engine::MakeRenderBasis(engine::kOriginCoordinate, engine::kOriginCoordinate);
 		pCamera->UpdateFlight(mCameraFrame, mFlightBody.vecPosition, fDeltaTime);
 	}
@@ -961,15 +851,7 @@ void ModelViewerApplication::RenderUi()
 			ImGui::PopID();
 		};
 		ImGui::SeparatorText("Render quality");
-		auto QualityToggle = [](const char* pcLabel, engine::Wrapper& rWrapper)
-		{
-			bool bValue = rWrapper.Get<bool>();
-			if (ImGui::Checkbox(pcLabel, &bValue))
-			{
-				rWrapper.Set(bValue);
-			}
-		};
-		QualityToggle("Multisampling", engine::gMultisampling);
+		engine::WrapperToggle("Multisampling", &engine::gMultisampling);
 		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
 		ImGui::TextUnformatted("Sample count");
 		ImGui::SetNextItemWidth(fQualityTrackWidth);
@@ -988,12 +870,12 @@ void ModelViewerApplication::RenderUi()
 			}
 			ImGui::EndCombo();
 		}
-		QualityToggle("Sample Shading", engine::gSampleShading);
+		engine::WrapperToggle("Sample Shading", &engine::gSampleShading);
 		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
 		QualitySlider("Min Sample Shading", engine::gMinimumSampleShading);
 		ImGui::EndDisabled();
 		ImGui::EndDisabled();
-		QualityToggle("Anisotropy", engine::gAnisotropy);
+		engine::WrapperToggle("Anisotropy", &engine::gAnisotropy);
 		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
 		QualitySlider("Max Anisotropy", engine::gMaximumAnisotropy);
 		ImGui::EndDisabled();
@@ -1005,12 +887,6 @@ void ModelViewerApplication::RenderUi()
 		ImGui::BeginDisabled(mFlags & ViewerFlags::kFlying);
 		ImGui::Checkbox("World background", &mbWorldBackground);
 		ImGui::EndDisabled();
-		int piSeed[2] {mIslandSeed.iQ, mIslandSeed.iR};
-		if (ImGui::InputInt2("Seed", piSeed))
-		{
-			mIslandSeed = {.iQ = piSeed[0], .iR = piSeed[1]};
-			GenerateIslands();
-		}
 		if (ImGui::Button("Reroll"))
 		{
 			mIslandSeed = engine::GridCoord::FromKey(common::RandomNext(mSeedRandomEngine));
@@ -1143,9 +1019,13 @@ void ModelViewerApplication::RenderUi()
 					mModelMetadataStatus = "Unsaved source edits";
 				}
 			}
-			static constexpr const char* kpcPlanes[] {"6 m", "50 m", "100 m"};
+			// ImGui parses inf and nan; NaN would make the body position NaN and inf would make it climb without bound, so keep the last value.
+			float fFlightHeight = mfFlightHeight;
 			ImGui::SetNextItemWidth(0.65f * fAvailableWidth);
-			ImGui::Combo("Altitude", &miFlightPlane, kpcPlanes, static_cast<int>(std::size(kpcPlanes)));
+			if (ImGui::InputFloat("Height (m)", &fFlightHeight, 0.0f, 0.0f, "%.9g") && std::isfinite(fFlightHeight))
+			{
+				mfFlightHeight = fFlightHeight;
+			}
 			ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
 			ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
 			if (ImGui::Button("Save"))
@@ -1243,9 +1123,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 	engine::RenderLightingSpreadIndirect(iCommandBuffer);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(engine::gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory);
-	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatProjection));
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
-	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, engine::gpCamera->mVecToEyeNormal);
+	XMStoreFloat4(&rMainLayout.f4WaterEyePosition, engine::gpCamera->mVecWaterEyePosition);
+	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, XMVectorSetW(engine::gpCamera->mVecToEyeNormal, engine::gpCamera->mbOrthographicProjection ? 1.0f : 0.0f));
 	game::Camera* pCamera = static_cast<game::Camera*>(engine::gpCamera);
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ModelViewProjection[0]), XMMatrixTranspose(pCamera->mMatModelView * pCamera->mMatModelPerspective));
 	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, pCamera->mVecModelEyePosition);

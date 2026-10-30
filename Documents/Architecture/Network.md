@@ -320,7 +320,9 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 38, which made every
+client-sendable). The current wire-protocol version is 39, which replaced the
+two Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()` with
+the one beam cooldown `nextBeamFireTime`; version 38 made every
 cell a flat-top hexagon: each `GridCoord` on the wire carries axial
 coordinates (`iQ`, `iR`), every cell-local position is local to its hexagon,
 and a `kClientSubscribe` coord must lie within grid distance 1 of an

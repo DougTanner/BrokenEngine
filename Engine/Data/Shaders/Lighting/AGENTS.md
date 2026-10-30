@@ -29,4 +29,4 @@ sample past the texture edge reads as no light. Switching that sampler to
 clamp-to-edge — the more common default — would instead smear the outermost lit
 texels across the whole off-texture margin.
 
-The renderer's Graphics documentation (`../../../Source/Graphics/AGENTS.md`) owns the camera-height texel references, world-sized texels, zoom rescaling, and recreation behavior.
+The renderer's Graphics documentation (`../../../Source/Graphics/AGENTS.md`) owns the framing texel references, world-sized texels, zoom rescaling, and recreation behavior.

@@ -287,19 +287,29 @@ void TweaksScreen::RenderToggleBar()
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
 	}
 
-	ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
+	// The bar's window background is transparent, so each label needs a button frame behind it to stay readable.
 	for (int64_t i = 0; i < msiSectionCount; ++i)
 	{
 		if (i > 0)
 		{
 			ImGui::SameLine();
 		}
-		if (ImGui::Selectable(mspSectionDescriptions[i].displayName.data(), mSectionVisible & SectionFlag(i), 0, ImVec2(fButtonWidth, 0.0f)))
+		bool bVisible = mSectionVisible & SectionFlag(i);
+		if (bVisible)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+		}
+		if (ImGui::Button(mspSectionDescriptions[i].displayName.data(), ImVec2(fButtonWidth, 0.0f)))
 		{
 			mSectionVisible.Toggle(SectionFlag(i));
 		}
+		if (bVisible)
+		{
+			ImGui::PopStyleColor(3);
+		}
 	}
-	ImGui::PopStyleVar();
 
 	if (bSliderActive)
 	{
@@ -308,11 +318,7 @@ void TweaksScreen::RenderToggleBar()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
 	ImGui::SetNextItemWidth(fContentWidth);
-	float fSunAngle = gSunAngleOverride.mfCurrent;
-	if (ImGui::SliderFloat("##Sun Angle", &fSunAngle, gSunAngleOverride.mfMin, gSunAngleOverride.mfMax, "%.6f"))
-	{
-		gSunAngleOverride.Set(fSunAngle);
-	}
+	ImGui::SliderFloat("##Sun Angle", &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
 	if (ImGui::IsItemActive())
 	{
 		mActiveSlider = "##Sun Angle";
@@ -393,6 +399,10 @@ void TweaksScreen::RenderSectionWindow(int64_t iSection)
 	ImVec2 f2InitialPosition = (mpWindowPositions[iSection].y > 0.0f) ? mpWindowPositions[iSection] : ImVec2 {kfStartX * UiScale(), mfToggleBarBottom};
 	ImGui::SetNextWindowPos(f2InitialPosition, ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowCollapsed(mSectionCollapsed & SectionFlag(iSection), ImGuiCond_FirstUseEver);
+	// Cap the height to the space below the toggle bar so a window dragged up against it still ends on screen.
+	static constexpr float kfBottomPadding = 10.0f;
+	ImGuiIO& rInputOutput = ImGui::GetIO();
+	ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(rInputOutput.DisplaySize.x, rInputOutput.DisplaySize.y - mfToggleBarBottom - kfBottomPadding * UiScale()));
 	bool bSectionVisible = (mSectionVisible & SectionFlag(iSection)); // ImGui::Begin writes the close-button [x] state back through this bool*
 	ImGui::Begin(mspSectionDescriptions[iSection].displayName.data(), bHasActiveSlider ? nullptr : &bSectionVisible, ImGuiWindowFlags_AlwaysAutoResize);
 	ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kfUiScale);

@@ -34,11 +34,14 @@ unreadable, the run falls through into the ordinary flow below, so a later
 Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
 never `resume-with-flag`, when the session worktree holds an uncommitted
 `Documents/Plans` path; that result's `message` names those paths and the
-user's options. The one exception is that off-tip run when the early lookup
-reports the held claim: whatever its uncommitted paths, it proceeds, reports
-them as `retained`, and is refused at the dirty-worktree gate only when the
-fast-forward would touch one of them. Such a run targets the held Plan, so a
-claim no longer live at the primary tip ends in `none-available`, or in a fresh
+user's options. There are two exceptions: that off-tip run when the early
+lookup reports the held claim, whatever its uncommitted paths, and an exact
+`-Plan` request whose every uncommitted path is under `Documents/Plans/` and
+none is the requested Plan. Either run proceeds, reports those
+paths as `retained`, and is refused at the dirty-worktree gate only when the
+fast-forward would touch one of them. The held-claim run targets the held Plan,
+so a claim no longer live at the primary tip ends in `none-available`, in
+`claim.plan-moved` when the fast-forward renamed the held Plan, or in a fresh
 claim on that same Plan while it is still eligible, never in a claim on a
 different Plan.
 
@@ -68,8 +71,15 @@ each listed item and diagnostic to the user in its next message.
 
 ## Final-refresh sync brief
 
-When the final claim refresh at [the `/next-plan` steps](../SKILL.md#steps)
-step 6 returns a `sync` object, main's one `researcher` brief carries
+The sync range of the final claim refresh at
+[the `/next-plan` steps](../SKILL.md#steps) step 6 is its claim result's `sync`
+object. Only in the refresh pass whose claim run returned
+`claim.plan-moved`, after the user-confirmed `-Plan '<moved.to>'` rerun, it
+instead runs from the `claim.plan-moved` result's `sync.from` to the rerun's
+`sync.to` when the rerun carries its own `sync`, and is the
+`claim.plan-moved` result's `sync` otherwise; a repeated refresh uses only its
+own claim result's `sync`. When that
+range exists, main's one `researcher` brief carries it as
 `sync.from..sync.to`, the preparation snapshot's path and `##` selectors, and
 the preparation handoff's one-line rows that cite repository paths outside that
 snapshot. The brief cites the worker's steps by path plus selector, as
@@ -116,7 +126,11 @@ current cause: blocked results list at most 10 sorted prerequisite paths and an
 omitted count, excluded results carry the matching row or Plan diagnostic,
 claimed results name the holder's session, worktree, and claim expiry and
 carry them as the `holder` object (`session`, `worktree`, `expiresAt`), and
-absent results say the path is absent from the session tree. A
+absent results say the path is absent from the session tree. An exact or held
+Plan that the run's own fast-forward renamed instead yields `claim.plan-moved`,
+exit 2, with `status: blocked` and `nextAction: stop-report-to-user`, carrying
+the `moved` object (`from`, `to`) and a `message` naming the new path; no Plan
+is claimed. Reaching that result proves no claim is held. A
 `-UserAuthorizedTakeover` rerun of a claimed result releases that holder's
 claim and claims the Plan, returning the ordinary claim result with `holder`
 naming the released session; a release WorktreeCli refuses stops with
@@ -129,7 +143,7 @@ Plans yields `plan-name-ambiguous`, whose `message` names no match; the matching
 Plan paths are in the result's `candidates` array.
 
 If an exact or resolved request differs from the Plan the session already
-holds, the `/v9` claim envelope returns
+holds, the `/v10` claim envelope returns
 `claim.plan-mismatch` with `status: blocked`, exit 2, and
 `nextAction: stop-report-to-user`. Its `conflict` object carries the normalized
 `requestedPlan` and `heldPlan`; WorktreeCli makes the comparison and the wrapper

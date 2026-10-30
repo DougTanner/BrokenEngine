@@ -71,9 +71,7 @@ struct ZoneRange
 struct ZonePair
 {
 	// Reserved counts live here rather than at the growth sites because the owner is default-constructed
-	common::StableVector<int64_t> indicesA = common::StableVector<int64_t>(4 * kiCollisionZonePreallocate);  // Object indices from layer A
 	common::StableVector<int64_t> indicesB = common::StableVector<int64_t>(4 * kiCollisionZonePreallocate);  // Object indices from layer B
-	int64_t iCountA = 0;
 	int64_t iCountB = 0;
 };
 
@@ -89,7 +87,6 @@ struct LayerPairZones
 		{
 			for (ZonePair& rZonePair : rRow)
 			{
-				rZonePair.indicesA.Resize(kiCollisionZonePreallocate);
 				rZonePair.indicesB.Resize(kiCollisionZonePreallocate);
 			}
 		}
@@ -214,21 +211,21 @@ ZoneRange Collision::CalculateObjectZoneRange(const CollisionLayer& rLayer, int6
 	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, rLayer.fRadius);
 }
 
-void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA)
+void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange)
 {
 	for (int64_t i = rRange.iStartY; i <= rRange.iEndY; ++i)
 	{
 		for (int64_t j = rRange.iStartX; j <= rRange.iEndX; ++j)
 		{
 			ZonePair& rZonePair = rPairZones.pZones[i][j];
-			common::StableVector<int64_t>& rIndices = bIsLayerA ? rZonePair.indicesA : rZonePair.indicesB;
-			int64_t& riCount = bIsLayerA ? rZonePair.iCountA : rZonePair.iCountB;
+			common::StableVector<int64_t>& rIndices = rZonePair.indicesB;
+			int64_t& riCount = rZonePair.iCountB;
 			if (riCount >= rIndices.Size())
 			{
 				// sLayers lookups feed only this rare overflow LOG, so fetch them here, not every zone iteration
 				const CollisionLayer& rLayerA = sLayers.at(rPairZones.iLayerA);
 				const CollisionLayer& rLayerB = sLayers.at(rPairZones.iLayerB);
-				LOG(kDefault, kWarning, "Collision: ZonePair.indices{} overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", bIsLayerA ? 'A' : 'B', riCount, rIndices.Size(), rPairZones.iLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.iLayerB, rLayerB.uiCategory, rLayerB.iCount, j, i);
+				LOG(kDefault, kWarning, "Collision: ZonePair.indicesB overflow (count: {}, capacity: {}) pair A={}(cat={},total={}) B={}(cat={},total={}) zone=({},{}). Increase kiCollisionZonePreallocate in Collision.h", riCount, rIndices.Size(), rPairZones.iLayerA, rLayerA.uiCategory, rLayerA.iCount, rPairZones.iLayerB, rLayerB.uiCategory, rLayerB.iCount, j, i);
 				DEBUG_BREAK();
 				rIndices.Resize(riCount * 2);
 			}
@@ -238,7 +235,7 @@ void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex
 	}
 }
 
-void Collision::InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const CollisionLayer& rLayer, bool bIsLayerA, bool bSweptPair)
+void Collision::InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const CollisionLayer& rLayer, bool bSweptPair)
 {
 	for (int64_t i = 0; i < rLayer.iCount; ++i)
 	{
@@ -248,7 +245,7 @@ void Collision::InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const Co
 		}
 
 		ZoneRange range = CalculateObjectZoneRange(rLayer, i, bSweptPair);
-		InsertObjectIntoZones(rPairZones, i, range, bIsLayerA);
+		InsertObjectIntoZones(rPairZones, i, range);
 	}
 }
 
@@ -310,7 +307,6 @@ void Collision::SetupZones()
 		{
 			for (ZonePair& rZonePair : rRow)
 			{
-				rZonePair.iCountA = 0;
 				rZonePair.iCountB = 0;
 			}
 		}
@@ -351,9 +347,9 @@ void Collision::SetupZones()
 			const CollisionLayer& rLayerB = sLayers.at(static_cast<size_t>(j));
 			bool bSweptPair = rLayerA.bSweptTest || rLayerB.bSweptTest;
 
-			// Insert both layers' objects into the zone grid (skip already-collided destroy-on-collide objects)
-			InsertLayerObjectsIntoZones(rPairZones, rLayerA, true, bSweptPair);
-			InsertLayerObjectsIntoZones(rPairZones, rLayerB, false, bSweptPair);
+			// Only layer B's objects enter the zone grid, since CollideLayerPair computes each layer-A object's zone range
+			// itself.
+			InsertLayerObjectsIntoZones(rPairZones, rLayerB, bSweptPair);
 
 			++iPairIndex;
 		}
@@ -528,6 +524,26 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	int64_t iLayerA = rPairContext.iLayerA;
 	int64_t iLayerB = rPairContext.iLayerB;
 	bool bSweptPair = rPairContext.bSweptPair;
+
+	// Skip a pair whose start-to-end height ranges are more than the combined radius plus an allowance apart. The
+	// allowance exceeds the rounding of both 3D tests below, so neither could accept a skipped pair; a NaN height
+	// fails every comparison and keeps the pair.
+	static constexpr float kfHeightAllowance = 10.0f;
+	float fStartZA = XMVectorGetZ(rLayerA.pVecStartPositions[i]);
+	float fEndZA = XMVectorGetZ(rLayerA.pVecEndPositions[i]);
+	float fStartZB = XMVectorGetZ(rLayerB.pVecStartPositions[j]);
+	float fEndZB = XMVectorGetZ(rLayerB.pVecEndPositions[j]);
+	float fHeightLimit = rLayerA.fRadius + rLayerB.fRadius + kfHeightAllowance;
+	float fStartStartZ = fStartZB - fStartZA;
+	float fStartEndZ = fStartZB - fEndZA;
+	float fEndStartZ = fEndZB - fStartZA;
+	float fEndEndZ = fEndZB - fEndZA;
+	bool bBAbove = fStartStartZ > fHeightLimit && fStartEndZ > fHeightLimit && fEndStartZ > fHeightLimit && fEndEndZ > fHeightLimit;
+	bool bBBelow = fStartStartZ < -fHeightLimit && fStartEndZ < -fHeightLimit && fEndStartZ < -fHeightLimit && fEndEndZ < -fHeightLimit;
+	if (bBAbove || bBBelow)
+	{
+		return;
+	}
 
 	if (!rAlignments.CanCollide(rLayerA.pAlignments[i], rLayerB.pAlignments[j]))
 	{

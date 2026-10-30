@@ -1,22 +1,21 @@
-# Capture ModelViewer PNGs without showing or activating the viewer: start the Debug viewer hidden in its
-# agent mode on a fresh app-data directory, post F9 to its own window, read each completion line from its
-# log, and close it by exact PID on every exit path after the start.
+# Capture one ModelViewer PNG without showing or activating the viewer: start the Debug viewer hidden in its
+# agent mode on a fresh app-data directory, wait for its initial streaming done line in its log, post F9 to
+# its own window, read the completion line from its log, and close it by exact PID on every exit path after
+# the start.
 # The viewer binds no port, so the capture takes no harness lock and runs no process check.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	# Absolute and must not exist; the script creates it, so the viewer starts from compiled defaults.
 	[Parameter(Mandatory)][string] $AppDataDirectory,
-	[ValidateNotNullOrEmpty()][string] $ModelPath,
-	# Capture until two consecutive captures share their SHA-256; otherwise return after the first.
-	[switch] $RequireStable
+	[ValidateNotNullOrEmpty()][string] $ModelPath
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $MaximumMessageLength = 256
-# Launch through the last capture, sized for a Debug cold start on a fresh app-data directory.
+# Launch through the capture, sized for a Debug cold start on a fresh app-data directory.
 $CaptureTimeoutSeconds = 180
 $CloseTimeoutSeconds = 60
 $PollMilliseconds = 250
@@ -32,20 +31,18 @@ $CodeExits = @{
 	'internal.error' = 1
 	'capture.executable-missing' = 2
 	'capture.timeout' = 2
-	'capture.unstable' = 2
 	'process.unexpected-exit' = 2
 	'close.forced' = 2
 }
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-model-viewer-capture/v1'
+	schemaVersion = 'broken-engine-model-viewer-capture/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'ModelViewer capture did not run.'
 	pid = $null
 	exitCode = $null
 	captures = [Collections.Generic.List[object]]::new()
-	stable = $(if ($RequireStable) { $false } else { $null })
 	windowVisible = $false
 	logFile = $null
 	crashReports = @()
@@ -97,10 +94,7 @@ function Read-ViewerLog([string] $Path) {
 }
 
 function Get-DeadlineOutcome {
-	if ($RequireStable -and $result.captures.Count -ge 2) {
-		return New-Outcome 'capture.unstable' "No two consecutive captures of $($result.captures.Count) matched within $CaptureTimeoutSeconds s."
-	}
-	return New-Outcome 'capture.timeout' "The capture did not finish within $CaptureTimeoutSeconds s ($($result.captures.Count) captures completed)."
+	return New-Outcome 'capture.timeout' "The capture did not finish within $CaptureTimeoutSeconds s."
 }
 
 function Get-ExitOutcome($Process) {
@@ -117,36 +111,32 @@ function Invoke-ViewerCapture($Process, [string] $LogPath, [Diagnostics.Stopwatc
 		Start-Sleep -Milliseconds $PollMilliseconds
 	}
 
-	$previousHash = $null
-	for ($sequence = 1; ; ++$sequence) {
-		# lParam 1: repeat count 1 with the previous-key-state bit clear, so the viewer does not treat it as a repeat.
-		if (-not [BrokenEngineHarness.ModelViewerWindow]::PostMessage($script:Window, $WmKeyDown, [IntPtr]$VkF9, [IntPtr]1)) {
-			throw "PostMessage F9 to the viewer window failed with Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())."
-		}
-		$pattern = "ModelViewer screenshot complete sequence=$sequence token=-?\d+ result=(\{.*\})\r?$"
-		while ($true) {
-			$completion = [regex]::Match((Read-ViewerLog $LogPath), $pattern, [Text.RegularExpressions.RegexOptions]::Multiline)
-			if ($completion.Success) { break }
-			if ($Process.HasExited) { return Get-ExitOutcome $Process }
-			if ($Clock.Elapsed -ge $deadline) { return Get-DeadlineOutcome }
-			Start-Sleep -Milliseconds $PollMilliseconds
-		}
-		$capture = $completion.Groups[1].Value | ConvertFrom-Json
-		if ($capture.PSObject.Properties.Name -contains 'error') {
-			return New-Outcome 'capture.failed' "Capture $sequence failed: $($capture.error)"
-		}
-		$hash = (Get-FileHash -LiteralPath $capture.path -Algorithm SHA256).Hash
-		$result.captures.Add([ordered]@{ path = $capture.path; width = $capture.width; height = $capture.height; sha256 = $hash })
-		if ([BrokenEngineHarness.ModelViewerWindow]::IsWindowVisible($script:Window)) { $result.windowVisible = $true }
-		if (-not $RequireStable) {
-			return New-Outcome 'ok' "Captured 1 PNG from PID $($Process.Id)."
-		}
-		if ($hash -ceq $previousHash) {
-			$result.stable = $true
-			return New-Outcome 'ok' "Captures $($sequence - 1) and $sequence matched after $sequence captures from PID $($Process.Id)."
-		}
-		$previousHash = $hash
+	while (-not [regex]::IsMatch((Read-ViewerLog $LogPath), 'ModelViewer initial streaming done\r?$', [Text.RegularExpressions.RegexOptions]::Multiline)) {
+		if ($Process.HasExited) { return Get-ExitOutcome $Process }
+		if ($Clock.Elapsed -ge $deadline) { return New-Outcome 'capture.timeout' "The viewer did not report initial streaming done within $CaptureTimeoutSeconds s." }
+		Start-Sleep -Milliseconds $PollMilliseconds
 	}
+
+	# lParam 1: repeat count 1 with the previous-key-state bit clear, so the viewer does not treat it as a repeat.
+	if (-not [BrokenEngineHarness.ModelViewerWindow]::PostMessage($script:Window, $WmKeyDown, [IntPtr]$VkF9, [IntPtr]1)) {
+		throw "PostMessage F9 to the viewer window failed with Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())."
+	}
+	$pattern = 'ModelViewer screenshot complete sequence=1 token=-?\d+ result=(\{.*\})\r?$'
+	while ($true) {
+		$completion = [regex]::Match((Read-ViewerLog $LogPath), $pattern, [Text.RegularExpressions.RegexOptions]::Multiline)
+		if ($completion.Success) { break }
+		if ($Process.HasExited) { return Get-ExitOutcome $Process }
+		if ($Clock.Elapsed -ge $deadline) { return Get-DeadlineOutcome }
+		Start-Sleep -Milliseconds $PollMilliseconds
+	}
+	$capture = $completion.Groups[1].Value | ConvertFrom-Json
+	if ($capture.PSObject.Properties.Name -contains 'error') {
+		return New-Outcome 'capture.failed' "Capture failed: $($capture.error)"
+	}
+	$hash = (Get-FileHash -LiteralPath $capture.path -Algorithm SHA256).Hash
+	$result.captures.Add([ordered]@{ path = $capture.path; width = $capture.width; height = $capture.height; sha256 = $hash })
+	if ([BrokenEngineHarness.ModelViewerWindow]::IsWindowVisible($script:Window)) { $result.windowVisible = $true }
+	return New-Outcome 'ok' "Captured 1 PNG from PID $($Process.Id)."
 }
 
 try {

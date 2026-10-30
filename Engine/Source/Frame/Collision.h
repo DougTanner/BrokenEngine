@@ -116,8 +116,8 @@ private:
 	static void SetupZones();
 	static ZoneRange CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius);
 	static ZoneRange CalculateObjectZoneRange(const CollisionLayer& rLayer, int64_t iIndex, bool bSweptPair);
-	static void InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA);
-	static void InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const CollisionLayer& rLayer, bool bIsLayerA, bool bSweptPair);
+	static void InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange);
+	static void InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const CollisionLayer& rLayer, bool bSweptPair);
 	static void CollideLayerPair(const Alignments& rAlignments, const LayerPairZones& rPairZones);
 	static void CommitCandidate(const CollisionCandidate& rCandidate);
 	static void AllocateResultStorage();

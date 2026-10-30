@@ -240,6 +240,9 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
+	// A Battleship beam hit from vecShooterPosition, applied during PostCollision. Defined in OmnisCombat.cpp.
+	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition);
+
 private:
 	// Defined in OmnisCombat.cpp:
 	static void XM_CALLCONV UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection);

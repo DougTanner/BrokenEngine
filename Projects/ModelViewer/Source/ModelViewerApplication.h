@@ -33,7 +33,7 @@ private:
 	};
 	struct FlightBody
 	{
-		XMVECTOR vecPosition {0.0f, 0.0f, 6.0f, 1.0f};
+		XMVECTOR vecPosition {};
 		XMVECTOR vecDirection {1.0f, 0.0f, 0.0f, 0.0f};
 		XMVECTOR vecVelocity {};
 		XMVECTOR vecDestination {};
@@ -78,19 +78,18 @@ private:
 	common::Timer mDisplayTimer;
 	FlightBody mFlightBody;
 	XMVECTOR mVecWaterAnchor {};
-	std::vector<XMFLOAT2> mWaterDestinations;
+	float mfFlightHeight = 0.0f;
+	common::crc_t mTallestIslandCrc = 0;
+	int64_t miTallestPlacement = -1;
+	int64_t miDestinationPlacement = -1;
 	XMFLOAT3A mf3ModelScale {1.0f, 1.0f, 1.0f};
 	XMFLOAT3A mf3ModelRotation {};
 	XMFLOAT3A mf3ModelOffset {};
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
-	std::filesystem::path mCheckoutPath;
-	std::filesystem::path mModelDataPath;
-	std::filesystem::path mModelSourcePath;
 	std::filesystem::path mModelMetadataPath;
 	std::string mModelMetadataStatus;
 	std::string mModelAlignmentError;
-	int miFlightPlane = 0;
 	engine::FrameInterpolateBase mCameraFrame;
 	engine::GridCoord mIslandSeed = engine::kOriginCoordinate;
 	engine::CellStaticData mIslandCell {.coordinate = engine::kOriginCoordinate};

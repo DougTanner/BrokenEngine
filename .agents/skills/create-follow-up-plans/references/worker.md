@@ -7,7 +7,7 @@
 For every proposal:
 
 1. State the false required condition and its originating criterion, accepted finding, or residual.
-2. Confirm root cause and unresolved state from current source or direct logs. Record durable `path:line`, symbol, and observed behavior evidence.
+2. Confirm root cause and unresolved state from current source or direct logs. Record durable `path:line`, symbol, and observed behavior evidence. A problem proven and reproducible from that evidence whose root cause that evidence cannot confirm takes the symptom substitution in `## Rules` instead.
 3. Prove it is pre-existing or outside the approved implementation boundary.
 4. Preserve user decisions and the authority order in root `AGENTS.md` `### Diagnosis Discipline`; report contradictions.
 
@@ -15,7 +15,7 @@ Group items only when root cause, implementation boundary, invariant, and verifi
 
 Search all live plan files by symbols, paths, root-cause terms, outcome, and `## Coordination`. A plan is a duplicate when it owns the same root cause and implementation boundary. Map the proposal to it unless the proven unmet acceptance criterion requires extending that plan.
 
-Done when every surviving proposal carries the evidence step 1 records — or its tooling-friction substitute under `## Rules` — and a duplicate decision.
+Done when every surviving proposal carries the evidence step 1 records — or its symptom substitute under `## Rules` — and a duplicate decision.
 
 ### 2. Draft and classify
 
@@ -23,8 +23,11 @@ Choose the owning area `Documents/Plans/AGENTS.md` `## Plan files` lists and a
 concise PascalCase filename; never overwrite a collision. Draft the smallest
 decision-complete plan with `# Title`, `## Context`, `## Design`,
 `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria`
-when the diff is insufficient, and `## Notes`. Include verified root cause,
-originating gap, implementation boundary, and applicable determinism/CRC,
+when the diff is insufficient, and `## Notes`. Include verified root cause (for
+a proposal whose root cause step 1's evidence cannot confirm, its symptom
+substitute under `## Rules`, with the investigation portion
+`Documents/Plans/AGENTS.md` `## Plan files` defines), originating gap,
+implementation boundary, and applicable determinism/CRC,
 serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading,
 allocation, shader, build, or live-verification exposure.
 When an acceptance criterion is settled by a live `/agent-harness` run, name
@@ -69,9 +72,19 @@ Done when the Plan body exists and its Change Workflow tier trigger is recorded 
 
 After editing an existing tracked Plan, run the scheduler-state check as [`Documents/Plans/AGENTS.md`](../../../../Documents/Plans/AGENTS.md) documents it. If it reports `worktree-cli.missing`, stop and report that authorized primary maintenance through `/compile` is required. Require `status: valid` and `code: ok`; record its `notices` and `healedClaims`. Never inspect machine-local claims.
 
+Once the row's route is taken, run the static-checks runner as
+[`change-workflow.md`](../../../references/change-workflow.md)
+`#### Step 5 — Run targeted pre-review checks` documents it, with the brief's
+`Baseline` as the baseline SHA; the runner owns the limit. Rewrap in place
+every `line-length` failure it reports in a Plan you wrote or edited, leaving
+the metadata line byte-for-byte, and rerun until that row reports no failure in
+those Plans. Failures in other files and other rows stay main's Step 5 work.
+
 Never create a request file, row, score, claim, or a commit that publishes a row.
 
-Done when exactly one row's route was taken for each proposal.
+Done when exactly one row's route was taken for each proposal and a runner run
+after your last rewrap reports no `line-length` failure in a Plan you wrote or
+edited.
 
 ## Rules
 
@@ -98,24 +111,32 @@ Done when exactly one row's route was taken for each proposal.
 - Reject each proposal class [`../SKILL.md`](../SKILL.md) `## When to use` excludes, stating why.
 - Tooling friction observed during a `/next-plan` run is a separate category.
 - So is a script or documented tool invocation that returned an oversized result flooding the main context, cited by the context-efficiency envelope (tool, invocation, measured size, checkpoint).
-- For tooling-friction proposals only, these substitutions replace the
-  corresponding root-cause-based requirements in these rules and in `## Steps` —
-  the proof steps, the grouping and duplicate rules, and the drafted Plan's
-  verified root cause; every other requirement still applies, and ordinary
-  proposals keep the full root-cause bar unchanged. The observed in-session
-  symptom with its citation — exact command or script path, observed output or
-  malformed result, and the rework or workaround it forced — substitutes for the
-  unmet acceptance criterion or accepted residual, and for the confirmed root
-  cause wherever one is required, including in the drafted Plan. For a
-  context-efficiency proposal, the envelope fields — tool, invocation, measured
-  size — plus the separately supplied checkpoint substitute for the
-  observed-output citation and for the rework or workaround it forced.
-- Proven root cause is deferred to the fix session, by the route the Plan's
-  `## Design` states. For the pre-existing and out-of-scope proof, verify that
-  the misbehaving skill or script is outside the claimed Plan's `## In scope`;
-  when it is inside, the failure is an in-scope blocker of the active change and
-  is rejected as a friction follow-up. Grouping and duplicate detection key on
-  (skill or script, observed symptom) instead of root cause; re-observing an
-  already-recorded symptom updates nothing and is rejected as a duplicate.
+- For a tooling-friction proposal, and for any other proposal whose problem is
+  proven and reproducible from the supplied evidence but whose root cause that
+  evidence cannot confirm, these substitutions replace the corresponding
+  root-cause-based requirements in these rules and in `## Steps` — the proof
+  steps, the grouping and duplicate rules, and the drafted Plan's verified root
+  cause; every other requirement still applies, and a proposal whose root cause
+  the evidence confirms keeps the full root-cause bar unchanged. The observed
+  symptom with its evidence substitutes for the confirmed root cause wherever
+  one is required, including in the drafted Plan, which carries the
+  investigation portion `Documents/Plans/AGENTS.md` `## Plan files` defines. For
+  a tooling-friction proposal, that evidence is the in-session citation — exact
+  command or script path, observed output or malformed result, and the rework or
+  workaround it forced — which also substitutes for the unmet acceptance
+  criterion or accepted residual. For a context-efficiency proposal, the
+  envelope fields — tool, invocation, measured size — plus the separately
+  supplied checkpoint substitute for the observed-output citation and for the
+  rework or workaround it forced.
+- For a proposal under the substitution above, proving the root cause is
+  deferred to the fix session, by the route the Plan's `## Design` states.
+  Grouping and duplicate detection key on the observed symptom instead of root
+  cause; re-observing an already-recorded symptom updates nothing and is
+  rejected as a duplicate. For a tooling-friction
+  proposal, the grouping key is (skill or script, observed symptom), and the
+  pre-existing and out-of-scope proof verifies that the misbehaving skill or
+  script is outside the claimed Plan's `## In scope`; when it is inside, the
+  failure is an in-scope blocker of the active change and is rejected as a
+  friction follow-up.
 - Plan files and the metadata line that must be their very first bytes are ordinary tracked Git content; write them directly, with or without a live Plan claim. `Documents/Features` remains manual and is not an alternate executable-Plan store.
 - Report a written Plan as tracked content; do not describe it as claimed or landed until that has actually happened.

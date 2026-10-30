@@ -62,7 +62,10 @@ XMVECTOR ProjectToFlightPlane(XMVECTOR vecLocalPosition, const RenderBasis& rBas
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
 	float fElevation = GlobalElevation(rBasis.coordinate, vecLocalPosition);
-	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gpFlightPlanes->Plane(iPlane).fHeightMeters));
+	XMVECTOR vecRenderPosition = Rebase(rBasis, vecLocalPosition);
+	// Orthographic eye lines run parallel to the view direction rather than through the (virtual) eye.
+	XMVECTOR vecLinePoint = engine::gpCamera->mbOrthographicProjection ? XMVectorAdd(vecRenderPosition, engine::gpCamera->mVecToEyeNormal) : engine::gpCamera->mVecEyePosition;
+	return common::ToBaseHeight(vecRenderPosition, vecLinePoint, std::max(fElevation, gpFlightPlanes->Plane(iPlane).fHeightMeters));
 }
 
 XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)

@@ -353,15 +353,11 @@ InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::f
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to open \"{}\" for fingerprinting", rPath.string()));
 	}
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		CloseHandle(handle);
-	})>;
-	ScopedHandle fileHandle(handleFile);
+	common::ScopedHandle pFileHandle(handleFile);
 	FILE_BASIC_INFO basicInfo {};
 	BY_HANDLE_FILE_INFORMATION fileInfo {};
-	if (GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE
-	 || GetFileInformationByHandle(fileHandle.get(), &fileInfo) == FALSE)
+	if (GetFileInformationByHandleEx(pFileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE
+	 || GetFileInformationByHandle(pFileHandle.get(), &fileInfo) == FALSE)
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to inspect \"{}\" for fingerprinting", rPath.string()));
 	}

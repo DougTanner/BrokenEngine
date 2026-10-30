@@ -13,8 +13,8 @@ namespace game
 {
 
 constexpr float kfHudEdgeMarginFraction = 0.05f;
-constexpr float kfHudPanelTopFraction = 0.125f;
-constexpr float kfHudPanelMaximumHeightFraction = 0.75f;
+constexpr float kfHudPanelTopFraction = 0.2f;
+constexpr float kfHudPanelHeightFraction = 0.6f;
 constexpr std::chrono::seconds kForceOpenGracePeriod = 2s;
 
 // Controls that send a simulation-affecting request are disabled while the server plays a replay
@@ -110,32 +110,15 @@ void HudScreen::Render()
 	}
 	mbPreviousForceOpen = bForceOpen;
 
-	// Right panel content gate: it has nothing useful to show without a focused owned entity in current snapshot.
-	std::optional<ShipLocator> optionalOwnedEntity;
-	{
-		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
-		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
-		{
-			optionalOwnedEntity = gpGame->ClientOwnedEntity(gpGame->RenderFrame(gpGame->mClientGridCoordinate));
-		}
-	}
-	bool bRightHasContent = optionalOwnedEntity.has_value();
+	// Right panel content gate: the focused member id, because the render frame trails a newly focused member by
+	// several ticks.
+	bool bRightHasContent = gpGame->HasFocusedClientEntity();
 
 	// With focused owned-entity content, mouse proximity to either anchor opens both panels together.
 	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	ImVec2 vRightAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
-
-	// Hover activation zone is a fixed-extent strip (PanelWidth x max-height fraction at the anchor), decoupled from the
-	// panels' content-driven live size so hover behavior is unchanged even as the panels visually shrink. Measure
-	// PanelWidth() under the same scale+font scopes the panels render with so the strip width matches them exactly.
-	ImVec2 vHoverExtent {};
-	{
-		engine::ScopedMenuScale menuScale;
-		engine::ScopedMenuFont menuFont;
-		vHoverExtent = ImVec2(PanelWidth(), rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
-	}
-	float fMouseLeft = engine::ComputeMouseOpennessTarget(vHoverExtent, vLeftAnchor, 0.0f);
-	float fMouseRight = engine::ComputeMouseOpennessTarget(vHoverExtent, vRightAnchor, 1.0f);
+	float fMouseLeft = engine::ComputeMouseOpennessTarget(mFleetSlide, vLeftAnchor, -1.0f);
+	float fMouseRight = engine::ComputeMouseOpennessTarget(mFocusedOwnedEntitySlide, vRightAnchor, 1.0f);
 	float fMouseTarget = std::max(fMouseLeft, fMouseRight);
 
 	// Final shared targets. When right has content: both panels see max(force, mouse) — strict sync.
@@ -176,14 +159,10 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 	ImVec2 vAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
-	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
+	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
-	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaximumHeightFraction (long lists scroll). Width
-	// pinned to PanelWidth() via the matching min/max constraint x.
-	float fPanelWidth = PanelWidth();
-	float fMaximumHeight = rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction;
-	ImGui::SetNextWindowSize(ImVec2(fPanelWidth, 0.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(fPanelWidth, 0.0f), ImVec2(fPanelWidth, fMaximumHeight));
+	// Fixed size shared with the right panel: the fleet list fills from the top and scrolls when long
+	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), rInputOutput.DisplaySize.y * kfHudPanelHeightFraction), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 	ImGui::Begin("FleetPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
 	mFleetSlide.vLastSize = ImGui::GetWindowSize();
@@ -232,12 +211,9 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaximumFleetsPerClient || IsServerReplaying());
 	if (ImGui::Button("[+]##Fleet"))
 	{
-		if (gpClientSession != nullptr)
-		{
-			gpGame->mFleetSelection.mCreateFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-			gpClientSession->SendCreateFleetRequest();
-			LOG(kDefault, kVerbose, "HUD CreateFleetRequest FleetCount: {}", iFleetCount);
-		}
+		gpGame->mFleetSelection.mCreateFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+		gpClientSession->SendCreateFleetRequest();
+		LOG(kDefault, kVerbose, "HUD CreateFleetRequest FleetCount: {}", iFleetCount);
 	}
 	ImGui::EndDisabled();
 
@@ -247,6 +223,29 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		ImGui::Separator();
 
 		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
+
+		// Above the member list, so a spawn's new row never moves these buttons
+		struct SpawnButton
+		{
+			const char* pcLabel = nullptr;
+			ShipType eType {};
+		};
+		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}};
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers || IsServerReplaying());
+		for (const auto& [i, rButton] : std::views::enumerate(kpSpawnButtons))
+		{
+			if (i > 0)
+			{
+				ImGui::SameLine();
+			}
+			if (ImGui::Button(rButton.pcLabel))
+			{
+				gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid, rButton.eType);
+				LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{}) Type: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, ShipTypeName(rButton.eType));
+			}
+		}
+		ImGui::EndDisabled();
 
 		for (const auto& [i, rMember] : std::views::enumerate(pFleet->members))
 		{
@@ -281,64 +280,6 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			}
 			ImGui::PopID();
 		}
-
-		struct SpawnButton
-		{
-			const char* pcLabel = nullptr;
-			ShipType eType {};
-		};
-		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}};
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers || IsServerReplaying());
-		for (const auto& [i, rButton] : std::views::enumerate(kpSpawnButtons))
-		{
-			if (i > 0)
-			{
-				ImGui::SameLine();
-			}
-			if (ImGui::Button(rButton.pcLabel))
-			{
-				if (gpClientSession != nullptr)
-				{
-					gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-					gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid, rButton.eType);
-					LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{}) Type: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, ShipTypeName(rButton.eType));
-				}
-			}
-		}
-		ImGui::EndDisabled();
-
-		ImGui::Separator();
-		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count()});
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
-		static float sfNavigationDelayEditValue = 0.0f;
-		static bool sbNavigationDelaySliderWasActive = false;
-		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
-		// sends exactly the value the user let go on
-		if (!sbNavigationDelaySliderWasActive)
-		{
-			sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
-		}
-		// Reserve the trailing label's width — AlwaysAutoResize windows default the item width to the full content
-		// width, which would push the label past the clip edge
-		ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Nav Delay").x + ImGui::GetStyle().ItemInnerSpacing.x));
-		// Ctrl+Click typed input can be non-finite or out of range and the server rejects such a delay, so the
-		// release below reverts it instead of clamping it; checking only on release leaves the text box alone while typing
-		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f");
-		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
-		if (ImGui::IsItemDeactivatedAfterEdit())
-		{
-			if (!IsNavigationDelayInRange(sfNavigationDelayEditValue))
-			{
-				sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
-			}
-			// An unchanged synchronized delay leaves this fleet's request pending.
-			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->navigationDelaySeconds.count())
-			{
-				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
-			}
-		}
-		ImGui::EndDisabled();
 	}
 
 	ImGui::End();
@@ -362,10 +303,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedOwnedEntitySlide, vAnchor, 1.0f, fTarget);
 	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
-	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
-	// captured earlier this frame (RenderFleetPanel runs first). First frame (vLastSize.y still zero): fall back to the cap.
-	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
-	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), fLeftHeight), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), rInputOutput.DisplaySize.y * kfHudPanelHeightFraction), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 	ImGui::Begin("FocusedOwnedEntityPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
 	mFocusedOwnedEntitySlide.vLastSize = ImGui::GetWindowSize();
@@ -375,6 +313,42 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImVec2 vPanelPosition = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
+
+	const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet();
+	if (pFleet != nullptr && gpGame->ClientOwnedEntityIdentifier() == pFleet->flagshipGlobalId)
+	{
+		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count()});
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+		static float sfNavigationDelayEditValue = 0.0f;
+		static bool sbNavigationDelaySliderWasActive = false;
+		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
+		// sends exactly the value the user let go on
+		if (!sbNavigationDelaySliderWasActive)
+		{
+			sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
+		}
+		// A negative width sizes the slider to the content's right edge minus the trailing label's width, so the label
+		// stays inside the clip edge
+		ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Nav Delay").x + ImGui::GetStyle().ItemInnerSpacing.x));
+		// Ctrl+Click typed input can be non-finite or out of range and the server rejects such a delay, so the
+		// release below reverts it instead of clamping it; checking only on release leaves the text box alone while typing
+		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f");
+		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
+		if (ImGui::IsItemDeactivatedAfterEdit())
+		{
+			if (!IsNavigationDelayInRange(sfNavigationDelayEditValue))
+			{
+				sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
+			}
+			// An unchanged synchronized delay leaves this fleet's request pending.
+			if (sfNavigationDelayEditValue != pFleet->navigationDelaySeconds.count())
+			{
+				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
+			}
+		}
+		ImGui::EndDisabled();
+	}
 
 	ShipOrders_t orders {};
 	float fNavigationDelay = 0.0f;
@@ -396,9 +370,8 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.ownedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier(), .bUseMissiles = bUseMissiles});
 
 		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
-		const ImGuiStyle& rStyle = ImGui::GetStyle();
-		ImVec2 vLabelSize = ImGui::CalcTextSize(pcLabel);
-		ImVec2 vButtonSize(vLabelSize.x + 2.0f * rStyle.FramePadding.x, vLabelSize.y + 2.0f * rStyle.FramePadding.y);
+		// Sized over both labels, so a mode flip never resizes or moves it
+		ImVec2 vButtonSize(engine::MenuButtonsWidth({U"Missiles", U"Blasters"}), ImGui::GetFrameHeight());
 		ImVec2 vAvailable = ImGui::GetContentRegionAvail();
 		ImVec2 vCursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
@@ -406,7 +379,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		if (ImGui::Button(pcLabel, vButtonSize))
 		{
-			if (gpClientSession != nullptr && (gpGame->ClientOwnedEntityIdentifier().iValue != 0))
+			if (gpGame->ClientOwnedEntityIdentifier().iValue != 0)
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendUpdateOwnedEntityRequest(gpGame->ClientOwnedEntityIdentifier().iValue, !bUseMissiles, fNavigationDelay);

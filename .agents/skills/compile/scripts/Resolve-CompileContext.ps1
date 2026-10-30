@@ -172,7 +172,7 @@ try {
 	$script:Result.repositoryRoot = $root
 
 	# With several game projects and none named, the project stays null and the caller picks from projects.
-	$projects = @(Get-AgentGameProjects $root | Where-Object { $_ -cne 'ModelViewer' })
+	$projects = @(Get-AgentGameProjects $root)
 	$script:Result.projects = $projects
 	if ($Target -eq 'ModelViewer') {
 		if (-not [string]::IsNullOrWhiteSpace($Project) -and $Project.Trim() -cne 'BrokenEngineSandbox') {

@@ -13,7 +13,7 @@ is engine-owned here.
 
 - `Wrapper` stores float, bool, or discrete values with one-consumer change tracking. `Changed<T>()` advances the previous-value state, so exactly one consumer may poll a wrapper each frame.
 - Mutate through `Set` or `Reset`, or restore defaults with `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
-- A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it; consumers clamp it. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
+- A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it, so every returned index is in range. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
 - One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
 - Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
@@ -27,6 +27,7 @@ is engine-owned here.
 ## Menu and Panel Helpers
 
 - Engine UI owns reusable player-facing menu layout and interaction helpers, including workbuffer-backed localized text conversion, wrapper controls, common sizing, menu chrome, and slide-panel behavior. Game UI owns the HUD's composition, game-state gating, labels, and interaction flows.
+- Side-panel hover (`ComputeMouseOpennessTarget`) is the full-height strip on the panel's side, measured by horizontal distance only, per the layout contract (`../../../Documents/UserInterfaceDesign.txt` section `11. Verification`). Layout rule: any future top or bottom bar's hover is the full-width strip on its edge, measured by vertical distance only.
 
 ## Graphics Quality Levels
 
@@ -42,11 +43,13 @@ is engine-owned here.
 - `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
-- `GraphicsSettings.bin` version 19 persists Water quality, Water Foam, the
-  Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Lighting
-  and Water Foam default on, and Defaults restores them. Older versions fail the
-  current-format gate and use defaults. Water Foam is a validated Boolean byte;
-  any value other than zero or one rejects the whole file before application.
+- `GraphicsSettings.bin` version 20 persists Water quality, Water Foam, the
+  Stagger Smoke Layer Updates flag, Terrain Shadow Update Cadence, Vertical
+  Field of View, and Orthographic Projection. Lighting and Water Foam default
+  on, and Defaults restores them. Older versions fail the current-format gate
+  and use defaults. Water Foam and Orthographic Projection are validated Boolean
+  bytes; any value other than zero or one rejects the whole file before
+  application.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
 - `TweaksSettings.cpp` persists the ImGui visibility toggle, the sun-angle override, and the Tweaks section state in `TweaksSettings.bin` version 14, versioned POD written through the engine versioned-file helpers, in `kbDebugInput` builds only.

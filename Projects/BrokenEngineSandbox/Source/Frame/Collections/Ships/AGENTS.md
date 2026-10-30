@@ -5,10 +5,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 ## Ship Invariants
 
 - Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range, including an immediate nudge for exact XY
-  overlap; blaster collision and missile explosion damage still apply.
+  separation within their 3D range between ships on the same flight-plane
+  layer, including an X position
+  correction for near-coincident XY; blaster collision and missile explosion
+  damage still apply.
   The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
-  owns the distance, correction, and shared-snapshot rules.
+  owns the layer, distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate
   position after terrain resolution, preserving Y/Z/W and stored/target planes.
   Tiny terrain intrusion from this correction is accepted; separation can
@@ -19,7 +21,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants).
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows run the fleet navigation below and are the owned entities (`Frame::OwnedEntityCount`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
-- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Spawn-phase weapon targeting reads the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
+- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Spawn-phase weapon targeting and the Battleship beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
@@ -42,15 +44,18 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   type, so pushers, knockback, and terrain contact move ships only horizontally.
   Change a ship's height through its target plane, not its velocity.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
-- Fighter and Battleship blasters and Omni missiles target only an enemy that
-  stores the shooter's own plane, aim along the horizontal offset to it, and are
-  not fired by a ship storing `kuiNoFlightPlane`. They read the stored plane
-  rather than Z, so a ship moved off its plane's height keeps its plane for
-  targeting; navigation and terrain contact still read height, and an Omni
-  launches missiles only while exactly at its stored plane's height. Omni
-  blasters alone fire on or between planes, pitched toward the target by the
-  wanted direction. Plane rules govern only target choice and aim; blaster and
-  missile collision, explosion damage, and pushers ignore planes.
+- Target choice treats a ship as on its nearest flight plane
+  (`NearestFlightPlane`), while collision and hits stay normal 3D. Fighter
+  blasters and Omni missiles target only an enemy whose nearest plane is the
+  shooter's stored plane and aim along the horizontal offset to it, so their
+  bolts and missiles stay on the shooter's plane and hit a climbing target only
+  by 3D contact; the Battleship beam has its own plane rule
+  (`../Battleships/AGENTS.md`). A ship storing `kuiNoFlightPlane` fires none of
+  them, and an Omni launches missiles only while exactly at its stored plane's
+  height. Omni blasters alone fire on or between planes, pitched toward the
+  target by the wanted direction. These plane rules govern only target choice and aim;
+  blaster and missile collision and explosion damage ignore planes, and pushers
+  follow their height-derived layer rule above.
 
 ## Fleet Navigation Invariants
 
