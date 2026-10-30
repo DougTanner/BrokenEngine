@@ -733,6 +733,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\TerrainElevation.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Quads\QuadsAxisAligned.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingReference.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingIndirect.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixture.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingFixtureReceiver.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingModelReceiver.frag" />

@@ -37,6 +37,7 @@ struct LightingComparisonSettings
 	int64_t iEvent = 0;
 	int64_t iAreaSamples = 256;
 	uint64_t uiCaptureRequest = 0;
+	bool bIndirect = false;
 	bool operator==(const LightingComparisonSettings&) const = default;
 };
 

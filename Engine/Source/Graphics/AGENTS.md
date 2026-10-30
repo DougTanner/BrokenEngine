@@ -182,8 +182,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   and rendering receivers together in one frame;
   each later preparation traces a fixed number of reference tiles,
   and only the frame that traces the last tiles enables the reference for its
-  own Main composition. Each tracing frame must publish the receivers frame's
-  counts. Unpause, a settings change, a changed publication or Graphics
+  own Main composition. With Indirect checked, a second phase of bounce tiles
+  follows every direct tile behind one barrier on the reference and writes a
+  total image, which that last frame enables instead. Each tracing frame must publish the
+  receivers frame's counts. Unpause, a settings change, a changed publication or Graphics
   recreation sets capture status `failed` with a reason, and recreation never
   resets that status.
 - The fixed client fixture supplies immutable sources, samples, geometry and
@@ -193,10 +195,12 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 ## Assets and Capture
 
 Comparison export runs after the composing frame's UI submission and waits that
-framebuffer's fence before reading back the raw receivers and reference and
-writing the finished PNG. It then disables the reference, so later frames
-compose zero local diffuse. `capture.json` records only the capture settings,
-wall time and device; the source commit identifies the fixture and code.
+framebuffer's fence before reading back the raw receivers, the reference and,
+with Indirect checked, the indirect image, and writing the finished PNG. It
+then disables the reference, so later frames compose zero local diffuse.
+`capture.json` records only the capture settings, the bounce ray and
+area-sample counts (zero without Indirect), wall time and device; the source
+commit identifies the fixture and code.
 
 - Animation aliases initialize before Graphics creation so record-once fixture draws can resolve them. They alias eagerly loaded pack memory and therefore cannot outlive `FileManager`. Validate all pack-derived ranges and indices before constructing aliases; temporary transforms use the workbuffer.
 - DirectXMath matrices are uploaded without an extra transpose. Animation nodes remain parent-before-child, enabling a single forward world-transform pass.

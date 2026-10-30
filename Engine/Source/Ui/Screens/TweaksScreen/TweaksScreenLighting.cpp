@@ -53,6 +53,8 @@ void RenderLightingSection(TweaksScreen& rScreen)
 			ImGui::SameLine();
 			bChanged |= ImGui::RadioButton("512##LightingSamples", &iSamples, 512);
 			settings.iAreaSamples = iSamples;
+			ImGui::SameLine();
+			bChanged |= ImGui::Checkbox("Indirect##LightingIndirect", &settings.bIndirect);
 			int iEvent = static_cast<int>(settings.iEvent);
 			bChanged |= ImGui::SliderInt("Event index##LightingEvent", &iEvent, 0, 119);
 			settings.iEvent = iEvent;

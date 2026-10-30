@@ -1,0 +1,96 @@
+#version 460
+
+#extension GL_EXT_ray_query : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+#include "ShaderRandom.h"
+#include "Lighting/LightingRadiometry.h"
+
+layout(local_size_x = 4, local_size_y = 4) in;
+layout(push_constant) uniform pushConstants { PushConstantsLayout pushConstantsLayout; };
+layout(set = 1, binding = 2, rgba32f) uniform writeonly image2D indirectOutput;
+// Shader reflection keys bindings by number across sets, and LightingQuery.h's Set 0 takes 3 and 4.
+layout(set = 1, binding = 30, rgba32f) uniform readonly image2D directInput;
+layout(set = 1, binding = 31, rgba32f) uniform writeonly image2D totalOutput;
+layout(set = 1, binding = 18) uniform sampler2D receiverPosition;
+layout(set = 1, binding = 19) uniform sampler2D receiverShadingNormal;
+layout(set = 1, binding = 27) uniform sampler2D receiverGeometricNormal;
+layout(set = 1, binding = 28) uniform sampler2D receiverAlbedo;
+
+// Lit fixture points lie within 150 m of a source inside the 512 m square; the farthest from any fixture camera's receivers is about 1,540 m.
+const float kfBounceRange = 2000.0f;
+
+void main()
+{
+	ivec2 i2Pixel = ivec2(pushConstantsLayout.f4Pipeline.xy) + ivec2(gl_LocalInvocationID.xy);
+	if (any(lessThan(i2Pixel, ivec2(0))) || any(greaterThanEqual(i2Pixel, imageSize(indirectOutput)))) return;
+	vec4 f4Indirect = vec4(0.0f);
+	if (all(lessThan(i2Pixel, textureSize(receiverPosition, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverShadingNormal, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverGeometricNormal, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverAlbedo, 0))))
+	{
+		vec4 f4Position = texelFetch(receiverPosition, i2Pixel, 0);
+		if (f4Position.w > 0.0f)
+		{
+			vec3 f3ShadingNormal = texelFetch(receiverShadingNormal, i2Pixel, 0).xyz;
+			vec3 f3GeometricNormal = texelFetch(receiverGeometricNormal, i2Pixel, 0).xyz;
+			vec3 f3Albedo = texelFetch(receiverAlbedo, i2Pixel, 0).rgb;
+			// Separate statements fix the draw order: the direction offset first, then each bounce's area offset in bounce order.
+			RandomEngine randomEngine = SeedRandomEngine(uint(i2Pixel.y * imageSize(indirectOutput).x + i2Pixel.x));
+			vec2 f2DirectionOffset;
+			f2DirectionOffset.x = Random01(randomEngine);
+			f2DirectionOffset.y = Random01(randomEngine);
+			// Branchless orthonormal basis about the shading normal (Duff et al. 2017).
+			float fSign = f3ShadingNormal.z >= 0.0f ? 1.0f : -1.0f;
+			float fA = -1.0f / (fSign + f3ShadingNormal.z);
+			float fB = f3ShadingNormal.x * f3ShadingNormal.y * fA;
+			vec3 f3Tangent = vec3(1.0f + fSign * f3ShadingNormal.x * f3ShadingNormal.x * fA, fSign * fB, -fSign * f3ShadingNormal.x);
+			vec3 f3Bitangent = vec3(fB, fSign + f3ShadingNormal.y * f3ShadingNormal.y * fA, -f3ShadingNormal.y);
+			vec3 f3Sum = vec3(0.0f);
+			for (uint k = 0u; k < uint(kiLightingBounceRays); ++k)
+			{
+				vec2 f2AreaOffset;
+				f2AreaOffset.x = Random01(randomEngine);
+				f2AreaOffset.y = Random01(randomEngine);
+				vec2 f2Sample = fract(lightingSamples[k] + f2DirectionOffset);
+				float fRadius = sqrt(f2Sample.y);
+				float fAngle = 2.0f * kfPi * f2Sample.x;
+				vec3 f3Direction = fRadius * cos(fAngle) * f3Tangent + fRadius * sin(fAngle) * f3Bitangent + sqrt(1.0f - f2Sample.y) * f3ShadingNormal;
+				if (dot(f3Direction, f3GeometricNormal) <= 0.0f)
+				{
+					continue;
+				}
+				LightingHit hit;
+				if (!LightingClosestHit(LightingRayOrigin(f4Position.xyz, f3GeometricNormal, f3Direction), f3Direction, 0.0f, kfBounceRange, hit))
+				{
+					continue;
+				}
+				for (uint i = 0u; i < lightingPublication.uiSourceCount; ++i)
+				{
+					LightingSource source = lightingSources[i];
+					if (source.uiType == kiLightingSourcePoint)
+					{
+						f3Sum += LightingPointRadiance(source, hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo);
+					}
+					else
+					{
+						for (uint j = 0u; j < uint(kiLightingBounceAreaSamples); ++j)
+						{
+							f3Sum += LightingRectangleRadiance(source, fract(lightingSamples[j] + f2AreaOffset), uint(kiLightingBounceAreaSamples), hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo);
+						}
+					}
+				}
+			}
+			// Cosine-weighted sampling cancels the integrand's cosine and 1/pi, so albedo times the mean hit radiance is the exitant radiance.
+			f4Indirect = vec4(f3Albedo * f3Sum / float(kiLightingBounceRays), 1.0f);
+		}
+	}
+	imageStore(indirectOutput, i2Pixel, f4Indirect);
+	vec4 f4Direct = imageLoad(directInput, i2Pixel);
+	imageStore(totalOutput, i2Pixel, vec4(f4Direct.rgb + f4Indirect.rgb, f4Direct.a));
+}

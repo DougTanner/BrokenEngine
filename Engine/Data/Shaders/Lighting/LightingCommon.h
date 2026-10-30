@@ -23,6 +23,8 @@ CONSTEXPR float kfLightingDistanceFloor = 0.01f;
 CONSTEXPR float kfLightingSourceRange = 150.0f;
 CONSTEXPR int kiLightingMaxSources = 1000;
 CONSTEXPR int kiLightingMaxSamples = 512;
+CONSTEXPR int kiLightingBounceRays = 256;
+CONSTEXPR int kiLightingBounceAreaSamples = 16;
 
 struct LightingSource
 {
@@ -97,6 +99,8 @@ static_assert(offsetof(LightingInstance, uiFirstGeometry) == 96);
 static_assert(sizeof(LightingGeometry) == 64);
 static_assert(offsetof(LightingGeometry, uiPositionStride) == 32);
 static_assert(sizeof(LightingHit) == 72);
+// LightingIndirect.comp reads these counts of samples-buffer points; the buffer is filled with only the selected 256 or 512.
+static_assert(kiLightingBounceRays <= 256 && kiLightingBounceAreaSamples <= 256);
 } // namespace shaders
 #endif
 

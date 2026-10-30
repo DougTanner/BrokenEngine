@@ -163,7 +163,7 @@ void Lighting::ApplyComparisonSettings(bool bCaptureAllowed)
 	else
 	{
 		rDiagnostics.status = "receivers";
-		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount;
+		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount * (rRequested.bIndirect ? 2 : 1);
 		pState->captureStart = std::chrono::steady_clock::now();
 	}
 }
@@ -213,6 +213,7 @@ void Lighting::PrepareComparisonPipelines()
 			return;
 		}
 		BindQueryDescriptors(rComparison.compute, iFramebuffer);
+		BindQueryDescriptors(rComparison.indirectCompute, iFramebuffer);
 		return;
 	}
 	if (rDiagnostics.status != "receivers")
@@ -230,6 +231,11 @@ void Lighting::PrepareComparisonPipelines()
 		for (Texture& rTexture : rComparison.receivers) rTexture.Create({.name = "LightingReceiver", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kColorAttachment});
 		rComparison.depth.Create({.name = "LightingReceiverDepth", .vkFormat = gpInstanceManager->mDepthVkFormat, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, .vkImageAspectFlags = gpSwapchainManager->mDepthTexture.mInfo.vkImageAspectFlags, .eTextureLayout = TextureLayout::kUndefined});
 		rComparison.reference.Create({.name = "LightingReference", .vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT, .vkExtent3D = State::Comparison::kVkExtent, .vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .eTextureLayout = TextureLayout::kGeneral});
+		TextureInfo indirectInfo = rComparison.reference.mInfo;
+		indirectInfo.name = "LightingIndirect";
+		rComparison.indirect.Create(indirectInfo);
+		indirectInfo.name = "LightingTotal";
+		rComparison.total.Create(indirectInfo);
 		std::array<VkAttachmentDescription, 5> attachments {};
 		std::array<VkAttachmentReference, 4> colors {};
 		std::array<VkImageView, 5> views {};
@@ -269,6 +275,13 @@ void Lighting::PrepareComparisonPipelines()
 		compute.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 2, .pTexture = &rComparison.reference});
 		for (int64_t i = 0; i < 4; ++i) compute.descriptorInfos.push_back({.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .iExplicitBinding = std::array<int64_t, 4> {18, 19, 27, 28}[i], .pTexture = &rComparison.receivers[i]});
 		rComparison.compute.Create(compute);
+		PipelineInfo indirect {.name = "LightingIndirect", .flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants}, .ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingIndirectcompCrc)}};
+		AddQueryDescriptorInfos(indirect, iFramebuffer);
+		indirect.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 2, .pTexture = &rComparison.indirect});
+		indirect.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 30, .pTexture = &rComparison.reference});
+		indirect.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageImages, .iExplicitBinding = 31, .pTexture = &rComparison.total});
+		for (int64_t i = 0; i < 4; ++i) indirect.descriptorInfos.push_back({.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .iExplicitBinding = std::array<int64_t, 4> {18, 19, 27, 28}[i], .pTexture = &rComparison.receivers[i]});
+		rComparison.indirectCompute.Create(indirect);
 	}
 	// Receiver model pipelines persist until comparison teardown: an earlier capture's receiver pass may still be pending.
 	for (const LightingModelRange& rRange : rFramebuffer.modelRanges)

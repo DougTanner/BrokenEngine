@@ -34,6 +34,12 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 		}
 		rComparison.reference.TransitionImageLayout(vkCommandBuffer, rComparison.eReferenceLayout, TextureLayout::kComputeReadWrite);
 		rComparison.eReferenceLayout = TextureLayout::kComputeReadWrite;
+		if (pState->settings.bIndirect)
+		{
+			rComparison.indirect.TransitionImageLayout(vkCommandBuffer, rComparison.eIndirectLayout, TextureLayout::kComputeReadWrite);
+			rComparison.total.TransitionImageLayout(vkCommandBuffer, rComparison.eIndirectLayout, TextureLayout::kComputeReadWrite);
+			rComparison.eIndirectLayout = TextureLayout::kComputeReadWrite;
+		}
 		RecordReceivers(vkCommandBuffer);
 		rDiagnostics.status = "tracing";
 		return;
@@ -41,6 +47,17 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 	int64_t iEnd = std::min(rDiagnostics.iCompletedTiles + State::Comparison::kiTilesPerFrame, rDiagnostics.iTotalTiles);
 	for (int64_t i = rDiagnostics.iCompletedTiles; i < iEnd; ++i)
 	{
+		if (i >= State::Comparison::kiTileCount)
+		{
+			if (i == State::Comparison::kiTileCount)
+			{
+				// Every direct tile precedes this barrier on the graphics queue, so every indirect tile reads the finished reference.
+				rComparison.reference.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
+			}
+			int64_t iTile = i - State::Comparison::kiTileCount;
+			rComparison.indirectCompute.RecordCompute(pState->iFramebuffer, vkCommandBuffer, 1, 1, 1, {static_cast<float>((iTile % State::Comparison::kiTileColumns) * 4), static_cast<float>((iTile / State::Comparison::kiTileColumns) * 4), 0.0f, 0.0f});
+			continue;
+		}
 		rComparison.compute.RecordCompute(pState->iFramebuffer, vkCommandBuffer, 1, 1, 1, {static_cast<float>((i % State::Comparison::kiTileColumns) * 4), static_cast<float>((i / State::Comparison::kiTileColumns) * 4), static_cast<float>(pState->settings.iAreaSamples), 0.0f});
 	}
 	rDiagnostics.iCompletedTiles = iEnd;
@@ -48,10 +65,18 @@ void Lighting::RecordCapture(VkCommandBuffer vkCommandBuffer)
 	{
 		return;
 	}
-	// Every earlier frame's tiles precede this barrier on the graphics queue, so Main composes the whole reference.
+	// Every earlier frame's tiles precede these barriers on the graphics queue, so Main composes the whole image.
 	rComparison.reference.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	rComparison.eReferenceLayout = TextureLayout::kShaderReadOnly;
-	gpTextureManager->mTextureDescriptors.SetLightingReference(pState->iFramebuffer, &rComparison.reference, true);
+	const Texture* pComposed = &rComparison.reference;
+	if (pState->settings.bIndirect)
+	{
+		rComparison.indirect.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		rComparison.total.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		rComparison.eIndirectLayout = TextureLayout::kShaderReadOnly;
+		pComposed = &rComparison.total;
+	}
+	gpTextureManager->mTextureDescriptors.SetLightingReference(pState->iFramebuffer, pComposed, true);
 	rDiagnostics.status = "composing";
 }
 
@@ -74,10 +99,10 @@ void Lighting::FinishCapture(int64_t iFramebuffer)
 		rDiagnostics.directory = gpFileManager->mTempDirectory / "Lighting" / std::format("capture-{}-{}", pState->uiServicedCapture, pState->captureStart.time_since_epoch().count());
 		std::filesystem::create_directories(rDiagnostics.directory);
 		SaveFinishedPng(iFramebuffer, rDiagnostics.directory / "finished.png");
-		static constexpr std::array<std::string_view, 5> kNames {"position.rgba32f", "shading-normal.rgba32f", "geometric-normal.rgba32f", "albedo.rgba32f", "direct.rgba32f"};
-		for (int64_t i = 0; i < std::ssize(kNames); ++i)
+		static constexpr std::array<std::string_view, 6> kNames {"position.rgba32f", "shading-normal.rgba32f", "geometric-normal.rgba32f", "albedo.rgba32f", "direct.rgba32f", "indirect.rgba32f"};
+		for (int64_t i = 0; i < std::ssize(kNames) - (rSettings.bIndirect ? 0 : 1); ++i)
 		{
-			const Texture& rTexture = i < std::ssize(rComparison.receivers) ? rComparison.receivers[i] : rComparison.reference;
+			const Texture& rTexture = i < std::ssize(rComparison.receivers) ? rComparison.receivers[i] : i == std::ssize(rComparison.receivers) ? rComparison.reference : rComparison.indirect;
 			std::vector<std::byte> bytes;
 			TextureCache::CopyImageToHostMemory(rTexture.mVkImage, State::Comparison::kVkExtent, VK_FORMAT_R32G32B32A32_SFLOAT, 1, 1, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, bytes);
 			LightingWriteFile(rDiagnostics.directory / kNames[i], bytes);
@@ -94,6 +119,8 @@ void Lighting::FinishCapture(int64_t iFramebuffer)
 			{"height", State::Comparison::kVkExtent.height},
 			{"wallMs", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - pState->captureStart).count()},
 			{"device", std::string_view(gpInstanceManager->mVkPhysicalDeviceProperties.deviceName)},
+			{"bounceRays", rSettings.bIndirect ? shaders::kiLightingBounceRays : 0},
+			{"bounceAreaSamples", rSettings.bIndirect ? shaders::kiLightingBounceAreaSamples : 0},
 		};
 		std::string text = capture.dump(2);
 		LightingWriteFile(rDiagnostics.directory / "capture.json", std::as_bytes(std::span(text)));

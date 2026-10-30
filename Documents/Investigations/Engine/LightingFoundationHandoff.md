@@ -26,7 +26,8 @@ rebuilding them.
   fixture solids and skinned mesh. Terrain preparation GPU time is the `Lighting Terrain` profile
   timer.
 - Hit material lookup, `LightingClosestHit` in
-  [LightingQuery.h](../../../Engine/Data/Shaders/Lighting/LightingQuery.h); it has no consumer yet.
+  [LightingQuery.h](../../../Engine/Data/Shaders/Lighting/LightingQuery.h); the one-bounce indirect
+  reference (`## Stage 2: one-bounce indirect reference`) is its consumer.
 - The fixed comparison fixture in
   [LightingFixture.cpp](../../../Engine/Source/Graphics/Lighting/LightingFixture.cpp): seed
   0x51A7, 1000 nested point and rectangle sources, panels, walls, overhang, colored wall, 120
@@ -39,7 +40,8 @@ rebuilding them.
   ([LightingReference.comp](../../../Engine/Data/Shaders/Lighting/LightingReference.comp)) with 256
   or 512 Halton area samples, and its capture (see `## Decisions`), which writes position,
   shading-normal, geometric-normal, albedo and direct `.rgba32f` raws, `finished.png` and
-  `capture.json` at 1920x1080.
+  `capture.json` at 1920x1080. With the `Indirect` option checked it also traces the one-bounce
+  indirect reference and writes `indirect.rgba32f` (`## Stage 2: one-bounce indirect reference`).
 - The candidate composition seam:
   [LightingCompose.h](../../../Engine/Data/Shaders/Lighting/LightingCompose.h) on model, terrain,
   water and fixture draws, enabled per framebuffer through
@@ -145,7 +147,17 @@ Checks:
 - MASK geometry is opaque. BLEND, water, smoke, sprites and shields do not occlude; water still
   receives light.
 - Traced terrain matches drawn terrain only within the 0.05 m ray offset.
-- `LightingClosestHit` material lookup for models, terrain and fixture solids is untested.
+- `LightingClosestHit` material lookup was checked once in stage 2, by a temporary probe comparing
+  the albedo it returns for each receiver's own surface with the raster albedo (Debug client,
+  Density 100, Default zoom, event 0, with a battleship spawned into view). It matches
+  on terrain (median max-channel difference 0.0057 over 200,965 pixels), on fixture solids (exact
+  over 406,358 pixels where the raster shows a fixture surface; the z = 0 water, coplanar with the
+  floor, hides about half the floor from the raster receivers) and on the skinned fixture mesh
+  (exactly 0.5 over 23,183 pixels). Rigid gameplay models are only weakly checked: the battleship's
+  albedo is at most 0.026, so its median difference of 0.0011 over 751 pixels cannot tell a correct
+  lookup from a black one; the probe does track that albedo (correlation 0.913, median relative
+  difference 0.16 over the 360 pixels with albedo above 0.01). Textured models with bright albedo
+  and MASK alpha on hits are not verified.
 
 ## Decisions
 
@@ -179,12 +191,63 @@ DDGI and Split Radiance Cascades compare their indirect lighting against a one-d
 reference; the other three candidates need only the direct reference. Stage 2 adds that reference
 to the foundation, so neither candidate builds its own.
 
-Brute force at 1000 lights is impractical: the direct reference alone evaluates about 108 billion
-ray queries per 1920x1080 capture at 256 area samples (800 points plus 200 rectangles of 256
-samples per pixel), and one bounce multiplies that by the hemisphere rays per pixel. Stage 2 must
-choose a scene size it can capture in practical wall time — source count, sample and ray counts,
-resolution — and record that choice in its plan.
+The Tweaks Lighting `Comparison` tab's `Indirect` option adds a second tile phase to the capture.
+After every direct tile,
+[LightingIndirect.comp](../../../Engine/Data/Shaders/Lighting/LightingIndirect.comp) traces 256
+cosine-weighted bounce rays per receiver pixel through `LightingClosestHit` and sums, at each hit,
+the light from every source, with 16 area samples per rectangle (`kiLightingBounceRays`,
+`kiLightingBounceAreaSamples`). Only local sources light a hit; a miss contributes zero. The result
+is in the same units as `direct.rgba32f`, so direct + indirect is the one-bounce total. A checked
+capture writes it to `indirect.rgba32f`, its `finished.png` shows direct + indirect, and its
+`capture.json` records `bounceRays` 256 and `bounceAreaSamples` 16. An unchecked capture writes the
+five raws as before and records both as 0. The commit fixes the sampling: the Halton point set
+shifted by a per-pixel offset seeded from the pixel index, plus a separate hit-side offset per
+bounce. Repeatability across processes was not tested.
 
-Stage 2 is the first consumer of `LightingClosestHit`, so it also verifies the model, terrain and
-fixture material lookup that is otherwise untested. DDGI and Split Radiance Cascades start after
-stage 2; the other three can start once this stage passes its acceptance table.
+Reference scene: Density scenario, 100 sources, Default zoom, event 0, 256 area samples, 256 bounce
+rays, 16 hit-side area samples. At 100 sources each receiver pixel costs about 103,000 ray queries
+(256 bounces, each one closest hit plus 80 point and 20 x 16 rectangle queries); at 1000 sources it
+would cost about ten times as many, so 100 sources was chosen for a capture estimated at about 7
+minutes. The Default view contains the red colored wall, so the scene shows colored bounce. A
+candidate captures this scene with `Indirect` checked and compares its indirect lighting alone
+against `indirect.rgba32f`.
+
+The measured captures below were made this way. The Sandbox client and server ran Debug x64, the
+client window at 1920x1080, on one fresh app-data root that held only `ClientGuid.bin` and the save
+`lighting-strip-baseline-t400` (2,547 bytes, SHA-256
+`42DD5DA00A924D39B95D985ACD09D9F104972BBD0946DBEF2FFCB1154E0AAF55`). Byte-identical copies of both
+are tracked in this commit under `Temp/lighting-strip-baseline/AppData/`, in the same per-process
+folders. The server `load`ed the save with `pauseAfterLoad` and stayed paused at tick 400, and no
+units were spawned. The Tweaks Lighting `Comparison` tab was set to `Fixture reference`,
+`Default zoom`, `Density`, 100 sources, 256 samples and event 0, with `Indirect` checked, or
+unchecked for the comparison capture, and then `Capture` was clicked.
+
+Measured on the Debug client with an AMD Radeon RX 9070 XT at 1920x1080:
+
+- Wall time: the checked capture took 422,140 ms (direct phase about 166 s at about 780 tiles/s,
+  bounce phase about 256 s at about 520 tiles/s); the unchecked capture took 165,802 ms. On the
+  foundation before stage 2, direct-only captures at Default/Lowest zoom took 156/154 s (Point),
+  160/167 s (Density 100) and 201/185 s (Density 1000). About 142 ms per frame of `Lighting Terrain`
+  caps the Debug client at about 7 fps, so each 1080-frame phase takes at least about 155 s; the
+  bounce phase is slower than that floor.
+- Colored bounce, checked on the floor only (z = 0, facing up, gray 0.5 albedo; positions in
+  camera-cell metres). Beside the red wall (x 100..118, y 42..74, 4,373 pixels) the mean indirect is
+  r 3.786e-3, g 9.736e-4, b 9.507e-4 (r/g 3.89, r/b 3.98); the mirrored region (x -118..-100, 7,605
+  pixels) has r/g 0.9996. Over the red-wall region, the mean `finished.png` red is 160.5 checked and
+  159.5 unchecked.
+- Per-pixel noise, std((a - b) / sqrt 2) / mean((a + b) / 2) of `indirect.r` over horizontally
+  adjacent pixel pairs: 0.41 beside the red wall, 0.64 in the mirrored region. Region means are
+  stable; single pixels are noisy. The error from 16 hit-side area samples is not measured
+  separately; it is part of this noise.
+- Surfaces that see the red wall: the wall faces -x in the plane x 119 (y 46.7..68, z 0.4..9 as
+  captured). Three 16 m floor cells beside the wall (x 96..119, y 48..68) have r/g 3.77..4.05; no
+  other group of 300 pixels or more apart from the wall reaches r/g 1.3 (smaller groups were not
+  reported). Gray vertical walls show no tint, and the up-facing plate at z 100.5 receives zero
+  indirect.
+- Not attributed: a mild warm tint, r/g 1.05..1.25, over much of the central and southern floor
+  away from the wall, including the floor south of the wall (x 80..128, y -80..-32) at r/g
+  1.05..1.14. It is not traced to a source; terrain or model bounce is plausible but unproven.
+
+Stage 2 is the first consumer of `LightingClosestHit`; `## Known omissions` records what of its
+material lookup was verified. DDGI and Split Radiance Cascades start after stage 2; the other three
+can start once this stage passes its acceptance table.

@@ -17,7 +17,8 @@ with point and one-sided rectangle sources in the camera cell's frame.
   albedo/pi applied once. Rectangle power is distributed over its area and
   sample count once; preserve emitter sidedness, full XYZ distance, and both
   shading and geometric normals.
-- `LightingCompose.h` reads completed linear direct diffuse with `texelFetch`
+- `LightingCompose.h` reads completed linear local diffuse (direct, or direct
+  plus one bounce when Indirect is checked) with `texelFetch`
   at the final fragment pixel only while the acquired framebuffer's Set 0
   control enables it. Opaque models, terrain, water and fixture draws add that
   result at their local diffuse seam before smoke; BLEND receives zero. Do not

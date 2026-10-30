@@ -234,11 +234,13 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   counts from the latest fence-completed publication, and capture `status` one of
   `not-run`, `receivers`, `tracing`, `composing`, `complete` or `failed` (with
   `error`). The Tweaks Lighting `Comparison` tab selects
-  mode/camera/scenario/count/samples/event and requests Capture, which needs
-  Fixture reference mode, a paused client and a 1920x1080 framebuffer, and
-  advances over ordinary frames. A `complete` capture's `directory` holds
-  `position`, `shading-normal`, `geometric-normal`, `albedo` and `direct`
-  `.rgba32f` raws, `finished.png` and `capture.json`. Other fields include
+  mode/camera/scenario/count/samples/Indirect/event and requests Capture, which
+  needs Fixture reference mode, a paused client and a 1920x1080 framebuffer, and
+  advances over ordinary frames; `totalTiles` counts the direct tiles, doubled
+  when Indirect is checked. A `complete` capture's `directory` holds
+  `position`, `shading-normal`, `geometric-normal`, `albedo`, `direct` and, with
+  Indirect checked, `indirect` `.rgba32f` raws, `finished.png` and
+  `capture.json`. Other fields include
   `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for every timer row
   (Lighting terrain preparation is the row whose `name` ends `Lighting Terrain`),
   including zeros, frame-coherent

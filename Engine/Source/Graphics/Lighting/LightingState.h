@@ -49,16 +49,20 @@ struct Lighting::State
 	struct Comparison
 	{
 		static constexpr VkExtent3D kVkExtent {1'920, 1'080, 1};
-		// One reference dispatch traces a 4x4-pixel tile; 120 per frame is a quarter tile row, so a capture traces over 1080 frames.
+		// One reference dispatch traces a 4x4-pixel tile; 120 per frame is a quarter tile row, so each tile phase traces over 1080 frames.
 		static constexpr int64_t kiTileColumns = kVkExtent.width / 4;
 		static constexpr int64_t kiTileCount = kiTileColumns * (kVkExtent.height / 4);
 		static constexpr int64_t kiTilesPerFrame = 120;
 		std::array<Texture, 4> receivers;
 		Texture depth;
 		Texture reference;
+		Texture indirect;
+		// Direct plus indirect; composed instead of the reference when Indirect is checked.
+		Texture total;
 		VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 		VkFramebuffer vkFramebuffer = VK_NULL_HANDLE;
 		Pipeline compute;
+		Pipeline indirectCompute;
 		Pipeline terrain;
 		Pipeline water;
 		Pipeline solidReceiver;
@@ -75,6 +79,8 @@ struct Lighting::State
 		std::unordered_map<ModelKey, std::unique_ptr<ModelPipeline>, ModelKeyHash> models;
 		std::unique_ptr<ModelPipeline> animationForward;
 		TextureLayout eReferenceLayout = TextureLayout::kGeneral;
+		// Shared by indirect and total, which always transition together.
+		TextureLayout eIndirectLayout = TextureLayout::kGeneral;
 	};
 	std::unique_ptr<Comparison> comparison;
 	struct FixtureSolid
