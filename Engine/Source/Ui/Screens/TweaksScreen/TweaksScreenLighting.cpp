@@ -54,7 +54,13 @@ void RenderLightingSection(TweaksScreen& rScreen)
 			bChanged |= ImGui::RadioButton("512##LightingSamples", &iSamples, 512);
 			settings.iAreaSamples = iSamples;
 			ImGui::SameLine();
-			bChanged |= ImGui::Checkbox("Indirect##LightingIndirect", &settings.bIndirect);
+			bool bIndirect = settings.flags & LightingComparisonFlags::kIndirect;
+			bChanged |= ImGui::Checkbox("Indirect##LightingIndirect", &bIndirect);
+			settings.flags.Set(LightingComparisonFlags::kIndirect, bIndirect);
+			ImGui::SameLine();
+			bool bShadows = settings.flags & LightingComparisonFlags::kShadows;
+			bChanged |= ImGui::Checkbox("Shadows##LightingShadows", &bShadows);
+			settings.flags.Set(LightingComparisonFlags::kShadows, bShadows);
 			int iEvent = static_cast<int>(settings.iEvent);
 			bChanged |= ImGui::SliderInt("Event index##LightingEvent", &iEvent, 0, 119);
 			settings.iEvent = iEvent;

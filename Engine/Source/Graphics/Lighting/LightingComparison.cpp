@@ -163,7 +163,7 @@ void Lighting::ApplyComparisonSettings(bool bCaptureAllowed)
 	else
 	{
 		rDiagnostics.status = "receivers";
-		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount * (rRequested.bIndirect ? 2 : 1);
+		rDiagnostics.iTotalTiles = State::Comparison::kiTileCount * ((rRequested.flags & LightingComparisonFlags::kIndirect) ? 2 : 1);
 		pState->captureStart = std::chrono::steady_clock::now();
 	}
 }

@@ -8,7 +8,8 @@ Smoke keeps one 2D field per flight plane and refreshes the planes on interleave
 - Every deposit lands at the lowest plane's height; point and area lights land on the terrain instead where it rises higher.
   Point and area lights project through `ProjectToBaseHeight` (`Engine/Source/Frame/Collections/PointLights/PointLightsRender.cpp:100`, `AreaLights/AreaLightsRender.cpp:129-132`), which is `ProjectToFlightPlane` onto plane 0, or onto the terrain where it rises above plane 0 (`Engine/Source/Graphics/GraphicsUtils.cpp:123-134`). `HexShield.vert:90-95` intersects the eye line with `fBaseHeight`. No depositor weighs the light's height.
 - Each frame then runs `gSpreadPassCount` spread passes, combine, temporal, and history copy (`CommandBufferRecordMain.cpp:108-209`). `Model.frag`, `Terrain.frag`, and `Water.frag` read the combine targets once through `ReadLighting` (`Engine/Data/Shaders/ShaderFunctions.h:114-119`), whatever the fragment's height. `AddSmoke` lights every smoke plane from that same sample (`ShaderFunctions.h:262`).
-- Every current light flies on the lowest plane. Spaceships and omnis hold `Lowest()` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.cpp:245`, `Omnis/Omnis.cpp:462`), and a flying missile's z velocity is zeroed (`Missiles/MissilesUpdate.cpp:194`). The planes are 6, 50, and 100 m (`Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h`). Only harness-placed lights reach the upper planes.
+- Ship-borne lights fly and fire on all three planes. Fighters, omnis and battleships climb toward their ordered plane through `ClimbTowardsFlightPlane(..., GetTargetFlightPlane(...), ...)` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.cpp:255`, `Omnis/Omnis.cpp:330`, `Battleships/Battleships.cpp:250`), up to planes 2, 1 and 0 respectively (`kiFighterHighestFlightPlane`, `kiOmniHighestFlightPlane`, `kiBattleshipHighestFlightPlane`).
+  The planes are 6, 50, and 100 m (`Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h`).
 
 ## How smoke renders per flight plane
 
@@ -35,14 +36,14 @@ What multiplies:
 Interleaving:
 - (i) None: every plane refreshes every frame. This is the upper bound on cost.
 - (ii) Stagger like smoke: deposit and spread only the scheduled plane each frame, and keep the other planes' last output and area. Under (a), combine still runs every frame over the kept outputs; under (b), each plane's temporal runs only on its refresh. This needs a held area per plane and an early crop-safety refresh, as smoke has.
-- (iii) Stagger only the upper planes and keep plane 0 every frame, because the fast ship-borne lights sit there.
+- (iii) Stagger only the upper planes and keep plane 0 every frame.
 
 ## What to measure
 
 Performance:
 - Read the GPU timer rows `kGpuTimerLightingDeposit`, `kGpuTimerLightingSpread`, `kGpuTimerLightingCombine`, `kGpuTimerLightingTemporal`, and the consumers `kGpuTimerObjects`, `kGpuTimerTerrain`, and `kGpuTimerWater` (`Engine/Source/Profile/ProfileManager.h:158-192`) through `query_profile`.
 - The `query_profile` caveat (`.agents/skills/agent-harness/references/command-reference.md` `## Durable caveats`) requires both sides in one process lifetime. The experiment build therefore needs a runtime toggle between today's single-plane path and the per-plane path, plus a stagger toggle like `gSmokeLayerStagger`, with cohorts alternated.
-- Test two scenes: today's battle content, where every light is on plane 0 and the extra planes are pure overhead, and harness-placed lights spread across 6, 50, and 100 m. Measure each zoomed in and fully zoomed out.
+- Test two scenes: today's battle content, which has lights on all three planes, and harness-placed lights spread across 6, 50, and 100 m. Measure each zoomed in and fully zoomed out.
 - Also record the memory the extra targets add.
 
 Quality, judged from screenshots of the same saved scene with the toggle flipped:

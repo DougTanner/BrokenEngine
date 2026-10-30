@@ -20,19 +20,60 @@ their ordinary paths. The candidate must preserve real XYZ and evaluate the comp
 brightness alone is not evidence of better directional quality. Historical legacy captures remain
 historical evidence, not a retained runtime comparison path.
 
+## Parts
+
+Part 1 is unshadowed base lighting. The candidate evaluates no light-to-point visibility, neither
+at receivers nor at bounce hits. It compares against foundation captures with `Shadows`
+unchecked and adds the Tweaks controls below to a technique subtab of the Tweaks Lighting section
+(`TweaksScreenLighting.cpp`).
+
+| Control | Range | Default |
+| --- | --- | --- |
+| Initial candidates | 1-32 | 8 |
+| ReGIR cells XY | 4-64 | 16 |
+| ReGIR cells Z | 2-32 | 8 |
+| Reservoirs per cell | 1-32 | 8 |
+| Uniform-mixture fraction | 0-1 | 0.1 |
+| Temporal reuse | on/off | on |
+| Temporal history cap | 1-32 | 20 |
+| Spatial neighbors | 0-8 | 4 |
+| Spatial radius | 1-64 px | 32 px |
+| High-candidate no-reuse diagnostic | on/off | off |
+
+Each control's default is the value in its table row; where `## Design` states an initial
+setting, the default equals it. Comparison captures use those defaults. No control alters the
+shared fixture sources, so the reference stays comparable. The candidate's passes appear as GPU
+timer rows on the Profile screen and in `query_profile`.
+
+Part 1 ends at a human evaluation. Present the user the candidate running live on the fixture
+with these controls, plus the part-1 evidence: comparison against the unshadowed reference,
+per-pass GPU time and bytes. The user judges base-lighting quality and performance and chooses
+one of three outcomes:
+- reject or defer the candidate;
+- tune it further;
+- start part 2.
+
+Record that decision in the evidence bundle. Part 2 adds light-to-point visibility through the
+foundation's ray queries and compares against the default `Shadows`-checked reference. It never
+begins without the user's explicit go. Terrain shadows and drop shadows keep their ordinary paths
+in both parts.
+
 ## Design
 
 Implement one direct-light path following RTXDI's ReGIR candidate generation and ReSTIR DI reservoir equations, adapted to GLSL. Use a bounded uniform camera-cell-relative 3D ReGIR grid, initially 16 x 16 x 8 cells, with eight light-sample reservoirs per cell. Rebuild candidates every frame from all local lights; use a nonzero uniform-light mixture so important lights are not excluded by the proposal distribution.
 
 At each visible receiver, generate eight initial candidates, perform one temporal reuse pass and one
-spatial pass with four neighbors, then evaluate selected-sample source visibility and full-normal
-diffuse contribution. Preserve proposal PDFs, sample counts, normalization, and re-evaluated target
+spatial pass with four neighbors, then evaluate the selected sample's full-normal diffuse
+contribution. Preserve proposal PDFs, sample counts, normalization, and re-evaluated target
 densities at reuse sites. Use geometric position/normal/depth rejection for disocclusion and moving
 receivers. Area samples carry emitter position and sampling density; source IDs must be stable
 across frames and invalidated on removal. Keep a high-candidate, no-reuse diagnostic output beside
 the exhaustive reference to distinguish estimator error from reuse artifacts.
 
-ReGIR stores candidate light distributions, not finished radiance. ReSTIR DI estimates direct illumination and requires the tracing prerequisite below for local shadows; neither supplies diffuse bounce lighting. Use explicit client-only light identities, geometry history, and motion reconstruction without adding simulation identity fields or a generic temporal framework.
+ReGIR stores candidate light distributions, not finished radiance. ReSTIR DI estimates direct illumination; neither supplies diffuse bounce lighting. Use explicit client-only light identities, geometry history, and motion reconstruction without adding simulation identity fields or a generic temporal framework.
+
+Part 2: evaluate selected-sample source visibility before the full-normal contribution, through the
+tracing prerequisite below, the visibility backend ReSTIR DI requires for local shadows.
 
 ## Implementation prerequisite
 
@@ -42,13 +83,14 @@ Do not rebuild those common mechanisms inside this candidate. Confirm the select
 required features/extensions/formats and retain its capability evidence; unsupported hardware
 blocks comparison rather than selecting a heightfield or screen-space substitute.
 
-Trace resident terrain, opaque models and overhangs under the foundation's material policy:
+Part 1 traces no geometry rays. Part 2's light-visibility rays trace resident terrain, opaque
+models and overhangs under the foundation's material policy:
 MASK is opaque; BLEND, water, smoke, sprites and shields do not occlude rays. Water remains a
 diffuse receiver. Preserve synchronous Frame borrowing, final GPU geometry/ranges, camera-cell
 coordinates, resource retirement and capture input lifetimes without asset/pack format changes.
 The foundation traces off-screen models but not off-screen terrain, which sits at the sea floor
 ([known omissions](LightingFoundationHandoff.md#known-omissions)). Verify static, moving and off-screen model
-occluders before judging the candidate algorithm. A missing
+occluders for part 2's rays before judging its results. A missing
 producer or failed foundation gate requires plan revision rather than an unrecorded substitute.
 
 ## Critical files
@@ -59,24 +101,29 @@ producer or failed foundation gate requires plan revision rather than an unrecor
 - `Engine/Data/Shaders/Lighting/{LightingCommon.h,LightingQuery.h,LightingRadiometry.h}`: shared source, material/query and radiometry contracts.
 - `Engine/Data/Shaders/{Model/ModelForward.h,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
 - Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp`: candidate implementation reusing the foundation fixture/reference.
+- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenLighting.cpp`: the technique subtab holding the part-1 Tweaks controls.
 
 ## In scope
 
-- The critical-file regions above, their required headers/project membership, and candidate resources needed by this single technique; reuse foundation ray-query ownership. Add `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp` for cell candidates, receiver reservoirs, temporal/spatial reuse, and visibility; `ShaderFunctions.h` for final full-normal direct contribution.
+- The critical-file regions above, their required headers/project membership, and candidate resources needed by this single technique; reuse foundation ray-query ownership. Add `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp` for cell candidates, receiver reservoirs, temporal/spatial reuse, and, in part 2, visibility; `ShaderFunctions.h` for final full-normal direct contribution.
 - Reuse the foundation fixture/light stream and capture exports (`capture.json` plus raw images) through supported debug/harness controls; no new simulation fields or network commands.
 - A debug selector for foundation zero diffuse versus this one candidate, plus reference/diagnostic outputs. Preserve the zero path and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
-- Reuse the foundation exhaustive shadowed direct-diffuse reference using all lights at 256 area samples; the foundation records no 256/512 convergence evidence and keeps its 512-sample control for suspected area-sampling noise. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
+- Reuse the foundation exhaustive direct-diffuse reference using all lights at 256 area samples, captured with `Shadows` unchecked for part 1 and with the default `Shadows` checked for part 2; the foundation records no 256/512 convergence evidence and keeps its 512-sample control for suspected area-sampling noise. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
+- The part-1 Tweaks controls listed in `## Parts`, each changing the live candidate output.
 - Client-only timers, resource-byte accounting, source/settings manifest, comparison screenshots and motion sequences. Integrate model/terrain/water local diffuse lighting; retain existing smoke/billboard policy and report its mismatch separately.
 
 ## Out of scope
 
-Production adoption/landing of the experimental renderer, optimization to a guessed frame budget, algorithm variants, multiple hardware backends, generic configuration systems, speculative scalability, gameplay/flight-plane rules, simulation/CRC, save/replay/wire formats, asset formats, and unit tests. No edits to other prototype branches or the historical investigation. No claim of physically complete GI, volumetric transport, or specular correctness.
+Production adoption/landing of the experimental renderer, optimization to a guessed frame budget, algorithm variants beyond the part-1 Tweaks evaluation controls, multiple hardware backends, generic configuration systems, speculative scalability, gameplay/flight-plane rules, simulation/CRC, save/replay/wire formats, asset formats, and unit tests.
+No edits to other prototype branches or the historical investigation. No claim of physically complete GI, volumetric transport, or specular correctness.
 
 ## Risk and invariants
 
 Authoring these documents is Tier 1. Executing this proposal requires fresh classification; new CPU/GPU layout contracts, acceleration-resource synchronization/lifetime, and cross-owner geometry integration are prospective Tier-3 triggers, requiring the normal plan reviews and approval before implementation.
 
-Preserve cell-local positions; convert to the camera cell only at publication/use, with retained caches rebased or invalidated on camera-cell changes. All added state is client-only and outside deterministic frames/CRC. Preserve record-once command buffers, in-flight descriptor safety, device recreation, and shared CPU/GLSL layouts. Three flight planes are test heights, never a replacement for full 3D visibility.
+Preserve cell-local positions; convert to the camera cell only at publication/use, with retained caches rebased or invalidated on camera-cell changes. All added state is client-only and outside deterministic frames/CRC. Preserve record-once command buffers, in-flight descriptor safety, device recreation, and shared CPU/GLSL layouts.
+Ship-borne lights fly and fire on all three flight planes: fighters, omnis and battleships each climb toward their ordered plane (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.cpp:255`, `Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp:330`, `Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:250`),
+up to planes 2, 1 and 0 respectively (100, 50 and 6 m), so lights at 6, 50 and 100 m are ordinary gameplay; the fixture's three heights are test heights, never a replacement for full 3D evaluation.
 
 ## Comparison fixture
 
@@ -107,15 +154,17 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 | --- | --- |
 | Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
-| Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
+| Visibility (part 2) | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
-| Technique quality | ReGIR/ReSTIR: record noise and bias against the exhaustive direct reference, candidate support, moving/removed lights, sample identity validity, disocclusion, temporal ghosting, and spatial light leaks. Test a tiny bright source among 1000 lights and a high light passing behind an occluder; reservoir reuse must not flatten XYZ or normals. |
+| Technique quality | ReGIR/ReSTIR: record noise and bias against the exhaustive direct reference, candidate support, moving/removed lights, sample identity validity, disocclusion, temporal ghosting, and spatial light leaks. Test a tiny bright source among 1000 lights; reservoir reuse must not flatten XYZ or normals. Part 2: test a high light passing behind an occluder. |
 | Matched visual evidence | Foundation zero, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
 | Honest radiometry | Compare candidate additive linear HDR against the foundation float reference; keep historical legacy MAX/rgba8 captures separately identified. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
-| Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare foundation zero/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
+| Cost and lag | Quality settings first: report part-1 cost, then part 2's added visibility cost separately, each as per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare foundation zero/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
 | Integrity | No validation errors during motion, resource rebuild, or camera-cell change; record client/server replay/CRC evidence through the harness showing visual state remains outside simulation. |
+| Tweaks controls | Each `## Parts` control changes the live output, and its defaults reproduce the comparison capture. |
+| Human evaluation gate | The user's part-1 decision is recorded in the evidence bundle; no part-2 edit precedes a recorded go. |
 
-Finish by retaining the exact branch/commit and evidence bundle and presenting the user with quality findings, limitations, and measured costs for adoption, defer, or reject. Do not automatically land the experimental renderer onto primary. Any accepted production change requires its own approved scope and normal landing guards.
+At the end of each part, finish by retaining the exact branch/commit and evidence bundle and presenting the user with quality findings, limitations, and measured costs: after part 1 for the human evaluation in `## Parts`, after part 2 for adoption, defer, or reject. Do not automatically land the experimental renderer onto primary. Any accepted production change requires its own approved scope and normal landing guards.
 
 ## Sources
 

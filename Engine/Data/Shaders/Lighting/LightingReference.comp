@@ -34,18 +34,19 @@ void main()
 			vec3 f3GeometricNormal = texelFetch(receiverGeometricNormal, i2Pixel, 0).xyz;
 			vec3 f3Albedo = texelFetch(receiverAlbedo, i2Pixel, 0).rgb;
 			uint uiSamples = uint(pushConstantsLayout.f4Pipeline.z);
+			bool bShadows = pushConstantsLayout.f4Pipeline.w != 0.0f;
 			for (uint i = 0u; i < lightingPublication.uiSourceCount; ++i)
 			{
 				LightingSource source = lightingSources[i];
 				if (source.uiType == kiLightingSourcePoint)
 				{
-					f4Result.rgb += LightingPointRadiance(source, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo);
+					f4Result.rgb += LightingPointRadiance(source, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo, bShadows);
 				}
 				else
 				{
 					for (uint j = 0u; j < uiSamples; ++j)
 					{
-						f4Result.rgb += LightingRectangleRadiance(source, lightingSamples[j], uiSamples, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo);
+						f4Result.rgb += LightingRectangleRadiance(source, lightingSamples[j], uiSamples, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo, bShadows);
 					}
 				}
 			}

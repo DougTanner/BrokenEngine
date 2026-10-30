@@ -28,6 +28,12 @@ enum class LightingFixtureScenario
 	kIsolatedRectangle,
 };
 
+enum class LightingComparisonFlags : uint8_t
+{
+	kIndirect = 1 << 0,
+	kShadows  = 1 << 1,
+};
+
 struct LightingComparisonSettings
 {
 	LightingComparisonMode eMode = LightingComparisonMode::kDisabled;
@@ -37,7 +43,7 @@ struct LightingComparisonSettings
 	int64_t iEvent = 0;
 	int64_t iAreaSamples = 256;
 	uint64_t uiCaptureRequest = 0;
-	bool bIndirect = false;
+	common::Flags<LightingComparisonFlags> flags = LightingComparisonFlags::kShadows;
 	bool operator==(const LightingComparisonSettings&) const = default;
 };
 

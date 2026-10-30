@@ -234,7 +234,7 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   counts from the latest fence-completed publication, and capture `status` one of
   `not-run`, `receivers`, `tracing`, `composing`, `complete` or `failed` (with
   `error`). The Tweaks Lighting `Comparison` tab selects
-  mode/camera/scenario/count/samples/Indirect/event and requests Capture, which
+  mode/camera/scenario/count/samples/Indirect/Shadows/event and requests Capture, which
   needs Fixture reference mode, a paused client and a 1920x1080 framebuffer, and
   advances over ordinary frames; `totalTiles` counts the direct tiles, doubled
   when Indirect is checked. A `complete` capture's `directory` holds

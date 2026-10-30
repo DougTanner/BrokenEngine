@@ -42,6 +42,9 @@ rebuilding them.
   shading-normal, geometric-normal, albedo and direct `.rgba32f` raws, `finished.png` and
   `capture.json` at 1920x1080. With the `Indirect` option checked it also traces the one-bounce
   indirect reference and writes `indirect.rgba32f` (`## Stage 2: one-bounce indirect reference`).
+  With the `Shadows` option unchecked (checked by default), neither the direct reference nor the
+  bounce reference's hit shading tests whether a source is visible; bounce rays still find their
+  hits, and `capture.json` records `shadows`.
 - The candidate composition seam:
   [LightingCompose.h](../../../Engine/Data/Shaders/Lighting/LightingCompose.h) on model, terrain,
   water and fixture draws, enabled per framebuffer through
@@ -51,7 +54,8 @@ rebuilding them.
 
 ## Acceptance table
 
-This stage is complete when every row passes on one commit; the candidates start from that commit.
+This stage is complete when every row passes on one commit; all five candidates start from the
+commit that adds the `Shadows` option.
 Row 3's user-approved replacement baseline is exact rebased upstream
 `cd6d410c064a5a5f905bf68efaf28493ab6fc33a`, captured in the existing session worktree.
 Recipe and preserved inputs: `Temp/lighting-matched-reference/reference-recipe.md`.
@@ -249,5 +253,4 @@ Measured on the Debug client with an AMD Radeon RX 9070 XT at 1920x1080:
   1.05..1.14. It is not traced to a source; terrain or model bounce is plausible but unproven.
 
 Stage 2 is the first consumer of `LightingClosestHit`; `## Known omissions` records what of its
-material lookup was verified. DDGI and Split Radiance Cascades start after stage 2; the other three
-can start once this stage passes its acceptance table.
+material lookup was verified.

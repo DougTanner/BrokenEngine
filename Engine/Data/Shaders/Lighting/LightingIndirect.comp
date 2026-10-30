@@ -40,6 +40,7 @@ void main()
 			vec3 f3ShadingNormal = texelFetch(receiverShadingNormal, i2Pixel, 0).xyz;
 			vec3 f3GeometricNormal = texelFetch(receiverGeometricNormal, i2Pixel, 0).xyz;
 			vec3 f3Albedo = texelFetch(receiverAlbedo, i2Pixel, 0).rgb;
+			bool bShadows = pushConstantsLayout.f4Pipeline.w != 0.0f;
 			// Separate statements fix the draw order: the direction offset first, then each bounce's area offset in bounce order.
 			RandomEngine randomEngine = SeedRandomEngine(uint(i2Pixel.y * imageSize(indirectOutput).x + i2Pixel.x));
 			vec2 f2DirectionOffset;
@@ -75,13 +76,13 @@ void main()
 					LightingSource source = lightingSources[i];
 					if (source.uiType == kiLightingSourcePoint)
 					{
-						f3Sum += LightingPointRadiance(source, hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo);
+						f3Sum += LightingPointRadiance(source, hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo, bShadows);
 					}
 					else
 					{
 						for (uint j = 0u; j < uint(kiLightingBounceAreaSamples); ++j)
 						{
-							f3Sum += LightingRectangleRadiance(source, fract(lightingSamples[j] + f2AreaOffset), uint(kiLightingBounceAreaSamples), hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo);
+							f3Sum += LightingRectangleRadiance(source, fract(lightingSamples[j] + f2AreaOffset), uint(kiLightingBounceAreaSamples), hit.f3Position, hit.f3GeometricNormal, hit.f3ShadingNormal, hit.f3Albedo, bShadows);
 						}
 					}
 				}
