@@ -4,7 +4,7 @@
 
 The user requested isolated, quality-first lighting prototypes and a plan per technique. Can a compact directional cache preserve light height and full-normal response with acceptable spatial softness? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
-All five independent candidates must start from the same verified commit on the reusable
+All seven independent candidates must start from the same verified commit on the reusable
 `lighting-foundation` branch, with no dependency on another candidate. Do not begin candidate
 implementation or comparison runs until a foundation commit passes the
 [foundation acceptance table](LightingFoundationHandoff.md#acceptance-table). Create experiment worktrees through
@@ -149,7 +149,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 
 | Criterion | Required observation/evidence |
 | --- | --- |
-| Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
+| Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all seven worktrees. |
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility (part 2) | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |

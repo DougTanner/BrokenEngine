@@ -4,7 +4,7 @@
 
 The user requested isolated, quality-first lighting prototypes and a plan per technique. Does evaluating local lights at the actual fragment improve height, normals, and occlusion enough to justify replacing projected deposits? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
-All five independent candidates must start from the same verified commit on the reusable
+All seven independent candidates must start from the same verified commit on the reusable
 `lighting-foundation` branch, with no dependency on another candidate. Do not begin candidate
 implementation or comparison runs until a foundation commit passes the
 [foundation acceptance table](LightingFoundationHandoff.md#acceptance-table). Create experiment worktrees through
@@ -31,7 +31,7 @@ unchecked and adds the Tweaks controls below to a technique subtab of the Tweaks
 | --- | --- | --- |
 | Tile size | 8, 16 or 32 px | 16 px |
 | Depth slices | 8-64 | 24 |
-| Area samples per emitter | 1-64 | 64 |
+| Area emitter evaluation | exact, or 1-64 stratified samples | exact |
 | Cluster light-count heatmap | on/off | off |
 
 Each control's default is the value in its table row; where `## Design` states an initial
@@ -56,8 +56,10 @@ in both parts.
 
 Implement forward clustered direct lighting: a 16 x 16 pixel XY grid with 24 logarithmic view-depth slices spanning the visible scene's near/far depths. Conservatively assign true 3D point and rectangular area light bounds to clusters; shade each visible receiver with the full XYZ source/receiver difference and full material normal. Use a two-pass count/prefix-sum/write list so the 1000-light case has no silent fixed-list truncation. Add diagnostics for counts and assignment omissions.
 
-Evaluate every light assigned to the cluster, unshadowed in part 1, using 64 fixed stratified
-samples per area emitter at the quality setting. Use additive linear HDR radiance with the same
+Evaluate every light assigned to the cluster, unshadowed in part 1. Each area emitter uses, by
+default, the exact closed-form irradiance of a polygon light on a diffuse receiver (the diffuse
+case of Linearly Transformed Cosines), clipped to the receiver's horizon, which is noise-free; the
+alternative mode uses 1-64 fixed stratified samples per area emitter. Use additive linear HDR radiance with the same
 distance/range, albedo, and diffuse BRDF definitions as the exhaustive reference. The unshadowed
 output isolates clustering/normal correctness. Clustering reduces candidate-light work; it is not
 GI.
@@ -145,7 +147,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 
 | Criterion | Required observation/evidence |
 | --- | --- |
-| Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
+| Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all seven worktrees. |
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility (part 2) | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
@@ -162,4 +164,6 @@ At the end of each part, finish by retaining the exact branch/commit and evidenc
 ## Sources
 
 [Clustered Deferred and Forward Shading](https://diglib.eg.org/items/6342d4d6-5220-4376-a5c6-a153058f4a3c). Cluster assignment and direct shading are distinct from the local-shadow visibility backend that part 2 requires.
+
+[Real-Time Polygonal-Light Shading with Linearly Transformed Cosines](https://eheitzresearch.wordpress.com/415-2/) (Heitz, Dupuy, Hill and Neubelt 2016). Its diffuse case is the exact area emitter evaluation; the specular warp is not used.
 

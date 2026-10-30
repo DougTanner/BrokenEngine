@@ -23,7 +23,7 @@ Smoke and lighting differ in one way that matters here. Smoke is a persistent si
 
 ## What three lighting planes would mean
 
-These are options, not a decision.
+These are options, not a decision. Option (b), with an exact deposit, is proposed as the [plane light field](LightingPrototypePlaneLightField.md) prototype plan.
 
 Assigning lights to planes. Each depositor projects with `ProjectToFlightPlane(..., iPlane)` instead of `ProjectToBaseHeight`, and `HexShield.vert` takes the plane's height instead of `fBaseHeight`.
 - (1) Split like smoke: use `ComputeSmokePlaneWeights`, so a light between planes deposits into both.

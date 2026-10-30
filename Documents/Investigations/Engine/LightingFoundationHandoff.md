@@ -2,13 +2,15 @@
 
 ## Purpose
 
-Five possibly discarded lighting prototypes — [clustered direct
+Seven possibly discarded lighting prototypes — [clustered direct
 lighting](LightingPrototypeClustered.md), [DDGI](LightingPrototypeDDGI.md), [directional
-cache](LightingPrototypeDirectionalCache.md), [ReGIR/ReSTIR](LightingPrototypeReGIRReSTIR.md) and
-[Split Radiance Cascades](LightingPrototypeSplitRadianceCascades.md) — each branch from one commit
-of the `lighting-foundation` branch, which sits next to main and never lands on it. The foundation
-carries only what all five share, so each candidate compares against identical inputs without
-rebuilding them.
+cache](LightingPrototypeDirectionalCache.md), [ReGIR/ReSTIR](LightingPrototypeReGIRReSTIR.md),
+[Split Radiance Cascades](LightingPrototypeSplitRadianceCascades.md), [plane light
+field](LightingPrototypePlaneLightField.md) and [Lighting Grid
+Hierarchy](LightingPrototypeLightingGridHierarchy.md) — each branch from one commit of the
+`lighting-foundation` branch, which sits next to main and never lands on it. The foundation carries
+only what all seven share, so each candidate compares against identical inputs without rebuilding
+them.
 
 ## What the foundation provides
 
@@ -54,8 +56,13 @@ rebuilding them.
 
 ## Acceptance table
 
-This stage is complete when every row passes on one commit; all five candidates start from the
-commit that adds the `Shadows` option.
+This stage is complete when every row passes on one commit; all seven candidates start from the
+commit that adds the `Shadows` option. DDGI and Split Radiance Cascades start last, only after the
+user has evaluated part 1 of every direct-light candidate (clustered, directional cache,
+ReGIR/ReSTIR, plane light field and Lighting Grid Hierarchy), because the one-bounce reference
+shows bounce barely changes the top-down image (`## Stage 2: one-bounce indirect reference`: the
+strongest colored bounce moves mean red by about 1/255 and the up-facing plate receives none), a
+measurement of one fixture scene at Default zoom.
 Row 3's user-approved replacement baseline is exact rebased upstream
 `cd6d410c064a5a5f905bf68efaf28493ab6fc33a`, captured in the existing session worktree.
 Recipe and preserved inputs: `Temp/lighting-matched-reference/reference-recipe.md`.
@@ -192,7 +199,7 @@ Taken on 2026-10-29, when the foundation was cut down from its original L1-L14 c
 ## Stage 2: one-bounce indirect reference
 
 DDGI and Split Radiance Cascades compare their indirect lighting against a one-diffuse-bounce
-reference; the other three candidates need only the direct reference. Stage 2 adds that reference
+reference; the direct-light candidates need only the direct reference. Stage 2 adds that reference
 to the foundation, so neither candidate builds its own.
 
 The Tweaks Lighting `Comparison` tab's `Indirect` option adds a second tile phase to the capture.
