@@ -40,6 +40,15 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		}
 		return 0;
 	}
+	// Tab never reaches ImGui outside text editing, where ImGui tabbing would otherwise start a slider's text entry.
+	if (uiMessage == WM_KEYDOWN && uiWordParameter == VK_TAB && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantTextInput))
+	{
+		if ((iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr)
+		{
+			gpModelViewerApplication->ToggleFlight();
+		}
+		return 0;
+	}
 	if (ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(hwnd, uiMessage, uiWordParameter, iLongParameter) != 0)
 	{
 		return TRUE;
@@ -49,7 +58,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		case WM_KEYDOWN:
 			if (uiWordParameter == VK_SPACE && (iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantCaptureKeyboard))
 			{
-				gpModelViewerApplication->ToggleFlight();
+				gpModelViewerApplication->TogglePause();
 				return 0;
 			}
 			if constexpr (kbDebugInput)

@@ -12,9 +12,9 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 {
 	PipelineInfo pipelineInfo = rPipelineInfo;
 
-	static constexpr int64_t kiModelAdditionalDescriptors = 6; // +1 lighting, +2 shadow, +3 smoke, +4 object shadows, +5 mesh data, +6 joint matrices
+	static constexpr int64_t kiModelAdditionalDescriptors = 7; // +1 lighting, +2 shadow, +3 smoke, +4 object shadows, +5 mesh data, +6 joint matrices, +7 terrain elevation
 
-	// Grow by the model descriptor plus its six appended slots before the scan, so the slots the loop
+	// Grow by the model descriptor plus its seven appended slots before the scan, so the slots the loop
 	// writes in place exist. Grown entries default to kEmpty, so the scan still stops at the first of them.
 	int64_t iDescriptorInfoCount = std::ssize(pipelineInfo.descriptorInfos) + kiModelAdditionalDescriptors + 1;
 	pipelineInfo.descriptorInfos.resize(iDescriptorInfoCount);
@@ -53,6 +53,10 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 			pipelineInfo.descriptorInfos.at(i + 6).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
 			pipelineInfo.descriptorInfos.at(i + 6).iExplicitBinding = shaders::kiModelBindingJointMatrix;
 			pipelineInfo.descriptorInfos.at(i + 6).pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data();
+
+			pipelineInfo.descriptorInfos.at(i + 7).flags = DescriptorFlags::kCombinedSamplers;
+			pipelineInfo.descriptorInfos.at(i + 7).iExplicitBinding = shaders::kiModelBindingTerrainElevation;
+			pipelineInfo.descriptorInfos.at(i + 7).pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture;
 			break;
 		}
 	}

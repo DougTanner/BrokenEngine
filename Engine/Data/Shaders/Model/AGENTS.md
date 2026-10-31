@@ -18,8 +18,11 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   `mat3(skinMatrix)` and therefore assumes near-rigid joint transforms rather
   than arbitrary non-uniform joint scaling.
 - Object shadow footprints use model world XY, independent of camera position.
-  Grow and horizon stretch extend only the half away from the active light;
-  vertical light uses south as the extension direction.
+  Horizon stretch extends only the half away from the active light;
+  vertical light uses south as the extension direction. The shadow-mode vertex
+  samples the terrain elevation render target at the model centre for the
+  blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is
+  shared, so every model pipeline binds that texture.
 - A model's height above the lowest flight plane fades the terrain shadow it
   receives and moves its lighting sample.
 - A model takes no smoke from planes below its own flight plane, smoke faded by
@@ -29,8 +32,8 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   of the model layout, because instances in one draw can sit on different
   planes.
 - A model receives object shadow only from planes above its own (channel
-  layout: `../Shadow/AGENTS.md` `## Overview`): it reads channel
-  `iInLayer + 1`, or 1 when no plane lies above. That value
+  layout: `../Shadow/AGENTS.md` `## Overview`): it takes the darker of the B
+  and A planes above `iInLayer`, or 1 when no plane lies above. That value
   multiplies into `fShadow`, reaching sun direct, IBL diffuse, and IBL
   specular, and is `fShadowMoon` for the moon terms.
 - Material output remains linear HDR for the fullscreen resolve. Engine cubemaps use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the sampling boundary.

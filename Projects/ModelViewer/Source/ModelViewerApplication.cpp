@@ -38,6 +38,11 @@ void ModelViewerApplication::ToggleFlight()
 	ResetDisplayTime();
 }
 
+void ModelViewerApplication::TogglePause()
+{
+	mFlags.Toggle(ViewerFlags::kPaused);
+}
+
 struct LightingPreset
 {
 	static constexpr int64_t kiVersion = 3;
@@ -725,7 +730,10 @@ bool ModelViewerApplication::Render()
 	}
 	if (mFlags & ViewerFlags::kFlying)
 	{
-		UpdateFlight(fDeltaTime);
+		if (!(mFlags & ViewerFlags::kPaused))
+		{
+			UpdateFlight(fDeltaTime);
+		}
 		mCameraFrame.iTick = miFrame;
 		mCameraFrame.renderBasis = engine::MakeRenderBasis(engine::kOriginCoordinate, engine::kOriginCoordinate);
 		pCamera->UpdateFlight(mCameraFrame, mFlightBody.vecPosition, fDeltaTime);
@@ -739,9 +747,14 @@ bool ModelViewerApplication::Render()
 	engine::gpIslands->UpdateActiveIslands(std::span<const engine::CellStaticData* const>(&pIslandCell, WorldVisible() ? 1 : 0));
 	FrameInterpolate& rFrame = mRenderInterpolates.at(engine::kOriginCoordinate);
 	rFrame.iFrame = miFrame++;
-	std::chrono::duration<float> elapsedTime(mTimer.GetDeltaNs());
+	std::chrono::nanoseconds frameTime = mTimer.GetDeltaNs(true);
+	if (!(mFlags & ViewerFlags::kPaused))
+	{
+		mElapsedTime += frameTime;
+	}
+	std::chrono::duration<float> elapsedTime(mElapsedTime);
 	engine::gpGraphics->RenderGlobal(elapsedTime);
-	if (mFlags & ViewerFlags::kPlaying)
+	if ((mFlags & ViewerFlags::kPlaying) && !(mFlags & ViewerFlags::kPaused))
 	{
 		const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(mPreviews.at(miSelected).crc);
 		float fDuration = rAnimation.mpAnimations[miSelectedAnimation].fDuration;
@@ -885,7 +898,8 @@ void ModelViewerApplication::RenderUi()
 			ImGui::PopStyleVar();
 			ImGui::Separator();
 			ImGui::SeparatorText("Islands");
-			ImGui::TextUnformatted((mFlags & ViewerFlags::kFlying) ? "SPACE: orbit preview" : "SPACE: autonomous flight");
+			ImGui::TextUnformatted((mFlags & ViewerFlags::kFlying) ? "TAB: orbit preview" : "TAB: autonomous flight");
+			ImGui::TextUnformatted((mFlags & ViewerFlags::kPaused) ? "SPACE: resume" : "SPACE: pause");
 			ImGui::BeginDisabled(mFlags & ViewerFlags::kFlying);
 			ImGui::Checkbox("World background", &mbWorldBackground);
 			ImGui::EndDisabled();
@@ -1036,6 +1050,9 @@ void ModelViewerApplication::RenderUi()
 		}
 		ImGui::End();
 	}
+	// Rewritten every frame because a surface-tier recreation replaces the manager and its text areas.
+	engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, (mFlags & ViewerFlags::kPaused) ? "PAUSED" : "");
+	engine::gpImGuiManager->RenderTextAreas();
 	const ImGuiIO& rInputOutput = ImGui::GetIO();
 	bool bCaptureMouse = rInputOutput.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);

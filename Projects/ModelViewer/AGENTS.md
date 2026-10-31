@@ -15,9 +15,11 @@ stored peak (`IslandHeader`). Startup steps the seed forward from the origin,
 and Reroll from a random seed, until the generated layout holds that template
 and another placement. Startup enables World background.
 
-SPACE toggles orbit preview and autonomous flight once per tap outside text
-editing. In flight the right window adds a Flight tab, removed on return to
-orbit and selected when SPACE enters flight while the panels are shown; every
+TAB toggles orbit preview and autonomous flight once per tap outside text
+editing and is then withheld from ImGui, whose tabbing would start a slider's
+text entry; during text editing TAB reaches ImGui as usual. In flight the right
+window adds a Flight tab, removed on return to orbit and selected when TAB
+enters flight while the panels are shown; every
 exact entry in it has a paired slider. Flight forces the world visible without
 changing the retained orbit background preference; returning to orbit restores
 that preference and pauses the body. Resuming flight preserves its position
@@ -64,6 +66,12 @@ always selected. Selection survives Graphics recreation. The right window title
 shows Preset: followed by the selected key, with a stable ImGui window ID and no
 duplicate content header. Ignore slot/reset key repeats and apply taps in
 received order before rendering.
+
+SPACE toggles a viewer-owned pause once per tap outside text editing. It
+freezes clip playback time, the flight body and the shader elapsed time;
+resuming continues from the frozen values without a catch-up interval. The
+camera, sun controls, mode toggle and panels stay usable, and the engine debug
+text area shows PAUSED.
 
 In Debug builds a non-repeat F3 toggles the engine Tweaks screen. F3, Q press
 and W/E/R/Backspace taps act only outside text editing, as SPACE does. While
@@ -181,8 +189,8 @@ functions, defined empty. Never satisfy an unused gameplay dependency with
 dummy cells, flags, sessions or reporting functions; the viewer constructs no
 `GameBase` or network session. By project membership it defines
 `engine::RenderFrameMain` for Main uniforms and the three UI functions
-`ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
-`CreateUiScreens` and `DestroyUiScreens` are empty. It compiles the engine
+`ImGuiManager` calls: `RenderUiScreens` draws the viewer panel and the
+engine text areas, and `CreateUiScreens` and `DestroyUiScreens` are empty. It compiles the engine
 Tweaks screen and `TweaksSettings` and registers only the engine Tweaks
 sections, adding no Tweaks content. The viewer `Pch.h` sets
 `kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false` and

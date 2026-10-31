@@ -14,6 +14,7 @@ public:
 	void SelectLightingPreset(int64_t iSlot);
 	void ResetLightingPreset();
 	void ToggleFlight();
+	void TogglePause();
 	bool WorldVisible() const;
 	void ResetDisplayTime();
 	bool Render();
@@ -30,6 +31,7 @@ private:
 		kFlying = 0x04,
 		kMetadataLoaded = 0x08,
 		kMetadataValid = 0x10,
+		kPaused = 0x20,
 	};
 	struct FlightBody
 	{
@@ -75,6 +77,8 @@ private:
 	glm::vec2 mPreviousMousePosition {};
 
 	common::Timer mTimer;
+	// Shader elapsed time advances only while unpaused, so resuming does not jump.
+	std::chrono::nanoseconds mElapsedTime {};
 	common::Timer mDisplayTimer;
 	FlightBody mFlightBody;
 	XMVECTOR mVecWaterAnchor {};

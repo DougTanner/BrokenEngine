@@ -13,6 +13,7 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
+#include "Frame/FlightPlaneTable.h"
 #include "Graphics/Camera.h"
 
 namespace engine
@@ -281,7 +282,7 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 	float fSunsetStretchScaled = fSunsetStretch * fStretchScale;
 	float fSunriseStretchCubed = fSunriseStretchScaled * fSunriseStretchScaled * fSunriseStretchScaled;
 	float fSunsetStretchCubed = fSunsetStretchScaled * fSunsetStretchScaled * fSunsetStretchScaled;
-	rGlobalLayout.fObjectShadowsExtension = gObjectShadowsGrow.mfCurrent + std::max(fSunriseStretchCubed, fSunsetStretchCubed);
+	rGlobalLayout.fObjectShadowsExtension = std::max(fSunriseStretchCubed, fSunsetStretchCubed);
 	float fSunX = XMVectorGetX(vecSunMoonNormal);
 	float fSunY = XMVectorGetY(vecSunMoonNormal);
 	float fHorizontalLength = std::sqrt(fSunX * fSunX + fSunY * fSunY);
@@ -433,8 +434,41 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	}
 	rGlobalLayout.fShadowBlurWeightSumInverse = 1.0f / fShadowBlurWeightSum;
 
-	rGlobalLayout.fObjectShadowsBlurSigma = gObjectShadowsBlurSigma.mfCurrent;
-	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(gObjectShadowsBlurRadius.mfCurrent);
+	// Object-shadow R and G hold ground coverage weighted toward the lowest and highest flight planes, so they blur with
+	// Low and High; B and A hold flight planes 1 and 2, whose sigma lerps Low to High by the same height fraction.
+	static_assert(game::kFlightPlanes.back().fHeightMeters > game::kFlightPlanes.front().fHeightMeters);
+	float fLowestPlaneHeight = game::kFlightPlanes.front().fHeightMeters;
+	float fObjectShadowsBlurHeightRangeInverse = 1.0f / (game::kFlightPlanes.back().fHeightMeters - fLowestPlaneHeight);
+	rGlobalLayout.fObjectShadowsBlurHeightRangeInverse = fObjectShadowsBlurHeightRangeInverse;
+	float fObjectShadowsBlurSigmaLow = gObjectShadowsBlurSigmaLow.mfCurrent;
+	float fObjectShadowsBlurSigmaHigh = gObjectShadowsBlurSigmaHigh.mfCurrent;
+	float pfObjectShadowsBlurSigmas[4] {fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaLow};
+	for (int64_t i = 1; i < std::ssize(game::kFlightPlanes); ++i)
+	{
+		float fPlaneHeightFraction = (game::kFlightPlanes[i].fHeightMeters - fLowestPlaneHeight) * fObjectShadowsBlurHeightRangeInverse;
+		pfObjectShadowsBlurSigmas[i + 1] = std::lerp(fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fPlaneHeightFraction);
+	}
+	// Per-channel half-kernel for ObjectShadowsBlurH/V: offset i of radius R weighs exp(-0.5 * (i * sigma / R)^2), normalized
+	// over the full span (center counts once, each side twice). Weights are staged locally because the layout is write-only.
+	int64_t iObjectShadowsBlurRadius = static_cast<int64_t>(gObjectShadowsBlurRadius.mfCurrent);
+	float pfObjectShadowsBlurWeights[shaders::kiMaxObjectShadowsBlurRadius + 1][4] {};
+	float pfObjectShadowsBlurWeightSums[4] {};
+	for (int64_t i = 0; i <= iObjectShadowsBlurRadius; ++i)
+	{
+		for (int64_t j = 0; j < 4; ++j)
+		{
+			float fNormalizedOffset = static_cast<float>(i) * pfObjectShadowsBlurSigmas[j] / static_cast<float>(iObjectShadowsBlurRadius);
+			float fWeight = std::exp(-0.5f * fNormalizedOffset * fNormalizedOffset);
+			pfObjectShadowsBlurWeights[i][j] = fWeight;
+			pfObjectShadowsBlurWeightSums[j] += (i == 0) ? fWeight : 2.0f * fWeight;
+		}
+	}
+	for (int64_t i = 0; i <= iObjectShadowsBlurRadius; ++i)
+	{
+		const float* pfWeights = pfObjectShadowsBlurWeights[i];
+		rGlobalLayout.pf4ObjectShadowsBlurWeights[i] = shaders::vec4(pfWeights[0] / pfObjectShadowsBlurWeightSums[0], pfWeights[1] / pfObjectShadowsBlurWeightSums[1], pfWeights[2] / pfObjectShadowsBlurWeightSums[2], pfWeights[3] / pfObjectShadowsBlurWeightSums[3]);
+	}
+	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(iObjectShadowsBlurRadius);
 	rGlobalLayout.fObjectShadowsTerrainShadowFadeInverse = 1.0f / gObjectShadowsTerrainShadowFade.mfCurrent;
 	float fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
 	rGlobalLayout.fObjectShadowsIntensity = fObjectShadowsIntensity * std::pow(fDayPercent, 0.1f);

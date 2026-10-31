@@ -23,65 +23,17 @@ void main()
 		return;
 
 	int iRadius = globalLayout.iObjectShadowsBlurRadius;
-	float fRadiusOverSigma = float(iRadius) / max(globalLayout.fObjectShadowsBlurSigma, 1e-6f);
-
 	vec2 f2InvOutputSize = 1.0f / vec2(i2OutputSize);
 	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvOutputSize;
 
+	// Each channel blurs with its own sigma, so taps are discrete: bilinear pairing would need one shared offset per
+	// tap pair.
 	vec4 f4Total = vec4(0.0f);
-	float fWeightSum = 0.0f;
-	ivec2 i2InputSize = textureSize(objectShadowsTextureSampler, 0);
-	// A linear sample at i + w2 / (w1 + w2) returns
-	// (w1 * T[i] + w2 * T[i + 1]) / (w1 + w2); multiplying it by the combined weight
-	// reconstructs the weighted sum. This identity requires the sampler and logical tap grids to match.
-	if (all(equal(i2InputSize, i2OutputSize)))
+	for (int i = -iRadius; i <= iRadius; ++i)
 	{
-		f4Total = textureLod(objectShadowsTextureSampler, f2Uv, 0.0f);
-		fWeightSum = 1.0f;
-		for (int i = 1; i <= iRadius; i += 2)
-		{
-			float fA1 = float(i) / fRadiusOverSigma;
-			float fWeight1 = exp(-0.5f * fA1 * fA1);
-			if (i + 1 <= iRadius)
-			{
-				float fA2 = float(i + 1) / fRadiusOverSigma;
-				float fWeight2 = exp(-0.5f * fA2 * fA2);
-				float fCombinedWeight = fWeight1 + fWeight2;
-				// Both Gaussian weights can underflow to zero; that pair contributes nothing and cannot form an offset.
-				if (fCombinedWeight > 0.0f)
-				{
-					float fCombinedOffset = float(i) + fWeight2 / fCombinedWeight;
-					vec2 f2Offset = vec2(fCombinedOffset, 0.0f) * f2InvOutputSize;
-					f4Total += fCombinedWeight *
-						(textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f)
-							+ textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f));
-					fWeightSum += 2.0f * fCombinedWeight;
-				}
-			}
-			else
-			{
-				// An odd radius leaves one unpaired outer tap on each side.
-				vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
-				f4Total += fWeight1 *
-					(textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f)
-						+ textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f));
-				fWeightSum += 2.0f * fWeight1;
-			}
-		}
-	}
-	else
-	{
-		// With different extents, interpolation uses the input texel grid while logical taps remain
-		// output-grid spaced, so bilinear pairing would reconstruct the wrong samples.
-		for (int i = -iRadius; i <= iRadius; ++i)
-		{
-			float fA = float(i) / fRadiusOverSigma;
-			float fWeight = exp(-0.5f * fA * fA);
-			vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
-			f4Total += fWeight * textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f);
-			fWeightSum += fWeight;
-		}
+		vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
+		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(i)] * textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f);
 	}
 
-	imageStore(objectShadowsBlurIntermediateTexture, ivec2(uiX, uiY), f4Total / fWeightSum);
+	imageStore(objectShadowsBlurIntermediateTexture, ivec2(uiX, uiY), f4Total);
 }

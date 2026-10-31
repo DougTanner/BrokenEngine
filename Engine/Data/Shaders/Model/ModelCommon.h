@@ -79,6 +79,8 @@ layout (scalar, set = 1, binding = kiModelBindingJointMatrix) buffer readonly jo
 	JointMatrix jointMatrices[];
 };
 
+layout (set = 1, binding = kiModelBindingTerrainElevation) uniform sampler2D elevationTextureSampler;
+
 void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout model)
 {
 	vec3 f3WorldPosition = Transform(vec4(f3LocalPosition, 1.0f), model.f3x4Transform);
@@ -112,7 +114,10 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	}
 	else
 	{
-		// Mode 2: Shadow projection.
+		// Mode 2: Shadow projection. The object-shadow blur measures height from the ground under the model centre (sea level
+		// over water) rather than from sea level, so a ship over high terrain blurs like a low one.
 		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4PositionLayer.xyz);
+		float fGroundHeight = max(textureLod(elevationTextureSampler, WorldToVisibleArea(model.f4PositionLayer.xyz, globalLayout.f4VisibleArea), 0.0f).x, 0.0f);
+		fOutHeightAboveBase = max(model.f4PositionLayer.z - fGroundHeight - globalLayout.fBaseHeight, 0.0f);
 	}
 }

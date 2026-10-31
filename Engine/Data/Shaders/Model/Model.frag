@@ -266,11 +266,11 @@ void main()
 	float fShadow = max(mainLayout.fPhysicallyBasedRenderingShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
-	// Object shadow channel c holds ships on flight plane c and above, so channel iInLayer + 1 excludes this ship's
-	// own plane; nothing lies above the highest plane. Sampled before the select to keep implicit derivatives uniform.
+	// Object shadow B and A hold only ships on flight planes 1 and 2, so the darker of those above iInLayer shades this
+	// ship; the result stays 1 when no plane lies above. Sampled before the select to keep implicit derivatives uniform.
 	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2VisibleAreaPosition);
-	int iObjectShadowsPlane = iInLayer + 1;
-	float fObjectShadow = iObjectShadowsPlane < int(globalLayout.uiFlightPlaneCount) ? f4ObjectShadows[iObjectShadowsPlane] : 1.0f;
+	vec2 f2ObjectShadowsAbove = mix(vec2(1.0f), f4ObjectShadows.zw, lessThan(ivec2(iInLayer), ivec2(1, 2)));
+	float fObjectShadow = min(f2ObjectShadowsAbove.x, f2ObjectShadowsAbove.y);
 	fShadow *= fObjectShadow;
 	float fShadowMoon = fObjectShadow;
 

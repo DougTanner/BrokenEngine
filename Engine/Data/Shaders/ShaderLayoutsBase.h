@@ -34,7 +34,7 @@ inline constexpr VkFormat kVkFormatLighting = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatSmoke = VK_FORMAT_R16_SFLOAT;
 inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
 inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
-inline constexpr VkFormat kVkFormatObjectShadows = VK_FORMAT_R16G16B16A16_SFLOAT; // Channel c: coverage by flight planes c and above
+inline constexpr VkFormat kVkFormatObjectShadows = VK_FORMAT_R16G16B16A16_SFLOAT; // RG: ground coverage split by ship height; B, A: coverage by flight planes 1, 2
 inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
 inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatWaterFoam = VK_FORMAT_R16_SFLOAT;
@@ -144,6 +144,7 @@ CONSTEXPR int kiWaterFoamHeight = 512;
 CONSTEXPR int kiWaterFoamMipLevels = 11;
 CONSTEXPR int kiModelBindingMeshData = 15;
 CONSTEXPR int kiModelBindingJointMatrix = 16;
+CONSTEXPR int kiModelBindingTerrainElevation = 17;
 
 // Water normal map atlas size. Shared by C++ (PipelineManager mppWaterNormalTextures array,
 // TextureManager kpWaterNormalCrcs/kpWaterNormalNames tables) and the water shader
@@ -171,6 +172,7 @@ CONSTEXPR int kiDebugTextureFormatTerrainElevation = 8;
 CONSTEXPR int kiShadowTextureExecutionSize = 64;
 
 CONSTEXPR int kiShadowBlurRadius = 5;
+CONSTEXPR int kiMaxObjectShadowsBlurRadius = 32; // gObjectShadowsBlurRadius slider maximum; sizes the GlobalLayout object-shadow blur half-kernel
 
 CONSTEXPR int kiComputeTileSize = 8;
 // Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes

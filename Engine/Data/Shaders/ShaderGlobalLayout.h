@@ -186,12 +186,13 @@ struct GlobalLayout
 	float pfShadowBlurWeights[kiShadowBlurRadius + 1] INIT; // Symmetric Gaussian half-kernel: ShadowBlurH/V index by abs(offset), scale by fShadowBlurWeightSumInverse.
 	float fShadowBlurWeightSumInverse INIT;
 	float fShadowAngleOffsetSum INIT; // Shadow sun angle + noon + sunset feather offsets, summed CPU-side (Shadow.comp feather term).
-	float fObjectShadowsBlurSigma INIT;
+	vec4 pf4ObjectShadowsBlurWeights[kiMaxObjectShadowsBlurRadius + 1] INIT; // Per object-shadow channel, pre-normalized Gaussian half-kernel: ObjectShadowsBlurH/V index by abs(offset); entries past iObjectShadowsBlurRadius are unused
 	float fObjectShadowsIntensity INIT;
-	float fObjectShadowsExtension INIT; // Grow + max(sunrise stretch cube, sunset stretch cube); the vertex supplies the away-light extent.
+	float fObjectShadowsExtension INIT; // max(sunrise stretch cube, sunset stretch cube); the vertex supplies the away-light extent.
 	int32_t iObjectShadowsBlurRadius INIT;
 	vec2 f2ObjectShadowsAwayLight INIT; // Unit horizontal direction opposite the active sun/moon, or south for vertical light.
 	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
+	float fObjectShadowsBlurHeightRangeInverse INIT; // 1 / (highest - lowest flight-plane height) (ModelShadow.frag ground-coverage height split)
 	float fShadowAffectAmbient INIT;
 	float fWaterReducedNoiseOriginX INIT;
 	int32_t iShadowElevationSize INIT;

@@ -9,6 +9,12 @@ layout(push_constant) uniform pushConstants
 	PushConstantsLayout pushConstantsLayout;
 };
 
+// Uniforms
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+	GlobalLayout globalLayout;
+};
+
 // Input
 layout (location = 0) in vec3 f3InWorldPosition;
 layout (location = 1) in vec3 f3InNormal;
@@ -26,6 +32,9 @@ layout (location = 0) out vec4 f4OutColor;
 
 void main()
 {
-	// Cumulative coverage merged by MAX blending: channel c holds every ship on flight plane c or above.
-	f4OutColor = vec4(lessThanEqual(ivec4(0, 1, 2, 3), ivec4(iInLayer)));
+	// Coverage merged by MAX blending. R and G split ground coverage by ship height above the ground below it, between
+	// the lowest and highest flight-plane heights, and blur with Sigma Low and High, so the ground blur varies smoothly
+	// with height. B and A hold ships on flight planes 1 and 2 only, for ship-on-ship shadows; no model reads plane 0's.
+	float fHeightFraction = clamp(fInHeightAboveBase * globalLayout.fObjectShadowsBlurHeightRangeInverse, 0.0f, 1.0f);
+	f4OutColor = vec4(1.0f - fHeightFraction, fHeightFraction, equal(ivec2(1, 2), ivec2(iInLayer)));
 }

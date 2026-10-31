@@ -13,8 +13,8 @@ namespace engine
 
 static_assert(shaders::kiMaxFlightPlanes == kiMaxFlightPlanes);
 
-// One RGBA object-shadow channel per flight plane.
-static_assert(std::ssize(game::kFlightPlanes) <= 4);
+// Object shadows: two RGBA channels split ground coverage by height, and one each holds flight planes 1 and 2.
+static_assert(std::ssize(game::kFlightPlanes) <= 3);
 
 // TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-plane names need static storage.
 constexpr std::string_view kpSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
