@@ -8,7 +8,7 @@ Smoke keeps one 2D field per flight plane and refreshes the planes on interleave
 - Every deposit lands at the lowest plane's height; point and area lights land on the terrain instead where it rises higher.
   Point and area lights project through `ProjectToBaseHeight` (`Engine/Source/Frame/Collections/PointLights/PointLightsRender.cpp:100`, `AreaLights/AreaLightsRender.cpp:129-132`), which is `ProjectToFlightPlane` onto plane 0, or onto the terrain where it rises above plane 0 (`Engine/Source/Graphics/GraphicsUtils.cpp:123-134`). `HexShield.vert:90-95` intersects the eye line with `fBaseHeight`. No depositor weighs the light's height.
 - Each frame then runs `gSpreadPassCount` spread passes, combine, temporal, and history copy (`CommandBufferRecordMain.cpp:108-209`). `Model.frag`, `Terrain.frag`, and `Water.frag` read the combine targets once through `ReadLighting` (`Engine/Data/Shaders/ShaderFunctions.h:114-119`), whatever the fragment's height. `AddSmoke` lights every smoke plane from that same sample (`ShaderFunctions.h:262`).
-- Every current light flies on the lowest plane. Spaceships and omnis hold `Lowest()` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.cpp:245`, `Omnis/Omnis.cpp:462`), and a flying missile's z velocity is zeroed (`Missiles/MissilesUpdate.cpp:194`). The planes are 6, 50, and 100 m (`Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h`). Only harness-placed lights reach the upper planes.
+- Every current light flies on the lowest plane. Spaceships and omnis hold `Lowest()` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.cpp:245`, `Omnis/Omnis.cpp:462`), and a flying missile's z velocity is zeroed (`Missiles/MissilesUpdate.cpp:194`). The planes are 15, 40, and 65 m (`Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h`). Only harness-placed lights reach the upper planes.
 
 ## How smoke renders per flight plane
 
@@ -30,7 +30,7 @@ Assigning lights to planes. Each depositor projects with `ProjectToFlightPlane(.
 
 What multiplies:
 - (a) Per-plane deposit and spread with one combine. The deposit targets and the spread chain triple, and combine sums the three planes. Each plane can have its own spread settings, such as a wider and dimmer spread higher up. Consumers are unchanged. A high light lights the surface differently, but receivers do not see height.
-- (b) A full stack per plane: deposit, spread, combine, temporal, history, and the ambient target all triple. Consumers sample every plane and weight it by the fragment's height, as `SmokeShadowFaded` does, and `AddSmoke` can light each smoke plane from its own lighting plane. Receivers see height: an object at 100 m is lit by 100 m lights. This option costs the most memory and the most consumer work, with three times the lighting samples in `Model.frag`, `Terrain.frag`, and `Water.frag`.
+- (b) A full stack per plane: deposit, spread, combine, temporal, history, and the ambient target all triple. Consumers sample every plane and weight it by the fragment's height, as `SmokeShadowFaded` does, and `AddSmoke` can light each smoke plane from its own lighting plane. Receivers see height: an object at 65 m is lit by 65 m lights. This option costs the most memory and the most consumer work, with three times the lighting samples in `Model.frag`, `Terrain.frag`, and `Water.frag`.
 
 Interleaving:
 - (i) None: every plane refreshes every frame. This is the upper bound on cost.
@@ -42,11 +42,11 @@ Interleaving:
 Performance:
 - Read the GPU timer rows `kGpuTimerLightingDeposit`, `kGpuTimerLightingSpread`, `kGpuTimerLightingCombine`, `kGpuTimerLightingTemporal`, and the consumers `kGpuTimerObjects`, `kGpuTimerTerrain`, and `kGpuTimerWater` (`Engine/Source/Profile/ProfileManager.h:158-192`) through `query_profile`.
 - The `query_profile` caveat (`.agents/skills/agent-harness/references/command-reference.md` `## Durable caveats`) requires both sides in one process lifetime. The experiment build therefore needs a runtime toggle between today's single-plane path and the per-plane path, plus a stagger toggle like `gSmokeLayerStagger`, with cohorts alternated.
-- Test two scenes: today's battle content, where every light is on plane 0 and the extra planes are pure overhead, and harness-placed lights spread across 6, 50, and 100 m. Measure each zoomed in and fully zoomed out.
+- Test two scenes: today's battle content, where every light is on plane 0 and the extra planes are pure overhead, and harness-placed lights spread across 15, 40, and 65 m. Measure each zoomed in and fully zoomed out.
 - Also record the memory the extra targets add.
 
 Quality, judged from screenshots of the same saved scene with the toggle flipped:
-- Does a high light read as higher on water and terrain, by footprint and brightness, than a 6 m light?
+- Does a high light read as higher on water and terrain, by footprint and brightness, than a 15 m light?
 - Under (b), are objects on the upper planes lit by their own plane's lights and not by lights far below?
 - Under staggering, do fast lights such as blasters and explosions lag or step, and do seams appear while the camera pans or zooms?
 - Does smoke lighting still look right?

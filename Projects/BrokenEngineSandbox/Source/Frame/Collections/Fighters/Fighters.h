@@ -7,6 +7,7 @@
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
+#include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
@@ -26,21 +27,20 @@ inline constexpr std::chrono::duration<float> kFighterDestroyExplosionInterval =
 
 inline constexpr float kfFighterRadius = 1.5f;
 
-inline constexpr float kfFighterAcceleration = 8.0f;
+inline constexpr float kfFighterAcceleration = 12.0f;
 inline constexpr float kfFighterDrag = 0.25f;
-inline constexpr float kfFighterMaxSpeed = 30.0f;
-inline constexpr float kfFighterMaxTurnRate = 4.0f;
+inline constexpr float kfFighterMaxSpeed = 45.0f;
+inline constexpr float kfFighterMaxTurnRate = 8.0f;
 
 inline constexpr float kfFighterClimbRate = 25.0f;
 inline constexpr int64_t kiFighterHighestFlightPlane = 2;
-static_assert(kiFighterHighestFlightPlane < std::ssize(kFlightPlanes));
+static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
 inline constexpr float kfFighterClimbTilt = 0.35f;
 
 inline constexpr float kfFighterSteeringSmoothing = 0.064f;
 inline constexpr float kfFighterSteeringDecay = 6.0f;
-inline constexpr float kfFighterChaseTurnRate = 32.0f;
-inline constexpr float kfFighterFleeTurnRate = 32.0f;
+inline constexpr float kfFighterChaseTurnRate = 64.0f;
 
 inline constexpr HeadingMovementConstants kFighterMovement
 {
@@ -57,9 +57,12 @@ inline constexpr float kfFighterPusherIntensity = 36.0f;
 inline constexpr float kfFighterPusherPower = 3.0f;
 inline constexpr float kfFighterMaxPusherPushVelocity = kfFighterMaxSpeed * 0.5f;
 
+inline constexpr std::chrono::duration<float> kFighterBeamCooldown = std::chrono::duration<float>(1.0f);
+inline constexpr float kfFighterBeamRange = 100.0f;
+
 struct FightersInterpolate : public engine::Collection<FightersInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 7;
+	static constexpr int64_t kiVersion = 8;
 
 	static void Register();
 
@@ -112,6 +115,10 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	// Render-only nose pitch from this tick's climb.
 	float* __restrict pfClimbTilts = nullptr;
+	// The beam line, held from the fire tick until PostRender Update releases it once the fade ends.
+	engine::area_lights_t* __restrict pBeamAreaLights = nullptr;
+	// The target position at fire time, where the beam line ends.
+	XMVECTOR* __restrict pVecBeamEnds = nullptr;
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
@@ -120,7 +127,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pAnimationTimes, rSelf.pWindTrails, rSelf.pfClimbTilts);
+		return std::tie(rSelf.pAnimationTimes, rSelf.pWindTrails, rSelf.pfClimbTilts, rSelf.pBeamAreaLights, rSelf.pVecBeamEnds);
 	}
 #endif
 	auto Members(this auto&& rSelf)
@@ -134,7 +141,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pPushers, rSelf.pRegistryIds, rSelf.pWindTrails);
+		return std::tie(rSelf.pPushers, rSelf.pRegistryIds, rSelf.pWindTrails, rSelf.pBeamAreaLights, rSelf.pVecBeamEnds);
 #else
 		return std::tie(rSelf.pPushers, rSelf.pRegistryIds);
 #endif
@@ -142,7 +149,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	auto OwnedHandles(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pPushers, rSelf.pWindTrails);
+		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pBeamAreaLights);
 #else
 		return std::tie(rSelf.pPushers);
 #endif
@@ -162,11 +169,11 @@ using fighter_t = engine::Id<FightersInterpolate>;
 
 struct FightersPostRender : public engine::Collection<FightersPostRender>
 {
-	static constexpr int64_t kiVersion = 9;
+	static constexpr int64_t kiVersion = 11;
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, the client echoes the navigation delay back in its update-owned-entity request, and
-	// no controller writes a target flight plane the type disallows.
+	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, and no controller writes
+	// a target flight plane the type disallows.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -198,8 +205,8 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
-	// A Battleship beam hit from vecShooterPosition, applied during PostCollision.
-	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition);
+	// A beam hit of fDamage from vecShooterPosition, applied during PostCollision.
+	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage);
 
 	fighter_t* __restrict pIds = nullptr;
 	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
@@ -210,7 +217,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	XMVECTOR* __restrict pVecDamageDirections = nullptr;
 	float* __restrict pfHealths = nullptr;
 	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
-	std::chrono::duration<float>* __restrict pNextBlasterSpawnTimes = nullptr;
+	std::chrono::duration<float>* __restrict pNextBeamFireTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
 	engine::GlobalId* __restrict pGlobalIds = nullptr;
@@ -222,13 +229,17 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	std::chrono::duration<float>* __restrict pCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecAiDirections = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
+	// The enemy position a Veer-off flies away from, read only while ShipFlags::kVeerOff is set.
+	XMVECTOR* __restrict pVecVeerOffPoints = nullptr;
+	// The fleet attack target's registry id, zero for none.
+	engine::registry_id_t* __restrict pRegistryTargets = nullptr;
 #if defined(BT_CLIENT)
 	XMVECTOR* __restrict pVecDebugNavigationWaypoints = nullptr;
 #endif // BT_CLIENT
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -252,7 +263,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	// CRC-only subset: excludes pGlobalIds and pClientGuids, which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
 	}
 
 	bool LogDifferences(const FightersPostRender& rOther) const;
@@ -267,7 +278,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		ShipController eController {};
 		ShipOrders_t orders {};
 		float fHealth = 0.0f;
-		std::chrono::duration<float> nextBlasterSpawnTime = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> nextBeamFireTime = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
 		float fDeltaRotation = 0.0f;
 		std::chrono::duration<float> navigationDelay = std::chrono::duration<float>(60.0f);
@@ -283,7 +294,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBlasterSpawnTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBeamFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

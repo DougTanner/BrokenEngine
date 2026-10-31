@@ -225,7 +225,6 @@ public:
 	GameFlags_t mGameFlags;
 	UiState meUiState = UiState::kPause;
 	char mpcModalMessage[256] = {};
-	bool mbShowImGui = false;
 #if defined(BT_CLIENT)
 	// Stored here rather than in ChatScreen so an ImGuiManager recreation keeps the history and an open input box.
 	ChatLog mChatLog;

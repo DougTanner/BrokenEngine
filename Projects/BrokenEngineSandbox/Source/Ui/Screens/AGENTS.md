@@ -27,7 +27,7 @@ runtime contracts of the screens that remain here.
   current delay instead of sending, because the server treats such a delay as
   corrupt data.
 - The three HUD-specific layout fractions and the HUD's own composition stay game-local, named.
-- Game Tweaks content is a developer tool gated twice: the engine Tweaks screen compiles its body in only under the `kbDebugInput` switch, and the engine's `UiScreens.cpp` draws it only while the runtime ImGui toggle is on. It is not a player-facing screen.
+- Game Tweaks content is a developer tool, not a player-facing screen: the engine Tweaks screen compiles its body in only under the `kbDebugInput` switch, and the engine `ImGuiManager` owns its runtime draw gate (`../../../../../Engine/Source/Graphics/Managers/AGENTS.md` `### ImGuiManager`).
 
 ## Ownership
 

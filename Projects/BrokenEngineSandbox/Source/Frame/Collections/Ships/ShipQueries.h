@@ -101,8 +101,8 @@ struct RegistryWindow
 // Builds one context per flight plane. Each binds the three ship types as source layers in ForEachShipType order and
 // the missile handles as the subscription layer. A row is eligible while it publishes a registry id and its arrival
 // grace has run out, and it joins only the context of the flight plane nearest its current Interpolate position, so a
-// ship climbing between planes joins its nearest plane's. With pPreviousFrame, its arrival grace decides eligibility and
-// its positions are bound as previous positions; without, the current grace decides and no previous positions are bound.
-[[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPreviousFrame, const MissilesPostRender& rSubscribers);
+// ship climbing between planes joins its nearest plane's. The previous frame's arrival grace decides eligibility and its
+// positions are bound as previous positions.
+[[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame, const MissilesPostRender& rSubscribers);
 
 } // namespace game

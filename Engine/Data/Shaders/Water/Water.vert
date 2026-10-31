@@ -43,7 +43,7 @@ void main()
 
 	// Over land: skip the displacement sample — the Z scale below would collapse to 0 anyway. Emit a
 	// flat vertex at world-Z=0 with up-normal; the fragment shader handles all elevations directly.
-	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x - globalLayout.fWaterHeight;
+	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x;
 	if (fTerrainElevation >= 0.0f)
 	{
 		f3OutPosition = vec3(f2WorldPosition, 0.0f);
@@ -68,7 +68,6 @@ void main()
 	f3OutNormal = f3WaveNormal; // pre-blended toward (0,0,1) in compute via fWaterWaveNormalBlend
 
 	f3OutPosition.xy += vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
-	f3OutPosition.z += globalLayout.fWaterHeight;
 
 	f2OutTexcoord = WorldToVisibleArea(f3OutPosition, globalLayout.f4VisibleArea);
 

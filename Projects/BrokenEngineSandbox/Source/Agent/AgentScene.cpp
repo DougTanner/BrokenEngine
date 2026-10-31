@@ -46,13 +46,13 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	{
 		names.push_back("kIsFlagship");
 	}
-	if (orders & ShipOrders::kUseMissiles)
+	if (flags & ShipFlags::kVeerOff)
 	{
-		names.push_back("kUseMissiles");
+		names.push_back("kVeerOff");
 	}
-	if (orders & ShipOrders::kPendingUseMissiles)
+	if (flags & ShipFlags::kHealing)
 	{
-		names.push_back("kPendingUseMissiles");
+		names.push_back("kHealing");
 	}
 	if (flags & ShipFlags::kFireBlaster)
 	{
@@ -61,14 +61,6 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	if (flags & ShipFlags::kBlasterSpawnLeft)
 	{
 		names.push_back("kBlasterSpawnLeft");
-	}
-	if (flags & ShipFlags::kFireMissile)
-	{
-		names.push_back("kFireMissile");
-	}
-	if (flags & ShipFlags::kMissileSpawnLeft)
-	{
-		names.push_back("kMissileSpawnLeft");
 	}
 	if (flags & ShipFlags::kFlee)
 	{

@@ -221,7 +221,6 @@ extern Wrapper gVisibleAreaExtraTop;
 extern Wrapper gVisibleAreaExtraBottom;
 extern Wrapper gTerrainElevationTextureMultiplier;
 
-extern Wrapper gSmokeTrailPower;
 extern Wrapper gSmokeTrailAlpha;
 
 

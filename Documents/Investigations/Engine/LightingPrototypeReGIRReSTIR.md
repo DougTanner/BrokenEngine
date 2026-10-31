@@ -75,17 +75,17 @@ Preserve cell-local positions; convert to the camera cell only at publication/us
 ## Comparison fixture
 
 Use a client-only fixture centered at camera-cell XY (0,0): a 512 m square neutral diffuse receiving
-surface, test receivers at Z=6/50/100 m, a vertical wall, a thin wall, an overhang, and a colored
+surface, test receivers at Z=15/40/65 m, a vertical wall, a thin wall, an overhang, and a colored
 bounce wall. Fix Lambertian albedo to 0.5 (bounce wall RGB 0.8/0.1/0.1), existing specular
 parameters, and seed 0x51A7. Generate one ordered 1000-light set using the existing fixed-seed RNG;
 take its first 100/300/1000 entries, with every fifth light a 4 m square area emitter. Distribute XY
-uniformly over the square and Z cyclically at 6/50/100 m; give all sources the same recorded linear
+uniformly over the square and Z cyclically at 15/40/65 m; give all sources the same recorded linear
 power and 150 m range. Freeze the full generated geometry, lights, and camera/event manifest before
 collecting results and reuse its exact bytes across candidates.
 
-Capture a close camera at (0,-600,900) looking at (0,0,6), and a wide camera at (0,-4000,6000) with
+Capture a close camera at (0,-600,900) looking at (0,0,15), and a wide camera at (0,-4000,6000) with
 the same look-at. Include isolated source/receiver pairs at the three heights. Over a fixed
-120-frame sequence, move one source from Z=6 to 100 m, move one receiver through those heights, and
+120-frame sequence, move one source from Z=15 to 65 m, move one receiver through those heights, and
 move one opaque occluder between that pair; repeat a fixed pan/zoom path and a camera-cell boundary
 crossing. Record scene-relative positions via the normal cell conversion. Keep the fixture identical
 for direct comparisons; indirect candidates additionally use the same colored-wall bounce
@@ -98,7 +98,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 | Criterion | Required observation/evidence |
 | --- | --- |
 | Reproducible comparison | Manifest records baseline/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
-| Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
+| Height and direction | Same-XY lights at 15/40/65 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
 | Technique quality | ReGIR/ReSTIR: record noise and bias against the exhaustive direct reference, candidate support, moving/removed lights, sample identity validity, disocclusion, temporal ghosting, and spatial light leaks. Test a tiny bright source among 1000 lights and a high light passing behind an occluder; reservoir reuse must not flatten XYZ or normals. |

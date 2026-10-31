@@ -14,6 +14,7 @@ const TweaksSliderMapRegistrar gMiscellaneousRegistrar
 {
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
 	{"Vertical Field of View", &gFieldOfView},
+	{"Camera Tilt", &gCameraTilt},
 };
 
 void RenderMiscellaneousSection(TweaksScreen& rScreen)
@@ -27,6 +28,7 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 	ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
 	rScreen.WrapperSlider("Vertical Field of View", iSection);
 	ImGui::EndDisabled();
+	rScreen.WrapperSlider("Camera Tilt", iSection);
 }
 
 } // namespace engine

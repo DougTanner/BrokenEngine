@@ -106,11 +106,6 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	if (rEvent.eState == engine::OwnedEntityState::kDied)
 	{
 		gpGame->RemoveClientOwnedEntity(rEvent.globalId);
-		// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
-		if (rEvent.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
-		{
-			gpGame->mWeaponModeToggle.Reset();
-		}
 		mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kDied));
 		return;
 	}
@@ -199,18 +194,9 @@ void ClientSession::OnServerLoad()
 	gpGame->SetClientGridCoordinate({});
 	gpGame->mfPreviousClientArmor = 0.0f;
 	engine::gpCamera->mVecVisualErrorOffset = {};
-	gpGame->mWeaponModeToggle.Reset();
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();
-}
-
-void ClientSession::SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay)
-{
-	mpRuntime->SendGameRequest(GamePacketType::kClientUpdateOwnedEntityRequest, [&]
-	{
-		LOG(kNetwork, kVerbose, "ClientSession::SendUpdateOwnedEntityRequest GlobalId: {} Missiles: {} NavDelay: {}", iGlobalId, bUseMissiles, common::Wb(fNavigationDelay, 3));
-	}, iGlobalId, static_cast<uint8_t>(bUseMissiles ? 1 : 0), fNavigationDelay);
 }
 
 void ClientSession::SendCreateFleetRequest()

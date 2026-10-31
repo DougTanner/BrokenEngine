@@ -6,6 +6,7 @@
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
+#include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/HexShields/HexShields.h"
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
@@ -25,10 +26,20 @@ namespace game
 // Shared constants (used across Omnis*.cpp files)
 inline constexpr std::chrono::duration<float> kDestroyTime = std::chrono::duration<float>(0.7f);
 inline constexpr std::chrono::duration<float> kDestroyExplosionInterval = std::chrono::duration<float>(0.005f);
-inline constexpr float kfOmniBlastersSpeed = 150.0f;
-inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.1f);
+inline constexpr float kfOmniBlastersSpeed = 225.0f;
+inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.2f);
 inline constexpr float kfBlasterTargetRange = 120.0f;
-inline constexpr float kfMissileTargetRange = 160.0f;
+
+// A healing fleet Omni regains armor only within the arrival distance of its escort slot, in x/y.
+inline constexpr float kfOmniHealRate = 5.0f;
+inline constexpr float kfOmniEscortArrivalDistance = 10.0f;
+// Escort steering is a damped arrival toward the slot: the wanted velocity is the slot offset times the gain, and the
+// velocity error over the scale saturates at full acceleration. Settles near critical damping across the jitter range.
+inline constexpr float kfOmniEscortPositionGain = 3.0f;
+inline constexpr float kfOmniEscortVelocityScale = 7.5f;
+// The heal beam's intensity pulses between the minimum and 1 at this frequency in hertz.
+inline constexpr float kfOmniHealBeamPulseFrequency = 1.5f;
+inline constexpr float kfOmniHealBeamPulseMinimum = 0.35f;
 
 inline constexpr float kfOmniRadius = 1.1f;
 
@@ -74,7 +85,7 @@ struct HexShieldIntensities
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 16;
+	static constexpr int64_t kiVersion = 17;
 
 	static void Register();
 
@@ -86,6 +97,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	static inline int64_t siImpactPuffControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siImpactPointLightControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siHexShieldTypeIndex = 0xFF;
+	static inline int64_t siHealBeamAreaLightTypeIndex = 0xFF;
 
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
@@ -127,6 +139,8 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	float* __restrict pfRotationAccelerationYs = nullptr;
 	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 	engine::hex_shields_t* __restrict pHexShields = nullptr;
+	// Held only while the row heals at its escort slot; PostRender Update adds and releases it.
+	engine::area_lights_t* __restrict pHealBeamAreaLights = nullptr;
 	float* __restrict pfShieldRotations = nullptr;
 	float* __restrict pfShieldShrinks = nullptr;
 	HexShieldDirections* __restrict pHexShieldDirections = nullptr;
@@ -141,7 +155,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pfShieldRotations, rSelf.pfShieldShrinks, rSelf.pHexShieldDirections, rSelf.pHexShieldVertexIntensities, rSelf.pHexShieldFragmentIntensities);
+		return std::tie(rSelf.pfRotationAccelerationXs, rSelf.pfRotationAccelerationYs, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pHealBeamAreaLights, rSelf.pfShieldRotations, rSelf.pfShieldShrinks, rSelf.pHexShieldDirections, rSelf.pHexShieldVertexIntensities, rSelf.pHexShieldFragmentIntensities);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
@@ -155,7 +169,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pPushers, rSelf.pRegistryIds, rSelf.pWindTrails, rSelf.pHexShields);
+		return std::tie(rSelf.pPushers, rSelf.pRegistryIds, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pHealBeamAreaLights);
 #else
 		return std::tie(rSelf.pPushers, rSelf.pRegistryIds);
 #endif
@@ -169,7 +183,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	auto OwnedHandles(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pHexShields);
+		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pHexShields, rSelf.pHealBeamAreaLights);
 #else
 		return std::tie(rSelf.pPushers);
 #endif
@@ -187,7 +201,7 @@ using omni_t = engine::Id<OmnisInterpolate>;
 
 struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 {
-	static constexpr int64_t kiVersion = 22;
+	static constexpr int64_t kiVersion = 24;
 
 	// Collision layer (set each frame in PreCollision)
 	// thread_local: parallel per-Frame tick via Dispatch
@@ -202,8 +216,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	}
 
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
-	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-owned-entity request, an
-	// unknown controller, which selects no script, and a target flight plane the type disallows, which no controller writes.
+	// Reject an out-of-range navigation delay too, which no navigation-delay admission accepts, an unknown controller, which
+	// selects no script, and a target flight plane the type disallows, which no controller writes.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -240,8 +254,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
-	// A Battleship beam hit from vecShooterPosition, applied during PostCollision. Defined in OmnisCombat.cpp.
-	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition);
+	// A beam hit of fDamage from vecShooterPosition, applied during PostCollision. Defined in OmnisCombat.cpp.
+	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage);
 
 private:
 	// Defined in OmnisCombat.cpp:
@@ -249,7 +263,6 @@ private:
 
 	// Weapon and death-explosion spawn helpers (called from OmnisPostRender::Spawn). Defined in OmnisCombat.cpp.
 	static void SpawnBlasters(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
-	static void SpawnMissiles(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
 	static void SpawnDeathExplosions(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
 
 public:
@@ -261,7 +274,6 @@ public:
 	ShipFlags_t* __restrict pFlags = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pNextBlasterFireTimes = nullptr;
-	std::chrono::duration<float>* __restrict pNextSecondarySpawnTimes = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecWantedDirections = nullptr;
 	float* __restrict pfArmors = nullptr;
@@ -274,20 +286,22 @@ public:
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
 	std::chrono::duration<float>* __restrict pCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
+	XMVECTOR* __restrict pVecVeerOffPoints = nullptr;
+	// The fleet attack target's registry id, zero for none.
+	engine::registry_id_t* __restrict pRegistryTargets = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalIds = nullptr;
 	engine::GlobalId* __restrict pFlagshipGlobalIds = nullptr;
 	std::chrono::duration<float>* __restrict pNavigationDelays = nullptr;
 	engine::GridCoord* __restrict pFleetWantedCoordinates = nullptr;
 	uint8_t* __restrict puiPendingFleetWantedCoordinateTicks = nullptr;
-	uint8_t* __restrict puiPendingWeaponModeTicks = nullptr;
 #if defined(BT_CLIENT)
 	XMVECTOR* __restrict pVecDebugNavigationWaypoints = nullptr;
 #endif // BT_CLIENT
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -311,7 +325,7 @@ public:
 	// CRC-only subset: excludes pClientGuids and pGlobalIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks);
 	}
 
 	bool LogDifferences(const OmnisPostRender& rOther) const;
@@ -327,7 +341,6 @@ public:
 		float fArmor = 0.0f;
 		float fShield = 0.0f;
 		std::chrono::duration<float> nextBlasterFireTime = std::chrono::duration<float>::zero();
-		std::chrono::duration<float> nextSecondarySpawnTime = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> shieldCooldown = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> shieldDownSoundCooldown = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> animationTime = std::chrono::duration<float>::zero();
@@ -342,7 +355,6 @@ public:
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-		uint8_t uiPendingWeaponModeTicks = 0;
 		uint8_t uiFlightPlane = kuiNoFlightPlane;
 		// Transfers preserve supplied combat fields and animation time; navigation resets at spawn, and shield rotation and shrink use defaults.
 		bool bTransfer = false;
@@ -351,7 +363,7 @@ public:
 		// so none of them is listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

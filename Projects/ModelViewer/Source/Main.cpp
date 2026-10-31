@@ -1,6 +1,7 @@
 #include "File/PackChunks.h"
 #include "Graphics/Screenshot.h"
 #include "Memory/GlobalAllocator.h"
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "CrashReport.h"
@@ -51,16 +52,24 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 				gpModelViewerApplication->ToggleFlight();
 				return 0;
 			}
+			if constexpr (kbDebugInput)
+			{
+				if (uiWordParameter == VK_F3 && (iLongParameter & (1i64 << 30)) == 0 && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantCaptureKeyboard))
+				{
+					engine::gbShowImGui = !engine::gbShowImGui;
+					return 0;
+				}
+			}
 			if (uiWordParameter == VK_F4 && (GetKeyState(VK_SHIFT) & 0x8000) == 0 && (GetKeyState(VK_CONTROL) & 0x8000) == 0 && (GetKeyState(VK_MENU) & 0x8000) == 0 && (GetKeyState(VK_LWIN) & 0x8000) == 0 && (GetKeyState(VK_RWIN) & 0x8000) == 0)
 			{
 				sbQuit = true;
 				return 0;
 			}
-			if (uiWordParameter == 'Q')
+			if (uiWordParameter == 'Q' && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantCaptureKeyboard))
 			{
 				sbComparisonHeld = true;
 			}
-			if ((uiWordParameter == 'W' || uiWordParameter == 'E' || uiWordParameter == 'R' || uiWordParameter == VK_BACK) && (iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr)
+			if ((uiWordParameter == 'W' || uiWordParameter == 'E' || uiWordParameter == 'R' || uiWordParameter == VK_BACK) && (iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantCaptureKeyboard))
 			{
 				gpModelViewerApplication->UpdateDefaultComparison(sbComparisonHeld);
 				if (uiWordParameter == VK_BACK)
@@ -218,6 +227,8 @@ int RunModelViewer(HINSTANCE hinstance)
 		DestroyWindow(hwnd);
 	});
 	auto pApplication = std::make_unique<ModelViewerApplication>();
+	// Register before the Graphics constructor builds ImGuiManager, which creates the Tweaks screen and loads its settings.
+	engine::RegisterEngineTweakSections();
 	auto pGraphics = std::make_unique<engine::Graphics>(hinstance, hwnd);
 	auto pCamera = std::make_unique<Camera>();
 	engine::gpTextureManager->WaitForTextures(engine::TextureManager::kPriorityTextures);

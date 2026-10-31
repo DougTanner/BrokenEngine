@@ -56,7 +56,9 @@ Every game-project scenario requests the `Debug` build. Request `Profile` or
 behavior; such a scenario cannot use anything a command reference limits to
 Debug or to `kbDebugInput` builds, or run a replay determinism check
 ([`replay.md`](references/replay.md)). The brief may state a
-wall-clock budget for the run; otherwise a 20-minute default applies.
+wall-clock budget for the run; otherwise a 10-minute default applies. A longer
+run follows [`change-workflow.md`](../../references/change-workflow.md)
+`### User Interaction` Long test runs.
 
 ## Handoff
 

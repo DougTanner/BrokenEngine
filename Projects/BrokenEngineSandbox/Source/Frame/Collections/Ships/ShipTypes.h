@@ -49,14 +49,11 @@ constexpr const char* ShipControllerName(ShipController eController)
 	return "Unknown";
 }
 
-// Set by controllers (the fleet path through the spawn and kUpdateShip, and the random-wave spawn); kUpdateShip also
-// writes the target flight plane. CountdownPendingOrders also applies kPendingUseMissiles to kUseMissiles when the
-// weapon-mode countdown ends.
+// Set by controllers (the fleet path through the spawn and kUpdateShip, and the random-wave spawn); kUpdateShip and the
+// Fighters and Omnis PostRender Update tactics also write the target flight plane.
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
-	kUseMissiles        = 0x0002,
-	kPendingUseMissiles = 0x0004,
 
 	// Target flight plane index in bits 8-15 (0 = lowest)
 };
@@ -77,10 +74,11 @@ inline void SetTargetFlightPlane(ShipOrders_t& rOrders, int64_t iFlightPlane)
 // Ship-internal state written by the ship's own phases.
 enum class ShipFlags : uint16_t
 {
+	kVeerOff              = 0x0001,
+	// A fleet Omni at zero armor: it holds no fire and escorts until healed back to full armor.
+	kHealing              = 0x0002,
 	kFireBlaster          = 0x0004,
 	kBlasterSpawnLeft     = 0x0008,
-	kFireMissile          = 0x0010,
-	kMissileSpawnLeft     = 0x0020,
 	kFlee                 = 0x0040,
 	kReturnToIslandCenter = 0x0080,
 

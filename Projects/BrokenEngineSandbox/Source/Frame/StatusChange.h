@@ -105,14 +105,12 @@ struct UpdateShipData
 {
 	ShipType eType {};
 	int64_t iUuid = 0;
-	bool bUseMissiles = false;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
-	uint8_t uiPendingWeaponModeTicks = 0;
 	uint8_t uiTargetFlightPlane = kuiKeepTargetFlightPlane;
 
 	static constexpr auto Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, bUseMissiles), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiPendingWeaponModeTicks), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> {};
 	}
 };
 

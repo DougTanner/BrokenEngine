@@ -6,7 +6,6 @@
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
-#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -43,16 +42,6 @@ static float AdmitNavigationDelay(float fDelay)
 	return fDelay;
 }
 
-static bool ReadBooleanByte(const uint8_t*& pCursor)
-{
-	int64_t iValue = engine::ReadUint8(pCursor);
-	if (iValue > 1)
-	{
-		engine::NetworkMessages::ThrowCorruptStream("ServerSession Boolean byte");
-	}
-	return iValue != 0;
-}
-
 static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
 {
 	uint8_t uiValue = engine::ReadUint8(pCursor);
@@ -65,8 +54,8 @@ static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
 
 // The engine drain admits each packet through its contract row first. Every client-sendable game contract row has
 // min == max (GamePacketType.h), so admission settles each payload's size exactly and the cases below add no per-case
-// size check; only residual value checks a row cannot express — navigation-delay range, Boolean bytes, and ship type
-// bytes — stay, and they throw to drop the packet.
+// size check; only residual value checks a row cannot express — navigation-delay range and ship type bytes — stay, and
+// they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
 	// Playback takes every simulation change from the recording. This is a timing refusal, not corruption, so it records
@@ -79,17 +68,6 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 
 	switch (static_cast<GamePacketType>(rPacket.iPacketType))
 	{
-		case GamePacketType::kClientUpdateOwnedEntityRequest:
-		{
-			// 8B global ID + 1B bUseMissiles + 4B fNavigationDelay = 13 bytes (type byte already stripped)
-			const uint8_t* pCursor = rPacket.payload.data();
-			engine::GlobalId globalId {};
-			globalId.iValue = engine::ReadInt64(pCursor);
-			bool bUseMissiles = ReadBooleanByte(pCursor);
-			float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
-			mPendingUpdateOwnedEntityRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
-			break;
-		}
 		case GamePacketType::kClientCreateFleetRequest:
 		{
 			mpFleetManager->mPendingCreateFleetRequests.push_back({.iClientId = rPacket.iClientId});
@@ -128,15 +106,9 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 	}
 }
 
+// Empty: fleet request queues drain inside their own Process*Requests, so no queue expires unprocessed.
 void ServerSession::BeforeNetworkPoll()
 {
-	// mfLastDeltaTime still describes the previous update here. A zero-delta update could not consume
-	// injected owned-entity requests, so retain them; a positive delta keeps their existing one-update lifetime.
-	if (gpGame->mfLastDeltaTime > 0.0f)
-	{
-		mPendingUpdateOwnedEntityRequests.clear();
-	}
-	// Fleet request queues drain inside their own Process*Requests, so there is nothing left to clear here.
 }
 
 void ServerSession::AfterNetworkPoll()
@@ -154,10 +126,9 @@ void ServerSession::FinalizeTickClients()
 	PublishServerEntityCounts();
 }
 
+// Empty: no queued client request becomes a once-per-update StatusChange.
 void ServerSession::BuildAdvancingFrameInputs()
 {
-	// Inject weapon mode toggle StatusChanges
-	ProcessUpdateOwnedEntityRequests();
 }
 
 void ServerSession::TickGameTimers(bool bRecording)
@@ -175,57 +146,6 @@ void ServerSession::TickGameTimers(bool bRecording)
 	if (bOutsideChange)
 	{
 		rReplayLog.recordedRecords.push_back({.iTick = gpGame->miTickCounter, .bytes = ReplayFleetRecordBytes()});
-	}
-}
-
-void ServerSession::ProcessUpdateOwnedEntityRequests()
-{
-	// Heap: pending owned-entity update requests may grow frame status changes
-	ScopedSuppressAllocationTracking suppress;
-
-	for (const PendingUpdateOwnedEntityRequest& rRequest : mPendingUpdateOwnedEntityRequests)
-	{
-		engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-		auto ownedIt = mClientOwnedEntities.mOwned.find(pClient->iClientId);
-		std::span<const engine::OwnedEntity> ownedEntities = ownedIt != mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-
-		engine::GridCoord updateCoord {};
-		bool bFound = false;
-		for (const engine::OwnedEntity& rOwnedEntity : ownedEntities)
-		{
-			if (rOwnedEntity.globalId == rRequest.globalId)
-			{
-				updateCoord = rOwnedEntity.coord;
-				bFound = true;
-				break;
-			}
-		}
-		if (!bFound)
-		{
-			continue;
-		}
-
-		auto it = game::gpGame->mFrameInputs.find(updateCoord);
-		if (it == game::gpGame->mFrameInputs.end())
-		{
-			continue;
-		}
-
-		ShipUuid shipUuid = ShipUuidByGlobalId(*game::gpGame->mCells.at(updateCoord).pCurrent, rRequest.globalId);
-		if (shipUuid.iUuid == 0)
-		{
-			continue;
-		}
-
-		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdateShip, .data = game::UpdateShipData {.eType = shipUuid.eType, .iUuid = shipUuid.iUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
-		it->second.statusChanges.push_back(updateChange);
-
-		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} Type: {} Uuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, ShipTypeName(shipUuid.eType), shipUuid.iUuid, updateCoord.iQ, updateCoord.iR, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
 	}
 }
 
@@ -250,7 +170,6 @@ void ServerSession::OnResetForLoad()
 	}
 
 	mpClientManager->ResetState();
-	mPendingUpdateOwnedEntityRequests.clear();
 	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
 }

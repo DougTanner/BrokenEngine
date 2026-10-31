@@ -1,6 +1,6 @@
 # Ship Forces in Three Dimensions
 
-Ships now move in Z between three flight planes (6, 50, and 100 m, `Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h:9-11`), but the forces that push a ship still act only horizontally, and explosions push nothing.
+Ships now move in Z between three flight planes (15, 40, and 65 m, `Projects/BrokenEngineSandbox/Source/Frame/FlightPlaneTable.h:9-11`), but the forces that push a ship still act only horizontally, and explosions push nothing.
 The user asked for these forces to act in true 3D.
 Two choices are still open: whether a pushed ship drifts back to its plane height, and whether explosions push ships at all. The user has already decided that an Omni pushed off its plane height does not launch missiles. This is an Investigation, not a Plan, until the user makes the two open choices.
 

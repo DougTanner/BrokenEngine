@@ -21,7 +21,6 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Missile Particle Vertical Velocity Spread", &gMissileExplosionParticleVerticalVelocitySpread},
 	{"Missile Particle Velocity Decay", &gMissileExplosionParticleVelocityDecay},
 	{"Missile Particle Gravity", &gMissileExplosionParticleGravity},
-	{"Missile Particle Visible Intensity", &gMissileExplosionParticleVisibleIntensity},
 	{"Missile Particle Intensity Spread", &gMissileExplosionParticleIntensitySpread},
 	{"Missile Particle Intensity Decay", &gMissileExplosionParticleIntensityDecay},
 	{"Missile Particle Intensity Power", &gMissileExplosionParticleIntensityPower},
@@ -49,7 +48,6 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Fighter Particle Vertical Velocity Spread", &gFighterExplosionParticleVerticalVelocitySpread},
 	{"Fighter Particle Velocity Decay", &gFighterExplosionParticleVelocityDecay},
 	{"Fighter Particle Gravity", &gFighterExplosionParticleGravity},
-	{"Fighter Particle Visible Intensity", &gFighterExplosionParticleVisibleIntensity},
 	{"Fighter Particle Intensity Spread", &gFighterExplosionParticleIntensitySpread},
 	{"Fighter Particle Intensity Decay", &gFighterExplosionParticleIntensityDecay},
 	{"Fighter Particle Intensity Power", &gFighterExplosionParticleIntensityPower},
@@ -78,7 +76,6 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Missile Particle Gravity");
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Missile Particle Visible Intensity");
 			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Missile Particle Intensity Spread");
 			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Missile Particle Intensity Decay");
 			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Missile Particle Intensity Power");
@@ -128,7 +125,6 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Fighter Particle Gravity");
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Fighter Particle Visible Intensity");
 			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Fighter Particle Intensity Spread");
 			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Fighter Particle Intensity Decay");
 			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Fighter Particle Intensity Power");

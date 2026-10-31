@@ -57,12 +57,6 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			const UpdateShipData& rUpdate = std::get<UpdateShipData>(rStatusChange.data);
 			bool bFound = VisitShipByUuid(rFrame, rUpdate.eType, rUpdate.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
-				// Weapon mode change is deferred via countdown ticks
-				rPostRender.pOrders[iIndex].Set(ShipOrders::kPendingUseMissiles, rUpdate.bUseMissiles);
-				if constexpr (requires { rPostRender.puiPendingWeaponModeTicks; })
-				{
-					rPostRender.puiPendingWeaponModeTicks[iIndex] = rUpdate.uiPendingWeaponModeTicks;
-				}
 				rPostRender.pNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds;
 				rPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
 				if (rUpdate.uiTargetFlightPlane != kuiKeepTargetFlightPlane)

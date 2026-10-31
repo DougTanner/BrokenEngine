@@ -55,6 +55,12 @@ authorized by that script's completion result and owes no Review and resolve
 correctness row, so it is recorded in the table with no review row of its own;
 the `Executable Plan check` row below still applies to that reviewed diff.
 
+A modified `Documents/Investigations/Engine/RefactorCandidates.md` owes no
+Review and resolve correctness row, so it is recorded in the table with no
+review row of its own. Rows the Change Workflow Verify and land step adds are
+authorized by that step; any other edit, such as a reviewing session's row
+removals, is authorized by that session's instruction.
+
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their
 independent signal. The change's tier sets the exploration ceiling, per

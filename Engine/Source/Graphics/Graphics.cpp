@@ -593,11 +593,10 @@ void Graphics::Refresh()
 	{
 		PollSetting<float>(gTerrainElevationTextureMultiplier, "TerrainElevationTexture multiplier", DestroyType::kPipelines, DestroyFlags::kTerrainElevation);
 
-		[[maybe_unused]] auto [fSmokeTrailPower, fSmokeTrailPowerPrevious, bSmokeTrailPowerChanged] = gSmokeTrailPower.Changed<float>();
 		[[maybe_unused]] auto [fSmokeTrailAlpha, fSmokeTrailAlphaPrevious, bSmokeTrailAlphaChanged] = gSmokeTrailAlpha.Changed<float>();
 		auto [fSmokeSimulationPixels, fPreviousSmokeSimulationPixels, bSmokeSimulationPixelsChanged] = gSmokeSimulationPixels.Changed<float>();
 		auto [fSmokeSimulationArea, fPreviousSmokeSimulationArea, bSmokeSimulationAreaChanged] = gSmokeSimulationArea.Changed<float>();
-		if (bSmokeTrailPowerChanged || bSmokeTrailAlphaChanged || bSmokeSimulationPixelsChanged || bSmokeSimulationAreaChanged) [[unlikely]]
+		if (bSmokeTrailAlphaChanged || bSmokeSimulationPixelsChanged || bSmokeSimulationAreaChanged) [[unlikely]]
 		{
 			LOG(kGraphics, kDebug, "SmokeSimulationPixels: {} -> {} ({} -> {})", common::Wb(fPreviousSmokeSimulationPixels, 3), common::Wb(fSmokeSimulationPixels, 3), common::Wb(gSmokeSimulationPixels.mfCurrent, 3), common::Wb(SmokeSimulationPixels(), 3));
 			LOG(kGraphics, kDebug, "SmokeSimulationArea: {} -> {}", common::Wb(fPreviousSmokeSimulationArea, 3), common::Wb(fSmokeSimulationArea, 3));

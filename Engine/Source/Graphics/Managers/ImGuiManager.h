@@ -106,6 +106,7 @@ private:
 };
 
 inline ImGuiManager* gpImGuiManager = nullptr;
+inline bool gbShowImGui = false;
 
 // Defined by the host program. ImGuiManager calls CreateUiScreens at the end of its constructor, RenderUiScreens between
 // ImGui::NewFrame and ImGui::Render, and DestroyUiScreens first in its destructor.

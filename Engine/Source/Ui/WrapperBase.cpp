@@ -10,7 +10,6 @@ Wrapper gVisibleAreaExtraTop(0.046f, 0.0f, 1.0f);
 Wrapper gVisibleAreaExtraBottom(0.16f, 0.0f, 1.0f);
 Wrapper gTerrainElevationTextureMultiplier(0.5f, 0.25f, 1.0f);
 
-Wrapper gSmokeTrailPower(1.0f, 0.1f, 10.0f);
 Wrapper gSmokeTrailAlpha(0.8f, 0.0f, 1.0f);
 
 

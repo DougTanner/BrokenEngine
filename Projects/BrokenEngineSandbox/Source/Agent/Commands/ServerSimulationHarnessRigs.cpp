@@ -351,8 +351,15 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			break;
 		}
 		case StatusChangeType::kSpawnBattleship:
-			SeatShipSpawnHeight(ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kBattleship);
+		{
+			BattleshipsPostRender::SpawnInfo& rData = ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			SeatShipSpawnHeight(rData, ShipType::kBattleship);
+			if (rData.uiNextMissileTube >= kiBattleshipMissileTubeSlots)
+			{
+				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(BattleshipsPostRender::SpawnInfo, uiNextMissileTube)::kName));
+			}
 			break;
+		}
 		case StatusChangeType::kSpawnBlaster:
 			ParseSpawnEntry<BlastersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
 			if (!IsAdoptableStatusChange(scheduled.change))
@@ -410,7 +417,6 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		case StatusChangeType::kUpdateShip:
 		{
 			UpdateShipData& rData = std::get<UpdateShipData>(scheduled.change.data);
-			rData.uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
 			RequireEntryKey<FRAME_COLUMN(UpdateShipData, eType)>(rEntry);
 			RequireEntryKey<FRAME_COLUMN(UpdateShipData, iUuid)>(rEntry);
 			ParseStatusChangeFields(rEntry, rData);

@@ -79,6 +79,10 @@ static nlohmann::json ExtractShips(const INTERPOLATE& rInterpolate, const POST_R
 		{
 			item["health"] = rPost.pfHealths[i];
 		}
+		if constexpr (requires { rPost.pRegistryTargets; })
+		{
+			item["registryTargetId"] = rPost.pRegistryTargets[i].uuid.iValue;
+		}
 		items.push_back(std::move(item));
 	}
 	return items;

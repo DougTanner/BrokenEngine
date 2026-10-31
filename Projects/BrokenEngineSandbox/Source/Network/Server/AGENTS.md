@@ -42,17 +42,10 @@ game state around the deterministic Frame tick.
   pushes it out the front under the [shared ship policy](../../Frame/Collections/Ships/AGENTS.md#ship-invariants). At most
   one Fighter launches per fleet per `kfShipSpawnInterval`, timed by `ServerClientManager::mNextFighterLaunchTicks`,
   which every load reset clears; a skipped Fighter stays dead and is tried again on the next tick.
-- Within `ServerSession::BuildAdvancingFrameInputs`, which the engine
-  `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset,
-  queued owned-entity updates run once per update and only on advancing
-  updates, staying deferred through paused and other zero-tick updates. When
-  that builder runs, every frame-input key is a live cell's coordinate: on top
-  of the engine's active-set rule
-  ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#session-invariants)),
-  `BuildFrameInputs` then adds one input per active coordinate, and nothing
-  between that and the end of the builder erases a cell or adds an input, so
-  a builder that found a coordinate's frame input reads that cell with
-  `mCells.at` without checking that it exists.
+- `ServerSession::BuildAdvancingFrameInputs`, which the engine
+  `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
+  advancing updates, is empty: no queued client request becomes a
+  once-per-update `StatusChange`.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the
   spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
   walk owners in GUID order, because each fleet's direction draw consumes the

@@ -50,18 +50,13 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Skybox 3", &gLightingWaterSkyboxThree},
 	{"Skybox 3 Power", &gLightingWaterSkyboxThreePower},
 	{"Skybox Lod", &gLightingWaterSkyboxLevelOfDetail},
-	{"Spec AA Variance", &gWaterSpecularAntialiasingVariance},
-	{"Spec AA Threshold", &gWaterSpecularAntialiasingThreshold},
-	{"Spec AA Mip Scale", &gWaterSpecularAntialiasingMipmapScale},
 	{"Normal Mip Bias", &gWaterNormalMipmapBias},
 	// Specular - Height Darken
 	{"Height Darken Top", &gWaterHeightDarkenTop},
 	{"Height Darken Bottom", &gWaterHeightDarkenBottom},
 	{"Height Darken Target", &gWaterHeightDarkenTarget},
-	{"Height Darken Source", &gWaterHeightDarkenSource},
 	{"Height Darken Lighting", &gWaterHeightDarkenLighting},
 	// Low - Wave
-	{"Low Max", &gWaterLowMaximum},
 	{"Angle", &gWaterLowAngle},
 	{"Wavelength", &gWaterLowWavelength},
 	{"Amplitude", &gWaterLowAmplitude},
@@ -91,9 +86,6 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	// Depth
 	{"Water Terrain Height", &gWaterTerrainHeight},
 	{"Water Terrain Fade", &gWaterTerrainFade},
-	{"Water Terrain Fade Clamp", &gWaterTerrainFadeClamp},
-	{"Water Height", &gWaterHeight},
-	{"Water Early Out", &gWaterEarlyOut},
 	{"Water Depth Lut Feather", &gWaterDepthLookupTableFeather},
 	{"Water Depth Lut Sunset Fade Power", &gWaterDepthLookupTableSunsetFadePower},
 	{"Water Depth Lut Sunset Fade Intensity", &gWaterDepthLookupTableSunsetFadeIntensity},
@@ -189,16 +181,12 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Skybox 3", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 3 Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox Lod", iSection, 1.0f);
-				rScreen.WrapperSlider("Spec AA Variance", iSection, 1.0f);
-				rScreen.WrapperSlider("Spec AA Threshold", iSection, 1.0f);
-				rScreen.WrapperSlider("Spec AA Mip Scale", iSection, 1.0f);
 				rScreen.WrapperSlider("Normal Mip Bias", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Height Darken");
 				rScreen.WrapperSlider("Height Darken Top", iSection, 1.0f);
 				rScreen.WrapperSlider("Height Darken Bottom", iSection, 1.0f);
 				rScreen.WrapperSlider("Height Darken Target", iSection, 1.0f);
-				rScreen.WrapperSlider("Height Darken Source", iSection, 1.0f);
 				rScreen.WrapperSlider("Height Darken Lighting", iSection, 1.0f);
 
 				ImGui::EndTable();
@@ -210,7 +198,6 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.RenderWaveCountRadioButtons(gWaterLowCount);
 
 			rScreen.WrapperSeparatorText("Wave");
-			rScreen.WrapperSlider("Low Max", iSection);
 			rScreen.WrapperSlider("Angle", iSection);
 			rScreen.WrapperSlider("Wavelength", iSection);
 			rScreen.WrapperSlider("Amplitude", iSection);
@@ -256,11 +243,6 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSeparatorText("Terrain Fade");
 			rScreen.WrapperSlider("Water Terrain Height", iSection);
 			rScreen.WrapperSlider("Water Terrain Fade", iSection);
-			rScreen.WrapperSlider("Water Terrain Fade Clamp", iSection);
-
-			rScreen.WrapperSeparatorText("Surface");
-			rScreen.WrapperSlider("Water Height", iSection);
-			rScreen.WrapperSlider("Water Early Out", iSection);
 
 			rScreen.WrapperSeparatorText("Depth Color");
 			rScreen.WrapperSlider("Water Depth Lut Feather", iSection);

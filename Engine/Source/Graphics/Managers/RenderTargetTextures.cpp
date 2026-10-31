@@ -213,7 +213,6 @@ void RenderTargetTextures::CreateSmokeTextures()
 	[&](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
 		float fCenter = static_cast<float>(iGradientSize) * 0.5f;
-		float fPower = gSmokeTrailPower.mfCurrent;
 		float fAlpha = gSmokeTrailAlpha.mfCurrent;
 
 		uint16_t* puiColor = reinterpret_cast<uint16_t*>(data.data());
@@ -223,7 +222,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 			{
 				float fX = -fCenter + 0.5f + static_cast<float>(i);
 				float fY = fCenter - 0.5f - static_cast<float>(j);
-				float fDistance = std::pow(std::sqrt(fX * fX + fY * fY) / fCenter, fPower);
+				float fDistance = std::sqrt(fX * fX + fY * fY) / fCenter;
 				float fIntensity = 1.0f - std::pow(fDistance, fAlpha) / (std::pow(fDistance, fAlpha) + std::pow((1.0f - fDistance), fAlpha));
 
 				int64_t iRed = static_cast<int64_t>(static_cast<float>(std::numeric_limits<uint16_t>::max()) * fIntensity);

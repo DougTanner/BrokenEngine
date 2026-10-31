@@ -138,9 +138,6 @@ Game::~Game()
 
 void Game::ResetGameState()
 {
-#if defined(BT_CLIENT)
-	mWeaponModeToggle.Reset();
-#endif // BT_CLIENT
 	mClientOwnedEntityIdentifiers.clear();
 	mClientOwnedEntityCoordinates.clear();
 #if defined(BT_CLIENT)

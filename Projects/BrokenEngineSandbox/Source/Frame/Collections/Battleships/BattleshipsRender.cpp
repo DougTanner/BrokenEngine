@@ -110,8 +110,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
-		    && !engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position)))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
 		{
 			continue;
 		}
@@ -158,7 +157,8 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matRoll * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
-			rModelLayout.f4Position = f4Position;
+			rModelLayout.f4PositionLayer = f4Position;
+			rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
 

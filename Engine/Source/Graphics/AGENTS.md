@@ -95,21 +95,26 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   tracking caches. A new cached position must join
   that shift or it will describe a place in the previous cell.
 - Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
-- The zoom value is the framing (`mfCameraFraming`): the eye height above the
-  look-at that would show the current view at `kfFramingFieldOfView`, so every
-  field of view and projection shows the same look-at-plane extent.
+- The zoom value is the framing (`mfCameraFraming`): the eye distance from the
+  look-at along the view axis that would show the current view at
+  `kfFramingFieldOfView`, so every field of view and projection shows the same
+  extent across the view-perpendicular plane through the look-at.
   `CalculateMatricesAndVisibleArea` derives the eye distance from framing and
   the true vertical field of view; orthographic projection
   (`mbOrthographicProjection`, latched there once per update) uses a virtual
   eye at the default field of view. Readers that measure zoom — LOD, zoom
   buckets, texel references, height-lerped tunables, audio blends — read
-  framing, never the eye distance. Field of view and projection mode join the
-  visible-area latch key because they move the ground area at a fixed framing
-  while the zoom bucket does not.
+  framing, never the eye distance. Camera tilt orbits the eye about the
+  look-at around world X, tilt 0 straight down and positive tilt moving the eye
+  south so the view looks north; the water eye stays at framing straight above
+  the look-at at any tilt, which water shading relies on. Field of view,
+  projection mode, and tilt join the visible-area latch key because they move
+  the ground area at a fixed framing while the zoom bucket does not.
 - Shadow and lighting texel sizes track independent framing references that
   expand immediately with outward zoom and contract at their existing rates
-  inward. The references never fall below live framing, preserving
-  raw-frustum coverage without changing settled on-screen density. Lighting
+  inward. The references never fall below live framing times
+  `mfTexelCoverageRatio`, preserving raw-frustum coverage without changing
+  settled on-screen density. Lighting
   temporal history rejects newly exposed texels when their reprojected UV falls
   outside the previous footprint, so outward zoom follows the
   configured lighting refresh cadence unless crop safety requires an earlier

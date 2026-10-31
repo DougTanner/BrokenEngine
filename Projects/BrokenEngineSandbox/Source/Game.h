@@ -49,17 +49,6 @@ struct ReplayStagedMeta
 };
 #endif
 
-#if defined(BT_CLIENT)
-// The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.
-struct WeaponModeKey
-{
-	engine::GlobalId ownedEntityIdentifier {};
-	bool bUseMissiles = false;
-
-	bool operator==(const WeaponModeKey&) const = default;
-};
-#endif
-
 class Game : public engine::GameBase, public common::Singleton<Game>
 {
 public:
@@ -104,8 +93,6 @@ public:
 #endif
 
 #if defined(BT_CLIENT)
-	engine::NetworkUiControl<WeaponModeKey> mWeaponModeToggle {};
-
 	FleetSelection mFleetSelection;
 
 	// In-memory mirror of the focused fleet and ship in ClientState.bin; loaded at startup, refreshed on every focus change, and written on orderly exit.

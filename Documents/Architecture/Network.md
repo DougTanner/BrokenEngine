@@ -311,7 +311,6 @@ sizes are the full packet including the type byte.
 | `kClientDebugFrameRequest` | 17 | 17 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown in every build; independent per-client two-second wall-clock cooldown; otherwise a no-op when `kbDesynchronizationDebugFrames == false` |
 | `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; a report whose header is not the one `HandleException` writes, including its crash-report version line, → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per UTC calendar day, counted in memory so a restart resets the count, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root; GitHub posting: `Engine/Source/AGENTS.md` `## Crash Reporting`; the server sends no reply |
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
-| `kClientUpdateOwnedEntityRequest` | 14 | 14 | 8 | yes | violation | use-missiles byte other than 0 or 1 → corrupt; nav delay non-finite or outside `[0,60]` → corrupt (`IsNavigationDelayInRange`), never clamped |
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
 | `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
 | `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; per-fleet member cap 16 |
@@ -320,9 +319,14 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 39, which replaced the
-two Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()` with
-the one beam cooldown `nextBeamFireTime`; version 38 made every
+client-sendable). The current wire-protocol version is 41, which removed the
+client update-owned-entity request, so every later game packet type moved down
+one value, and dropped the weapon-mode fields from the `UpdateShip` payload and
+the Omni `SpawnInfo` `Fields()`; version 40 replaced the beam cooldown
+`nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()` with the missile
+tube slot `uiNextMissileTube`; version 39 replaced the two Battleship blaster
+cooldowns in the Battleship `SpawnInfo` `Fields()` with the one beam cooldown
+`nextBeamFireTime`; version 38 made every
 cell a flat-top hexagon: each `GridCoord` on the wire carries axial
 coordinates (`iQ`, `iR`), every cell-local position is local to its hexagon,
 and a `kClientSubscribe` coord must lie within grid distance 1 of an

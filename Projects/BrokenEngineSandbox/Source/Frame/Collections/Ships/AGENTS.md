@@ -1,6 +1,6 @@
 # Ships - Shared Ship Code
 
-What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), and the ship status changes (`ShipStatusChanges`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
+What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and Omnis steer by (`FleetCoordination`), and the ship status changes (`ShipStatusChanges`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
 
 ## Ship Invariants
 
@@ -18,10 +18,11 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - A ship releases and clears its pusher when its natural explosion begins.
   Zero handles skip Sync and push queries; final removal and transfer retain
   ordinary owned-handle cleanup. Fleet Battleships follow their
-  [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants).
-- A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows run the fleet navigation below and are the owned entities (`Frame::OwnedEntityCount`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
+  [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
+  fleet Omnis theirs (`../Omnis/AGENTS.md`).
+- A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter or Omni in its flagship's cell (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
-- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Spawn-phase weapon targeting and the Battleship beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
+- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Omni and Battleship Spawn-phase weapon targeting and the Fighter beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
@@ -30,7 +31,9 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   lowest-to-highest flight plane range and a stored flight plane that is neither
   `kuiNoFlightPlane` nor allowed for the type, on every Frame read.
 - A ship's target flight plane lives in its orders, set at spawn and changed by
-  `kUpdateShip`; each type flies only up to its own highest plane
+  `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
+  by the random-spawn Omni chase (`../Fighters/AGENTS.md`,
+  `../Omnis/AGENTS.md`); each type flies only up to its own highest plane
   (`IsFlightPlaneAllowed`). Its current plane is stored in the shared
   Interpolate column `puiFlightPlanes`: the plane index while settled,
   `kuiNoFlightPlane` while climbing between planes. A genuine spawn stores its
@@ -45,17 +48,42 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   Change a ship's height through its target plane, not its velocity.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
 - Target choice treats a ship as on its nearest flight plane
-  (`NearestFlightPlane`), while collision and hits stay normal 3D. Fighter
-  blasters and Omni missiles target only an enemy whose nearest plane is the
-  shooter's stored plane and aim along the horizontal offset to it, so their
-  bolts and missiles stay on the shooter's plane and hit a climbing target only
-  by 3D contact; the Battleship beam has its own plane rule
-  (`../Battleships/AGENTS.md`). A ship storing `kuiNoFlightPlane` fires none of
-  them, and an Omni launches missiles only while exactly at its stored plane's
-  height. Omni blasters alone fire on or between planes, pitched toward the
-  target by the wanted direction. These plane rules govern only target choice and aim;
-  blaster and missile collision and explosion damage ignore planes, and pushers
-  follow their height-derived layer rule above.
+  (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
+  missiles and Omni blasters target only an enemy whose nearest plane is the
+  shooter's stored plane and stay on the shooter's plane, hitting a climbing
+  target only by 3D contact: a missile aims along the horizontal offset to its
+  target, and an Omni bolt flies flat along the Omni's hull. The Fighter beam
+  has its own plane rule (`../Fighters/AGENTS.md`). A ship storing
+  `kuiNoFlightPlane` fires none of them, and a Battleship launches missiles only
+  while exactly at its stored plane's height. No Omni targets, chases, or faces
+  an enemy above its highest plane. These plane rules govern only target choice
+  and aim; blaster and missile collision and explosion damage ignore planes, and
+  pushers follow their height-derived layer rule above.
+
+## Fleet Coordination Invariants
+
+- A fleet's stance is recomputed every tick from the cell's own previous frame
+  and never stored: weapons free while an enemy of its flagship is within the
+  `kfWeaponsFreeDistanceSquared` x/y distance of the flagship
+  (`FleetCoordination.cpp`), escort otherwise. Only a flagship row in the cell
+  gives its fleet a stance and position; enemies in other cells are not seen.
+- Fleet Fighters and fleet Omnis steer by the stance through one shared tactic
+  function keyed by ship type (`ChooseFleetTactic`): escort at the ship's own
+  slot among its type's fleet rows, Attack and Veer-off while weapons free.
+  Attack ignores enemies above the type's highest plane. Each type's `AGENTS.md`
+  documents its slots.
+- A weapons-free fleet Fighter or Omni not finishing a veer-off attacks its kept
+  target, the enemy row in the previous frame whose registry id its
+  `pRegistryTargets` stores (`FleetCoordination.cpp`). When the id is zero or
+  names no enemy row at or below its type's highest plane there, it picks and
+  stores the enemy nearest its flagship in x/y among those, ties keeping the
+  first row in `ForEachShipType` order, so fleet ships of one type picking on
+  the same tick share one target. Escort and veer-off leave the id untouched, so
+  a target that died or left keeps its stale id until the next pick; in Update
+  only leaving the flagship's cell clears it. Registry ids come from a
+  frame-wide counter (`MakeUuid`,
+  `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale id never
+  names another row.
 
 ## Fleet Navigation Invariants
 

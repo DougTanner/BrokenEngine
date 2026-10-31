@@ -47,10 +47,6 @@ engine::Wrapper gHexShieldLightingIntensity(4.0f, 0.0f, 8.0f);
 engine::Wrapper gMissileExhaustLightingArea(2.0f, 1.0f, 4.0f);
 engine::Wrapper gMissileExhaustLightingIntensity(3.5f, 0.0f, 5.0f);
 
-// Fighters - Blaster
-engine::Wrapper gFighterBlasterLightingArea(1.0f, 0.5f, 2.0f);
-engine::Wrapper gFighterBlasterLightingIntensity(0.2f, 0.0f, 1.0f);
-
 // Fighters - Hit flash
 engine::Wrapper gHitFlashLightingAreaOne(2.0f, 1.0f, 4.0f);
 engine::Wrapper gHitFlashLightingAreaTwo(0.0f, 0.0f, 4.0f);
@@ -95,9 +91,6 @@ engine::Wrapper gOmniImpactVisibleIntensityTwo(0.5f, 0.0f, 2.5f);
 engine::Wrapper gHexShieldIntensityDecay(1.25f, 0.1f, 6.0f);
 
 engine::Wrapper gMissileExhaustVisibleIntensity(1.0f, 0.1f, 5.0f);
-
-// Fighters - Blaster
-engine::Wrapper gFighterBlasterVisibleIntensity(1.0f, 0.1f, 5.0f);
 
 // Fighters - Hit flash
 engine::Wrapper gHitFlashVisibleAreaOne(0.375f, 0.04f, 1.9f);

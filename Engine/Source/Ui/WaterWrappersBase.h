@@ -47,21 +47,16 @@ extern Wrapper gLightingWaterSkyboxTwoPower;
 extern Wrapper gLightingWaterSkyboxThree;
 extern Wrapper gLightingWaterSkyboxThreePower;
 extern Wrapper gLightingWaterSkyboxLevelOfDetail;
-extern Wrapper gWaterSpecularAntialiasingVariance;
-extern Wrapper gWaterSpecularAntialiasingThreshold;
-extern Wrapper gWaterSpecularAntialiasingMipmapScale;
 extern Wrapper gWaterNormalMipmapBias;
 
 // Specular - Height Darken
 extern Wrapper gWaterHeightDarkenTop;
 extern Wrapper gWaterHeightDarkenBottom;
 extern Wrapper gWaterHeightDarkenTarget;
-extern Wrapper gWaterHeightDarkenSource;
 extern Wrapper gWaterHeightDarkenLighting;
 
 // Low frequency waves
 extern Wrapper gWaterLowCount; // wave-count radio selector, not slider-mapped
-extern Wrapper gWaterLowMaximum;
 extern Wrapper gWaterLowAngle;
 extern Wrapper gWaterLowWavelength;
 extern Wrapper gWaterLowAmplitude;
@@ -90,9 +85,6 @@ extern Wrapper gWaterMediumAmplitudeFadeEnd;
 // Depth
 extern Wrapper gWaterTerrainHeight;
 extern Wrapper gWaterTerrainFade;
-extern Wrapper gWaterTerrainFadeClamp;
-extern Wrapper gWaterHeight;
-extern Wrapper gWaterEarlyOut;
 extern Wrapper gWaterDepthLookupTableFeather;
 extern Wrapper gWaterDepthLookupTableSunsetFadePower;
 extern Wrapper gWaterDepthLookupTableSunsetFadeIntensity;

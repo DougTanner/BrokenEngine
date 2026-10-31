@@ -1,6 +1,5 @@
 #if defined(BT_CLIENT)
 
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
@@ -8,7 +7,6 @@
 #include "Ui/Screens/ModalScreen.h"
 #include "Ui/Screens/PauseMenuScreen.h"
 #include "Ui/Screens/SoundMenuScreen.h"
-#include "Ui/TweaksSettings.h"
 
 #include "Ui/Screens/HudScreen.h"
 #include "Game.h"
@@ -16,7 +14,6 @@
 namespace engine
 {
 
-static std::unique_ptr<TweaksScreen> spTweaksScreen;
 static std::unique_ptr<MainMenuScreen> spMainMenuScreen;
 static std::unique_ptr<ModalScreen> spModalScreen;
 static std::unique_ptr<PauseMenuScreen> spPauseMenuScreen;
@@ -28,7 +25,6 @@ static std::unique_ptr<ChatScreen> spChatScreen;
 
 void CreateUiScreens()
 {
-	spTweaksScreen = std::make_unique<TweaksScreen>();
 	spMainMenuScreen = std::make_unique<MainMenuScreen>();
 	spModalScreen = std::make_unique<ModalScreen>();
 	spPauseMenuScreen = std::make_unique<PauseMenuScreen>();
@@ -37,11 +33,6 @@ void CreateUiScreens()
 	spGameSettingsScreen = std::make_unique<GameSettingsScreen>();
 	spHudScreen = std::make_unique<game::HudScreen>();
 	spChatScreen = std::make_unique<ChatScreen>();
-
-	if (game::gpGame != nullptr)
-	{
-		LoadTweaksSettings();
-	}
 }
 
 void RenderUiScreens()
@@ -52,7 +43,7 @@ void RenderUiScreens()
 	spMainMenuScreen->Render();
 	spModalScreen->Render();
 
-	if (!game::gpGame->mbShowImGui)
+	if (!gbShowImGui)
 	{
 		spHudScreen->Render();
 		spChatScreen->Render();
@@ -62,23 +53,12 @@ void RenderUiScreens()
 		spGameSettingsScreen->Render();
 	}
 
-	if (game::gpGame->mbShowImGui)
-	{
-		spTweaksScreen->Render();
-	}
-
 	RenderImPlotGraphs();
 	gpImGuiManager->RenderTextAreas();
 }
 
 void DestroyUiScreens()
 {
-	if (game::gpGame != nullptr)
-	{
-		SaveTweaksSettings();
-	}
-
-	spTweaksScreen.reset();
 	spMainMenuScreen.reset();
 	spModalScreen.reset();
 	spPauseMenuScreen.reset();
@@ -87,11 +67,6 @@ void DestroyUiScreens()
 	spGameSettingsScreen.reset();
 	spHudScreen.reset();
 	spChatScreen.reset();
-}
-
-TweaksScreen& GetTweaksScreen()
-{
-	return *spTweaksScreen;
 }
 
 } // namespace engine

@@ -97,7 +97,9 @@ extended with these fields:
   or none.
 
 Each shared `Residuals` row names a pre-existing defect, incomplete trace,
-pending external verdict, or size observation, using `none` when absent.
+pending external verdict, size observation, or refactor observation, using
+`none` when absent. A `refactor observation` row is one line:
+`<path:line> — <observed shape> — <suggested restructure>`.
 
 Each `Findings` row is one line on this form:
 

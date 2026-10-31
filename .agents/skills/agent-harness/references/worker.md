@@ -85,14 +85,13 @@ and the handoff this run returns.
      checkout, requires the resolved `AgentHarness.exe`, mints the owner token,
      and claims the lock, printing one compact `broken-engine-harness-claim/v1`
      JSON object.
-   - When another session holds the lock, it provisions once and then retries
-     only the claim until it succeeds, the holder becomes stale under step 11,
-     or the script's own wait budget ends with `claim.wait-timeout` (step 7).
-     Never hand-write a poll loop, invent a sleep window, or add a wait
-     parameter. A stale holder is still waited on while a
-     project server started without `--agent-port` is running, because a
-     harness server cannot start beside it; once none remains the wait ends
-     with `claim.foreign-owner`.
+   - It provisions once and then waits within one budget. While a project
+     server started without `--agent-port` is running it claims nothing,
+     because a harness server cannot start beside it. Otherwise, when another
+     session holds the lock, it retries the claim until it succeeds, the holder
+     becomes stale under step 11 (`claim.foreign-owner`), or the budget ends
+     with `claim.wait-timeout` (step 7). Never hand-write a poll loop, invent a
+     sleep window, or add a wait parameter.
    - Run it synchronously in the foreground and remain in-turn until its exit
      code and JSON result are captured, giving the call the maximum available
      execution timeout, or at least 600000 ms on a host with no maximum, so the
@@ -154,10 +153,11 @@ and the handoff this run returns.
      attempt here; for every exit `2` the
      script never launches the game, so the Launch and ping-wait steps below are
      not performed and their absence is not a further failure to diagnose.
-   - `claim.wait-timeout` means the lock was still held when the script's wait
-     budget ended, by a fresh holder or by a stale one kept waiting for a
-     project server started without `--agent-port`: no lock was taken and its
-     owner token was never recorded, so re-invoke the claim per step 5.
+   - `claim.wait-timeout` means the script's wait budget ended while the lock
+     was still held by a fresh holder, which `currentOwner` describes, or while
+     a project server started without `--agent-port` still ran, with
+     `currentOwner` `null`: either way no lock is held and its owner token was
+     never recorded, so re-invoke the claim per step 5.
    - `claim.project-underivable` means the recorded data directory lacks the
      `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix: nothing
      was provisioned and no owner token or lock was taken, so route `/compile`
@@ -203,7 +203,9 @@ and the handoff this run returns.
      `claim.pack-version-underivable`, `claim.game-data-unreadable`,
      `claim.provision-failed`, `claim.harness-missing`, `claim.token-failed`,
      `claim.metadata-unreadable`, `claim.failed`, or `internal.error`); stop and
-     report it.
+     report it. A `claim.failed` from the script's release of its own
+     just-taken claim may leave the lock held under the result's `owner` until
+     it goes stale under step 11.
    - Never reconstruct provisioning, harness-path resolution, token minting, the
      pack version check, or the claim inline.
 
@@ -697,9 +699,9 @@ other run skips them. Step 45 runs steps 3-4 itself. The recovery frees only a
 lock whose record `worktree` is the adopted worktree and whose `session` is not
 `normal-launch`: that holder is this session's own stopped worker at any
 heartbeat age, so step 11's fresh-owner rule, which protects foreign owners,
-does not apply to it, and any other holder, including the never-released lock
-of a Normal launch from this worktree, is foreign and left untouched. Compare
-worktree paths as the claim records them, each canonicalized by
+does not apply to it, and any other holder, including a Normal-launch holder
+from this worktree whose release did not run, is foreign and left untouched.
+Compare worktree paths as the claim records them, each canonicalized by
 `Get-AgentCanonicalPath` (`.agents/scripts/AgentScriptCommon.psm1`), ignoring
 case.
 

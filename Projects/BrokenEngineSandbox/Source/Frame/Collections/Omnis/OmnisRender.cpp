@@ -176,7 +176,8 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		auto matTransform = XMMatrixMultiply(alignment.matPreMove, XMMatrixMultiply(alignment.matPreRotate, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
 
 		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
-		XMStoreFloat4(&rOmniLayout.f4Position, vecPosition);
+		XMStoreFloat4(&rOmniLayout.f4PositionLayer, vecPosition);
+		rOmniLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition)));
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rOmniLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rOmniLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));

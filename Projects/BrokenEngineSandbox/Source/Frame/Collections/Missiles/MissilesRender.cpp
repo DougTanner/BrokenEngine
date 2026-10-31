@@ -88,8 +88,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
-		    && !engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position)))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
 		{
 			continue;
 		}
@@ -115,7 +114,8 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matYaw * matTranslation;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
-		rModelLayout.f4Position = f4Position;
+		rModelLayout.f4PositionLayer = f4Position;
+		rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
 		rModelLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};

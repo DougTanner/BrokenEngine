@@ -12,7 +12,6 @@ const TweaksSliderMapRegistrar gHexShieldRegistrar
 {
 	{"Grow", &gHexShieldGrow},
 	{"Edge Distance", &gHexShieldEdgeDistance},
-	{"Edge Power", &gHexShieldEdgePower},
 	{"Edge Multiplier", &gHexShieldEdgeMultiplier},
 	{"Wave Multiplier", &gHexShieldWaveMultiplier},
 	{"Wave Dot", &gHexShieldWaveDotMultiplier},
@@ -30,7 +29,6 @@ void RenderHexShieldSection(TweaksScreen& rScreen)
 	rScreen.WrapperSeparatorText("Edge");
 	rScreen.WrapperSlider("Grow", iSection);
 	rScreen.WrapperSlider("Edge Distance", iSection);
-	rScreen.WrapperSlider("Edge Power", iSection);
 	rScreen.WrapperSlider("Edge Multiplier", iSection);
 
 	rScreen.WrapperSeparatorText("Wave");

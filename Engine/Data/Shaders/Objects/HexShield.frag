@@ -54,7 +54,7 @@ void main()
 	}
 
 	// Edge
-	float fEdgeMultiplier = mainLayout.fHexShieldEdgeMultiplier * pow(max(length(f3InOriginalPosition) - mainLayout.fHexShieldEdgeDistance, 0.0f), mainLayout.fHexShieldEdgePower);
+	float fEdgeMultiplier = mainLayout.fHexShieldEdgeMultiplier * max(length(f3InOriginalPosition) - mainLayout.fHexShieldEdgeDistance, 0.0f);
 	f4OutColor.a *= pHexShields[i].f4Color.a * fEdgeMultiplier;
 
 	// Accumulated alpha can exceed 1 (or fall below 0 via the edge/direction terms); SRC_ALPHA/ONE_MINUS_SRC_ALPHA

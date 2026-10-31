@@ -50,7 +50,9 @@ extended with these fields:
   headers, or none.
 
 Each shared `Residuals` row names a pre-existing issue, incomplete review,
-pending external verdict, or size observation; use `none` when absent.
+pending external verdict, size observation, or refactor observation; use `none`
+when absent. A refactor observation row takes the `/repo-code-review`
+`## Handoff` form.
 
 Each `Findings` row is one line on this form:
 

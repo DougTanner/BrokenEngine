@@ -1,6 +1,6 @@
 # Smoke Shaders - Sparse Camera-Following Simulation
 
-Smoke is a client-only 2D density field per flight plane; each plane's field follows the camera on its own held world rectangle and refreshes on its own frames. Objects deposit into the fields, two compute passes advect and diffuse each plane's field, and world shaders sample every plane, lowest first, through shared smoke helpers.
+Smoke is a client-only 2D density field per flight plane; each plane's field follows the camera on its own held world rectangle and refreshes on its own frames. Objects deposit into the fields, two compute passes advect and diffuse each plane's field, and world shaders sample the planes, lowest first, through shared smoke helpers; Model (`../Model/AGENTS.md`) owns which planes a model samples.
 
 ## Frame and Remap Contract
 

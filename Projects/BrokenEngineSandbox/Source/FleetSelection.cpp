@@ -74,7 +74,6 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 
 	mFocusedMemberGlobalId = memberGlobalId;
 	mPendingFocusMemberGlobalId = {};
-	gpGame->mWeaponModeToggle.Reset();
 
 	const FleetMember& rMember = *memberIt;
 	if (!(rMember.flags & FleetMemberFlags::kIsDead))

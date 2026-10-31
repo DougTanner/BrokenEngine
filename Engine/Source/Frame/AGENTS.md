@@ -91,13 +91,13 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   plane a height is nearest (an exact midpoint takes the lower plane).
   Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes
   with positive, strictly ascending heights, then that every island template's
-  header elevation ceiling stays below the highest plane, so it follows
+  stored peak height stays below the highest plane, so it follows
   `IslandTerrain` construction.
 
 ## Frame Registry
 
 - The frame registry (`FrameRegistry.h`) lets one collection find rows of another by binding columns the collections already own: it copies no records, allocates nothing, and keeps no state between query windows, so nothing it produces is serialized, CRC'd, or transferred.
-- The game builds both query windows and owns their timing, bound columns, and batch storage (`../../../Documents/Architecture/FrameUpdatePipeline.md`); the engine never names a game collection.
+- The game builds its one query window and owns its timing, bound columns, and batch storage (`../../../Documents/Architecture/FrameUpdatePipeline.md`); the engine never names a game collection.
 - The caller owns one combined workbuffer reservation per query window, holding
   the source-row indices, registry scratch, and layer descriptors, and keeps it
   alive until the context is destroyed; form every pointer and span the context

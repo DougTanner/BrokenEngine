@@ -1,14 +1,14 @@
 # Read the game data directory from the project's build records, require the project executables,
 # provision the checkout, resolve AgentHarness, mint an owner token, and claim the harness lock.
-# A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
-# repeats, until the lock is acquired, the holder's own heartbeat reaches the staleness point, or
-# the wait budget ends, and nothing touches the holder's processes, heartbeat, or claim. The wait
-# is bounded: a holder that keeps refreshing its heartbeat is waited on for at most
-# $WaitBudgetSeconds, which then ends with claim.wait-timeout for the caller to re-invoke. A stale
-# holder is still waited on, within that same budget, while a project server started without
-# --agent-port is running: that server holds the machine-wide single-instance mutex, so no harness
-# server can start beside it, and the takeover steps quit only --agent-port listeners. An ended
-# wait reports the holder record the last claim attempt itself printed.
+# Provisioning runs once and only the wait repeats. While a project server started without
+# --agent-port is running no claim is made: that server holds the machine-wide single-instance
+# mutex, so no harness server can start beside it. A claim that succeeds while such a server has
+# appeared meanwhile is released with this invocation's own owner token and the wait goes on. A
+# foreign owner is waited out, not stolen from, until its own heartbeat reaches the staleness point,
+# and nothing touches the holder's processes, heartbeat, or claim. The whole wait is bounded by
+# $WaitBudgetSeconds, which then ends with claim.wait-timeout for the caller to re-invoke. An ended
+# wait reports the holder record the last claim attempt itself printed, or no holder when the wait
+# ended on such a server.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -31,9 +31,10 @@ $MaximumOutputCharacters = 2048
 $PollMilliseconds = 5000
 # Mirrors the five-minute staleness rule that agent-harness worker.md step 11 owns.
 $StaleHeartbeatSeconds = 300
-# The foreign-owner claim wait, timed from after provisioning, stays under Claude Code's 600000 ms
-# tool cap and outlasts $StaleHeartbeatSeconds, so a holder that stops heartbeating is still judged
-# stale within one invocation.
+# The whole claim wait, on a foreign holder or on a project server started without --agent-port,
+# is timed from after provisioning and stays under Claude Code's 600000 ms tool cap. It outlasts
+# $StaleHeartbeatSeconds, so a holder that stops heartbeating is still judged stale within one
+# invocation unless waiting on such a server used up the budget.
 $WaitBudgetSeconds = 480
 
 $result = [ordered]@{
@@ -107,6 +108,13 @@ function ConvertTo-LockUtc($Value) {
 		catch { return $null }
 	}
 	return $null
+}
+
+# A null CommandLine casts to empty, so a server whose command line cannot be read counts as started
+# without --agent-port.
+function Get-NonAgentGameServers([string] $ServerBaseName) {
+	return @(Get-CimInstance Win32_Process -Filter "Name LIKE '$ServerBaseName%'" |
+		Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
 }
 
 # The expected pack version comes from this worktree's own DataFile.h — the source the executables were
@@ -353,48 +361,71 @@ try {
 	}
 	$result.owner = $owner
 
-	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
-	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
-	# The wait ends when the lock is acquired, when the refused holder's heartbeat reaches
-	# $StaleHeartbeatSeconds old while no project server started without --agent-port is running, or
-	# when $WaitBudgetSeconds have passed. A holder the worker may take over is not waited past once no
-	# such server remains, and the budget, checked after staleness so a holder that goes stale inside it
-	# still ends with claim.foreign-owner, ends any other wait with claim.wait-timeout, which the caller
-	# answers by re-invoking instead of giving up on the holder.
+	# Only the wait repeats: provisioning, the harness path, and the owner token above stay valid for
+	# the whole wait, and the same owner token reclaims after each refusal. Each pass first lists the
+	# project servers started without --agent-port and makes no claim while one runs. A claim that
+	# succeeds is followed by a second listing, and a server that appeared between the two makes the
+	# script release its own claim and keep waiting. A refused holder whose heartbeat reaches
+	# $StaleHeartbeatSeconds old ends the wait, so the worker may take it over. The budget, checked
+	# after staleness so a holder that goes stale inside it still ends with claim.foreign-owner, ends
+	# any other wait with claim.wait-timeout, which the caller answers by re-invoking instead of giving
+	# up on the holder.
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 	$attempts = 0
 	$budgetEnded = $false
+	$record = $null
 	while ($true) {
-		$attempts++
-		$claim = Invoke-NativeCapture $agentHarness @(
-			'lock', 'claim', '--key', $Key, '--owner', $owner, '--session', $Session, '--worktree', $root)
-		$record = ConvertFrom-LockOutput $claim.Stdout
-		if ($claim.ExitCode -eq 0) {
-			if ($null -eq $record) {
-				Complete-HarnessClaim 1 'error' 'claim.metadata-unreadable' 'AgentHarness claimed the lock but did not print a readable lock record.'
-			}
-			$result.claim = $record
-			Complete-HarnessClaim 0 'pass' 'ok' "Harness lock '$Key' claimed by owner $owner after $attempts attempt(s)."
-		}
-		if ($claim.ExitCode -ne 2) {
-			Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
-		}
-		# Sleeping a full interval past the holder's staleness point would overshoot the moment the
-		# takeover steps become available.
-		$heartbeatUtc = ConvertTo-LockUtc (Get-LockField $record 'heartbeatAt')
-		$remainingMilliseconds = ($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds
-		if ($remainingMilliseconds -le 0) {
-			# A null CommandLine casts to empty, so a server whose command line cannot be read keeps the wait.
-			$gameServers = @(Get-CimInstance Win32_Process -Filter "Name LIKE '$serverBaseName%'" |
-				Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
-			if ($gameServers.Count -eq 0) { break }
+		$gameServers = @(Get-NonAgentGameServers $serverBaseName)
+		if ($gameServers.Count -gt 0) {
+			$record = $null
 			$remainingMilliseconds = $PollMilliseconds
+		}
+		else {
+			$attempts++
+			$claim = Invoke-NativeCapture $agentHarness @(
+				'lock', 'claim', '--key', $Key, '--owner', $owner, '--session', $Session, '--worktree', $root)
+			$record = ConvertFrom-LockOutput $claim.Stdout
+			if ($claim.ExitCode -eq 0) {
+				$gameServers = @(Get-NonAgentGameServers $serverBaseName)
+				if ($gameServers.Count -eq 0) {
+					if ($null -eq $record) {
+						Complete-HarnessClaim 1 'error' 'claim.metadata-unreadable' 'AgentHarness claimed the lock but did not print a readable lock record.'
+					}
+					$result.claim = $record
+					Complete-HarnessClaim 0 'pass' 'ok' "Harness lock '$Key' claimed by owner $owner after $attempts attempt(s)."
+				}
+				$release = Invoke-NativeCapture $agentHarness @('lock', 'release', '--key', $Key, '--owner', $owner)
+				if ($release.ExitCode -ne 0) {
+					Complete-HarnessClaim 1 'error' 'claim.failed' ("AgentHarness lock release of this claim, after a project server started " +
+						"without --agent-port appeared, failed with exit $($release.ExitCode): $($release.Stdout) $($release.Stderr)")
+				}
+				$record = $null
+				$remainingMilliseconds = $PollMilliseconds
+			}
+			else {
+				if ($claim.ExitCode -ne 2) {
+					Complete-HarnessClaim 1 'error' 'claim.failed' "AgentHarness lock claim failed with exit $($claim.ExitCode): $($claim.Stderr)"
+				}
+				# Sleeping a full interval past the holder's staleness point would overshoot the moment the
+				# takeover steps become available.
+				$heartbeatUtc = ConvertTo-LockUtc (Get-LockField $record 'heartbeatAt')
+				$remainingMilliseconds = ($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds
+				if ($remainingMilliseconds -le 0) { break }
+			}
 		}
 		if ($stopwatch.Elapsed.TotalSeconds -ge $WaitBudgetSeconds) {
 			$budgetEnded = $true
 			break
 		}
 		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
+	}
+
+	# Only the budget ends a pass that holds no refused record, so the wait was spent on a project
+	# server and there is no holder to report.
+	if ($null -eq $record) {
+		Complete-HarnessClaim 2 'blocked' 'claim.wait-timeout' ("Harness lock '$Key' was not claimed while a project server started " +
+			"without --agent-port ran (PID $(($gameServers | ForEach-Object { $_.ProcessId }) -join ', ')) after waiting " +
+			"$([Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) seconds over $attempts attempt(s).")
 	}
 
 	# The wait ended with the lock still held, so the last attempt's record describes the holder.

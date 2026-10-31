@@ -46,26 +46,18 @@ Wrapper gLightingWaterSkyboxTwoPower(25.035f, 1.0f, 100.0f);
 Wrapper gLightingWaterSkyboxThree(405.89f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
 Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
-// Water.frag variance scales the specular filter kernel; mode 1 maps 0.25 to the exact pixel footprint.
-// In modes 2 and 3, threshold clamps the widening.
-Wrapper gWaterSpecularAntialiasingVariance(0.0f, 0.0f, 2.0f);
-Wrapper gWaterSpecularAntialiasingThreshold(0.0f, 0.0f, 1.0f);
-// WATER_SPEC_AA_MIP_HANDOFF: mip scale multiplies the baked per-mip Toksvig variance term (1.0 = the
-// physically-derived kernel); mip bias is the water-normal sampler's LOD bias (negative = sharpen,
-// positive = blur; 0 = unbiased, unlike the global -gMipmapLevelOfDetailBias sharpen), sampler recreate on change.
-Wrapper gWaterSpecularAntialiasingMipmapScale(0.0f, 0.0f, 4.0f);
+// Water-normal sampler LOD bias (negative = sharpen, positive = blur; 0 = unbiased, unlike the global
+// -gMipmapLevelOfDetailBias sharpen); a change recreates the samplers.
 Wrapper gWaterNormalMipmapBias(0.3f, 0.0f, 1.0f);
 
 // Specular - Height Darken
 Wrapper gWaterHeightDarkenTop(0.05f, -0.1f, 0.05f);
 Wrapper gWaterHeightDarkenBottom(-0.1f, -0.5f, 0.0f);
 Wrapper gWaterHeightDarkenTarget(1.0f, 0.0f, 2.0f);
-Wrapper gWaterHeightDarkenSource(0.0f, 0.0f, 1.0f);
 Wrapper gWaterHeightDarkenLighting(0.1f, 0.0f, 1.0f);
 
 // Low frequency waves
 Wrapper gWaterLowCount(31i64, std::vector<int64_t> {15, 31, 63, 127, 255});
-Wrapper gWaterLowMaximum(255.0f, 0.0f, 255.0f, 1.0f);
 Wrapper gWaterLowAngle(4.8f, 0.0f, XM_2PI);
 Wrapper gWaterLowWavelength(4.0f, 1.0f, 20.0f);
 Wrapper gWaterLowAmplitude(0.05f, 0.0f, 0.1f);
@@ -96,9 +88,6 @@ Wrapper gWaterMediumAmplitudeFadeEnd(600.0f, 0.0f, 10'000.0f);
 // Depth
 Wrapper gWaterTerrainHeight(3.5f, 1.0f, 8.0f);
 Wrapper gWaterTerrainFade(0.3f, 0.1f, 5.0f);
-Wrapper gWaterTerrainFadeClamp(0.0f, 0.0f, 0.5f);
-Wrapper gWaterHeight(0.0f, -0.1f, 0.03f);
-Wrapper gWaterEarlyOut(0.0f, -0.1f, 0.1f);
 Wrapper gWaterDepthLookupTableFeather(0.1f, 0.01f, 0.2f);
 Wrapper gWaterDepthLookupTableSunsetFadePower(10.0f, 0.1f, 10.0f);
 Wrapper gWaterDepthLookupTableSunsetFadeIntensity(0.3f, 0.0f, 1.0f);

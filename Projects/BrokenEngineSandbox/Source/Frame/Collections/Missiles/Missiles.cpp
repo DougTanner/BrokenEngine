@@ -234,7 +234,6 @@ void MissilesInterpolate::Register()
 		.pParticleVerticalVelocitySpreadScale = &gMissileExplosionParticleVerticalVelocitySpread,
 		.pParticleVelocityDecayScale = &gMissileExplosionParticleVelocityDecay,
 		.pParticleGravityScale = &gMissileExplosionParticleGravity,
-		.pParticleVisibleIntensityScale = &gMissileExplosionParticleVisibleIntensity,
 		.pParticleIntensitySpreadScale = &gMissileExplosionParticleIntensitySpread,
 		.pParticleIntensityDecayScale = &gMissileExplosionParticleIntensityDecay,
 		.pParticleIntensityPowerScale = &gMissileExplosionParticleIntensityPower,
@@ -397,8 +396,7 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 	ASSERT(!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying));
 	ASSERT(!(rCurrentPostRender.pFlags[i] & kFalling));
 
-	// The registry subscription is released by the Update caller, which is the only site holding a live query
-	// window; the falling missile itself keeps no handle past that release.
+	// The Update caller clears the registry handle, so a falling missile keeps none.
 	rCurrentPostRender.pFlags[i].Set(kFalling);
 	rCurrentPostRender.pfDeltaRotations[i] = 0.0f;
 	rCurrentPostRender.pVecVelocities[i] = XMVectorSetZ(rCurrentPostRender.pVecVelocities[i], XMVectorGetZ(rCurrentPostRender.pVecVelocities[i]) - kfMissileGravity * deltaTime.count());

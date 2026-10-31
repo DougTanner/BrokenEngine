@@ -66,7 +66,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	// The opening frame takes the gate too, so its Enter never reaches the engine toggles or ProcessGameMenuInput. The
 	// box opens only while the Tweaks overlay is hidden, because ChatScreen renders only then.
-	if (menuInput.flags & MenuInputFlags::kOpenChat && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !mbShowImGui)
+	if (menuInput.flags & MenuInputFlags::kOpenChat && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !gbShowImGui)
 	{
 		mChatLog.bInputOpen = true;
 	}
@@ -124,7 +124,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 	{
 		if (menuInput.flags & MenuInputFlags::kMenuTweaks)
 		{
-			mbShowImGui = !mbShowImGui;
+			gbShowImGui = !gbShowImGui;
 		}
 
 		if (menuInput.flags & MenuInputFlags::kMenuDebugTexture)

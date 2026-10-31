@@ -576,6 +576,9 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Battleships\Battleships.h">
       <Filter>Game\Frame\Collections\Battleships</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\FleetCoordination.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
@@ -1168,6 +1171,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsRender.cpp">
       <Filter>Game\Frame\Collections\Battleships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\FleetCoordination.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.cpp">
       <Filter>Game\Frame\Collections\Ships</Filter>

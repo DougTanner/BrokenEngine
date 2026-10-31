@@ -38,7 +38,7 @@ void main()
 	vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.f4VisibleArea);
 	vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
 
-	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x - globalLayout.fWaterHeight;
+	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x;
 	// Over land (terrain at/above water height): Water.vert skips the displacement fetch for these texels,
 	// so skip the medium-band Gerstner loop + Jacobian normal — the stored value is never sampled.
 	if (fTerrainElevation >= 0.0f)

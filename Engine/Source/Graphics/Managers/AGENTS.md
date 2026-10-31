@@ -163,8 +163,6 @@ per-mip barriers return all levels to shader-read for compute and fragment
 consumers; do not substitute whole-image transitions during the mip chain.
 Coverage history and presentation share that completed image.
 
-Water's variance-table consumption is documented in Water shaders (`../../../Data/Shaders/Water/AGENTS.md`).
-
 ### TextureUploadManager
 
 A dedicated upload thread with a fixed staging budget, persisting large-texture
@@ -218,7 +216,12 @@ the pool.
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
-- The manager owns ImGui setup and submission only. It calls three UI functions `ImGuiManager.h` declares and each client program defines by project membership, `CreateUiScreens`, `RenderUiScreens`, and `DestroyUiScreens`, at construction, each frame, and destruction. The gameplay client defines them in `../../Ui/Screens/UiScreens.cpp` (`../../Ui/Screens/AGENTS.md`).
+- The manager owns ImGui setup, submission, and the Tweaks screen. It calls three UI functions `ImGuiManager.h` declares and each client program defines by project membership, `CreateUiScreens`, `RenderUiScreens`, and `DestroyUiScreens`, at construction, each frame, and destruction. The gameplay client defines them in `../../Ui/Screens/UiScreens.cpp` (`../../Ui/Screens/AGENTS.md`).
+- For every client program, the manager creates the Tweaks screen and loads
+  its settings immediately before `CreateUiScreens`, saves them and destroys
+  the screen immediately after `DestroyUiScreens`, and renders it after
+  `RenderUiScreens` while `gbShowImGui` is set, so a replacement saves then
+  reloads them.
 - A swapchain-tier recreation, deferred or not, keeps the manager: only its
   swapchain-image framebuffers, texture retirements, and UI prepass indirect
   buffer are destroyed and rebuilt, while the ImGui context, backends, font

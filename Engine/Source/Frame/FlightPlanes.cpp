@@ -22,10 +22,10 @@ FlightPlanes::FlightPlanes()
 		fPreviousHeightMeters = rPlane.fHeightMeters;
 	}
 
-	// The header elevation ceiling bounds every heightmap texel, so no terrain reaches the highest plane.
+	// The quantized stored peak is the highest resident heightmap texel, so no terrain reaches the highest plane.
 	for ([[maybe_unused]] const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
-		ASSERT(rTemplate.fWorldElevationMeters + common::kfSeaBottomMeters < Highest().fHeightMeters);
+		ASSERT(DirectX::PackedVector::XMConvertHalfToFloat(DirectX::PackedVector::XMConvertFloatToHalf(rTemplate.fPeakHeightMeters)) < Highest().fHeightMeters);
 	}
 }
 

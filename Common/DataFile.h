@@ -373,20 +373,12 @@ static_assert(sizeof(ShaderHeader) == 24, "ShaderHeader layout changed — bump 
 
 struct TextureHeader
 {
-	// Per-mip Toksvig slope variance mean((1 - |avgN|) / |avgN|), baked by ExportTexture for BC5
-	// normal maps on the regular export path (zeros for every other format/path). Entries past the
-	// real mip chain are padded with the last real value at write time, so readers index by any
-	// clamped LOD without a count. Sized to 72 bytes, tying IslandHeader as the largest ChunkHeader
-	// union member — real BC5 chains max out at 9 mips (1024^2).
-	static constexpr int64_t kiMipVarianceCount = 10;
-
 	int64_t iTextureWidth = 0;
 	int64_t iTextureHeight = 0;
 	int64_t iMipLevels = 0;
 	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
-	float pfMipVariance[kiMipVarianceCount] {};
 };
-static_assert(sizeof(TextureHeader) == 72, "TextureHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportTexture::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(sizeof(TextureHeader) == 32, "TextureHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportTexture::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
 
 // Audio format metadata for PCM WAV files
 struct AudioHeader
@@ -442,7 +434,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 57 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 58 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

@@ -30,14 +30,15 @@ adding the fields below; the other entries are its own commands. For the engine
   A negative `offset` or `limit` is a parameter error. Returns
   `{"total","items":[...]}`. Ship rows (`fighters`, `omnis`, `battleships`):
   `index,uuid,globalId,controller,orders,targetFlightPlane,flags,lifecycleFlags,alignment,local,dir,vel,arrivalGrace,flagshipGlobalId,registryId`,
-  plus `armor,shield` for omnis and `health` for fighters and battleships;
+  plus `armor,shield` for omnis, `health` for fighters and battleships, and
+  `registryTargetId` for fighters and omnis: the `registryId` of a fleet
+  fighter's or omni's kept attack target, 0 for none;
   missile rows:
   `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, and the target
-  flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
+  `kIsFlagship` and the target flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
   lowest plane; a Fighter allows 0-2, an Omni 0-1, a Battleship 0), `flags` the
   integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
   `arrivalGrace` seconds. `registryId` is the ship's frame registry handle
@@ -129,7 +130,7 @@ adding the fields below; the other entries are its own commands. For the engine
   | Collection | Writes that remove the row at the next tick | Normal staged death instead |
   |---|---|---|
   | `omnis` | `pLifecycleFlags:2` (`kDestroy`) | `pfArmors:0`: PostCollision starts the 0.7 s death sequence with its explosions |
-  | `fighters`, `battleships` | `pLifecycleFlags:2` (`kDestroy`) | Use a killing blaster hit or missile blast to start natural staged death. Directly setting `kDying` fails the ship pusher ownership check because identity and handle columns cannot be edited. `pfHealths:0` alone changes nothing until the next hit, and a `RandomSpawn` ship's health regenerates while the nearest enemy ship is more than 60 m away |
+  | `fighters`, `battleships` | `pLifecycleFlags:2` (`kDestroy`) | Use a killing blaster hit or missile blast to start natural staged death. Directly setting `kDying` fails the ship pusher ownership check because identity and handle columns cannot be edited. `pfHealths:0` alone changes nothing until the next hit |
   | `missiles` | `pLifecycleFlags:2` (`kDestroy`) | none: `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
   | `blasters` | `pLifecycleFlags:2` (`kDestroy`) | none |
   | `explosions` | `pLifecycleFlags:2` (`kDestroy`); a row with trails takes its trails with it. Also `pLifecycleFlags:4` (`kDying`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pLifecycleFlags:4` on a row with trails: the row goes when its last trail ends. A row with neither bit, such as a `SpawnExplosion` injected without `lifecycleFlags`, is never removed unless one is written |
@@ -222,14 +223,14 @@ adding the fields below; the other entries are its own commands. For the engine
 
   | `type` | Fields |
   |--------|--------|
-  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
-  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `uiFlightPlane`, `bTransfer` |
-  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBeamFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBeamFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `uiNextMissileTube`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
   | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
   | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
-  | `UpdateShip` | `eType` (required), `iUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks`, `uiTargetFlightPlane` |
+  | `UpdateShip` | `eType` (required), `iUuid` (required), `navigationDelaySeconds`, `uiTargetFlightPlane` |
   | `UpdateFleet` | `eType` (required), `iUuid` (required), `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
 
   `iUuid` is the `uuid` of a `query_collection` row in the collection `eType`
@@ -240,9 +241,9 @@ adding the fields below; the other entries are its own commands. For the engine
   `vecVelocity`, and a missile's `vecStoredDirection` to `[1,0]`; `alignment` to
   `"fleet"`; a ship's `fleetWantedCoordinate` to `coord`; a `SpawnMissile`'s
   `flags`, when the entry has no `flags` key, to `kTargetRandom` (16) for a
-  `"fleet"` `alignment` and to `kTargetFleet` (8) otherwise; and the `UpdateShip`
-  `uiPendingWeaponModeTicks` and `UpdateFleet`
-  `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`); the
+  `"fleet"` `alignment` and to `kTargetFleet` (8) otherwise; and the
+  `UpdateFleet` `uiPendingFleetWantedCoordinateTicks` to 32
+  (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
   plane. A spawn
   gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
@@ -257,15 +258,17 @@ adding the fields below; the other entries are its own commands. For the engine
   AI and not an ownership harness rig; a missile starts with no homing target,
   which only in-tick code sets. A `SpawnExplosion` starts at the simulation time
   of the tick it is applied after, in its `coord`.
-  An `UpdateShip` entry's `bUseMissiles` takes effect on an omni
-  `uiPendingWeaponModeTicks` ticks after the tick it enters; `0` leaves it
-  pending. Fighters and battleships fire no missiles.
   Any other `uiTargetFlightPlane` sets the ship's target flight plane, toward
-  which it then climbs or descends. Every `UpdateShip` entry also applies its
-  `bUseMissiles`, `navigationDelaySeconds`, and `uiPendingWeaponModeTicks`,
-  defaults included, and resets the ship's cell-change timer to that delay, so
-  an entry that only changes the plane restates the ship's current weapon mode
-  (`orders` bit 2) and delay (`read_frame` `pNavigationDelays`).
+  which it then climbs or descends; a Fighter's own PostRender Update rewrites
+  that plane from the next tick whenever it runs its
+  [fleet or attack tactics](../../Source/Frame/Collections/Fighters/AGENTS.md),
+  a fleet Omni's on every tick outside its transfer lock, and a random-spawn
+  Omni's on every such tick it finds an enemy on an Omni plane
+  ([Omni behavior](../../Source/Frame/Collections/Omnis/AGENTS.md)).
+  Every `UpdateShip` entry also applies its `navigationDelaySeconds`, default
+  included, and resets the ship's cell-change timer to that delay, so an entry
+  that only changes the plane restates the ship's current delay (`read_frame`
+  `pNavigationDelays`).
 
   The batch also fails during replay playback, on an inactive `coord`, on an
   unknown key, on a value outside its member type's form above, on a
@@ -279,10 +282,11 @@ adding the fields below; the other entries are its own commands. For the engine
   `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
   exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a `navigationDelay` or
   `navigationDelaySeconds` outside `[0,60]`, on a `nextBlasterFireTime`
-  outside `[0,kBlasterFireInterval]`, and on a `DestroyShip` whose `iUuid`
-  names a fleet-controlled Battleship in its `coord`'s current frame. The command makes no terrain check; a
-  blaster destroys itself on terrain contact, so a `SpawnBlaster` that must
-  survive needs a terrain-clear `vecPosition` (the probe in
+  outside `[0,kBlasterFireInterval]`, on a `uiNextMissileTube` of 16 or more,
+  and on a `DestroyShip` whose `iUuid` names a fleet-controlled Battleship in
+  its `coord`'s current frame. The command makes no terrain check; a blaster
+  destroys itself on terrain contact, so a `SpawnBlaster` that must survive
+  needs a terrain-clear `vecPosition` (the probe in
   [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
   bound on how many entries one cell's tick receives: every due entry of a
   coordinate joins that tick's one published batch. A batch over 1,024 status
@@ -342,9 +346,13 @@ adding the fields below; the other entries are its own commands. For the engine
   include `globalId` gives its later spawns of `type`, its joins and respawns:
   an Omni or Battleship is born at that plane's height, and a Fighter launches
   at its Battleship's height and plane but takes the plane set here as its
-  target flight plane. It queues no status change and no
-  live member's plane changes (move one with an `inject_payload` `UpdateShip`
-  `uiTargetFlightPlane`). The value is saved with the fleet. The `result` is `null`.
+  target flight plane, which its own
+  [tactics](../../Source/Frame/Collections/Fighters/AGENTS.md) rewrite once its
+  arrival grace ends; a fleet Omni's
+  [tactics](../../Source/Frame/Collections/Omnis/AGENTS.md) likewise rewrite
+  it once its transfer lock ends. It queues no status change and no
+  live member's plane changes (move a Battleship with an `inject_payload`
+  `UpdateShip` `uiTargetFlightPlane`; no tactic rewrites its plane). The value is saved with the fleet. The `result` is `null`.
   Fails during replay playback (`cannot set fleet flight plane during replay
   playback`), on an unknown key, on a non-integer `globalId` or `plane`, on an
   unknown `type` (`'type' must be Fighter|Omni|Battleship`), on a `plane` the

@@ -25,7 +25,7 @@ float NativeSource(ivec2 i2Coord, ivec2 i2Active)
 {
 	i2Coord = clamp(i2Coord, ivec2(0), i2Active);
 	vec2 f2NativeUv = vec2(i2Coord) / vec2(i2Active);
-	if (textureLod(elevationTextureSampler, f2NativeUv, 0.0f).x >= globalLayout.fWaterHeight)
+	if (textureLod(elevationTextureSampler, f2NativeUv, 0.0f).x >= 0.0f)
 	{
 		return 0.0f;
 	}

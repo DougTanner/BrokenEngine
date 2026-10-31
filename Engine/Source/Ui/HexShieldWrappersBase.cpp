@@ -7,7 +7,6 @@ namespace engine
 
 engine::Wrapper gHexShieldGrow(0.1f, 0.05f, 0.2f);
 engine::Wrapper gHexShieldEdgeDistance(0.94f, 0.9f, 0.955f);
-engine::Wrapper gHexShieldEdgePower(1.0f, 0.5f, 2.0f);
 engine::Wrapper gHexShieldEdgeMultiplier(10.0f, 5.0f, 20.0f);
 
 engine::Wrapper gHexShieldWaveMultiplier(0.35f, 0.0f, 1.0f);

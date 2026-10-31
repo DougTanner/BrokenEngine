@@ -17,12 +17,14 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   a warning right after a spawn is expected. The
   [shared ship policy](Ships/AGENTS.md#ship-invariants) governs the subsequent
   separation correction and its accepted tiny terrain intrusion.
-- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals in PostRender Spawn. Hydration is filling a newly allocated collection slot from transferred or loaded data.
+- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals in PostRender Spawn, except the heal beam, which PostRender Update recreates. Hydration is filling a newly allocated collection slot from transferred or loaded data.
 - Every ship type receives a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival
   grace, which is an intentional fresh one-second arrival default, each ship's
   navigation state, which resets to spawn defaults, Fighters' and Battleships'
-  previous-frame reaction flags, which restart from defaults, and client-only
+  previous-frame reaction flags and the Omnis' `kVeerOff`, which restart from
+  defaults, Fighters' and Omnis' kept attack targets, which clear because
+  registry ids are per cell, and client-only
   shield animation state, which uses canonical client defaults; other fresh
   gameplay spawn defaults and fresh random draws apply only to genuine spawns.
   Select between transferred gameplay values and fresh

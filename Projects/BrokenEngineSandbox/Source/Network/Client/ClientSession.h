@@ -47,7 +47,6 @@ public:
 
 	void ConnectToServer(std::string_view serverAddress);
 
-	void SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);

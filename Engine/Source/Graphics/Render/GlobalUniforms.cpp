@@ -287,24 +287,18 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 	float fHorizontalLength = std::sqrt(fSunX * fSunX + fSunY * fSunY);
 	rGlobalLayout.f2ObjectShadowsAwayLight.x = fHorizontalLength == 0.0f ? 0.0f : -fSunX / fHorizontalLength;
 	rGlobalLayout.f2ObjectShadowsAwayLight.y = fHorizontalLength == 0.0f ? -1.0f : -fSunY / fHorizontalLength;
-	rGlobalLayout.fObjectShadowsSouthOffset = gObjectShadowsSouthOffset.mfCurrent;
-}
-
-XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position)
-{
-	f4Position.y -= gObjectShadowsSouthOffset.mfCurrent;
-	f4Position.z = gWaterHeight.mfCurrent;
-	return f4Position;
 }
 
 static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
 {
 	// Shadow texels use a coverage-safe framing reference: outward zoom expands it immediately, inward zoom contracts it at the existing
-	// rate, and it never falls below live framing. Derive texel size from the framing's analytic straight-down reference-angle frustum, not the snapped
-	// render area, so the grid is bit-stable at settled framing and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
-	// pixels span that frustum; the headroom covers the live area throughout zoom transitions. Use the actual clamped extent for
-	// device-independent coverage and center the computed shadow area on the camera, snapped to the texel grid.
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelFraming, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, engine::gpCamera->mVecPosition);
+	// rate, and it never falls below live framing times the tilt coverage ratio. Derive texel size from that tilt-covering framing's analytic
+	// reference-angle frustum, not the snapped render area, so the grid is bit-stable at settled framing and tilt and integer-texel XY pan does not
+	// shimmer. textureWidth / kfShadowHeadroomMultiplier pixels span that frustum; the headroom covers the live area throughout zoom transitions.
+	// Use the actual clamped extent for device-independent coverage and center the computed shadow area on the tilted footprint, snapped to the
+	// texel grid.
+	XMVECTOR vecFootprintCenter = XMVectorAdd(engine::gpCamera->mVecPosition, XMVectorSet(0.0f, engine::gpCamera->mfTexelCenterOffsetNorth, 0.0f, 0.0f));
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelFraming, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
 
 	// The shadow chain's current and previous world areas advance together on a refresh and are both held on a skip,
 	// so consumers keep sampling the texture through the area it was written with. A recreate makes the previous

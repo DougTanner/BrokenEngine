@@ -341,7 +341,8 @@ function Get-RoutingTrigger([object[]] $Entries) {
 		[void] $classes.Add($entry.Class)
 		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
 		# A deleted Plan file never fires this trigger: /next-plan completion deletes the claimed Plan, and that deletion owes no review row.
-		if (-not ($entry.Status -ceq 'D' -and $entry.Class -ceq 'plan')) {
+		# A modified refactor-candidate log never fires it either: the Verify and land step adds that log's rows after review.
+		if (-not ($entry.Status -ceq 'D' -and $entry.Class -ceq 'plan') -and -not ($entry.Status -ceq 'M' -and $entry.Path -ceq 'Documents/Investigations/Engine/RefactorCandidates.md')) {
 			[void] $coherenceClasses.Add($entry.Class)
 			if ($null -ne $entry.OldClass) { [void] $coherenceClasses.Add($entry.OldClass) }
 		}

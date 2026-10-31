@@ -72,9 +72,10 @@ class CameraBase : public common::Singleton<CameraBase>
 public:
 
 	static constexpr float kfDefaultSunAngle = 1.8f;
-	// The zoom value is the framing: the eye height above the look-at that would show the current view at this vertical
-	// field of view, in degrees. Every projection and field of view shows the same look-at-plane half-height,
-	// framing * tan(kfFramingFieldOfView / 2); the eye is derived from it.
+	// The zoom value is the framing: the eye distance from the look-at along the view axis that would show the current
+	// view at this vertical field of view, in degrees. Every projection and field of view shows the same half-height
+	// across the view-perpendicular plane through the look-at, framing * tan(kfFramingFieldOfView / 2); the eye is
+	// derived from it.
 	static constexpr float kfFramingFieldOfView = 25.3125f;
 	static constexpr float kfCameraFramingDefault = 300.0f;
 	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
@@ -90,9 +91,10 @@ public:
 	static constexpr float kfFramingMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
 #endif
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
-	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing,
-	// this margin keeps the raw live-frustum footprints inside their textures throughout zoom transitions. At settled
-	// framing, the raw live-frustum window equals the wanted pixel size regardless of this value.
+	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing times
+	// mfTexelCoverageRatio, this margin keeps the raw live-frustum footprints inside their textures throughout zoom
+	// transitions. At settled framing and tilt, the raw live-frustum window matches the wanted pixel size along the axis
+	// that sets mfTexelCoverageRatio, up to the look-at plane's height above Z = 0, regardless of this value.
 	static constexpr float kfShadowHeadroomMultiplier = 1.5f;
 	static constexpr float kfLightingHeadroomMultiplier = 1.5f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
@@ -106,15 +108,11 @@ public:
 	XMFLOAT4 mf4RenderVisibleArea {};
 	XMFLOAT4 mf4LargeVisibleArea {};
 
-	XMFLOAT4 mf4VisibleTopLeft {};
-	XMFLOAT4 mf4VisibleTopRight {};
-	XMFLOAT4 mf4VisibleBottomLeft {};
-	XMFLOAT4 mf4VisibleBottomRight {};
-
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
-	// The eye at kfFramingFieldOfView (framing above the look-at); the water eye vector, reflected ray, and reflection
-	// Fresnel read it so they do not change with field of view or projection mode.
+	// The untilted eye at kfFramingFieldOfView, framing straight above the look-at whatever the tilt; the water eye
+	// vector, reflected ray, and reflection Fresnel read it so they do not change with field of view, projection mode,
+	// or tilt.
 	XMVECTOR mVecWaterEyePosition {};
 	XMVECTOR mVecToEyeNormal {};
 
@@ -163,12 +161,21 @@ public:
 	bool mbZooming = false;
 
 	// Framing reference that sizes the shadow texel grid. Expands immediately with outward zoom and contracts
-	// at the shadow rate inward. 0 = uninitialized (snap directly to live framing on first frame).
+	// at the shadow rate inward. 0 = uninitialized (snap directly to live framing times mfTexelCoverageRatio on first
+	// frame).
 	float mfShadowTexelFraming = 0.0f;
 
 	// Framing reference that sizes the lighting texel grid. Expands immediately with outward zoom and contracts
-	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live framing on first frame).
+	// at the independent lighting rate inward. 0 = uninitialized (snap directly to live framing times
+	// mfTexelCoverageRatio on first frame).
 	float mfLightingTexelFraming = 0.0f;
+
+	// The tilted footprint's larger width or height ratio to the untilted one, scaling the framing both texel references
+	// track; exactly 1 at tilt 0.
+	float mfTexelCoverageRatio = 1.0f;
+	// North shift of the tilted footprint's center from the look-at, added to the position the shadow and lighting
+	// areas center on; exactly 0 at tilt 0.
+	float mfTexelCenterOffsetNorth = 0.0f;
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
 

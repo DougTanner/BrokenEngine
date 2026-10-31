@@ -290,15 +290,6 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	std::optional<ShipLocator> optionalOwnedEntity = std::nullopt;
-	{
-		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
-		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
-		{
-			optionalOwnedEntity = gpGame->ClientOwnedEntity(gpGame->RenderFrame(gpGame->mClientGridCoordinate));
-		}
-	}
-
 	ImVec2 vAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedOwnedEntitySlide, vAnchor, 1.0f, fTarget);
 	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
@@ -345,44 +336,6 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			{
 				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
-			}
-		}
-		ImGui::EndDisabled();
-	}
-
-	ShipOrders_t orders {};
-	float fNavigationDelay = 0.0f;
-	bool bHasWeaponMode = false;
-	if (optionalOwnedEntity.has_value())
-	{
-		VisitShip(gpGame->RenderFrame(gpGame->mClientGridCoordinate), *optionalOwnedEntity, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
-		{
-			orders = rPostRender.pOrders[iRow];
-			fNavigationDelay = rPostRender.pNavigationDelays[iRow].count();
-			// Only a ship with a weapon-mode countdown ever applies kPendingUseMissiles, so only it shows the toggle
-			bHasWeaponMode = requires { rPostRender.puiPendingWeaponModeTicks; };
-		});
-	}
-
-	if (bHasWeaponMode)
-	{
-		bool bUseMissiles = static_cast<bool>(orders & ShipOrders::kUseMissiles);
-		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.ownedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier(), .bUseMissiles = bUseMissiles});
-
-		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
-		// Sized over both labels, so a mode flip never resizes or moves it
-		ImVec2 vButtonSize(engine::MenuButtonsWidth({U"Missiles", U"Blasters"}), ImGui::GetFrameHeight());
-		ImVec2 vAvailable = ImGui::GetContentRegionAvail();
-		ImVec2 vCursor = ImGui::GetCursorPos();
-		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
-
-		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
-		if (ImGui::Button(pcLabel, vButtonSize))
-		{
-			if (gpGame->ClientOwnedEntityIdentifier().iValue != 0)
-			{
-				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				gpClientSession->SendUpdateOwnedEntityRequest(gpGame->ClientOwnedEntityIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}
 		ImGui::EndDisabled();

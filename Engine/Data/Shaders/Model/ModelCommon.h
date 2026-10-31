@@ -20,6 +20,7 @@ layout (location = 5) out vec2 f2OutUV3;
 layout (location = 6) out vec2 f2OutUV4;
 layout (location = 7) out vec4 f4OutColorAdd;
 layout (location = 8) out float fOutHeightAboveBase;
+layout (location = 9) out flat int iOutLayer;
 
 // Push constants
 layout(push_constant) uniform pushConstants
@@ -94,7 +95,8 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	f2OutUV4 = f2InUV4;
 	f4OutColorAdd = model.f4ColorAdd;
 	// The model centre, not the vertex, so every vertex of a ship on the lowest flight plane gets exactly 0.
-	fOutHeightAboveBase = max(model.f4Position.z - globalLayout.fBaseHeight, 0.0f);
+	fOutHeightAboveBase = max(model.f4PositionLayer.z - globalLayout.fBaseHeight, 0.0f);
+	iOutLayer = int(model.f4PositionLayer.w);
 
 	int iRenderingMode = int(pushConstantsLayout.f4Pipeline.y);
 	if (iRenderingMode == 0)
@@ -111,6 +113,6 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	else
 	{
 		// Mode 2: Shadow projection.
-		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4Position.xyz);
+		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4PositionLayer.xyz);
 	}
 }

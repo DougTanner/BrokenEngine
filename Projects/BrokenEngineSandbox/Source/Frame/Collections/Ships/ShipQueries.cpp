@@ -92,10 +92,9 @@ float ShipHull(const Frame& rFrame, ShipLocator locator)
 	});
 }
 
-RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPreviousFrame, const MissilesPostRender& rSubscribers)
+RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame, const MissilesPostRender& rSubscribers)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	const Frame& rGraceFrame = pPreviousFrame != nullptr ? *pPreviousFrame : rFrame;
 
 	auto IsEligible = [](const auto& rInterpolate, const auto& rGracePostRender, int64_t i)
 	{
@@ -106,7 +105,7 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPrevio
 	int64_t iSubscriberCount = rSubscribers.iCount;
 	int64_t iAscendingCount = iSubscriberCount;
 	std::array<int64_t, kiPlaneCount> eligibleCounts {};
-	ForEachShipType(rFrame.interpolate, rGraceFrame.postRender, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
+	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
 	{
 		iAscendingCount = std::max(iAscendingCount, rInterpolate.iCount);
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
@@ -149,7 +148,7 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPrevio
 	{
 		eligibleRows[i] = reinterpret_cast<int64_t*>(pBufferBytes + scratchOffsets[i]);
 	}
-	ForEachShipType(rFrame.interpolate, rGraceFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
+	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
 	{
 		std::array<int64_t, kiPlaneCount> layerFirstRows = filledCounts;
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
@@ -180,16 +179,13 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPrevio
 		}
 	});
 	// Previous rows still align with the current ones: no row is added or removed before the Update phase ends.
-	if (pPreviousFrame != nullptr)
+	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rPreviousInterpolate, [[maybe_unused]] const auto& rPreviousPostRender)
 	{
-		ForEachShipType(*pPreviousFrame, [&](ShipType eType, const auto& rPreviousInterpolate, [[maybe_unused]] const auto& rPreviousPostRender)
+		for (int64_t i = 0; i < kiPlaneCount; ++i)
 		{
-			for (int64_t i = 0; i < kiPlaneCount; ++i)
-			{
-				pLayers[i * kiLayerCount + std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
-			}
-		});
-	}
+			pLayers[i * kiLayerCount + std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
+		}
+	});
 
 	engine::RegistrySubscriptionLayer subscriptionLayer
 	{

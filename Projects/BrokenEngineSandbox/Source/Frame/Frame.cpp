@@ -103,7 +103,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 144 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 145 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -208,20 +208,22 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	engine::CompactCollections(rFrame, std::tuple_cat(rFrame.interpolate.Collections(), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.Collections(), GamePostRenderCollections(rFrame.postRender)));
 }
 
-// Each wave is one ship type picked at random, spaced by that type's radius. Only fleet ships, never random-spawn
-// rows, anchor and repel a wave.
+// Each wave is one ship type picked at random, spaced by that type's radius, anchored where the most of its ships fit
+// and among those farthest from the reference fleet ship, which it faces. Only fleet ships, never random-spawn rows,
+// place and repel a wave.
 static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
 {
 	static constexpr int64_t kiGridDimension = 20;
 	static constexpr int64_t kiMaximumFleetSize = 16;
 	static constexpr float kfMinimumFleetDistance = 120.0f;
-	static constexpr float kfDesiredAnchorDistance = 150.0f;
 
-	// Count non-exploding fleet and random-spawn ships per type; the first fleet ship is the spawn center
+	// Count non-exploding fleet and random-spawn ships per type; the reference fleet ship is the first fleet ship's
+	// flagship when it is in the cell, else that first fleet ship
 	std::array<int64_t, std::to_underlying(ShipType::kCount)> fleetCounts {};
 	std::array<int64_t, std::to_underlying(ShipType::kCount)> randomSpawnCounts {};
 	auto vecFleetPosition = XMVectorZero();
-	bool bFoundCenter = false;
+	engine::GlobalId flagshipGlobalId {};
+	bool bFoundFleetShip = false;
 	ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 	{
 		for (int64_t i = 0; i < rShipPostRender.iCount; ++i)
@@ -235,17 +237,23 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 				++randomSpawnCounts[std::to_underlying(eType)];
 				continue;
 			}
-			if (!bFoundCenter)
+			if (!bFoundFleetShip)
 			{
 				vecFleetPosition = rShipInterpolate.pVecPositions[i];
-				bFoundCenter = true;
+				flagshipGlobalId = rShipPostRender.pFlagshipGlobalIds[i];
+				bFoundFleetShip = true;
 			}
 			++fleetCounts[std::to_underlying(eType)];
 		}
 	});
-	if (!bFoundCenter)
+	if (!bFoundFleetShip)
 	{
 		return;
+	}
+	std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFrame, flagshipGlobalId);
+	if (optionalFlagship)
+	{
+		vecFleetPosition = ShipPosition(rFrame.interpolate, *optionalFlagship);
 	}
 
 	// The wave's type: one equal-odds draw over the three types, whose radius sets the wave's clearance and spacing.
@@ -324,9 +332,9 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 		pf2LocalOffsets[i].y = fOffset * fShipSideSpacing;
 	}
 
-	// Step 3: score every grid cell as a candidate anchor; pick best-fit
+	// Step 3: score every grid cell as a candidate anchor; keep the best-scoring one.
 	int64_t iBestScore = 0;
-	float fBestDistanceCost = std::numeric_limits<float>::max();
+	float fBestDistance = 0.0f;
 	int64_t iBestAnchorIndex = -1;
 	float fBestFacingCosine = 1.0f;
 	float fBestFacingSine = 0.0f;
@@ -337,7 +345,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 			float fAnchorX = fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX;
 			float fAnchorY = fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY;
 
-			// Facing direction: anchor -> spawn-center fleet ship (XY only)
+			// Facing direction: anchor -> reference fleet ship (XY only)
 			float fToFleetX = XMVectorGetX(vecFleetPosition) - fAnchorX;
 			float fToFleetY = XMVectorGetY(vecFleetPosition) - fAnchorY;
 			float fDistance = std::sqrt(fToFleetX * fToFleetX + fToFleetY * fToFleetY);
@@ -372,11 +380,10 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 				continue;
 			}
 
-			float fDistanceCost = std::abs(fDistance - kfDesiredAnchorDistance);
-			if (iScore > iBestScore || (iScore == iBestScore && fDistanceCost < fBestDistanceCost))
+			if (iScore > iBestScore || (iScore == iBestScore && fDistance > fBestDistance))
 			{
 				iBestScore = iScore;
-				fBestDistanceCost = fDistanceCost;
+				fBestDistance = fDistance;
 				iBestAnchorIndex = i * kiGridDimension + j;
 				fBestFacingCosine = fFacingCosine;
 				fBestFacingSine = fFacingSine;
@@ -408,7 +415,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 			continue;
 		}
 
-		// Flattened because the spawn-center ship may fly another plane; the validity check keeps its horizontal part nonzero.
+		// Flattened because the reference fleet ship may fly another plane; the validity check keeps its horizontal part nonzero.
 		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFleetPosition, vecSpawnPosition), 0.0f));
 		switch (eWaveType)
 		{

@@ -26,6 +26,7 @@ extern Wrapper gMinimumSampleShading;
 extern Wrapper gMipmapLevelOfDetailBias;
 extern Wrapper gOrthographicProjection;
 extern Wrapper gFieldOfView;
+extern Wrapper gCameraTilt;
 extern Wrapper gWaterShapeDetail;
 extern Wrapper gWaterFoamSystemEnabled;
 extern Wrapper gSmokeSimulationPixels;

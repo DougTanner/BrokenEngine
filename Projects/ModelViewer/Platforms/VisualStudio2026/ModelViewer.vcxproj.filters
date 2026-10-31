@@ -135,6 +135,7 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp"><Filter>Engine\Memory</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp"><Filter>Engine\Profile</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -144,11 +145,25 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenLighting.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenMisc.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenPbr.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenShadow.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSmoke.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSound.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSunMoon.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenTerrain.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWater.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWind.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -294,6 +309,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h"><Filter>Engine\Profile</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h"><Filter>Engine\Ui</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveWidget.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
@@ -312,6 +328,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
@@ -327,5 +344,6 @@
     <ClInclude Include="..\..\Source\Graphics\Camera.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\Source\ModelViewerApplication.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h"><Filter>Viewer</Filter></ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h"><Filter>Viewer</Filter></ClInclude>
   </ItemGroup>
 </Project>

@@ -73,6 +73,7 @@ layout (location = 5) in vec2 f2InUV3;
 layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in vec4 f4InColorAdd;
 layout (location = 8) in float fInHeightAboveBase;
+layout (location = 9) in flat int iInLayer;
 
 // Fragment output
 layout (location = 0) out vec4 f4OutColor;
@@ -370,14 +371,24 @@ void main()
 	color += mainLayout.fPhysicallyBasedRenderingEmissive * emissive;
 #endif
 
-	// Apply smoke/fog per flight plane, lowest first (project position to the plane, fade with height above it; planes
-	// above the fragment apply in full)
+	// Apply smoke/fog per flight plane, lowest first, projecting the position to each plane. Planes below the model's
+	// own plane are skipped; its own plane fades with the fragment's height above it so the model pokes through; planes
+	// above apply in full. The loop counter is the sampler index, so it counts from plane 0 and skips lower planes:
+	// instances in one draw can sit on different planes.
 #if ENABLE_SMOKE
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
+		if (iPlane < iInLayer)
+		{
+			continue;
+		}
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InWorldPosition, iPlane);
-		float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+		float fSmokeFade = 1.0f;
+		if (iPlane == iInLayer)
+		{
+			float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
+			fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+		}
 		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
 	}
 #endif

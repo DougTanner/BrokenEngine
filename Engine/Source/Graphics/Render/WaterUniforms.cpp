@@ -234,11 +234,8 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 
 void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, std::chrono::duration<float> elapsedTime)
 {
-	rGlobalLayout.fWaterEarlyOut = gWaterEarlyOut.mfCurrent;
-	rGlobalLayout.fWaterHeight = gWaterHeight.mfCurrent;
 	rGlobalLayout.fWaterTerrainHeight = gWaterTerrainHeight.mfCurrent;
 	rGlobalLayout.fWaterTerrainFadeInverse = 1.0f / gWaterTerrainFade.mfCurrent;
-	rGlobalLayout.fWaterTerrainFadeClamp = gWaterTerrainFadeClamp.mfCurrent;
 
 	rGlobalLayout.fWaterDepthLookupTableFeather = gWaterDepthLookupTableFeather.mfCurrent;
 	rGlobalLayout.fWaterDepthColorFeather = gWaterDepthColorFeather.mfCurrent;
@@ -416,7 +413,7 @@ static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double fW
 		return;
 	}
 
-	int64_t iCount = std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMaximum.mfCurrent));
+	int64_t iCount = gWaterLowCount.Get<int64_t>();
 
 	LowWaveTunables tunables {};
 	tunables.iCount = iCount;

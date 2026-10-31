@@ -28,3 +28,6 @@
 * whitespace=blank-at-eol,-space-before-tab,-blank-at-eof
 *.md -whitespace
 *.txt -whitespace
+
+# Concurrent sessions insert rows at the same place in this log; union keeps both sides' rows on rebase.
+Documents/Investigations/Engine/RefactorCandidates.md merge=union

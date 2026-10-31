@@ -73,8 +73,6 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 
 [[nodiscard]] bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t id, RegistryResult& rResult);
 
-void ReleaseRegistryTarget(RegistryQueryContext& rContext, registry_id_t& rId);
-
 // Binds a foreign-typed id column as bytes. Viewing an Id<T> array through a const Uuid* or a
 // const registry_id_t* is undefined behavior — the specializations are not similar types — so the ownership
 // layer erases the element type here and reads each element back through Uuid.

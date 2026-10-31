@@ -37,9 +37,6 @@ constexpr float kfReturnedDistance = kfReturnDistance - 20.0f;
 constexpr float kfTerrainBounceRotation = 8.0f;
 constexpr float kfTerrainBounceVelocity = 4.0f;
 
-constexpr float kfHealthRegeneration = 0.1f;
-constexpr float kfHealthRegenerationDistance = 60.0f;
-
 int64_t HighestFlightPlane(ShipType eType)
 {
 	switch (eType)
@@ -126,26 +123,6 @@ void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks)
 	if (riPendingFleetWantedCoordinateTicks > 0)
 	{
 		riPendingFleetWantedCoordinateTicks--;
-	}
-}
-
-void CountdownPendingOrders(ShipOrders_t& rOrders, int64_t& riPendingFleetWantedCoordinateTicks, int64_t& riPendingWeaponModeTicks)
-{
-	CountdownPendingOrders(riPendingFleetWantedCoordinateTicks);
-	if (riPendingWeaponModeTicks > 0)
-	{
-		riPendingWeaponModeTicks--;
-		if (riPendingWeaponModeTicks == 0)
-		{
-			if (rOrders & ShipOrders::kPendingUseMissiles)
-			{
-				rOrders.Set(ShipOrders::kUseMissiles);
-			}
-			else
-			{
-				rOrders.Set(ShipOrders::kUseMissiles, false);
-			}
-		}
 	}
 }
 
@@ -311,6 +288,17 @@ static const engine::NavData& NavigationPlaneData(const engine::CellStaticData& 
 {
 	static const engine::NavData sEmptyNavData;
 	return (iNavigationPlane < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iNavigationPlane)) : sEmptyNavData;
+}
+
+XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal)
+{
+	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, NavigationFlightPlane(XMVectorGetZ(vecPosition), iTargetFlightPlane));
+	XMVECTOR vecLevelDestination = XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition));
+	XMVECTOR vecWaypoint = XMVectorZero();
+	engine::NavQueryDirection(vecPosition, vecLevelDestination, rNavData, vecWaypoint);
+	// NavQueryDirection snaps its destination with the same polygon snap, so a final waypoint matches it exactly.
+	rbFinal = XMVector2Equal(vecWaypoint, engine::NavQuerySnapToNavigable(vecLevelDestination, rNavData));
+	return vecWaypoint;
 }
 
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
@@ -623,14 +611,14 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 	}
 }
 
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, float fBlasterSpeed, float fBlasterTargetRange, float fMissileTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
 	bool bTargetInRange = false;
 	bool bTargetForLook = false;
 	XMVECTOR vecTargetInRangePosition = XMVectorZero();
 	XMVECTOR vecTargetInRangeVelocity = XMVectorZero();
 	XMVECTOR vecTargetForLookPosition = XMVectorZero();
-	float fBestInRange = fMissileTargetRange;
+	float fBestInRange = fBlasterTargetRange;
 	float fBestForLook = std::numeric_limits<float>::max();
 	// Firing and look targets require a visible enemy past arrival grace.
 	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity)
@@ -639,8 +627,13 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 		{
 			return;
 		}
+		int64_t iTargetFlightPlane = NearestFlightPlane(vecTargetPosition);
+		if (iTargetFlightPlane > iHighestFlightPlane)
+		{
+			return;
+		}
 		float fDistance = common::Distance(vecPosition, vecTargetPosition);
-		if (fDistance < fBestInRange)
+		if (iTargetFlightPlane == uiFlightPlane && fDistance < fBestInRange)
 		{
 			fBestInRange = fDistance;
 			vecTargetInRangePosition = vecTargetPosition;
@@ -668,14 +661,10 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 		rbLookTargetFound = true;
 	}
 
-	// Weapon spawn timers rate-limit continuous fire; blasters require the shorter target range.
+	// The blaster spawn timer rate-limits continuous fire.
 	if (bTargetInRange)
 	{
-		rFlags.Set(ShipFlags::kFireMissile);
-		if (common::Distance(vecPosition, vecTargetInRangePosition) <= fBlasterTargetRange)
-		{
-			rFlags.Set(ShipFlags::kFireBlaster);
-		}
+		rFlags.Set(ShipFlags::kFireBlaster);
 	}
 }
 
@@ -684,14 +673,6 @@ void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::durat
 	if (shieldCooldown.count() <= 0.0f)
 	{
 		rfShield = std::min(rfShield + deltaTime.count() * fRegeneration, fMaximumShield);
-	}
-}
-
-void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, std::chrono::duration<float> deltaTime, float fMaximumHealth, float& rfHealth)
-{
-	if (bEnemyFound && common::Distance(vecPosition, vecNearestEnemy) > kfHealthRegenerationDistance) [[unlikely]]
-	{
-		rfHealth = std::min(rfHealth + deltaTime.count() * kfHealthRegeneration, fMaximumHealth);
 	}
 }
 

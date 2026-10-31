@@ -9,7 +9,6 @@ namespace engine
 
 extern engine::Wrapper gHexShieldGrow;
 extern engine::Wrapper gHexShieldEdgeDistance;
-extern engine::Wrapper gHexShieldEdgePower;
 extern engine::Wrapper gHexShieldEdgeMultiplier;
 
 extern engine::Wrapper gHexShieldWaveMultiplier;

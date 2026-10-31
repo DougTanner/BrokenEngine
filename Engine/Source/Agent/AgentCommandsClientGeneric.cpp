@@ -1217,7 +1217,7 @@ Client& RequireAcceptedClient(std::string_view command)
 void AppendUiStateFields(nlohmann::json& rResult)
 {
 	rResult["uiState"] = UiStateName(game::gpGame->meUiState);
-	rResult["tweaksVisible"] = game::gpGame->mbShowImGui;
+	rResult["tweaksVisible"] = gbShowImGui;
 	rResult["gameFlags"] = GameFlagNames(game::gpGame->mGameFlags);
 }
 

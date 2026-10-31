@@ -371,8 +371,6 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		},
 	});
 
-	// Water. All three skybox-specular lobes are evaluated inline with analytic specular AA
-	// (WATER_SPEC_AA_MODE in Water.frag) instead of MSAA sample shading — kSampleShading stays off.
 	mpPipelines[kPipelineWater].Create(
 	{
 		.name = "Water",

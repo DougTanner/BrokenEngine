@@ -8,7 +8,7 @@
 #include "Frame/CellStaticData.h"
 #include "Ui/WrapperBase.h"
 
-#include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Profile/ProfileRows.h"
@@ -40,13 +40,12 @@ constexpr float kfFighterExplosionPositionJitter = kfFighterRadius * 0.375f;
 constexpr float kfFighterExplosionDirectionJitter = 0.5f;
 constexpr int64_t kiFighterExplosionTrailCount = 5;
 
-static void RegisterFighterBlasterType();
-
 // Shared type indices (accessible from FightersCombat.cpp via extern)
 int64_t giFighterExplosionTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
 static int64_t siFighterHitFlashTypeIndex = 0xFF;
 int64_t giFighterHitFlashControllerTypeIndex = 0xFF;
+int64_t giFighterBeamAreaLightTypeIndex = 0xFF;
 
 static void RegisterFighterHitFlashEffect();
 #endif
@@ -61,15 +60,12 @@ constexpr float kfFighterExplosionParticleIntensityDecay = 2.4f;
 constexpr float kfFighterExplosionTrailLengthRandom = kfFighterRadius * 1.25f;
 constexpr int64_t kiFighterExplosionSecondaryCount = 1;
 
-constexpr float kfSpawnBlasterEnemyAngle = 0.1f;
-constexpr float kfBlastersSpeed = 50.0f;
-constexpr std::chrono::duration<float> kBlastersSpawnCooldown = std::chrono::duration<float>(1.0f);
-
-constexpr float kfFighterBlasterSize = kfFighterRadius * 0.15f;
-// Fighter blaster lighting tuning is supplied by LightingWrappers (gFighterBlaster*).
-
 #if defined(BT_CLIENT)
 constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
+
+constexpr std::chrono::duration<float> kFighterBeamFadeTime(0.5f);
+constexpr float kfFighterBeamHalfWidth = 0.15f;
+constexpr float kfFighterBeamStartOffset = 1.0f;
 #endif // BT_CLIENT
 
 void FightersInterpolate::Register()
@@ -95,44 +91,23 @@ void FightersInterpolate::Register()
 		.pParticleVerticalVelocitySpreadScale = &gFighterExplosionParticleVerticalVelocitySpread,
 		.pParticleVelocityDecayScale = &gFighterExplosionParticleVelocityDecay,
 		.pParticleGravityScale = &gFighterExplosionParticleGravity,
-		.pParticleVisibleIntensityScale = &gFighterExplosionParticleVisibleIntensity,
 		.pParticleIntensitySpreadScale = &gFighterExplosionParticleIntensitySpread,
 		.pParticleIntensityDecayScale = &gFighterExplosionParticleIntensityDecay,
 		.pParticleIntensityPowerScale = &gFighterExplosionParticleIntensityPower,
 	});
 
-	RegisterFighterBlasterType();
 #if defined(BT_CLIENT)
 	RegisterFighterHitFlashEffect();
-#endif
-}
 
-static int64_t siFighterBlasterPointLightTypeIndex = 0xFF;
-static int64_t siFighterBlasterTypeIndex = 0xFF;
-
-static void RegisterFighterBlasterType()
-{
-#if defined(BT_CLIENT)
-	engine::PointLightsInterpolate::RegisterType(siFighterBlasterPointLightTypeIndex,
+	// Every corner samples the texture's middle column, so the line is equally bright from end to end instead of
+	// fading out toward the shooter and the target.
+	engine::AreaLightsInterpolate::RegisterType(giFighterBeamAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC72pngCrc,
-		.uiColor = 0xFFFFFFFF,
-		.fVisibleArea = kfFighterBlasterSize,
-		.bCameraAligned = true,
-		.pVisibleIntensityWrapper = &gFighterBlasterVisibleIntensity,
-		.pLightingAreaWrapper = &gFighterBlasterLightingArea,
-		.pLightingIntensityWrapper = &gFighterBlasterLightingIntensity,
+		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
+		.fLightingIntensity = 200.0f,
 	});
-#endif // BT_CLIENT
-
-	BlastersInterpolate::RegisterType(siFighterBlasterTypeIndex,
-	{
-		.f2Size = {kfFighterBlasterSize, kfFighterBlasterSize},
-		.iPointLightTypeIndex = siFighterBlasterPointLightTypeIndex,
-		.pWindTrailIntensityWrapper = &gWindDepositFightersBlastersIntensity,
-		.pWindTrailWidthWrapper = &gWindDepositFightersBlastersWidth,
-		.pWindTrailLengthMultiplierWrapper = &gWindDepositFightersBlastersLengthMultiplier,
-	});
+#endif
 }
 
 // The registry binds this collection's position column directly, so its ID needs no per-tick sync.
@@ -149,6 +124,21 @@ static void XM_CALLCONV SyncFighter(FrameInterpolate& rFrameInterpolate, engine:
 }
 
 #if defined(BT_CLIENT)
+void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier)
+{
+	XMVECTOR vecStartToEnd = XMVectorSubtract(vecEnd, vecStart);
+	XMVECTOR vecDirection = XMVector3Normalize(vecStartToEnd);
+	XMVECTOR vecOffsetStart = XMVectorMultiplyAdd(XMVectorReplicate(kfFighterBeamStartOffset), vecDirection, vecStart);
+	float fLength = std::max(XMVectorGetX(XMVector3Length(vecStartToEnd)) - kfFighterBeamStartOffset, 0.0f);
+	auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecOffsetStart, vecDirection, fLength, 0.0f, kfFighterBeamHalfWidth);
+	engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
+	{
+		.iTypeIndex = iTypeIndex,
+		.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
+		.fIntensityMultiplier = fIntensityMultiplier,
+	});
+}
+
 static void RegisterFighterHitFlashEffect()
 {
 	engine::PointLightsInterpolate::RegisterType(siFighterHitFlashTypeIndex,
@@ -299,6 +289,16 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 				.fLengthMultiplier = game::gWindDepositFightersLengthMultiplier.mfCurrent,
 			});
 		}
+
+		// The fade derives from the shared cooldown alone, so it holds at any delta, render interpolation included.
+		if ((rCurrent.pBeamAreaLights[i].uuid.iValue != 0))
+		{
+			std::chrono::duration<float> fade = rPreviousPostRender.pNextBeamFireTimes[i] - deltaTime - (kFighterBeamCooldown - kFighterBeamFadeTime);
+			if (fade > std::chrono::duration<float>::zero())
+			{
+				SyncFighterBeam(rCurrentFrameInterpolate, rCurrent.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecPosition, rCurrent.pVecBeamEnds[i], fade / kFighterBeamFadeTime);
+			}
+		}
 #endif // BT_CLIENT
 	}
 }
@@ -332,7 +332,7 @@ void FightersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.eController = rCurrentPostRender.pController[i],
 				.orders = rCurrentPostRender.pOrders[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
-				.nextBlasterSpawnTime = rCurrentPostRender.pNextBlasterSpawnTimes[i],
+				.nextBeamFireTime = rCurrentPostRender.pNextBeamFireTimes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
@@ -382,63 +382,6 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kFighterDestroyTime;
 			XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 			SpawnFighterExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
-			continue;
-		}
-
-		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
-		{
-			continue;
-		}
-
-		if (rCurrentPostRender.pArrivalGracePeriods[i] > std::chrono::duration<float>::zero())
-		{
-			continue;
-		}
-
-		// A ship climbing between planes stores no plane and holds fire.
-		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
-		if (uiFlightPlane == kuiNoFlightPlane)
-		{
-			continue;
-		}
-
-		XMVECTOR vecNearestEnemy = XMVectorZero();
-		if (!FindNearestEnemyShip(rFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], uiFlightPlane, vecNearestEnemy))
-		{
-			continue;
-		}
-
-		if (!FrameInterpolate::IsVisible(vecNearestEnemy, rCurrentInterpolate.pVecPositions[i]))
-		{
-			continue;
-		}
-
-		// Horizontal offset: the blaster flies flat along the heading, so only the heading-plane angle decides a hit.
-		XMVECTOR vecToEnemy = XMVectorSetZ(XMVectorSubtract(vecNearestEnemy, rCurrentInterpolate.pVecPositions[i]), 0.0f);
-		XMVECTOR vecToEnemyNormal = XMVector3Normalize(vecToEnemy);
-		float fAngleToEnemy = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToEnemyNormal));
-
-		bool bSpawnBlaster = fAngleToEnemy <= kfSpawnBlasterEnemyAngle;
-
-		if (rCurrentPostRender.pNextBlasterSpawnTimes[i] < std::chrono::duration<float>::zero() && bSpawnBlaster)
-		{
-			rCurrentPostRender.pNextBlasterSpawnTimes[i] = kBlastersSpawnCooldown;
-
-			XMVECTOR vecDirection = rCurrentInterpolate.pVecDirections[i];
-			XMVECTOR vecBlasterVelocity = XMVectorScale(vecDirection, kfBlastersSpeed);
-			XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
-
-			BlastersPostRender::Spawn(rFrame,
-			{
-				.vecPosition = vecPosition,
-				.vecVelocity = vecBlasterVelocity,
-				.iTypeIndex = siFighterBlasterTypeIndex,
-				.alignment = rCurrentPostRender.pAlignments[i],
-			});
-
-#if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gFighterBlasterVolume.mfCurrent, gFighterBlasterPitchMinimum.mfCurrent, gFighterBlasterPitchRandom.mfCurrent);
-#endif
 		}
 	}
 }
@@ -456,6 +399,10 @@ void FightersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		.fWidth = game::gWindDepositFightersWidth.mfCurrent,
 		.fLengthMultiplier = game::gWindDepositFightersLengthMultiplier.mfCurrent,
 	});
+
+	// A transfer arrival carries the cooldown but draws no beam until its next shot.
+	rFighters.pBeamAreaLights[iIndex] = {};
+	rFighters.pVecBeamEnds[iIndex] = XMVectorZero();
 }
 
 void FightersInterpolate::ClientInitializeAll(Frame& rFrame)
@@ -523,7 +470,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfFighterHealth;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
-	rCurrentPostRender.pNextBlasterSpawnTimes[iIndex] = rInfo.nextBlasterSpawnTime;
+	rCurrentPostRender.pNextBeamFireTimes[iIndex] = rInfo.nextBeamFireTime;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
@@ -535,6 +482,9 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecVeerOffPoints[iIndex] = XMVectorZero();
+	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
+	rCurrentPostRender.pRegistryTargets[iIndex] = {};
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
@@ -565,6 +515,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	}
 	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
 
+	FleetBoard fleetBoard(rPreviousFrame);
+
 	// Cell center: every cell's local frame is centered on the origin; W=1.0 keeps it a proper position.
 	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
@@ -576,7 +528,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		float fHealth = rPrevious.pfHealths[i];
 		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
-		std::chrono::duration<float> nextBlasterSpawnTime = rPrevious.pNextBlasterSpawnTimes[i] - deltaTime;
+		std::chrono::duration<float> nextBeamFireTime = rPrevious.pNextBeamFireTimes[i] - deltaTime;
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
@@ -584,6 +536,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		std::chrono::duration<float> cellChangeTimer = rPrevious.pCellChangeTimers[i];
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
+		XMVECTOR vecVeerOffPoint = rPrevious.pVecVeerOffPoints[i];
+		engine::registry_id_t registryTarget = rPrevious.pRegistryTargets[i];
 		int64_t iNavigationDirection = GetNavigationDirection(flags);
 		int64_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 
@@ -596,6 +550,12 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		{
 			// ComputeNavigation overwrites the debug waypoint only on a recompute tick, so carry it forward here.
 			rCurrent.pVecDebugNavigationWaypoints[i] = rPrevious.pVecDebugNavigationWaypoints[i];
+		}
+
+		// The fade has ended; the cooldown exceeds the fade, so the light is gone before the next shot.
+		if (nextBeamFireTime <= kFighterBeamCooldown - kFighterBeamFadeTime)
+		{
+			engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pBeamAreaLights[i]);
 		}
 #endif // BT_CLIENT
 
@@ -611,7 +571,19 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			}
 			else if (rPrevious.pController[i] == ShipController::kFleet)
 			{
-				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kFighter, rPreviousFrame, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+				if (tactic.bHasDestination)
+				{
+					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes
+					// mode and recomputes its path; no cached path direction survives.
+					vecAiDirection = XMVector2Normalize(XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f));
+					iNavigationDirection = -1;
+				}
+				else
+				{
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+				}
 				bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
 				if (bAligning)
 				{
@@ -627,14 +599,17 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			}
 			else
 			{
-				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
-
-				RegenerateHealth(vecPosition, bEnemyFound, vecNearestEnemy, deltaTime, kfFighterHealth, fHealth);
-				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
-				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfFighterFleeTurnRate : kfFighterChaseTurnRate;
-				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
+				ShipTactic tactic {};
+				if (ChooseAttackTactic(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], kiFighterHighestFlightPlane, flags, vecVeerOffPoint, tactic))
+				{
+					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+				}
+				else
+				{
+					// No enemy in the cell: return to an island, which also clears kFlee.
+					tactic.vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, false, XMVectorZero(), flags, tactic.bHasDestination);
+				}
+				SteerHeadingTowards(vecPosition, vecDirection, tactic.vecDestination, tactic.bHasDestination, kfFighterChaseTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kFighterMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
@@ -666,7 +641,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pfHealths[i] = fHealth;
 		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
-		rCurrent.pNextBlasterSpawnTimes[i] = nextBlasterSpawnTime;
+		rCurrent.pNextBeamFireTimes[i] = nextBeamFireTime;
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
@@ -674,6 +649,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
+		rCurrent.pVecVeerOffPoints[i] = vecVeerOffPoint;
+		rCurrent.pRegistryTargets[i] = registryTarget;
 
 		rCurrentInterpolate.pfDeltaRotations[i] = fDeltaRotation;
 	}
@@ -718,7 +695,7 @@ bool FightersPostRender::LogDifferences(const FightersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
 		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
-		bEqual &= common::LogDifference<"pNextBlasterSpawnTimes">(i, pNextBlasterSpawnTimes[i], rOther.pNextBlasterSpawnTimes[i]);
+		bEqual &= common::LogDifference<"pNextBeamFireTimes">(i, pNextBeamFireTimes[i], rOther.pNextBeamFireTimes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
@@ -732,6 +709,8 @@ bool FightersPostRender::LogDifferences(const FightersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
+		bEqual &= common::LogDifference<"pVecVeerOffPoints">(i, pVecVeerOffPoints[i], rOther.pVecVeerOffPoints[i]);
+		bEqual &= common::LogDifference<"pRegistryTargets">(i, pRegistryTargets[i].uuid.iValue, rOther.pRegistryTargets[i].uuid.iValue);
 	}
 
 	return bEqual;

@@ -6,6 +6,7 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -57,6 +58,9 @@ constexpr float kfHexShieldFadeThreshold = 0.25f;
 // Omni models, one per ShipController (defined in OmnisRender.cpp)
 extern const common::crc_t kOmniFleetModel;
 extern const common::crc_t kOmniRandomModel;
+
+// Defined in Fighters.cpp.
+void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier);
 
 constexpr float kfRotationTiltFactor = 0.015f;
 constexpr float kfRotationTiltMaximum = 0.4f;
@@ -170,6 +174,15 @@ void OmnisInterpolate::Register()
 		.uiLightingColor = 0x40FFFF00, // Cyan (ABGR)
 		.fMinimumIntensity = 0.0f,    // Shield invisible when idle
 	});
+
+	// The Fighter beam's texture and middle column, tinted green.
+	engine::AreaLightsInterpolate::RegisterType(siHealBeamAreaLightTypeIndex,
+	{
+		.uiCrc = data::kTexturesBlasterBC72pngCrc,
+		.puiColors = {0xFF00FF00, 0xFF00FF00, 0xFF00FF00, 0xFF00FF00}, // Green (ABGR)
+		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
+		.fLightingIntensity = 200.0f,
+	});
 #endif // BT_CLIENT
 }
 
@@ -227,7 +240,6 @@ void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 #endif // BT_CLIENT
 
 	SpawnBlasters(rFrame, rStaticData.coordinate);
-	SpawnMissiles(rFrame, rStaticData.coordinate);
 	SpawnDeathExplosions(rFrame, rStaticData.coordinate);
 }
 
@@ -261,6 +273,7 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentInterpolate.pfRotationAccelerationYs[iIndex] = 0.0f;
 	rCurrentInterpolate.pWindTrails[iIndex] = {};
 	rCurrentInterpolate.pHexShields[iIndex] = {};
+	rCurrentInterpolate.pHealBeamAreaLights[iIndex] = {};
 	rCurrentInterpolate.pfShieldRotations[iIndex] = rInfo.fShieldRotation;
 	rCurrentInterpolate.pfShieldShrinks[iIndex] = rInfo.fShieldShrink;
 	rCurrentInterpolate.pHexShieldDirections[iIndex] = {};
@@ -273,7 +286,6 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pOrders[iIndex] = rInfo.orders;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pNextBlasterFireTimes[iIndex] = rInfo.nextBlasterFireTime;
-	rCurrentPostRender.pNextSecondarySpawnTimes[iIndex] = rInfo.nextSecondarySpawnTime;
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecWantedDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pfArmors[iIndex] = rInfo.bTransfer ? rInfo.fArmor : kfOmniArmor;
@@ -288,18 +300,22 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows its flagship in the same cell
+	// A veer-off reacts to the previous frame, so it restarts here; kHealing carries across a transfer.
 	ShipFlags_t spawnFlags = rInfo.flags;
+	spawnFlags.Set(ShipFlags::kVeerOff, false);
 	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecVeerOffPoints[iIndex] = XMVectorZero();
+	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
+	rCurrentPostRender.pRegistryTargets[iIndex] = {};
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
 	rCurrentPostRender.pFlagshipGlobalIds[iIndex] = rInfo.flagshipGlobalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
-	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rInfo.uiPendingWeaponModeTicks;
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
@@ -448,6 +464,18 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 			engine::HexShieldsInterpolate::Sync(rFrameInterpolate, rCurrent.pHexShields[i], syncData);
 		}
 
+		// The flagship row of this tick is not updated yet, so the beam starts at its previous-frame position, about one
+		// tick behind. Without the flagship the light keeps its last corners until PostRender Update releases it.
+		if ((rCurrent.pHealBeamAreaLights[i].uuid.iValue != 0))
+		{
+			std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rPreviousFrame, rPreviousPostRender.pFlagshipGlobalIds[i]);
+			if (optionalFlagship)
+			{
+				float fTime = static_cast<float>(rFrameInterpolate.iTick) * engine::kfDeltaTime + rFrameInterpolate.fDeltaTime;
+				float fPulse = 0.5f + 0.5f * std::sin(XM_2PI * kfOmniHealBeamPulseFrequency * fTime);
+				SyncFighterBeam(rFrameInterpolate, rCurrent.pHealBeamAreaLights[i], siHealBeamAreaLightTypeIndex, ShipPosition(rPreviousFrame.interpolate, *optionalFlagship), vecPosition, std::lerp(kfOmniHealBeamPulseMinimum, 1.0f, fPulse));
+			}
+		}
 #endif // BT_CLIENT
 	}
 }
@@ -511,12 +539,13 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	}
 	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
 
+	FleetBoard fleetBoard(rPreviousFrame);
+
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		ShipOrders_t orders = rPrevious.pOrders[i];
 		ShipFlags_t flags = rPrevious.pFlags[i];
 		std::chrono::duration<float> nextBlasterFireTime = rPrevious.pNextBlasterFireTimes[i];
-		std::chrono::duration<float> nextSecondarySpawnTime = rPrevious.pNextSecondarySpawnTimes[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		XMVECTOR vecWantedDirection = rPrevious.pVecWantedDirections[i];
 		float fArmor = rPrevious.pfArmors[i];
@@ -531,11 +560,14 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		std::chrono::duration<float> navigationDelay = rPrevious.pNavigationDelays[i];
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
-		int64_t iPendingWeaponModeTicks = rPrevious.puiPendingWeaponModeTicks[i];
 		int64_t iNavigationDirection = GetNavigationDirection(flags);
 		int64_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
+		XMVECTOR vecVeerOffPoint = rPrevious.pVecVeerOffPoints[i];
+		engine::registry_id_t registryTarget = rPrevious.pRegistryTargets[i];
 		XMVECTOR vecPosition = rPreviousInterpolate.pVecPositions[i];
+		// Within the arrival distance of its slot on this tick's escort; only a healing omni there heals.
+		bool bAtEscortSlot = false;
 
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
@@ -548,7 +580,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 #endif // BT_CLIENT
 
-		CountdownPendingOrders(orders, iPendingFleetWantedCoordinateTicks, iPendingWeaponModeTicks);
+		CountdownPendingOrders(iPendingFleetWantedCoordinateTicks);
 
 		// Transfer lock skips navigation, target acquisition, and movement acceleration.
 		if (transferLockTimer > std::chrono::duration<float>::zero())
@@ -557,14 +589,76 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 		else
 		{
+			// An escort tick accelerates along this instead of the AI direction.
+			std::optional<XMVECTOR> optionalEscortSteering;
 			if (rPrevious.pController[i] == ShipController::kFleet)
 			{
-				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+				// A healing omni escorts whatever its fleet's stance.
+				FleetView view = fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]);
+				if (flags & ShipFlags::kHealing)
+				{
+					view.eStance = FleetStance::kEscort;
+				}
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, view, rPrevious.pGlobalIds[i], vecPosition, rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
+				if (tactic.bHasDestination)
+				{
+					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes mode
+					// and recomputes its path.
+					XMVECTOR vecToDestination = XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f);
+					vecAiDirection = XMVector2Normalize(vecToDestination);
+					iNavigationDirection = -1;
+					if (view.eStance == FleetStance::kEscort)
+					{
+						// Routed around terrain to the slot, or to the nearest clear point when the slot lies inside terrain.
+						bool bFinalWaypoint = false;
+						XMVECTOR vecWaypoint = NextRouteWaypoint(rStaticData, vecPosition, tactic.vecDestination, tactic.iTargetFlightPlane, bFinalWaypoint);
+						XMVECTOR vecToWaypoint = XMVectorSetZ(XMVectorSubtract(vecWaypoint, vecPosition), 0.0f);
+						if (bFinalWaypoint)
+						{
+							// Damped arrival: steer the velocity toward the waypoint offset times the gain, saturating at full
+							// acceleration. vecVelocity is still the previous tick's.
+							XMVECTOR vecSteering = XMVectorSetZ(XMVectorDivide(XMVectorSubtract(XMVectorScale(vecToWaypoint, kfOmniEscortPositionGain), vecVelocity), XMVectorReplicate(kfOmniEscortVelocityScale)), 0.0f);
+							float fSteeringLength = XMVectorGetX(XMVector2Length(vecSteering));
+							optionalEscortSteering = fSteeringLength > 1.0f ? XMVectorScale(vecSteering, 1.0f / fSteeringLength) : vecSteering;
+						}
+						else
+						{
+							optionalEscortSteering = XMVector2Normalize(vecToWaypoint);
+						}
+						bAtEscortSlot = XMVectorGetX(XMVector2LengthSq(vecToDestination)) <= kfOmniEscortArrivalDistance * kfOmniEscortArrivalDistance;
+					}
+				}
+				else
+				{
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+				}
 			}
 			else
 			{
+				// The nearest enemy on an Omni plane, one plane at a time; an exact tie keeps the lower plane.
 				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
+				bool bEnemyFound = false;
+				float fNearestDistanceSquared = std::numeric_limits<float>::max();
+				for (int64_t j = 0; j <= kiOmniHighestFlightPlane; ++j)
+				{
+					XMVECTOR vecPlaneEnemy = XMVectorZero();
+					if (!FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], j, vecPlaneEnemy))
+					{
+						continue;
+					}
+					float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPlaneEnemy, vecPosition)));
+					if (fDistanceSquared < fNearestDistanceSquared)
+					{
+						fNearestDistanceSquared = fDistanceSquared;
+						vecNearestEnemy = vecPlaneEnemy;
+						bEnemyFound = true;
+					}
+				}
+				if (bEnemyFound)
+				{
+					SetTargetFlightPlane(orders, NearestFlightPlane(vecNearestEnemy));
+				}
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
 				if (bHasDestination)
@@ -575,17 +669,42 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
-			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], kfOmniBlastersSpeed, kfBlasterTargetRange, kfMissileTargetRange, flags, bLookTargetFound, vecLookPosition);
+			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, flags, bLookTargetFound, vecLookPosition);
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
-			ApplyAcceleratedMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
+			ApplyAcceleratedMovement(iNavigationDirection, optionalEscortSteering.value_or(vecAiDirection), deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
 
 			if (bLookTargetFound)
 			{
 				UpdateFacing(vecPosition, vecLookPosition, vecWantedDirection);
 			}
 		}
+
+		bool bHealing = bAtEscortSlot && (flags & ShipFlags::kHealing);
+		if (bHealing)
+		{
+			fArmor = std::min(fArmor + kfOmniHealRate * deltaTime.count(), kfOmniArmor);
+			if (fArmor >= kfOmniArmor)
+			{
+				flags.Set(ShipFlags::kHealing, false);
+			}
+		}
+
+#if defined(BT_CLIENT)
+		// The heal beam shows exactly while the omni heals; the light it holds stays out of the CRC.
+		if (bHealing && (flags & ShipFlags::kHealing))
+		{
+			if (rFrame.interpolate.pOmnis->pHealBeamAreaLights[i].uuid.iValue == 0)
+			{
+				engine::AreaLightsPostRender::Add(rFrame, rFrame.interpolate.pOmnis->pHealBeamAreaLights[i], OmnisInterpolate::siHealBeamAreaLightTypeIndex);
+			}
+		}
+		else
+		{
+			engine::ReleaseIndexableElementAndClearHandle(rFrame, rFrame.interpolate.pOmnis->pHealBeamAreaLights[i]);
+		}
+#endif // BT_CLIENT
 
 		// Shield regeneration and pushes also run while transfer-locked. Terrain contact uses the sweep end's height.
 		float fHeight = XMVectorGetZ(rFrame.interpolate.pOmnis->pVecPositions[i]);
@@ -610,7 +729,6 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		rCurrent.pOrders[i] = orders;
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pNextBlasterFireTimes[i] = nextBlasterFireTime;
-		rCurrent.pNextSecondarySpawnTimes[i] = nextSecondarySpawnTime;
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pVecWantedDirections[i] = vecWantedDirection;
 		rCurrent.pfArmors[i] = fArmor;
@@ -624,9 +742,10 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pNavigationDelays[i] = navigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
+		rCurrent.pVecVeerOffPoints[i] = vecVeerOffPoint;
+		rCurrent.pRegistryTargets[i] = registryTarget;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
-		rCurrent.puiPendingWeaponModeTicks[i] = static_cast<uint8_t>(iPendingWeaponModeTicks);
 	}
 }
 
@@ -664,7 +783,6 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pNextBlasterFireTimes">(i, pNextBlasterFireTimes[i], rOther.pNextBlasterFireTimes[i]);
-		bEqual &= common::LogDifference<"pNextSecondarySpawnTimes">(i, pNextSecondarySpawnTimes[i], rOther.pNextSecondarySpawnTimes[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pVecWantedDirections">(i, pVecWantedDirections[i], rOther.pVecWantedDirections[i]);
 		bEqual &= common::LogDifference<"pfArmors">(i, pfArmors[i], rOther.pfArmors[i]);
@@ -678,6 +796,8 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
+		bEqual &= common::LogDifference<"pVecVeerOffPoints">(i, pVecVeerOffPoints[i], rOther.pVecVeerOffPoints[i]);
+		bEqual &= common::LogDifference<"pRegistryTargets">(i, pRegistryTargets[i].uuid.iValue, rOther.pRegistryTargets[i].uuid.iValue);
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
@@ -685,7 +805,6 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
-		bEqual &= common::LogDifference<"puiPendingWeaponModeTicks">(i, puiPendingWeaponModeTicks[i], rOther.puiPendingWeaponModeTicks[i]);
 	}
 
 	return bEqual;

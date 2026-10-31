@@ -167,11 +167,12 @@ This is a criterion-specific gate, not general launch readiness. It holds the cl
 
 For a user request to launch the game for their own play or testing. These are
 the `## Launch` executables without the harness run: a running-server check,
-then a harness lock claim under session `normal-launch` that is never released,
-but no process check, readiness wait, heartbeat, or release, and none of the
-agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`,
-`--windowed`, hidden windows). The client therefore opens a normal window that
-takes physical input, its fullscreen state follows the order in
+then a harness lock claim under session `normal-launch` that is released once
+both processes have started, but no process check, readiness wait, or
+heartbeat, and none of the agent-only arguments (`--agent-port`,
+`--app-data-directory`, `--log-file`, `--windowed`, hidden windows). The client
+therefore opens a normal window that takes physical input, its fullscreen state
+follows the order in
 [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md)
 `## Startup and Main Loop`, and both processes use the per-user AppData, so the
 user's own settings and saves apply. `--loopback-only` stays, as in every
@@ -191,15 +192,15 @@ If that lists a process, report it to the user instead of stopping it; take no l
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project '<Project>'
 ```
 
-- Exit `0`: launch below. Do not keep the claim's owner token; keep its result's `gameDataDirectory`.
+- Exit `0`: launch below. Keep the result's `owner` and `agentHarness` until the release below, and its `gameDataDirectory`.
 - `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet.
   When step 11 classifies the holder fresh, re-invoke the claim; when stale, run
   steps 11-15 with session label `normal-launch`, using step 1's fixed ports
   (`27100` and `27101`) and the expected executables from the project
   hub step 4 reads. A completed steal continues to the launch below with the
-  `claim.foreign-owner` result's `gameDataDirectory`, and its new owner token is
-  not kept either; a `BLOCKED` takeover is reported to the user with nothing
-  launched.
+  `claim.foreign-owner` result's `gameDataDirectory`, keeping the steal's new
+  owner token and that result's `agentHarness` until the release below; a
+  `BLOCKED` takeover is reported to the user with nothing launched.
 - `claim.wait-timeout`: re-invoke the claim.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
@@ -217,13 +218,21 @@ $ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @('--loopback-
 [ordered]@{ serverPid = $ServerProcess.Id; clientPid = $ClientProcess.Id } | ConvertTo-Json -Compress
 ```
 
-The client connects as `## Launch` describes. If a launch fails, only report it
-to the user; the claimed lock goes stale five minutes after the claim and the
-takeover steps take it over. Leave both processes running for the user, who
-closes them; never quit, stop, or release them, and never heartbeat or release
-the lock. The claim's owner token is not kept, so after the launch this session
-does not hold the harness lock and `/compile` never sends `quit` to these
-processes. A harness run started meanwhile waits in its claim until the user
-closes the server, then takes the stale lock over through worker steps 11-15;
-when the server closed within five minutes of the claim, that run waits out the
-rest of those five minutes.
+Then release the lock with the kept owner token, as its own shell call that runs
+even when the launch block threw:
+
+```powershell
+& '<absolute AgentHarness path>' lock release --key default --owner '<owner token>'
+```
+
+Exit `0` released the lock. Exit `2` means the lock is absent or another owner
+took it over; leave it alone. On any other exit, report the release result to
+the user. Then discard the owner token. Never release through
+`Invoke-HarnessRelease.ps1`, which quits and force-stops processes.
+
+The client connects as `## Launch` describes. If a launch fails, report it to
+the user after the release. Leave both processes running for the user, who
+closes them; never quit or stop them. After the release this session holds no
+owner token, so `/compile` never sends `quit` to these processes. A harness run
+started meanwhile claims as worker steps 5 and 7 describe; while the user's
+client stays open, it waits as `## Launch` requires.

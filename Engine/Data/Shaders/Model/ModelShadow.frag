@@ -19,6 +19,7 @@ layout (location = 5) in vec2 f2InUV3;
 layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in vec4 f4InColorAdd;
 layout (location = 8) in float fInHeightAboveBase;
+layout (location = 9) in flat int iInLayer;
 
 // Output
 layout (location = 0) out float fOutColor;

@@ -5,9 +5,9 @@ Revisit When: the user schedules live tuning of the High flight layer.
 ## Request and scope
 
 Expose the High layer's height as an easy-to-adjust developer control from
-0.0 to 200.0 meters, initially 100.0. Ships may fly through terrain when it
+0.0 to 200.0 meters, initially 65.0. Ships may fly through terrain when it
 is set too low; the user explicitly accepts this. High may also be below or
-equal to Low (6 m) or Medium (50 m). Keep their heights unchanged.
+equal to Low (15 m) or Medium (40 m). Keep their heights unchanged.
 
 This is a manually executed feature under `Documents/Features`. Saving this
 document authorizes no runtime implementation and creates no scheduler claim.
@@ -73,9 +73,9 @@ ordinary serialization, CRC, difference logging, and snapshot treatment.
 Frame input records the transition so reconciliation and replay use the
 historically correct value. The server seeds newly activated cells from the
 current accepted value; late joins, resubscriptions, and cell transfers must
-not restore the compile-time 100 m default or revert an accepted setting.
+not restore the compile-time 65 m default or revert an accepted setting.
 Render consumers use the height belonging to the displayed frame. Start a
-new session at 100 m; do not add a separate user-settings persistence format.
+new session at 65 m; do not add a separate user-settings persistence format.
 Saved simulation state and replay restore the recorded height.
 
 There is no generic simulation-value Tweaks bridge in the inspected code:
@@ -116,7 +116,7 @@ a general configuration/admin system for this slider.
   that ordinal assumptions do not accidentally select another graph.
 - Engine `Graphics/FlightPlaneProjection.cpp`, camera/picking, smoke and wind
   plane consumers, shader-facing plane heights, and ship render/shadows:
-  inventory every `gpFlightPlanes`, `kFlightPlanes`, and fixed 100 m use;
+  inventory every `gpFlightPlanes`, `kFlightPlanes`, and fixed 65 m use;
   update only consumers made incorrect by the effective High height.
 - Update owning AGENTS contracts that currently promise immutable ordered
   heights, above-terrain High, or endpoint-based admissible ship heights.
@@ -129,12 +129,12 @@ a general configuration/admin system for this slider.
 ## Acceptance criteria
 
 1. Only developer Tweaks > Misc > Ships exposes High Layer Height, with
-   range 0.0–200.0 m and session default 100.0 m; Low and Medium remain 6/50 m.
-2. Exercise 0, 6, 25, 50, 100, and 200 m, changing values repeatedly while
+   range 0.0–200.0 m and session default 65.0 m; Low and Medium remain 15/40 m.
+2. Exercise 0, 15, 25, 40, 65, and 200 m, changing values repeatedly while
    ships climb. Existing High-target ships move smoothly at their type's
    existing rate, new High ships use the accepted height, and unrelated
    targets and XY movement remain intact.
-3. At 0, 6, and 50 m, High retains its identity, empty navigation graph, and
+3. At 0, 15, and 40 m, High retains its identity, empty navigation graph, and
    terrain exemption. Ships may pass through terrain; no ordering assertion,
    terrain clamp, accidental plane relabeling, or equal-height ambiguity occurs.
 4. Server and clients agree on accepted value, application tick, ship heights,

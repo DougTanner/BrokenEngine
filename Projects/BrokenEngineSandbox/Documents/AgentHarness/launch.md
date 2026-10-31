@@ -16,4 +16,4 @@ during play remain in memory and may be lost on exception, crash, or hard kill.
 
 ## Durable caveats
 
-- Client weapon-mode requests received during paused or other zero-tick updates persist until the first advancing update. Client `kClientFleetNavigationDelay` requests apply immediately.
+- Client `kClientFleetNavigationDelay` requests apply immediately.

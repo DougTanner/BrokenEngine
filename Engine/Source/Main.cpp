@@ -7,7 +7,6 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SoundSettings.h"
 #include "Ui/SoundSettingsWrappersBase.h"
-#include "Ui/TweaksSettings.h"
 #include "CrashReport.h"
 
 #include "Frame/TerrainUtils.h"
@@ -318,9 +317,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 	auto pInput = std::make_unique<Input>();
 	gpInput = pInput.get();
 
-	// Load tweaks settings (requires both Game and ImGuiManager)
-	LoadTweaksSettings();
-
 	// Load persistent client state (the game's camera focus + zoom). Requires engine::gpCamera and gpGame; both exist by here.
 	game::LoadClientState();
 
@@ -519,7 +515,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 #endif
 
 #if defined(BT_CLIENT)
-	SaveTweaksSettings();
 	SaveSoundSettings();
 	SaveGraphicsSettings();
 	SaveGameSettings();

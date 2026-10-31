@@ -41,8 +41,12 @@ report template live in [`../SKILL.md`](../SKILL.md).
    every changed `.cpp` file has one measurement.
 10. Record a size observation only when the changed region exposes a concrete
     cohesive split. Return it as a manager follow-up candidate; never reduce the
-    file or prescribe an inline reduction during review. Done when each
-    qualifying file carries one observation and no reduction is prescribed.
+    file or prescribe an inline reduction during review. Record a refactor
+    observation only for a design shape in code the review already traced that
+    a refactor would improve; never read further code to find one. Done when
+    each qualifying file carries one size observation, no reduction is
+    prescribed, and every refactor observation cites code the review already
+    traced.
 11. Return the report and the conditional `/update-vcxproj` trigger. Never read
     or grep project XML in this review. Done when the report states the trigger
     or `none`.

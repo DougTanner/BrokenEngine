@@ -37,6 +37,42 @@ static constexpr float Smoothstep(float fParameter)
 	return fParameter * fParameter * (3.0f - 2.0f * fParameter);
 }
 
+// Bounding rectangle (minX, maxY, maxX, minY), relative to the look-at, of the four screen-corner rays meeting Z = 0
+// and the highest flight plane, for an eye orbiting the look-at by fTilt radians about +X. It takes no look-at XY, so
+// it stays bit-stable while the camera pans, and at tilt 0 it is exactly symmetric about the look-at.
+static XMFLOAT4 TiltedFootprint(float fTilt, bool bOrthographic, float fEyeDistance, float fFramingHalfHeight, float fTangentHalfFieldOfView, float fAspectRatio, float fLookAtHeight)
+{
+	float fSine = std::sin(fTilt);
+	float fCosine = std::cos(fTilt);
+	XMFLOAT4 f4Footprint {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max()};
+	for (float fHeight : {0.0f, gpFlightPlanes->Highest().fHeightMeters})
+	{
+		// -1 is the bottom (south) screen edge, +1 the top (north) one.
+		for (float fVertical : {-1.0f, 1.0f})
+		{
+			float fHalfWidth = 0.0f;
+			float fY = 0.0f;
+			if (bOrthographic)
+			{
+				fHalfWidth = fFramingHalfHeight * fAspectRatio;
+				fY = fVertical * fFramingHalfHeight * fCosine + (fLookAtHeight + fVertical * fFramingHalfHeight * fSine - fHeight) * fSine / fCosine;
+			}
+			else
+			{
+				float fViewDepth = (fLookAtHeight + fEyeDistance * fCosine - fHeight) / (fCosine - fVertical * fSine * fTangentHalfFieldOfView);
+				fHalfWidth = fViewDepth * fAspectRatio * fTangentHalfFieldOfView;
+				fY = -fEyeDistance * fSine + fViewDepth * (fSine + fVertical * fCosine * fTangentHalfFieldOfView);
+			}
+			// The camera right vector is +X at any tilt, so the left and right corners mirror about the look-at.
+			f4Footprint.x = std::min(f4Footprint.x, -fHalfWidth);
+			f4Footprint.y = std::max(f4Footprint.y, fY);
+			f4Footprint.z = std::max(f4Footprint.z, fHalfWidth);
+			f4Footprint.w = std::min(f4Footprint.w, fY);
+		}
+	}
+	return f4Footprint;
+}
+
 CameraTarget::CameraTarget(Kind eKind, XMVECTOR vecPosition, XMVECTOR vecVisualOffset)
 : meKind(eKind)
 , mVecPosition(vecPosition)
@@ -171,13 +207,15 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	}
 	UpdateFraming();
 
-	// Keep each world-texel reference at or above the live framing: zero initialization and outward zoom snap
-	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
-	// density change remains gradual. At a settled framing both references converge to the live framing.
-	UpdateTexelFramingReference(mfCameraFraming, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelFraming);
-	UpdateTexelFramingReference(mfCameraFraming, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelFraming);
-
 	CalculateMatricesAndVisibleArea();
+
+	// Keep each world-texel reference at or above the live framing times the tilt coverage ratio: zero initialization,
+	// outward zoom, and a tilt increase snap immediately for full viewport coverage, while inward zoom and a tilt
+	// decrease contract at the existing independent rates so the density change remains gradual. At a settled framing
+	// and tilt both references converge to that product.
+	float fCoveredFraming = mfCameraFraming * mfTexelCoverageRatio;
+	UpdateTexelFramingReference(fCoveredFraming, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelFraming);
+	UpdateTexelFramingReference(fCoveredFraming, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelFraming);
 
 	// Decay the visual error offset for smooth reconciliation corrections on the sim-scaled render delta the camera and
 	// entity interpolation use. The caller's PullTarget read it before this update.
@@ -359,16 +397,20 @@ XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 
 void CameraBase::CalculateMatricesAndVisibleArea()
 {
-	// The eye derives from the framing: it sits where the projection shows the framing's look-at-plane half-height.
-	// Orthographic shows that half-height at any distance, so it places a virtual eye at the default field of view.
+	// The eye derives from the framing: it sits on the view axis at the distance from the look-at where the projection
+	// shows the framing's half-height across the view-perpendicular plane through the look-at. Orthographic shows that
+	// half-height at any distance, so it places a virtual eye at the default field of view.
 	mbOrthographicProjection = gOrthographicProjection.Get<bool>();
+	float fTiltDegrees = gCameraTilt.mfCurrent;
+	float fTilt = XMConvertToRadians(fTiltDegrees);
 	float fFramingHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
 	float fEyeFieldOfView = mbOrthographicProjection ? gFieldOfView.mfDefault : gFieldOfView.mfCurrent;
 	float fEyeDistance = fFramingHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
-	// Eye sits directly above target along +Z (straight-down view). W=0 direction added to mVecPosition (W=1) preserves position.
-	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	// The eye orbits the look-at about +X: tilt 0 is straight down, positive tilt moves the eye south so the view looks
+	// north. W=0 direction added to mVecPosition (W=1) preserves position.
+	mVecToEyeNormal = XMVectorSet(0.0f, -std::sin(fTilt), std::cos(fTilt), 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(mVecToEyeNormal, fEyeDistance));
-	mVecWaterEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(mVecToEyeNormal, mfCameraFraming));
+	mVecWaterEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, mfCameraFraming, 0.0f));
 
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
 	auto vecUpNormal = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
@@ -381,57 +423,21 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	static constexpr float kfFarClipPerEyeDistance = 2.667f;
 	float fNearClip = fEyeDistance * kfNearClipPerEyeDistance;
 	float fFarClip = std::max(kfMinimumFarClip, fEyeDistance * kfFarClipPerEyeDistance);
-	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
-	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
 	mMatProjection = mbOrthographicProjection ? XMMatrixOrthographicRH(2.0f * fFramingHalfHeight * fAspectRatio, 2.0f * fFramingHalfHeight, fNearClip, fFarClip) : XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent), fAspectRatio, fNearClip, fFarClip);
 
-	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorZero(), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
+	// One footprint feeds the visible area and the texel coverage. The tilt-0 call runs the same operations on the same
+	// arguments when the tilt is 0, so the ratio is then exactly 1 and the symmetric footprint's center offset exactly 0.
+	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(gFieldOfView.mfCurrent));
+	float fLookAtHeight = XMVectorGetZ(mVecPosition);
+	XMFLOAT4 f4Footprint = TiltedFootprint(fTilt, mbOrthographicProjection, fEyeDistance, fFramingHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
+	XMFLOAT4 f4UntiltedFootprint = TiltedFootprint(0.0f, mbOrthographicProjection, fEyeDistance, fFramingHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
+	mfTexelCoverageRatio = std::max((f4Footprint.z - f4Footprint.x) / (f4UntiltedFootprint.z - f4UntiltedFootprint.x), (f4Footprint.y - f4Footprint.w) / (f4UntiltedFootprint.y - f4UntiltedFootprint.w));
+	mfTexelCenterOffsetNorth = 0.5f * (f4Footprint.w + f4Footprint.y);
 
-	XMMATRIX matIdentity = XMMatrixIdentity();
-
-	XMVECTOR vecRayStart {};
-	XMVECTOR vecRayEnd {};
-	XMVECTOR vecPlaneIntersection {};
-
-	XMFLOAT3 f3ScreenPosition { 0.0f, 0.0f, 0.0f };
-
-	struct VisibleCorner
-	{
-		float fScreenX = 0.0f;
-		float fScreenY = 0.0f;
-		XMFLOAT4* pTarget = nullptr;
-	};
-	const VisibleCorner pCorners[] =
-	{
-		{ .fScreenX = 0.0f, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopLeft },
-		{ .fScreenX = fViewportWidth, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopRight },
-		{ .fScreenX = 0.0f, .fScreenY = fViewportHeight, .pTarget = &mf4VisibleBottomLeft },
-		{ .fScreenX = fViewportWidth, .fScreenY = fViewportHeight, .pTarget = &mf4VisibleBottomRight },
-	};
-
-	for (const VisibleCorner& rCorner : pCorners)
-	{
-		f3ScreenPosition.x = rCorner.fScreenX;
-		f3ScreenPosition.y = rCorner.fScreenY;
-
-		f3ScreenPosition.z = 0.0f;
-		vecRayStart = XMVector3Unproject(XMLoadFloat3(&f3ScreenPosition), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatProjection, mMatView, matIdentity);
-		f3ScreenPosition.z = 1.0f;
-		vecRayEnd = XMVector3Unproject(XMLoadFloat3(&f3ScreenPosition), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatProjection, mMatView, matIdentity);
-
-		vecPlaneIntersection = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
-		// The SDK returns all-lane QNaN when the corner ray is parallel to the Z=0 plane; a NaN corner would
-		// poison the visible area and every grid-snapped extent derived from it.
-		if (XMVector3IsNaN(vecPlaneIntersection)) [[unlikely]]
-		{
-			vecPlaneIntersection = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-		}
-
-		XMStoreFloat4(rCorner.pTarget, vecPlaneIntersection);
-	}
-
-	mf4LargeVisibleArea = XMFLOAT4 {mf4VisibleTopLeft.x, mf4VisibleTopLeft.y, mf4VisibleTopRight.x, mf4VisibleBottomRight.y};
+	float fLookAtX = XMVectorGetX(mVecPosition);
+	float fLookAtY = XMVectorGetY(mVecPosition);
+	mf4LargeVisibleArea = XMFLOAT4 {fLookAtX + f4Footprint.x, fLookAtY + f4Footprint.y, fLookAtX + f4Footprint.z, fLookAtY + f4Footprint.w};
 
 	if (gpGraphics->mFramebufferVkExtent2D.width > gpGraphics->mFramebufferVkExtent2D.height) [[likely]]
 	{
@@ -491,9 +497,9 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
 
-	// Field of view and projection move the Z = 0 area at a fixed framing without moving the bucket, so they re-latch
-	// the quad size through the key; otherwise the snapped span could fall short of the raw area.
-	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(gFieldOfView.mfCurrent) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
+	// Field of view, projection, and tilt move the ground area at a fixed framing without moving the bucket, so they
+	// re-latch the quad size through the key; otherwise the snapped span could fall short of the raw area.
+	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(gFieldOfView.mfCurrent) ^ std::bit_cast<uint32_t>(fTiltDegrees) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
 
 	if (iZoomBucket != miVisibleAreaZoomBucket || uiLatchKey != muiVisibleAreaLatchKey || iLevelOfDetail != miVisibleAreaLevelOfDetail)
 	{

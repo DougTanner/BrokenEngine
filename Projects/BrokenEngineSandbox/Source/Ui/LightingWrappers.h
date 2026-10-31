@@ -74,11 +74,6 @@ extern engine::Wrapper gMissileExhaustVisibleIntensity;
 extern engine::Wrapper gMissileExhaustLightingArea;
 extern engine::Wrapper gMissileExhaustLightingIntensity;
 
-// Fighters - Blaster
-extern engine::Wrapper gFighterBlasterVisibleIntensity;
-extern engine::Wrapper gFighterBlasterLightingArea;
-extern engine::Wrapper gFighterBlasterLightingIntensity;
-
 // Fighters - Hit flash
 extern engine::Wrapper gHitFlashVisibleAreaOne;
 extern engine::Wrapper gHitFlashVisibleAreaTwo;

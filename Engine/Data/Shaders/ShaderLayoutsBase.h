@@ -149,11 +149,6 @@ CONSTEXPR int kiModelBindingJointMatrix = 16;
 // (Water.frag pWaterNormalSamplers[] sampler array).
 CONSTEXPR int kiWaterNormalCount = 17;
 
-// Length of each per-octave-group mip-variance table uploaded for Water.frag's
-// WATER_SPEC_AA_MIP_HANDOFF kernel. Must equal common::TextureHeader::kiMipVarianceCount
-// (static_assert in TextureManager.cpp) — the tables are copied verbatim from texture chunk headers.
-CONSTEXPR int kiWaterSpecularAntialiasingMipTableSize = 10;
-
 // Island bindless-slot ceiling: shared by C++ and the terrain shaders, it sizes the bindless
 // sampler arrays (Terrain.frag / TerrainElevation.frag), their descriptor counts (PipelineManager),
 // and the TextureManager render-target pointer vectors.
@@ -274,7 +269,7 @@ static_assert(BT_OFFSETOF(PbrMaterialLayout, fColorTextureIndex) == 68, "PbrMate
 
 struct ModelLayout
 {
-	vec4 f4Position INIT;
+	vec4 f4PositionLayer INIT;        // xyz model centre; w FlightPlanes::NearestPlaneIndex of its height (Model.frag skips smoke planes below, fades this one)
 	vec4 f3x4Transform[3] INIT;
 	vec4 f3x4TransformNormal[3] INIT;
 	vec4 f4ColorAdd INIT;

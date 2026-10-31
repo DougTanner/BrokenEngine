@@ -197,7 +197,6 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 {
 	rMainLayout.fHexShieldGrow = engine::gHexShieldGrow.mfCurrent;
 	rMainLayout.fHexShieldEdgeDistance = engine::gHexShieldEdgeDistance.mfCurrent;
-	rMainLayout.fHexShieldEdgePower = engine::gHexShieldEdgePower.mfCurrent;
 	rMainLayout.fHexShieldEdgeMultiplier = engine::gHexShieldEdgeMultiplier.mfCurrent;
 
 	rMainLayout.fHexShieldWaveMultiplier = engine::gHexShieldWaveMultiplier.mfCurrent;

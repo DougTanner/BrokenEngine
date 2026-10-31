@@ -7,8 +7,8 @@ Revisit When: water impacts start to matter visually — ship wreckage falling i
 Nothing reacts to the sea surface today:
 
 - A falling missile that reaches the sea is removed with no effect. In the terrain-hit branch of `MissilesPostRender::PostCollision` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesUpdate.cpp`), a `kFalling` missile whose hit is at or below z = 0 gets `kDestroy` instead of `Explode`. `TracePointAgainstTerrain` traces against the elevation grid, so in open water that hit is the sea floor (`kfSeaBottomMeters`), not the water surface.
-- `ExplosionsPostRender::Spawn` (`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) adds the same lights, puffs, smoke trails, wind radials, and GPU particles over water as over land. Omnis and spaceships fly at the lowest flight plane (6 m), so their explosions over water happen at that height.
-- The water surface renders at `gWaterHeight` (default 0). Its displacement is GPU-only: `Engine/Data/Shaders/Water/WaterDisplacement.comp` bakes Gerstner displacement into a texture whose texels match the active LOD's visible-area vertex grid (`Water.vert`), and Low water quality bakes none. There is no CPU wave-height query.
+- `ExplosionsPostRender::Spawn` (`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) adds the same lights, puffs, smoke trails, wind radials, and GPU particles over water as over land. Omnis and spaceships fly at the lowest flight plane (15 m), so their explosions over water happen at that height.
+- The water surface renders at height 0. Its displacement is GPU-only: `Engine/Data/Shaders/Water/WaterDisplacement.comp` bakes Gerstner displacement into a texture whose texels match the active LOD's visible-area vertex grid (`Water.vert`), and Low water quality bakes none. There is no CPU wave-height query.
 - The client runs the same deterministic tick as the server, so both trigger sites already execute on the client. Reconciliation replays ticks marked `FrameFlags::kRecalculated`: `AudioManager::PlayOneShot3d` ignores those frames itself, and `ExplosionsPostRender::Spawn` skips its `ParticleManager::Spawn` calls on them.
 
 ## Design
@@ -19,7 +19,7 @@ Nothing reacts to the sea surface today:
 - **Client-only trigger.** Spawn under `BT_CLIENT` at the trigger site, as `SynchronizeMissileTrail` is guarded beside it, so there is no new frame member, wire data, or CRC exposure. Splash particles and rings are not frame state, so they skip `kRecalculated` frames like explosion particles do, or every reconcile repeats them. Any randomness in them must not draw from the shared frame random engine inside the client guard.
 - **Open choices.**
   - Where the ring lives: a new `ParticleManager` layout, or a separate client-side ring list.
-  - The height threshold for "near sea level", which decides whether every unit explosion over water at the lowest flight plane (6 m) splashes.
+  - The height threshold for "near sea level", which decides whether every unit explosion over water at the lowest flight plane (15 m) splashes.
   - The falling-missile splash point: the z = 0 crossing of the traced segment, rather than the sea-floor hit position.
 
 ## Out of scope

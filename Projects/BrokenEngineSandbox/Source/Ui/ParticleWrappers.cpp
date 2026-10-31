@@ -13,7 +13,6 @@ engine::Wrapper gMissileExplosionParticleVerticalVelocityBase(0.25f, 0.0f, 3.0f)
 engine::Wrapper gMissileExplosionParticleVerticalVelocitySpread(3.0f, 0.0f, 3.0f);
 engine::Wrapper gMissileExplosionParticleVelocityDecay(5.0f, 0.0f, 6.0f);
 engine::Wrapper gMissileExplosionParticleGravity(2.0f, 0.0f, 5.0f);
-engine::Wrapper gMissileExplosionParticleVisibleIntensity(1.0f, 0.0f, 6.0f);
 engine::Wrapper gMissileExplosionParticleIntensitySpread(5.0f, 0.0f, 6.0f);
 engine::Wrapper gMissileExplosionParticleIntensityDecay(2.5f, 0.0f, 5.0f);
 engine::Wrapper gMissileExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);
@@ -43,7 +42,6 @@ engine::Wrapper gFighterExplosionParticleVerticalVelocityBase(0.25f, 0.0f, 3.0f)
 engine::Wrapper gFighterExplosionParticleVerticalVelocitySpread(3.0f, 0.0f, 3.0f);
 engine::Wrapper gFighterExplosionParticleVelocityDecay(5.0f, 0.0f, 6.0f);
 engine::Wrapper gFighterExplosionParticleGravity(2.0f, 0.0f, 5.0f);
-engine::Wrapper gFighterExplosionParticleVisibleIntensity(1.0f, 0.0f, 6.0f);
 engine::Wrapper gFighterExplosionParticleIntensitySpread(5.0f, 0.0f, 6.0f);
 engine::Wrapper gFighterExplosionParticleIntensityDecay(1.5f, 0.0f, 5.0f);
 engine::Wrapper gFighterExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);

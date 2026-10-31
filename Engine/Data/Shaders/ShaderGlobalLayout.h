@@ -190,7 +190,6 @@ struct GlobalLayout
 	float fObjectShadowsIntensity INIT;
 	float fObjectShadowsExtension INIT; // Grow + max(sunrise stretch cube, sunset stretch cube); the vertex supplies the away-light extent.
 	int32_t iObjectShadowsBlurRadius INIT;
-	float fObjectShadowsSouthOffset INIT;
 	vec2 f2ObjectShadowsAwayLight INIT; // Unit horizontal direction opposite the active sun/moon, or south for vertical light.
 	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
 	float fShadowAffectAmbient INIT;
@@ -226,7 +225,6 @@ struct GlobalLayout
 	float fWaterFoamDeltaTime INIT;
 	int iWaterFoamReset INIT;
 	int iWaterFoamEnabled INIT;
-	float fWaterEarlyOut INIT;
 	float fWaterReducedNormalOriginX INIT;
 	float fWaterReducedNormalOriginY INIT;
 	float fWaterReducedNormalOriginTwoX INIT;
@@ -239,10 +237,8 @@ struct GlobalLayout
 
 	float fWaterOriginX INIT;
 	float fWaterOriginY INIT;
-	float fWaterHeight INIT;
 	float fWaterTerrainHeight INIT;
 	float fWaterTerrainFadeInverse INIT; // 1 / gWaterTerrainFade (Water.frag alpha fade); unguarded.
-	float fWaterTerrainFadeClamp INIT;
 	float fWaterDepthLookupTableFeather INIT;
 	float fWaterDepthColorFeather INIT;
 	float fWaterDepthColorFloor INIT;

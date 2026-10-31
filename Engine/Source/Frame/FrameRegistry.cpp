@@ -227,18 +227,6 @@ bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t i
 	return true;
 }
 
-void ReleaseRegistryTarget(RegistryQueryContext& rContext, registry_id_t& rId)
-{
-	EligibleRowReference found = FindEligibleRow(rContext.sourceLayers, rId);
-	if (found.pLayer != nullptr)
-	{
-		ASSERT(rContext.subscriberCounts[found.iEligibleIndex] > 0);
-		--rContext.subscriberCounts[found.iEligibleIndex];
-	}
-
-	rId = {};
-}
-
 bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());

@@ -67,8 +67,8 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	ASSERT(siRendered + rCurrent.iCount <= iPointLightsBufferCapacity);
 	ASSERT(siRendered + rCurrent.iCount <= iVisibleLightsBufferCapacity);
 
-	XMVECTOR vecCameraRightNormal = XMVector3Normalize(engine::gpCamera->mMatView.r[0]);
-	XMVECTOR vecCameraUpNormal = XMVector3Normalize(engine::gpCamera->mMatView.r[1]);
+	XMVECTOR vecCameraRightNormal = XMVector3Normalize(XMMatrixTranspose(engine::gpCamera->mMatView).r[0]);
+	XMVECTOR vecCameraUpNormal = XMVector3Normalize(XMMatrixTranspose(engine::gpCamera->mMatView).r[1]);
 
 	float fMinLightingArea = MinLightingDepositSize();
 

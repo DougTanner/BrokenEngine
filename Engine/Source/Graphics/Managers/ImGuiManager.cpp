@@ -4,7 +4,9 @@
 
 #include "Data/Raw.h"
 #include "File/PackChunks.h"
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/TweaksSettings.h"
 
 #include "Game.h"
 
@@ -68,6 +70,13 @@ static_assert(std::size(kpThemePalettes) == static_cast<size_t>(UiTheme::kCount)
 static ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
 {
 	return ImVec4(rf4Color.x, rf4Color.y, rf4Color.z, fAlpha);
+}
+
+static std::unique_ptr<TweaksScreen> spTweaksScreen;
+
+TweaksScreen& GetTweaksScreen()
+{
+	return *spTweaksScreen;
 }
 
 ImGuiManager::ImGuiManager(HWND hwnd)
@@ -153,6 +162,8 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	ImGui::EndFrame();
 
+	spTweaksScreen = std::make_unique<TweaksScreen>();
+	LoadTweaksSettings();
 	CreateUiScreens();
 }
 
@@ -261,6 +272,8 @@ void ImGuiManager::ApplyThemeColors(UiTheme eTheme)
 ImGuiManager::~ImGuiManager()
 {
 	DestroyUiScreens();
+	SaveTweaksSettings();
+	spTweaksScreen.reset();
 	mTextureResources.clear();
 	// Before backend shutdown: retired TextureResource destructors remove their backend descriptors
 	DestroyScreenDependentResources();
@@ -474,6 +487,10 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	ImGui::NewFrame();
 
 	RenderUiScreens();
+	if (gbShowImGui)
+	{
+		spTweaksScreen->Render();
+	}
 
 	ImGui::Render();
 	mpDrawData = ImGui::GetDrawData();

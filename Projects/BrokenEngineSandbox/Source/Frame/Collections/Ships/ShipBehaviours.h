@@ -60,8 +60,9 @@ inline constexpr uint8_t kuiNoFlightPlane = 255;
 [[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
-// Also counts down the weapon-mode change and applies kPendingUseMissiles when it finishes.
-void CountdownPendingOrders(ShipOrders_t& rOrders, int64_t& riPendingFleetWantedCoordinateTicks, int64_t& riPendingWeaponModeTicks);
+
+// The next route waypoint toward vecDestination on the NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.
+[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal);
 
 // Fleet navigation: roaming, cross-cell movement, island destinations, and following the row's own flagship.
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
@@ -91,12 +92,12 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 // Pass the row's own pusher; adds to the caller-initialized rfPositionCorrectionX, applied after terrain resolution.
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX);
 
-// Firing and look targets from previous-frame data: sets kFireMissile for an enemy within fMissileTargetRange and
-// kFireBlaster when it is also within fBlasterTargetRange; the look position leads an in-range target.
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, float fBlasterSpeed, float fBlasterTargetRange, float fMissileTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
+// Firing and look targets from previous-frame data, ignoring enemies above iHighestFlightPlane: sets kFireBlaster for an
+// enemy within fBlasterTargetRange on the shooter's stored plane uiFlightPlane, so a climbing shooter holds fire. The
+// look position leads the nearest such target, else is the nearest enemy at any range.
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield);
-void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, std::chrono::duration<float> deltaTime, float fMaximumHealth, float& rfHealth);
 
 // Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both
 // infinities fail it too.

@@ -20,8 +20,6 @@ const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 	{"Omni Blasters Deposit Width", &gWindDepositOmniBlastersWidth},
 	{"Omni Blasters Deposit Intensity", &gWindDepositOmniBlastersIntensity},
 	{"Blasters Deposit Length Multiplier", &gWindDepositOmniBlastersLengthMultiplier},
-	{"Fighters Blasters Deposit Width", &gWindDepositFightersBlastersWidth},
-	{"Fighters Blasters Deposit Intensity", &gWindDepositFightersBlastersIntensity},
 	{"Explosions Deposit Width", &gWindDepositExplosionsWidth},
 	{"Explosions Deposit Intensity", &gWindDepositExplosionsIntensity},
 };
@@ -44,10 +42,6 @@ void RenderWindDepositsTab(engine::TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Omni Blasters Deposit Width", iSection);
 	rScreen.WrapperSlider("Omni Blasters Deposit Intensity", iSection);
 	rScreen.WrapperSlider("Blasters Deposit Length Multiplier", iSection);
-
-	rScreen.WrapperSeparatorText("Fighters Blasters");
-	rScreen.WrapperSlider("Fighters Blasters Deposit Width", iSection);
-	rScreen.WrapperSlider("Fighters Blasters Deposit Intensity", iSection);
 
 	rScreen.WrapperSeparatorText("Explosions");
 	rScreen.WrapperSlider("Explosions Deposit Width", iSection);

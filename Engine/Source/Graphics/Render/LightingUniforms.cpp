@@ -27,16 +27,17 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// Lighting mirrors the shadow area's raw-frustum-safe framing reference. RenderTargetTextures sizes deposit/spread/combine through
 	// LightingDetailTextureSize with kfLightingHeadroomMultiplier; textureWidth / that multiplier pixels span the framing's reference-angle
 	// frustum at mfLightingTexelFraming. The reference expands immediately outward, contracts at the existing rate inward, and never falls below
-	// live framing. Actual clamped extents preserve device-independent coverage. At settled framing the grid stays fixed; snap the camera-centered
-	// f4LightingArea to integer deposit texels because deposit rasterizes lights. Spread/combine/temporal resample that world rectangle at
-	// their own resolutions.
+	// live framing times the tilt coverage ratio. Actual clamped extents preserve device-independent coverage. At settled framing and tilt the grid
+	// stays fixed; snap f4LightingArea, centered on the tilted footprint, to integer deposit texels because deposit rasterizes lights.
+	// Spread/combine/temporal resample that world rectangle at their own resolutions.
 	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.width);
 	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.height);
 	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.width);
 	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.height);
 	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelFraming, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, engine::gpCamera->mVecPosition);
+	XMVECTOR vecFootprintCenter = XMVectorAdd(engine::gpCamera->mVecPosition, XMVectorSet(0.0f, engine::gpCamera->mfTexelCenterOffsetNorth, 0.0f, 0.0f));
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelFraming, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
 
 	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
 	static TemporalAreaLatch sTemporalAreaLatch {};
@@ -218,26 +219,6 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fWaterNormalWeightOne = fWaterNormalWeightOne;
 	rMainLayout.fWaterNormalWeightTwo = fWaterNormalWeightTwo;
 	rMainLayout.fWaterNormalWeightThree = fWaterNormalWeightThree;
-	// Water.frag MIP_HANDOFF / mode-3 weight chain folded CPU-side (the weights are uniform once resolved by
-	// framing): per-octave relative-weight squares and the mode-3 agreement divisor's reciprocal.
-	float fWaterNormalWeightTotal = fWaterNormalWeightOne + fWaterNormalWeightTwo + fWaterNormalWeightThree;
-	if (fWaterNormalWeightTotal > 0.0f)
-	{
-		float fInverseTotalWeight = 1.0f / fWaterNormalWeightTotal;
-		float fRelativeWeightOne = fWaterNormalWeightOne * fInverseTotalWeight;
-		float fRelativeWeightTwo = fWaterNormalWeightTwo * fInverseTotalWeight;
-		float fRelativeWeightThree = fWaterNormalWeightThree * fInverseTotalWeight;
-		rMainLayout.fWaterNormalRelativeWeightSquaredOne = fRelativeWeightOne * fRelativeWeightOne;
-		rMainLayout.fWaterNormalRelativeWeightSquaredTwo = fRelativeWeightTwo * fRelativeWeightTwo;
-		rMainLayout.fWaterNormalRelativeWeightSquaredThree = fRelativeWeightThree * fRelativeWeightThree;
-	}
-	else
-	{
-		rMainLayout.fWaterNormalRelativeWeightSquaredOne = 0.0f;
-		rMainLayout.fWaterNormalRelativeWeightSquaredTwo = 0.0f;
-		rMainLayout.fWaterNormalRelativeWeightSquaredThree = 0.0f;
-	}
-	rMainLayout.fWaterNormalWeightSumInverse = 1.0f / std::max(3.0f * fWaterNormalWeightTotal, shaders::kfEpsilon);
 	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; the two tunables are independent and their ranges overlap, so
 	// floor the range magnitude at kfEpsilon to keep the reciprocal finite, keeping the sign so a top below the bottom still reads as an inverted range.
 	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.mfCurrent;
@@ -248,7 +229,6 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	fWaterHeightDarkenRange = fWaterHeightDarkenRange < 0.0f ? -fRangeMagnitude : fRangeMagnitude;
 	rMainLayout.fWaterHeightDarkenRangeInverse = 1.0f / fWaterHeightDarkenRange;
 	rMainLayout.fWaterHeightDarkenTarget = gWaterHeightDarkenTarget.mfCurrent;
-	rMainLayout.fWaterHeightDarkenSource = gWaterHeightDarkenSource.mfCurrent;
 	rMainLayout.fWaterHeightDarkenLighting = gWaterHeightDarkenLighting.mfCurrent;
 
 	// GlobalUniforms folds fLightingWaterSkyboxSunBias into globalLayout.f4WaterBiasedSunNormal.
@@ -266,24 +246,7 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fLightingWaterSkyboxOneBeachReduction = gLightingWaterSkyboxOneBeachReduction.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxTwoBeachReduction = gLightingWaterSkyboxTwoBeachReduction.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxThreeBeachReduction = gLightingWaterSkyboxThreeBeachReduction.mfCurrent;
-	// Per-lobe FilteredPowerLobe constants (Water.frag WATER_SPEC_AA_MODE 2/3): 2/(power+2) and 1/(1+power), xyz = lobes One/Two/Three.
-	rMainLayout.f4WaterSkyboxLobeAlphaSquared = {2.0f / (fSkyboxPowerOne + 2.0f), 2.0f / (fSkyboxPowerTwo + 2.0f), 2.0f / (fSkyboxPowerThree + 2.0f), 0.0f};
-	rMainLayout.f4WaterSkyboxLobeOnePlusPowerInverse = {1.0f / (1.0f + fSkyboxPowerOne), 1.0f / (1.0f + fSkyboxPowerTwo), 1.0f / (1.0f + fSkyboxPowerThree), 0.0f};
 	rMainLayout.fLightingWaterSkyboxLevelOfDetail = gLightingWaterSkyboxLevelOfDetail.mfCurrent;
-	rMainLayout.fWaterSpecularAntialiasingVariance = gWaterSpecularAntialiasingVariance.mfCurrent;
-	rMainLayout.fWaterSpecularAntialiasingThreshold = gWaterSpecularAntialiasingThreshold.mfCurrent;
-	rMainLayout.fWaterSpecularAntialiasingMipmapScale = gWaterSpecularAntialiasingMipmapScale.mfCurrent;
-	rMainLayout.fWaterNormalMipmapBias = gWaterNormalMipmapBias.mfCurrent;
-	// WATER_SPEC_AA_MIP_HANDOFF uses header-baked Toksvig variance tables for the three selected octave-group textures.
-	// Copying their 30 floats every frame keeps texture selections current without a separate invalidation path.
-	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[0 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexOne.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
-	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[1 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexTwo.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
-	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[2 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexThree.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
-	// Full-detail reference weights for WATER_SPEC_AA_FADE_HANDOFF: the same LerpAtHeight the live
-	// fWaterNormalWeight* uploads above use, evaluated at the near-camera endpoint height.
-	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
-	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
-	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
 
 	rMainLayout.fLightingWaterReflectedAmount = gLightingWaterReflectedAmount.mfCurrent;
 	rMainLayout.fLightingWaterReflectedNormalBlendWave = gLightingWaterReflectedNormalBlendWave.mfCurrent;

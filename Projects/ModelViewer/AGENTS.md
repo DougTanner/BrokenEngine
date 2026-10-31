@@ -63,12 +63,22 @@ shows Preset: followed by the selected key, with a stable ImGui window ID and no
 duplicate content header. Ignore slot/reset key repeats and apply taps in
 received order before rendering.
 
+In Debug builds a non-repeat F3 toggles the engine Tweaks screen. F3, Q press
+and W/E/R/Backspace taps act only outside text editing, as SPACE does. While
+Tweaks is open the viewer hides only its panel windows; orbit, sun drag and
+wheel zoom keep working. Tweaks edits of the shared Pbr, SunMoon and
+color-grading wrappers apply live, are not saved to the preset until the next
+viewer-panel slider edit (which saves every current value, Tweaks-edited
+participants included), are replaced by the next W/E/R preset load or Backspace
+reset, and an edit made while Q is held is discarded on Q release.
+
 Presets use separate viewer-owned versioned AppData files through the shared atomic
 file helpers. Unsupported versions are rejected without migration and use the
 same compiled-default fallback. Validate the complete payload before applying
 any value; participant order is part of the format and changes require its
 version bump.
-Only slider edits and explicit selected-preset resets write preset files.
+Only viewer-panel slider edits and explicit selected-preset resets write preset
+files.
 
 Bare F4 uses the ordinary window-close path, restoring comparison before saving
 graphics settings and releasing owners. Modified F4 adds no viewer close binding;
@@ -163,18 +173,21 @@ its fitted camera while preserving edits for flight.
 
 The viewer compiles only engine files whose game names it supplies: game name
 and version, HDR clear color and UI reference height in `Game.h`, the
-flight-plane table, profile rows, `game::FrameInterpolate`, and
-`game::Camera::SunAngle`. Never satisfy an unused gameplay dependency with
+flight-plane table, profile rows, `game::FrameInterpolate`,
+`game::Camera::SunAngle`, and the four `game::Render*TweakExtensions`
+functions, defined empty. Never satisfy an unused gameplay dependency with
 dummy cells, flags, sessions or reporting functions; the viewer constructs no
 `GameBase` or network session. By project membership it defines
 `engine::RenderFrameMain` for Main uniforms and the three UI functions
 `ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
-`CreateUiScreens` and `DestroyUiScreens` are empty. The viewer `Pch.h` sets
+`CreateUiScreens` and `DestroyUiScreens` are empty. It compiles the engine
+Tweaks screen and `TweaksSettings` and registers only the engine Tweaks
+sections, adding no Tweaks content. The viewer `Pch.h` sets
 `kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false` and
 `kbDrawModelsOverWorld` to `true`. Keep ordinary
 engine profiling collection, Graphics lifecycle and local crash reporting
 without network upload.
-In orbit, the viewer's world camera is fixed top-down at the default engine
+In orbit, the viewer's world camera follows Camera Tilt at the default engine
 framing under the shared projection settings over the water anchor, with a
 separate model orbit pose used only for model draws. Flight uses the engine's
 tracked camera and world model matrices and eye position; retain orbit fitting

@@ -3,24 +3,6 @@
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
 
-// WATER_SPEC_AA_MODE selects compile-time filtering of sub-pixel high-power skybox lobes; re-run DataPacker after
-// define edits, as for DT_LIGHTING_ONLY. 0: pointwise reference; 1: closed-form box integral of s^p over the pixel
-// footprint; 2: Kaplanyan/Tokuyoshi NDF variance widening via Vlachos; 3: Toksvig variance from weighted normal-sum
-// agreement; 4: 2x2 ALU supersampling at derivative-extrapolated normals. fWaterSpecularAntialiasingVariance controls modes 1-3
-// and fWaterSpecularAntialiasingThreshold modes 2-3. Analytic filtering needs neither MSAA sample shading nor a prepass.
-#define WATER_SPEC_AA_MODE 3
-
-// Zoom/minification handoff for modes 2-3: adds DataPacker-baked per-mip Toksvig variance — the
-// normal variance the BC5 mip chain averages away, invisible to the screen-space kernels above
-// because DecodeNormal re-unitizes every fetch — into the lobe kernel via an analytic per-octave
-// LOD (Bruneton-style geometry->BRDF transition). Fixes camera-zoom specular flicker.
-// Runtime sliders: fWaterSpecularAntialiasingMipmapScale scales the term; fWaterNormalMipmapBias biases the analytic
-// LOD in lockstep with the water-normal sampler's LOD bias.
-#define WATER_SPEC_AA_MIP_HANDOFF 1
-// Also hand off the variance the camera-height weight fade removes, referenced to the near-camera
-// full-weight look — far water keeps its statistical roughness instead of flattening to gloss.
-#define WATER_SPEC_AA_FADE_HANDOFF 0
-
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
@@ -63,8 +45,8 @@ void main()
 {
 	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f3InPosition, globalLayout.f4VisibleArea);
 
-	float fTerrainElevation = texture(elevationTextureSampler, f2VisibleAreaTexcoord).x - globalLayout.fWaterHeight;
-	if (fTerrainElevation > globalLayout.fWaterEarlyOut)
+	float fTerrainElevation = texture(elevationTextureSampler, f2VisibleAreaTexcoord).x;
+	if (fTerrainElevation > 0.0f)
 	{
 		f4OutColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		discard;
@@ -79,10 +61,10 @@ void main()
 	// reconstructing world position and subtracting f4WaterEyePosition: at large camera coords, the world
 	// round-trip drops low bits from f2InInitialPosition (small + large then subtract large), and the
 	// lost bits shift with camera motion — visible as a velocity-correlated specular darkening at
-	// intermediate fLightingWaterSkyboxNormalSoften. Top-down camera: f4WaterEyePosition.xy == fWaterOrigin
-	// by construction (CameraBase.cpp sets it directly above the look-at), so eye - waterWorld = -f2InInitial.
+	// intermediate fLightingWaterSkyboxNormalSoften. The water eye is directly above the water origin by
+	// construction (CameraBase.cpp sets it above the look-at at any tilt), so eye - waterWorld = -f2InInitial.
 	vec3 f3ToEyeNormal = normalize(vec3(-f2InInitialPosition, mainLayout.f4WaterEyePosition.z));
-	f3ToEyeNormal = normalize(mix(f3ToEyeNormal, mainLayout.f4ToEyeNormal.xyz, globalLayout.fLightingWaterSkyboxNormalSoften));
+	f3ToEyeNormal = normalize(mix(f3ToEyeNormal, vec3(0.0, 0.0, 1.0), globalLayout.fLightingWaterSkyboxNormalSoften));
 
 	WaterNormalSamplingResult normalResult = SampleWaterNormals();
 
@@ -143,7 +125,7 @@ void main()
 	float fReflectionTerrainMultiplier = specularResult.fReflectionTerrainMultiplier;
 	float fReflection = specularResult.fReflection;
 
-	// Factor the skybox combine so Height Darken can weight base color and skybox specular independently:
+	// Factor the skybox combine so Height Darken can weight the skybox specular without the base color:
 	// mix(A, B, t) + add*t*B = (1-t)*A + (1+add)*t*B → base = (1-fReflection)*f3LightingColor, specular = (1+fSkyboxAdd)*fReflection*f3SkyboxColorSun.
 	float fSkyboxAdd = mainLayout.fLightingWaterSkyboxAdd;
 	vec3 f3SkyboxSpecular;
@@ -163,13 +145,11 @@ void main()
 	}
 
 	// Wave trough darken: at z >= Top no darkening (multiplier 1.0); at z <= Bottom max darkening (multiplier 1.0 - Target).
-	// Source/Lighting weights independently mix the per-path multiplier toward 1.0 so each contribution can opt in/out.
-	// Lighting also covers the skybox specular and the EWNS lighting deposit (applied at f3WaterLightingMults below).
+	// The Lighting weight mixes the multiplier toward 1.0; it covers only the skybox specular and the EWNS lighting
+	// deposit (applied at f3WaterLightingMults below).
 	float fHeightT = clamp((f3InPosition.z - mainLayout.fWaterHeightDarkenBottom) * mainLayout.fWaterHeightDarkenRangeInverse, 0.0f, 1.0f);
 	float fHeightDarken = mix(1.0f - mainLayout.fWaterHeightDarkenTarget, 1.0f, fHeightT);
-	float fHeightDarkenSource = mix(1.0f, fHeightDarken, mainLayout.fWaterHeightDarkenSource);
 	float fHeightDarkenLighting = mix(1.0f, fHeightDarken, mainLayout.fWaterHeightDarkenLighting);
-	vec3 f3BaseDarkened           = fHeightDarkenSource   * f3LightingColor;
 	vec3 f3SkyboxSpecularDarkened = fHeightDarkenLighting * f3SkyboxSpecular;
 
 	// Shadow with smoke at world position. Moon bypasses the terrain ray-march shadow only;
@@ -184,15 +164,15 @@ void main()
 	// fShadowAffectAmbient relaxes shadow on the sky-ambient half only; sun + skybox specular keep full shadow.
 	// Mirrors SunLighting() at ShaderFunctions.h:76-80, reusing fEffectiveShadow as its fAmbientShadow (identical Rec.601-weighted formula).
 	float fAmbientShadowApplied = mix(1.0f, fEffectiveShadow, globalLayout.fShadowAffectAmbient);
-	vec3 f3SunContribution     = fEffectiveShadow      * (fSunScalar     * f3BaseDarkened + f3SkyboxSpecularDarkened);
-	vec3 f3AmbientContribution = fAmbientShadowApplied *  fAmbientScalar * f3BaseDarkened;
+	vec3 f3SunContribution     = fEffectiveShadow      * (fSunScalar     * f3LightingColor + f3SkyboxSpecularDarkened);
+	vec3 f3AmbientContribution = fAmbientShadowApplied *  fAmbientScalar * f3LightingColor;
 	f4OutColor.xyz = f3SunContribution + f3AmbientContribution;
 	// Cubemap-colored 0.5 ambient floor lifts only darker shadowed water; componentwise max preserves
 	// brighter lighting/highlights, while fAmbientShadowApplied keeps Affect Ambient control.
 	f4OutColor.xyz = max(f4OutColor.xyz, 0.5f * fAmbientShadowApplied * globalLayout.f4AmbientColor.xyz * f3SkyboxColor);
 
 	// Terrain elevation (for water transparency)
-	f4OutColor.w = clamp(-fTerrainElevation * globalLayout.fWaterTerrainFadeInverse, globalLayout.fWaterTerrainFadeClamp, 1.0f);
+	f4OutColor.w = clamp(-fTerrainElevation * globalLayout.fWaterTerrainFadeInverse, 0.0f, 1.0f);
 
 	// Sample lighting texture at projected base-height x/y
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f));

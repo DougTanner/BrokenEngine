@@ -40,8 +40,6 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 	{"Hex Shield Lighting Intensity", &gHexShieldLightingIntensity},
 	{"Missile Exhaust Lighting Area", &gMissileExhaustLightingArea},
 	{"Missile Exhaust Lighting Intensity", &gMissileExhaustLightingIntensity},
-	{"Fighter Blaster Lighting Area", &gFighterBlasterLightingArea},
-	{"Fighter Blaster Lighting Intensity", &gFighterBlasterLightingIntensity},
 	{"Hit Flash Lighting Area One", &gHitFlashLightingAreaOne},
 	{"Hit Flash Lighting Area Two", &gHitFlashLightingAreaTwo},
 	{"Hit Flash Lighting Intensity One", &gHitFlashLightingIntensityOne},
@@ -100,10 +98,6 @@ void RenderLightingEffectsLightingTab(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSeparatorText("Missiles - Exhaust");
 		rScreen.WrapperSlider("Lighting Area", iSection, 1.0f, "Missile Exhaust Lighting Area");
 		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Missile Exhaust Lighting Intensity");
-
-		rScreen.WrapperSeparatorText("Fighters - Blaster");
-		rScreen.WrapperSlider("Lighting Area", iSection, 1.0f, "Fighter Blaster Lighting Area");
-		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Fighter Blaster Lighting Intensity");
 
 		rScreen.WrapperSeparatorText("Fighters - Hit Flash");
 		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Hit Flash Lighting Area One");

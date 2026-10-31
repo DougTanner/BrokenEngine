@@ -37,8 +37,7 @@ vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, ve
 	vec2 f2Lateral = f3WorldPosition.xy - f3ObjectPosition.xy;
 	float fAwayExtent = max(dot(f2Lateral, globalLayout.f2ObjectShadowsAwayLight), 0.0f);
 	vec3 f3ShadowPosition = f3WorldPosition;
-	f3ShadowPosition.xy += vec2(0.0f, -globalLayout.fObjectShadowsSouthOffset)
-	                    + globalLayout.f2ObjectShadowsAwayLight * globalLayout.fObjectShadowsExtension * fAwayExtent;
+	f3ShadowPosition.xy += globalLayout.f2ObjectShadowsAwayLight * globalLayout.fObjectShadowsExtension * fAwayExtent;
 	vec2 f2VisibleAreaUV = WorldToVisibleArea(f3ShadowPosition, globalLayout.f4VisibleArea);
 	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 }

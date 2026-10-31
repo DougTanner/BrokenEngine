@@ -51,8 +51,12 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
     list binds as one filename and the run fails; the single-path
     `-File ... -Path <path>` form still works for one file) as a size
     observation in `Residuals`; splitting it via `ShaderFunctions.h`/`*Common.h`
-    is follow-up work, not part of this findings-only review. Done when every
-    changed shader over that size has a `Residuals` size observation.
+    is follow-up work, not part of this findings-only review. Record a
+    refactor observation in `Residuals` only for a design shape in code the
+    review already traced that a refactor would improve;
+    never read further code to find one. Done when every changed shader over
+    that size has a `Residuals` size observation and every refactor
+    observation cites code the review already traced.
 
 ## Rules
 

@@ -42,7 +42,6 @@ int64_t giBattleshipExplosionTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
 static int64_t siBattleshipHitFlashTypeIndex = 0xFF;
 int64_t giBattleshipHitFlashControllerTypeIndex = 0xFF;
-int64_t giBattleshipBeamAreaLightTypeIndex = 0xFF;
 
 static void RegisterBattleshipHitFlashEffect();
 #endif
@@ -59,10 +58,6 @@ constexpr int64_t kiBattleshipExplosionSecondaryCount = 1;
 
 #if defined(BT_CLIENT)
 constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
-
-constexpr std::chrono::duration<float> kBattleshipBeamFadeTime(0.5f);
-constexpr float kfBattleshipBeamHalfWidth = 0.15f;
-constexpr float kfBattleshipBeamStartOffset = 3.0f;
 #endif // BT_CLIENT
 
 void BattleshipsInterpolate::Register()
@@ -88,7 +83,6 @@ void BattleshipsInterpolate::Register()
 		.pParticleVerticalVelocitySpreadScale = &gFighterExplosionParticleVerticalVelocitySpread,
 		.pParticleVelocityDecayScale = &gFighterExplosionParticleVelocityDecay,
 		.pParticleGravityScale = &gFighterExplosionParticleGravity,
-		.pParticleVisibleIntensityScale = &gFighterExplosionParticleVisibleIntensity,
 		.pParticleIntensitySpreadScale = &gFighterExplosionParticleIntensitySpread,
 		.pParticleIntensityDecayScale = &gFighterExplosionParticleIntensityDecay,
 		.pParticleIntensityPowerScale = &gFighterExplosionParticleIntensityPower,
@@ -96,15 +90,6 @@ void BattleshipsInterpolate::Register()
 
 #if defined(BT_CLIENT)
 	RegisterBattleshipHitFlashEffect();
-
-	// Every corner samples the texture's middle column, so the line is equally bright from end to end instead of
-	// fading out toward the shooter and the target.
-	engine::AreaLightsInterpolate::RegisterType(giBattleshipBeamAreaLightTypeIndex,
-	{
-		.uiCrc = data::kTexturesBlasterBC72pngCrc,
-		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
-		.fLightingIntensity = 200.0f,
-	});
 #endif
 }
 
@@ -122,21 +107,6 @@ static void XM_CALLCONV SyncBattleship(FrameInterpolate& rFrameInterpolate, engi
 }
 
 #if defined(BT_CLIENT)
-void XM_CALLCONV SyncBattleshipBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier)
-{
-	XMVECTOR vecStartToEnd = XMVectorSubtract(vecEnd, vecStart);
-	XMVECTOR vecDirection = XMVector3Normalize(vecStartToEnd);
-	XMVECTOR vecOffsetStart = XMVectorMultiplyAdd(XMVectorReplicate(kfBattleshipBeamStartOffset), vecDirection, vecStart);
-	float fLength = std::max(XMVectorGetX(XMVector3Length(vecStartToEnd)) - kfBattleshipBeamStartOffset, 0.0f);
-	auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecOffsetStart, vecDirection, fLength, 0.0f, kfBattleshipBeamHalfWidth);
-	engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
-	{
-		.iTypeIndex = giBattleshipBeamAreaLightTypeIndex,
-		.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
-		.fIntensityMultiplier = fIntensityMultiplier,
-	});
-}
-
 static void RegisterBattleshipHitFlashEffect()
 {
 	engine::PointLightsInterpolate::RegisterType(siBattleshipHitFlashTypeIndex,
@@ -278,16 +248,6 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 				.fLengthMultiplier = game::gWindDepositFightersLengthMultiplier.mfCurrent,
 			});
 		}
-
-		// The fade derives from the shared cooldown alone, so it holds at any delta, render interpolation included.
-		if ((rCurrent.pBeamAreaLights[i].uuid.iValue != 0))
-		{
-			std::chrono::duration<float> fade = rPreviousPostRender.pNextBeamFireTimes[i] - deltaTime - (kBattleshipBeamCooldown - kBattleshipBeamFadeTime);
-			if (fade > std::chrono::duration<float>::zero())
-			{
-				SyncBattleshipBeam(rCurrentFrameInterpolate, rCurrent.pBeamAreaLights[i], vecPosition, rCurrent.pVecBeamEnds[i], fade / kBattleshipBeamFadeTime);
-			}
-		}
 #endif // BT_CLIENT
 	}
 }
@@ -321,7 +281,7 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.eController = rCurrentPostRender.pController[i],
 				.orders = rCurrentPostRender.pOrders[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
-				.nextBeamFireTime = rCurrentPostRender.pNextBeamFireTimes[i],
+				.uiNextMissileTube = rCurrentPostRender.puiNextMissileTubes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
@@ -359,6 +319,8 @@ void BattleshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [
 
 void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
+	SpawnMissiles(rFrame, rStaticData.coordinate);
+
 	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
@@ -388,10 +350,6 @@ void BattleshipsInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		.fWidth = game::gWindDepositFightersWidth.mfCurrent,
 		.fLengthMultiplier = game::gWindDepositFightersLengthMultiplier.mfCurrent,
 	});
-
-	// A transfer arrival carries the cooldown but draws no beam until its next shot.
-	rBattleships.pBeamAreaLights[iIndex] = {};
-	rBattleships.pVecBeamEnds[iIndex] = XMVectorZero();
 }
 
 void BattleshipsInterpolate::ClientInitializeAll(Frame& rFrame)
@@ -458,7 +416,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfBattleshipHealth;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
-	rCurrentPostRender.pNextBeamFireTimes[iIndex] = rInfo.nextBeamFireTime;
+	rCurrentPostRender.puiNextMissileTubes[iIndex] = rInfo.uiNextMissileTube;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
@@ -511,7 +469,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		float fHealth = rPrevious.pfHealths[i];
 		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
-		std::chrono::duration<float> nextBeamFireTime = rPrevious.pNextBeamFireTimes[i] - deltaTime;
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
@@ -531,12 +488,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		{
 			// ComputeNavigation overwrites the debug waypoint only on a recompute tick, so carry it forward here.
 			rCurrent.pVecDebugNavigationWaypoints[i] = rPrevious.pVecDebugNavigationWaypoints[i];
-		}
-
-		// The fade has ended; the cooldown exceeds the fade, so the light is gone before the next shot.
-		if (nextBeamFireTime <= kBattleshipBeamCooldown - kBattleshipBeamFadeTime)
-		{
-			engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pBeamAreaLights[i]);
 		}
 #endif // BT_CLIENT
 
@@ -571,7 +522,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				XMVECTOR vecNearestEnemy = XMVectorZero();
 				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
 
-				RegenerateHealth(vecPosition, bEnemyFound, vecNearestEnemy, deltaTime, kfBattleshipHealth, fHealth);
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
 				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfBattleshipFleeTurnRate : kfBattleshipChaseTurnRate;
@@ -607,7 +557,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pfHealths[i] = fHealth;
 		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
-		rCurrent.pNextBeamFireTimes[i] = nextBeamFireTime;
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
@@ -659,7 +608,7 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
 		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
-		bEqual &= common::LogDifference<"pNextBeamFireTimes">(i, pNextBeamFireTimes[i], rOther.pNextBeamFireTimes[i]);
+		bEqual &= common::LogDifference<"puiNextMissileTubes">(i, puiNextMissileTubes[i], rOther.puiNextMissileTubes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);

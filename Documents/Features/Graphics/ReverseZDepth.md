@@ -41,7 +41,7 @@ Reverse the mapping so near maps to 1 and far maps to 0, and keep a 32-bit float
 
 A grep of the current code found these sites. Re-run the inventory before implementing.
 
-- `CameraBase::CalculateMatricesAndVisibleArea` sets the projection in one expression that selects the perspective or orthographic matrix; both branches must reverse. It also finds the visible-area corners by passing screen z 0 and 1 to `XMVector3Unproject` as the ray start and end. Under reverse-Z the two ends swap but the line stays the same, so the intersection with the Z=0 plane should not change. Verify this.
+- `CameraBase::CalculateMatricesAndVisibleArea` sets the projection in one expression that selects the perspective or orthographic matrix; both branches must reverse. Its large visible area comes from the closed-form `TiltedFootprint` helper, which reads the eye geometry and never the projection matrix or depth, so reverse-Z does not change it.
 - `CameraBase::WorldToScreen` returns projected depth in Z from `XMVector3Project`, and that value reverses meaning. Its only callers, in `Projects/BrokenEngineSandbox/Source/Agent/AgentScene.cpp`, read only X and Y.
 - `PipelineCreator.cpp` sets `depthCompareOp` and calls `ConfigureViewportScissor`.
 - `Texture::RecordBeginRenderPass` sets the depth clear value.

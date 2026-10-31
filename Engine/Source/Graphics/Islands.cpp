@@ -232,17 +232,16 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 	std::memset(puiPerTemplateBase, 0, static_cast<size_t>(iTemplateArrayBytes));
 	std::memset(puiPerTemplateEmitCount, 0, static_cast<size_t>(iTemplateArrayBytes));
 
-	// mf4RenderVisibleArea is the straight-down frustum footprint at Z=0. The lowest terrain vertices
-	// are sunk to mfSeaFloorElevation, whose perspective footprint is the widest; expand analytically
-	// about the camera XY so every higher vertex lies within this conservative area.
+	// mf4RenderVisibleArea bounds Z=0 and above; scaling it about the eye XY maps it onto the sea floor. Under tilt the
+	// eye XY can lie outside the rectangle, so each edge takes the outer of both, covering every vertex in between.
 	XMFLOAT4A f4EyePosition {};
 	XMStoreFloat4A(&f4EyePosition, engine::gpCamera->mVecEyePosition);
 	float fSeaFloorScale = (f4EyePosition.z - gpIslandTerrain->mfSeaFloorElevation) / f4EyePosition.z;
 	XMFLOAT4 f4MeshVisibleArea = engine::gpCamera->mf4RenderVisibleArea;
-	f4MeshVisibleArea.x = f4EyePosition.x + (f4MeshVisibleArea.x - f4EyePosition.x) * fSeaFloorScale;
-	f4MeshVisibleArea.y = f4EyePosition.y + (f4MeshVisibleArea.y - f4EyePosition.y) * fSeaFloorScale;
-	f4MeshVisibleArea.z = f4EyePosition.x + (f4MeshVisibleArea.z - f4EyePosition.x) * fSeaFloorScale;
-	f4MeshVisibleArea.w = f4EyePosition.y + (f4MeshVisibleArea.w - f4EyePosition.y) * fSeaFloorScale;
+	f4MeshVisibleArea.x = std::min(f4MeshVisibleArea.x, f4EyePosition.x + (f4MeshVisibleArea.x - f4EyePosition.x) * fSeaFloorScale);
+	f4MeshVisibleArea.y = std::max(f4MeshVisibleArea.y, f4EyePosition.y + (f4MeshVisibleArea.y - f4EyePosition.y) * fSeaFloorScale);
+	f4MeshVisibleArea.z = std::max(f4MeshVisibleArea.z, f4EyePosition.x + (f4MeshVisibleArea.z - f4EyePosition.x) * fSeaFloorScale);
+	f4MeshVisibleArea.w = std::min(f4MeshVisibleArea.w, f4EyePosition.y + (f4MeshVisibleArea.w - f4EyePosition.y) * fSeaFloorScale);
 
 	// Placement positions are local to the cell that owns them, so every pass below resolves that cell's offset from
 	// the camera cell once and hands it to the visibility test and the emission that consume the position.

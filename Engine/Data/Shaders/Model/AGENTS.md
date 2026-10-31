@@ -17,9 +17,15 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   cause. The skinned normal path combines the mesh normal matrix with
   `mat3(skinMatrix)` and therefore assumes near-rigid joint transforms rather
   than arbitrary non-uniform joint scaling.
-- Object shadow footprints use model world XY with a fixed south offset,
-  independent of camera position. Grow and horizon stretch extend only the half
-  away from the active light; vertical light uses south as the extension direction.
+- Object shadow footprints use model world XY, independent of camera position.
+  Grow and horizon stretch extend only the half away from the active light;
+  vertical light uses south as the extension direction.
 - A model's height above the lowest flight plane fades the terrain shadow it
   receives and moves its lighting sample.
+- A model takes no smoke from planes below its own flight plane, smoke faded by
+  the fragment's height above its own plane so it pokes through, and full smoke
+  from every plane above. Its own plane is the one nearest its centre height
+  (`FlightPlanes::NearestPlaneIndex`), stored per instance by every CPU writer
+  of the model layout, because instances in one draw can sit on different
+  planes.
 - Material output remains linear HDR for the fullscreen resolve. Engine cubemaps use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the sampling boundary.

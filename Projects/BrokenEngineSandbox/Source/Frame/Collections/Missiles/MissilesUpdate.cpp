@@ -87,10 +87,9 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Before the ship Updates, current registry ids and interpolated positions still align with previous rows.
-	// Bind previous positions for retained-target homing, previous arrival grace for eligibility, and previous
-	// missile handles while current handles are being updated. A missile reads only the context of the flight plane at
-	// its height.
-	RegistryWindow window = BuildShipRegistryWindow(rFrame, &rPreviousFrame, *rPreviousFrame.postRender.pMissiles);
+	// Bind previous positions for retained-target homing and previous arrival grace for eligibility. A missile reads
+	// only the context of the flight plane at its height.
+	RegistryWindow window = BuildShipRegistryWindow(rFrame, rPreviousFrame, *rPreviousFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -162,9 +161,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// A targetless missile re-acquires every tick, in the post-loop pass, so the handle it produces is
-			// stored but does not steer until the next tick.
-
 			// Retained targets steer toward the source's previous-frame position.
 			if (bRetained)
 			{
@@ -219,80 +215,8 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())
 		{
-			// The only release site: this is the one missile transition that happens while the window is live.
-			ASSERT(optionalFlightPlane.has_value());
-			engine::ReleaseRegistryTarget(window.contexts[static_cast<size_t>(*optionalFlightPlane)], rCurrent.puiRegistryTargets[i]);
+			rCurrent.puiRegistryTargets[i] = {};
 			Fall(rFrame, i, deltaTime);
-		}
-	}
-
-	// Acquire targetless flying missiles after all handles and expiry releases are published, one flight plane at a time
-	// in its own context, in ascending row order within the plane. Fixed-size stack arrays bound acquisition scratch
-	// storage; each chunk updates shared subscription counts before the next.
-	static constexpr int64_t kiAcquireChunk = 64;
-	int64_t piAcquireRows[kiAcquireChunk] {};
-	engine::RegistryResult pAcquireResults[kiAcquireChunk] {};
-	int64_t iAcquireCount = 0;
-
-	auto AcquireChunk = [&](engine::RegistryQueryContext& rContext)
-	{
-		engine::AcquireRegistryTargets(rContext,
-		{
-			.pTargets = rCurrent.puiRegistryTargets,
-			.pVecOrigins = rCurrentInterpolate.pVecPositions,
-			.pVecDirections = rCurrentInterpolate.pVecDirections,
-			.pAlignments = rCurrent.pAlignments,
-			.rows = std::span<const int64_t>(piAcquireRows, static_cast<size_t>(iAcquireCount)),
-			.results = std::span<engine::RegistryResult>(pAcquireResults, static_cast<size_t>(iAcquireCount)),
-			.iSourceCount = rCurrent.iCount,
-		}, kfMissileTargetAcquireRange);
-		iAcquireCount = 0;
-	};
-
-	for (int64_t j = 0; j < std::ssize(window.contexts); ++j)
-	{
-		engine::RegistryQueryContext& rContext = window.contexts[j];
-
-		for (int64_t i = 0; i < rCurrent.iCount; ++i)
-		{
-			if (rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
-			{
-				continue;
-			}
-
-			if (rCurrent.pFlags[i] & kFalling)
-			{
-				continue;
-			}
-
-			if (rCurrent.pTimes[i].count() >= kMissileLifetime.count())
-			{
-				continue;
-			}
-
-			if ((rCurrent.puiRegistryTargets[i].uuid.iValue != 0))
-			{
-				continue;
-			}
-
-			if (FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) != j)
-			{
-				continue;
-			}
-
-			// /analyze loses the iAcquireCount reset because it happens inside AcquireChunk: the flush below runs on
-			// every write, so the counter is always below the chunk size here.
-			_Analysis_assume_(iAcquireCount >= 0 && iAcquireCount < kiAcquireChunk);
-			piAcquireRows[iAcquireCount++] = i;
-			if (iAcquireCount == kiAcquireChunk)
-			{
-				AcquireChunk(rContext);
-			}
-		}
-
-		if (iAcquireCount > 0)
-		{
-			AcquireChunk(rContext);
 		}
 	}
 }

@@ -1,7 +1,7 @@
 # `/Engine/Source/Ui/Screens/` - Engine ImGui Screens
 
 Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family.
-`UiScreens.cpp` owns their construction and per-frame invocation through the UI functions `ImGuiManager` calls, loading the Tweaks settings right after construction and saving them right before destruction only while a game exists, that is when `Graphics` replaces `ImGuiManager`; the screens are built before the game at boot and destroyed after it at shutdown, so `Main.cpp` does that boot load and shutdown save; `ImGuiManager` owns submission.
+`UiScreens.cpp` owns the gameplay client's construction and per-frame invocation of every screen except Tweaks through the UI functions `ImGuiManager` calls, and draws only Main Menu and Modal while Tweaks is open; `ImGuiManager` owns the Tweaks screen, its settings load and save, and submission (`../../Graphics/Managers/AGENTS.md` `### ImGuiManager`).
 The HUD and the game's Tweaks content stay in the game project. This document owns the runtime contracts that code changes must preserve.
 
 ## Standard Menu Contract

@@ -185,19 +185,6 @@ TextureManager::TextureManager()
 			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		}, bCubemap ? mWhiteCubeTexture.mVkImageView : mWhiteTexture.mVkImageView);
-
-		// Water normal maps: copy the DataPacker-baked per-mip Toksvig variance table (already
-		// padded past the real mip chain with the last value) for the WATER_SPEC_AA_MIP_HANDOFF
-		// uniform upload. Header-resident so no lazy chunk data is needed at startup.
-		static_assert(shaders::kiWaterSpecularAntialiasingMipTableSize == common::TextureHeader::kiMipVarianceCount, "The shader-side mip-variance table length must match the pack format's");
-		for (int64_t i = 0; i < kiWaterNormalCount; ++i)
-		{
-			if (kpWaterNormalCrcs[i] == rCrc)
-			{
-				std::copy(std::begin(rLazyChunk.header.textureHeader.pfMipVariance), std::end(rLazyChunk.header.textureHeader.pfMipVariance), std::begin(mpfWaterNormalMipVariance[i]));
-				break;
-			}
-		}
 	}
 
 	// Pre-fill texture arrays with white placeholders for lazy index assignment
@@ -439,9 +426,7 @@ void TextureManager::CreateSamplers()
 
 	// Water-normal variant: its own slider-driven bias instead of the global -gMipmapLevelOfDetailBias sharpen —
 	// a sharpen bias tuned for albedo pushes minified normal fetches toward noisier mips (specular
-	// shimmer), and Water.frag's WATER_SPEC_AA_MIP_HANDOFF analytic LOD must track the hardware LOD
-	// (the slider value is also uploaded as fWaterNormalMipmapBias). Applied directly, not negated:
-	// negative = sharpen, positive = blur.
+	// shimmer). Applied directly, not negated: negative = sharpen, positive = blur.
 	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipmapBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");

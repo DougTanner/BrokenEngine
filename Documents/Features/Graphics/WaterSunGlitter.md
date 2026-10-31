@@ -38,10 +38,10 @@ f3SkyboxSpecular += fGlitter * f3SunOrMoon;
 ## Out of scope
 
 - Bloom / HDR post-processing (glitter benefits from it but does not require it; see `HdrResolveAndColorGrading.txt`)
-- Changes to the existing specular lobes or `WATER_SPEC_AA_MODE` filtering
+- Changes to the existing specular lobes
 - Dedicated sparkle texture
 
 ## Notes
 
 - Client-only rendering path; no determinism/CRC exposure.
-- Aliasing: sparkle is intentionally high-frequency and the analytic spec-AA filters do not cover this new term. The threshold slider is the flicker control (higher = sparser/steadier). If pointwise evaluation still flickers objectionably, widen the smoothstep by the same screen-space variance kernel `WATER_SPEC_AA_MODE 2` already computes (`f3NormalDerivativeX`/`f3NormalDerivativeY` are available) — pre-staged decision for `/external-grill-plan`.
+- Aliasing: sparkle is intentionally high-frequency and, like the existing specular lobes, is evaluated pointwise. The threshold slider is the flicker control (higher = sparser/steadier). If pointwise evaluation still flickers objectionably, widen the smoothstep by screen-space derivatives of the reflection normal — pre-staged decision for `/external-grill-plan`.

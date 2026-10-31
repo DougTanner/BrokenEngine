@@ -60,6 +60,11 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
   (`.agents/references/authority-order.md`). Open each option with a written
   label such as `Option 1:`, never a rendered list marker, and reuse those
   labels in any question naming options.
+- Long test runs: before dispatching a test run (an `/agent-harness` scenario, a
+  replay determinism check, or any other test) expected to take more than 10
+  minutes, ask the user first, giving the expected duration, what the run
+  checks, and a shorter alternative such as a spot-check; dispatch the longer
+  run only when the user agrees.
 - Footer: only the main-session message that asks the `/finalize-changes`
   landing confirmation question carries it; that message ends with
   `Follow-up Plans created:` and the single word `none`, or one line per Plan
@@ -222,8 +227,9 @@ candidates are not findings: the validator's re-proof, not main, decides each on
 pair as one review row from the validator handoff, or the finder's when the
 validator is skipped, and the later reviews check the applied removals like any
 other changed bytes. Main decides each design suggestion from either pass once,
-by putting it to the user before the landing confirmation under
-`### User Interaction`; an accepted one follows the Step 8 Leftovers rule.
+by putting it to the user before Step 9 under `### User Interaction`; an
+accepted one follows the Step 8 Leftovers rule, and one the user does not accept
+is logged at Step 9, where one still unanswered counts as not accepted.
 
 #### Step 7 — Apply the triggered cleanup
 
@@ -267,6 +273,7 @@ round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land
 
+- main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows its header lists, from the session's handoffs and its own context, reading no further code — before dispatching the `/finalize-changes` preparation; a changed log joins the session's full landing set. Skipped for a `/save-plan` or Plan-rejection landing, whose `/finalize-changes` exception requires the change to hold exactly its Plan paths.
 - `implementer` runs `/finalize-changes` — at a landing gate.
 
 Exactly one explicit user confirmation authorizes changing primary; after it the finalizer advances primary under the landing lock. The confirmation contract, the acceptance table, and what a later diff change re-triggers live in `/finalize-changes`. Landing completes one stage; the session ends only when every stage is complete or explicitly deferred, with a tracked follow-up Plan where required.

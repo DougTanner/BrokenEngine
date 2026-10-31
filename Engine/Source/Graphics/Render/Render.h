@@ -150,8 +150,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame
 
-XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position);
-
 // Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
 inline bool gbLightingTemporalReset = false;
 void RenderLightingGlobal(int64_t iCommandBuffer);

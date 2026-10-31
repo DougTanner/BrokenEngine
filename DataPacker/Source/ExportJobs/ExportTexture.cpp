@@ -240,87 +240,11 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }
 
-// Per-mip Toksvig slope variance for a BC5 normal map: decode mip 0 to 3D normals, box-average a
-// pyramid WITHOUT renormalizing (the shortened mean-normal length encodes sub-texel variance), and
-// record mean((1 - |avgN|) / max(|avgN|, 0.01)) per level. Baked here because the runtime cannot recover it:
-// BC5 stores only XY and the shader's DecodeNormal reconstructs a unit-length Z, so mip filtering
-// silently discards the variance. Consumed by Water.frag's WATER_SPEC_AA_MIP_HANDOFF kernel via
-// TextureHeader::pfMipVariance. Levels past iMipLevels pad with the last real value so the engine
-// reader indexes by clamped LOD without a count.
-static void ComputeBc5MipVariance(const Texture& rTexture, float pfOutVariance[common::TextureHeader::kiMipVarianceCount])
-{
-	int64_t iWidth = rTexture.miWidth;
-	int64_t iHeight = rTexture.miHeight;
-	const std::vector<float>& rMip0 = rTexture.mData.at(0);
-
-	// Decode matches Water.frag's sign-inverted DecodeNormal (the sign flip is irrelevant to the
-	// length statistic but keeps the two decodes textually comparable). Pixels are 0-255 scale.
-	std::vector<float> normals(3 * iWidth * iHeight);
-	for (int64_t i = 0; i < iWidth * iHeight; ++i)
-	{
-		float fX = 1.0f - 2.0f * (rMip0.at(4 * i + 0) / 255.0f);
-		float fY = 1.0f - 2.0f * (rMip0.at(4 * i + 1) / 255.0f);
-		normals.at(3 * i + 0) = fX;
-		normals.at(3 * i + 1) = fY;
-		normals.at(3 * i + 2) = std::sqrt(std::max(0.0f, 1.0f - fX * fX - fY * fY));
-	}
-
-	int64_t iMipLevels = std::ssize(rTexture.mData);
-	for (int64_t iLevel = 0; iLevel < common::TextureHeader::kiMipVarianceCount; ++iLevel)
-	{
-		if (iLevel >= iMipLevels)
-		{
-			pfOutVariance[iLevel] = pfOutVariance[iLevel - 1];
-			continue;
-		}
-
-		double fVarianceSum = 0.0;
-		for (int64_t i = 0; i < iWidth * iHeight; ++i)
-		{
-			float fLength = std::sqrt(normals.at(3 * i) * normals.at(3 * i) + normals.at(3 * i + 1) * normals.at(3 * i + 1) + normals.at(3 * i + 2) * normals.at(3 * i + 2));
-			fVarianceSum += (1.0 - fLength) / std::max(fLength, 0.01f);
-		}
-		pfOutVariance[iLevel] = static_cast<float>(fVarianceSum / static_cast<double>(iWidth * iHeight));
-
-		// 2x2 box-average down to the next level, clamping the source coordinate for odd dimensions
-		int64_t iNextWidth = std::max<int64_t>(iWidth / 2, 1);
-		int64_t iNextHeight = std::max<int64_t>(iHeight / 2, 1);
-		std::vector<float> downsampled(3 * iNextWidth * iNextHeight);
-		for (int64_t iY = 0; iY < iNextHeight; ++iY)
-		{
-			for (int64_t iX = 0; iX < iNextWidth; ++iX)
-			{
-				int64_t iX0 = 2 * iX;
-				int64_t iY0 = 2 * iY;
-				int64_t iX1 = std::min(iX0 + 1, iWidth - 1);
-				int64_t iY1 = std::min(iY0 + 1, iHeight - 1);
-				for (int64_t iChannel = 0; iChannel < 3; ++iChannel)
-				{
-					downsampled.at(3 * (iY * iNextWidth + iX) + iChannel) = 0.25f * (
-						normals.at(3 * (iY0 * iWidth + iX0) + iChannel) +
-						normals.at(3 * (iY0 * iWidth + iX1) + iChannel) +
-						normals.at(3 * (iY1 * iWidth + iX0) + iChannel) +
-						normals.at(3 * (iY1 * iWidth + iX1) + iChannel));
-				}
-			}
-		}
-		normals = std::move(downsampled);
-		iWidth = iNextWidth;
-		iHeight = iNextHeight;
-	}
-}
-
 void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 {
 	std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
 	Texture texture(mInputPath, FileType::kImage);
 	texture.MakeMipmaps(vkFormat);
-
-	float pfMipVariance[common::TextureHeader::kiMipVarianceCount] {};
-	if (vkFormat == VK_FORMAT_BC5_UNORM_BLOCK)
-	{
-		ComputeBc5MipVariance(texture, pfMipVariance);
-	}
 
 	std::vector<std::byte> data = texture.Export(vkFormat, {});
 
@@ -334,6 +258,5 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 	pHeader->textureHeader.iTextureHeight = texture.miHeight;
 	pHeader->textureHeader.iMipLevels = std::ssize(texture.mData);
 	pHeader->textureHeader.vkFormat = vkFormat;
-	std::copy(std::begin(pfMipVariance), std::end(pfMipVariance), std::begin(pHeader->textureHeader.pfMipVariance));
 	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }

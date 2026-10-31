@@ -14,7 +14,7 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
   only, taking medium to zero at terrain while leaving the low boundary
   unchanged; `Medium Shore Softness` `0` bypasses the envelope. Both weights
   remain bounded. The shore Z taper applies to both bands; over-land vertices
-  remain flat and fragments discard above the configured terrain threshold.
+  remain flat and fragments discard where terrain elevation is above zero.
 - Compute accumulates tangent and bitangent derivatives and uses their cross product for the wave normal. Do not replace that full cross-product form with the simplified first-order normal: as a band's summed steepness x frequency x amplitude approaches 1 — the point where Gerstner waves start folding over on themselves — the simplified normal drifts away from the true one and eventually tilts the wrong way, while the cross product stays correct.
 - The flat-normal dampener is applied once, in the compute prepass, where the baked wave normal is blended toward straight up. Tune it at that source; do not add a second fade in the vertex or fragment stage.
 
@@ -63,8 +63,7 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 
 ## Lighting Contracts
 
-- Analytic specular antialiasing is selected by `WATER_SPEC_AA_MODE`. How it passes the per-mip variance from one stage to the next is selected by `WATER_SPEC_AA_MIP_HANDOFF`, which consumes DataPacker's BC5 per-mip variance tables. Changes to either switch require shader repacking; keep analytic LOD and water-normal sampler bias aligned.
-- Shoreline skybox-lobe reductions are applied once before every specular antialiasing branch: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
+- Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height lighting and smoke projections keep the true eye line (`ToEyeLine`).
 - Lighting samples at a base-height projection and smoke at each flight plane's projection, both derived from the undisplaced world position, keeping them stable under wave animation.
