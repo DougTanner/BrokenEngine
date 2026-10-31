@@ -380,9 +380,9 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 	SelectSurfaceFormat();
 	SelectDepthFormat();
 
-	// Elevation, lighting, smoke, and wind prepasses enable MAX/ADD blending with kMax/kAdd.
+	// Elevation, lighting, smoke, wind, and object shadow prepasses enable MAX/ADD blending with kMax/kAdd.
 	// Their attachment formats require VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT; absence makes pipeline creation undefined behavior.
-	const VkFormat pVkBlendedRenderTargetFormats[] {shaders::kVkFormatElevation, shaders::kVkFormatLighting, shaders::kVkFormatSmoke, shaders::kVkFormatWind};
+	const VkFormat pVkBlendedRenderTargetFormats[] {shaders::kVkFormatElevation, shaders::kVkFormatLighting, shaders::kVkFormatSmoke, shaders::kVkFormatWind, shaders::kVkFormatObjectShadows};
 	for (const VkFormat& rVkFormat : pVkBlendedRenderTargetFormats)
 	{
 		if (!SupportsColorAttachmentBlend(rVkFormat))

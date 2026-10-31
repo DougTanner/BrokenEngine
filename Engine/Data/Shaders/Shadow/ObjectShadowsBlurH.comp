@@ -11,7 +11,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsTextureSampler;
-layout (set = 1, binding = 2, r16) uniform writeonly image2D objectShadowsBlurIntermediateTexture; // kVkFormatShadow
+layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurIntermediateTexture; // kVkFormatObjectShadows
 
 void main()
 {
@@ -28,7 +28,7 @@ void main()
 	vec2 f2InvOutputSize = 1.0f / vec2(i2OutputSize);
 	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvOutputSize;
 
-	float fTotal = 0.0f;
+	vec4 f4Total = vec4(0.0f);
 	float fWeightSum = 0.0f;
 	ivec2 i2InputSize = textureSize(objectShadowsTextureSampler, 0);
 	// A linear sample at i + w2 / (w1 + w2) returns
@@ -36,7 +36,7 @@ void main()
 	// reconstructs the weighted sum. This identity requires the sampler and logical tap grids to match.
 	if (all(equal(i2InputSize, i2OutputSize)))
 	{
-		fTotal = 1.0f - textureLod(objectShadowsTextureSampler, f2Uv, 0.0f).x;
+		f4Total = textureLod(objectShadowsTextureSampler, f2Uv, 0.0f);
 		fWeightSum = 1.0f;
 		for (int i = 1; i <= iRadius; i += 2)
 		{
@@ -52,9 +52,9 @@ void main()
 				{
 					float fCombinedOffset = float(i) + fWeight2 / fCombinedWeight;
 					vec2 f2Offset = vec2(fCombinedOffset, 0.0f) * f2InvOutputSize;
-					fTotal += fCombinedWeight *
-						((1.0f - textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f).x)
-							+ (1.0f - textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f).x));
+					f4Total += fCombinedWeight *
+						(textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f)
+							+ textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f));
 					fWeightSum += 2.0f * fCombinedWeight;
 				}
 			}
@@ -62,9 +62,9 @@ void main()
 			{
 				// An odd radius leaves one unpaired outer tap on each side.
 				vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
-				fTotal += fWeight1 *
-					((1.0f - textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f).x)
-						+ (1.0f - textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f).x));
+				f4Total += fWeight1 *
+					(textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f)
+						+ textureLod(objectShadowsTextureSampler, f2Uv - f2Offset, 0.0f));
 				fWeightSum += 2.0f * fWeight1;
 			}
 		}
@@ -78,10 +78,10 @@ void main()
 			float fA = float(i) / fRadiusOverSigma;
 			float fWeight = exp(-0.5f * fA * fA);
 			vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
-			fTotal += fWeight * (1.0f - textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f).x);
+			f4Total += fWeight * textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f);
 			fWeightSum += fWeight;
 		}
 	}
 
-	imageStore(objectShadowsBlurIntermediateTexture, ivec2(uiX, uiY), vec4(fTotal / fWeightSum, 0.0f, 0.0f, 0.0f));
+	imageStore(objectShadowsBlurIntermediateTexture, ivec2(uiX, uiY), f4Total / fWeightSum);
 }

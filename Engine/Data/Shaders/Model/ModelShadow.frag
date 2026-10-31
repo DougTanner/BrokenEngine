@@ -22,9 +22,10 @@ layout (location = 8) in float fInHeightAboveBase;
 layout (location = 9) in flat int iInLayer;
 
 // Output
-layout (location = 0) out float fOutColor;
+layout (location = 0) out vec4 f4OutColor;
 
 void main()
 {
-	fOutColor = 0.0f;
+	// Cumulative coverage merged by MAX blending: channel c holds every ship on flight plane c or above.
+	f4OutColor = vec4(lessThanEqual(ivec4(0, 1, 2, 3), ivec4(iInLayer)));
 }

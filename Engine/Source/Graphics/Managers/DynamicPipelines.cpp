@@ -151,7 +151,7 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 			.pipelineInfo =
 			{
 				.name = rShadowName,
-				.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants, PipelineFlags::kUpdateAfterBind},
+				.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants, PipelineFlags::kUpdateAfterBind, PipelineFlags::kMax},
 				.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelShadowfragCrc)},
 				.pVertexBuffer = pModelBuffer,
 				.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass,

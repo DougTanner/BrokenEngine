@@ -28,4 +28,9 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   (`FlightPlanes::NearestPlaneIndex`), stored per instance by every CPU writer
   of the model layout, because instances in one draw can sit on different
   planes.
+- A model receives object shadow only from planes above its own (channel
+  layout: `../Shadow/AGENTS.md` `## Overview`): it reads channel
+  `iInLayer + 1`, or 1 when no plane lies above. That value
+  multiplies into `fShadow`, reaching sun direct, IBL diffuse, and IBL
+  specular, and is `fShadowMoon` for the moon terms.
 - Material output remains linear HDR for the fullscreen resolve. Engine cubemaps use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the sampling boundary.

@@ -12,9 +12,9 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 {
 	PipelineInfo pipelineInfo = rPipelineInfo;
 
-	static constexpr int64_t kiModelAdditionalDescriptors = 5; // +1 lighting, +2 shadow, +3 smoke, +4 mesh data, +5 joint matrices
+	static constexpr int64_t kiModelAdditionalDescriptors = 6; // +1 lighting, +2 shadow, +3 smoke, +4 object shadows, +5 mesh data, +6 joint matrices
 
-	// Grow by the model descriptor plus its five appended slots before the scan, so the slots the loop
+	// Grow by the model descriptor plus its six appended slots before the scan, so the slots the loop
 	// writes in place exist. Grown entries default to kEmpty, so the scan still stops at the first of them.
 	int64_t iDescriptorInfoCount = std::ssize(pipelineInfo.descriptorInfos) + kiModelAdditionalDescriptors + 1;
 	pipelineInfo.descriptorInfos.resize(iDescriptorInfoCount);
@@ -41,15 +41,18 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 			pipelineInfo.descriptorInfos.at(i + 3).iCount = shaders::kiMaxFlightPlanes;
 			pipelineInfo.descriptorInfos.at(i + 3).ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne;
 
+			pipelineInfo.descriptorInfos.at(i + 4).flags = DescriptorFlags::kCombinedSamplers;
+			pipelineInfo.descriptorInfos.at(i + 4).pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture;
+
 			// Binding 15: Per-mesh data (matrix, normal matrix, joint count/offset)
-			pipelineInfo.descriptorInfos.at(i + 4).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
-			pipelineInfo.descriptorInfos.at(i + 4).iExplicitBinding = shaders::kiModelBindingMeshData;
-			pipelineInfo.descriptorInfos.at(i + 4).pBuffers = gpBufferManager->mMeshDataStorageBuffers.data();
+			pipelineInfo.descriptorInfos.at(i + 5).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
+			pipelineInfo.descriptorInfos.at(i + 5).iExplicitBinding = shaders::kiModelBindingMeshData;
+			pipelineInfo.descriptorInfos.at(i + 5).pBuffers = gpBufferManager->mMeshDataStorageBuffers.data();
 
 			// Binding 16: Joint matrices (separate dynamically-sized buffer; MeshData stays fixed-size)
-			pipelineInfo.descriptorInfos.at(i + 5).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
-			pipelineInfo.descriptorInfos.at(i + 5).iExplicitBinding = shaders::kiModelBindingJointMatrix;
-			pipelineInfo.descriptorInfos.at(i + 5).pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data();
+			pipelineInfo.descriptorInfos.at(i + 6).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
+			pipelineInfo.descriptorInfos.at(i + 6).iExplicitBinding = shaders::kiModelBindingJointMatrix;
+			pipelineInfo.descriptorInfos.at(i + 6).pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data();
 			break;
 		}
 	}

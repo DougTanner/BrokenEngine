@@ -2,7 +2,8 @@
 
 ## Overview
 
-Two independent compute chains post-process top-down (orthographic, world-XY-mapped) shadow data for the RTS camera. The terrain chain ray-marches sun occlusion, runs horizontal and vertical Gaussian blur, temporally resolves the final result, then refreshes distinct history storage. The object chain blurs its top-down object-coverage raster separately. Terrain and water consume both final textures; models consume only terrain shadow.
+Two independent compute chains post-process top-down (orthographic, world-XY-mapped) shadow data for the RTS camera. The terrain chain ray-marches sun occlusion, runs horizontal and vertical Gaussian blur, temporally resolves the final result, then refreshes distinct history storage.
+The object chain blurs its top-down object-coverage raster separately; channel `c` of that raster holds coverage by ships on flight plane `c` and above, merged by MAX blending. Terrain and water consume both final textures, reading object-shadow channel 0; models consume both as `../Model/AGENTS.md` describes.
 
 ## Terrain Shadow Contract
 
@@ -13,4 +14,4 @@ Two independent compute chains post-process top-down (orthographic, world-XY-map
 - Temporal validity: temporal reprojection samples history only when the reprojected coordinate stays inside `[0, 1]`; disocclusions and reset history use current output. A separate history-copy pass transfers the result between distinct storage images after temporal resolve, avoiding same-image read/write aliasing.
 - Sun direction is loop parameters, not branches: morning versus evening flips the march increment, start offset, and width-scale sign. The ray-march is 1-D along texture rows because the sun azimuth is east/west; the wider, sunward-extended elevation raster admits off-screen occluders.
 - Shadow shaping: per-occluder shadow is feathered by sun-versus-terrain angle and distance falloff, then max-accumulated. An elevation height-fade band limits low-beach noise at dawn and dusk, while the moon multiplier fades terrain shadow with the lighting envelope.
-- Terrain and object blur differ: terrain radius is a compile-time constant, while object blur receives its radius and sigma from runtime settings. Object horizontal pairing requires matching logical tap spacing and sampler grids; when its independently scaled input differs, it uses discrete output-grid taps. Both object inputs remain linear, clamp-to-edge; horizontal blur inverts coverage and vertical blur restores multiply-with-lighting form.
+- Terrain and object blur differ: terrain radius is a compile-time constant, while object blur receives its radius and sigma from runtime settings. Object horizontal pairing requires matching logical tap spacing and sampler grids; when its independently scaled input differs, it uses discrete output-grid taps. Both object inputs remain linear, clamp-to-edge; both passes blur every channel, the horizontal pass on raw coverage, and vertical blur converts it to multiply-with-lighting form.

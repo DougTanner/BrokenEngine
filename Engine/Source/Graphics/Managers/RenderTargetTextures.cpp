@@ -6,10 +6,15 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "TextureManager.h"
 
+#include "Frame/FlightPlaneTable.h"
+
 namespace engine
 {
 
 static_assert(shaders::kiMaxFlightPlanes == kiMaxFlightPlanes);
+
+// One RGBA object-shadow channel per flight plane.
+static_assert(std::ssize(game::kFlightPlanes) <= 4);
 
 // TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-plane names need static storage.
 constexpr std::string_view kpSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
@@ -368,7 +373,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "ObjectShadows",
 		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
+		.vkFormat = shaders::kVkFormatObjectShadows,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsRenderTextureX), .height = static_cast<uint32_t>(iObjectShadowsRenderTextureY), .depth = 1},
 		.iMipLevels = 1,
 		.iArrayLayers = 1,
@@ -378,7 +383,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.vkRenderPassAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.vkRenderPassClearColorValue = {1.0f, 0.0f, 0.0f, 0.0f},
+		.vkRenderPassClearColorValue = {0.0f, 0.0f, 0.0f, 0.0f},
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 		.vkRenderPassDestinationStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 	});
@@ -389,7 +394,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.textureFlags = {},
 		.name = "ObjectShadowsBlur",
 		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
+		.vkFormat = shaders::kVkFormatObjectShadows,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsBlurTextureX), .height = static_cast<uint32_t>(iObjectShadowsBlurTextureY), .depth = 1},
 		.iMipLevels = 1,
 		.iArrayLayers = 1,
@@ -404,7 +409,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.textureFlags = {},
 		.name = "ObjectShadowsBlurIntermediate",
 		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
+		.vkFormat = shaders::kVkFormatObjectShadows,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsBlurTextureX), .height = static_cast<uint32_t>(iObjectShadowsBlurTextureY), .depth = 1},
 		.iMipLevels = 1,
 		.iArrayLayers = 1,

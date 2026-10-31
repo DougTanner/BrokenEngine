@@ -34,6 +34,7 @@ inline constexpr VkFormat kVkFormatLighting = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatSmoke = VK_FORMAT_R16_SFLOAT;
 inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
 inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
+inline constexpr VkFormat kVkFormatObjectShadows = VK_FORMAT_R16G16B16A16_SFLOAT; // Channel c: coverage by flight planes c and above
 inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
 inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
 inline constexpr VkFormat kVkFormatWaterFoam = VK_FORMAT_R16_SFLOAT;

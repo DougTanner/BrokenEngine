@@ -29,7 +29,11 @@ viewer.
   for the requested game project in place of the worker steps, apart from the
   worker steps it cites, leave both processes running for the user, and return
   `Criterion results: 0/0 passed` with the launch command and both PIDs as
-  `Decisive checks` rows.
+  `Decisive checks` rows. Those PIDs show only what was running at launch:
+  before a later step that needs those executables closed (a build, a harness
+  run, landing), never assume they are still open or ask the user to close them
+  first; run that step and ask the user only when its own check reports one
+  still live (`/compile` contention, the harness claim and client waits).
 - After the dispatching session stops a harness worker before its handoff
   arrives: its next harness dispatch is a release-only recovery run; while
   another harness worker of this session is still running, send it only after

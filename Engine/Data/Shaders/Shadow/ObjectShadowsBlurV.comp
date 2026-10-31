@@ -11,7 +11,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsBlurIntermediateSampler;
-layout (set = 1, binding = 2, r16) uniform writeonly image2D objectShadowsBlurTexture; // kVkFormatShadow
+layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurTexture; // kVkFormatObjectShadows
 
 void main()
 {
@@ -28,7 +28,7 @@ void main()
 	vec2 f2InvSize = 1.0f / vec2(i2Size);
 	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvSize;
 
-	float fTotal = textureLod(objectShadowsBlurIntermediateSampler, f2Uv, 0.0f).x;
+	vec4 f4Total = textureLod(objectShadowsBlurIntermediateSampler, f2Uv, 0.0f);
 	float fWeightSum = 1.0f;
 	// Intermediate and output grids match, so a linear sample at j + w2 / (w1 + w2) returns
 	// (w1 * T[j] + w2 * T[j + 1]) / (w1 + w2); multiplying it by the combined weight
@@ -47,9 +47,9 @@ void main()
 			{
 				float fCombinedOffset = float(j) + fWeight2 / fCombinedWeight;
 				vec2 f2Offset = vec2(0.0f, fCombinedOffset) * f2InvSize;
-				fTotal += fCombinedWeight *
-					(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f).x
-						+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f).x);
+				f4Total += fCombinedWeight *
+					(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f)
+						+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f));
 				fWeightSum += 2.0f * fCombinedWeight;
 			}
 		}
@@ -57,13 +57,12 @@ void main()
 		{
 			// An odd radius leaves one unpaired outer tap on each side.
 			vec2 f2Offset = vec2(0.0f, float(j)) * f2InvSize;
-			fTotal += fWeight1 *
-				(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f).x
-					+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f).x);
+			f4Total += fWeight1 *
+				(textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f)
+					+ textureLod(objectShadowsBlurIntermediateSampler, f2Uv - f2Offset, 0.0f));
 			fWeightSum += 2.0f * fWeight1;
 		}
 	}
 
-	float fOutColor = 1.0f - globalLayout.fObjectShadowsIntensity * fTotal / fWeightSum;
-	imageStore(objectShadowsBlurTexture, ivec2(uiX, uiY), vec4(fOutColor, 0.0f, 0.0f, 0.0f));
+	imageStore(objectShadowsBlurTexture, ivec2(uiX, uiY), 1.0f - globalLayout.fObjectShadowsIntensity * f4Total / fWeightSum);
 }

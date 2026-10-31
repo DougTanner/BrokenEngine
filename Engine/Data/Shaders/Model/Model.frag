@@ -62,6 +62,7 @@ layout (scalar, set = 2, binding = 8) buffer readonly pbrMaterialsUniform
 layout (set = 1, binding = 9) uniform sampler2D pLightingSamplers[3];
 layout (set = 1, binding = 10) uniform sampler2D shadowTextureSampler;
 layout (set = 1, binding = 11) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
+layout (set = 1, binding = 12) uniform sampler2D objectShadowsTextureSampler;
 
 // Vertex inputs
 layout (location = 0) in vec3 f3InWorldPosition;
@@ -251,8 +252,8 @@ void main()
 		fEffectiveAo = 1.0 + material.fOcclusionStrength * (fAo - 1.0);
 	}
 
-	// Engine-specific lighting. Sun and moon split: moon bypasses shadow attenuation (Model.frag samples only
-	// the terrain shadow texture), sun still receives it. The sun/moon color terms are precomputed CPU-side
+	// Engine-specific lighting. Sun and moon split: the sun receives terrain and object shadow, the moon only
+	// object shadow. The sun/moon color terms are precomputed CPU-side
 	// (GlobalUniforms.cpp PopulateDayCycleColors): the per-target Objects intensity and fPhysicallyBasedRenderingSun fold into
 	// f4PbrSun/MoonColorObjects, and the IBL specular path multiplies in the Rec.709 luminance / fPhysicallyBasedRenderingDayBrightness
 	// via the separate f4PbrSun/MoonColorObjectsIbl. Kept as two fields so the IBL path stays linear in fPhysicallyBasedRenderingSun
@@ -265,7 +266,13 @@ void main()
 	float fShadow = max(mainLayout.fPhysicallyBasedRenderingShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
-	const float fShadowMoon = 1.0; // moon bypasses terrain shadow; Model.frag has no other shadow inputs
+	// Object shadow channel c holds ships on flight plane c and above, so channel iInLayer + 1 excludes this ship's
+	// own plane; nothing lies above the highest plane. Sampled before the select to keep implicit derivatives uniform.
+	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2VisibleAreaPosition);
+	int iObjectShadowsPlane = iInLayer + 1;
+	float fObjectShadow = iObjectShadowsPlane < int(globalLayout.uiFlightPlaneCount) ? f4ObjectShadows[iObjectShadowsPlane] : 1.0f;
+	fShadow *= fObjectShadow;
+	float fShadowMoon = fObjectShadow;
 
 	// Accumulate lighting
 	vec3 color = vec3(0.0);

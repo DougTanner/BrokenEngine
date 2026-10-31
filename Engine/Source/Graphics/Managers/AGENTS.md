@@ -15,7 +15,8 @@ Vulkan services exposed through `gp*` globals. `Graphics` constructs its manager
 - Boot fails loud when the device does not advertise
   `VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT` (the device's promise that it
   can blend into a given pixel format) for every special-format render target
-  the MAX/ADD-blended prepasses write: elevation, lighting, smoke, and wind.
+  the MAX/ADD-blended prepasses write: elevation, lighting, smoke, wind, and
+  object shadows.
   Blending without it is silent undefined behavior at pipeline creation, so this
   device dependency is hard, unlike the sampler linear-filter probe that
   downgrades gracefully. Adding a blended prepass on a new format must extend
