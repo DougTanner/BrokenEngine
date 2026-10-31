@@ -10,6 +10,7 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-10-31 claude/4651544d-53aa-4a04-b074-f08eb3cea56e — refactor observation — Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp:678 — a random-spawn Omni scans its enemies with line-of-sight tests twice per tick, once in FindAttackTarget for steering and once in AcquireTarget (:698) for fire and look — one per-row targeting pass whose result feeds both steering and the blaster and look picks would remove the repeated scan and sight tests
 - 2026-10-31 claude/6474a6e5-0b43-47ad-81ad-b041b5850efe — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/FleetCoordination.cpp:249 — let `ChooseFleetTactic` return only the plain Attack tactic for both types
   and move the veer-off start and continuation into the Fighter script (`Fighters.cpp`, which already owns
   `pVecVeerOffPoints`); the shared function would then need no type test and no veer-off output parameter.

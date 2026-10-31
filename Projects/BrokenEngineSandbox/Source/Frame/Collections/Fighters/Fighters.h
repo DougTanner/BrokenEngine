@@ -231,7 +231,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
 	// The enemy position a Veer-off flies away from, read only while ShipFlags::kVeerOff is set.
 	XMVECTOR* __restrict pVecVeerOffPoints = nullptr;
-	// The fleet attack target's registry id, zero for none.
+	// The kept attack target's registry id, zero for none.
 	engine::registry_id_t* __restrict pRegistryTargets = nullptr;
 #if defined(BT_CLIENT)
 	XMVECTOR* __restrict pVecDebugNavigationWaypoints = nullptr;

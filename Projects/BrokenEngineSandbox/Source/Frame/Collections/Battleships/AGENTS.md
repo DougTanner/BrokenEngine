@@ -4,15 +4,16 @@ Battleships are a copy of Fighters with larger, slower constants
 (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with
 the Battleship names. Keep the two collections parallel; only the tube missiles
 and fleet health below and the Fighters' beam, client-only climb tilt, fleet
-tactics, `pVecVeerOffPoints`, `pRegistryTargets`, and lack of flee differ: a
-random-spawn Battleship, when island candidates are available, prioritizes
-returning to an island, fleeing a nearby enemy ship, then chasing the nearest
-enemy ship; in a cell with no island candidates, it clears the return-to-island
-state and uses flee/chase steering for an enemy ship or only decays the current
-turn otherwise. Return and flee transitions use distance hysteresis. A
-`kTargetFlagship` row chases the enemy flagship with neither return nor flee
-(`../Ships/AGENTS.md`); its missiles keep the rule below, which already covers
-the flagship.
+tactics, `pVecVeerOffPoints`, and lack of flee differ: a random-spawn
+Battleship, when island candidates are available, prioritizes returning to an
+island, fleeing its enemy ship when nearby, then chasing it; in a cell with no
+island candidates, it clears the return-to-island state and uses flee/chase
+steering for an enemy ship or only decays the current turn otherwise. Return
+and flee transitions use distance hysteresis. That enemy is its kept attack
+target (`../Ships/AGENTS.md` `## Ship Invariants`), picked from itself in 3D at
+or below plane 0. A `kTargetFlagship` row's kept attack target is the enemy
+flagship, which it chases with neither return nor flee (`../Ships/AGENTS.md`);
+its missiles keep the rule below, which already covers the flagship.
 
 ## Weapon Invariants
 
@@ -25,12 +26,12 @@ the flagship.
   cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
   ship, so launches come exactly `kBattleshipMissileCooldown` apart.
 - A launching row launches at most one missile per tick, at the enemy nearest
-  it by 3D distance among those within `kfBattleshipMissileRange`, with no
-  visibility test, that the shared plane targeting rule allows
-  (`../Ships/AGENTS.md`), and that fewer missiles than its type's
-  `kiMissilesPerTarget` cap target; an exact distance tie keeps the first in
-  `ForEachEnemyShip` order. The count covers every missile targeting it, other
-  Battleships' missiles included, and every launch made earlier in the
+  it by 3D distance among those within `kfBattleshipMissileRange` that the
+  shared plane and line-of-sight targeting rules allow (`../Ships/AGENTS.md`),
+  and that fewer missiles than its type's `kiMissilesPerTarget` cap target; an
+  exact distance tie keeps the first in `ForEachEnemyShip` order. Missiles do
+  not prefer the kept attack target. The count covers every missile targeting
+  it, other Battleships' missiles included, and every launch made earlier in the
   same tick, so a later shooter sees an earlier shooter's launches. Each missile
   receives that enemy as its target at launch, with no registry acquisition
   (`../Missiles/AGENTS.md`).

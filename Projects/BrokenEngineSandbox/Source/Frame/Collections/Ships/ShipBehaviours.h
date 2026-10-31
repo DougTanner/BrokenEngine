@@ -93,10 +93,13 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX);
 
 // Firing and look targets from previous-frame data, ignoring enemies above iHighestFlightPlane: sets kFireBlaster for an
-// enemy within fBlasterTargetRange on the shooter's stored plane uiFlightPlane, so a climbing shooter holds fire. The
-// look position leads the nearest such target, or with bPreferFlagship the nearest such enemy flagship when one
-// qualifies, else is the nearest enemy at any range.
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, bool bPreferFlagship, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
+// enemy within fBlasterTargetRange on the shooter's stored plane uiFlightPlane with clear line of sight, so a climbing
+// shooter holds fire. The look position leads the nearest such target, preferring the kept attack target registryTarget
+// when it qualifies, else is the nearest enemy in line of sight at any range.
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
+// No terrain on the shooter's plane graph crosses the segment between the two positions, each first snapped clear of
+// terrain as a route destination is; always true on a plane without terrain collision.
+[[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield);
 

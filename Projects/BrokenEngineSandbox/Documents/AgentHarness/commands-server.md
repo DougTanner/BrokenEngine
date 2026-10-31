@@ -31,8 +31,8 @@ adding the fields below; the other entries are its own commands. For the engine
   `{"total","items":[...]}`. Ship rows (`fighters`, `omnis`, `battleships`):
   `index,uuid,globalId,controller,orders,targetFlightPlane,flags,lifecycleFlags,alignment,local,dir,vel,arrivalGrace,flagshipGlobalId,registryId`,
   plus `armor,shield` for omnis, `health` for fighters and battleships, and
-  `registryTargetId` for fighters and omnis: the `registryId` of a fleet
-  fighter's or omni's kept attack target, 0 for none;
+  `registryTargetId` for every ship type: the `registryId` of the row's kept
+  attack target, 0 for none;
   missile rows:
   `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested

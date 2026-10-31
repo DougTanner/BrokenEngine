@@ -26,16 +26,12 @@ std::optional<ShipLocator> FindShipByGlobalId(const Frame& rFrame, engine::Globa
 	return optionalLocator;
 }
 
-bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, std::optional<int64_t> optionalFlightPlane, XMVECTOR& rVecResult)
+bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult)
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	bool bFound = false;
 	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
-		if (optionalFlightPlane && NearestFlightPlane(vecPosition) != *optionalFlightPlane)
-		{
-			return;
-		}
 		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFrom)));
 		if (fDistanceSquared < fClosestDistanceSquared)
 		{
@@ -47,7 +43,109 @@ bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, en
 	return bFound;
 }
 
-bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult)
+bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, bool bHorizontal, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight)
+{
+	auto PickDistanceSquared = [&](FXMVECTOR vecEnemyPosition)
+	{
+		XMVECTOR vecOffset = XMVectorSubtract(vecEnemyPosition, vecPickFrom);
+		return XMVectorGetX(bHorizontal ? XMVector2LengthSq(vecOffset) : XMVector3LengthSq(vecOffset));
+	};
+	auto RegistryId = [&](ShipLocator locator)
+	{
+		return VisitShip(rPreviousFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
+		{
+			return rInterpolate.pRegistryIds[iRow];
+		});
+	};
+
+	bool bKept = false;
+	bool bKeptAboveHighestPlane = false;
+	XMVECTOR vecKeptPosition = XMVectorZero();
+	bool bFound = false;
+	float fNearestDistanceSquared = std::numeric_limits<float>::max();
+	engine::registry_id_t nearestRegistryId {};
+	XMVECTOR vecNearestPosition = XMVectorZero();
+	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+	{
+		engine::registry_id_t registryId = RegistryId(locator);
+		bool bIsKept = rRegistryTarget.uuid.iValue != 0 && registryId == rRegistryTarget;
+		if (NearestFlightPlane(vecEnemyPosition) > iHighestFlightPlane)
+		{
+			bKeptAboveHighestPlane = bKeptAboveHighestPlane || bIsKept;
+			return;
+		}
+		if (bIsKept)
+		{
+			bKept = true;
+			vecKeptPosition = vecEnemyPosition;
+		}
+		float fDistanceSquared = PickDistanceSquared(vecEnemyPosition);
+		if (fDistanceSquared < fNearestDistanceSquared)
+		{
+			fNearestDistanceSquared = fDistanceSquared;
+			nearestRegistryId = registryId;
+			vecNearestPosition = vecEnemyPosition;
+			bFound = true;
+		}
+	});
+	if (!bFound)
+	{
+		if (bKeptAboveHighestPlane)
+		{
+			rRegistryTarget = {};
+		}
+		return false;
+	}
+
+	if (bKept && HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecKeptPosition))
+	{
+		rVecResult = vecKeptPosition;
+		rbInLineOfSight = true;
+		return true;
+	}
+
+	// Only a candidate nearer than the best one in sight so far takes a sight test.
+	bool bVisibleFound = false;
+	float fVisibleDistanceSquared = 0.0f;
+	engine::registry_id_t visibleRegistryId {};
+	XMVECTOR vecVisiblePosition = XMVectorZero();
+	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+	{
+		if (NearestFlightPlane(vecEnemyPosition) > iHighestFlightPlane)
+		{
+			return;
+		}
+		float fDistanceSquared = PickDistanceSquared(vecEnemyPosition);
+		if ((!bVisibleFound || fDistanceSquared < fVisibleDistanceSquared) && HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecEnemyPosition))
+		{
+			bVisibleFound = true;
+			fVisibleDistanceSquared = fDistanceSquared;
+			visibleRegistryId = RegistryId(locator);
+			vecVisiblePosition = vecEnemyPosition;
+		}
+	});
+
+	if (bVisibleFound)
+	{
+		rRegistryTarget = visibleRegistryId;
+		rVecResult = vecVisiblePosition;
+		rbInLineOfSight = true;
+	}
+	else if (bKept)
+	{
+		rVecResult = vecKeptPosition;
+		rbInLineOfSight = false;
+	}
+	else
+	{
+		rRegistryTarget = nearestRegistryId;
+		rVecResult = vecNearestPosition;
+		rbInLineOfSight = false;
+	}
+	return true;
+}
+
+bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryId, XMVECTOR& rVecResult)
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	bool bFound = false;
@@ -61,6 +159,7 @@ bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom
 		if (fDistanceSquared < fClosestDistanceSquared)
 		{
 			fClosestDistanceSquared = fDistanceSquared;
+			rRegistryId = rFrame.interpolate.pBattleships->pRegistryIds[locator.iRow];
 			rVecResult = vecPosition;
 			bFound = true;
 		}

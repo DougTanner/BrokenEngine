@@ -10,5 +10,7 @@ XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavDat
 
 // Is the position inside a no-navigation polygon? Reads x/y only.
 bool XM_CALLCONV NavQueryPointBlocked(FXMVECTOR vecPosition, const NavData& rNavData);
+// Does the segment cross a no-navigation polygon edge? Reads x/y only; false on an empty graph.
+bool XM_CALLCONV NavQuerySegmentBlocked(FXMVECTOR vecStart, FXMVECTOR vecEnd, const NavData& rNavData);
 
 } // namespace engine

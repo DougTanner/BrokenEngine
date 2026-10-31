@@ -320,7 +320,7 @@ void BattleshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [
 
 void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	SpawnMissiles(rFrame, rStaticData.coordinate);
+	SpawnMissiles(rFrame, rStaticData);
 
 	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
@@ -430,6 +430,8 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
+	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
+	rCurrentPostRender.pRegistryTargets[iIndex] = {};
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
@@ -479,6 +481,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		std::chrono::duration<float> cellChangeTimer = rPrevious.pCellChangeTimers[i];
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
+		engine::registry_id_t registryTarget = rPrevious.pRegistryTargets[i];
 		int64_t iNavigationDirection = GetNavigationDirection(flags);
 		int64_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 
@@ -522,19 +525,30 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			}
 			else
 			{
+				XMVECTOR vecTarget = XMVectorZero();
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = XMVectorZero();
-				if ((rPrevious.pOrders[i] & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecDestination))
+				bool bRouteToTarget = false;
+				if ((rPrevious.pOrders[i] & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecTarget))
 				{
 					// A flagship chase never flees or returns to an island.
 					flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
+					vecDestination = vecTarget;
 					bHasDestination = true;
+					bRouteToTarget = !HasLineOfSight(rStaticData, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
 				}
 				else
 				{
-					XMVECTOR vecNearestEnemy = XMVectorZero();
-					bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
-					vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+					bool bInLineOfSight = false;
+					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
+					vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
+					// A fleeing Battleship turns away from the enemy itself.
+					bRouteToTarget = bEnemyFound && !bInLineOfSight && !(flags & ShipFlags::kReturnToIslandCenter) && !(flags & ShipFlags::kFlee);
+				}
+				if (bRouteToTarget)
+				{
+					bool bFinalWaypoint = false;
+					vecDestination = NextRouteWaypoint(rStaticData, vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfBattleshipFleeTurnRate : kfBattleshipChaseTurnRate;
 				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfBattleshipSteeringSmoothing, kfBattleshipSteeringDecay, deltaTime, fDeltaRotation);
@@ -577,6 +591,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
+		rCurrent.pRegistryTargets[i] = registryTarget;
 
 		rCurrentInterpolate.pfDeltaRotations[i] = fDeltaRotation;
 	}
@@ -636,6 +651,7 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
+		bEqual &= common::LogDifference<"pRegistryTargets">(i, pRegistryTargets[i].uuid.iValue, rOther.pRegistryTargets[i].uuid.iValue);
 	}
 
 	return bEqual;

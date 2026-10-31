@@ -611,19 +611,16 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 	}
 }
 
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, bool bPreferFlagship, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
 	bool bTargetInRange = false;
+	bool bKeptTargetInRange = false;
 	bool bTargetForLook = false;
-	bool bFlagshipInRange = false;
 	XMVECTOR vecTargetInRangePosition = XMVectorZero();
 	XMVECTOR vecTargetInRangeVelocity = XMVectorZero();
 	XMVECTOR vecTargetForLookPosition = XMVectorZero();
-	XMVECTOR vecFlagshipInRangePosition = XMVectorZero();
-	XMVECTOR vecFlagshipInRangeVelocity = XMVectorZero();
 	float fBestInRange = fBlasterTargetRange;
 	float fBestForLook = std::numeric_limits<float>::max();
-	float fBestFlagshipInRange = fBlasterTargetRange;
 	// Firing and look targets require a visible enemy past arrival grace.
 	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity)
 	{
@@ -636,33 +633,37 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 		{
 			return;
 		}
+		bool bKeptTarget = registryTarget.uuid.iValue != 0 && VisitShip(rPreviousFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
+		{
+			return rInterpolate.pRegistryIds[iRow];
+		}) == registryTarget;
 		float fDistance = common::Distance(vecPosition, vecTargetPosition);
-		if (iTargetFlightPlane == uiFlightPlane && fDistance < fBestInRange)
+		// A kept target within range wins over every nearer candidate.
+		bool bInRangeCandidate = iTargetFlightPlane == uiFlightPlane && (bKeptTarget ? fDistance < fBlasterTargetRange : (!bKeptTargetInRange && fDistance < fBestInRange));
+		bool bLookCandidate = fDistance < fBestForLook;
+		if (!(bInRangeCandidate || bLookCandidate))
+		{
+			return;
+		}
+		if (!HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecTargetPosition))
+		{
+			return;
+		}
+		if (bInRangeCandidate)
 		{
 			fBestInRange = fDistance;
 			vecTargetInRangePosition = vecTargetPosition;
 			vecTargetInRangeVelocity = vecTargetVelocity;
 			bTargetInRange = true;
+			bKeptTargetInRange = bKeptTarget;
 		}
-		if (bPreferFlagship && iTargetFlightPlane == uiFlightPlane && fDistance < fBestFlagshipInRange && IsFlagship(rPreviousFrame.postRender, locator))
-		{
-			fBestFlagshipInRange = fDistance;
-			vecFlagshipInRangePosition = vecTargetPosition;
-			vecFlagshipInRangeVelocity = vecTargetVelocity;
-			bFlagshipInRange = true;
-		}
-		if (fDistance < fBestForLook)
+		if (bLookCandidate)
 		{
 			fBestForLook = fDistance;
 			vecTargetForLookPosition = vecTargetPosition;
 			bTargetForLook = true;
 		}
 	});
-	if (bFlagshipInRange)
-	{
-		vecTargetInRangePosition = vecFlagshipInRangePosition;
-		vecTargetInRangeVelocity = vecFlagshipInRangeVelocity;
-	}
 
 	rbLookTargetFound = false;
 	rVecLookPosition = XMVectorZero();
@@ -682,6 +683,12 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 	{
 		rFlags.Set(ShipFlags::kFireBlaster);
 	}
+}
+
+bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
+{
+	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, uiFlightPlane);
+	return !engine::NavQuerySegmentBlocked(engine::NavQuerySnapToNavigable(vecShooterPosition, rNavData), engine::NavQuerySnapToNavigable(vecTargetPosition, rNavData), rNavData);
 }
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield)

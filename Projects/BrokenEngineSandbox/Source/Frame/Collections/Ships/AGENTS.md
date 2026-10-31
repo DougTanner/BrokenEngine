@@ -24,10 +24,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
   its cell's previous frame holds an enemy `kIsFlagship` Battleship row past
-  arrival grace, it chases the 3D-nearest one in place of the nearest enemy, as
-  each type document describes (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`,
-  `../Battleships/AGENTS.md`). With no such flagship the row steers as an
-  unflagged one that tick. The bit stays and transfers with the row.
+  arrival grace, the 3D-nearest one becomes its kept attack target (below) in
+  place of `FindAttackTarget`'s pick, even while it is hidden, and the row
+  chases it as each type document describes (`../Fighters/AGENTS.md`,
+  `../Omnis/AGENTS.md`, `../Battleships/AGENTS.md`). With no such flagship the
+  row steers as an unflagged one that tick. The bit stays and transfers with the
+  row.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
 - In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon targeting and the Fighter beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
@@ -60,12 +62,32 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   shooter's stored plane and stay on the shooter's plane, hitting a climbing
   target only by 3D contact: a missile aims along the horizontal offset to its
   target, and an Omni bolt flies flat along the Omni's hull. The Fighter beam
-  has its own plane rule (`../Fighters/AGENTS.md`). A ship storing
-  `kuiNoFlightPlane` fires none of them, and a Battleship launches missiles only
-  while exactly at its stored plane's height. No Omni targets, chases, or faces
-  an enemy above its highest plane. These plane rules govern only target choice
-  and aim; blaster and missile collision and explosion damage ignore planes, and
-  pushers follow their height-derived layer rule above.
+  has its own plane rule (`../Fighters/AGENTS.md`). All three weapons fire only
+  at an enemy in line of sight (`HasLineOfSight`) on the shooter's stored plane.
+  The test is 2D against inflated navigation polygons, so it blocks slightly
+  early near terrain; it is unchecked on a plane without terrain collision. An
+  Omni faces only an enemy in line of sight. A ship storing `kuiNoFlightPlane`
+  fires none of them, and a Battleship launches missiles only while exactly at
+  its stored plane's height. No Omni targets, chases, or faces an enemy above
+  its highest plane. These plane rules govern only target choice and aim;
+  blaster and missile collision and explosion damage ignore planes, and pushers
+  follow their height-derived layer rule above.
+- Every Fighter, Omni, and random-spawn Battleship keeps one attack target, the
+  enemy row in the previous frame whose registry id its `pRegistryTargets`
+  stores, chosen by `FindAttackTarget` (`ShipQueries.h`) or, for a
+  `kTargetFlagship` row, the flagship rule above. A fleet ship picks
+  from its flagship (`## Fleet Coordination Invariants`), a random-spawn ship
+  from itself as its type's `AGENTS.md` states. Sight is tested on the ship's
+  stored plane, so a ship changing layer sees every enemy and flies its regular
+  attack pattern. In `FindAttackTarget`'s pick an enemy in line of sight always
+  wins: a hidden kept target is kept, and routed to, only while no enemy is in
+  sight. An enemy above the type's highest plane is never a target; a
+  pick that finds no other enemy clears a kept target there. While the target
+  is hidden the ship steers at its `NextRouteWaypoint` on the target's nearest
+  plane every tick, an exception to the path-query cadence
+  (`## Fleet Navigation Invariants`), and starts no veer-off; a random-spawn
+  ship returning to an island and a fleeing random-spawn Battleship skip that
+  route. Fleet Battleships pick none.
 
 ## Fleet Coordination Invariants
 
@@ -78,20 +100,15 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   function keyed by ship type (`ChooseFleetTactic`): escort at the ship's own
   slot among its type's fleet rows; while weapons free, Attack and Veer-off for
   Fighters and Attack for Omnis, whose script circles the target
-  (`../Omnis/AGENTS.md`). Attack ignores enemies above the type's highest
-  plane. Each type's `AGENTS.md` documents its slots.
+  (`../Omnis/AGENTS.md`). Each type's `AGENTS.md` documents its slots.
 - A weapons-free fleet Omni, or fleet Fighter not finishing a veer-off, attacks
-  its kept target, the enemy row in the previous frame whose registry id its
-  `pRegistryTargets` stores (`FleetCoordination.cpp`). When the id is zero or
-  names no enemy row at or below its type's highest plane there, it picks and
-  stores the enemy nearest its flagship in x/y among those, ties keeping the
-  first row in `ForEachShipType` order, so fleet ships of one type picking on
-  the same tick share one target. Escort and veer-off leave the id untouched, so
-  a target that died or left keeps its stale id until the next pick; in Update
-  only leaving the flagship's cell clears it. Registry ids come from a
-  frame-wide counter (`MakeUuid`,
-  `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale id never
-  names another row.
+  its kept attack target (`## Ship Invariants`), picked from its flagship in
+  x/y. Escort and veer-off leave the id untouched, so a target that died or left
+  keeps its stale id until the next pick; in Update only leaving the flagship's
+  cell, or a pick dropping a kept target above the type's highest plane
+  (`## Ship Invariants`), clears it. Registry ids come from a frame-wide counter
+  (`MakeUuid`, `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale
+  id never names another row.
 
 ## Fleet Navigation Invariants
 

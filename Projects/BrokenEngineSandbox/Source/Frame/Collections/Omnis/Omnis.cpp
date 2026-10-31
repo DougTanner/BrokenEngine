@@ -623,7 +623,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				// Omnis never veer off, so the fleet tactic's veer-off point is discarded.
 				XMVECTOR vecVeerOffPoint = XMVectorZero();
-				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, view, rPrevious.pGlobalIds[i], vecPosition, rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
 				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{
@@ -662,43 +662,30 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
 			}
-			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
+			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
 			{
 				// A flagship chase never flees or returns to an island.
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
-				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(OmniCirclingPoint(vecPosition, vecFlagship), vecPosition), 0.0f));
+				bool bFinalWaypoint = false;
+				XMVECTOR vecDestination = HasLineOfSight(rStaticData, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, vecPosition, vecFlagship, NearestFlightPlane(vecFlagship), bFinalWaypoint);
+				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
 			}
 			else
 			{
-				// The nearest enemy on an Omni plane, one plane at a time; an exact tie keeps the lower plane.
-				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = false;
-				float fNearestDistanceSquared = std::numeric_limits<float>::max();
-				for (int64_t j = 0; j <= kiOmniHighestFlightPlane; ++j)
-				{
-					XMVECTOR vecPlaneEnemy = XMVectorZero();
-					if (!FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], j, vecPlaneEnemy))
-					{
-						continue;
-					}
-					float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPlaneEnemy, vecPosition)));
-					if (fDistanceSquared < fNearestDistanceSquared)
-					{
-						fNearestDistanceSquared = fDistanceSquared;
-						vecNearestEnemy = vecPlaneEnemy;
-						bEnemyFound = true;
-					}
-				}
+				XMVECTOR vecTarget = XMVectorZero();
+				bool bInLineOfSight = false;
+				bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiOmniHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
 				if (bEnemyFound)
 				{
-					SetTargetFlightPlane(orders, NearestFlightPlane(vecNearestEnemy));
+					SetTargetFlightPlane(orders, NearestFlightPlane(vecTarget));
 				}
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
-					vecDestination = OmniCirclingPoint(vecPosition, vecDestination);
+					bool bFinalWaypoint = false;
+					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				if (bHasDestination)
 				{
@@ -708,8 +695,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
-			bool bPreferFlagship = rPrevious.pController[i] == ShipController::kRandomSpawn && (orders & ShipOrders::kTargetFlagship);
-			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, bPreferFlagship, flags, bLookTargetFound, vecLookPosition);
+			AcquireTarget(rPreviousFrame, rStaticData, vecPosition, rPrevious.pAlignments[i], registryTarget, rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, flags, bLookTargetFound, vecLookPosition);
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);

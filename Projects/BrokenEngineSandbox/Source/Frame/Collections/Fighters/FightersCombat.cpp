@@ -59,10 +59,10 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	SpawnFighterExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 
-// Hits the nearest enemy ship whose nearest flight plane is the shooter's stored plane, that is inside the cell, within
-// beam range, and lined up with the heading; a random-spawn kTargetFlagship shooter hits the nearest such enemy flagship
-// instead when one qualifies. Only a strictly nearer row replaces the best, so an exact distance tie keeps the first row
-// in ForEachShipType order. Returns false when no ship qualifies.
+// Hits the kept attack target when it qualifies, else the nearest enemy ship whose nearest flight plane is the shooter's
+// stored plane, that is inside the cell, within beam range, lined up with the heading, and in clear line of sight. Only a
+// strictly nearer row replaces the best, so an exact distance tie keeps the first row in ForEachShipType order. Returns
+// false when no ship qualifies.
 static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t i, uint8_t uiFlightPlane)
 {
 	static constexpr float kfBeamRangeSquared = kfFighterBeamRange * kfFighterBeamRange;
@@ -72,14 +72,12 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	XMVECTOR vecShooterPosition = rCurrentInterpolate.pVecPositions[i];
 	XMVECTOR vecShooterDirection = rCurrentInterpolate.pVecDirections[i];
 	engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
-	bool bPreferFlagship = rCurrentPostRender.pController[i] == ShipController::kRandomSpawn && (rCurrentPostRender.pOrders[i] & ShipOrders::kTargetFlagship);
+	engine::registry_id_t registryTarget = rCurrentPostRender.pRegistryTargets[i];
 
 	std::optional<ShipLocator> optionalTarget;
+	bool bKeptTargetChosen = false;
 	float fNearestDistanceSquared = 0.0f;
 	XMVECTOR vecEnd = XMVectorZero();
-	std::optional<ShipLocator> optionalFlagshipTarget;
-	float fFlagshipDistanceSquared = 0.0f;
-	XMVECTOR vecFlagshipEnd = XMVectorZero();
 	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
 		if (NearestFlightPlane(vecPosition) != uiFlightPlane)
@@ -103,24 +101,18 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 		{
 			return;
 		}
-		if (!optionalTarget || fDistanceSquared < fNearestDistanceSquared)
+		bool bKeptTarget = registryTarget.uuid.iValue != 0 && VisitShip(rFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
+		{
+			return rInterpolate.pRegistryIds[iRow];
+		}) == registryTarget;
+		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasLineOfSight(rStaticData, uiFlightPlane, vecShooterPosition, vecPosition))
 		{
 			optionalTarget = locator;
+			bKeptTargetChosen = bKeptTarget;
 			fNearestDistanceSquared = fDistanceSquared;
 			vecEnd = vecPosition;
 		}
-		if (bPreferFlagship && IsFlagship(rFrame.postRender, locator) && (!optionalFlagshipTarget || fDistanceSquared < fFlagshipDistanceSquared))
-		{
-			optionalFlagshipTarget = locator;
-			fFlagshipDistanceSquared = fDistanceSquared;
-			vecFlagshipEnd = vecPosition;
-		}
 	});
-	if (optionalFlagshipTarget)
-	{
-		optionalTarget = optionalFlagshipTarget;
-		vecEnd = vecFlagshipEnd;
-	}
 
 	if (!optionalTarget)
 	{

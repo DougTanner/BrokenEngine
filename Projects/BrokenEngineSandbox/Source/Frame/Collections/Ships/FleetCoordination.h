@@ -6,6 +6,11 @@
 
 #include "Frame/Collections/Ships/ShipTypes.h"
 
+namespace engine
+{
+struct CellStaticData;
+} // namespace engine
+
 namespace game
 {
 
@@ -53,15 +58,17 @@ struct ShipTactic
 // For fleet Fighters and Omnis (eType). Escort flies to the ship's own slot around its flagship; while the fleet is weapons
 // free, Attack and Veer-off take over for Fighters and plain Attack for Omnis; a ship outside its flagship's cell
 // navigates on its type's highest plane.
-// Attack targets the kept rRegistryTarget while it names an enemy row, else keeps and targets the enemy nearest the
-// flagship in x/y; escort leaves it untouched and only the outside-the-cell branch clears it. No tactic targets a plane
-// above the type's highest one. Reads only the previous frame.
-[[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
+// Attack targets the kept attack target rRegistryTarget (FindAttackTarget, picked from the flagship in x/y, sight from
+// the stored plane uiFlightPlane) and routes to its next waypoint while it is hidden; escort leaves it untouched, and only
+// the outside-the-cell branch and FindAttackTarget's drop of a kept target above the highest plane clear it. No tactic
+// targets a plane above the type's highest one. Reads only the previous frame.
+[[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
 
-// Veer-off until 150 m from the veer-off point, else Attack the horizontally nearest enemy at or below
-// iHighestFlightPlane on its plane, veering off within 20 m; with bTargetFlagship the nearest enemy flagship, when the
-// previous frame holds one, replaces that enemy. Returns false, leaving rTactic unchanged, when not veering off and the
-// previous frame holds no such enemy.
-[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic);
+// Veer-off until 150 m from the veer-off point, else Attack its kept attack target rRegistryTarget (FindAttackTarget,
+// picked from itself in x/y, at or below iHighestFlightPlane) on its plane, veering off within 20 m, or route to its next
+// waypoint while it is hidden; with bTargetFlagship the nearest enemy flagship, when the previous frame holds one,
+// becomes the kept attack target instead. Returns false, leaving rTactic unchanged, when not veering off and the previous
+// frame holds no such enemy.
+[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic);
 
 } // namespace game

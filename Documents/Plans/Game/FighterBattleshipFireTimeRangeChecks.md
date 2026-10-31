@@ -39,16 +39,16 @@ Read from source:
 Values the simulation produces:
 
 - Both cooldowns count down by the tick delta every tick, with no lower clamp
-  (`Fighters.cpp:531`, `Battleships.cpp:475`), so a ship with no target holds
+  (`Fighters.cpp:531`, `Battleships.cpp:477`), so a ship with no target holds
   an ever more negative finite value; float subtraction stops changing it
   long before it could reach -inf.
 - A Fighter fires when its cooldown is below zero and then sets it to
   `kFighterBeamCooldown`, 1.0 s
-  (`FightersCombat.cpp:249-256`, `Fighters.h:60`). A Battleship launches when
+  (`FightersCombat.cpp:241-248`, `Fighters.h:60`). A Battleship launches when
   its cooldown is at or below zero and then sets it to
   `kBattleshipMissileCooldown`, 0.125 s
-  (`BattleshipsCombat.cpp:240-244` and `:323`, `Battleships.h:64`).
-  Spawn defaults are zero (`Fighters.h:281`, `Battleships.h:283`).
+  (`BattleshipsCombat.cpp:240-244` and `:327`, `Battleships.h:64`).
+  Spawn defaults are zero (`Fighters.h:281`, `Battleships.h:285`).
 - So every stored value is finite and at most its type's cooldown constant.
 
 Effect of a bad value read from a save, following from the fire tests above:

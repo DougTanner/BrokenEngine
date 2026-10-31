@@ -206,7 +206,7 @@ void BattleshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame
 	}
 }
 
-void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
+void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
 {
 	static constexpr float kfMissileRangeSquared = kfBattleshipMissileRange * kfBattleshipMissileRange;
 
@@ -282,6 +282,10 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 			{
 				return;
 			}
+			if (!HasLineOfSight(rStaticData, uiFlightPlane, vecShipPosition, vecEnemyPosition))
+			{
+				return;
+			}
 
 			optionalTarget = target;
 			fNearestDistanceSquared = fDistanceSquared;
@@ -323,7 +327,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 		rCurrentPostRender.pNextMissileFireTimes[i] = kBattleshipMissileCooldown;
 
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoordinate, vecTubePosition, gMissileLaunchVolume.mfCurrent, gMissilePitchMin.mfCurrent, gMissilePitchRandom.mfCurrent);
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, rStaticData.coordinate, vecTubePosition, gMissileLaunchVolume.mfCurrent, gMissilePitchMin.mfCurrent, gMissilePitchRandom.mfCurrent);
 #endif
 	}
 }

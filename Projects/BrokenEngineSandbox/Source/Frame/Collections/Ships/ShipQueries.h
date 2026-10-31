@@ -73,12 +73,19 @@ void ForEachEnemyShip(const FrameInterpolate& rInterpolate, const FramePostRende
 // Global ID 0 names no ship: every random-spawn row carries it.
 [[nodiscard]] std::optional<ShipLocator> FindShipByGlobalId(const Frame& rFrame, engine::GlobalId globalId);
 
-// Returns false when no enemy row qualifies; ties keep the first row in ForEachShipType order. With
-// optionalFlightPlane, only rows whose nearest flight plane is that plane qualify.
-[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, std::optional<int64_t> optionalFlightPlane, XMVECTOR& rVecResult);
+// Returns false when no enemy row qualifies; ties keep the first row in ForEachShipType order.
+[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
 
-// The enemy kIsFlagship Battleship row nearest vecFrom; returns false when none qualifies, ties keep the first row.
-[[nodiscard]] bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
+// The kept attack target rRegistryTarget in line of sight from vecPosition on uiFlightPlane, else the enemy nearest
+// vecPickFrom in line of sight, else the kept target hidden, else the nearest enemy hidden. Nearest is x/y when bHorizontal,
+// else 3D, ties keeping the first row in ForEachShipType order; enemies above iHighestFlightPlane never qualify. Returns
+// false when the previous frame holds no such enemy, clearing rRegistryTarget when its row is above iHighestFlightPlane
+// and leaving every other output unchanged.
+[[nodiscard]] bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, bool bHorizontal, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight);
+
+// The enemy kIsFlagship Battleship row nearest vecFrom, with its registry id; returns false, leaving both outputs
+// unchanged, when none qualifies; ties keep the first row.
+[[nodiscard]] bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryId, XMVECTOR& rVecResult);
 
 // A Battleship row whose orders carry kIsFlagship.
 [[nodiscard]] bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator);

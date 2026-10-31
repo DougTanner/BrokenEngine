@@ -286,7 +286,7 @@ public:
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
 	std::chrono::duration<float>* __restrict pCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
-	// The fleet attack target's registry id, zero for none.
+	// The kept attack target's registry id, zero for none.
 	engine::registry_id_t* __restrict pRegistryTargets = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalIds = nullptr;

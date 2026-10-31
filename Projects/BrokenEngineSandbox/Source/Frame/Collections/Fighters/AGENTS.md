@@ -17,12 +17,10 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   veer-off in progress even when none remains, and otherwise heads for the
   nearest island center, setting the return-to-island state with distance
   hysteresis, or only decays its turn in a cell with no island candidates.
-- Attack heads for its target and targets that enemy's nearest plane. A
-  random-spawn fighter's target is the enemy ship nearest it in x/y, or the
-  enemy flagship for a `kTargetFlagship` row (`../Ships/AGENTS.md`), picked
-  every tick with no target lock; a fleet fighter's is its kept
-  `pRegistryTargets` target (`../Ships/AGENTS.md`
-  `## Fleet Coordination Invariants`). Within the
+- Attack heads for its target and targets that enemy's nearest plane. Its
+  target is its kept attack target (`../Ships/AGENTS.md` `## Ship Invariants`),
+  picked from itself in x/y for a random-spawn fighter, or the enemy flagship
+  for a `kTargetFlagship` row. Within the
   `kfVeerOffStartDistanceSquared` x/y distance it sets `ShipFlags::kVeerOff`,
   stores the enemy position in `pVecVeerOffPoints`, and flies directly away
   from that point on the point's nearest plane until the
@@ -71,14 +69,15 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   stores a flight plane, and its `pNextBeamFireTimes` cooldown is below zero; a
   shot resets the cooldown to `kFighterBeamCooldown`, and the cooldown
   transfers with the ship.
-- The beam hits the nearest enemy ship by 3D distance, with no visibility test,
-  among those inside the cell whose nearest flight plane is the shooter's
-  stored plane (`../Ships/AGENTS.md`), within `kfFighterBeamRange`, and whose
-  horizontal offset is within `kfFighterBeamAimAngle` of the heading; a
-  `kTargetFlagship` shooter (`../Ships/AGENTS.md`) prefers the nearest such
-  enemy flagship and otherwise hits the nearest such enemy. With none it holds
-  fire. An exact distance tie keeps the first row in `ForEachShipType` order,
-  and a later shooter sees an earlier shooter's kill.
+- The beam hits the shooter's kept attack target when it qualifies, else the
+  nearest qualifying enemy ship by 3D distance. A qualifying ship is inside the
+  cell, its nearest flight plane is the shooter's stored plane, it is in line
+  of sight (`../Ships/AGENTS.md` `## Ship Invariants`) and within
+  `kfFighterBeamRange`, and its horizontal offset is within
+  `kfFighterBeamAimAngle` of the heading; with none the beam holds fire. A
+  `kTargetFlagship` shooter's kept attack target is the enemy flagship. An
+  exact distance tie keeps the first row in `ForEachShipType` order, and a
+  later shooter sees an earlier shooter's kill.
 - A hit deals `kfFighterBeamDamage` at once through the target type's
   `ApplyBeamDamage` death path, and a Fighter's or Battleship's death knockback
   pushes it away from the shooter.

@@ -568,6 +568,23 @@ bool XM_CALLCONV NavQueryPointBlocked(FXMVECTOR vecPosition, const NavData& rNav
 	return PointInAnyPolygon(f2Position, rNavData.vertices.data(), rNavData);
 }
 
+bool XM_CALLCONV NavQuerySegmentBlocked(FXMVECTOR vecStart, FXMVECTOR vecEnd, const NavData& rNavData)
+{
+	if (rNavData.vertices.empty())
+	{
+		return false;
+	}
+
+	XMFLOAT4A f4Start {};
+	XMStoreFloat4A(&f4Start, vecStart);
+	XMFLOAT4A f4End {};
+	XMStoreFloat4A(&f4End, vecEnd);
+	XMFLOAT2 f2Start {f4Start.x, f4Start.y};
+	XMFLOAT2 f2End {f4End.x, f4End.y};
+
+	return SegmentBlockedByObstacle(f2Start, f2End, rNavData.vertices.data(), rNavData);
+}
+
 XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavData& rNavData)
 {
 	const XMFLOAT2* pVertices = rNavData.vertices.data();

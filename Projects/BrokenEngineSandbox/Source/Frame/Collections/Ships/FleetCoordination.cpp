@@ -25,75 +25,6 @@ static float XM_CALLCONV HorizontalDistanceSquared(FXMVECTOR vecFrom, FXMVECTOR 
 	return XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecTo, vecFrom)));
 }
 
-// Skips enemies above iHighestFlightPlane. Ties keep the first row in ForEachShipType order.
-static bool XM_CALLCONV FindHorizontallyNearestEnemyShip(const Frame& rPreviousFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, XMVECTOR& rVecResult)
-{
-	bool bFound = false;
-	float fNearestDistanceSquared = std::numeric_limits<float>::max();
-	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
-	{
-		if (NearestFlightPlane(vecPosition) > iHighestFlightPlane)
-		{
-			return;
-		}
-		float fDistanceSquared = HorizontalDistanceSquared(vecFrom, vecPosition);
-		if (fDistanceSquared < fNearestDistanceSquared)
-		{
-			fNearestDistanceSquared = fDistanceSquared;
-			rVecResult = vecPosition;
-			bFound = true;
-		}
-	});
-	return bFound;
-}
-
-// The kept target's position while rRegistryTarget names an enemy row; otherwise rRegistryTarget becomes the enemy nearest
-// the flagship in x/y, ties keeping the first row in ForEachShipType order. Both skip enemies above iHighestFlightPlane.
-// Returns false, leaving both outputs unchanged, when the previous frame holds no such enemy.
-static bool XM_CALLCONV FindFleetAttackTarget(const Frame& rPreviousFrame, FXMVECTOR vecFlagshipPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult)
-{
-	bool bKept = false;
-	bool bFound = false;
-	float fNearestDistanceSquared = std::numeric_limits<float>::max();
-	engine::registry_id_t nearestRegistryId {};
-	XMVECTOR vecNearestPosition = XMVectorZero();
-	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
-	{
-		if (NearestFlightPlane(vecPosition) > iHighestFlightPlane)
-		{
-			return;
-		}
-		engine::registry_id_t registryId = VisitShip(rPreviousFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
-		{
-			return rInterpolate.pRegistryIds[iRow];
-		});
-		if (rRegistryTarget.uuid.iValue != 0 && registryId == rRegistryTarget)
-		{
-			bKept = true;
-			rVecResult = vecPosition;
-		}
-		float fDistanceSquared = HorizontalDistanceSquared(vecFlagshipPosition, vecPosition);
-		if (fDistanceSquared < fNearestDistanceSquared)
-		{
-			fNearestDistanceSquared = fDistanceSquared;
-			nearestRegistryId = registryId;
-			vecNearestPosition = vecPosition;
-			bFound = true;
-		}
-	});
-	if (bKept)
-	{
-		return true;
-	}
-	if (!bFound)
-	{
-		return false;
-	}
-	rRegistryTarget = nearestRegistryId;
-	rVecResult = vecNearestPosition;
-	return true;
-}
-
 // Flies directly away from the veer-off point on that point's plane; a ship exactly over it gets its own position.
 static ShipTactic XM_CALLCONV VeerOffTactic(FXMVECTOR vecPosition, FXMVECTOR vecVeerOffPoint)
 {
@@ -143,6 +74,19 @@ static ShipTactic XM_CALLCONV AttackOrStartVeerOff(FXMVECTOR vecPosition, FXMVEC
 	}
 
 	return AttackTactic(vecEnemyPosition);
+}
+
+// For a target hidden from the ship: the next route waypoint toward it on its nearest plane.
+static ShipTactic XM_CALLCONV RouteTactic(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecTargetPosition)
+{
+	int64_t iTargetFlightPlane = NearestFlightPlane(vecTargetPosition);
+	bool bFinalWaypoint = false;
+	return
+	{
+		.vecDestination = NextRouteWaypoint(rStaticData, vecPosition, vecTargetPosition, iTargetFlightPlane, bFinalWaypoint),
+		.iTargetFlightPlane = iTargetFlightPlane,
+		.bHasDestination = true,
+	};
 }
 
 // The fleet's non-dying ships of eType in the previous frame share their type's escort circle evenly in global-ID order,
@@ -232,7 +176,7 @@ FleetView FleetBoard::Find(engine::GlobalId flagshipGlobalId) const
 	return {};
 }
 
-ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
+ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
 {
 	int64_t iHighestFlightPlane = HighestFlightPlane(eType);
 	if (rView.flagshipGlobalId.iValue == 0)
@@ -253,8 +197,13 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 		}
 
 		XMVECTOR vecTargetPosition = XMVectorZero();
-		if (FindFleetAttackTarget(rPreviousFrame, rView.vecFlagshipPosition, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition))
+		bool bInLineOfSight = false;
+		if (FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, rView.vecFlagshipPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 		{
+			if (!bInLineOfSight)
+			{
+				return RouteTactic(rStaticData, vecPosition, vecTargetPosition);
+			}
 			if (eType == ShipType::kFighter)
 			{
 				return AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint);
@@ -272,25 +221,25 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	};
 }
 
-bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic)
+bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
 {
 	if (ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, rTactic))
 	{
 		return true;
 	}
 
-	XMVECTOR vecEnemyPosition = XMVectorZero();
-	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, vecEnemyPosition))
+	XMVECTOR vecTargetPosition = XMVectorZero();
+	bool bInLineOfSight = false;
+	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition))
 	{
-		rTactic = AttackOrStartVeerOff(vecPosition, vecEnemyPosition, rFlags, rVecVeerOffPoint);
-		return true;
+		bInLineOfSight = HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
-	if (!FindHorizontallyNearestEnemyShip(rPreviousFrame, vecPosition, alignment, iHighestFlightPlane, vecEnemyPosition))
+	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 	{
 		return false;
 	}
 
-	rTactic = AttackOrStartVeerOff(vecPosition, vecEnemyPosition, rFlags, rVecVeerOffPoint);
+	rTactic = bInLineOfSight ? AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint) : RouteTactic(rStaticData, vecPosition, vecTargetPosition);
 	return true;
 }
 

@@ -22,9 +22,9 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 - A transfer arrival restores carried gameplay state verbatim except arrival
   grace, which is an intentional fresh one-second arrival default, each ship's
   navigation state, which resets to spawn defaults, Fighters' and Battleships'
-  previous-frame reaction flags, which restart from defaults, Fighters' and
-  Omnis' kept attack targets, which clear because registry ids are per cell,
-  and client-only
+  previous-frame reaction flags, which restart from defaults, every ship type's
+  kept attack target, which clears because registry ids are per cell, and
+  client-only
   shield animation state, which uses canonical client defaults; other fresh
   gameplay spawn defaults and fresh random draws apply only to genuine spawns.
   Select between transferred gameplay values and fresh
