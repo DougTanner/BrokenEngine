@@ -936,6 +936,19 @@ bool GameBase::HandleDeferredSwapchain()
 	return true;
 }
 
+// The camera-relative effects a world-hidden stretch would leave stale at the old view, cleared once as the world hides
+// so they restart clean when it returns.
+static void ClearRetainedEffects()
+{
+	gbSmokeClear = true;
+	gpParticleManager->mbReset = true;
+	WindTrailsInterpolate::sPreviousPositions.clear();
+	gbWaterFoamReset = true;
+	// Wind has no per-frame clear; the one-shot clear needs the graphics queue drained.
+	CHECK_VK(vkQueueWaitIdle(gpDeviceManager->mGraphicsVkQueue));
+	gpTextureManager->mRenderTargetTextures.ClearWindTextures();
+}
+
 void GameBase::Render()
 {
 	const std::vector<GridCoord>& rActiveCoordinates = mActiveCoordinates;
@@ -954,6 +967,22 @@ void GameBase::Render()
 		gpParticleManager->DiscardStagedSpawns();
 		// RenderMainPresentAcquire is skipped too, so signal the upload thread here to keep transfer uploads moving while the swapchain is deferred.
 		gpTextureUploadManager->SignalFrame();
+		return;
+	}
+
+	// Behind an opaque map overlay no world pass is recorded or submitted; the frame waits its fence and submits only the UI.
+	bool bWorldHidden = game::gpGame->MapOpacity() >= 1.0f;
+	static bool sbWorldHidden = false;
+	if (bWorldHidden && !sbWorldHidden)
+	{
+		ClearRetainedEffects();
+	}
+	sbWorldHidden = bWorldHidden;
+	if (bWorldHidden)
+	{
+		// RenderGlobal is skipped, so drop this frame's staged spawns as the deferred-swapchain skip does.
+		gpParticleManager->DiscardStagedSpawns();
+		gpGraphics->RenderUiPresentAcquire(gpSwapchainManager->miFramebufferIndex);
 		return;
 	}
 

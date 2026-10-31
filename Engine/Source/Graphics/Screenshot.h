@@ -9,7 +9,7 @@ struct ScreenshotRequest;
 struct DumpRenderTargetRequest;
 
 // Capture the present swapchain image per rRequest (downscale + JPG/PNG), saved asynchronously. Called only from
-// the RenderMainPresentAcquire capture site (fence-signal precondition documented there / in Screenshot.cpp).
+// the Graphics::PresentAcquire capture site (fence-signal precondition documented there / in Screenshot.cpp).
 void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest);
 
 // Read back the named render target per rRequest and encode it (grayscale-normalized PNG for single-channel,

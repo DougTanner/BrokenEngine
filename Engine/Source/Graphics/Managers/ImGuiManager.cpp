@@ -679,9 +679,9 @@ void ImGuiManager::ProcessTextures(VkCommandBuffer vkCommandBuffer, int64_t iFra
 	}
 }
 
-void ImGuiManager::Submit(int64_t iFramebuffer)
+void ImGuiManager::Submit(int64_t iFramebuffer, bool bAfterMain)
 {
-	// RenderGlobal completed this framebuffer's previous fence before Main reset it for the current submission.
+	// The frame's fence wait completed this framebuffer's previous fence before it was reset for the current submission.
 	TextureRetirement& rRetirement = mTextureRetirements.at(iFramebuffer);
 	rRetirement.resources.clear();
 	rRetirement.stagingBuffers.clear();
@@ -719,6 +719,28 @@ void ImGuiManager::Submit(int64_t iFramebuffer)
 		.clearValueCount = 0,
 		.pClearValues = nullptr,
 	};
+
+	if (!bAfterMain)
+	{
+		// No Main resolve wrote the present image this frame, and a recreated swapchain image may never have been
+		// written, so discard its contents into the layout the pass loads from. PRESENT_SRC_KHR takes no access mask;
+		// the pass's external dependency, chained through the shared stage, makes the image visible to its attachment accesses.
+		VkImageMemoryBarrier vkImageMemoryBarrier
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.pNext = nullptr,
+			.srcAccessMask = 0,
+			.dstAccessMask = 0,
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentImage,
+			.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1},
+		};
+		vkCmdPipelineBarrier(rCommandBuffers.mImGuiVkCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
+	}
+
 	vkCmdBeginRenderPass(rCommandBuffers.mImGuiVkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	mpDrawData->Textures = nullptr;
@@ -730,13 +752,14 @@ void ImGuiManager::Submit(int64_t iFramebuffer)
 
 	CHECK_VK(vkEndCommandBuffer(rCommandBuffers.mImGuiVkCommandBuffer));
 
+	VkSemaphore vkWaitSemaphore = bAfterMain ? rCommandBuffers.mMainFinishedVkSemaphore : gpSwapchainManager->mImageAvailableVkSemaphore;
 	VkPipelineStageFlags vkWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo vkSubmitInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
 		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &rCommandBuffers.mMainFinishedVkSemaphore,
+		.pWaitSemaphores = &vkWaitSemaphore,
 		.pWaitDstStageMask = &vkWaitStage,
 		.commandBufferCount = 1,
 		.pCommandBuffers = &rCommandBuffers.mImGuiVkCommandBuffer,

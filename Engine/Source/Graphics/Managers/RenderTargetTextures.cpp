@@ -332,9 +332,13 @@ void RenderTargetTextures::CreateWindTextures()
 	// Occupancy describes these textures' contents, so it is replaced exactly when they are and sized from their new extent.
 	gpBufferManager->CreateWindHierarchicalBuffers();
 
-	// Wind spread writes only occupancy-active tiles, leaving inactive texels untouched for smoke to sample.
-	// Clear both ping-pong textures once at creation so inactive texels contain zero.
-	// The device is idle on the boot and recreation paths.
+	// Wind spread writes only occupancy-active tiles, leaving inactive texels untouched for smoke to sample, so clear both
+	// ping-pong textures once at creation so inactive texels contain zero.
+	ClearWindTextures();
+}
+
+void RenderTargetTextures::ClearWindTextures()
+{
 	OneShotCommandBuffer oneShotCommandBuffer;
 	VkClearColorValue vkWindClearColor {{0.0f, 0.0f, 0.0f, 0.0f}};
 	VkImageSubresourceRange vkWindSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};

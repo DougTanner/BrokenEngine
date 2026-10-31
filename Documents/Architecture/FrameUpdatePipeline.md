@@ -204,7 +204,11 @@ PostRender phases from PreCollision on in `RunFrameTick`, and begin/render/end
 in the main render pass — so engine registration, and with it the engine type
 indices, always comes first. Graphics resources are the exception:
 `PipelineManager` calls only the game's `FrameInterpolate::GraphicsResources`,
-which walks the engine collections before the game collections.
+which walks the engine collections before the game collections. A
+world-hidden frame
+([`Engine/Source/Graphics/AGENTS.md`](../../Engine/Source/Graphics/AGENTS.md)
+`## Frame and Resource Lifecycle`) skips the main render pass, so no
+begin/render/end collection walk runs on it.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

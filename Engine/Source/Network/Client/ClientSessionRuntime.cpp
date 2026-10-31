@@ -683,8 +683,9 @@ void ClientSessionRuntime::ComputeActiveSet()
 		miVisibleNeighborCount = 0;
 		if (game::gpGame->HasFocusedClientEntity())
 		{
-			// Camera-zoom-dependent VisibleArea: mf4LargeVisibleArea packs (minX, maxY, maxX, minY).
-			const XMFLOAT4& rf4Visible = gpCamera->mf4LargeVisibleArea;
+			// The world framing's visible area, packed (minX, maxY, maxX, minY), so a framing override (the map) loads no
+			// extra cells.
+			const XMFLOAT4& rf4Visible = gpCamera->mf4WorldVisibleArea;
 			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
 			// neighbour hexagon is therefore centered at that neighbour's own offset from the camera basis, so both

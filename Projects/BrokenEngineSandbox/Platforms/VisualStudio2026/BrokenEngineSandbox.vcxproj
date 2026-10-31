@@ -385,6 +385,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
+    <ClInclude Include="..\..\Source\Ui\Screens\MapScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
@@ -392,6 +393,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\LightingWrappers.h" />
+    <ClInclude Include="..\..\Source\Ui\MapWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\SmokeWrappers.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h" />
@@ -596,6 +598,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp" />
+    <ClCompile Include="..\..\Source\Ui\MapWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
@@ -605,6 +608,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsLighting.cpp" />
+    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenMap.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenParticles.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSmokeDeposits.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSoundEffects.cpp" />
@@ -646,6 +650,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\HudScreen.cpp" />
+    <ClCompile Include="..\..\Source\Ui\Screens\MapScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\ModalScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.cpp" />

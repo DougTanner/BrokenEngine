@@ -10,7 +10,7 @@ namespace engine
 void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, int64_t iMipmapLevels, int64_t iArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData)
 {
 	// Heap: rOutputData.resize + staging-buffer creation. Main-loop-reachable per frame via the kbScreenshots trigger
-	// (Graphics::RenderMainPresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutputData
+	// (Graphics::PresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutputData
 	// is std::move'd into the async save lambda so it cannot use the workbuffer.
 	ScopedSuppressAllocationTracking suppress;
 

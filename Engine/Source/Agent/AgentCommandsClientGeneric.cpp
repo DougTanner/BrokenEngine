@@ -195,7 +195,7 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 // the async save records its result. Schema: {"path"?,"maxWidth"?:1568,"format"?:"jpg|png","quality"?:80}.
 static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
-	// The capture consume site (RenderMainPresentAcquire) is compiled out under !kbScreenshots, so a deferred request
+	// The capture consume site (Graphics::PresentAcquire) is compiled out under !kbScreenshots, so a deferred request
 	// would never resolve — fail fast instead of blocking the agent channel until the liveness timeout.
 	if constexpr (!kbScreenshots)
 	{

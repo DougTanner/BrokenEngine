@@ -1,6 +1,6 @@
 # Game UI Screens
 
-The HUD and the game extension of engine TweaksScreen. The six standard
+The HUD, the map screen, and the game extension of engine TweaksScreen. The six standard
 player-facing menus are engine-owned
 (`../../../../../Engine/Source/Ui/Screens/AGENTS.md`), which also owns the
 shared authoring rules every screen follows — 2160-height scaling,
@@ -27,6 +27,22 @@ runtime contracts of the screens that remain here.
   current delay instead of sending, because the server treats such a delay as
   corrupt data.
 - The three HUD-specific layout fractions and the HUD's own composition stay game-local, named.
+- The map screen is a full-screen overlay: an opaque background and the
+  world's cell hexagons, projected at ground level through the live camera,
+  both at the map opacity. The map is open exactly while the camera's framing
+  override is set and not releasing, so no separate open flag exists; TAB
+  eases the override out to the map framing, or releases it back to the world
+  framing, which the map never changes, so cells and islands load for the
+  gameplay view. Opacity is a log-scale function of the rendered framing
+  alone, so the fade matches the camera through a reversal mid-ease; at full
+  opacity the frame is a world-hidden frame
+  (`../../../../../Engine/Source/Graphics/AGENTS.md`
+  `## Frame and Resource Lifecycle`). A session reset closes an open map with
+  no ease. The map framing, the fully-opaque framing, and the ease
+  length are the game Tweaks Map sliders, unpersisted and at their defaults
+  outside `kbDebugInput` builds; their ranges keep the opaque framing above the
+  ceiling and at or below every map framing, so the map always reaches full
+  opacity. A map framing or ease-length change applies at the next toggle.
 - Game Tweaks content is a developer tool, not a player-facing screen: the engine Tweaks screen compiles its body in only under the `kbDebugInput` switch, and the engine `ImGuiManager` owns its runtime draw gate (`../../../../../Engine/Source/Graphics/Managers/AGENTS.md` `### ImGuiManager`).
 
 ## Ownership

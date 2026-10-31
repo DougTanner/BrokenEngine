@@ -31,6 +31,22 @@ static void UpdateTexelFramingReference(float fLiveFraming, float fContractionMe
 	rfReferenceFraming = std::max(rfReferenceFraming - fMaxContraction, fLiveFraming);
 }
 
+// Cubic Hermite from (fStart, fStartVelocity) to (fTarget, 0) over fDuration.
+static float EvaluateFramingEase(float fStart, float fStartVelocity, float fTarget, float fElapsed, float fDuration, float& rfVelocity)
+{
+	float fParameter = fElapsed / fDuration;
+	float fParameterSquared = fParameter * fParameter;
+	float fParameterCubed = fParameterSquared * fParameter;
+	float fStartHeightBasis = 2.0f * fParameterCubed - 3.0f * fParameterSquared + 1.0f;
+	float fStartVelocityBasis = fParameterCubed - 2.0f * fParameterSquared + fParameter;
+	float fTargetHeightBasis = -2.0f * fParameterCubed + 3.0f * fParameterSquared;
+	float fStartHeightBasisDerivative = 6.0f * fParameterSquared - 6.0f * fParameter;
+	float fStartVelocityBasisDerivative = 3.0f * fParameterSquared - 4.0f * fParameter + 1.0f;
+	float fTargetHeightBasisDerivative = -6.0f * fParameterSquared + 6.0f * fParameter;
+	rfVelocity = (fStartHeightBasisDerivative * fStart + fStartVelocityBasisDerivative * fStartVelocity * fDuration + fTargetHeightBasisDerivative * fTarget) / fDuration;
+	return fStartHeightBasis * fStart + fStartVelocityBasis * fStartVelocity * fDuration + fTargetHeightBasis * fTarget;
+}
+
 static constexpr float Smoothstep(float fParameter)
 {
 	fParameter = std::clamp(fParameter, 0.0f, 1.0f);
@@ -206,14 +222,23 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		UpdatePosition(vecTargetPosition, fDeltaTime);
 	}
 	UpdateFraming();
+	UpdateFramingOverride();
 
 	CalculateMatricesAndVisibleArea();
 
-	// Keep each world-texel reference at or above the live framing times the tilt coverage ratio: zero initialization,
-	// outward zoom, and a tilt increase snap immediately for full viewport coverage, while inward zoom and a tilt
-	// decrease contract at the existing independent rates so the density change remains gradual. At a settled framing
-	// and tilt both references converge to that product.
-	float fCoveredFraming = mfCameraFraming * mfTexelCoverageRatio;
+	// Keep each world-texel reference at or above the rendered framing times the tilt coverage ratio: zero
+	// initialization, outward zoom, and a tilt increase snap immediately for full viewport coverage, while inward zoom and
+	// a tilt decrease contract at the existing independent rates so the density change remains gradual. At a settled
+	// framing and tilt both references converge to that product.
+	float fRenderFraming = RenderFraming();
+	float fCoveredFraming = fRenderFraming * mfTexelCoverageRatio;
+	// Above the gameplay ceiling (the map zoom) both references track rendered framing, so a return from the map does not
+	// leave the texel grids contracting from the map framing.
+	if (fRenderFraming > kfFramingMaximum)
+	{
+		mfShadowTexelFraming = 0.0f;
+		mfLightingTexelFraming = 0.0f;
+	}
 	UpdateTexelFramingReference(fCoveredFraming, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelFraming);
 	UpdateTexelFramingReference(fCoveredFraming, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelFraming);
 
@@ -310,7 +335,7 @@ void CameraBase::UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime)
 void CameraBase::UpdateFraming()
 {
 	int64_t iScrollDelta = mCameraInput.iScrollDelta;
-	if (iScrollDelta != 0)
+	if (iScrollDelta != 0 && !mbFramingOverride)
 	{
 		// Scale per-tick zoom delta with current framing, bounded by sqrt so wide framings don't get 4x ticks and over-build Hermite velocity that carries into close framings.
 		float fFramingDelta = static_cast<float>(iScrollDelta) * kfFramingPerWheelTick * std::sqrt(mfCameraFraming / kfCameraFramingDefault);
@@ -337,20 +362,58 @@ void CameraBase::UpdateFraming()
 		}
 		else
 		{
-			// Cubic Hermite from (mfFramingStart, mfFramingStartVelocity) to (mfCameraFramingTarget, 0) over kfFramingBlendDuration.
-			float fParameter = fFramingElapsed / kfFramingBlendDuration;
-			float fParameterSquared = fParameter * fParameter;
-			float fParameterCubed = fParameterSquared * fParameter;
-			float fStartHeightBasis = 2.0f * fParameterCubed - 3.0f * fParameterSquared + 1.0f;
-			float fStartVelocityBasis = fParameterCubed - 2.0f * fParameterSquared + fParameter;
-			float fTargetHeightBasis = -2.0f * fParameterCubed + 3.0f * fParameterSquared;
-			mfCameraFraming = fStartHeightBasis * mfFramingStart + fStartVelocityBasis * mfFramingStartVelocity * kfFramingBlendDuration + fTargetHeightBasis * mfCameraFramingTarget;
-			float fStartHeightBasisDerivative = 6.0f * fParameterSquared - 6.0f * fParameter;
-			float fStartVelocityBasisDerivative = 3.0f * fParameterSquared - 4.0f * fParameter + 1.0f;
-			float fTargetHeightBasisDerivative = -6.0f * fParameterSquared + 6.0f * fParameter;
-			mfFramingVelocity = (fStartHeightBasisDerivative * mfFramingStart + fStartVelocityBasisDerivative * mfFramingStartVelocity * kfFramingBlendDuration + fTargetHeightBasisDerivative * mfCameraFramingTarget) / kfFramingBlendDuration;
+			mfCameraFraming = EvaluateFramingEase(mfFramingStart, mfFramingStartVelocity, mfCameraFramingTarget, fFramingElapsed, kfFramingBlendDuration, mfFramingVelocity);
 		}
 	}
+}
+
+void CameraBase::UpdateFramingOverride()
+{
+	if (!mbFramingOverride)
+	{
+		return;
+	}
+
+	float fTarget = mbFramingOverrideReleasing ? mfCameraFraming : mfOverrideTarget;
+	float fOverrideElapsed = mfTime - mfOverrideStartTime;
+	if (fOverrideElapsed >= mfOverrideBlendDuration)
+	{
+		mfOverrideFraming = fTarget;
+		mfOverrideVelocity = 0.0f;
+		if (mbFramingOverrideReleasing)
+		{
+			mbFramingOverride = false;
+		}
+	}
+	else
+	{
+		mfOverrideFraming = EvaluateFramingEase(mfOverrideStart, mfOverrideStartVelocity, fTarget, fOverrideElapsed, mfOverrideBlendDuration, mfOverrideVelocity);
+	}
+}
+
+void CameraBase::SetFramingOverride(float fTarget, float fBlendDuration)
+{
+	if (!mbFramingOverride)
+	{
+		mfOverrideFraming = mfCameraFraming;
+		mbFramingOverride = true;
+	}
+	// Start from rest, so no carried velocity is scaled by a longer ease.
+	mbFramingOverrideReleasing = false;
+	mfOverrideStart = mfOverrideFraming;
+	mfOverrideStartVelocity = 0.0f;
+	mfOverrideStartTime = mfTime;
+	mfOverrideBlendDuration = fBlendDuration;
+	mfOverrideTarget = fTarget;
+}
+
+void CameraBase::ReleaseFramingOverride(float fBlendDuration)
+{
+	mfOverrideStart = mfOverrideFraming;
+	mfOverrideStartVelocity = mfOverrideVelocity;
+	mfOverrideStartTime = mfTime;
+	mfOverrideBlendDuration = fBlendDuration;
+	mbFramingOverrideReleasing = true;
 }
 
 void CameraBase::ResetForSession()
@@ -401,16 +464,17 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// shows the framing's half-height across the view-perpendicular plane through the look-at. Orthographic shows that
 	// half-height at any distance, so it places a virtual eye at the default field of view.
 	mbOrthographicProjection = gOrthographicProjection.Get<bool>();
+	float fRenderFraming = RenderFraming();
 	float fTiltDegrees = gCameraTilt.mfCurrent;
 	float fTilt = XMConvertToRadians(fTiltDegrees);
-	float fFramingHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
+	float fFramingHalfHeight = fRenderFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
 	float fEyeFieldOfView = mbOrthographicProjection ? gFieldOfView.mfDefault : gFieldOfView.mfCurrent;
 	float fEyeDistance = fFramingHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
 	// The eye orbits the look-at about +X: tilt 0 is straight down, positive tilt moves the eye south so the view looks
 	// north. W=0 direction added to mVecPosition (W=1) preserves position.
 	mVecToEyeNormal = XMVectorSet(0.0f, -std::sin(fTilt), std::cos(fTilt), 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(mVecToEyeNormal, fEyeDistance));
-	mVecWaterEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, mfCameraFraming, 0.0f));
+	mVecWaterEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, fRenderFraming, 0.0f));
 
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
 	auto vecUpNormal = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
@@ -439,6 +503,19 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fLookAtY = XMVectorGetY(mVecPosition);
 	mf4LargeVisibleArea = XMFLOAT4 {fLookAtX + f4Footprint.x, fLookAtY + f4Footprint.y, fLookAtX + f4Footprint.z, fLookAtY + f4Footprint.w};
 
+	// Cell selection reads the world framing's area, so an override loads no extra cells.
+	if (mbFramingOverride)
+	{
+		float fWorldHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
+		float fWorldEyeDistance = fWorldHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
+		XMFLOAT4 f4WorldFootprint = TiltedFootprint(fTilt, mbOrthographicProjection, fWorldEyeDistance, fWorldHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
+		mf4WorldVisibleArea = XMFLOAT4(fLookAtX + f4WorldFootprint.x, fLookAtY + f4WorldFootprint.y, fLookAtX + f4WorldFootprint.z, fLookAtY + f4WorldFootprint.w);
+	}
+	else
+	{
+		mf4WorldVisibleArea = mf4LargeVisibleArea;
+	}
+
 	if (gpGraphics->mFramebufferVkExtent2D.width > gpGraphics->mFramebufferVkExtent2D.height) [[likely]]
 	{
 		mf4RenderVisibleArea = mf4LargeVisibleArea;
@@ -458,7 +535,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// floor(area / quadSize) amplifies quad-size jitter by approximately area / quadSize, so quad size must stay stable while the latch key is unchanged.
 	[[maybe_unused]] XMFLOAT4 f4RawInputArea = mf4RenderVisibleArea;
 
-	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(mfCameraFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
+	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fRenderFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
 	// LOD hysteresis: refuse to flip back across the shared boundary if framing is still
 	// near it. Boundaries are at kfMinimumFraming * 4^L; 5% band absorbs FP rounding around
 	// asymptotic settling.
@@ -466,7 +543,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	if (iLevelOfDetail == miVisibleAreaLevelOfDetail - 1)
 	{
 		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail));
-		if (mfCameraFraming > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
+		if (fRenderFraming > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
@@ -474,7 +551,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	else if (iLevelOfDetail == miVisibleAreaLevelOfDetail + 1)
 	{
 		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail + 1));
-		if (mfCameraFraming < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
+		if (fRenderFraming < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
@@ -486,13 +563,13 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fQuadsX = static_cast<float>(rLevelOfDetailMesh.iQuadCountX);
 	float fQuadsY = static_cast<float>(rLevelOfDetailMesh.iQuadCountY);
 
-	int64_t iZoomBucket = static_cast<int64_t>(std::floor(mfCameraFraming));
+	int64_t iZoomBucket = static_cast<int64_t>(std::floor(fRenderFraming));
 	static constexpr float kfZoomBucketHysteresis = 0.1f;
-	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && mfCameraFraming > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
+	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && fRenderFraming > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
 	{
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
-	else if (iZoomBucket == miVisibleAreaZoomBucket + 1 && mfCameraFraming < static_cast<float>(miVisibleAreaZoomBucket + 1) + kfZoomBucketHysteresis)
+	else if (iZoomBucket == miVisibleAreaZoomBucket + 1 && fRenderFraming < static_cast<float>(miVisibleAreaZoomBucket + 1) + kfZoomBucketHysteresis)
 	{
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}

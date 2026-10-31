@@ -82,6 +82,7 @@ Per-framebuffer command buffers and the submission graph. The Global and Main re
 - Submission workers publish work through `PersistentWorker` wake/wait edges: Main waits for Global, and UI waits for Main. Data read by a worker must be written before its wake.
 - Per-frame uniform copies need no host-write barrier of their own: `Buffer::RecordCopy` supplies barriers on both sides of the copy, and `vkQueueSubmit` implicitly makes the CPU's earlier host-visible writes device-visible. That is what lets a record-once command buffer have its uniform contents rewritten every frame; do not add a per-frame `VK_ACCESS_HOST_WRITE_BIT` barrier or conclude the scheme is unsafe.
 - Main resets the framebuffer fence but submits without it. The inseparable following ImGui submission signals that fence; every path that submits Main must also submit ImGui.
+- A world-hidden frame submits neither Global nor Main: it resets the fence itself and submits ImGui alone, waiting on swapchain image availability after discarding the present image into the ImGui pass's load layout, because no Main resolve wrote it and a recreated swapchain image may never have been written.
 
 ### BufferManager
 
@@ -204,7 +205,7 @@ intensity, so callers pass camera-cell positions, then append under the spawn
 mutex during joined frame-tick work. `RenderGlobal` runs after the worker join,
 copies staged spawns into the current framebuffer's mapped storage, and clears
 CPU staging; when `GameBase::Render` skips `RenderGlobal` for a deferred
-swapchain it clears staging with `DiscardStagedSpawns` instead, so ticks keep
+swapchain or a world-hidden frame it clears staging with `DiscardStagedSpawns` instead, so ticks keep
 spawning without accumulating past the staging limit. Bindless texture-index
 assignment mutates descriptor bookkeeping while spawning; its safety relies on
 this tick/render phase exclusion. Keep that exclusion if spawn or descriptor
@@ -215,7 +216,7 @@ the pool.
 
 ### ImGuiManager
 
-Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
+Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main (or, on a world-hidden frame, for swapchain image availability), signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
 - The manager owns ImGui setup, submission, and the Tweaks screen. It calls three UI functions `ImGuiManager.h` declares and each client program defines by project membership, `CreateUiScreens`, `RenderUiScreens`, and `DestroyUiScreens`, at construction, each frame, and destruction. The gameplay client defines them in `../../Ui/Screens/UiScreens.cpp` (`../../Ui/Screens/AGENTS.md`).
 - For every client program, the manager creates the Tweaks screen and loads

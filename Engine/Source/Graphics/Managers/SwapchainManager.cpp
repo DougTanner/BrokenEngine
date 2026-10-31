@@ -588,7 +588,7 @@ void SwapchainManager::PresentToQueue(int64_t iFramebufferIndex)
 	// Handle stale swapchain by requesting deferred recreation
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
-		// The kbRenderThread frame-tail mPresent.Wait() in Graphics::RenderMainPresentAcquire publishes this write before Refresh() in the next Create() and prevents the next frame's Global submit from racing vkQueuePresentKHR on the shared queue.
+		// The kbRenderThread frame-tail mPresent.Wait() in Graphics::PresentAcquire publishes this write before Refresh() in the next Create() and prevents the next frame's Global submit from racing vkQueuePresentKHR on the shared queue.
 		// A same-frame kSurface escalation must never downgrade to kSwapchain.
 		gpGraphics->meDestroyType = std::max(DestroyType::kSwapchain, gpGraphics->meDestroyType);
 		return;

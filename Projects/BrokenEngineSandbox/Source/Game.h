@@ -68,6 +68,12 @@ public:
 
 	bool HasFocusedClientEntity() const;
 	void UpdateCameraShake();
+
+	// The map is open while the camera's framing override is set and not releasing.
+	bool MapOpen() const;
+	void ToggleMap();
+	// The map overlay's opacity, from the rendered framing on a log scale: 0 at the gameplay ceiling, 1 at the opaque framing.
+	float MapOpacity() const;
 #endif
 
 #if defined(BT_SERVER)

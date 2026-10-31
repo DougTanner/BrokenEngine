@@ -12,6 +12,11 @@ void RegisterGameTweakSections()
 		.displayName = "Particles", .stableKey = "Particles",
 		.pRender = RenderParticlesSection,
 	});
+	engine::TweaksScreen::RegisterSection(giTweakSectionMap,
+	{
+		.displayName = "Map", .stableKey = "Map",
+		.pRender = RenderMapSection,
+	});
 }
 
 void RenderLightingTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab)

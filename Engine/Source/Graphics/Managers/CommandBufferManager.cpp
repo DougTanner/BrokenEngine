@@ -196,7 +196,15 @@ void CommandBufferManager::SubmitUiCommandBuffer(int64_t iFramebufferIndex)
 {
 	mSubmitMain.Wait();
 
-	gpImGuiManager->Submit(iFramebufferIndex);
+	gpImGuiManager->Submit(iFramebufferIndex, true);
+}
+
+void CommandBufferManager::SubmitUiOnlyCommandBuffer(int64_t iFramebufferIndex)
+{
+	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
+	CHECK_VK(vkResetFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence));
+
+	gpImGuiManager->Submit(iFramebufferIndex, false);
 }
 
 } // namespace engine

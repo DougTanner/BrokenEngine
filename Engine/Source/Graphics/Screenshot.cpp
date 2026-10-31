@@ -70,7 +70,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 {
 	LOG(kGraphics, kDebug, "SaveScreenshot()");
 
-	// Wait for the acquired framebuffer's Image command buffer after SubmitUiCommandBuffer queues mVkFence and before Present; the fence must
+	// Wait for the acquired framebuffer's Image command buffer after the UI submission queues mVkFence and before Present; the fence must
 	// carry a pending or completed signal for the captured content.
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 	CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
@@ -88,7 +88,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 	// Heap: the std::async shared-state + worker thread (and the previous future's teardown) escape into the
 	// screenshot save thread, so the workbuffer cannot hold them. Suppression is thread-local and covers the rest
 	// of this (synchronous) function; the lambda body runs on the screenshot thread and suppresses tracking itself.
-	// Main-loop-reachable per frame via the kbScreenshots trigger (Graphics::RenderMainPresentAcquire -> here).
+	// Main-loop-reachable per frame via the kbScreenshots trigger (Graphics::PresentAcquire -> here).
 	// (CopyImageToHostMemory's data.resize + staging buffer are already suppressed in TextureCache.)
 	ScopedSuppressAllocationTracking suppress;
 	if (sSaveScreenshot.valid())

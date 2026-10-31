@@ -61,7 +61,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent / fWaterScale);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent / fWaterScale);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
 	// Scroll speed follows the Gerstner phase speed, which grows with the square root of wavelength.
 	float fSpeedScale = std::sqrt(fWaterScale);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor) * fSpeedScale);
@@ -530,7 +530,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	// Camera framing scales geometric wave amplitudes using each stack's Start and End settings.
 	// Water Scale below 1 pulls the fades in so the shortest waves fade out before they alias on the vertex grid; above 1
 	// the fades stay put, since moving them out would alias on LOD 1.
-	float fCameraFraming = engine::gpCamera->mfCameraFraming;
+	float fCameraFraming = engine::gpCamera->RenderFraming();
 	float fFadeScale = std::min(gWaterScale.mfCurrent, 1.0f);
 	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent * fFadeScale;
 	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent * fFadeScale;

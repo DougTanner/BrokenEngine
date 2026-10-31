@@ -16,6 +16,8 @@ public:
 	void CreateShadowTextures();
 	void CreateSmokeTextures();
 	void CreateWindTextures();
+	// Zeroes both wind textures and their occupancy. Callers have drained the graphics queue.
+	void ClearWindTextures();
 	void CreateObjectShadowsTextures();
 	void CreateTerrainTextures();
 	void CreateWaterDisplacementTextures();

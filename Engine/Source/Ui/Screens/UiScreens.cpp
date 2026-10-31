@@ -9,6 +9,7 @@
 #include "Ui/Screens/SoundMenuScreen.h"
 
 #include "Ui/Screens/HudScreen.h"
+#include "Ui/Screens/MapScreen.h"
 #include "Game.h"
 
 namespace engine
@@ -21,6 +22,7 @@ static std::unique_ptr<GraphicsMenuScreen> spGraphicsMenuScreen;
 static std::unique_ptr<SoundMenuScreen> spSoundMenuScreen;
 static std::unique_ptr<GameSettingsScreen> spGameSettingsScreen;
 static std::unique_ptr<game::HudScreen> spHudScreen;
+static std::unique_ptr<game::MapScreen> spMapScreen;
 static std::unique_ptr<ChatScreen> spChatScreen;
 
 void CreateUiScreens()
@@ -32,11 +34,15 @@ void CreateUiScreens()
 	spSoundMenuScreen = std::make_unique<SoundMenuScreen>();
 	spGameSettingsScreen = std::make_unique<GameSettingsScreen>();
 	spHudScreen = std::make_unique<game::HudScreen>();
+	spMapScreen = std::make_unique<game::MapScreen>();
 	spChatScreen = std::make_unique<ChatScreen>();
 }
 
 void RenderUiScreens()
 {
+	// First, under every other screen, and whatever the UI state: a world-hidden frame shows only this overlay of the world.
+	spMapScreen->Render();
+
 	// Menu screens required to progress past the pre-game / rejection flows must render even
 	// with Tweaks open — otherwise a persisted-active Tweaks menu strands a fresh client with
 	// no way to reach Connect/Spawn. Each self-gates internally on the game's UI state.
@@ -66,6 +72,7 @@ void DestroyUiScreens()
 	spSoundMenuScreen.reset();
 	spGameSettingsScreen.reset();
 	spHudScreen.reset();
+	spMapScreen.reset();
 	spChatScreen.reset();
 }
 

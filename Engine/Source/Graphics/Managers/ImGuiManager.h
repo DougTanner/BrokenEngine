@@ -42,7 +42,9 @@ public:
 	void CreateScreenDependentResources();
 
 	void Prepare(int64_t iFramebuffer);
-	void Submit(int64_t iFramebuffer);
+	// Waits Main's completion when bAfterMain; otherwise waits swapchain image availability and discards the present
+	// image into the pass's load layout.
+	void Submit(int64_t iFramebuffer, bool bAfterMain);
 	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);
 	void UpdateTextArea(TextAreas eTextArea, std::string_view characters);
 	std::string_view GetTextArea(TextAreas eTextArea) const;

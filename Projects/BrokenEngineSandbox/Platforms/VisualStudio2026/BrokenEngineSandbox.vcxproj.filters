@@ -603,6 +603,9 @@
     <ClInclude Include="..\..\Source\Ui\SmokeWrappers.h">
       <Filter>Game\Ui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\MapWrappers.h">
+      <Filter>Game\Ui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
@@ -856,6 +859,9 @@
       <Filter>Engine\Ui\Screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Ui\Screens\MapScreen.h">
       <Filter>Game\Ui\Screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.h">
@@ -1488,6 +1494,9 @@
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenParticles.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenMap.cpp">
+      <Filter>Game\Ui\Screens\TweaksScreen</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSmokeDeposits.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
@@ -1504,6 +1513,9 @@
       <Filter>Game\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp">
+      <Filter>Game\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\MapWrappers.cpp">
       <Filter>Game\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp">
@@ -1576,6 +1588,9 @@
       <Filter>Engine\Ui\Screens</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Ui\Screens\HudScreen.cpp">
+      <Filter>Game\Ui\Screens</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Ui\Screens\MapScreen.cpp">
       <Filter>Game\Ui\Screens</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.cpp">

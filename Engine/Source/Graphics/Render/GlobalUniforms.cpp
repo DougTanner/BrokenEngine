@@ -519,7 +519,7 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 
 	// PopulateSunMoonDirection folds fTerrainSnowBlend into f4TerrainSnowSunNormal.
 	rGlobalLayout.fTerrainSnowAmbientOcclusionExclusion = gTerrainSnowAmbientOcclusionExclusion.mfCurrent;
-	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
+	float fTerrainDetailNormalsMultiplier = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), gTerrainDetailNormalsMultiplier.startHeight.mfCurrent, gTerrainDetailNormalsMultiplier.endHeight.mfCurrent, gTerrainDetailNormalsMultiplier.low.mfCurrent, gTerrainDetailNormalsMultiplier.high.mfCurrent);
 
 	rGlobalLayout.fTerrainRockSize = gTerrainRockSize.mfCurrent;
 	rGlobalLayout.fTerrainRockBlend = gTerrainRockBlend.mfCurrent;

@@ -62,7 +62,7 @@ float SmokeSimulationPixels();
 float SmokeSimulationPixelsY();
 
 // Agent/dev screenshot request queued into Graphics::mOptionalScreenshotRequest; consumed once at the capture site in
-// RenderMainPresentAcquire. Empty path -> default %TEMP%\Screenshots\agent_{N}.{jpg|png}. iMaxWidth <= 0 disables
+// PresentAcquire. Empty path -> default %TEMP%\Screenshots\agent_{N}.{jpg|png}. iMaxWidth <= 0 disables
 // downscale; the image is downscaled preserving aspect when wider than iMaxWidth.
 struct ScreenshotRequest
 {
@@ -107,6 +107,9 @@ public:
 
 	void RenderGlobal(std::chrono::duration<float> currentTime);
 	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
+	// A world-hidden frame: waits only this framebuffer's fence and submits only the UI, recording no Global or Main
+	// work and leaving miFrameCounter unchanged.
+	void RenderUiPresentAcquire(int64_t iCommandBuffer);
 	void Create();
 	void Refresh();
 	void Destroy();
@@ -146,7 +149,7 @@ public:
 	common::InTheLastSecond mRendersInTheLastSecond;
 
 	// One-shot capture mailboxes filled off the render path (agent Drain / F9 toggle), consumed once at the
-	// RenderMainPresentAcquire capture site (between the UI submit and Present — see the deadlock note there).
+	// PresentAcquire capture site (between the UI submit and Present — see the deadlock note there).
 	std::optional<ScreenshotRequest> mOptionalScreenshotRequest;
 	std::optional<DumpRenderTargetRequest> mOptionalDumpRenderTargetRequest;
 
@@ -158,6 +161,9 @@ private:
 	// zero-area defined currentExtent (window off-screen/minimized) with the tier still below kSurface. Not const —
 	// the CHECK_VK inside can escalate meDestroyType to kSurface (surface-lost), which the < kSurface term then excludes.
 	bool SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabilitiesKHR);
+
+	void WaitFramebuffer(int64_t iCommandBuffer);
+	void PresentAcquire(int64_t iCommandBuffer);
 
 	template <typename T>
 	void PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType eTier, std::optional<DestroyFlags> optionalFlag = std::nullopt, bool bGate = true);

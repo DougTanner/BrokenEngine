@@ -7,10 +7,12 @@
 namespace game
 {
 
-// Startup-assigned dense section index, written by RegisterGameTweakSections(). engine::kiInvalidTweakSection until then.
+// Startup-assigned dense section indices, written by RegisterGameTweakSections(). engine::kiInvalidTweakSection until then.
 inline int64_t giTweakSectionParticles = engine::kiInvalidTweakSection;
+inline int64_t giTweakSectionMap = engine::kiInvalidTweakSection;
 
 void RenderParticlesSection(engine::TweaksScreen& rScreen);
+void RenderMapSection(engine::TweaksScreen& rScreen);
 void RenderSmokeDepositsTab(engine::TweaksScreen& rScreen);
 void RenderWindDepositsTab(engine::TweaksScreen& rScreen);
 void RenderLightingEffectsVisibleTab(engine::TweaksScreen& rScreen);

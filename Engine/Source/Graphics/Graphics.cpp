@@ -115,10 +115,8 @@ Graphics::~Graphics()
 	Destroy();
 }
 
-void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
+void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 {
-	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
-
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iCommandBuffer);
 	VkResult vkResult = vkGetFenceStatus(gpDeviceManager->mVkDevice, rCommandBuffers.mVkFence);
 	if (vkResult == VK_NOT_READY)
@@ -136,6 +134,13 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 	gpIslands->MarkFramebufferWaited(iCommandBuffer);
 
 	mRenderFrameDeltaNanoseconds = mRenderFrameTimer.GetDeltaNs(true);
+}
+
+void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
+{
+	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
+
+	WaitFramebuffer(iCommandBuffer);
 
 	// Only this framebuffer's sets are idle after its fence wait, so the epoch writes them alone; every other framebuffer applies
 	// the queued publications once its own fence has signaled. AnyRestorationPending also covers template-owned elevation without a
@@ -190,7 +195,7 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 	}
 	++miFrameCounter;
 
-	if (rCommandBuffers.mFlags & CommandBufferFlags::kExecuted)
+	if (gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iCommandBuffer).mFlags & CommandBufferFlags::kExecuted)
 	{
 		gpProfileManager->GpuRead(iCommandBuffer, kGpuTimerGlobal, kGpuTimerCount, true);
 	}
@@ -215,7 +220,32 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 
 	gpCommandBufferManager->SubmitUiCommandBuffer(iCommandBuffer);
 
-	// Capture after SubmitUiCommandBuffer and before Present: the UI submit has queued mVkFence, so SaveScreenshot waits on a pending or
+	PresentAcquire(iCommandBuffer);
+}
+
+void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
+{
+	WaitFramebuffer(iCommandBuffer);
+
+	// Only the UI range: the Global and Main timers keep their last values while no world pass is submitted.
+	if (gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iCommandBuffer).mFlags & CommandBufferFlags::kExecuted)
+	{
+		gpProfileManager->GpuRead(iCommandBuffer, kGpuTimerUiRender, kGpuTimerCount, false);
+	}
+
+	// No Global submission stops the timer PresentAcquire started.
+	gpProfileManager->CpuStop(kCpuTimerAcquireToGlobal, {CpuStopFlags::kSmoothNow, CpuStopFlags::kCrossThread});
+
+	gpImGuiManager->Prepare(iCommandBuffer);
+
+	gpCommandBufferManager->SubmitUiOnlyCommandBuffer(iCommandBuffer);
+
+	PresentAcquire(iCommandBuffer);
+}
+
+void Graphics::PresentAcquire(int64_t iCommandBuffer)
+{
+	// Capture after the UI submission and before Present: the UI submit has queued mVkFence, so SaveScreenshot waits on a pending or
 	// completed signal while the present image remains application-owned.
 	// Screenshot capture incurs a full GPU synchronization and is dev-only.
 	if constexpr (kbScreenshots)

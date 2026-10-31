@@ -102,6 +102,9 @@ public:
 	XMFLOAT2 mf2VisibleAreaQuadSize {};
 	XMFLOAT4 mf4RenderVisibleArea {};
 	XMFLOAT4 mf4LargeVisibleArea {};
+	// The world framing's ground footprint (minX, maxY, maxX, minY) at the look-at, which cell selection reads; a copy of
+	// mf4LargeVisibleArea while no framing override is active.
+	XMFLOAT4 mf4WorldVisibleArea {};
 
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
@@ -138,6 +141,8 @@ public:
 
 	float mfTime = 0.0f;
 
+	// The world framing: wheel-driven and saved, it sets the chase rate, audio, and cell selection. The view reads
+	// RenderFraming().
 	float mfCameraFraming = kfCameraFramingInitial;
 	float mfCameraFramingTarget = kfCameraFramingInitial;
 	XMVECTOR mVecLastKnownTargetPosition {};
@@ -154,6 +159,18 @@ public:
 	float mfFramingStartTime = 0.0f;
 	float mfFramingVelocity = 0.0f;
 	bool mbZooming = false;
+
+	// While the override is active, the view, the projection, mf4LargeVisibleArea, mf4RenderVisibleArea, and the render
+	// zoom readers use mfOverrideFraming. While it is releasing, it eases to the live world framing and ends there.
+	bool mbFramingOverride = false;
+	bool mbFramingOverrideReleasing = false;
+	float mfOverrideFraming = 0.0f;
+	float mfOverrideVelocity = 0.0f;
+	float mfOverrideStart = 0.0f;
+	float mfOverrideStartVelocity = 0.0f;
+	float mfOverrideStartTime = 0.0f;
+	float mfOverrideBlendDuration = 0.0f;
+	float mfOverrideTarget = 0.0f;
 
 	// Framing reference that sizes the shadow texel grid. Expands immediately with outward zoom and contracts
 	// at the shadow rate inward. 0 = uninitialized (snap directly to live framing times mfTexelCoverageRatio on first
@@ -178,6 +195,16 @@ public:
 
 	void ResetForSession();
 	void RestoreFraming(float fFraming);
+	// Eases the rendered framing at rest from its current value to fTarget over fBlendDuration seconds of camera time.
+	void SetFramingOverride(float fTarget, float fBlendDuration);
+	// Eases the rendered framing, carrying its velocity, back to the world framing over fBlendDuration seconds of camera
+	// time, then ends the override.
+	void ReleaseFramingOverride(float fBlendDuration);
+
+	float RenderFraming() const
+	{
+		return mbFramingOverride ? mfOverrideFraming : mfCameraFraming;
+	}
 
 	// Adds the error to the offset, or zeroes the offset when the sum is longer than kfVisualErrorMaxDistance. Returns
 	// the sum's length either way.
@@ -212,6 +239,7 @@ private:
 	XMVECTOR ResolveTarget(const CameraTarget& rCameraTarget);
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);
 	void UpdateFraming();
+	void UpdateFramingOverride();
 
 	XMFLOAT2 mf2LatchedQuadSize {};
 	// Zero is below every real framing bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.

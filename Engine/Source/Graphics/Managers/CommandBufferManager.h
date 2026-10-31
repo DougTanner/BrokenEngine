@@ -18,6 +18,8 @@ public:
 	void SubmitGlobalCommandBuffer(int64_t iFramebufferIndex);
 	void SubmitMainCommandBuffer(int64_t iFramebufferIndex);
 	void SubmitUiCommandBuffer(int64_t iFramebufferIndex);
+	// A world-hidden frame's only submission: resets the fence Main would have reset, then submits ImGui.
+	void SubmitUiOnlyCommandBuffer(int64_t iFramebufferIndex);
 
 	std::vector<CommandBuffers> mPerFramebufferCommandBuffers;
 

@@ -4,6 +4,7 @@
 
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Ui/Localization.h"
+#include "Ui/MapWrappers.h"
 
 namespace game
 {
@@ -114,6 +115,29 @@ void Game::UpdateCameraShake()
 		}
 	}
 }
+
+bool Game::MapOpen() const
+{
+	return engine::gpCamera->mbFramingOverride && !engine::gpCamera->mbFramingOverrideReleasing;
+}
+
+void Game::ToggleMap()
+{
+	// gMapFraming and gMapBlendSeconds are read only here, so a slider change to either takes effect at the next toggle.
+	if (!MapOpen())
+	{
+		engine::gpCamera->SetFramingOverride(gMapFraming.mfCurrent, gMapBlendSeconds.mfCurrent);
+	}
+	else
+	{
+		engine::gpCamera->ReleaseFramingOverride(gMapBlendSeconds.mfCurrent);
+	}
+}
+
+float Game::MapOpacity() const
+{
+	return std::clamp(std::log(engine::gpCamera->RenderFraming() / engine::CameraBase::kfFramingMaximum) / std::log(gMapOpaqueFraming.mfCurrent / engine::CameraBase::kfFramingMaximum), 0.0f, 1.0f);
+}
 #endif // BT_CLIENT
 
 Game::~Game()
@@ -142,6 +166,8 @@ void Game::ResetGameState()
 	mClientOwnedEntityCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
+	// Close the map with no ease, so no world-hidden frame runs over the menu.
+	engine::gpCamera->mbFramingOverride = false;
 #endif
 	mfPreviousClientArmor = 0.0f;
 }
@@ -177,6 +203,11 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 #if defined(BT_CLIENT)
 void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 {
+	if (rInputPoll.KeyboardPressed(VK_TAB) && !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone)
+	{
+		ToggleMap();
+	}
+
 	if constexpr (kbDebugInput)
 	{
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
