@@ -3,7 +3,6 @@
 #include "Memory/GlobalAllocator.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/GraphicsQualityWrappersBase.h"
-#include "Ui/GraphicsSettings.h"
 #include "CrashReport.h"
 
 #include "Graphics/Camera.h"
@@ -186,9 +185,8 @@ int RunModelViewer(HINSTANCE hinstance)
 		return 1;
 	}
 	engine::gpIslandTerrain->WaitForElevationMaps();
-	engine::LoadGraphicsSettings();
-	// The viewer never publishes a native water source grid.
-	engine::gWaterLevel.Reset(engine::GraphicsQualityLevel::kLow);
+	// The viewer runs on compiled graphics defaults and never reads or writes a settings file.
+	engine::ApplyAllGraphicsQualityLevels();
 
 	WNDCLASSEX windowClass
 	{
@@ -350,7 +348,6 @@ int RunModelViewer(HINSTANCE hinstance)
 	}
 	gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
 	pApplication->UpdateDefaultComparison(false);
-	engine::SaveGraphicsSettings();
 	return 0;
 }
 

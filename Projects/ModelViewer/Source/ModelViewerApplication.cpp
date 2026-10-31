@@ -34,6 +34,12 @@ void ModelViewerApplication::ResetDisplayTime()
 void ModelViewerApplication::ToggleFlight()
 {
 	mFlags.Set(ViewerFlags::kFlying, !(mFlags & ViewerFlags::kFlying));
+	if (mFlags & ViewerFlags::kFlying)
+	{
+		// Each flight starts at the engine's initial zoom, as a new Sandbox client does.
+		engine::gpCamera->RestoreFraming(engine::CameraBase::kfCameraFramingInitial);
+		engine::gpCamera->mbZooming = false;
+	}
 	miDragButton = -1;
 	ResetDisplayTime();
 }
@@ -1107,10 +1113,20 @@ void ModelViewerApplication::RenderUi()
 			}
 		}
 	}
-	if (!bCaptureMouse && !mPreviews.empty() && !(mFlags & ViewerFlags::kFlying))
+	int64_t iScrollDelta = 0;
+	if (!bCaptureMouse && !mPreviews.empty())
 	{
-		pCamera->Zoom(rInputOutput.MouseWheel);
+		if (mFlags & ViewerFlags::kFlying)
+		{
+			// ImGui reports wheel notches; the engine framing zoom consumes raw Win32 wheel units, as Sandbox's Input does.
+			iScrollDelta = std::lround(rInputOutput.MouseWheel * WHEEL_DELTA);
+		}
+		else
+		{
+			pCamera->Zoom(rInputOutput.MouseWheel);
+		}
 	}
+	pCamera->mCameraInput.iScrollDelta = iScrollDelta;
 	engine::gpGraphics->Refresh();
 }
 

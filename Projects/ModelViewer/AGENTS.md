@@ -22,7 +22,9 @@ window adds a Flight tab, removed on return to orbit and selected when TAB
 enters flight while the panels are shown; every
 exact entry in it has a paired slider. Flight forces the world visible without
 changing the retained orbit background preference; returning to orbit restores
-that preference and pauses the body. Resuming flight preserves its position
+that preference and pauses the body. In flight the wheel drives the engine
+camera's framing zoom between its minimum and maximum, starting at the engine's
+initial framing on every flight entry. Resuming flight preserves its position
 without a catch-up interval. One viewer-owned body loops between peaks: the
 tallest template's peak, then a random other placement's peak, then the tallest
 again. The body stays inside the original cell, never transfers cells, and never
@@ -47,11 +49,11 @@ must survive Graphics recreation, with resources republished before use.
 
 Holding Q temporarily applies engine defaults to the right-hand lighting float
 sliders and disables their edits. Preserve the current tweaks across Graphics
-recreation and restore them on Q release, focus loss, or shutdown before saving
-settings. Preset selection or reset while Q is held updates what will be restored;
+recreation and restore them on Q release, focus loss, or shutdown. Preset selection or reset while Q is held updates what will be restored;
 comparison never saves a preset or changes its selection. Sun angle and the left
-Render quality controls remain outside comparison, presets and Backspace reset;
-quality persists through ordinary graphics settings. Model diffuse IBL multiplies the shared ambient color
+Render quality controls remain outside comparison, presets and Backspace reset.
+The viewer never loads or saves graphics settings: every run starts from the
+compiled graphics defaults, and edits last only until exit. Model diffuse IBL multiplies the shared ambient color
 directly; sun/moon IBL specular remains independent. One ordered descriptor table
 owns both lighting UI and
 preset/comparison membership.
@@ -59,8 +61,8 @@ preset/comparison membership.
 W/E/R taps load independent presets for those same sliders; edits auto-save
 only the selected preset. Missing or invalid presets apply all compiled defaults,
 without writing on selection. Backspace applies compiled defaults and saves them
-to the selected preset, retaining selection. Startup loads ordinary graphics
-settings, then selects and loads W before Graphics construction; a preset is
+to the selected preset, retaining selection. Startup selects and loads W before
+Graphics construction; a preset is
 always selected. Selection survives Graphics recreation. The right window title
 shows Preset: followed by the selected key, with a stable ImGui window ID and no
 duplicate content header. Ignore slot/reset key repeats and apply taps in
@@ -89,8 +91,8 @@ version bump.
 Only viewer-panel slider edits and explicit selected-preset resets write preset
 files.
 
-Bare F4 uses the ordinary window-close path, restoring comparison before saving
-graphics settings and releasing owners. Modified F4 adds no viewer close binding;
+Bare F4 uses the ordinary window-close path, restoring comparison and releasing
+owners. Modified F4 adds no viewer close binding;
 Alt-F4 retains native window handling.
 
 F9 permits one outstanding PNG capture. Successful completion is logged only
@@ -213,9 +215,6 @@ environment for equal sun input and shared defaults. Right-drag
 sun rotation changes only the model direction and persists in world space across
 Sun angle edits, model changes and Graphics recreation. Sun angle still drives
 shared day-cycle colors and brightness and the base direction for world and model.
-The viewer publishes no native water source grid, so startup selects Low water
-quality after graphics settings load, before Graphics construction; preserve
-that policy across recreation.
 Orbit preview isolation excludes world lighting deposits, smoke and terrain
 occlusion from model shading; flight uses ordinary world shading and depth.
 Flight also uses the engine's projected ground shadows with shared world sun
