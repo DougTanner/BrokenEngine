@@ -179,7 +179,7 @@ void OmnisInterpolate::Register()
 	engine::AreaLightsInterpolate::RegisterType(siHealBeamAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC72pngCrc,
-		.puiColors = {0xFF00FF00, 0xFF00FF00, 0xFF00FF00, 0xFF00FF00}, // Green (ABGR)
+		.puiColors = {0x00FF00FF, 0x00FF00FF, 0x00FF00FF, 0x00FF00FF}, // Opaque green (RRGGBBAA)
 		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
 		.fLightingIntensity = 200.0f,
 	});
@@ -634,6 +634,13 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
 			}
+			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
+			{
+				// A flagship chase never flees or returns to an island.
+				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
+				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
+				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFlagship, vecPosition), 0.0f));
+			}
 			else
 			{
 				// The nearest enemy on an Omni plane, one plane at a time; an exact tie keeps the lower plane.
@@ -669,7 +676,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
-			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, flags, bLookTargetFound, vecLookPosition);
+			bool bPreferFlagship = rPrevious.pController[i] == ShipController::kRandomSpawn && (orders & ShipOrders::kTargetFlagship);
+			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, bPreferFlagship, flags, bLookTargetFound, vecLookPosition);
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
@@ -685,7 +693,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		if (bHealing)
 		{
 			fArmor = std::min(fArmor + kfOmniHealRate * deltaTime.count(), kfOmniArmor);
-			if (fArmor >= kfOmniArmor)
+			fShield = std::min(fShield + kfOmniHealRate * deltaTime.count(), kfOmniShield);
+			if (fArmor >= kfOmniArmor && fShield >= kfOmniShield)
 			{
 				flags.Set(ShipFlags::kHealing, false);
 			}

@@ -519,11 +519,20 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			}
 			else
 			{
-				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
-
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+				XMVECTOR vecDestination = XMVectorZero();
+				if ((rPrevious.pOrders[i] & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecDestination))
+				{
+					// A flagship chase never flees or returns to an island.
+					flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
+					bHasDestination = true;
+				}
+				else
+				{
+					XMVECTOR vecNearestEnemy = XMVectorZero();
+					bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
+					vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+				}
 				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfBattleshipFleeTurnRate : kfBattleshipChaseTurnRate;
 				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfBattleshipSteeringSmoothing, kfBattleshipSteeringDecay, deltaTime, fDeltaRotation);
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);

@@ -47,6 +47,32 @@ bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, en
 	return bFound;
 }
 
+bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult)
+{
+	float fClosestDistanceSquared = std::numeric_limits<float>::max();
+	bool bFound = false;
+	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+	{
+		if (!IsFlagship(rFrame.postRender, locator))
+		{
+			return;
+		}
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFrom)));
+		if (fDistanceSquared < fClosestDistanceSquared)
+		{
+			fClosestDistanceSquared = fDistanceSquared;
+			rVecResult = vecPosition;
+			bFound = true;
+		}
+	});
+	return bFound;
+}
+
+bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator)
+{
+	return locator.eType == ShipType::kBattleship && (rPostRender.pBattleships->pOrders[locator.iRow] & ShipOrders::kIsFlagship);
+}
+
 ShipUuid ShipUuidByGlobalId(const Frame& rFrame, engine::GlobalId globalId)
 {
 	std::optional<ShipLocator> optionalLocator = FindShipByGlobalId(rFrame, globalId);

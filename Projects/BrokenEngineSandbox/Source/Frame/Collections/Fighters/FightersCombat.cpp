@@ -60,20 +60,26 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 }
 
 // Hits the nearest enemy ship whose nearest flight plane is the shooter's stored plane, that is inside the cell, within
-// beam range, and lined up with the heading. Only a strictly nearer row replaces the best, so an exact distance tie keeps
-// the first row in ForEachShipType order. Returns false when no ship qualifies.
+// beam range, and lined up with the heading; a random-spawn kTargetFlagship shooter hits the nearest such enemy flagship
+// instead when one qualifies. Only a strictly nearer row replaces the best, so an exact distance tie keeps the first row
+// in ForEachShipType order. Returns false when no ship qualifies.
 static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t i, uint8_t uiFlightPlane)
 {
 	static constexpr float kfBeamRangeSquared = kfFighterBeamRange * kfFighterBeamRange;
 
 	FightersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pFighters;
+	const FightersPostRender& rCurrentPostRender = *rFrame.postRender.pFighters;
 	XMVECTOR vecShooterPosition = rCurrentInterpolate.pVecPositions[i];
 	XMVECTOR vecShooterDirection = rCurrentInterpolate.pVecDirections[i];
-	engine::AlignmentIdentifier alignment = rFrame.postRender.pFighters->pAlignments[i];
+	engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
+	bool bPreferFlagship = rCurrentPostRender.pController[i] == ShipController::kRandomSpawn && (rCurrentPostRender.pOrders[i] & ShipOrders::kTargetFlagship);
 
 	std::optional<ShipLocator> optionalTarget;
 	float fNearestDistanceSquared = 0.0f;
 	XMVECTOR vecEnd = XMVectorZero();
+	std::optional<ShipLocator> optionalFlagshipTarget;
+	float fFlagshipDistanceSquared = 0.0f;
+	XMVECTOR vecFlagshipEnd = XMVectorZero();
 	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
 		if (NearestFlightPlane(vecPosition) != uiFlightPlane)
@@ -103,7 +109,18 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 			fNearestDistanceSquared = fDistanceSquared;
 			vecEnd = vecPosition;
 		}
+		if (bPreferFlagship && IsFlagship(rFrame.postRender, locator) && (!optionalFlagshipTarget || fDistanceSquared < fFlagshipDistanceSquared))
+		{
+			optionalFlagshipTarget = locator;
+			fFlagshipDistanceSquared = fDistanceSquared;
+			vecFlagshipEnd = vecPosition;
+		}
 	});
+	if (optionalFlagshipTarget)
+	{
+		optionalTarget = optionalFlagshipTarget;
+		vecEnd = vecFlagshipEnd;
+	}
 
 	if (!optionalTarget)
 	{

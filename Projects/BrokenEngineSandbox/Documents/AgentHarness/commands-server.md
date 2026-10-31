@@ -38,10 +38,11 @@ adding the fields below; the other entries are its own commands. For the engine
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship` and the target flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
-  lowest plane; a Fighter allows 0-2, an Omni 0-1, a Battleship 0), `flags` the
-  integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
-  `arrivalGrace` seconds. `registryId` is the ship's frame registry handle
+  `kIsFlagship`, 2 `kTargetFlagship`, and the target flight plane index in
+  bits 8-15), `targetFlightPlane` that index (0 the lowest plane; a Fighter
+  allows 0-2, an Omni 0-1, a Battleship 0), `flags` the integer `ShipFlags`
+  mask, `lifecycleFlags` the integer lifecycle mask, and `arrivalGrace`
+  seconds. `registryId` is the ship's frame registry handle
   and `registryTargetId` is the registry handle the missile is homing on, so a
   live missile's nonzero `registryTargetId` matches a ship `registryId` in
   the same cell, or one that ship cleared later in the same tick (death,

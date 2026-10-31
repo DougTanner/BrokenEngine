@@ -46,6 +46,10 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	{
 		names.push_back("kIsFlagship");
 	}
+	if (orders & ShipOrders::kTargetFlagship)
+	{
+		names.push_back("kTargetFlagship");
+	}
 	if (flags & ShipFlags::kVeerOff)
 	{
 		names.push_back("kVeerOff");

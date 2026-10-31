@@ -262,7 +262,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	};
 }
 
-bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic)
+bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic)
 {
 	if (ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, rTactic))
 	{
@@ -270,6 +270,11 @@ bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPo
 	}
 
 	XMVECTOR vecEnemyPosition = XMVectorZero();
+	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, vecEnemyPosition))
+	{
+		rTactic = AttackOrStartVeerOff(vecPosition, vecEnemyPosition, rFlags, rVecVeerOffPoint);
+		return true;
+	}
 	if (!FindHorizontallyNearestEnemyShip(rPreviousFrame, vecPosition, alignment, iHighestFlightPlane, vecEnemyPosition))
 	{
 		return false;

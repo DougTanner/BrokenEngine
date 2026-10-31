@@ -6,7 +6,7 @@ namespace game
 {
 
 inline constexpr float kfOmniArmor = 25.0f;
-inline constexpr float kfOmniShield = 100.0f;
+inline constexpr float kfOmniShield = 50.0f;
 inline constexpr float kfOmniShieldRegeneration = 5.0f;
 
 inline constexpr float kfOmniEnergy = 25.0f;

@@ -30,7 +30,7 @@ inline constexpr float kfOmniBlastersSpeed = 225.0f;
 inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.2f);
 inline constexpr float kfBlasterTargetRange = 120.0f;
 
-// A healing fleet Omni regains armor only within the arrival distance of its escort slot, in x/y.
+// A healing fleet Omni regains armor and shield only within the arrival distance of its escort slot, in x/y.
 inline constexpr float kfOmniHealRate = 5.0f;
 inline constexpr float kfOmniEscortArrivalDistance = 10.0f;
 // Escort steering is a damped arrival toward the slot: the wanted velocity is the slot offset times the gain, and the

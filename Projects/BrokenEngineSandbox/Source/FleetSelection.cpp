@@ -187,7 +187,8 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 			mFocusedMemberGlobalId = {};
 		}
 
-		if (std::ssize(pFleet->members) > iPreviousFocusedFleetMemberCount)
+		// A new member takes focus only when no member holds it, so spawning into a fleet keeps the current focus.
+		if (std::ssize(pFleet->members) > iPreviousFocusedFleetMemberCount && mFocusedMemberGlobalId.iValue == 0)
 		{
 			engine::GlobalId newMemberGlobalId = pFleet->members.back().globalId;
 			// The spawn event and this sync share one reliable flush, and the client applies owned-entity events

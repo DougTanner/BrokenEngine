@@ -77,6 +77,12 @@ void ForEachEnemyShip(const FrameInterpolate& rInterpolate, const FramePostRende
 // optionalFlightPlane, only rows whose nearest flight plane is that plane qualify.
 [[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, std::optional<int64_t> optionalFlightPlane, XMVECTOR& rVecResult);
 
+// The enemy kIsFlagship Battleship row nearest vecFrom; returns false when none qualifies, ties keep the first row.
+[[nodiscard]] bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
+
+// A Battleship row whose orders carry kIsFlagship.
+[[nodiscard]] bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator);
+
 struct ShipUuid
 {
 	ShipType eType {};

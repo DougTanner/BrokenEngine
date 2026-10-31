@@ -56,8 +56,9 @@ struct ShipTactic
 [[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
 
 // Veer-off until 150 m from the veer-off point, else Attack the horizontally nearest enemy at or below
-// iHighestFlightPlane on its plane, veering off within 20 m. Returns false, leaving rTactic unchanged, when not veering
-// off and the previous frame holds no such enemy.
-[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic);
+// iHighestFlightPlane on its plane, veering off within 20 m; with bTargetFlagship the nearest enemy flagship, when the
+// previous frame holds one, replaces that enemy. Returns false, leaving rTactic unchanged, when not veering off and the
+// previous frame holds no such enemy.
+[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, ShipTactic& rTactic);
 
 } // namespace game

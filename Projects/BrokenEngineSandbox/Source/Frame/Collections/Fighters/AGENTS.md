@@ -18,7 +18,8 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   nearest island center, setting the return-to-island state with distance
   hysteresis, or only decays its turn in a cell with no island candidates.
 - Attack heads for its target and targets that enemy's nearest plane. A
-  random-spawn fighter's target is the enemy ship nearest it in x/y, picked
+  random-spawn fighter's target is the enemy ship nearest it in x/y, or the
+  enemy flagship for a `kTargetFlagship` row (`../Ships/AGENTS.md`), picked
   every tick with no target lock; a fleet fighter's is its kept
   `pRegistryTargets` target (`../Ships/AGENTS.md`
   `## Fleet Coordination Invariants`). Within the
@@ -73,9 +74,11 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
 - The beam hits the nearest enemy ship by 3D distance, with no visibility test,
   among those inside the cell whose nearest flight plane is the shooter's
   stored plane (`../Ships/AGENTS.md`), within `kfFighterBeamRange`, and whose
-  horizontal offset is within `kfFighterBeamAimAngle` of the heading; with none
-  it holds fire. An exact distance tie keeps the first row in `ForEachShipType`
-  order, and a later shooter sees an earlier shooter's kill.
+  horizontal offset is within `kfFighterBeamAimAngle` of the heading; a
+  `kTargetFlagship` shooter (`../Ships/AGENTS.md`) prefers the nearest such
+  enemy flagship and otherwise hits the nearest such enemy. With none it holds
+  fire. An exact distance tie keeps the first row in `ForEachShipType` order,
+  and a later shooter sees an earlier shooter's kill.
 - A hit deals `kfFighterBeamDamage` at once through the target type's
   `ApplyBeamDamage` death path, and a Fighter's or Battleship's death knockback
   pushes it away from the shooter.

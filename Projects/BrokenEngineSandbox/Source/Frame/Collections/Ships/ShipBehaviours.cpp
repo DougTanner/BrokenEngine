@@ -611,17 +611,21 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 	}
 }
 
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, bool bPreferFlagship, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
 	bool bTargetInRange = false;
 	bool bTargetForLook = false;
+	bool bFlagshipInRange = false;
 	XMVECTOR vecTargetInRangePosition = XMVectorZero();
 	XMVECTOR vecTargetInRangeVelocity = XMVectorZero();
 	XMVECTOR vecTargetForLookPosition = XMVectorZero();
+	XMVECTOR vecFlagshipInRangePosition = XMVectorZero();
+	XMVECTOR vecFlagshipInRangeVelocity = XMVectorZero();
 	float fBestInRange = fBlasterTargetRange;
 	float fBestForLook = std::numeric_limits<float>::max();
+	float fBestFlagshipInRange = fBlasterTargetRange;
 	// Firing and look targets require a visible enemy past arrival grace.
-	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity)
+	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity)
 	{
 		if (!FrameInterpolate::IsVisible(vecPosition, vecTargetPosition))
 		{
@@ -640,6 +644,13 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 			vecTargetInRangeVelocity = vecTargetVelocity;
 			bTargetInRange = true;
 		}
+		if (bPreferFlagship && iTargetFlightPlane == uiFlightPlane && fDistance < fBestFlagshipInRange && IsFlagship(rPreviousFrame.postRender, locator))
+		{
+			fBestFlagshipInRange = fDistance;
+			vecFlagshipInRangePosition = vecTargetPosition;
+			vecFlagshipInRangeVelocity = vecTargetVelocity;
+			bFlagshipInRange = true;
+		}
 		if (fDistance < fBestForLook)
 		{
 			fBestForLook = fDistance;
@@ -647,6 +658,11 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, FXMVECTOR vecPositio
 			bTargetForLook = true;
 		}
 	});
+	if (bFlagshipInRange)
+	{
+		vecTargetInRangePosition = vecFlagshipInRangePosition;
+		vecTargetInRangeVelocity = vecFlagshipInRangeVelocity;
+	}
 
 	rbLookTargetFound = false;
 	rVecLookPosition = XMVectorZero();

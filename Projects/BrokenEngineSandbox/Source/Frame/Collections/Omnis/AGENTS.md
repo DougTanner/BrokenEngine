@@ -4,7 +4,7 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
 
 ## Behavior Invariants
 
-- Omnis fire only blasters, at the nearest visible enemy within `kfBlasterTargetRange` on the Omni's stored plane, one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire.
+- Omnis fire only blasters, at the nearest visible enemy within `kfBlasterTargetRange` on the Omni's stored plane, preferring the nearest such enemy flagship for a `kTargetFlagship` Omni (`../Ships/AGENTS.md`), one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire.
 - A fleet-controlled Omni in its flagship's cell steers by its fleet's stance
   through the fleet tactic it shares with fleet Fighters
   (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`) on the highest
@@ -27,7 +27,9 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   and transfer arrival.
 - A random-spawn Omni chases the nearest enemy on an Omni plane and, outside
   transfer lock, writes that enemy's plane into its orders; with no such enemy
-  its target plane stays.
+  its target plane stays. A `kTargetFlagship` row (`../Ships/AGENTS.md`) whose
+  enemy flagship is at or below the highest Omni plane heads straight for it
+  instead, with no flee or return to an island.
 
 ## Fleet Health Invariants
 
@@ -38,12 +40,12 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   explodes, and the random-spawn waves replace it.
 - While `kHealing` is set an Omni fires nothing and escorts whatever its
   fleet's stance. On a tick it is within `kfOmniEscortArrivalDistance` in x/y of
-  its slot, its armor rises by `kfOmniHealRate` per second up to `kfOmniArmor`;
-  reaching that clears `kHealing`, and it fires again in the same tick's Spawn
-  phase. An Omni waiting at the nearest clear point to a slot inside terrain
-  heals only when that point lies within the arrival distance of the slot
-  itself. `kHealing` carries across a transfer. The shield keeps its passive
-  regeneration.
+  its slot, its armor and its shield each rise by `kfOmniHealRate` per second up
+  to `kfOmniArmor` and `kfOmniShield`; both full clears `kHealing`, and it
+  fires again in the same tick's Spawn phase. An Omni waiting at the nearest
+  clear point to a slot inside terrain heals only when that point lies within
+  the arrival distance of the slot itself. `kHealing` carries across a
+  transfer. The shield also keeps its passive regeneration.
 
 ## Heal Beam
 

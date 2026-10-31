@@ -21,8 +21,15 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
   fleet Omnis theirs (`../Omnis/AGENTS.md`).
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter or Omni in its flagship's cell (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
+- A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
+  its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
+  its cell's previous frame holds an enemy `kIsFlagship` Battleship row past
+  arrival grace, it chases the 3D-nearest one in place of the nearest enemy, as
+  each type document describes (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`,
+  `../Battleships/AGENTS.md`). With no such flagship the row steers as an
+  unflagged one that tick. The bit stays and transfers with the row.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
-- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Omni and Battleship Spawn-phase weapon targeting and the Fighter beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
+- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon targeting and the Fighter beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range

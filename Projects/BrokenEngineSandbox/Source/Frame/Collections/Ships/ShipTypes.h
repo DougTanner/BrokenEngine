@@ -54,6 +54,8 @@ constexpr const char* ShipControllerName(ShipController eController)
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
+	// A random-spawn row that chases and prefers to shoot the nearest enemy flagship in its cell.
+	kTargetFlagship     = 0x0002,
 
 	// Target flight plane index in bits 8-15 (0 = lowest)
 };

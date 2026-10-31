@@ -9,7 +9,10 @@ random-spawn Battleship, when island candidates are available, prioritizes
 returning to an island, fleeing a nearby enemy ship, then chasing the nearest
 enemy ship; in a cell with no island candidates, it clears the return-to-island
 state and uses flee/chase steering for an enemy ship or only decays the current
-turn otherwise. Return and flee transitions use distance hysteresis.
+turn otherwise. Return and flee transitions use distance hysteresis. A
+`kTargetFlagship` row chases the enemy flagship with neither return nor flee
+(`../Ships/AGENTS.md`); its missiles keep the rule below, which already covers
+the flagship.
 
 ## Weapon Invariants
 

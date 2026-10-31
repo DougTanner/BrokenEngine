@@ -81,15 +81,10 @@ public:
 	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
 	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
-	// Release zoom-out ceiling (dev builds zoom further; see kfFramingMaximum). NOT a texel reference: the shadow/lighting
-	// texel grids hold a constant on-screen pixel size at any framing (the texels coarsen with zoom instead of cropping
-	// coverage), so this is purely the gameplay limit on how far the camera can pull back.
-	static constexpr float kfFramingMaximumRelease = 600.0f;
-#if defined(BT_RELEASE)
-	static constexpr float kfFramingMaximum = kfFramingMaximumRelease; // Shipping: gameplay zoom-out ceiling
-#else
-	static constexpr float kfFramingMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
-#endif
+	// Zoom-out ceiling. NOT a texel reference: the shadow/lighting texel grids hold a constant on-screen pixel size at
+	// any framing (the texels coarsen with zoom instead of cropping coverage), so this is purely the gameplay limit on
+	// how far the camera can pull back.
+	static constexpr float kfFramingMaximum = 600.0f;
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
 	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing times
 	// mfTexelCoverageRatio, this margin keeps the raw live-frustum footprints inside their textures throughout zoom

@@ -600,7 +600,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			else
 			{
 				ShipTactic tactic {};
-				if (ChooseAttackTactic(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], kiFighterHighestFlightPlane, flags, vecVeerOffPoint, tactic))
+				if (ChooseAttackTactic(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i] & ShipOrders::kTargetFlagship, flags, vecVeerOffPoint, tactic))
 				{
 					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 				}

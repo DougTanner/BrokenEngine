@@ -103,7 +103,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 145 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 146 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -209,13 +209,15 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 }
 
 // Each wave is one ship type picked at random, spaced by that type's radius, anchored where the most of its ships fit
-// and among those farthest from the reference fleet ship, which it faces. Only fleet ships, never random-spawn rows,
-// place and repel a wave.
+// and among those nearest kfPreferredFleetDistance from the reference fleet ship, which it faces. Only fleet ships,
+// never random-spawn rows, place and repel a wave.
 static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
 {
 	static constexpr int64_t kiGridDimension = 20;
 	static constexpr int64_t kiMaximumFleetSize = 16;
+	static constexpr int64_t kiRandomSpawnsPerFleetShip = 2;
 	static constexpr float kfMinimumFleetDistance = 120.0f;
+	static constexpr float kfPreferredFleetDistance = 300.0f;
 
 	// Count non-exploding fleet and random-spawn ships per type; the reference fleet ship is the first fleet ship's
 	// flagship when it is in the cell, else that first fleet ship
@@ -261,7 +263,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	// The wave starts settled on its type's highest flight plane.
 	int64_t iWaveFlightPlane = HighestFlightPlane(eWaveType);
 	// The type draw happens even when it has no room, so a full type does not shift later draws.
-	int64_t iShipCount = std::clamp(fleetCounts[std::to_underlying(eWaveType)] - randomSpawnCounts[std::to_underlying(eWaveType)], 0i64, kiMaximumFleetSize);
+	int64_t iShipCount = std::clamp(kiRandomSpawnsPerFleetShip * fleetCounts[std::to_underlying(eWaveType)] - randomSpawnCounts[std::to_underlying(eWaveType)], 0i64, kiMaximumFleetSize);
 	if (iShipCount == 0)
 	{
 		return;
@@ -334,7 +336,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 
 	// Step 3: score every grid cell as a candidate anchor; keep the best-scoring one.
 	int64_t iBestScore = 0;
-	float fBestDistance = 0.0f;
+	float fBestDistanceError = 0.0f;
 	int64_t iBestAnchorIndex = -1;
 	float fBestFacingCosine = 1.0f;
 	float fBestFacingSine = 0.0f;
@@ -380,10 +382,11 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 				continue;
 			}
 
-			if (iScore > iBestScore || (iScore == iBestScore && fDistance > fBestDistance))
+			float fDistanceError = std::abs(fDistance - kfPreferredFleetDistance);
+			if (iScore > iBestScore || (iScore == iBestScore && fDistanceError < fBestDistanceError))
 			{
 				iBestScore = iScore;
-				fBestDistance = fDistance;
+				fBestDistanceError = fDistanceError;
 				iBestAnchorIndex = i * kiGridDimension + j;
 				fBestFacingCosine = fFacingCosine;
 				fBestFacingSine = fFacingSine;
@@ -417,6 +420,9 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 
 		// Flattened because the reference fleet ship may fly another plane; the validity check keeps its horizontal part nonzero.
 		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFleetPosition, vecSpawnPosition), 0.0f));
+		// A coin toss per placed ship, drawn before its Spawn draws, picks the ships that target the enemy flagship.
+		ShipOrders_t orders = waveOrders;
+		orders.Set(ShipOrders::kTargetFlagship, common::Random(1i64, rFrame.postRender.randomEngine) == 1);
 		switch (eWaveType)
 		{
 			case ShipType::kFighter:
@@ -426,7 +432,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
-					.orders = waveOrders,
+					.orders = orders,
 					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
@@ -437,7 +443,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
-					.orders = waveOrders,
+					.orders = orders,
 					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
@@ -448,7 +454,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
-					.orders = waveOrders,
+					.orders = orders,
 					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
