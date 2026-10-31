@@ -10,7 +10,7 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   escort clock (`../Ships/FleetCoordination.cpp`), a point `kfEscortDistance`
   from the flagship. The fleet's non-dying Fighters in the cell's previous
   frame share the circle evenly in global-ID order, and the clock turns
-  counter-clockwise once per `kiEscortLapTicks` as a pure function of the frame
+  clockwise once per `kiEscortLapTicks` as a pure function of the frame
   tick, never stored; weapons free it attacks. Outside that cell it keeps the
   shared fleet navigation on the highest Fighter plane. A random-spawn fighter
   attacks whenever its cell's previous frame holds an enemy ship, finishes a

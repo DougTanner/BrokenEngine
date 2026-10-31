@@ -213,8 +213,8 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
-	// One sequential pass, shooters in row order and each one's enemies in ForEachEnemyShip order: Spawn appends each
-	// missile at once, so a later count includes every earlier launch of this tick.
+	// One sequential pass in row order, each row launching at most one missile: Spawn appends each missile at once, so a
+	// later count includes every earlier launch of this tick.
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
@@ -237,17 +237,29 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 			continue;
 		}
 
-		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
-		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), vecHullDirection));
+		// At or below zero, unlike the Fighter beam's strictly below, so launches come exactly the cooldown apart.
+		if (rCurrentPostRender.pNextMissileFireTimes[i] > std::chrono::duration<float>::zero())
+		{
+			continue;
+		}
+
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 
+		std::optional<engine::registry_id_t> optionalTarget;
+		float fNearestDistanceSquared = 0.0f;
+		XMVECTOR vecTargetPosition = XMVectorZero();
 		ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecEnemyVelocity)
 		{
 			if (NearestFlightPlane(vecEnemyPosition) != uiFlightPlane)
 			{
 				return;
 			}
-			if (XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecEnemyPosition, vecShipPosition))) > kfMissileRangeSquared)
+			float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecEnemyPosition, vecShipPosition)));
+			if (fDistanceSquared > kfMissileRangeSquared)
+			{
+				return;
+			}
+			if (optionalTarget && !(fDistanceSquared < fNearestDistanceSquared))
 			{
 				return;
 			}
@@ -257,7 +269,6 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 				return rInterpolate.pRegistryIds[iRow];
 			});
 
-			// Read the columns per enemy: a launch may reallocate them.
 			const MissilesPostRender& rMissiles = *rFrame.postRender.pMissiles;
 			int64_t iTargetingCount = 0;
 			for (int64_t j = 0; j < rMissiles.iCount; ++j)
@@ -267,40 +278,53 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, [[maybe_unus
 					++iTargetingCount;
 				}
 			}
-
-			for (; iTargetingCount < kiMissilesPerTarget; ++iTargetingCount)
+			if (iTargetingCount >= kiMissilesPerTarget[std::to_underlying(locator.eType)])
 			{
-				uint8_t uiSlot = rCurrentPostRender.puiNextMissileTubes[i];
-				XMVECTOR vecOutwardNormal = (uiSlot % 2 == 0) ? vecLeftNormal : XMVectorNegate(vecLeftNormal);
-				float fAlongOffset = kfBattleshipMissileTubeFrontOffset - static_cast<float>(uiSlot / 2) * kfBattleshipMissileTubeSpacing;
-				XMVECTOR vecTubePosition = XMVectorMultiplyAdd(XMVectorReplicate(fAlongOffset), vecHullDirection, vecShipPosition);
-				vecTubePosition = XMVectorMultiplyAdd(XMVectorReplicate(kfBattleshipMissileTubeSideOffset), vecOutwardNormal, vecTubePosition);
-				vecTubePosition = XMVectorSetZ(vecTubePosition, fShipHeight);
+				return;
+			}
 
-				// Missiles Update zeroes a flying missile's velocity Z, so it holds the ship's plane height.
-				bool bSpawned = MissilesPostRender::Spawn(rFrame,
-				{
-					.vecPosition = vecTubePosition,
-					.vecDirection = vecOutwardNormal,
-					.vecVelocity = XMVectorScale(vecOutwardNormal, kfBattleshipMissileInitialVelocity),
-					.vecStoredDirection = common::DirectionTo(vecTubePosition, XMVectorSetZ(vecEnemyPosition, fShipHeight)),
-					.uiTarget = target,
-					.fAcceleration = kfBattleshipMissileAcceleration,
-					.flags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet,
-					.alignment = alignment,
-				});
-				// A refused launch takes no slot and ends this tick's launches at this enemy.
-				if (!bSpawned)
-				{
-					return;
-				}
-				rCurrentPostRender.puiNextMissileTubes[i] = static_cast<uint8_t>((uiSlot + 1) % kiBattleshipMissileTubeSlots);
+			optionalTarget = target;
+			fNearestDistanceSquared = fDistanceSquared;
+			vecTargetPosition = vecEnemyPosition;
+		});
+
+		if (!optionalTarget)
+		{
+			continue;
+		}
+
+		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
+		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), vecHullDirection));
+		uint8_t uiSlot = rCurrentPostRender.puiNextMissileTubes[i];
+		XMVECTOR vecOutwardNormal = (uiSlot % 2 == 0) ? vecLeftNormal : XMVectorNegate(vecLeftNormal);
+		float fAlongOffset = kfBattleshipMissileTubeFrontOffset - static_cast<float>(uiSlot / 2) * kfBattleshipMissileTubeSpacing;
+		XMVECTOR vecTubePosition = XMVectorMultiplyAdd(XMVectorReplicate(fAlongOffset), vecHullDirection, vecShipPosition);
+		vecTubePosition = XMVectorMultiplyAdd(XMVectorReplicate(kfBattleshipMissileTubeSideOffset), vecOutwardNormal, vecTubePosition);
+		vecTubePosition = XMVectorSetZ(vecTubePosition, fShipHeight);
+
+		// Missiles Update zeroes a flying missile's velocity Z, so it holds the ship's plane height.
+		bool bSpawned = MissilesPostRender::Spawn(rFrame,
+		{
+			.vecPosition = vecTubePosition,
+			.vecDirection = vecOutwardNormal,
+			.vecVelocity = XMVectorScale(vecOutwardNormal, kfBattleshipMissileInitialVelocity),
+			.vecStoredDirection = common::DirectionTo(vecTubePosition, XMVectorSetZ(vecTargetPosition, fShipHeight)),
+			.uiTarget = *optionalTarget,
+			.fAcceleration = kfBattleshipMissileAcceleration,
+			.flags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet,
+			.alignment = alignment,
+		});
+		// A refused launch takes no slot and leaves the cooldown unchanged.
+		if (!bSpawned)
+		{
+			continue;
+		}
+		rCurrentPostRender.puiNextMissileTubes[i] = static_cast<uint8_t>((uiSlot + 1) % kiBattleshipMissileTubeSlots);
+		rCurrentPostRender.pNextMissileFireTimes[i] = kBattleshipMissileCooldown;
 
 #if defined(BT_CLIENT)
-				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoordinate, vecTubePosition, gMissileLaunchVolume.mfCurrent, gMissilePitchMin.mfCurrent, gMissilePitchRandom.mfCurrent);
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoordinate, vecTubePosition, gMissileLaunchVolume.mfCurrent, gMissilePitchMin.mfCurrent, gMissilePitchRandom.mfCurrent);
 #endif
-			}
-		});
 	}
 }
 

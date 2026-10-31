@@ -59,8 +59,9 @@ inline constexpr float kfBattleshipMissileRange = 150.0f;
 inline constexpr int64_t kiBattleshipMissileTubesPerSide = 8;
 // A launch slot k fires from tube k / 2, on the left side when k is even.
 inline constexpr int64_t kiBattleshipMissileTubeSlots = 2 * kiBattleshipMissileTubesPerSide;
-// A Battleship launches at an enemy only while fewer missiles than this target it.
-inline constexpr int64_t kiMissilesPerTarget = 2;
+// A Battleship launches at an enemy only while fewer missiles than its type's cap, indexed by ShipType, target it.
+inline constexpr std::array<int64_t, std::to_underlying(ShipType::kCount)> kiMissilesPerTarget {1, 4, 8};
+inline constexpr std::chrono::duration<float> kBattleshipMissileCooldown = std::chrono::duration<float>(0.125f);
 
 struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate, engine::CollectionFlags::kIdToIndex>
 {
@@ -165,7 +166,7 @@ using battleship_t = engine::Id<BattleshipsInterpolate>;
 
 struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 {
-	static constexpr int64_t kiVersion = 5;
+	static constexpr int64_t kiVersion = 6;
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
 	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, no controller writes a
@@ -221,6 +222,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
 	// The next missile launch slot, in [0, kiBattleshipMissileTubeSlots).
 	uint8_t* __restrict puiNextMissileTubes = nullptr;
+	std::chrono::duration<float>* __restrict pNextMissileFireTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
 	engine::GlobalId* __restrict pGlobalIds = nullptr;
@@ -238,7 +240,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.puiNextMissileTubes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.puiNextMissileTubes, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -262,7 +264,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	// CRC-only subset: excludes pGlobalIds and pClientGuids, which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.puiNextMissileTubes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.puiNextMissileTubes, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations);
 	}
 
 	bool LogDifferences(const BattleshipsPostRender& rOther) const;
@@ -278,6 +280,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 		ShipOrders_t orders {};
 		float fHealth = 0.0f;
 		uint8_t uiNextMissileTube = 0;
+		std::chrono::duration<float> nextMissileFireTime = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
 		float fDeltaRotation = 0.0f;
 		std::chrono::duration<float> navigationDelay = std::chrono::duration<float>(60.0f);
@@ -293,7 +296,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, uiNextMissileTube), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, uiNextMissileTube), FRAME_COLUMN(SpawnInfo, nextMissileFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

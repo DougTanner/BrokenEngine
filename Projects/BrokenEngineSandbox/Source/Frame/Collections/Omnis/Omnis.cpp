@@ -47,6 +47,12 @@ constexpr std::chrono::duration<float> kImpactPuffDuration(0.1f);
 #endif // BT_CLIENT
 
 constexpr float kfRotateTowardsSpeed = 10.0f;
+
+constexpr float kfOmniCirclingDistance = 30.0f;
+// Cosine and sine of the 27-degree lead of the circling point ahead of the Omni.
+constexpr float kfOmniCirclingLeadCos = 0.8910065f;
+constexpr float kfOmniCirclingLeadSin = 0.4539905f;
+
 #if defined(BT_CLIENT)
 constexpr float kfShieldShrinkSpeed = 1.5f;
 constexpr float kfShieldRotationSpeed = 4.0f;
@@ -300,15 +306,13 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows its flagship in the same cell
-	// A veer-off reacts to the previous frame, so it restarts here; kHealing carries across a transfer.
+	// kHealing carries across a transfer.
 	ShipFlags_t spawnFlags = rInfo.flags;
-	spawnFlags.Set(ShipFlags::kVeerOff, false);
 	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
-	rCurrentPostRender.pVecVeerOffPoints[iIndex] = XMVectorZero();
 	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
 	rCurrentPostRender.pRegistryTargets[iIndex] = {};
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
@@ -510,6 +514,25 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	}
 }
 
+// vecTarget while the Omni is farther than kfOmniCirclingDistance from it in x/y; within it, the point on that circle the
+// lead angle clockwise ahead of the Omni, so chasing it circles the target clockwise. An Omni exactly over its target gets
+// vecTarget.
+static XMVECTOR XM_CALLCONV OmniCirclingPoint(FXMVECTOR vecPosition, FXMVECTOR vecTarget)
+{
+	XMVECTOR vecOffset = XMVectorSetZ(XMVectorSubtract(vecPosition, vecTarget), 0.0f);
+	if (XMVectorGetX(XMVector2LengthSq(vecOffset)) > kfOmniCirclingDistance * kfOmniCirclingDistance)
+	{
+		return vecTarget;
+	}
+
+	// XMVector2Normalize divides every lane by the x/y length, so Z is zeroed above; a zero offset normalizes to zero.
+	XMVECTOR vecNormal = XMVector2Normalize(vecOffset);
+	float fX = XMVectorGetX(vecNormal);
+	float fY = XMVectorGetY(vecNormal);
+	XMVECTOR vecLeadNormal = XMVectorSet(fX * kfOmniCirclingLeadCos + fY * kfOmniCirclingLeadSin, fY * kfOmniCirclingLeadCos - fX * kfOmniCirclingLeadSin, 0.0f, 0.0f);
+	return XMVectorAdd(vecTarget, XMVectorScale(vecLeadNormal, kfOmniCirclingDistance));
+}
+
 // OmnisPostRender::Update orchestrates the shared per-row behaviours in ShipBehaviours.cpp and the helpers in OmnisCombat.cpp.
 
 void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -563,7 +586,6 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		int64_t iNavigationDirection = GetNavigationDirection(flags);
 		int64_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
-		XMVECTOR vecVeerOffPoint = rPrevious.pVecVeerOffPoints[i];
 		engine::registry_id_t registryTarget = rPrevious.pRegistryTargets[i];
 		XMVECTOR vecPosition = rPreviousInterpolate.pVecPositions[i];
 		// Within the arrival distance of its slot on this tick's escort; only a healing omni there heals.
@@ -599,10 +621,16 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				{
 					view.eStance = FleetStance::kEscort;
 				}
+				// Omnis never veer off, so the fleet tactic's veer-off point is discarded.
+				XMVECTOR vecVeerOffPoint = XMVectorZero();
 				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, view, rPrevious.pGlobalIds[i], vecPosition, rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
 				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{
+					if (tactic.bAttacking)
+					{
+						tactic.vecDestination = OmniCirclingPoint(vecPosition, tactic.vecDestination);
+					}
 					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes mode
 					// and recomputes its path.
 					XMVECTOR vecToDestination = XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f);
@@ -639,7 +667,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				// A flagship chase never flees or returns to an island.
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
-				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFlagship, vecPosition), 0.0f));
+				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(OmniCirclingPoint(vecPosition, vecFlagship), vecPosition), 0.0f));
 			}
 			else
 			{
@@ -668,6 +696,10 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
+				{
+					vecDestination = OmniCirclingPoint(vecPosition, vecDestination);
+				}
 				if (bHasDestination)
 				{
 					vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
@@ -751,7 +783,6 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pNavigationDelays[i] = navigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
-		rCurrent.pVecVeerOffPoints[i] = vecVeerOffPoint;
 		rCurrent.pRegistryTargets[i] = registryTarget;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
@@ -805,7 +836,6 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
-		bEqual &= common::LogDifference<"pVecVeerOffPoints">(i, pVecVeerOffPoints[i], rOther.pVecVeerOffPoints[i]);
 		bEqual &= common::LogDifference<"pRegistryTargets">(i, pRegistryTargets[i].uuid.iValue, rOther.pRegistryTargets[i].uuid.iValue);
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);

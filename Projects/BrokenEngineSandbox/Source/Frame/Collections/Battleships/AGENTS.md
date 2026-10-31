@@ -19,14 +19,17 @@ the flagship.
 - Homing tube missiles replace the Fighter's beam: the PostRender
   Spawn hook launches them first, then emits the staggered death explosions. It
   runs in one sequential pass over the rows in ascending order. A row launches
-  when it is not dying, its arrival grace has run out, and the shared plane and
-  height rule allows it (`../Ships/AGENTS.md` `## Ship Invariants`). There is no
-  cooldown.
-- A launching row visits its enemies in `ForEachEnemyShip` order and launches
-  at each one within `kfBattleshipMissileRange` of 3D distance, with no
+  when it is not dying, its arrival grace has run out, the shared plane and
+  height rule allows it (`../Ships/AGENTS.md` `## Ship Invariants`), and its
+  `pNextMissileFireTimes` cooldown is at or below zero. A launch resets the
+  cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
+  ship, so launches come exactly `kBattleshipMissileCooldown` apart.
+- A launching row launches at most one missile per tick, at the enemy nearest
+  it by 3D distance among those within `kfBattleshipMissileRange`, with no
   visibility test, that the shared plane targeting rule allows
-  (`../Ships/AGENTS.md`), while fewer than `kiMissilesPerTarget` missiles
-  target that enemy. The count covers every missile targeting it, other
+  (`../Ships/AGENTS.md`), and that fewer missiles than its type's
+  `kiMissilesPerTarget` cap target; an exact distance tie keeps the first in
+  `ForEachEnemyShip` order. The count covers every missile targeting it, other
   Battleships' missiles included, and every launch made earlier in the
   same tick, so a later shooter sees an earlier shooter's launches. Each missile
   receives that enemy as its target at launch, with no registry acquisition
@@ -36,8 +39,8 @@ the flagship.
   step through the `kiBattleshipMissileTubesPerSide` tubes from front to back,
   wrapping from the last right tube to the first left one. A missile leaves its
   tube outward from that side at the ship's exact height, so it starts on the
-  ship's plane. A launch `MissilesPostRender::Spawn` refuses takes no slot and
-  ends launches at that enemy for the tick.
+  ship's plane. A launch `MissilesPostRender::Spawn` refuses takes no slot,
+  leaves the cooldown unchanged, and launches nothing that tick.
 - The tube slot transfers with the ship, and the PostRender `PostRead` rejects a
   slot at or above `kiBattleshipMissileTubeSlots` on every Frame read.
 

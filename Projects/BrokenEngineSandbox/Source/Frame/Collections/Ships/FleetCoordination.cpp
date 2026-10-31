@@ -121,6 +121,17 @@ static bool XM_CALLCONV ContinueVeerOff(FXMVECTOR vecPosition, FXMVECTOR vecVeer
 	return false;
 }
 
+static ShipTactic XM_CALLCONV AttackTactic(FXMVECTOR vecEnemyPosition)
+{
+	return
+	{
+		.vecDestination = vecEnemyPosition,
+		.iTargetFlightPlane = NearestFlightPlane(vecEnemyPosition),
+		.bHasDestination = true,
+		.bAttacking = true,
+	};
+}
+
 // Starts a veer-off from an enemy within kfVeerOffStartDistanceSquared in x/y, else attacks it on its nearest plane.
 static ShipTactic XM_CALLCONV AttackOrStartVeerOff(FXMVECTOR vecPosition, FXMVECTOR vecEnemyPosition, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint)
 {
@@ -131,16 +142,11 @@ static ShipTactic XM_CALLCONV AttackOrStartVeerOff(FXMVECTOR vecPosition, FXMVEC
 		return VeerOffTactic(vecPosition, rVecVeerOffPoint);
 	}
 
-	return
-	{
-		.vecDestination = vecEnemyPosition,
-		.iTargetFlightPlane = NearestFlightPlane(vecEnemyPosition),
-		.bHasDestination = true,
-	};
+	return AttackTactic(vecEnemyPosition);
 }
 
 // The fleet's non-dying ships of eType in the previous frame share their type's escort circle evenly in global-ID order,
-// slot 0 due East. The Fighters' clock turns counter-clockwise once per kiEscortLapTicks; the Omnis' stays fixed.
+// clockwise from slot 0 due East. The Fighters' clock turns clockwise once per kiEscortLapTicks; the Omnis' stays fixed.
 static XMVECTOR XM_CALLCONV EscortSlotPoint(ShipType eType, const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId)
 {
 	int64_t iCount = 0;
@@ -181,7 +187,7 @@ static XMVECTOR XM_CALLCONV EscortSlotPoint(ShipType eType, const Frame& rPrevio
 	int64_t iPeriod = kiEscortLapTicks * iCount;
 	int64_t iPhase = (iLapTick * iCount + iSlot * kiEscortLapTicks) % iPeriod;
 	common::SinCos rotation = common::DeterministicSinCos(XM_2PI * static_cast<float>(iPhase) / static_cast<float>(iPeriod));
-	return XMVectorAdd(rView.vecFlagshipPosition, XMVectorSet(rotation.fCos * fEscortDistance, rotation.fSin * fEscortDistance, 0.0f, 0.0f));
+	return XMVectorAdd(rView.vecFlagshipPosition, XMVectorSet(rotation.fCos * fEscortDistance, -rotation.fSin * fEscortDistance, 0.0f, 0.0f));
 }
 
 FleetBoard::FleetBoard(const Frame& rPreviousFrame)
@@ -239,7 +245,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	if (rView.eStance == FleetStance::kWeaponsFree)
 	{
 		ShipTactic tactic {};
-		if (ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, tactic))
+		if (eType == ShipType::kFighter && ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, tactic))
 		{
 			// Attack ignores enemies above the type's highest plane, so only a veer-off point loaded from a save can lie above it.
 			tactic.iTargetFlightPlane = std::min(tactic.iTargetFlightPlane, iHighestFlightPlane);
@@ -249,7 +255,11 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 		XMVECTOR vecTargetPosition = XMVectorZero();
 		if (FindFleetAttackTarget(rPreviousFrame, rView.vecFlagshipPosition, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition))
 		{
-			return AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint);
+			if (eType == ShipType::kFighter)
+			{
+				return AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint);
+			}
+			return AttackTactic(vecTargetPosition);
 		}
 	}
 

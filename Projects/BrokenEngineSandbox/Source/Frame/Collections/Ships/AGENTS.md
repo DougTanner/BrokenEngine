@@ -76,11 +76,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   gives its fleet a stance and position; enemies in other cells are not seen.
 - Fleet Fighters and fleet Omnis steer by the stance through one shared tactic
   function keyed by ship type (`ChooseFleetTactic`): escort at the ship's own
-  slot among its type's fleet rows, Attack and Veer-off while weapons free.
-  Attack ignores enemies above the type's highest plane. Each type's `AGENTS.md`
-  documents its slots.
-- A weapons-free fleet Fighter or Omni not finishing a veer-off attacks its kept
-  target, the enemy row in the previous frame whose registry id its
+  slot among its type's fleet rows; while weapons free, Attack and Veer-off for
+  Fighters and Attack for Omnis, whose script circles the target
+  (`../Omnis/AGENTS.md`). Attack ignores enemies above the type's highest
+  plane. Each type's `AGENTS.md` documents its slots.
+- A weapons-free fleet Omni, or fleet Fighter not finishing a veer-off, attacks
+  its kept target, the enemy row in the previous frame whose registry id its
   `pRegistryTargets` stores (`FleetCoordination.cpp`). When the id is zero or
   names no enemy row at or below its type's highest plane there, it picks and
   stores the enemy nearest its flagship in x/y among those, ties keeping the

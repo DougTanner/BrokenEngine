@@ -282,6 +282,7 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.orders = rCurrentPostRender.pOrders[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
 				.uiNextMissileTube = rCurrentPostRender.puiNextMissileTubes[i],
+				.nextMissileFireTime = rCurrentPostRender.pNextMissileFireTimes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
@@ -417,6 +418,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfBattleshipHealth;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentPostRender.puiNextMissileTubes[iIndex] = rInfo.uiNextMissileTube;
+	rCurrentPostRender.pNextMissileFireTimes[iIndex] = rInfo.nextMissileFireTime;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
@@ -470,6 +472,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		float fHealth = rPrevious.pfHealths[i];
 		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
+		std::chrono::duration<float> nextMissileFireTime = rPrevious.pNextMissileFireTimes[i] - deltaTime;
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
 		std::chrono::duration<float> navigationDelay = rPrevious.pNavigationDelays[i];
@@ -567,6 +570,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		rCurrent.pfHealths[i] = fHealth;
 		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
+		rCurrent.pNextMissileFireTimes[i] = nextMissileFireTime;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
 		rCurrent.pNavigationDelays[i] = navigationDelay;
@@ -618,6 +622,7 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
 		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
 		bEqual &= common::LogDifference<"puiNextMissileTubes">(i, puiNextMissileTubes[i], rOther.puiNextMissileTubes[i]);
+		bEqual &= common::LogDifference<"pNextMissileFireTimes">(i, pNextMissileFireTimes[i], rOther.pNextMissileFireTimes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);

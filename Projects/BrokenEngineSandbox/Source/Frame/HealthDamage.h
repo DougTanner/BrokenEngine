@@ -23,7 +23,7 @@ inline constexpr std::chrono::duration<float> kMissileLifetime(10.0f);
 inline constexpr float kfMissileGravity = 9.8f;
 
 inline constexpr float kfFighterHealth = 10.0f;
-inline constexpr float kfBattleshipHealth = 60.0f;
+inline constexpr float kfBattleshipHealth = 300.0f;
 
 namespace CollisionCategory
 {

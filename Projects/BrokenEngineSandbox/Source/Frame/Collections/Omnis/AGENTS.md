@@ -11,9 +11,11 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   Omni plane: in escort it holds its own fixed slot `kfOmniEscortDistance` from the
   flagship. The fleet's non-dying Omnis in the cell's previous frame share the
   circle evenly in global-ID order, slot 0 due East, and the slots never turn.
-  Weapons free it attacks its kept `pRegistryTargets` target and veers off as a
-  fleet Fighter does (`../Fighters/AGENTS.md`), ignoring enemies above the
-  highest Omni plane. An
+  Weapons free it attacks its kept `pRegistryTargets` target, ignoring enemies
+  above the highest Omni plane, and within `kfOmniCirclingDistance` of it in x/y
+  circles it clockwise by chasing a point on that circle ahead of itself
+  (`OmniCirclingPoint`), with no coordination among Omnis; it never
+  circles its escort slot. An
   escort tick routes around terrain on its navigated plane's graph
   (`NextRouteWaypoint`) to the slot, or to the nearest clear point when the slot
   lies inside terrain, and accelerates along a damped arrival on that final
@@ -23,12 +25,12 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   `## Fleet Navigation Invariants`). Outside its flagship's cell it keeps the
   shared fleet navigation. Outside transfer lock every tick writes its tactic's
   target plane into its orders, overriding a spawn plane and a `kUpdateShip`
-  plane. `kVeerOff` clears in escort, outside the flagship's cell, and on spawn
-  and transfer arrival.
-- A random-spawn Omni chases the nearest enemy on an Omni plane and, outside
+  plane.
+- A random-spawn Omni chases the nearest enemy on an Omni plane, circling it as
+  a fleet Omni circles its target unless returning to an island, and, outside
   transfer lock, writes that enemy's plane into its orders; with no such enemy
   its target plane stays. A `kTargetFlagship` row (`../Ships/AGENTS.md`) whose
-  enemy flagship is at or below the highest Omni plane heads straight for it
+  enemy flagship is at or below the highest Omni plane chases and circles it
   instead, with no flee or return to an island.
 
 ## Fleet Health Invariants

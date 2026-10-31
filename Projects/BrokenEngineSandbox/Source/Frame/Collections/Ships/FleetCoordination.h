@@ -46,10 +46,13 @@ struct ShipTactic
 	int64_t iTargetFlightPlane = 0;
 	// False: no destination; a fleet ship then runs the shared fleet navigation instead.
 	bool bHasDestination = false;
+	// True only for an Attack tactic, whose destination is the attacked enemy's position.
+	bool bAttacking = false;
 };
 
-// For fleet Fighters and Omnis (eType). Escort flies to the ship's own slot around its flagship, Attack and Veer-off take
-// over while the fleet is weapons free, and a ship outside its flagship's cell navigates on its type's highest plane.
+// For fleet Fighters and Omnis (eType). Escort flies to the ship's own slot around its flagship; while the fleet is weapons
+// free, Attack and Veer-off take over for Fighters and plain Attack for Omnis; a ship outside its flagship's cell
+// navigates on its type's highest plane.
 // Attack targets the kept rRegistryTarget while it names an enemy row, else keeps and targets the enemy nearest the
 // flagship in x/y; escort leaves it untouched and only the outside-the-cell branch clears it. No tactic targets a plane
 // above the type's highest one. Reads only the previous frame.
