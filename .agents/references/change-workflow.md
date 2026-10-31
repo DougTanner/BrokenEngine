@@ -273,7 +273,7 @@ round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land
 
-- main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows its header lists, from the session's handoffs and its own context, reading no further code — before dispatching the `/finalize-changes` preparation; a changed log joins the session's full landing set. Skipped for a `/save-plan` or Plan-rejection landing, whose `/finalize-changes` exception requires the change to hold exactly its Plan paths.
+- main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows its header lists, from the session's handoffs and its own context, reading no further code — before the `/finalize-changes` dispatch; a changed log joins the session's full landing set. Skipped for a `/save-plan` or Plan-rejection landing, whose `/finalize-changes` exception requires the change to hold exactly its Plan paths.
 - `implementer` runs `/finalize-changes` — at a landing gate.
 
 Exactly one explicit user confirmation authorizes changing primary; after it the finalizer advances primary under the landing lock. The confirmation contract, the acceptance table, and what a later diff change re-triggers live in `/finalize-changes`. Landing completes one stage; the session ends only when every stage is complete or explicitly deferred, with a tracked follow-up Plan where required.
