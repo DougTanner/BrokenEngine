@@ -16,17 +16,19 @@ and Reroll from a random seed, until the generated layout holds that template
 and another placement. Startup enables World background.
 
 SPACE toggles orbit preview and autonomous flight once per tap outside text
-editing. Flight forces the world visible without changing the retained orbit
-background preference; returning to orbit restores that preference and pauses
-the body. Resuming flight preserves its position without a catch-up interval.
-One viewer-owned body loops between peaks: the tallest template's peak, then a
-random other placement's peak, then the tallest again. The body stays inside
-the original cell, never transfers cells, and never enters deterministic game
-state. Peaks are horizontal
-destinations only: the body flies at the exact, unbounded Height (m) entry,
-which accepts only finite values and is reached at a fixed rate, with no
-terrain collision, island avoidance or descent hold. Flight planes are not a
-viewer control; the table stays supplied for engine files
+editing. In flight the right window adds a Flight tab, removed on return to
+orbit and selected when SPACE enters flight while the panels are shown; every
+exact entry in it has a paired slider. Flight forces the world visible without
+changing the retained orbit background preference; returning to orbit restores
+that preference and pauses the body. Resuming flight preserves its position
+without a catch-up interval. One viewer-owned body loops between peaks: the
+tallest template's peak, then a random other placement's peak, then the tallest
+again. The body stays inside the original cell, never transfers cells, and never
+enters deterministic game state. Peaks are horizontal destinations only: the
+body flies at the exact, unbounded Height (m) entry, which has a 0-100 m slider,
+accepts only finite values and is reached at a fixed rate, with no terrain
+collision, island avoidance or descent hold. Flight planes are not a viewer
+control; the table stays supplied for engine files
 ([Engine integration](#engine-integration)).
 Model selection resets the body to its water anchor and the Height (m) entry to
 its default height in either mode, retaining the active mode. Reroll rebuilds elevation before the
@@ -127,8 +129,8 @@ and foreground.
 
 ## Source metadata authoring
 
-The flight panel edits XYZ scale, rotation in degrees and offset, and offers
-explicit Save to the selected source's adjacent `.model.json`. The
+The right window's Flight tab edits XYZ scale, rotation in degrees and offset,
+and offers explicit Save to the selected source's adjacent `.model.json`. The
 [exporter owns the metadata format](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
 Geometry and animation still come from packs; alignment always comes from this
 checkout's source metadata on startup and actual model selection, with no packed

@@ -782,10 +782,9 @@ void ModelViewerApplication::RenderUi()
 		}
 		float fPanelsTop = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y + fMargin;
 		ImGui::End();
-		float fFlightPanelHeight = (mFlags & ViewerFlags::kFlying) ? 290.0f * fScale : 0.0f;
-		float fPanelsBottom = pViewport->Pos.y + pViewport->Size.y - fMargin - ((mFlags & ViewerFlags::kFlying) ? fFlightPanelHeight + fMargin : 0.0f);
+		float fPanelsBottom = pViewport->Pos.y + pViewport->Size.y - fMargin;
 		float fPanelHeight = std::max(1.0f, fPanelsBottom - fPanelsTop);
-		float fPanelCenter = (mFlags & ViewerFlags::kFlying) ? 0.5f * (fPanelsTop + fPanelsBottom) : pViewport->Pos.y + 0.5f * pViewport->Size.y;
+		float fPanelCenter = pViewport->Pos.y + 0.5f * pViewport->Size.y;
 		float fCenteredPanelHeight = std::max(1.0f, 2.0f * std::min(fPanelCenter - fPanelsTop, fPanelsBottom - fPanelCenter));
 		float fCatalogWidth = std::min(460.0f * fScale, 0.4f * pViewport->Size.x);
 		float fAvailableWidth = std::max(1.0f, pViewport->Size.x - 2.0f * fMargin);
@@ -925,128 +924,117 @@ void ModelViewerApplication::RenderUi()
 		float fLightingTop = bStackPanels ? fPanelsTop + fCatalogHeight + fMargin : fPanelCenter;
 		float fLightingHeight = bStackPanels ? std::max(1.0f, fPanelHeight - fCatalogHeight - fMargin) : fCenteredPanelHeight;
 		ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + pViewport->Size.x - fMargin - fLightingWidth, fLightingTop), ImGuiCond_Always, ImVec2(0.0f, bStackPanels ? 0.0f : 0.5f));
-		if (bStackPanels)
-		{
-			ImGui::SetNextWindowSize(ImVec2(fLightingWidth, fLightingHeight));
-		}
-		else
-		{
-			ImGui::SetNextWindowSizeConstraints(ImVec2(fLightingWidth, 0.0f), ImVec2(fLightingWidth, fLightingHeight));
-		}
+		ImGui::SetNextWindowSize(ImVec2(fLightingWidth, fLightingHeight));
 		char pcLightingTitle[32];
 		std::snprintf(pcLightingTitle, sizeof(pcLightingTitle), "Preset: %c###Lighting", "WER"[miSelectedLightingPreset]);
-		if (ImGui::Begin(pcLightingTitle, nullptr, iPanelWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
+		if (ImGui::Begin(pcLightingTitle, nullptr, iWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
-			float fNormalFrameHeight = ImGui::GetFrameHeight();
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (1.5f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
-			auto LightingSlider = [this, fLightingTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
+			if (ImGui::BeginTabBar("Panels", ImGuiTabBarFlags_AutoSelectNewTabs))
 			{
-				ImGui::BeginDisabled(mFlags & ViewerFlags::kComparingDefaults);
-				ImGui::PushID(static_cast<int>(muiLightingRevision));
-				ImGui::PushID(pcLabel);
-				ImGui::TextUnformatted(pcLabel);
-				ImGui::SetNextItemWidth(fLightingTrackWidth);
-				float fValue = rWrapper.mfCurrent;
-				if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
+				if (ImGui::BeginTabItem("Lighting"))
 				{
-					rWrapper.Set(fValue);
-					std::array<float, 20> values {};
-					for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+					float fNormalFrameHeight = ImGui::GetFrameHeight();
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (1.5f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
+					auto LightingSlider = [this, fLightingTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
 					{
-						values.at(i) = rDescriptor.pWrapper->mfCurrent;
+						ImGui::BeginDisabled(mFlags & ViewerFlags::kComparingDefaults);
+						ImGui::PushID(static_cast<int>(muiLightingRevision));
+						ImGui::PushID(pcLabel);
+						ImGui::TextUnformatted(pcLabel);
+						ImGui::SetNextItemWidth(fLightingTrackWidth);
+						float fValue = rWrapper.mfCurrent;
+						if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
+						{
+							rWrapper.Set(fValue);
+							std::array<float, 20> values {};
+							for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+							{
+								values.at(i) = rDescriptor.pWrapper->mfCurrent;
+							}
+							SaveLightingPreset(values);
+						}
+						ImGui::PopID();
+						ImGui::PopID();
+						ImGui::EndDisabled();
+					};
+					for (const LightingDescriptor& rDescriptor : kLightingDescriptors)
+					{
+						if (rDescriptor.pcHeading != nullptr)
+						{
+							ImGui::SeparatorText(rDescriptor.pcHeading);
+						}
+						LightingSlider(rDescriptor.pcLabel, *rDescriptor.pWrapper);
 					}
-					SaveLightingPreset(values);
+					ImGui::PopStyleVar();
+					ImGui::EndTabItem();
 				}
-				ImGui::PopID();
-				ImGui::PopID();
-				ImGui::EndDisabled();
-			};
-			for (const LightingDescriptor& rDescriptor : kLightingDescriptors)
-			{
-				if (rDescriptor.pcHeading != nullptr)
+				if ((mFlags & ViewerFlags::kFlying) && ImGui::BeginTabItem("Flight"))
 				{
-					ImGui::SeparatorText(rDescriptor.pcHeading);
+					auto SliderRows = [fScale](const char* pcLabel, std::span<float* const> values, std::span<const char* const> rowLabels, float fMin, float fMax)
+					{
+						bool bChanged = false;
+						ImGui::PushID(pcLabel);
+						ImGui::SeparatorText(pcLabel);
+						for (const auto& [i, pfValue] : std::views::enumerate(values))
+						{
+							ImGui::PushID(rowLabels[i]);
+							ImGui::TextUnformatted(rowLabels[i]);
+							ImGui::SameLine();
+							float fInputWidth = 65.0f * fScale;
+							ImGui::SetNextItemWidth(std::max(1.0f, ImGui::GetContentRegionAvail().x - fInputWidth - ImGui::GetStyle().ItemSpacing.x));
+							float fValue = std::isfinite(*pfValue) ? *pfValue : fMin;
+							if (ImGui::SliderFloat("##Slider", &fValue, fMin, fMax, "%.3f", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat))
+							{
+								*pfValue = fValue;
+								bChanged = true;
+							}
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(fInputWidth);
+							bChanged |= ImGui::InputFloat("##Exact", pfValue, 0.0f, 0.0f, "%.9g");
+							ImGui::PopID();
+						}
+						ImGui::PopID();
+						return bChanged;
+					};
+					const char* ppcAxes[] {"X", "Y", "Z"};
+					bool bAlignmentChanged = SliderRows("Scale", std::array {&mf3ModelScale.x, &mf3ModelScale.y, &mf3ModelScale.z}, ppcAxes, 0.01f, 10.0f);
+					bAlignmentChanged |= SliderRows("Rotation (degrees)", std::array {&mf3ModelRotation.x, &mf3ModelRotation.y, &mf3ModelRotation.z}, ppcAxes, -180.0f, 180.0f);
+					bAlignmentChanged |= SliderRows("Offset", std::array {&mf3ModelOffset.x, &mf3ModelOffset.y, &mf3ModelOffset.z}, ppcAxes, -1.0f, 1.0f);
+					if (bAlignmentChanged)
+					{
+						ValidateModelAlignment();
+						if (mFlags & ViewerFlags::kMetadataLoaded)
+						{
+							mModelMetadataStatus = "Unsaved source edits";
+						}
+					}
+					// ImGui parses inf and nan; NaN would make the body position NaN and inf would make it climb without bound, so keep the last value.
+					float fFlightHeight = mfFlightHeight;
+					if (SliderRows("Height (m)", std::array {&fFlightHeight}, std::array {""}, 0.0f, 100.0f) && std::isfinite(fFlightHeight))
+					{
+						mfFlightHeight = fFlightHeight;
+					}
+					ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
+					ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
+					if (ImGui::Button("Save"))
+					{
+						SaveModelMetadata();
+					}
+					ImGui::EndDisabled();
+					ImGui::SameLine();
+					ImGui::TextWrapped("%s", mModelMetadataStatus.c_str());
+					if (!mModelAlignmentError.empty())
+					{
+						ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
+					}
+					ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
+					ImGui::EndTabItem();
 				}
-				LightingSlider(rDescriptor.pcLabel, *rDescriptor.pWrapper);
+				ImGui::EndTabBar();
 			}
-			ImGui::PopStyleVar();
 			engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 		}
 		ImGui::End();
-		if (mFlags & ViewerFlags::kFlying)
-		{
-			ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + fMargin, fPanelsBottom + fMargin));
-			ImGui::SetNextWindowSize(ImVec2(fAvailableWidth, fFlightPanelHeight));
-			if (ImGui::Begin("Flight", nullptr, iWindowFlags))
-			{
-				bool bAlignmentChanged = false;
-				auto AlignmentSliders = [fScale, &bAlignmentChanged](const char* pcLabel, XMFLOAT3A& rf3Value, float fMin, float fMax)
-				{
-					ImGui::TableNextColumn();
-					ImGui::PushID(pcLabel);
-					ImGui::TextUnformatted(pcLabel);
-					float* pfValues[] {&rf3Value.x, &rf3Value.y, &rf3Value.z};
-					const char* ppcAxes[] {"X", "Y", "Z"};
-					for (const auto& [i, pfValue] : std::views::enumerate(pfValues))
-					{
-						ImGui::PushID(ppcAxes[i]);
-						ImGui::TextUnformatted(ppcAxes[i]);
-						ImGui::SameLine();
-						float fInputWidth = 65.0f * fScale;
-						ImGui::SetNextItemWidth(std::max(1.0f, ImGui::GetContentRegionAvail().x - fInputWidth - ImGui::GetStyle().ItemSpacing.x));
-						float fValue = std::isfinite(*pfValue) ? *pfValue : fMin;
-						if (ImGui::SliderFloat("##Slider", &fValue, fMin, fMax, "%.3f", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat))
-						{
-							*pfValue = fValue;
-							bAlignmentChanged = true;
-						}
-						ImGui::SameLine();
-						ImGui::SetNextItemWidth(fInputWidth);
-						bAlignmentChanged |= ImGui::InputFloat("##Exact", pfValue, 0.0f, 0.0f, "%.9g");
-						ImGui::PopID();
-					}
-					ImGui::PopID();
-				};
-				if (ImGui::BeginTable("Model alignment", 3, ImGuiTableFlags_SizingStretchSame))
-				{
-					AlignmentSliders("Scale", mf3ModelScale, 0.01f, 10.0f);
-					AlignmentSliders("Rotation (degrees)", mf3ModelRotation, -180.0f, 180.0f);
-					AlignmentSliders("Offset", mf3ModelOffset, -1.0f, 1.0f);
-					ImGui::EndTable();
-				}
-				if (bAlignmentChanged)
-				{
-					ValidateModelAlignment();
-					if (mFlags & ViewerFlags::kMetadataLoaded)
-					{
-						mModelMetadataStatus = "Unsaved source edits";
-					}
-				}
-				// ImGui parses inf and nan; NaN would make the body position NaN and inf would make it climb without bound, so keep the last value.
-				float fFlightHeight = mfFlightHeight;
-				ImGui::SetNextItemWidth(0.65f * fAvailableWidth);
-				if (ImGui::InputFloat("Height (m)", &fFlightHeight, 0.0f, 0.0f, "%.9g") && std::isfinite(fFlightHeight))
-				{
-					mfFlightHeight = fFlightHeight;
-				}
-				ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
-				ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
-				if (ImGui::Button("Save"))
-				{
-					SaveModelMetadata();
-				}
-				ImGui::EndDisabled();
-				ImGui::SameLine();
-				ImGui::TextWrapped("%s", mModelMetadataStatus.c_str());
-				if (!mModelAlignmentError.empty())
-				{
-					ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
-				}
-				ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
-				engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
-			}
-			ImGui::End();
-		}
 	}
 	const ImGuiIO& rInputOutput = ImGui::GetIO();
 	bool bCaptureMouse = rInputOutput.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
