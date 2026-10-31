@@ -325,7 +325,7 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		return (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
 	}, [&](int64_t i)
 	{
-		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+		engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 	});
 }
 

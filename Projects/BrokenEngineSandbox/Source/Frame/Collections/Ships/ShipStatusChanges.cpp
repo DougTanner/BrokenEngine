@@ -76,7 +76,7 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			const DestroyShipData& rDestroy = std::get<DestroyShipData>(rStatusChange.data);
 			VisitShipByUuid(rFrame, rDestroy.eType, rDestroy.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
-				rPostRender.pLifecycleFlags[iIndex].Set(engine::LifecycleFlags::kDestroy);
+				engine::MarkDestroy(rPostRender.pLifecycleFlags[iIndex]);
 			});
 			continue;
 		}

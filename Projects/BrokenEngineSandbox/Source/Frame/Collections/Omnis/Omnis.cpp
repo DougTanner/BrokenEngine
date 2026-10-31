@@ -215,7 +215,7 @@ void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	},
 	[&](int64_t i)
 	{
-		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+		engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 	});
 }
 

@@ -44,8 +44,8 @@ decltype(auto) VisitShip(FRAME& rFrame, ShipLocator locator, VISITOR&& rVisitor)
 	std::unreachable();
 }
 
-// Calls rVisitor(ShipLocator, position, velocity) for every non-exploding row past arrival grace whose alignment is an
-// enemy of alignment, in ForEachShipType order.
+// Calls rVisitor(ShipLocator, position, velocity) for every row past arrival grace that is not kDying, which
+// MarkDestroy also sets, and whose alignment is an enemy of alignment, in ForEachShipType order.
 template <typename VISITOR>
 void ForEachEnemyShip(const FrameInterpolate& rInterpolate, const FramePostRender& rPostRender, engine::AlignmentIdentifier alignment, VISITOR&& rVisitor)
 {

@@ -364,7 +364,7 @@ void FightersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		return (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero());
 	}, [&](int64_t i)
 	{
-		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+		engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 	});
 }
 

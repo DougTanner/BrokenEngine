@@ -9,7 +9,8 @@ namespace engine
 struct FramePostRenderBase;
 
 // Every PostRender's pLifecycleFlags column. The Destroy-phase compaction fold (CompactCollections) removes a
-// kTransfer or kDestroy row; kDying marks a timed death its own collection plays out before it sets kDestroy.
+// kTransfer or kDestroy row. kDying marks a row readers skip because it is leaving: a timed death its collection plays
+// out before it marks the row, or a row MarkDestroy marked.
 enum class LifecycleFlags : uint8_t
 {
 	kTransfer = 0x01,
@@ -17,6 +18,13 @@ enum class LifecycleFlags : uint8_t
 	kDying    = 0x04,
 };
 using LifecycleFlags_t = common::Flags<LifecycleFlags>;
+
+// The one way to mark a row kDestroy: kDying comes with it, so every reader that skips a dying row also skips a row
+// marked for removal earlier in the tick.
+inline void MarkDestroy(LifecycleFlags_t& rLifecycleFlags)
+{
+	rLifecycleFlags.Set({LifecycleFlags::kDestroy, LifecycleFlags::kDying});
+}
 
 template <typename FRAME, typename INTERPOLATE, typename POST_RENDER>
 void ReleaseOwnedHandles(FRAME& rFrame, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, int64_t i);
@@ -139,7 +147,7 @@ void ReleaseIndexableElementAndClearHandle(FRAME& rFrame, Id<INTERPOLATE>& rId)
 	std::tuple_element_t<static_cast<size_t>(kiIndex), PostRenderTuple> rPostRender = std::get<static_cast<size_t>(kiIndex)>(rFrame.postRender.Collections());
 
 	int64_t iIndex = rInterpolate.idToIndexMap.at(rId);
-	rPostRender.pLifecycleFlags[iIndex].Set(LifecycleFlags::kDestroy);
+	MarkDestroy(rPostRender.pLifecycleFlags[iIndex]);
 	ReleaseOwnedHandles(rFrame, rInterpolate, rPostRender, iIndex);
 	rId = {};
 }

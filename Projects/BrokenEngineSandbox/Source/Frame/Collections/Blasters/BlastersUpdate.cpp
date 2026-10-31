@@ -220,13 +220,13 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		engine::CollisionOutcome outcome = engine::Collision::GetOutcome(siCollisionLayerIndex, i);
 		if (outcome.eType == engine::CollisionOutcomeType::kEntity)
 		{
-			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+			engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 			continue;
 		}
 
 		if (outcome.eType == engine::CollisionOutcomeType::kTerrain) [[unlikely]]
 		{
-			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+			engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 			XMVECTOR vecCollisionPosition = outcome.vecTerrainPosition;
 
 			// Add jitter for visual variety

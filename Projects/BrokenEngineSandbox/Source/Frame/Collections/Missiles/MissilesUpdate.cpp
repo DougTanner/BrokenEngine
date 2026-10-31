@@ -296,7 +296,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 #endif
 			if ((rCurrentPostRender.pFlags[i] & kFalling) && XMVectorGetZ(outcome.vecTerrainPosition) <= 0.0f)
 			{
-				rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
+				engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
 			}
 			else
 			{

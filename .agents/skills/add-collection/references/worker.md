@@ -183,7 +183,7 @@ runner applies. The purpose and the triggers live in
   call `RemoveIndexableElement` from collection code outside the removals the
   row-lifecycle bullet of `Engine/Source/Frame/Collections/AGENTS.md`
   `## Core Contract` names; remove any other row by releasing it from its owner
-  or marking it `kDestroy`, as that bullet directs.
+  or marking it with `engine::MarkDestroy`, as that bullet directs.
   Manual identity wiring is conditional on a real alternate ID source or
   lifecycle, such as Sounds' client-only UUID stream, not on the flag itself.
 - Optional hooks merged into the surrounding phase need no no-op boilerplate:

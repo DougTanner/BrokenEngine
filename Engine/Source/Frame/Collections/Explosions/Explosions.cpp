@@ -218,7 +218,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			continue;
 		}
 
-		rPostRender.pLifecycleFlags[i].Set(LifecycleFlags::kDestroy);
+		MarkDestroy(rPostRender.pLifecycleFlags[i]);
 	}
 }
 

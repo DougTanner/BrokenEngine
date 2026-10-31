@@ -145,6 +145,4 @@ included (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.m
 ## Notes
 
 - Ordinary debt follow-up; no Plan covered this root cause when this Plan was
-  written. `Documents/Plans/Game/ForEachEnemyShipSkipsDestroyRows.md` edits
-  the `FireBeam` visitors in the combat files this Plan leaves out of scope, so
-  no coordination is needed.
+  written.

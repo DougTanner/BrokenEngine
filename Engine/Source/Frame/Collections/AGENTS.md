@@ -20,10 +20,13 @@ Use `/add-collection` for a new collection and `/add-collection-member` for any 
   `pLifecycleFlags` column (`engine::LifecycleFlags_t`,
   `CollectionLifecycle.h`), carried to the next frame (listed in
   `PersistentMembers()` where declared): `kTransfer` leaves the cell, `kDestroy`
-  removes the row, and `kDying` marks a timed death in progress, which only a
-  collection with a timed death acts on. `AddElement` zeroes it on every new
-  row. Transfer and Destroy hooks only set these bits and build transfer
-  requests; the one removal a hook makes is `DestroyExpiredControlled` dropping
+  removes the row, and `kDying` marks a row readers skip because it is leaving:
+  either a timed death in progress, which only a collection with a timed death
+  acts on, or a row marked for removal. Simulation code marks a row for removal
+  only through `engine::MarkDestroy`, which sets `kDestroy` and `kDying`
+  together. `AddElement` zeroes `pLifecycleFlags` on every new row. Transfer
+  and Destroy hooks only set these bits and build transfer requests; the one
+  removal a hook makes is `DestroyExpiredControlled` dropping
   expired controlled rows, which no handle names. `engine::CompactCollections` (`FrameUtils.h`),
   called once as the last step of the game's Destroy phase, is the only removal
   of a `kTransfer` or `kDestroy` row, and the rows a marked row's
