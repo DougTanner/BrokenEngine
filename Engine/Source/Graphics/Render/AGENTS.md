@@ -47,7 +47,10 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   foam material layers and spawn noise each reduce camera position divided by
   their independent tile size modulo two in double precision before float
   publication, preserving the mirrored sampler's two-tile period. These CPU
-  reductions are the precision owner for distant-world water sampling.
+  reductions are the precision owner for distant-world water sampling. Water
+  Scale is applied on the CPU, so each scaled size, frequency, or tile size must
+  be the identical float in its origin reduction and its published uniform, or
+  the pattern drifts as the camera moves.
 - Retained world rectangles — shadow, lighting, and water foam history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
 - Water owns foam footprint, time, controls, and reset publication. Graphics

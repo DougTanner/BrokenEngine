@@ -46,7 +46,7 @@ struct MainLayout
 	float fWaterNormalWeightTwo INIT;
 	float fWaterNormalWeightThree INIT;
 	float fWaterHeightDarkenBottom INIT;
-	float fWaterHeightDarkenRangeInverse INIT; // 1 / (gWaterHeightDarkenTop - fWaterHeightDarkenBottom) (Water.frag height darken); magnitude floored at kfEpsilon, sign kept
+	float fWaterHeightDarkenRangeInverse INIT; // 1 / (gWaterHeightDarkenTop * gWaterScale - fWaterHeightDarkenBottom) (Water.frag height darken); magnitude floored at kfEpsilon, sign kept
 	float fWaterHeightDarkenTarget INIT;
 	float fWaterHeightDarkenLighting INIT;
 

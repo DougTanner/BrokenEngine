@@ -55,14 +55,18 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	gPresentationContinuity.cameraBasisCoordinate = engine::gpCamera->mBasisCoordinate;
 	gPresentationContinuity.f2WaterOrigin = {f4CameraPosition.x, f4CameraPosition.y};
 
-	double fSizeBaseOne = static_cast<double>(gLightingSampledNormalsOneSize.mfCurrent);
-	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
-	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
+	// RenderLightingMain publishes the same float size quotients; a different value would make the pattern drift with camera motion.
+	float fWaterScale = gWaterScale.mfCurrent;
+	double fSizeBaseOne = static_cast<double>(gLightingSampledNormalsOneSize.mfCurrent / fWaterScale);
+	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent / fWaterScale);
+	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent / fWaterScale);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
 	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraFraming, engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
-	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
-	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
-	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor));
+	// Scroll speed follows the Gerstner phase speed, which grows with the square root of wavelength.
+	float fSpeedScale = std::sqrt(fWaterScale);
+	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor) * fSpeedScale);
+	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor) * fSpeedScale);
+	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor) * fSpeedScale);
 	float fRotationOne = gWaterNormalRotationOne.mfCurrent;
 	float fRotationTwo = gWaterNormalRotationTwo.mfCurrent;
 	float fRotationThree = gWaterNormalRotationThree.mfCurrent;
@@ -149,7 +153,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	rGlobalLayout.fWaterReducedNormalTimeThreeY = static_cast<float>(sfReducedTimeThreeY);
 
 	// Modulo 10.0 requires noise and normal-map octave multipliers in tenths for seamless fract() wraps.
-	double fNoiseFrequency = static_cast<double>(gWaterColorNoiseFrequency.mfCurrent);
+	double fNoiseFrequency = static_cast<double>(gWaterColorNoiseFrequency.mfCurrent / fWaterScale);
 	XMFLOAT2 f2ReducedNoiseOrigin {static_cast<float>(std::fmod(fNoiseFrequency * fCameraX, 10.0)), static_cast<float>(std::fmod(fNoiseFrequency * fCameraY, 10.0))};
 	rGlobalLayout.fWaterReducedNoiseOriginX = f2ReducedNoiseOrigin.x;
 	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
@@ -159,7 +163,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	{
 		auto ReduceFoamOrigin = [&](float fTileSize, shaders::vec2& rf2ReducedOrigin)
 		{
-			double fInverseTileSize = 1.0 / static_cast<double>(fTileSize);
+			double fInverseTileSize = 1.0 / static_cast<double>(fTileSize * fWaterScale);
 			rf2ReducedOrigin.x = static_cast<float>(std::fmod(fInverseTileSize * fCameraX, 2.0));
 			rf2ReducedOrigin.y = static_cast<float>(std::fmod(fInverseTileSize * fCameraY, 2.0));
 			return static_cast<float>(fInverseTileSize);
@@ -242,13 +246,13 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterDepthColorFloor = gWaterDepthColorFloor.mfCurrent;
 	rGlobalLayout.fWaterUnderseaCompressionInverse = 1.0f / gWaterUnderseaCompression.mfCurrent; // TerrainElevation.frag undersea depth-curve exponent
 	rGlobalLayout.fWaterDepthReflectionFeatherInverse = 1.0f / (fDayPercent * gWaterDepthReflectionFeather.mfCurrent); // unguarded: night dayPercent=0 -> +inf absorbed by the shader clamp
-	rGlobalLayout.fWaterColorNoiseFrequency = gWaterColorNoiseFrequency.mfCurrent;
+	rGlobalLayout.fWaterColorNoiseFrequency = gWaterColorNoiseFrequency.mfCurrent / gWaterScale.mfCurrent; // same quotient PopulateWaterReducedUv reduces
 
 	PopulateWaterSunsetFade(rGlobalLayout, fSunAngle);
 
 	rGlobalLayout.fWaterFresnel = std::pow(fDayPercent, 0.5f) * gWaterFresnel.mfCurrent;
 	rGlobalLayout.fWaterColorBottom = gWaterColorBottom.mfCurrent;
-	rGlobalLayout.fWaterColorHeightInverse = 1.0f / gWaterColorHeight.mfCurrent;
+	rGlobalLayout.fWaterColorHeightInverse = 1.0f / (gWaterColorHeight.mfCurrent * gWaterScale.mfCurrent);
 	rGlobalLayout.fWaterColorNoiseAmount = gWaterColorNoiseAmount.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseWeightOne = gWaterColorNoiseWeightOne.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseWeightTwo = gWaterColorNoiseWeightTwo.mfCurrent;
@@ -311,6 +315,7 @@ struct LowWaveTunables
 	float fWavelengthAdjust = 0.0f;
 	float fAmplitudeAdjust = 0.0f;
 	float fSpeedAdjust = 0.0f;
+	float fScale = 0.0f;
 
 	bool operator==(const LowWaveTunables&) const = default;
 };
@@ -325,6 +330,7 @@ struct MediumWaveTunables
 	float fWavelengthAdjust = 0.0f;
 	float fAmplitudeAdjust = 0.0f;
 	float fSpeedAdjust = 0.0f;
+	float fScale = 0.0f;
 
 	bool operator==(const MediumWaveTunables&) const = default;
 };
@@ -337,6 +343,11 @@ static MediumWaveTunables sMediumWaveTunables {};
 // Cached wave terms require fixed per-wave float expression order and RandomEngine consumption.
 static void RebuildLowWaveInvariants(int64_t iCount)
 {
+	// Water Scale multiplies wavelength and amplitude, preserving wave shape, and speed by its square root (deep-water dispersion).
+	float fWavelength = gWaterLowWavelength.mfCurrent * gWaterScale.mfCurrent;
+	float fAmplitude = gWaterLowAmplitude.mfCurrent * gWaterScale.mfCurrent;
+	float fSpeed = gWaterLowSpeed.mfCurrent * std::sqrt(gWaterScale.mfCurrent);
+
 	// Wave 0: fixed primary direction, no RNG draw, no amplitude clamp.
 	auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent));
 	sLowWaveStaging.pf4WavesOne[0].x = XMVectorGetX(vecDirection);
@@ -346,9 +357,9 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 	sLowWaveStaging.pf4WavesOne[0].z = XMVectorGetX(vecDirection);
 	sLowWaveStaging.pf4WavesOne[0].w = XMVectorGetY(vecDirection);
 
-	sLowWaveStaging.pf4WavesTwo[0].x = (2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent); // Omega
-	sLowWaveStaging.pfBaseAmplitude[0] = gWaterLowAmplitude.mfCurrent;
-	sLowWaveStaging.pf4WavesTwo[0].z = gWaterLowSpeed.mfCurrent * sLowWaveStaging.pf4WavesTwo[0].x; // Phi
+	sLowWaveStaging.pf4WavesTwo[0].x = (2.0f * XM_PI) / fWavelength; // Omega
+	sLowWaveStaging.pfBaseAmplitude[0] = fAmplitude;
+	sLowWaveStaging.pf4WavesTwo[0].z = fSpeed * sLowWaveStaging.pf4WavesTwo[0].x; // Phi
 
 	common::RandomEngine randomEngine {};
 	for (int64_t i = 1; i < iCount; ++i)
@@ -366,10 +377,10 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 		float fWavelengthAdjust = fAdjust * gWaterLowWavelengthAdjust.mfCurrent;
 		float fAmplitudeAdjust = (1.0f - fAdjust) * std::abs(gWaterLowAmplitudeAdjust.mfCurrent) * common::Random(randomEngine);
 		float fSpeedAdjust = fAdjust * gWaterLowSpeedAdjust.mfCurrent;
-		sLowWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent + fWavelengthAdjust * gWaterLowWavelength.mfCurrent)); // Omega
-		float fBaseAmplitude = std::abs(gWaterLowAmplitude.mfCurrent - fAmplitudeAdjust * gWaterLowAmplitude.mfCurrent);
+		sLowWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (fWavelength + fWavelengthAdjust * fWavelength)); // Omega
+		float fBaseAmplitude = std::abs(fAmplitude - fAmplitudeAdjust * fAmplitude);
 		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sLowWaveStaging.pf4WavesTwo[i].x));
-		sLowWaveStaging.pf4WavesTwo[i].z = (gWaterLowSpeed.mfCurrent + gWaterLowSpeed.mfCurrent * fSpeedAdjust * common::Random(randomEngine)) * sLowWaveStaging.pf4WavesTwo[i].x; // Phi
+		sLowWaveStaging.pf4WavesTwo[i].z = (fSpeed + fSpeed * fSpeedAdjust * common::Random(randomEngine)) * sLowWaveStaging.pf4WavesTwo[i].x; // Phi
 
 		// Thin the low-frequency band: zero every kiWaveCullModulo-th wave's amplitude below kiWaveCullLimit (tuning to reduce low-wave repetition).
 		static constexpr int64_t kiWaveCullLimit = 64;
@@ -386,6 +397,11 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 // written (the displacement shader reads only the .xy direction); .zw stay zero-initialised.
 static void RebuildMediumWaveInvariants(int64_t iCount)
 {
+	// Water Scale as in RebuildLowWaveInvariants.
+	float fWavelength = gWaterMediumWavelength.mfCurrent * gWaterScale.mfCurrent;
+	float fAmplitude = gWaterMediumAmplitude.mfCurrent * gWaterScale.mfCurrent;
+	float fSpeed = gWaterMediumSpeed.mfCurrent * std::sqrt(gWaterScale.mfCurrent);
+
 	common::RandomEngine randomEngine {};
 	for (int64_t i = 0; i < iCount; ++i)
 	{
@@ -397,11 +413,11 @@ static void RebuildMediumWaveInvariants(int64_t iCount)
 		float fWavelengthAdjust = -gWaterMediumWavelengthAdjust.mfCurrent + 2.0f * gWaterMediumWavelengthAdjust.mfCurrent * common::Random(randomEngine);
 		float fAmplitudeAdjust = -gWaterMediumAmplitudeAdjust.mfCurrent + 2.0f * gWaterMediumAmplitudeAdjust.mfCurrent * common::Random(randomEngine);
 		float fSpeedAdjust = -gWaterMediumSpeedAdjust.mfCurrent + 2.0f * gWaterMediumSpeedAdjust.mfCurrent * common::Random(randomEngine);
-		sMediumWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterMediumWavelength.mfCurrent + fWavelengthAdjust * gWaterMediumWavelength.mfCurrent)); // Omega
-		float fBaseAmplitude = std::abs(gWaterMediumAmplitude.mfCurrent + fAmplitudeAdjust * gWaterMediumAmplitude.mfCurrent);
+		sMediumWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (fWavelength + fWavelengthAdjust * fWavelength)); // Omega
+		float fBaseAmplitude = std::abs(fAmplitude + fAmplitudeAdjust * fAmplitude);
 		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sMediumWaveStaging.pf4WavesTwo[i].x));
 		sMediumWaveStaging.pfBaseAmplitude[i] = fBaseAmplitude;
-		sMediumWaveStaging.pf4WavesTwo[i].z = (gWaterMediumSpeed.mfCurrent + fSpeedAdjust * gWaterMediumSpeed.mfCurrent) * sMediumWaveStaging.pf4WavesTwo[i].x; // Phi
+		sMediumWaveStaging.pf4WavesTwo[i].z = (fSpeed + fSpeedAdjust * fSpeed) * sMediumWaveStaging.pf4WavesTwo[i].x; // Phi
 	}
 }
 
@@ -425,6 +441,7 @@ static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double fW
 	tunables.fWavelengthAdjust = gWaterLowWavelengthAdjust.mfCurrent;
 	tunables.fAmplitudeAdjust = gWaterLowAmplitudeAdjust.mfCurrent;
 	tunables.fSpeedAdjust = gWaterLowSpeedAdjust.mfCurrent;
+	tunables.fScale = gWaterScale.mfCurrent;
 	if (tunables != sLowWaveTunables)
 	{
 		sLowWaveTunables = tunables;
@@ -465,6 +482,7 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double
 	tunables.fWavelengthAdjust = gWaterMediumWavelengthAdjust.mfCurrent;
 	tunables.fAmplitudeAdjust = gWaterMediumAmplitudeAdjust.mfCurrent;
 	tunables.fSpeedAdjust = gWaterMediumSpeedAdjust.mfCurrent;
+	tunables.fScale = gWaterScale.mfCurrent;
 	if (tunables != sMediumWaveTunables)
 	{
 		sMediumWaveTunables = tunables;
@@ -510,12 +528,15 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
 
 	// Camera framing scales geometric wave amplitudes using each stack's Start and End settings.
+	// Water Scale below 1 pulls the fades in so the shortest waves fade out before they alias on the vertex grid; above 1
+	// the fades stay put, since moving them out would alias on LOD 1.
 	float fCameraFraming = engine::gpCamera->mfCameraFraming;
-	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
-	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
+	float fFadeScale = std::min(gWaterScale.mfCurrent, 1.0f);
+	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent * fFadeScale;
+	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent * fFadeScale;
 	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraFraming) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
-	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent;
-	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
+	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent * fFadeScale;
+	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent * fFadeScale;
 	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraFraming) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
 
 	PopulateGerstnerLowWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);

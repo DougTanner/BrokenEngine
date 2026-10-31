@@ -3,6 +3,12 @@
 namespace engine
 {
 
+// Global
+// Scales the water pattern lengths (wavelengths, wave height, normal-map, color-noise and foam tile sizes, height
+// thresholds) at the CPU publication sites; depth and terrain lengths stay unscaled, and wave and normal-map scroll
+// speeds scale by its square root.
+Wrapper gWaterScale(1.0f, 0.3f, 4.0f);
+
 // Specular - Normals
 // Water normal map atlas: 3 weighted samples each indexed into TextureManager::kpWaterNormalCrcs.
 Wrapper gWaterNormalIndexOne(12i64, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});

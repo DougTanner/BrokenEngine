@@ -5,6 +5,9 @@
 namespace engine
 {
 
+// Global
+extern Wrapper gWaterScale;
+
 // Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
 extern Wrapper gWaterNormalIndexOne;
 extern Wrapper gLightingSampledNormalsOneSize;

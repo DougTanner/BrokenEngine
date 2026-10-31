@@ -205,9 +205,11 @@ void RenderLightingMain(int64_t iCommandBuffer)
 {
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	rMainLayout.fLightingSampledNormalsOneSize = gLightingSampledNormalsOneSize.mfCurrent;
-	rMainLayout.fLightingSampledNormalsTwoSize = gLightingSampledNormalsTwoSize.mfCurrent;
-	rMainLayout.fLightingSampledNormalsThreeSize = gLightingSampledNormalsThreeSize.mfCurrent;
+	// Same float quotients PopulateWaterReducedUv reduces the normal origins with.
+	float fWaterScale = gWaterScale.mfCurrent;
+	rMainLayout.fLightingSampledNormalsOneSize = gLightingSampledNormalsOneSize.mfCurrent / fWaterScale;
+	rMainLayout.fLightingSampledNormalsTwoSize = gLightingSampledNormalsTwoSize.mfCurrent / fWaterScale;
+	rMainLayout.fLightingSampledNormalsThreeSize = gLightingSampledNormalsThreeSize.mfCurrent / fWaterScale;
 	rMainLayout.uiWaterNormalIndexOne = static_cast<uint32_t>(gWaterNormalIndexOne.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexTwo = static_cast<uint32_t>(gWaterNormalIndexTwo.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexThree = static_cast<uint32_t>(gWaterNormalIndexThree.Get<int64_t>());
@@ -221,8 +223,8 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fWaterNormalWeightThree = fWaterNormalWeightThree;
 	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; the two tunables are independent and their ranges overlap, so
 	// floor the range magnitude at kfEpsilon to keep the reciprocal finite, keeping the sign so a top below the bottom still reads as an inverted range.
-	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.mfCurrent;
-	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.mfCurrent;
+	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.mfCurrent * fWaterScale;
+	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.mfCurrent * fWaterScale;
 	rMainLayout.fWaterHeightDarkenBottom = fWaterHeightDarkenBottom;
 	float fWaterHeightDarkenRange = fWaterHeightDarkenTop - fWaterHeightDarkenBottom;
 	float fRangeMagnitude = std::max(std::abs(fWaterHeightDarkenRange), shaders::kfEpsilon);

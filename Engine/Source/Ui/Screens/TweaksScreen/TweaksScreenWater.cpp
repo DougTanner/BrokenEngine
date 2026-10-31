@@ -12,6 +12,8 @@ namespace engine
 
 const TweaksSliderMapRegistrar gWaterRegistrar
 {
+	// Global
+	{"Water Scale", &gWaterScale},
 	// Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
 	{"Size 1", &gLightingSampledNormalsOneSize},
 	{"Weight Min 1", &gLightingSampledNormalsWeightOneMinimum},
@@ -125,6 +127,8 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 void RenderWaterSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionWater;
+
+	rScreen.WrapperSlider("Water Scale", iSection);
 
 	if (ImGui::BeginTabBar("WaterTabs"))
 	{
