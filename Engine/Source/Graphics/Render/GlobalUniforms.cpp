@@ -450,7 +450,7 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	}
 	// Per-channel half-kernel for ObjectShadowsBlurH/V: offset i of radius R weighs exp(-0.5 * (i * sigma / R)^2), normalized
 	// over the full span (center counts once, each side twice). Weights are staged locally because the layout is write-only.
-	int64_t iObjectShadowsBlurRadius = static_cast<int64_t>(gObjectShadowsBlurRadius.mfCurrent);
+	int64_t iObjectShadowsBlurRadius = std::lround(fDayPercent * gObjectShadowsBlurRadiusNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsBlurRadiusSunset.mfCurrent);
 	float pfObjectShadowsBlurWeights[shaders::kiMaxObjectShadowsBlurRadius + 1][4] {};
 	float pfObjectShadowsBlurWeightSums[4] {};
 	for (int64_t i = 0; i <= iObjectShadowsBlurRadius; ++i)

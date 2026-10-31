@@ -28,7 +28,8 @@ extern Wrapper gObjectShadowsSunset;
 extern Wrapper gObjectShadowsSunsetStretch;
 extern Wrapper gObjectShadowsBlurSigmaLow;
 extern Wrapper gObjectShadowsBlurSigmaHigh;
-extern Wrapper gObjectShadowsBlurRadius;
+extern Wrapper gObjectShadowsBlurRadiusNoon;
+extern Wrapper gObjectShadowsBlurRadiusSunset;
 extern Wrapper gObjectShadowsTerrainShadowFade;
 extern Wrapper gSmokeShadowIntensity;
 

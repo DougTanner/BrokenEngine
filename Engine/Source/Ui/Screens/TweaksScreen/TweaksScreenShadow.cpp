@@ -31,7 +31,8 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Sunset Stretch", &gObjectShadowsSunsetStretch},
 	{"Object Blur Sigma Low", &gObjectShadowsBlurSigmaLow},
 	{"Object Blur Sigma High", &gObjectShadowsBlurSigmaHigh},
-	{"Object Blur Radius", &gObjectShadowsBlurRadius},
+	{"Object Blur Radius Noon", &gObjectShadowsBlurRadiusNoon},
+	{"Object Blur Radius Sunset", &gObjectShadowsBlurRadiusSunset},
 	{"Terrain Shadow Height Fade", &gObjectShadowsTerrainShadowFade},
 	{"Smoke Shadow Intensity", &gSmokeShadowIntensity},
 };
@@ -66,7 +67,8 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Sunset Stretch", iSection);
 	rScreen.WrapperSlider("Object Blur Sigma Low", iSection);
 	rScreen.WrapperSlider("Object Blur Sigma High", iSection);
-	rScreen.WrapperSlider("Object Blur Radius", iSection);
+	rScreen.WrapperSlider("Object Blur Radius Noon", iSection);
+	rScreen.WrapperSlider("Object Blur Radius Sunset", iSection);
 	rScreen.WrapperSlider("Terrain Shadow Height Fade", iSection);
 	rScreen.WrapperSlider("Smoke Shadow Intensity", iSection);
 }

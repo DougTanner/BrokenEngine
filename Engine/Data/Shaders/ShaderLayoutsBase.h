@@ -171,7 +171,7 @@ CONSTEXPR int kiDebugTextureFormatTerrainElevation = 8;
 CONSTEXPR int kiShadowTextureExecutionSize = 64;
 
 CONSTEXPR int kiShadowBlurRadius = 5;
-CONSTEXPR int kiMaxObjectShadowsBlurRadius = 32; // gObjectShadowsBlurRadius slider maximum; sizes the GlobalLayout object-shadow blur half-kernel
+CONSTEXPR int kiMaxObjectShadowsBlurRadius = 128; // gObjectShadowsBlurRadiusNoon/Sunset slider maximum; sizes the GlobalLayout object-shadow blur half-kernel
 
 CONSTEXPR int kiComputeTileSize = 8;
 // Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes
