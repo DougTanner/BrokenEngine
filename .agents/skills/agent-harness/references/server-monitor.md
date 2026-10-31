@@ -4,7 +4,8 @@
 
 ### Server Monitor window capture and click
 
-The server has no visible window. The separate Server Monitor is a plain Win32
+An agent-mode server's only visible window is its console, shown minimized,
+which has no statistics view. The separate Server Monitor is a plain Win32
 GDI window; client `screenshot`, `describe_ui`, and `click` cannot drive it.
 Build it with `/compile -Target ServerMonitor`, then start it from the adopted
 worktree root:

@@ -383,6 +383,11 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		throw std::runtime_error("SetConsoleCtrlHandler failed");
 	}
+	// Agent-mode console stays minimized without stealing focus; shown after the handler so closing it runs the final autosave
+	if (gLaunchOptions.iAgentPort != 0)
+	{
+		ShowWindow(GetConsoleWindow(), SW_SHOWMINNOACTIVE);
+	}
 #endif
 	LOG(kDefault, kInfo, "\nEnter main loop");
 	LogIndent(1);
