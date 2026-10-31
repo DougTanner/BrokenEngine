@@ -14,4 +14,4 @@ Terrain first composites island heightmaps into visible and shadow elevation tar
 - Island-local UVs do not rotate with world placement. Rotate mesh placement and decoded normal XY together; reconstructed normal Z is rotation-invariant.
 - The packed material mask is R=Rock, G=Sand, B=Snow, A=Flow. Flow contains authored data that Terrain does not read today, reserved for future use (`Documents/Features/Graphics/IslandFlowMaskUsage.md`).
 - Snow has priority over rock and sand, contributes its sun-oriented normal, and suppresses ambient-occlusion darkening. Height fading gates detail-normal samples only; material color remains mask-driven.
-- Island normals, ambient occlusion, and masks use the clamp sampler, while detail normals use the repeat sampler. They intentionally follow the global color-texture mip bias rather than the model-data sampler.
+- Island normals, ambient occlusion, and masks use the clamp sampler, while detail normals use the repeat sampler.

@@ -50,7 +50,6 @@ extern Wrapper gLightingWaterSkyboxTwoPower;
 extern Wrapper gLightingWaterSkyboxThree;
 extern Wrapper gLightingWaterSkyboxThreePower;
 extern Wrapper gLightingWaterSkyboxLevelOfDetail;
-extern Wrapper gWaterNormalMipmapBias;
 
 // Specular - Height Darken
 extern Wrapper gWaterHeightDarkenTop;

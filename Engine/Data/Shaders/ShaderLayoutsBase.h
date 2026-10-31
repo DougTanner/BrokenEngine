@@ -122,7 +122,6 @@ CONSTEXPR float kfEpsilon = 1.0e-6f;
 // both sides in lockstep.
 CONSTEXPR int kiGlobalBindingGlobalUniform = 0;
 CONSTEXPR int kiGlobalBindingMainUniform = 1;
-CONSTEXPR int kiGlobalBindingSamplerRepeatModelData = 13;
 CONSTEXPR int kiGlobalBindingSamplerRepeat = 3;
 CONSTEXPR int kiGlobalBindingBindlessTextures = 4;
 CONSTEXPR int kiGlobalBindingSamplerClamp = 12;

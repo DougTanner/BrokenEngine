@@ -128,16 +128,19 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		WrapperToggle("Multisampling", &gMultisampling);
+		if (WrapperToggle("Multisampling", &gMultisampling) && !gMultisampling.Get<bool>())
+		{
+			gSampleShading.Set(false);
+		}
 		ImGui::BeginDisabled(!gMultisampling.Get<bool>());
 		RadioRow(nullptr, &gSampleCount, gSampleCount.mfCurrent, {{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
-		ImGui::EndDisabled();
 
 		ImGui::Separator();
 
 		WrapperToggle("Sample Shading", &gSampleShading);
 		ImGui::BeginDisabled(!gSampleShading.Get<bool>());
 		ColumnSlider("Min Sample Shading", &gMinimumSampleShading);
+		ImGui::EndDisabled();
 		ImGui::EndDisabled();
 
 		ImGui::Separator();
@@ -146,7 +149,6 @@ void GraphicsMenuScreen::Render()
 		ImGui::BeginDisabled(!gAnisotropy.Get<bool>());
 		ColumnSlider("Max Anisotropy", &gMaximumAnisotropy);
 		ImGui::EndDisabled();
-		ColumnSlider("Mip Lod Bias", &gMipmapLevelOfDetailBias);
 
 		ImGui::TableNextColumn();
 

@@ -6,9 +6,7 @@
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
-#include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
-#include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileRows.h"
@@ -577,9 +575,6 @@ void Graphics::Refresh()
 	PollSetting<float>(gMaximumAnisotropy, "Max anisotropy", DestroyType::kSamplers);
 	PollSetting<bool>(gSampleShading, "Sample shading", DestroyType::kPipelines);
 	PollSetting<float>(gMinimumSampleShading, "Min sample shading", DestroyType::kPipelines);
-	PollSetting<float>(gMipmapLevelOfDetailBias, "Mip lod bias", DestroyType::kSamplers);
-	PollSetting<float>(gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias, "Model data mip bias", DestroyType::kSamplers);
-	PollSetting<float>(gWaterNormalMipmapBias, "Water normal mip bias", DestroyType::kSamplers);
 	PollSetting<bool>(gWireframe, "Wireframe", DestroyType::kPipelines);
 	PollSetting<bool>(gDebugTexture, nullptr, DestroyType::kCommandBuffers);
 	PollSetting<bool>(gWaterFoamSystemEnabled, "Water foam", DestroyType::kCommandBuffers);

@@ -6,8 +6,6 @@
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
-#include "Ui/PbrWrappersBase.h"
-#include "Ui/WaterWrappersBase.h"
 
 #include "Profile/ProfileRows.h"
 
@@ -315,15 +313,6 @@ void TextureManager::CreateSamplers()
 		gMaximumAnisotropy.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerAnisotropy);
 	}
 
-	if (-gMipmapLevelOfDetailBias.mfCurrent > gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
-	{
-		gMipmapLevelOfDetailBias.Reset(-gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	}
-	else if (gMipmapLevelOfDetailBias.mfCurrent < -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
-	{
-		gMipmapLevelOfDetailBias.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	}
-
 	VkSamplerCreateInfo vkSmokeSamplerCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -369,7 +358,7 @@ void TextureManager::CreateSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent,
+		.mipLodBias = 0.0f,
 		.anisotropyEnable = VK_FALSE,
 		.maxAnisotropy = 1.0f,
 		.compareEnable = VK_FALSE,
@@ -382,7 +371,6 @@ void TextureManager::CreateSamplers()
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotLinearClamp]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotLinearClamp], "LinearClamp");
 
-	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = gAnisotropy.Get<bool>() ? VK_TRUE : VK_FALSE;
 	vkSamplerCreateInfo.maxAnisotropy = gMaximumAnisotropy.mfCurrent;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotClamp]));
@@ -411,27 +399,12 @@ void TextureManager::CreateSamplers()
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeat]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeat], "Repeat");
 
-	// Model normal and metallic-roughness textures carry data rather than color. Apply their dedicated
-	// bias directly so negative sharpens, positive blurs, and zero is unbiased.
-	vkSamplerCreateInfo.mipLodBias = std::clamp(gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatModelData]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatModelData], "RepeatModelData");
-
-	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeat]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeat], "MirroredRepeat");
 
-	// Water-normal variant: its own slider-driven bias instead of the global -gMipmapLevelOfDetailBias sharpen —
-	// a sharpen bias tuned for albedo pushes minified normal fetches toward noisier mips (specular
-	// shimmer). Applied directly, not negated: negative = sharpen, positive = blur.
-	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipmapBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");
-
-	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
 	vkSamplerCreateInfo.maxAnisotropy = 1.0f;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear]));
@@ -460,7 +433,6 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 		{.eFlag = DescriptorFlags::kSamplerBorderWhite, .eSlot = kSamplerSlotBorderWhite},
 		{.eFlag = DescriptorFlags::kSamplerRepeat, .eSlot = kSamplerSlotRepeat},
 		{.eFlag = DescriptorFlags::kSamplerMirroredRepeat, .eSlot = kSamplerSlotMirroredRepeat},
-		{.eFlag = DescriptorFlags::kSamplerMirroredRepeatWater, .eSlot = kSamplerSlotMirroredRepeatWater},
 		{.eFlag = DescriptorFlags::kSamplerClampLinear, .eSlot = kSamplerSlotLinearClamp},
 		{.eFlag = DescriptorFlags::kSamplerRepeatLinear, .eSlot = kSamplerSlotRepeatLinear},
 		{.eFlag = DescriptorFlags::kSamplerMirroredRepeatLinear, .eSlot = kSamplerSlotMirroredRepeatLinear},

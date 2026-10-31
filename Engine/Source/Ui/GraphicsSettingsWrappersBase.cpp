@@ -11,7 +11,6 @@ Wrapper gAnisotropy(true);
 Wrapper gMaximumAnisotropy(16.0f, 1.0f, 16.0f);
 Wrapper gSampleShading(false);
 Wrapper gMinimumSampleShading(0.6f, 0.0f, 1.0f);
-Wrapper gMipmapLevelOfDetailBias(1.0f, 0.0f, 2.0f);
 Wrapper gOrthographicProjection(false);
 Wrapper gFieldOfView(15.0f, 5.0f, 25.0f); // True vertical angle in degrees
 Wrapper gCameraTilt(20.0f, 0.0f, 45.0f); // Rotation about world X in degrees; positive looks north

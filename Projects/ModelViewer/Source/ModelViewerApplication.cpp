@@ -45,11 +45,11 @@ void ModelViewerApplication::TogglePause()
 
 struct LightingPreset
 {
-	static constexpr int64_t kiVersion = 3;
-	std::array<float, 20> values {};
+	static constexpr int64_t kiVersion = 4;
+	std::array<float, 19> values {};
 };
 
-static_assert(sizeof(LightingPreset) == 80, "LightingPreset::kiVersion must be bumped with its layout or participant order");
+static_assert(sizeof(LightingPreset) == 76, "LightingPreset::kiVersion must be bumped with its layout or participant order");
 static_assert(std::is_trivially_copyable_v<LightingPreset>);
 
 constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.bin", "ModelViewerPresetE.bin", "ModelViewerPresetR.bin"};
@@ -273,7 +273,7 @@ struct LightingDescriptor
 	const char* pcHeading = nullptr;
 };
 
-constexpr std::array<LightingDescriptor, 20> kLightingDescriptors
+constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
 {
 	LightingDescriptor { .pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment", },
 	LightingDescriptor { .pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr, },
@@ -288,8 +288,7 @@ constexpr std::array<LightingDescriptor, 20> kLightingDescriptors
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower, .pcLabel = "BRDF Diffuse Power", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular, .pcLabel = "BRDF Specular", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower, .pcLabel = "BRDF Specular Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias, .pcLabel = "Model Data Mip Bias", .pcHeading = "Material sampling and emissive", },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = "Emissive", },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingExposure, .pcLabel = "Exposure", .pcHeading = "HDR color grading", },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingGamma, .pcLabel = "Gamma", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Saturation", .pcHeading = nullptr, },
@@ -297,9 +296,9 @@ constexpr std::array<LightingDescriptor, 20> kLightingDescriptors
 	LightingDescriptor { .pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr, },
 };
 
-static std::array<float, 20> GetLightingDefaults()
+static std::array<float, 19> GetLightingDefaults()
 {
-	std::array<float, 20> values {};
+	std::array<float, 19> values {};
 	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 	{
 		values.at(i) = rDescriptor.pWrapper->mfDefault;
@@ -327,7 +326,7 @@ void ModelViewerApplication::UpdateDefaultComparison(bool bHeld)
 	mFlags.Set(ViewerFlags::kComparingDefaults, bHeld);
 }
 
-void ModelViewerApplication::ApplyLightingValues(const std::array<float, 20>& rValues)
+void ModelViewerApplication::ApplyLightingValues(const std::array<float, 19>& rValues)
 {
 	// End slider interactions with the previous lighting state.
 	++muiLightingRevision;
@@ -342,7 +341,7 @@ void ModelViewerApplication::ApplyLightingValues(const std::array<float, 20>& rV
 	}
 }
 
-void ModelViewerApplication::SaveLightingPreset(const std::array<float, 20>& rValues)
+void ModelViewerApplication::SaveLightingPreset(const std::array<float, 19>& rValues)
 {
 	// Heap: preset file I/O allocates paths and streams.
 	ScopedSuppressAllocationTracking suppress;
@@ -379,7 +378,7 @@ void ModelViewerApplication::SelectLightingPreset(int64_t iSlot)
 
 void ModelViewerApplication::ResetLightingPreset()
 {
-	std::array<float, 20> values = GetLightingDefaults();
+	std::array<float, 19> values = GetLightingDefaults();
 	ApplyLightingValues(values);
 	SaveLightingPreset(values);
 }
@@ -866,7 +865,10 @@ void ModelViewerApplication::RenderUi()
 				ImGui::PopID();
 			};
 			ImGui::SeparatorText("Render quality");
-			engine::WrapperToggle("Multisampling", &engine::gMultisampling);
+			if (engine::WrapperToggle("Multisampling", &engine::gMultisampling) && !engine::gMultisampling.Get<bool>())
+			{
+				engine::gSampleShading.Set(false);
+			}
 			ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
 			ImGui::TextUnformatted("Sample count");
 			ImGui::SetNextItemWidth(fQualityTrackWidth);
@@ -894,7 +896,6 @@ void ModelViewerApplication::RenderUi()
 			ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
 			QualitySlider("Max Anisotropy", engine::gMaximumAnisotropy);
 			ImGui::EndDisabled();
-			QualitySlider("Mip Lod Bias", engine::gMipmapLevelOfDetailBias);
 			ImGui::PopStyleVar();
 			ImGui::Separator();
 			ImGui::SeparatorText("Islands");
@@ -960,7 +961,7 @@ void ModelViewerApplication::RenderUi()
 						if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
 						{
 							rWrapper.Set(fValue);
-							std::array<float, 20> values {};
+							std::array<float, 19> values {};
 							for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 							{
 								values.at(i) = rDescriptor.pWrapper->mfCurrent;

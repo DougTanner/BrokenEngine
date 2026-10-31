@@ -52,7 +52,6 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Skybox 3", &gLightingWaterSkyboxThree},
 	{"Skybox 3 Power", &gLightingWaterSkyboxThreePower},
 	{"Skybox Lod", &gLightingWaterSkyboxLevelOfDetail},
-	{"Normal Mip Bias", &gWaterNormalMipmapBias},
 	// Specular - Height Darken
 	{"Height Darken Top", &gWaterHeightDarkenTop},
 	{"Height Darken Bottom", &gWaterHeightDarkenBottom},
@@ -185,7 +184,6 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Skybox 3", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 3 Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox Lod", iSection, 1.0f);
-				rScreen.WrapperSlider("Normal Mip Bias", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Height Darken");
 				rScreen.WrapperSlider("Height Darken Top", iSection, 1.0f);

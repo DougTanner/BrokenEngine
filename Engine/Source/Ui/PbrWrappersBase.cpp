@@ -5,7 +5,6 @@ namespace engine
 
 Wrapper gPhysicallyBasedRenderingSun(0.8f, 0.5f, 1.0f);
 Wrapper gPhysicallyBasedRenderingDayBrightness(3.0f, 1.0f, 4.0f);
-Wrapper gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias(-0.17f, -2.0f, 2.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse(9.0f, 0.0f, 20.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower(0.8f, 0.5f, 2.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular(3.0f, 0.0f, 30.0f);

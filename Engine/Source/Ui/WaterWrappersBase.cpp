@@ -52,9 +52,6 @@ Wrapper gLightingWaterSkyboxTwoPower(25.035f, 1.0f, 100.0f);
 Wrapper gLightingWaterSkyboxThree(405.89f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
 Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
-// Water-normal sampler LOD bias (negative = sharpen, positive = blur; 0 = unbiased, unlike the global
-// -gMipmapLevelOfDetailBias sharpen); a change recreates the samplers.
-Wrapper gWaterNormalMipmapBias(0.3f, 0.0f, 1.0f);
 
 // Specular - Height Darken
 Wrapper gWaterHeightDarkenTop(0.05f, -0.1f, 0.05f);

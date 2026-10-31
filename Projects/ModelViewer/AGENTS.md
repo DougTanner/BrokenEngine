@@ -51,8 +51,7 @@ recreation and restore them on Q release, focus loss, or shutdown before saving
 settings. Preset selection or reset while Q is held updates what will be restored;
 comparison never saves a preset or changes its selection. Sun angle and the left
 Render quality controls remain outside comparison, presets and Backspace reset;
-quality persists through ordinary graphics settings. Model Data Mip Bias remains
-a lighting participant. Model diffuse IBL multiplies the shared ambient color
+quality persists through ordinary graphics settings. Model diffuse IBL multiplies the shared ambient color
 directly; sun/moon IBL specular remains independent. One ordered descriptor table
 owns both lighting UI and
 preset/comparison membership.

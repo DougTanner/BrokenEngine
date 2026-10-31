@@ -12,7 +12,6 @@ const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 {
 	{"Sun", &gPhysicallyBasedRenderingSun},
 	{"Day Brightness", &gPhysicallyBasedRenderingDayBrightness},
-	{"Model Data Mip Bias", &gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias},
 	{"BRDF Diffuse", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse},
 	{"BRDF Diffuse Power", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower},
 	{"BRDF Specular", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular},
@@ -54,7 +53,6 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 				rScreen.WrapperSeparatorText("Engine Variables");
 				rScreen.WrapperSlider("Sun", iSection, 1.0f);
 				rScreen.WrapperSlider("Day Brightness", iSection, 1.0f);
-				rScreen.WrapperSlider("Model Data Mip Bias", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("BRDF");
 				rScreen.WrapperSlider("BRDF Diffuse", iSection, 1.0f);

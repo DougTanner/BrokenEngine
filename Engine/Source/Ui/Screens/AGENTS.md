@@ -26,7 +26,7 @@ The HUD and the game's Tweaks content stay in the game project. This document ow
 
 - Players see the audio menu labeled AUDIO, while its screen, UI state, wrappers, and settings file keep the internal Sound name; renaming the internals would rewrite a persisted filename.
 - Time of Day stays visible and enabled while the Graphics screen is open, and the camera keeps returning that override. The main-menu entry point seeds it from the live camera; the pause-menu entry point does not, so opening Graphics in game reuses the retained override and may snap the sun. A new entry point must pick one of the two behaviors.
-- Disabling a Graphics parent control never resets its child values.
+- Disabling a Graphics parent control never resets its child values, with one exception: turning Multisampling off also turns Sample Shading off, which has no effect at one sample per pixel. The ModelViewer's Render quality panel does the same.
 - Water quality keeps the mesh-detail scale fixed at `0.25`: Low disables vertex displacement, Medium uses the fixed low-wave band, High the low- and medium-wave bands.
 - Anisotropy applies to visible image passes such as models, terrain, and water; TextureManager (`../../Graphics/Managers/AGENTS.md` `### TextureManager`) lists which samplers omit anisotropy.
 - Compare GPU timers in Immediate mode or with fixed GPU clocks; FIFO down-clocking and boosting around the refresh cap makes per-pass times workload-dependent.
