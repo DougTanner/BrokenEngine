@@ -186,7 +186,7 @@ Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'
 	Select-Object ProcessId, Name
 ```
 
-If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules (foreground, maximum host timeout, identical re-invocation after a host timeout, never backgrounded), adding `-Configuration <name>` only for a build other than `Debug`:
+If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules, adding `-Configuration <name>` only for a build other than `Debug`:
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project '<Project>'
@@ -194,14 +194,17 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
 
 - Exit `0`: launch below. Keep the result's `owner` and `agentHarness` until the release below, and its `gameDataDirectory`.
 - `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet.
-  When step 11 classifies the holder fresh, re-invoke the claim; when stale, run
+  When step 11 classifies the holder fresh, re-invoke the claim within worker
+  step 5's claim cap; when stale, run
   steps 11-15 with session label `normal-launch`, using step 1's fixed ports
   (`27100` and `27101`) and the expected executables from the project
   hub step 4 reads. A completed steal continues to the launch below with the
   `claim.foreign-owner` result's `gameDataDirectory`, keeping the steal's new
   owner token and that result's `agentHarness` until the release below; a
   `BLOCKED` takeover is reported to the user with nothing launched.
-- `claim.wait-timeout`: re-invoke the claim.
+- `claim.wait-timeout`: re-invoke the claim within worker step 5's claim cap.
+  When the claim cap ends the claim on any route, report the holder
+  (`currentOwner`, or the server PIDs) to the user and launch nothing.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
 Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the `## Machine-readable launch configuration` of the project hub, `Projects/<Project>/Documents/AgentHarness.md`; its executable names are the Debug ones, so under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:

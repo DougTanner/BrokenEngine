@@ -119,7 +119,9 @@ or a launch routes `/compile` for the named target, and a
 `claim.data-directory-mismatch` residual routes `/compile` of both the Server
 and the Client target in one data mode, and a ModelViewer
 `capture.executable-missing` residual routes `/compile` ModelViewer Debug, each
-with no user stop.
+with no user stop. A claim the worker ended `BLOCKED` at its claim cap is a user
+stop: main tells the user which session (`currentOwner`) or server (its PIDs)
+holds the lock and asks, and never redispatches on its own.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:

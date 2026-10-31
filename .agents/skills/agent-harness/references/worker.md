@@ -59,7 +59,8 @@ and the handoff this run returns.
 ### Provision and claim
 
 5. Claim through `../scripts/Invoke-HarnessClaim.ps1`, run from the session
-   worktree root. Done when that single invocation has returned its JSON object:
+   worktree root. Done when that single invocation has returned its JSON object,
+   or the claim cap ends the attempt with its `BLOCKED` report:
 
    ```powershell
    pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -Project '<Project>'
@@ -99,17 +100,37 @@ and the handoff this run returns.
      fire-and-forget watcher, or a host background-execution parameter such as
      `run_in_background`, and never end a delegated turn while the claim is
      running — a background task's completion notification cannot resume a
-     worker whose turn has ended.
-   - If the host call times out, re-invoke the identical command; it resumes the
-     same wait. If the host instead moves the still-running call to the
-     background and that background task has already exited, use its exit
-     code and JSON output as the claim result and do not re-invoke: an exit-0
-     claim returns holding the lock. Otherwise stop that background task, then
-     re-invoke the identical command in the foreground: a still-running wait
-     has not claimed, and the new invocation mints a fresh owner token. A host
-     that hands a still-running call back to be polled, as Codex's
-     `exec_command` does, has not moved it to the background: keep polling it
-     in-turn until it exits.
+     worker whose turn has ended. One invocation waits at most its 480-second
+     budget, so it finishes inside Claude Code's 10-minute (600000 ms) maximum
+     command timeout; Claude Code moves a call that reaches its host timeout to
+     the background rather than killing it.
+   - If the host call times out and ends the call, re-invoke the identical
+     command; the re-invocation does not resume the earlier wait, it mints a new
+     owner token and restarts the wait. If the host instead moves the
+     still-running call to the background and that background task has already
+     exited, use its exit code and JSON output as the claim result and do not
+     re-invoke: an exit-0 claim returns holding the lock. If that task is still
+     running, wait in-turn for it to exit and use its exit code and JSON as the
+     claim result, never stopping it and never re-invoking it, each wait call
+     bounded under the host tool cap
+     ([`subagent-handoff.md`](../../../references/subagent-handoff.md)
+     `## Handoffs`). A host that hands a still-running call back to be polled,
+     as Codex's `exec_command` does, has not moved it to the background: keep
+     polling it in-turn until it exits.
+   - Claim cap: make at most three claim invocations per claim entry while no
+     lock is held, counting the first and every re-invocation, whatever routed
+     it: a host timeout, a `claim.wait-timeout`, or a holder step 11 classifies
+     fresh (step 7); re-entering step 5 after a route that ended the attempt,
+     such as a `/compile` route's re-enter, starts a new count. Keep the count
+     in agent context with the retained claim outputs (`## Rules`), never in a
+     file. When the third invocation ends without the lock and a host timeout
+     or step 7 would re-invoke, end the attempt instead and report it `BLOCKED`
+     to main in a shared `Residuals` row with that result's code and
+     `currentOwner`, or, when
+     `currentOwner` is `null` (a project server started without
+     `--agent-port`), the server PIDs its `message` names. When the host ended
+     that third invocation with no JSON, report the host timeout and that
+     holder from the last invocation that returned JSON, or that none did.
    - The launch-script calls below pass the claim result's `gameDataDirectory`
      as their `-GameDataDirectory`. Only when the approved acceptance needs
      derived data, such as a deliberately corrupted pack, make a real byte copy
@@ -131,7 +152,8 @@ and the handoff this run returns.
 7. Read the claim result and act on its exit code. Done when the claim is held
    with its values retained, or the reported block or failure is reported and
    the attempt ends or, for a stale holder, routes to the takeover steps or,
-   for `claim.wait-timeout`, step 5 is re-invoked.
+   for `claim.wait-timeout`, step 5 is re-invoked within its claim cap, or that
+   cap ends the attempt with its `BLOCKED` report.
 
    - Exit `0` (`status` `pass`) supplies the `owner` token, the resolved
      `agentHarness` path, and the `claim` record; retain those values outside
@@ -146,7 +168,7 @@ and the handoff this run returns.
    - Exit `2` (`status` `blocked`) carries one of eight codes. A
      `claim.foreign-owner` reports a holder the script judged stale and
      continues into the takeover steps, which reconfirm that under step 11, a
-     `claim.wait-timeout` re-invokes step 5, while
+     `claim.wait-timeout` re-invokes step 5 within its claim cap, while
      `claim.project-underivable`, `claim.executable-missing`,
      `claim.data-directory-mismatch`, `shared-data.changed`,
      `shared-data.record-missing`, and `claim.pack-version-mismatch` end the
@@ -157,7 +179,7 @@ and the handoff this run returns.
      was still held by a fresh holder, which `currentOwner` describes, or while
      a project server started without `--agent-port` still ran, with
      `currentOwner` `null`: either way no lock is held and its owner token was
-     never recorded, so re-invoke the claim per step 5.
+     never recorded, so re-invoke the claim per step 5, within its claim cap.
    - `claim.project-underivable` means the recorded data directory lacks the
      `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix: nothing
      was provisioned and no owner token or lock was taken, so route `/compile`
@@ -194,7 +216,7 @@ and the handoff this run returns.
      advances `claimedAt` — so confirm staleness from `heartbeatAt` per step 11;
      the takeover steps take the old owner token from `currentOwner.owner` and
      the harness path from `agentHarness`. When step 11 instead classifies the
-     holder fresh, re-invoke the claim per step 5.
+     holder fresh, re-invoke the claim per step 5, within its claim cap.
    - The script never steals and never touches a foreign owner's processes,
      heartbeat, or claim, whether it acquires the lock, blocks once the holder
      is stale, or ends its wait with `claim.wait-timeout`.
