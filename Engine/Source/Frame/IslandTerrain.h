@@ -72,7 +72,7 @@ struct IslandTemplate
 	int64_t iMeshIndexCount = 0;
 
 	// Per-island valid-area convex hull (CCW) in island-local meters, centered. Slices the kIsland
-	// chunk payload after the mesh indices. Shared: the server packs island placements against the
+	// chunk payload after the map thumbnail. Shared: the server packs island placements against the
 	// rotated hull (IslandChainPlacement) and the client also debug-renders it (MainUniforms
 	// DebugRenderIslandValidArea). WaitForElevationMaps sets a non-null pointer and a count of at
 	// least 3 for every template.
@@ -103,6 +103,12 @@ struct IslandTemplate
 	int64_t iMeshArenaBlockedGeneration = 0;
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
 	bool bMeshCpuDecommitted = false;
+
+	// Resident RGBA8 top-down map picture, row 0 at template-local +Y; slices the kIsland chunk payload after the
+	// mesh indices and the picture's two int32 dimensions.
+	const uint8_t* puiThumbnailPixels = nullptr;
+	int64_t iThumbnailWidth = 0;
+	int64_t iThumbnailHeight = 0;
 
 	// Elevation R16_SFLOAT is raw-copied from the resident heightmap after first mint (by the upload thread on a
 	// distinct transfer queue, otherwise recorded at restoration), retired by EvictionSweep with

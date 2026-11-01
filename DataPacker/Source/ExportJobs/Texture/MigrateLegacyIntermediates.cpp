@@ -29,88 +29,6 @@ static VkFormat IntermediateFormatFromExtension(const std::filesystem::path& rPa
 	return VK_FORMAT_UNDEFINED;
 }
 
-// Reads mip 0 from a raw BCn payload without its texture header.
-static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, int64_t iWidth, int64_t iHeight, VkFormat vkFormat)
-{
-	int64_t iBlocksX = (iWidth + 3) / 4;
-	int64_t iBlocksY = (iHeight + 3) / 4;
-	int64_t iBlockSizeBytes = (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK) ? 8 : 16;
-	std::vector<uint8_t> rgba8(static_cast<size_t>(iWidth * iHeight * 4));
-
-	for (int64_t iBlockY = 0; iBlockY < iBlocksY; ++iBlockY)
-	{
-		for (int64_t iBlockX = 0; iBlockX < iBlocksX; ++iBlockX)
-		{
-			const std::byte* puiBlock = puiEncoded + (iBlockY * iBlocksX + iBlockX) * iBlockSizeBytes;
-			int64_t piBlockRgba[16 * 4] = {};
-
-			switch (vkFormat)
-			{
-				case VK_FORMAT_BC4_UNORM_BLOCK:
-				{
-					uint8_t puiBc4Pixels[16] = {};
-					rgbcx::unpack_bc4(puiBlock, puiBc4Pixels, 1);
-					for (int64_t i = 0; i < 16; ++i)
-					{
-						piBlockRgba[i * 4 + 0] = puiBc4Pixels[i];
-						piBlockRgba[i * 4 + 3] = 255;
-					}
-					break;
-				}
-				case VK_FORMAT_BC5_UNORM_BLOCK:
-				{
-					uint8_t puiBc5Pixels[16 * 2] = {};
-					rgbcx::unpack_bc5(puiBlock, puiBc5Pixels, 0, 1, 2);
-					for (int64_t i = 0; i < 16; ++i)
-					{
-						piBlockRgba[i * 4 + 0] = puiBc5Pixels[i * 2 + 0];
-						piBlockRgba[i * 4 + 1] = puiBc5Pixels[i * 2 + 1];
-						piBlockRgba[i * 4 + 3] = 255;
-					}
-					break;
-				}
-				case VK_FORMAT_BC7_UNORM_BLOCK:
-				{
-					bc7decomp::color_rgba pBc7Pixels[16] = {};
-					bc7decomp::unpack_bc7(puiBlock, pBc7Pixels);
-					for (int64_t i = 0; i < 16; ++i)
-					{
-						piBlockRgba[i * 4 + 0] = pBc7Pixels[i].r;
-						piBlockRgba[i * 4 + 1] = pBc7Pixels[i].g;
-						piBlockRgba[i * 4 + 2] = pBc7Pixels[i].b;
-						piBlockRgba[i * 4 + 3] = pBc7Pixels[i].a;
-					}
-					break;
-				}
-				default:
-					ASSERT(false);
-					std::unreachable();
-			}
-
-			for (int64_t i = 0; i < 4; ++i)
-			{
-				for (int64_t j = 0; j < 4; ++j)
-				{
-					int64_t iX = iBlockX * 4 + j;
-					int64_t iY = iBlockY * 4 + i;
-					if (iX >= iWidth || iY >= iHeight)
-					{
-						continue;
-					}
-					int64_t iDestIndex = (iY * iWidth + iX) * 4;
-					int64_t iBlockIndex = (i * 4 + j) * 4;
-					rgba8.at(iDestIndex + 0) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 0]);
-					rgba8.at(iDestIndex + 1) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 1]);
-					rgba8.at(iDestIndex + 2) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 2]);
-					rgba8.at(iDestIndex + 3) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 3]);
-				}
-			}
-		}
-	}
-
-	return rgba8;
-}
-
 // Magic-prefixed files are skipped. BCn migration decodes mip 0, regenerates the mip chain, and writes the current format with Texture::Save; R16 migration zlib-compresses the raw bytes and writes magic.
 static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 {
@@ -230,7 +148,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		return;
 	}
 
-	std::vector<uint8_t> rgba8 = DecodeBcnMip0ToRgba8(rawBytes.data(), iWidth, iHeight, vkFormat);
+	std::vector<uint8_t> rgba8 = DecodeBcnToRgba8(rawBytes.data(), iWidth, iHeight, vkFormat);
 
 	{
 		std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);

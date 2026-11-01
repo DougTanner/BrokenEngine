@@ -94,6 +94,9 @@ struct TextureIntermediateHeader
 // check). Out-of-range qwords read as 0 rather than overrunning the buffer.
 TextureIntermediateHeader ReadTextureIntermediateHeader(std::span<const std::byte> data);
 
+// Decodes one BC4/BC5/BC7 mip level of iWidth x iHeight, the level puiEncoded starts at, into RGBA8.
+std::vector<uint8_t> DecodeBcnToRgba8(const std::byte* puiEncoded, int64_t iWidth, int64_t iHeight, VkFormat vkFormat);
+
 // True when the filename carries the `[C]` cubemap tag — the convention marking a .ktx or
 // face-image-directory cubemap input. Shared by ExportTexture routing and the IBL pre-pass
 // (ExportCubemapIbl) so the tag test stays scoped to filename() at every site.

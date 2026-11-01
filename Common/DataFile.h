@@ -22,8 +22,12 @@ inline constexpr float kfSeaBottomMeters = -10.0f;
 
 // Heightmap depth (engine-meters) below which island textures are zeroed out at bake time and
 // above which a pixel counts toward the island's valid-area convex polygon. Beach = 0, deeper =
-// negative. Shared by DataPacker (texture masking + valid-area hull) and the engine debug render.
+// negative. Shared by DataPacker (texture masking + valid-area hull + map thumbnail alpha) and the engine debug render.
 inline constexpr float kfUnderwaterMaskThresholdMeters = -2.5f;
+
+// Edge length in texels of a whole route's top-down map picture; each leaf's thumbnail takes its crop's
+// fraction of the full bake on each axis.
+inline constexpr int64_t kiIslandThumbnailRouteSize = 256;
 
 inline void AlignOutputStream(std::fstream& rFileStream)
 {
@@ -292,7 +296,10 @@ struct IslandHeader
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
 	// Chunk data payload follows the heightmap R16 halfs:
-	// [float2 positions[iMeshVertexCount]][uint32 indices[iMeshIndexCount]][float2 valid-area hull verts[iValidAreaVertexCount]].
+	// [float2 positions[iMeshVertexCount]][uint32 indices[iMeshIndexCount]][int32 thumbnail width, height]
+	// [RGBA8 thumbnail[width * height]][float2 valid-area hull verts[iValidAreaVertexCount]].
+	// The thumbnail is the map picture: straight-alpha Color times AO, row 0 north, alpha the fraction of covered
+	// heightmap samples at or above kfUnderwaterMaskThresholdMeters.
 	// Mesh Z is omitted — Terrain.vert re-derives world Z from the composite elevation sampler. The
 	// valid-area hull is the CCW convex hull (island-local meters, centered) of pixels at or above
 	// kfUnderwaterMaskThresholdMeters; consumed by IslandChainPlacement's SAT overlap test on client
@@ -482,7 +489,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 59 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 60 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

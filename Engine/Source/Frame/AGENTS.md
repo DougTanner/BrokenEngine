@@ -157,8 +157,9 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   port the curve into `CellElevation`: it would change CRC'd sim positions for a
   purely visual effect. Do not assert stronger guarantees about the texture's
   sampling format here.
-- Client terrain residency keeps the shared heightmap and hull resident but
-  decommits each template's CPU mesh slice whenever it is not being restored.
+- Client terrain residency keeps the shared heightmap, the map thumbnail, and
+  the hull resident but decommits each template's CPU mesh slice whenever it is
+  not being restored.
   Coordinate texture and mesh restoration or eviction only in the renderer's
   bindless write epoch after all pending adds and removes are processed; this
   visual residency stays outside the CRC. A template's elevation image is a raw

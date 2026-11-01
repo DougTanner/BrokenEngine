@@ -942,7 +942,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
 	// Reclaim a dead sub-range of a resident lazy chunk. Only the page-aligned interior is decommitted, so the
-	// boundary partial-pages — which may share bytes with the neighbouring heightmap/hull payload — stay committed;
+	// boundary partial-pages — which may share bytes with the neighbouring payload — stay committed;
 	// a sub-page range (tiny island) decommits nothing. Other chunks are untouched.
 	// Main-thread only, with no concurrent reader of the range.
 	// A failed MEM_DECOMMIT is benign (the pages simply stay committed) so its result is not checked.

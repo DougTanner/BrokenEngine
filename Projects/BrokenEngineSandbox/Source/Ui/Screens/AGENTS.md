@@ -27,15 +27,17 @@ runtime contracts of the screens that remain here.
   current delay instead of sending, because the server treats such a delay as
   corrupt data.
 - The three HUD-specific layout fractions and the HUD's own composition stay game-local, named.
-- The map screen is a full-screen overlay: an opaque background and the
-  world's cell hexagons, projected at ground level through the live camera,
-  both at the map opacity. The map is open exactly while the camera's framing
-  override is set and not releasing, so no separate open flag exists; TAB
-  eases the override out to the map framing, or releases it back to the world
-  framing, which the map never changes, so cells and islands load for the
-  gameplay view. Opacity is a log-scale function of the rendered framing
-  alone, so the fade matches the camera through a reversal mid-ease; at full
-  opacity the frame is a world-hidden frame
+- The map screen is a full-screen overlay: an opaque background, each shown
+  cell's islands as their templates' baked top-down pictures, and the world's
+  cell hexagons, projected at ground level through the live camera, all at the
+  map opacity. The placements come from the client's own island-chain
+  generation per shown cell, never from the client's cells. The map is open
+  exactly while the camera's framing override is set and not releasing, so no
+  separate open flag exists; TAB eases the override out to the map framing, or
+  releases it back to the world framing, which the map never changes, so cells
+  and islands load for the gameplay view. Opacity is a log-scale function of the
+  rendered framing alone, so the fade matches the camera through a reversal
+  mid-ease; at full opacity the frame is a world-hidden frame
   (`../../../../../Engine/Source/Graphics/AGENTS.md`
   `## Frame and Resource Lifecycle`). A session reset closes an open map with
   no ease. The map framing, the fully-opaque framing, and the ease

@@ -142,7 +142,8 @@ void IslandTerrain::WaitForElevationMaps()
 		const LazyChunk& rLazyChunk = rChunkMap.at(rCrc);
 		const common::IslandHeader& rIslandHeader = rLazyChunk.header.islandHeader;
 
-		// Chunk payload layout (set by ExportIsland::Export): [heightmap R16 halfs][float2 mesh positions][uint32 mesh indices][float2 valid-area hull verts].
+		// Chunk payload layout (set by ExportIsland::Export): [heightmap R16 halfs][float2 mesh positions][uint32 mesh indices]
+		// [int32 thumbnail width, height][RGBA8 thumbnail][float2 valid-area hull verts].
 		// Validate every count from the pack header before forming payload pointers or reclaiming a range.
 		// iSize excludes the lazy-pool's alignment pad, so it must describe the layout exactly and fit the
 		// actual resident extent.
@@ -173,14 +174,25 @@ void IslandTerrain::WaitForElevationMaps()
 			return iSectionBytes;
 		};
 
-		[[maybe_unused]] int64_t iMeshPositionBytes = ConsumeSection(rIslandHeader.iMeshVertexCount, 2 * static_cast<int64_t>(sizeof(float)));
-		ConsumeSection(rIslandHeader.iMeshIndexCount, static_cast<int64_t>(sizeof(uint32_t)));
-		int64_t iValidAreaBytes = ConsumeSection(rIslandHeader.iValidAreaVertexCount, static_cast<int64_t>(sizeof(XMFLOAT2)));
+		int64_t iMeshPositionBytes = ConsumeSection(rIslandHeader.iMeshVertexCount, 2 * static_cast<int64_t>(sizeof(float)));
+		int64_t iMeshIndexBytes = ConsumeSection(rIslandHeader.iMeshIndexCount, static_cast<int64_t>(sizeof(uint32_t)));
+		int64_t iMeshBytes = iMeshPositionBytes + iMeshIndexBytes;
+		const std::byte* pAfterHeightmap = rLazyChunk.pData + iHeightmapBytes;
+
+		int64_t iThumbnailSizeBytes = ConsumeSection(2, static_cast<int64_t>(sizeof(int32_t)));
+		int32_t piThumbnailSize[2] {};
+		std::memcpy(piThumbnailSize, pAfterHeightmap + iMeshBytes, sizeof(piThumbnailSize));
+		if (piThumbnailSize[0] < 1 || piThumbnailSize[0] > common::kiIslandThumbnailRouteSize || piThumbnailSize[1] < 1 || piThumbnailSize[1] > common::kiIslandThumbnailRouteSize)
+		{
+			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
+		}
+		int64_t iThumbnailBytes = iThumbnailSizeBytes + ConsumeSection(static_cast<int64_t>(piThumbnailSize[0]) * piThumbnailSize[1], 4);
+
+		ConsumeSection(rIslandHeader.iValidAreaVertexCount, static_cast<int64_t>(sizeof(XMFLOAT2)));
 		if (iBytesRemaining != 0)
 		{
 			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
-		int64_t iMeshBytes = rLazyChunk.header.iSize - iHeightmapBytes - iValidAreaBytes;
 
 		rTemplate.puiHeightmapHalf = reinterpret_cast<const uint16_t*>(rLazyChunk.pData);
 		rTemplate.iHeightmapWidth = rIslandHeader.iHeightmapWidth;
@@ -188,12 +200,15 @@ void IslandTerrain::WaitForElevationMaps()
 		rTemplate.iMeshVertexCount = rIslandHeader.iMeshVertexCount;
 		rTemplate.iMeshIndexCount = rIslandHeader.iMeshIndexCount;
 		rTemplate.iValidAreaVertexCount = rIslandHeader.iValidAreaVertexCount;
-		const std::byte* pAfterHeightmap = rLazyChunk.pData + iHeightmapBytes;
 		// Not validated here: DataPacker's VerifyHullCcwConvex (ExportIsland.cpp) already fails the bake on a
 		// non-CCW or non-convex hull, which is what ConvexHullsOverlap's SAT requires of these vertices.
-		rTemplate.pf2ValidAreaVertices = reinterpret_cast<const XMFLOAT2*>(pAfterHeightmap + iMeshBytes);
+		rTemplate.pf2ValidAreaVertices = reinterpret_cast<const XMFLOAT2*>(pAfterHeightmap + iMeshBytes + iThumbnailBytes);
 
 #if defined(BT_CLIENT)
+		rTemplate.puiThumbnailPixels = reinterpret_cast<const uint8_t*>(pAfterHeightmap + iMeshBytes + iThumbnailSizeBytes);
+		rTemplate.iThumbnailWidth = piThumbnailSize[0];
+		rTemplate.iThumbnailHeight = piThumbnailSize[1];
+
 		// Mesh CPU pointers are client-only. The lazy-pool slice is reclaimed immediately and
 		// asynchronously restored only when this template gains a render slot.
 		rTemplate.pfMeshPositions = reinterpret_cast<const float*>(pAfterHeightmap);
@@ -203,10 +218,11 @@ void IslandTerrain::WaitForElevationMaps()
 #endif
 
 #if defined(BT_SERVER)
-		// The server never reads the mesh CPU slice (no GPU upload, no device loss), so reclaim it immediately after
-		// load: decommit the [positions][indices] sub-range of the kIsland chunk. Heightmap (before, offset 0) and hull
-		// (after) stay resident — the server reads the heightmap for NavContour below and the hull for placement/nav.
-		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, iHeightmapBytes, iMeshBytes);
+		// The server never reads the mesh CPU slice (no GPU upload, no device loss) or the map thumbnail, so reclaim
+		// both immediately after load: decommit the [positions][indices][thumbnail] sub-range of the kIsland chunk.
+		// Heightmap (before, offset 0) and hull (after) stay resident — the server reads the heightmap for NavContour
+		// below and the hull for placement/nav.
+		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, iHeightmapBytes, iMeshBytes + iThumbnailBytes);
 #endif
 	}
 

@@ -20,6 +20,9 @@ struct ExportedIsland
 	std::vector<float> cpuMeshPositions;   // float2 XY pairs in island-local meters (origin at center). Z is discarded — Terrain.vert re-derives it from the elevation sampler.
 	std::vector<uint32_t> cpuMeshIndices;
 	std::vector<float> cpuValidAreaVertices;   // float2 XY pairs in island-local meters (origin at center) — CCW convex hull of pixels at or above the underwater mask threshold.
+	std::vector<uint8_t> thumbnailPixels;   // RGBA8 map picture, row 0 north.
+	int64_t iThumbnailWidth = 0;
+	int64_t iThumbnailHeight = 0;
 	int64_t iHeightmapWidth = 0;
 	int64_t iHeightmapHeight = 0;
 	int64_t iMeshVertexCount = 0;
@@ -280,6 +283,101 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	}
 }
 
+// Decodes mip 2 of a leaf's BC texture intermediate: the texture is encoded from the crop, kiElevationDivisor
+// times the heightmap, so mip 2 matches the heightmap sample for sample.
+static std::vector<uint8_t> DecodeIslandTextureMip2(const std::filesystem::path& rFile, VkFormat vkFormat, int64_t iHeightmapWidth, int64_t iHeightmapHeight)
+{
+	std::vector<std::byte> fileBytes = common::ReadEntireFile(rFile);
+	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes);
+	// 15 is the mip ceiling ExportTexture enforces on the same intermediate.
+	if (!header.bHadMagic || std::ssize(fileBytes) <= header.iPayloadOffset || header.iWidth != iHeightmapWidth * kiElevationDivisor
+	 || header.iHeight != iHeightmapHeight * kiElevationDivisor || header.iMipCount < 3 || header.iMipCount > 15)
+	{
+		throw std::runtime_error(std::format("Island texture \"{}\" declares {}x{} with {} mips; expected a magic-prefixed {}x{} intermediate with 3 to 15 mips.", rFile.string(), header.iWidth, header.iHeight, header.iMipCount, iHeightmapWidth * kiElevationDivisor, iHeightmapHeight * kiElevationDivisor));
+	}
+
+	int64_t iInflatedSize = common::ComputeImageByteSize(vkFormat, header.iWidth, header.iHeight, header.iMipCount, 1, 1);
+	int64_t iPayloadSize = std::ssize(fileBytes) - header.iPayloadOffset;
+	if (!std::in_range<uLong>(iInflatedSize) || !std::in_range<uLong>(iPayloadSize))
+	{
+		throw std::runtime_error(std::format("Island texture \"{}\" has a {}-byte payload inflating to {} bytes, beyond zlib's size range.", rFile.string(), iPayloadSize, iInflatedSize));
+	}
+	std::vector<std::byte> inflated(static_cast<size_t>(iInflatedSize));
+	uLongf uiInflatedSize = static_cast<uLongf>(iInflatedSize);
+	int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(inflated.data()), &uiInflatedSize, reinterpret_cast<const Bytef*>(fileBytes.data() + header.iPayloadOffset), static_cast<uLong>(iPayloadSize));
+	if (iZlibResult != Z_OK || static_cast<int64_t>(uiInflatedSize) != iInflatedSize)
+	{
+		throw std::runtime_error(std::format("Island texture \"{}\" failed to inflate to its {}-byte mip chain (zlib result {}, {} bytes).", rFile.string(), iInflatedSize, iZlibResult, uiInflatedSize));
+	}
+
+	// The exact fill of a chain of at least three mips keeps mip 2 inside the inflated bytes.
+	int64_t iMip2Offset = common::ComputeImageByteSize(vkFormat, header.iWidth, header.iHeight, 2, 1, 1);
+	return DecodeBcnToRgba8(inflated.data() + iMip2Offset, iHeightmapWidth, iHeightmapHeight, vkFormat);
+}
+
+// Builds the map picture from the leaf's encoded Color and AO. Each thumbnail texel covers a block of heightmap
+// samples: alpha is the fraction at or above the underwater mask threshold, and RGB the mean of Color times AO
+// over only those samples, because underwater texels are already masked to black and straight-alpha blending
+// would darken the coastline a second time.
+static void BuildIslandThumbnail(const std::filesystem::path& rInputPath, const BakedDimensions& rBaked, ExportedIsland& rOut)
+{
+	// The leaf's share of the route picture on each axis: integer ceiling, rounded up to a multiple of 4.
+	rOut.iThumbnailWidth = common::RoundUp<int64_t, 4>((rBaked.iCropWidth * common::kiIslandThumbnailRouteSize + rBaked.iFullTexturePixels - 1) / rBaked.iFullTexturePixels);
+	rOut.iThumbnailHeight = common::RoundUp<int64_t, 4>((rBaked.iCropHeight * common::kiIslandThumbnailRouteSize + rBaked.iFullTexturePixels - 1) / rBaked.iFullTexturePixels);
+	int64_t iHeightmapWidth = rOut.iHeightmapWidth;
+	int64_t iHeightmapHeight = rOut.iHeightmapHeight;
+	if (iHeightmapWidth < rOut.iThumbnailWidth || iHeightmapHeight < rOut.iThumbnailHeight)
+	{
+		throw std::runtime_error(std::format("Island leaf \"{}\" heightmap {}x{} is smaller than its {}x{} thumbnail.", rInputPath.string(), iHeightmapWidth, iHeightmapHeight, rOut.iThumbnailWidth, rOut.iThumbnailHeight));
+	}
+
+	std::vector<uint8_t> color = DecodeIslandTextureMip2(rInputPath / kpcIslandColor, VK_FORMAT_BC7_UNORM_BLOCK, iHeightmapWidth, iHeightmapHeight);
+	std::vector<uint8_t> ambientOcclusion = DecodeIslandTextureMip2(rInputPath / kpcIslandAmbientOcclusion, VK_FORMAT_BC4_UNORM_BLOCK, iHeightmapWidth, iHeightmapHeight);
+
+	rOut.thumbnailPixels.resize(static_cast<size_t>(rOut.iThumbnailWidth * rOut.iThumbnailHeight * 4));
+	for (int64_t iY = 0; iY < rOut.iThumbnailHeight; ++iY)
+	{
+		int64_t iRowBegin = iY * iHeightmapHeight / rOut.iThumbnailHeight;
+		int64_t iRowEnd = (iY + 1) * iHeightmapHeight / rOut.iThumbnailHeight;
+		for (int64_t iX = 0; iX < rOut.iThumbnailWidth; ++iX)
+		{
+			int64_t iColumnBegin = iX * iHeightmapWidth / rOut.iThumbnailWidth;
+			int64_t iColumnEnd = (iX + 1) * iHeightmapWidth / rOut.iThumbnailWidth;
+			int64_t iLandCount = 0;
+			int64_t piSums[3] = {};
+			for (int64_t i = iRowBegin; i < iRowEnd; ++i)
+			{
+				for (int64_t j = iColumnBegin; j < iColumnEnd; ++j)
+				{
+					int64_t iSample = i * iHeightmapWidth + j;
+					if (rOut.cpuHeightmapData.at(iSample) >= common::kfUnderwaterMaskThresholdMeters)
+					{
+						++iLandCount;
+						int64_t iAmbientOcclusion = ambientOcclusion.at(iSample * 4);
+						for (int64_t k = 0; k < 3; ++k)
+						{
+							piSums[k] += color.at(iSample * 4 + k) * iAmbientOcclusion;
+						}
+					}
+				}
+			}
+
+			// Rounded integer means; a texel with no land stays the resize's transparent black.
+			if (iLandCount > 0)
+			{
+				int64_t iSampleCount = (iRowEnd - iRowBegin) * (iColumnEnd - iColumnBegin);
+				int64_t iDivisor = iLandCount * 255;
+				int64_t iPixel = (iY * rOut.iThumbnailWidth + iX) * 4;
+				for (int64_t k = 0; k < 3; ++k)
+				{
+					rOut.thumbnailPixels.at(iPixel + k) = static_cast<uint8_t>((piSums[k] + iDivisor / 2) / iDivisor);
+				}
+				rOut.thumbnailPixels.at(iPixel + 3) = static_cast<uint8_t>((iLandCount * 255 + iSampleCount / 2) / iSampleCount);
+			}
+		}
+	}
+}
+
 // bEncodeTextures gates only the four BC encodes below. Everything else here feeds the chunk payload
 // and runs unconditionally, so a texture reuse still produces a complete ExportedIsland.
 static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIsland& rOut, bool bEncodeTextures)
@@ -415,6 +513,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		EncodeMaterialMasks(rInputPath, textureSourceDirectory, diagnosticsDirectory, baked, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight);
 	}
 
+	// After the encode, so a re-encode's Color and AO feed the picture.
+	BuildIslandThumbnail(rInputPath, baked, rOut);
 }
 
 std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
@@ -447,6 +547,15 @@ std::string ExportIsland::GetInputFingerprint() const
 	for (const char* pcFile : {"BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"})
 	{
 		fingerprint[pcFile] = std::string_view(pcFile) == kpcBakedDimensionsFile ? GetBakedDimensionsFingerprint(mInputPath) : gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
+	}
+	// The map thumbnail reads Color and AO. A published leaf never re-encodes them, so new bytes arriving
+	// through Git must dirty the chunk here; an unpublished leaf's texture stage already re-runs Export.
+	if (IsPublishedIslandLeaf(mInputPath))
+	{
+		for (const char* pcFile : {kpcIslandColor, kpcIslandAmbientOcclusion})
+		{
+			fingerprint[pcFile] = gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
+		}
 	}
 	return fingerprint.dump();
 }
@@ -601,8 +710,10 @@ void ExportIsland::Export()
 	int64_t iHeightmapDataSize = std::ssize(heightmapHalf) * static_cast<int64_t>(sizeof(uint16_t));
 	int64_t iMeshPositionBytes = std::ssize(exported.cpuMeshPositions) * static_cast<int64_t>(sizeof(float));
 	int64_t iMeshIndexBytes = std::ssize(exported.cpuMeshIndices) * static_cast<int64_t>(sizeof(uint32_t));
+	int64_t iThumbnailDimensionBytes = 2 * static_cast<int64_t>(sizeof(int32_t));
+	int64_t iThumbnailPixelBytes = std::ssize(exported.thumbnailPixels);
 	int64_t iValidAreaBytes = std::ssize(exported.cpuValidAreaVertices) * static_cast<int64_t>(sizeof(float));
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes + iValidAreaBytes);
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes + iThumbnailDimensionBytes + iThumbnailPixelBytes + iValidAreaBytes);
 
 	std::filesystem::path ambientOcclusionFile(relativeFile);
 	ambientOcclusionFile /= kpcIslandAmbientOcclusion;
@@ -632,11 +743,20 @@ void ExportIsland::Export()
 	pHeader->islandHeader.uiPeakTexelX = static_cast<uint16_t>(exported.iPeakTexelX);
 	pHeader->islandHeader.uiPeakTexelY = static_cast<uint16_t>(exported.iPeakTexelY);
 
-	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][valid-area hull verts]. Runtime
-	// IslandTerrain slices these contiguously using IslandHeader's count fields.
+	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][int32 thumbnail width, height]
+	// [RGBA8 thumbnail][valid-area hull verts]. Runtime IslandTerrain slices these contiguously using
+	// IslandHeader's count fields and the thumbnail's own dimensions.
+	int32_t piThumbnailDimensions[2] = {static_cast<int32_t>(exported.iThumbnailWidth), static_cast<int32_t>(exported.iThumbnailHeight)};
 	std::byte* pData = dataSpan.data();
 	std::memcpy(pData, heightmapHalf.data(), iHeightmapDataSize);
-	std::memcpy(pData + iHeightmapDataSize, exported.cpuMeshPositions.data(), iMeshPositionBytes);
-	std::memcpy(pData + iHeightmapDataSize + iMeshPositionBytes, exported.cpuMeshIndices.data(), iMeshIndexBytes);
-	std::memcpy(pData + iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes, exported.cpuValidAreaVertices.data(), iValidAreaBytes);
+	pData += iHeightmapDataSize;
+	std::memcpy(pData, exported.cpuMeshPositions.data(), iMeshPositionBytes);
+	pData += iMeshPositionBytes;
+	std::memcpy(pData, exported.cpuMeshIndices.data(), iMeshIndexBytes);
+	pData += iMeshIndexBytes;
+	std::memcpy(pData, piThumbnailDimensions, iThumbnailDimensionBytes);
+	pData += iThumbnailDimensionBytes;
+	std::memcpy(pData, exported.thumbnailPixels.data(), iThumbnailPixelBytes);
+	pData += iThumbnailPixelBytes;
+	std::memcpy(pData, exported.cpuValidAreaVertices.data(), iValidAreaBytes);
 }

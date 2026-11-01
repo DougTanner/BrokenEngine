@@ -20,10 +20,10 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
-	// Governs the chunk payload only (heightmap R16 quantize, mesh XY, indices, valid-area hull) — the
-	// BC texture encode is versioned separately by kiTextureVersion below, so a payload bump re-packs
-	// chunks without rewriting the tracked island textures.
-	static constexpr int64_t kiVersion = Version(32);
+	// Governs the chunk payload only (heightmap R16 quantize, mesh XY, indices, map thumbnail, valid-area
+	// hull) — the BC texture encode is versioned separately by kiTextureVersion below, so a payload bump
+	// re-packs chunks without rewriting the tracked island textures.
+	static constexpr int64_t kiVersion = Version(33);
 
 	ExportIsland(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 	: ExportJob(rChunkFlags, rFile, kiVersion)

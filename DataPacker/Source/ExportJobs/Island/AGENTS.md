@@ -64,7 +64,16 @@ engine publishes the same value to the shaders and to the debug hull draw. Never
 introduce a second local threshold — nothing would catch baked textures drifting
 out of step with the shader.
 
-The island payload stores the quantized elevation field, XY mesh data, indices, and valid-area hull. Runtime terrain reconstructs Z from elevation. The hull must have at least three vertices and remain convex and counter-clockwise because deterministic client/server island placement consumes it through `common::ConvexHullsOverlap` with no substitute shape; producer checks enforce those properties before serialization, so a leaf whose hull has fewer than three vertices fails its export.
+The island payload stores the quantized elevation field, XY mesh data, indices,
+the map thumbnail, and valid-area hull. Runtime terrain reconstructs Z from
+elevation. The thumbnail is the leaf's RGBA8 top-down map picture and uses the
+same shared underwater threshold; its layout is in the `IslandHeader` payload
+comment in `Common/DataFile.h` and its size rule in `BuildIslandThumbnail` in
+`ExportIsland.cpp`. The hull must have at least three vertices and remain convex
+and counter-clockwise because deterministic client/server island placement
+consumes it through `common::ConvexHullsOverlap` with no substitute shape;
+producer checks enforce those properties before serialization, so a leaf whose
+hull has fewer than three vertices fails its export.
 
 `IslandHeader` also carries the leaf's peak height and texel, defined in its
 `Common/DataFile.h` field comment.
@@ -77,8 +86,9 @@ The publication schema owns delivered file identity rules and has its own versio
 the four calculated stages; bump only the owner of changed bytes or contracts. The bake version covers
 raw Gaea output; the split version covers post-bake crop, split, leaf-output, or completion rules. `ExportIsland::kiTextureVersion`
 covers the BC texture encode alone, and `ExportIsland::kiVersion` covers the chunk payload —
-quantized elevation, mesh, indices, hull, and `IslandHeader` layout — which may also require the
-shared data-format version.
+quantized elevation, mesh, indices, map thumbnail, hull, and `IslandHeader` layout — which may also
+require the shared data-format version. The chunk fingerprint also covers a published leaf's Color
+and AO, which the map thumbnail derives from.
 
 The BC outputs are tracked in the checkout, which shapes the texture stage: its version stays a plain `int64_t` outside `ExportJob::Version(...)`, so a chunk-header layout change cannot rewrite hundreds of megabytes of tracked textures for byte-identical output. Its marker fingerprints only the encode's own inputs; the processed mesh is deliberately excluded so a mesh-only rebake re-packs the chunk without touching the textures.
 
