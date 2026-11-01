@@ -121,9 +121,15 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 
 	// The same base AllocateResultStorage later writes to spiLayerBaseOffsets
 	int64_t iBase = 0;
+	int64_t iHitboxBase = 0;
 	for (int64_t i = 0; i < iLayerIndex; ++i)
 	{
-		iBase += sLayers.at(i).iCount;
+		const CollisionLayer& rEarlierLayer = sLayers.at(i);
+		iBase += rEarlierLayer.iCount;
+		if (rEarlierLayer.layerFlags & CollisionLayerFlags::kHitboxes)
+		{
+			iHitboxBase += rEarlierLayer.iCount;
+		}
 	}
 	int64_t iEnd = iBase + rLayer.iCount;
 	int64_t iRowCount = (sMaximumTimes.Size() == 0) ? std::max(kiCollisionResultSpanPreallocate, iEnd) : iEnd;
@@ -162,6 +168,17 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 	rStoredLayer = rLayer;
 	rStoredLayer.pfMaxTimes = sMaximumTimes.Data() + iBase;
 	rStoredLayer.pFlags = sFlags.Data() + iBase;
+	if (rLayer.layerFlags & CollisionLayerFlags::kHitboxes)
+	{
+		int64_t iHitboxEnd = iHitboxBase + rLayer.iCount;
+		if (iHitboxEnd > sRowRadii.Size())
+		{
+			sRowRadii.Resize(iHitboxEnd);
+			sHitboxes.Resize(iHitboxEnd);
+		}
+		rStoredLayer.pfRowRadii = sRowRadii.Data() + iHitboxBase;
+		rStoredLayer.pHitboxes = sHitboxes.Data() + iHitboxBase;
+	}
 	++siLayerCount;
 	return iLayerIndex;
 }
@@ -170,6 +187,26 @@ std::span<CollisionFlags_t> Collision::GetLayerFlags(int64_t iLayerIndex)
 {
 	const CollisionLayer& rLayer = sLayers.at(iLayerIndex);
 	return {rLayer.pFlags, static_cast<size_t>(rLayer.iCount)};
+}
+
+std::span<float> Collision::GetLayerRadii(int64_t iLayerIndex)
+{
+	const CollisionLayer& rLayer = sLayers.at(iLayerIndex);
+	ASSERT(rLayer.layerFlags & CollisionLayerFlags::kHitboxes);
+	return {rLayer.pfRowRadii, static_cast<size_t>(rLayer.iCount)};
+}
+
+std::span<CollisionHitbox> Collision::GetLayerHitboxes(int64_t iLayerIndex)
+{
+	const CollisionLayer& rLayer = sLayers.at(iLayerIndex);
+	ASSERT(rLayer.layerFlags & CollisionLayerFlags::kHitboxes);
+	return {rLayer.pHitboxes, static_cast<size_t>(rLayer.iCount)};
+}
+
+// A hitbox layer's row radius replaces its layer radius.
+static float RowRadius(const CollisionLayer& rLayer, int64_t iIndex)
+{
+	return rLayer.pfRowRadii != nullptr ? rLayer.pfRowRadii[iIndex] : rLayer.fRadius;
 }
 
 ZoneRange Collision::CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius)
@@ -208,7 +245,7 @@ ZoneRange Collision::CalculateObjectZoneRange(const CollisionLayer& rLayer, int6
 		fMinimumY = f4Position.y;
 		fMaximumY = f4Position.y;
 	}
-	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, rLayer.fRadius);
+	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, RowRadius(rLayer, iIndex));
 }
 
 void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange)
@@ -345,7 +382,7 @@ void Collision::SetupZones()
 
 			const CollisionLayer& rLayerA = sLayers.at(static_cast<size_t>(i));
 			const CollisionLayer& rLayerB = sLayers.at(static_cast<size_t>(j));
-			bool bSweptPair = rLayerA.bSweptTest || rLayerB.bSweptTest;
+			bool bSweptPair = (rLayerA.layerFlags & CollisionLayerFlags::kSweptTest) || (rLayerB.layerFlags & CollisionLayerFlags::kSweptTest);
 
 			// Only layer B's objects enter the zone grid, since CollideLayerPair computes each layer-A object's zone range
 			// itself.
@@ -515,6 +552,50 @@ void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 	}
 }
 
+// Cyrus-Beck clip: narrows [rfEnter, rfExit] of the point path rf3Start + t * rf3Delta to the part inside the CCW
+// convex polygon extruded over [fMinimumZ, fMaximumZ], boundary included. Returns false once the interval is empty.
+static bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit)
+{
+	// The path is inside the half-space where fOutside + t * fRate <= 0.
+	auto ClipToHalfSpace = [&rfEnter, &rfExit](float fOutside, float fRate)
+	{
+		if (fRate == 0.0f)
+		{
+			return fOutside <= 0.0f;
+		}
+		float fTime = -fOutside / fRate;
+		if (fRate < 0.0f)
+		{
+			rfEnter = std::max(rfEnter, fTime);
+		}
+		else
+		{
+			rfExit = std::min(rfExit, fTime);
+		}
+		return rfEnter <= rfExit;
+	};
+
+	if (!ClipToHalfSpace(fMinimumZ - rf3Start.z, -rf3Delta.z) || !ClipToHalfSpace(rf3Start.z - fMaximumZ, rf3Delta.z))
+	{
+		return false;
+	}
+	for (int64_t i = 0; i < std::ssize(vertices); ++i)
+	{
+		const XMFLOAT2& rStartVertex = vertices[i];
+		const XMFLOAT2& rEndVertex = vertices[(i + 1) % std::ssize(vertices)];
+		// Outward normal of the CCW edge (v1 - v0) is (edge.y, -edge.x).
+		float fNormalX = rEndVertex.y - rStartVertex.y;
+		float fNormalY = rStartVertex.x - rEndVertex.x;
+		float fOutside = fNormalX * (rf3Start.x - rStartVertex.x) + fNormalY * (rf3Start.y - rStartVertex.y);
+		float fRate = fNormalX * rf3Delta.x + fNormalY * rf3Delta.y;
+		if (!ClipToHalfSpace(fOutside, fRate))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 // The caller deduplicates each B object for the current A object.
 static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t i, int64_t j)
 {
@@ -533,7 +614,9 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	float fEndZA = XMVectorGetZ(rLayerA.pVecEndPositions[i]);
 	float fStartZB = XMVectorGetZ(rLayerB.pVecStartPositions[j]);
 	float fEndZB = XMVectorGetZ(rLayerB.pVecEndPositions[j]);
-	float fHeightLimit = rLayerA.fRadius + rLayerB.fRadius + kfHeightAllowance;
+	float fRadiusA = RowRadius(rLayerA, i);
+	float fRadiusB = RowRadius(rLayerB, j);
+	float fHeightLimit = fRadiusA + fRadiusB + kfHeightAllowance;
 	float fStartStartZ = fStartZB - fStartZA;
 	float fStartEndZ = fStartZB - fEndZA;
 	float fEndStartZ = fEndZB - fStartZA;
@@ -554,8 +637,6 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	XMVECTOR vecEndA = XMVectorLerp(rLayerA.pVecStartPositions[i], rLayerA.pVecEndPositions[i], 1.0f);
 	XMVECTOR vecStartB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], 0.0f);
 	XMVECTOR vecEndB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], 1.0f);
-	float fRadiusA = rLayerA.fRadius;
-	float fRadiusB = rLayerB.fRadius;
 
 	bool bCollided = false;
 	float fTimeOfImpact = 1.0f;
@@ -585,6 +666,41 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 
 	}
 
+	// A box or outline row narrows the sphere hit to its box prism, then for an outline its hull prism. The hitbox
+	// holds the ship's end pose, so the projectile point's path is taken relative to the ship's motion.
+	const CollisionHitbox* pHitbox = rLayerA.pHitboxes != nullptr ? &rLayerA.pHitboxes[i] : (rLayerB.pHitboxes != nullptr ? &rLayerB.pHitboxes[j] : nullptr);
+	bool bHitboxContact = pHitbox != nullptr && pHitbox->eHitboxLevel != common::ModelHitboxLevel::kSphere;
+	XMVECTOR vecContactPoint = vecImpactA;
+	if (bHitboxContact)
+	{
+		ASSERT(bSweptPair && (rLayerA.pHitboxes == nullptr || rLayerB.pHitboxes == nullptr));
+		bool bHitboxA = rLayerA.pHitboxes != nullptr;
+		XMVECTOR vecShipDelta = bHitboxA ? XMVectorSubtract(vecEndA, vecStartA) : XMVectorSubtract(vecEndB, vecStartB);
+		XMVECTOR vecPathStart = XMVectorAdd(bHitboxA ? vecStartB : vecStartA, vecShipDelta);
+		XMVECTOR vecPathDelta = XMVectorSubtract(bHitboxA ? vecEndB : vecEndA, vecPathStart);
+		XMFLOAT3A f3PathStart {};
+		XMFLOAT3A f3PathDelta {};
+		XMStoreFloat3A(&f3PathStart, vecPathStart);
+		XMStoreFloat3A(&f3PathDelta, vecPathDelta);
+
+		float fEnter = 0.0f;
+		float fExit = 1.0f;
+		if (!ClipSegmentToPrism(f3PathStart, f3PathDelta, pHitbox->pf2BoxVertices, pHitbox->fMinimumZ, pHitbox->fMaximumZ, fEnter, fExit))
+		{
+			return;
+		}
+		if (pHitbox->eHitboxLevel == common::ModelHitboxLevel::kOutline
+		 && !ClipSegmentToPrism(f3PathStart, f3PathDelta, std::span(pHitbox->pf2HullVertices, static_cast<size_t>(pHitbox->iHullVertexCount)), pHitbox->fMinimumZ, pHitbox->fMaximumZ, fEnter, fExit))
+		{
+			return;
+		}
+
+		fTimeOfImpact = fEnter;
+		vecImpactA = XMVectorLerp(rLayerA.pVecStartPositions[i], rLayerA.pVecEndPositions[i], fTimeOfImpact);
+		vecImpactB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], fTimeOfImpact);
+		vecContactPoint = bHitboxA ? vecImpactB : vecImpactA;
+	}
+
 	float fMaximumTimeA = rLayerA.pfMaxTimes[i];
 	float fMaximumTimeB = rLayerB.pfMaxTimes[j];
 	if (fTimeOfImpact >= fMaximumTimeA || fTimeOfImpact >= fMaximumTimeB)
@@ -592,12 +708,14 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 		return;
 	}
 
-	XMVECTOR vecDifference = XMVectorSubtract(vecImpactA, vecImpactB);
-	float fDistance = XMVectorGetX(XMVector3Length(vecDifference));
-	XMVECTOR vecContactPoint = vecImpactA;
-	if (fDistance > 0.0f)
+	if (!bHitboxContact)
 	{
-		vecContactPoint = XMVectorSubtract(vecImpactA, XMVectorScale(vecDifference, fRadiusA / fDistance));
+		XMVECTOR vecDifference = XMVectorSubtract(vecImpactA, vecImpactB);
+		float fDistance = XMVectorGetX(XMVector3Length(vecDifference));
+		if (fDistance > 0.0f)
+		{
+			vecContactPoint = XMVectorSubtract(vecImpactA, XMVectorScale(vecDifference, fRadiusA / fDistance));
+		}
 	}
 
 	CollisionEventScratch& rScratch = GetCollisionEventScratch();
@@ -629,7 +747,7 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, const LayerPairZ
 	const CollisionLayer& rLayerA = sLayers.at(iLayerA);
 	const CollisionLayer& rLayerB = sLayers.at(iLayerB);
 
-	bool bSweptPair = rLayerA.bSweptTest || rLayerB.bSweptTest;
+	bool bSweptPair = (rLayerA.layerFlags & CollisionLayerFlags::kSweptTest) || (rLayerB.layerFlags & CollisionLayerFlags::kSweptTest);
 	CollisionPairContext pairContext
 	{
 		.rAlignments = rAlignments,

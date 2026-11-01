@@ -9,7 +9,7 @@
 namespace engine
 {
 
-constexpr int64_t kiDynamicBufferInitialCapacity = 256;
+constexpr int64_t kiDynamicBufferInitialCapacity = 32'768;
 
 PipelineManager::PipelineManager()
 : common::Singleton<PipelineManager>(gpPipelineManager, this)

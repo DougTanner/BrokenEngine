@@ -34,7 +34,9 @@ stable mesh arena whose residency is published through indirect records rather
 than a re-record, and has its CPU slice released by
 `PackChunks::DecommitChunkRange` (`IslandTemplate::bMeshCpuDecommitted`).
 
-The server never opens the Model pack: `IsServerChunk` accepts Islands only. DataPacker has no notion of eager or lazy, Model chunks are written uncompressed, and the lazy open path already validates any chunk type's location and header, so moving Model to the lazy set changes no `.pack` or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump.
+The server eager-loads the Model pack for ship hitboxes: `IsServerChunk` accepts Islands and Model.
+On both builds, `InitializeShipHitboxes` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.cpp`, called from the `Game` constructor) reads each ship model's outline from `GetEagerChunkMap` at boot, so moving Model to the lazy set must keep that outline available then.
+DataPacker has no notion of eager or lazy, Model chunks are written uncompressed, and the lazy open path already validates any chunk type's location and header, so moving Model to the lazy set changes no `.pack` or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump.
 
 Sixteen models are tracked today: ten under `Engine/Data/Models` and six under the sandbox's `Data/Models`.
 

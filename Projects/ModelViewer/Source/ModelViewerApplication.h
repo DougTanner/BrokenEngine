@@ -89,6 +89,8 @@ private:
 	XMFLOAT3A mf3ModelScale {1.0f, 1.0f, 1.0f};
 	XMFLOAT3A mf3ModelRotation {};
 	XMFLOAT3A mf3ModelOffset {};
+	// Not editable; Save writes back the loaded setting.
+	common::ModelHitboxLevel meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
 	XMMATRIX mMatModelPreRotate = XMMatrixIdentity();

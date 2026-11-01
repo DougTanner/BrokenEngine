@@ -117,4 +117,74 @@ inline bool IsPolygonCcw(std::span<const XMFLOAT2> vertices)
 	return fSignedArea > 0.0f;
 }
 
+// Bake-time producers verify this before serializing a hull for ConvexHullsOverlap or a prism test: CCW, with every
+// vertex turning strictly left. Callers exclude polygons with fewer than three vertices.
+inline bool IsPolygonStrictlyConvexCcw(std::span<const XMFLOAT2> vertices)
+{
+	if (!IsPolygonCcw(vertices))
+	{
+		return false;
+	}
+	int64_t iVertexCount = std::ssize(vertices);
+	for (int64_t i = 0; i < iVertexCount; ++i)
+	{
+		const XMFLOAT2& rPreviousVertex = vertices[static_cast<size_t>((i + iVertexCount - 1) % iVertexCount)];
+		const XMFLOAT2& rCurrentVertex = vertices[static_cast<size_t>(i)];
+		const XMFLOAT2& rNextVertex = vertices[static_cast<size_t>((i + 1) % iVertexCount)];
+		float fCross = (rCurrentVertex.x - rPreviousVertex.x) * (rNextVertex.y - rPreviousVertex.y) - (rCurrentVertex.y - rPreviousVertex.y) * (rNextVertex.x - rPreviousVertex.x);
+		if (fCross <= 0.0f)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+// Andrew's monotone chain, for offline bakes (it allocates). Sorts points in place by x, then y, and returns their CCW
+// convex hull with collinear points dropped. Fewer than three points, or all points collinear, give fewer than three
+// vertices.
+inline std::vector<XMFLOAT2> BuildConvexHull(std::span<XMFLOAT2> points)
+{
+	if (std::ssize(points) < 3)
+	{
+		return {};
+	}
+
+	std::sort(points.begin(), points.end(), [](const XMFLOAT2& rA, const XMFLOAT2& rB)
+	{
+		return rA.x < rB.x || (rA.x == rB.x && rA.y < rB.y);
+	});
+
+	// Cross product of (rA-rO) x (rB-rO); <= 0 drops collinear points, yielding a CCW hull.
+	auto Cross = [](const XMFLOAT2& rO, const XMFLOAT2& rA, const XMFLOAT2& rB)
+	{
+		return (rA.x - rO.x) * (rB.y - rO.y) - (rA.y - rO.y) * (rB.x - rO.x);
+	};
+
+	int64_t iCount = std::ssize(points);
+	std::vector<XMFLOAT2> hull(static_cast<size_t>(iCount) * 2);
+	int64_t iHullVertexCount = 0;
+	for (const XMFLOAT2& rPoint : points)
+	{
+		while (iHullVertexCount >= 2 && Cross(hull.at(static_cast<size_t>(iHullVertexCount - 2)), hull.at(static_cast<size_t>(iHullVertexCount - 1)), rPoint) <= 0.0f)
+		{
+			--iHullVertexCount;
+		}
+		hull.at(static_cast<size_t>(iHullVertexCount++)) = rPoint;
+	}
+	int64_t iLower = iHullVertexCount + 1;
+	for (int64_t i = iCount - 2; i >= 0; --i)
+	{
+		const XMFLOAT2& rPoint = points[static_cast<size_t>(i)];
+		while (iHullVertexCount >= iLower && Cross(hull.at(static_cast<size_t>(iHullVertexCount - 2)), hull.at(static_cast<size_t>(iHullVertexCount - 1)), rPoint) <= 0.0f)
+		{
+			--iHullVertexCount;
+		}
+		hull.at(static_cast<size_t>(iHullVertexCount++)) = rPoint;
+	}
+	// Last point repeats the first; drop it.
+	hull.resize(static_cast<size_t>(iHullVertexCount) - 1);
+	return hull;
+}
+
 } // namespace common

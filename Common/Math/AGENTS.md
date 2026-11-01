@@ -35,7 +35,7 @@ Adding or removing a draw changes every later result. Keep random draws and mode
 
 ## Convex Hulls
 
-`ConvexHull2D`, `BuildWorldHull`, and `ConvexHullsOverlap` provide deterministic island-placement geometry. Runtime SAT assumes convex, counter-clockwise hulls; producers must preserve those properties and validate them before serialization. Placement math that feeds CRC state uses deterministic trig.
+`ConvexHull2D`, `BuildWorldHull`, and `ConvexHullsOverlap` provide deterministic island-placement and posed ship-hitbox geometry; offline bakes build hulls with `BuildConvexHull` and validate them with `IsPolygonStrictlyConvexCcw`. Runtime SAT and hitbox prism tests assume convex, counter-clockwise hulls; producers must preserve those properties and validate them before serialization. Placement math that feeds CRC state uses deterministic trig.
 
 ## See Also
 

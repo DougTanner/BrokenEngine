@@ -3,6 +3,7 @@
 #include "Data/Audio.h"
 #include "Frame/CellStaticData.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -150,7 +151,7 @@ void FightersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.fRadius = kfFighterRadius,
+		.layerFlags = engine::CollisionLayerFlags::kHitboxes,
 		.uiCategory = CollisionCategory::kuiFighter,
 		.uiCollidesWith = CollidesWith::kuiFighter,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -160,6 +161,14 @@ void FightersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+	}
+
+	std::span<float> radii = engine::Collision::GetLayerRadii(siCollisionLayerIndex);
+	std::span<engine::CollisionHitbox> hitboxes = engine::Collision::GetLayerHitboxes(siCollisionLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		radii[static_cast<size_t>(i)] = gShipHitboxShapes[std::to_underlying(ShipType::kFighter)][std::to_underlying(rCurrentPostRender.pController[i])].fRadius;
+		BuildShipHitbox(ShipType::kFighter, rCurrentPostRender.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], hitboxes[static_cast<size_t>(i)]);
 	}
 }
 
@@ -282,7 +291,7 @@ void FightersPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [
 		}
 
 		XMVECTOR vecClosestSource {};
-		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], OpposingBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment), vecClosestSource);
+		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], engine::Collision::GetLayerHitboxes(siCollisionLayerIndex)[static_cast<size_t>(i)], OpposingBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment), vecClosestSource);
 
 		if (fDamage <= 0.0f)
 		{

@@ -84,6 +84,12 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   outcome, so collections trace neither (`Collision::AddLayer`,
   `Collision::GetOutcome` in `Collision.h`). Per-pair collision masks must be
   bi-directional and same-layer collision is unsupported; both are asserted.
+- In a `CollisionLayerFlags::kHitboxes` layer, the row radius is the first
+  level, so it must enclose the row's box or hull prism; for a box or outline
+  row, a pair it accepts is narrowed by clipping the other row's path, as a
+  point, against those prisms. That pair must be swept with only one hitbox
+  side, and the other layer's radius should be 0. `AreaDamage::Get` also reads
+  the hitbox.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
 - `FlightPlanes` reads the game's immutable flight-plane table directly at boot
   on both builds; its lowest plane is the base height every simulation and

@@ -67,12 +67,12 @@ The VM-side stop script speaks this framing with `System.Net.Sockets.TcpClient`.
 | Path on the VM | Holds | Writable by `beserver` |
 | --- | --- | --- |
 | `C:\BrokenEngine\Server\BrokenEngineSandboxServer.exe` | Release server | no |
-| `C:\BrokenEngine\Server\Data\Islands.manifest`, `Islands.pack` | the only data the server opens (`Engine/Source/File/PackChunks.cpp:104-108,264-271`) | no |
+| `C:\BrokenEngine\Server\Data\Islands.manifest`, `Islands.pack`, `Model.manifest`, `Model.pack` | the only data the server opens (`Engine/Source/File/PackChunks.cpp:104-108,274-285`) | no |
 | `C:\BrokenEngine\State\` | `--app-data-directory`. The server appends `Broken Engine Sandbox Server\`, giving `ServerAutosave.save`, its timestamped backups, crash reports, and `GitHubCrashReportToken.txt` | yes (Modify), except the token file, which `beserver` can only read |
 | `C:\BrokenEngine\Logs\` | one log per launch, `server-<yyyyMMdd-HHmmss UTC>.log` | yes (Modify) |
 | `C:\BrokenEngine\Scripts\` | the VM-side scripts | no |
 
-The deploy set is the exe plus `Data\Islands.manifest` and `Data\Islands.pack`, nothing else, because those two are the only data files the server opens. The launch pins `--app-data-directory` to a fixed VM path, because by default the server writes its saves and crash reports under the launching account's roaming AppData (gap G5, `Engine/Source/File/FileManager.cpp:132-152`).
+The deploy set is the exe plus `Data\Islands.manifest`, `Data\Islands.pack`, `Data\Model.manifest`, and `Data\Model.pack`, nothing else, because those four are the only data files the server opens. The launch pins `--app-data-directory` to a fixed VM path, because by default the server writes its saves and crash reports under the launching account's roaming AppData (gap G5, `Engine/Source/File/FileManager.cpp:132-152`).
 
 `Start-Server.ps1` creates `C:\BrokenEngine\Logs` if it is absent and names each log per launch, because `--log-file` does not create its parent and truncates an existing file (gap G7, `Common/Log/Log.cpp:72-81`). It then starts the server with `Start-Process`, working directory `C:\BrokenEngine\Server`, and this command line:
 
@@ -162,14 +162,14 @@ Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .
   1. Require the VM to be running.
   2. Resolve `BrokenEngineSandboxServer.exe` from the session worktree's
      `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/`. Resolve
-     `Islands.manifest` and `Islands.pack` from the primary checkout's
+     `Islands.manifest`, `Islands.pack`, `Model.manifest`, and `Model.pack` from the primary checkout's
      `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data/`,
      which is the Shared data both Release builds consume
      (`.agents/skills/compile/references/runtime-data-mode.md`
      `## Mode selection`). The primary root is the parent of
      `git rev-parse --path-format=absolute --git-common-dir`.
   3. If `BrokenEngineSandboxServer` is running on the VM, run `Stop-Server.ps1` over SSH and fail if it fails.
-  4. `scp` the VM-side scripts to `C:\BrokenEngine\Scripts\`, the exe to `C:\BrokenEngine\Server\`, and the two Islands files to `C:\BrokenEngine\Server\Data\`.
+  4. `scp` the VM-side scripts to `C:\BrokenEngine\Scripts\`, the exe to `C:\BrokenEngine\Server\`, and the four data files to `C:\BrokenEngine\Server\Data\`.
   5. Copy the GitHub token. This mirrors the `admin-password.txt` handling in `/deploy-server` `SKILL.md` `## Inputs`. The token file is `%LOCALAPPDATA%\BrokenEngine\DeployServer\GitHubCrashReportToken.txt`, which the user creates on their PC.
      - When the file is absent, skip this step. Report that no token was copied and that any token already on the VM is unchanged.
      - Otherwise, over SSH, create `C:\BrokenEngine\State\Broken Engine Sandbox Server\` when it is absent, then `scp` the file into it.
@@ -249,7 +249,7 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 - Running the server as a Windows service. A non-interactive "run whether user is logged on or not" task. Re-asserting `DefaultUserName` after a console logon.
 - Creating or rotating the GitHub token or monitor secret, and posting a test issue.
 - Minidumps (gap G10), pruning autosave backups (gap G6) or logs, and copying autosaves off the VM.
-- Deploying Local-mode (changed) island data. Changed islands invalidate the autosave, and the server then starts a fresh world (`Projects/BrokenEngineSandbox/Source/Game.cpp:27-30`).
+- Deploying Local-mode (changed) island data. Changed islands invalidate the autosave, and the server then starts a fresh world (`Projects/BrokenEngineSandbox/Source/Game.cpp:28-31`).
 - Installing PowerShell 7 on the VM, changing the Azure guest patch mode, IPv6, DNS names, Dev/Test pricing, Azure Bastion, and load testing.
 
 ## Acceptance criteria
@@ -260,7 +260,7 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 4. `Initialize-ServerVm.ps1` succeeds, and `query user` over SSH shows an active `beserver` session after the restart.
 5. `Publish-Server.ps1` succeeds, and over SSH:
    - `Get-NetUDPEndpoint -LocalPort 27015` is owned by `BrokenEngineSandboxServer`;
-   - `C:\BrokenEngine\Server` holds exactly the exe and `Data\Islands.manifest` and `Data\Islands.pack`;
+   - `C:\BrokenEngine\Server` holds exactly the exe and `Data\Islands.manifest`, `Data\Islands.pack`, `Data\Model.manifest`, and `Data\Model.pack`;
    - `Get-NetFirewallRule -Name BrokenEngine-Game-UDP` is enabled with action Allow;
    - `Get-NetFirewallRule -Name BrokenEngine-Monitor-TCP` is enabled with action Allow, TCP local port 27017, the server program, and every profile;
    - no enabled inbound Block rule names the server exe;

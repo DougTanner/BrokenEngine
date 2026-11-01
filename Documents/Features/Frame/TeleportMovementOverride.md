@@ -21,7 +21,8 @@ Writing a new position straight into the omni's position array is not enough:
 - `Engine/Source/Frame/Collision.cpp:156-161` builds swept AABBs from that start/end pair, and
   `:588-594` runs `SweptSphereTest` across the whole segment.
 - Blasters (`Collections/Blasters/BlastersUpdate.cpp:276`) and missiles
-  (`Collections/Missiles/MissilesUpdate.cpp:356`) are the only layers setting `bSweptTest = true`.
+  (`Collections/Missiles/MissilesUpdate.cpp:356`) are the only layers setting `bSweptTest = true`
+  (now `CollisionLayerFlags::kSweptTest`).
 
 So an omni moved a long distance inside a tick is swept against every blaster and missile
 lying along the jump path and collects hits it never flew through. The previous-frame start

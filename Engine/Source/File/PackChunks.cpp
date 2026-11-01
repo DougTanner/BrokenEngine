@@ -103,8 +103,8 @@ constexpr bool IsEagerChunk(data::DataTypes eDataType)
 
 constexpr bool IsServerChunk(data::DataTypes eDataType)
 {
-	// Server simulates terrain/physics from Islands only; Audio + Texture are client-only consumers.
-	return eDataType == data::kDataTypeIslands;
+	// Server reads terrain from Islands and ship hitboxes from Model outlines; Audio + Texture are client-only.
+	return eDataType == data::kDataTypeIslands || eDataType == data::kDataTypeModel;
 }
 
 data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
@@ -277,7 +277,7 @@ void PackChunks::LoadPackFiles()
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 #if defined(BT_SERVER)
-		// Server consumes only Islands among lazy chunks, so it skips opening the other lazy packs.
+		// Server consumes only Islands and Model chunks, so it skips opening the other packs.
 		if (!IsServerChunk(static_cast<data::DataTypes>(i)))
 		{
 			continue;
@@ -320,11 +320,6 @@ void PackChunks::LoadPackFiles()
 			{
 				FailMissingRequiredAsset(manifestPath, "duplicate chunk CRC");
 			}
-		}
-		if (static_cast<data::DataTypes>(i) == data::kDataTypeIslands)
-		{
-			const std::vector<common::ChunkLocation>& rChunkLocations = mpChunkLocations[i];
-			mPackIntegrityToken = rChunkLocations.empty() ? common::kCrcSeed : common::Crc(std::span<const common::ChunkLocation>(rChunkLocations.data(), rChunkLocations.size()));
 		}
 		manifestStream.close();
 
@@ -395,6 +390,15 @@ void PackChunks::LoadPackFiles()
 		CloseHandle(handlePackValidation);
 	}
 
+	// The handshake token folds the Islands then the Model location table CRC, each kCrcSeed when its table is empty.
+	auto LocationTableCrc = [this](data::DataTypes eDataType)
+	{
+		const std::vector<common::ChunkLocation>& rChunkLocations = mpChunkLocations[eDataType];
+		return rChunkLocations.empty() ? common::kCrcSeed : common::Crc(std::span<const common::ChunkLocation>(rChunkLocations.data(), rChunkLocations.size()));
+	};
+	common::crc_t pTableCrcs[] = {LocationTableCrc(data::kDataTypeIslands), LocationTableCrc(data::kDataTypeModel)};
+	mPackIntegrityToken = common::Crc(std::span<const common::crc_t>(pTableCrcs));
+
 	// Reserve stable chunk destinations without heap lock contention during background loading.
 	int64_t iPoolOffset = 0;
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
@@ -455,13 +459,18 @@ void PackChunks::LoadPackFiles()
 
 	mLoadingFuture = std::async(std::launch::async, common::ThreadLocal::Entry([this]()
 	{
-#if defined(BT_CLIENT)
 		for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 		{
 			if (!IsEagerChunk(static_cast<data::DataTypes>(i)))
 			{
 				continue;
 			}
+#if defined(BT_SERVER)
+			if (!IsServerChunk(static_cast<data::DataTypes>(i)))
+			{
+				continue;
+			}
+#endif
 
 			std::vector<std::byte>& rPackBytes = mpPackFileData[i];
 
@@ -503,7 +512,6 @@ void PackChunks::LoadPackFiles()
 				LOG(kLoading, kDebug, "Eager chunk {} \"{}\" size {}", rChunkLocation.crc, std::string_view(pChunkHeader->pcPath), rChunkLocation.uiSize);
 			}
 		}
-#endif
 
 		// Eager map + pack buffers are now fully populated; publish to acquiring readers.
 		mbEagerLoadComplete.store(true, std::memory_order_release);

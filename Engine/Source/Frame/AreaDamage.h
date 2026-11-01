@@ -5,6 +5,8 @@ namespace engine
 
 inline constexpr int64_t kiAreaDamageSourcePreallocate = 16;
 
+struct CollisionHitbox;
+
 struct AreaDamageSource
 {
 	XMVECTOR vecPosition {};
@@ -19,9 +21,10 @@ public:
 
 	static void Add(const AreaDamageSource& rSource);
 
-	// Returns total damage with linear falloff applied, filtered by category mask
+	// Returns total damage with linear falloff applied, filtered by category mask. Each source's distance is to the
+	// hitbox's deepest shape: its box prism for kBox, its hull prism for kOutline, and vecPosition for kSphere.
 	// Outputs the closest damage source position via rvecClosestSource
-	static float Get(FXMVECTOR vecPosition, uint16_t uiCategoryMask, XMVECTOR& rvecClosestSource);
+	static float Get(FXMVECTOR vecPosition, const CollisionHitbox& rHitbox, uint16_t uiCategoryMask, XMVECTOR& rvecClosestSource);
 
 	static inline thread_local int64_t siAreaDamageSourceCount = 0;
 

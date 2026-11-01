@@ -86,45 +86,7 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 		}
 	}
 
-	if (std::ssize(candidates) < 3)
-	{
-		return;
-	}
-
-	std::sort(candidates.begin(), candidates.end(), [](const XMFLOAT2& rA, const XMFLOAT2& rB)
-	{
-		return rA.x < rB.x || (rA.x == rB.x && rA.y < rB.y);
-	});
-
-	// Cross product of (rA-rO) x (rB-rO); <= 0 drops collinear points, yielding a CCW hull.
-	auto Cross = [](const XMFLOAT2& rO, const XMFLOAT2& rA, const XMFLOAT2& rB)
-	{
-		return (rA.x - rO.x) * (rB.y - rO.y) - (rA.y - rO.y) * (rB.x - rO.x);
-	};
-
-	int64_t iCount = std::ssize(candidates);
-	std::vector<XMFLOAT2> hull(static_cast<size_t>(iCount) * 2);
-	int64_t iHullVertexCount = 0;
-	for (const XMFLOAT2& rCandidate : candidates)
-	{
-		while (iHullVertexCount >= 2 && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), rCandidate) <= 0.0f)
-		{
-			--iHullVertexCount;
-		}
-		hull.at(iHullVertexCount++) = rCandidate;
-	}
-	int64_t iLower = iHullVertexCount + 1;
-	for (int64_t i = iCount - 2; i >= 0; --i)
-	{
-		while (iHullVertexCount >= iLower && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), candidates.at(i)) <= 0.0f)
-		{
-			--iHullVertexCount;
-		}
-		hull.at(iHullVertexCount++) = candidates.at(i);
-	}
-	// Last point repeats the first; drop it.
-	hull.resize(static_cast<size_t>(iHullVertexCount) - 1);
-
+	std::vector<XMFLOAT2> hull = common::BuildConvexHull(candidates);
 	if (std::ssize(hull) < 3)
 	{
 		return;
@@ -143,21 +105,8 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 {
 	// cpuValidAreaVertices is interleaved x,y floats; XMFLOAT2 is a padding-free {float,float}, so
-	// it aliases the same bytes as the hull vertices for the shared CCW predicate.
-	ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), static_cast<size_t>(rOut.iValidAreaVertexCount))));
-	for (int64_t i = 0; i < rOut.iValidAreaVertexCount; ++i)
-	{
-		int64_t iPreviousVertex = (i + rOut.iValidAreaVertexCount - 1) % rOut.iValidAreaVertexCount;
-		int64_t iNextVertex = (i + 1) % rOut.iValidAreaVertexCount;
-		float fPreviousX = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2);
-		float fPreviousY = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2 + 1);
-		float fCurrentX = rOut.cpuValidAreaVertices.at(i * 2);
-		float fCurrentY = rOut.cpuValidAreaVertices.at(i * 2 + 1);
-		float fNextX = rOut.cpuValidAreaVertices.at(iNextVertex * 2);
-		float fNextY = rOut.cpuValidAreaVertices.at(iNextVertex * 2 + 1);
-		float fCross = (fCurrentX - fPreviousX) * (fNextY - fPreviousY) - (fCurrentY - fPreviousY) * (fNextX - fPreviousX);
-		ASSERT(fCross > 0.0f);
-	}
+	// it aliases the same bytes as the hull vertices for the shared convexity predicate.
+	ASSERT(common::IsPolygonStrictlyConvexCcw(std::span<const XMFLOAT2>(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), static_cast<size_t>(rOut.iValidAreaVertexCount))));
 }
 
 // Shared encode tail: mask invisible underwater texels flat, build the BC mip chain, write the

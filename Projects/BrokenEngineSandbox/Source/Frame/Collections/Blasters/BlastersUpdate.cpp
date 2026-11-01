@@ -24,8 +24,6 @@ namespace game
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
 
-constexpr float kfBlasterCollisionRadius = 0.5f;
-
 constexpr float kfTerrainImpactJitter = 0.25f;
 
 #if defined(BT_CLIENT)
@@ -188,9 +186,8 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.fRadius = kfBlasterCollisionRadius,
 		.fDamage = kfBlasterDamage,
-		.bSweptTest = true,
+		.layerFlags = engine::CollisionLayerFlags::kSweptTest,
 		.uiCategory = CollisionCategory::kuiBlaster,
 		.uiCollidesWith = CollidesWith::kuiBlaster,
 		.pAlignments = rCurrentPostRender.pAlignments,

@@ -22,8 +22,27 @@ enum class CollisionFlags : uint8_t
 };
 using CollisionFlags_t = common::Flags<CollisionFlags>;
 
+enum class CollisionLayerFlags : uint8_t
+{
+	kSweptTest = 0x01, // Sweep every pair involving this layer
+	kHitboxes = 0x02,  // Each row's radius and hitbox come from GetLayerRadii and GetLayerHitboxes
+};
+using CollisionLayerFlags_t = common::Flags<CollisionLayerFlags>;
+
 struct CellStaticData;
 struct SegmentHit;
+
+// One hitbox layer row's posed shape in its cell's local frame: the box and hull are CCW top-down polygons, each
+// extruded over [fMinimumZ, fMaximumZ]. A kSphere row's box and hull are unread.
+struct CollisionHitbox
+{
+	common::ModelHitboxLevel eHitboxLevel = common::ModelHitboxLevel::kSphere;
+	XMFLOAT2 pf2BoxVertices[4] {};
+	XMFLOAT2 pf2HullVertices[common::kiModelOutlineVertexMaximum] {};
+	float fMinimumZ = 0.0f;
+	float fMaximumZ = 0.0f;
+	int64_t iHullVertexCount = 0;
+};
 
 // Per-layer binding data (provided by collections each frame)
 struct CollisionLayer
@@ -34,11 +53,13 @@ struct CollisionLayer
 	// AddLayer points these at Collision-owned columns; callers leave them null
 	const float* pfMaxTimes = nullptr;         // Exclusive entity-collision cutoff
 	CollisionFlags_t* pFlags = nullptr;       // Per-object flags (read/write for kAlreadyCollided)
+	float* pfRowRadii = nullptr;              // Null unless kHitboxes
+	CollisionHitbox* pHitboxes = nullptr;     // Null unless kHitboxes
 	const XMVECTOR* pVecVelocities = nullptr; // Velocity/direction per object
 	int64_t iCount = 0;
-	float fRadius = 0.0f;
+	float fRadius = 0.0f;                     // Unread when kHitboxes is set
 	float fDamage = 0.0f;
-	bool bSweptTest = false;                  // Sweep every pair involving this layer
+	CollisionLayerFlags_t layerFlags {};
 
 	uint16_t uiCategory = 0;
 	uint16_t uiCollidesWith = 0;
@@ -92,11 +113,17 @@ public:
 
 	// Per-frame layer registration and binding (called in PreCollision phase). Traces each row's start-to-end segment
 	// against the cell exit, and against terrain when pTerrainStaticData is set, and stores the hits and the row's
-	// exclusive maximum time; the rows stay valid through the owning collection's PostCollision.
+	// exclusive maximum time; the rows stay valid through the owning collection's PostCollision, and a hitbox layer's
+	// radii and hitboxes through the AreaDamage phase.
 	static int64_t AddLayer(const CollisionLayer& rLayer);
 
 	// The caller writes every row's flags here after AddLayer and before Collide.
 	static std::span<CollisionFlags_t> GetLayerFlags(int64_t iLayerIndex);
+
+	// For a layer with kHitboxes, the caller writes every row's radius and hitbox here after AddLayer and before
+	// Collide.
+	static std::span<float> GetLayerRadii(int64_t iLayerIndex);
+	static std::span<CollisionHitbox> GetLayerHitboxes(int64_t iLayerIndex);
 
 	// Frame drives collision detection; layer category masks and alignment pairs filter collisions.
 	static void Collide(const Alignments& rAlignments);
@@ -143,6 +170,12 @@ private:
 	static inline thread_local common::StableVector<CollisionFlags_t> sFlags = common::StableVector<CollisionFlags_t>(kiRowReserveCount);
 	static thread_local common::StableVector<SegmentHit> sTerrainHits;
 	static thread_local common::StableVector<SegmentHit> sBoundaryHits;
+
+	// Indexed only over the rows of layers with kHitboxes, in registration order; callers write them through
+	// GetLayerRadii and GetLayerHitboxes. sLayers' radius and hitbox pointers point into them, so they only grow,
+	// never move.
+	static inline thread_local common::StableVector<float> sRowRadii = common::StableVector<float>(kiRowReserveCount);
+	static inline thread_local common::StableVector<CollisionHitbox> sHitboxes = common::StableVector<CollisionHitbox>(kiRowReserveCount);
 };
 
 } // namespace engine

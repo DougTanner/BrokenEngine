@@ -7,6 +7,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Ships/FleetCoordination.h"
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -501,7 +502,7 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.fRadius = kfOmniRadius,
+		.layerFlags = engine::CollisionLayerFlags::kHitboxes,
 		.uiCategory = CollisionCategory::kuiOmni,
 		.uiCollidesWith = CollidesWith::kuiOmni,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -511,6 +512,14 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+	}
+
+	std::span<float> radii = engine::Collision::GetLayerRadii(siCollisionLayerIndex);
+	std::span<engine::CollisionHitbox> hitboxes = engine::Collision::GetLayerHitboxes(siCollisionLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		radii[static_cast<size_t>(i)] = gShipHitboxShapes[std::to_underlying(ShipType::kOmni)][std::to_underlying(rCurrentPostRender.pController[i])].fRadius;
+		BuildShipHitbox(ShipType::kOmni, rCurrentPostRender.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], hitboxes[static_cast<size_t>(i)]);
 	}
 }
 

@@ -14,7 +14,8 @@ The active valley-stall fix remains responsible for escaping toward the next nav
 ## Confirmed gaps
 
 - `Projects/BrokenEngineSandbox/Source/Frame/TerrainUtils.h:31`, `NavigationClearanceMeters` and `NavigationThresholdElevation`, use only `kfOmniRadius` and `kfPushMargin`. Their definitions in `Collections/Omnis/Omnis.h:33` yield about 1.83337 m clearance, while `Collections/Battleships/Battleships.h:27` sets the Battleship contact radius to 4.5 m. These collection paths are relative to the same game Frame directory. This is an existing sizing mismatch, independently of the saved stall.
-- `Common/DataFile.h:91` (`SceneHeader`) and `:306` (`ModelHeader`) carry no drawn bounds. The latter carries alignment rotation, scale and offset. `Engine/Source/File/PackChunks.cpp:104` admits only Islands on the server; eager Scene/Model payload loading at `:458` is client-only. Model-derived simulation clearance needs an explicit producer and shared metadata consumption contract.
+- `Common/DataFile.h:91` (`SceneHeader`) carries no drawn bounds. Every model chunk carries a `ModelOutline` (`:360`): the top-down convex hull and z range of the model's vertices after alignment. `Engine/Source/File/PackChunks.cpp:104` admits Islands and Model on the server, and the eager loop at `:469` loads Model there, but nothing derives navigation clearance from that outline yet; model-derived simulation clearance still needs a consumption contract.
+It also remains open whether that outline, a hull over every packed vertex rather than drawn indexed geometry with mesh/skin transforms, is an adequate producer or `AccumulateDrawnBounds` must feed one.
 - `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:406`, `AccumulateDrawnBounds`, already measures drawn indexed geometry with mesh/skin transforms. Reuse is available; raw vertex extrema or an assumed normalized cube do not establish the actual drawn bounds after normalization and pre-scale. The glTF and Assimp decoder normalization paths and main-only Scene export must be considered.
 - Fleet destinations already enter `ComputeNavigation` in
 `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp:331`. Random-spawn
@@ -51,4 +52,4 @@ Execution is Tier 3 if it changes CRC-visible steering, packed layout/trust boun
 
 ## Related records
 
-No existing executable Plan owns these gaps. [FlagshipPinnedAgainstTerrainBlocksFighterLaunch.md](FlagshipPinnedAgainstTerrainBlocksFighterLaunch.md) records a separate pinning symptom and unproven hypotheses; it does not establish this saved stall's cause. [ModelShapedHitboxes.md](../../Features/Frame/ModelShapedHitboxes.md) explicitly excludes terrain collision and navigation clearance. Keep those boundaries when promoting this record to a decision-complete Plan.
+No existing executable Plan owns these gaps. [FlagshipPinnedAgainstTerrainBlocksFighterLaunch.md](FlagshipPinnedAgainstTerrainBlocksFighterLaunch.md) records a separate pinning symptom and unproven hypotheses; it does not establish this saved stall's cause. Keep that boundary when promoting this record to a decision-complete Plan.

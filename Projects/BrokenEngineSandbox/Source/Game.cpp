@@ -2,6 +2,7 @@
 
 #include "Input/Input.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Ui/Localization.h"
 #include "Ui/MapWrappers.h"
@@ -16,6 +17,7 @@ Game::Game()
 : common::Singleton<Game>(gpGame, this)
 {
 	InitializeLocalization();
+	InitializeShipHitboxes();
 
 	int64_t iNextAlignment = 1;
 	mFleetAlignment = engine::AlignmentIdentifier(iNextAlignment++);

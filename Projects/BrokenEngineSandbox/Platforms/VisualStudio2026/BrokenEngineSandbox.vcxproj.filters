@@ -582,6 +582,9 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
@@ -1182,6 +1185,9 @@
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.cpp">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipQueries.cpp">

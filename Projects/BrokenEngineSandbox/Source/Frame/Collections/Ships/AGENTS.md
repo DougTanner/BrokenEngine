@@ -1,6 +1,6 @@
 # Ships - Shared Ship Code
 
-What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and Omnis steer by (`FleetCoordination`), and the ship status changes (`ShipStatusChanges`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
+What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and Omnis steer by (`FleetCoordination`), the ship status changes (`ShipStatusChanges`), and the collision hitboxes (`ShipHitboxes`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
 
 ## Ship Invariants
 
@@ -20,6 +20,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   ordinary owned-handle cleanup. Fleet Battleships follow their
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
   fleet Omnis theirs (`../Omnis/AGENTS.md`).
+- A ship's collision and missile-damage shape is its model's baked outline
+  scaled by the type's gameplay radius, at the depth its sidecar hitbox setting
+  names. `kShipHitboxTypes` must name each controller's Render model. Each ship
+  PreCollision writes every row's radius and posed hitbox from its current pose
+  (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
+  each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
+  death shrink.
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter or Omni in its flagship's cell (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick

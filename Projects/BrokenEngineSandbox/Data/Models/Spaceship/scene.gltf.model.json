@@ -1,6 +1,7 @@
 {
-	"version": 1,
+	"version": 2,
 	"rotationDegrees": [90, 0, 90],
 	"scale": [0.672389, 0.672389, 0.672389],
-	"offset": [0, 0.0621412, -0.0985188]
+	"offset": [0, 0.0621412, -0.0985188],
+	"hitbox": "sphere"
 }

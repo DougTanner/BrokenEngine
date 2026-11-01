@@ -16,7 +16,6 @@ inline constexpr std::chrono::duration<float> kArrivalGracePeriod(1.0f);
 
 inline constexpr float kfBlasterDamage = 6.0f;
 inline constexpr float kfFighterBeamDamage = kfBlasterDamage;
-inline constexpr float kfMissileCollisionRadius = 0.5f;
 inline constexpr float kfMissileDamageRadius = 7.0f;
 inline constexpr float kfMissileDamage = 30.0f;
 inline constexpr std::chrono::duration<float> kMissileLifetime(10.0f);

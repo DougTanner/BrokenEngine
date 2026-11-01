@@ -89,7 +89,8 @@ static const char* ValidateCachedChunkBody(std::span<const std::byte> body, comm
 		return "chunk header size outside chunk";
 	}
 	// AllocateHeaderAndData gives a fresh body exactly the header plus the alignment-rounded data, so any other
-	// extent was not produced by this job. Scene jobs append animation data past that point (ExportScene::Export).
+	// extent was not produced by this job. Scene jobs append animation data past that point (ExportScene::Export), and
+	// Model jobs the outline section (ExportModel::Export).
 	int64_t iExpectedSize = common::kiChunkDataOffset + common::RoundUp<int64_t, common::kiAlignmentBytes>(pHeader->iSize);
 	if (bAllowTail ? static_cast<int64_t>(body.size()) < iExpectedSize : static_cast<int64_t>(body.size()) != iExpectedSize)
 	{
@@ -234,7 +235,7 @@ std::vector<std::byte>& ExportJob::RunExport()
 			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), std::ssize(mHeaderAndData));
 			mbDirty = true;
 		}
-		else if (const char* pcReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, mChunkFlags & common::ChunkFlags::kScene); pcReason != nullptr)
+		else if (const char* pcReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, (mChunkFlags & common::ChunkFlags::kScene) || (mChunkFlags & common::ChunkFlags::kModel)); pcReason != nullptr)
 		{
 			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation ({}); re-exporting", mChunkFile.string(), pcReason);
 			mbDirty = true;

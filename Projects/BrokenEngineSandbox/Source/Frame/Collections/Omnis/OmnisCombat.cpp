@@ -187,7 +187,7 @@ void OmnisPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		}
 
 		XMVECTOR vecClosestSource {};
-		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], OpposingBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment), vecClosestSource);
+		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], engine::Collision::GetLayerHitboxes(siCollisionLayerIndex)[static_cast<size_t>(i)], OpposingBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment), vecClosestSource);
 
 		if (fDamage <= 0.0f)
 		{

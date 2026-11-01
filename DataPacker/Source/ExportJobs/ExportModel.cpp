@@ -23,6 +23,7 @@ std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::
 void ExportModel::Export()
 {
 	common::ModelHeader modelHeader {};
+	common::ModelOutline outline {};
 	std::filesystem::path metadataPath = GetModelMetadataPath(mInputPath);
 	if (std::filesystem::exists(metadataPath))
 	{
@@ -30,6 +31,7 @@ void ExportModel::Export()
 		modelHeader.f3RotationRadians = XMFLOAT3(XMConvertToRadians(metadata.f3RotationDegrees.x), XMConvertToRadians(metadata.f3RotationDegrees.y), XMConvertToRadians(metadata.f3RotationDegrees.z));
 		modelHeader.f3Scale = metadata.f3Scale;
 		modelHeader.f3Offset = metadata.f3Offset;
+		outline.eHitboxLevel = metadata.eHitboxLevel;
 	}
 
 	int64_t iStride = sizeof(common::ModelVertex);
@@ -117,6 +119,38 @@ void ExportModel::Export()
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(vertices.data()), static_cast<size_t>(uiVertexBytes)), kpcContext);
 	fileStream.close();
 
+	// The outline is the aligned model's top-down hull, aligned in offset, scale, then pre-rotation order as the Fighters
+	// and Battleships render chains do.
+	common::ModelAlignment alignment = common::GetModelAlignment(modelHeader);
+	XMMATRIX matAlignment = XMMatrixMultiply(XMMatrixMultiply(alignment.matPreMove, XMMatrixScalingFromVector(XMLoadFloat3A(&alignment.f3Scale))), alignment.matPreRotate);
+	const common::ModelVertex* pVertices = reinterpret_cast<const common::ModelVertex*>(vertices.data());
+	std::vector<XMFLOAT2> hullPoints(uiVertexCount);
+	outline.fMinimumZ = std::numeric_limits<float>::max();
+	outline.fMaximumZ = std::numeric_limits<float>::lowest();
+	for (int64_t i = 0; i < static_cast<int64_t>(uiVertexCount); ++i)
+	{
+		XMFLOAT3A f3Position {};
+		XMStoreFloat3A(&f3Position, XMVector3Transform(XMLoadFloat3(&pVertices[i].f3Pos), matAlignment));
+		if (!std::isfinite(f3Position.x) || !std::isfinite(f3Position.y) || !std::isfinite(f3Position.z))
+		{
+			throw std::runtime_error("ExportModel::Export aligned vertex position is not finite");
+		}
+		hullPoints.at(static_cast<size_t>(i)) = {f3Position.x, f3Position.y};
+		outline.fMinimumZ = std::min(outline.fMinimumZ, f3Position.z);
+		outline.fMaximumZ = std::max(outline.fMaximumZ, f3Position.z);
+	}
+	std::vector<XMFLOAT2> hull = common::BuildConvexHull(hullPoints);
+	if (std::ssize(hull) < 3 || std::ssize(hull) > common::kiModelOutlineVertexMaximum)
+	{
+		throw std::runtime_error(std::format("ExportModel::Export outline has {} hull vertices; it needs 3 to {}", std::ssize(hull), common::kiModelOutlineVertexMaximum));
+	}
+	if (!common::IsPolygonStrictlyConvexCcw(hull))
+	{
+		throw std::runtime_error("ExportModel::Export outline hull is not strictly convex and counter-clockwise");
+	}
+	std::copy(hull.begin(), hull.end(), outline.pf2HullVertices);
+	outline.iHullVertexCount = static_cast<int32_t>(std::ssize(hull));
+
 	int64_t iIndexCount = static_cast<int64_t>(uiIndexCount);
 	int64_t iIndicesSize = std::ssize(indices16) > 0
 		? common::ModelHeader::VerticesOffset(iIndexCount, sizeof(uint16_t))
@@ -137,6 +171,11 @@ void ExportModel::Export()
 		std::memcpy(dataSpan.data(), indices32.data(), common::VectorByteSize(indices32));
 	}
 	std::memcpy(dataSpan.data() + iIndicesSize, vertices.data(), common::VectorByteSize(vertices));
+
+	// The resize below invalidates pHeader and dataSpan.
+	int64_t iOutlineOffset = common::kiChunkDataOffset + common::ModelHeader::OutlineOffset(iDataSize);
+	mHeaderAndData.resize(static_cast<size_t>(iOutlineOffset) + sizeof(common::ModelOutline));
+	std::memcpy(mHeaderAndData.data() + iOutlineOffset, &outline, sizeof(outline));
 }
 
 std::string ExportModel::GetInputFingerprint() const

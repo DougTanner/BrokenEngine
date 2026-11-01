@@ -6,6 +6,7 @@
 #include "File/PackChunks.h"
 #include "Graphics/Debug/DebugRender.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
@@ -145,7 +146,8 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
-	engine::ModelAlignment alignment = engine::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kOmni)].models[iPipeline]);
+	common::ModelAlignment alignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -242,6 +244,7 @@ void OmnisInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInte
 	for (int64_t i = 0; i < rOmnis.iCount; ++i)
 	{
 		XMVECTOR vecPosition = rOmnis.pVecPositions[i];
+		DebugRenderShipHitbox(rFrameInterpolate.renderBasis, ShipType::kOmni, rPostRender.pController[i], vecPosition, rOmnis.pVecDirections[i]);
 		RenderCombatAim(rFrameInterpolate, rRenderFrame.postRender, vecPosition, rPostRender.pVecWantedDirections[i], rPostRender.pAlignments[i]);
 		if (rPostRender.pController[i] == ShipController::kFleet)
 		{

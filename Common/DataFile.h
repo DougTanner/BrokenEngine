@@ -45,8 +45,8 @@ struct ChunkLocation
 	uint64_t uiSize = 0;
 	// Hash of the chunk's stored bytes [uiOffset, uiOffset + uiSize), written by DataPacker. The runtime
 	// deliberately never re-hashes payloads to check it — that would slow startup. It exists so the
-	// Islands location table folded into mPackIntegrityToken tracks island content rather than only
-	// names, offsets, and sizes, letting the client/server handshake reject differing island data.
+	// Islands and Model location tables folded into mPackIntegrityToken track island and model content
+	// rather than only names, offsets, and sizes, letting the client/server handshake reject differing data.
 	crc_t contentCrc = 0;
 };
 static_assert(sizeof(ChunkLocation) == 32, "ChunkLocation layout changed — bump DataHeader::kiVersion");
@@ -318,11 +318,18 @@ struct ModelHeader
 	XMFLOAT3 f3Offset {};
 	uint32_t uiPad = 0;
 
-	// Runtime model chunk layout: [indices ALIGN4] [vertices]. Single source for the writer
+	// Runtime model chunk layout: [indices ALIGN4] [vertices] [ModelOutline ALIGN16]. Single source for the writer
 	// (ExportModel.cpp) and the generic index+vertex bind reader (Buffer::RecordBindVertexBuffer).
 	static constexpr int64_t VerticesOffset(int64_t iIndexCount, int64_t iIndexElementSize)
 	{
 		return RoundUp<int64_t, 4>(iIndexCount * iIndexElementSize);
+	}
+
+	// The ModelOutline section sits past the chunk's iSize, so the GPU upload of iSize bytes excludes it.
+	// Single source for the writer (ExportModel.cpp) and the ship hitbox reader.
+	static constexpr int64_t OutlineOffset(int64_t iChunkSize)
+	{
+		return RoundUp<int64_t, kiAlignmentBytes>(iChunkSize);
 	}
 
 	// Single source for the `.MODEL` writer/reader (ExportScene/ExportModel) and the runtime index-type
@@ -337,6 +344,47 @@ static_assert(BT_OFFSETOF(ModelHeader, f3RotationRadians) == 24, "ModelHeader ro
 static_assert(BT_OFFSETOF(ModelHeader, f3Scale) == 36, "ModelHeader scale offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 static_assert(BT_OFFSETOF(ModelHeader, f3Offset) == 48, "ModelHeader offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 static_assert(BT_OFFSETOF(ModelHeader, uiPad) == 60, "ModelHeader padding changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+
+// A model's hitbox levels, named by its `.model.json` "hitbox" key. Ordered, so a level at or above kBox has a box.
+enum class ModelHitboxLevel : uint32_t
+{
+	kSphere,
+	kBox,
+	kOutline,
+};
+
+inline constexpr int64_t kiModelOutlineVertexMaximum = 96;
+
+// The top-down CCW convex hull of a model's vertices after its alignment (offset, scale, pre-rotation), their z range,
+// and the sidecar's hitbox setting, in aligned model units. DataPacker bakes one for every model.
+struct ModelOutline
+{
+	XMFLOAT2 pf2HullVertices[kiModelOutlineVertexMaximum] {};
+	float fMinimumZ = 0.0f;
+	float fMaximumZ = 0.0f;
+	int32_t iHullVertexCount = 0;
+	ModelHitboxLevel eHitboxLevel = ModelHitboxLevel::kSphere;
+};
+static_assert(sizeof(ModelOutline) == 784, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
+
+// A packed model's asset alignment; each consumer fixes where matPreMove, its own scaling built from f3Scale, and
+// matPreRotate sit in its transform chain.
+struct ModelAlignment
+{
+	XMMATRIX matPreMove {};
+	XMMATRIX matPreRotate {};
+	XMFLOAT3A f3Scale {};
+};
+
+inline ModelAlignment GetModelAlignment(const ModelHeader& rModelHeader)
+{
+	return
+	{
+		.matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset)),
+		.matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z),
+		.f3Scale = {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z},
+	};
+}
 
 struct ShaderHeader
 {
@@ -434,7 +482,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 58 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 59 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

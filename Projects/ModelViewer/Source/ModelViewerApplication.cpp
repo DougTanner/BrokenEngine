@@ -169,7 +169,7 @@ void ModelViewerApplication::ValidateModelAlignment()
 		.f3Scale = mf3ModelScale,
 		.f3Offset = mf3ModelOffset,
 	};
-	engine::ModelAlignment alignment = engine::GetModelAlignment(modelHeader);
+	common::ModelAlignment alignment = common::GetModelAlignment(modelHeader);
 	XMMATRIX matAlignment = alignment.matPreMove * XMMatrixScaling(kfFlightRadius * alignment.f3Scale.x, kfFlightRadius * alignment.f3Scale.y, kfFlightRadius * alignment.f3Scale.z) * alignment.matPreRotate;
 	XMVECTOR vecDeterminant;
 	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(&vecDeterminant, matAlignment));
@@ -192,6 +192,7 @@ void ModelViewerApplication::LoadModelMetadata()
 	mf3ModelScale = {1.0f, 1.0f, 1.0f};
 	mf3ModelRotation = {};
 	mf3ModelOffset = {};
+	meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
 	ValidateModelAlignment();
 	mModelMetadataPath.clear();
 	try
@@ -224,6 +225,7 @@ void ModelViewerApplication::LoadModelMetadata()
 			mf3ModelScale = metadata.f3Scale;
 			mf3ModelRotation = metadata.f3RotationDegrees;
 			mf3ModelOffset = metadata.f3Offset;
+			meModelHitboxLevel = metadata.eHitboxLevel;
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
 			{
@@ -242,6 +244,7 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelScale = {1.0f, 1.0f, 1.0f};
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
+		meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
 		ValidateModelAlignment();
 		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
@@ -252,7 +255,7 @@ void ModelViewerApplication::SaveModelMetadata()
 	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
 	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
-	std::string content = std::format("{{\n\t\"version\": 1,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}]\n}}\n", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z);
+	std::string content = std::format("{{\n\t\"version\": 2,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\"\n}}\n", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
 	std::filesystem::path stagingPath = mModelMetadataPath;
 	stagingPath += ".tmp";
 	std::ofstream stream(stagingPath, std::ios::binary);

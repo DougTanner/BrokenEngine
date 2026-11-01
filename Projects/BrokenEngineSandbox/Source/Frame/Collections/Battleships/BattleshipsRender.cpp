@@ -5,6 +5,7 @@
 #include "Data/Scene.h"
 #include "File/PackChunks.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -128,7 +129,8 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	int64_t iRenderedOffset = siRendered[iPipeline];
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
-	engine::ModelAlignment alignment = engine::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[iPipeline]);
+	common::ModelAlignment alignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -230,6 +232,7 @@ void BattleshipsInterpolate::DebugRender(const FrameInterpolate& __restrict rFra
 
 	for (int64_t i = 0; i < rBattleships.iCount; ++i)
 	{
+		DebugRenderShipHitbox(rFrameInterpolate.renderBasis, ShipType::kBattleship, rPostRender.pController[i], rBattleships.pVecPositions[i], rBattleships.pVecDirections[i]);
 		if (rPostRender.pController[i] == ShipController::kFleet)
 		{
 			DebugRenderNavigation(rFrameInterpolate, rRenderFrame, rBattleships.pVecPositions[i], rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfBattleshipRadius);

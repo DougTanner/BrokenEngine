@@ -20,7 +20,7 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   such marker goes through `ExportJob::ReadMarkerFile`/`WriteMarkerFile` and is
   removed before the first output write.
 - Each job's `std::async` launch wraps `RunExport` in `common::ThreadLocal::Entry`, so the job runs with its own worker's `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other parallel exports.
-- `AllocateHeaderAndData` is normally called once per export. Scene animation data is appended afterward; its chunk size excludes that section and a header pointer captured before vector growth is invalid after reallocation.
+- `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline section are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
 - `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.
 
 ## Matching and Routing
@@ -188,11 +188,12 @@ without modifying the source.
 `ExportModel` owns optional adjacent `<source-filename>.model.json` metadata:
 remove only the generated final `.MODEL` extension before appending
 `.model.json`, so `scene.gltf.MODEL` uses `scene.gltf.model.json`.
-Present metadata requires integer `version: 1` and complete `rotationDegrees`,
+Present metadata requires integer `version: 2`, complete `rotationDegrees`,
 `scale`, and `offset` arrays, each with exactly three numeric components that
-fit finite floats; every scale component must remain strictly positive after
-conversion. Invalid present metadata fails through the export aggregate;
-absence alone supplies zero rotation and offset with unit scale.
+fit finite floats, and a `hitbox` string of `sphere`, `box`, or `outline`;
+every scale component must remain strictly positive after conversion. Invalid
+present metadata fails through the export aggregate; absence alone supplies
+zero rotation and offset with unit scale and the `sphere` hitbox setting.
 `common::ReadModelMetadata` (`Common/ModelMetadata.h`) is the one reader and
 validator, shared with ModelViewer authoring.
 
@@ -201,6 +202,12 @@ separately in `ModelHeader`, leaving geometry and animation unchanged. Rotation
 composes X, then Y, then Z; offset is in exported model coordinates. Alignment
 describes the asset's visual basis, scale, and pivot; gameplay sizing and dynamic
 render transforms remain consumer-owned.
+
+Every model chunk, whatever its hitbox setting, ends in a `common::ModelOutline`
+section: the top-down convex hull and z range of the vertices after alignment,
+plus the setting. The bake owns the outline's value checks — a hull outside 3
+to `kiModelOutlineVertexMaximum` vertices, a non-finite value, or a failed
+convexity check fails the export — so runtime readers check only memory safety.
 
 The model job fingerprints both `.MODEL` content and metadata content or explicit
 absence, so metadata addition, editing, or removal dirties model packing without

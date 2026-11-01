@@ -302,7 +302,7 @@ sizes are the full packet including the type byte.
 
 | Packet | Min | Max | /tick | Handshake | Over-cap | Residual semantic validation |
 |--------|----|----|------|-----------|----------|------------------------------|
-| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
+| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` then `Model.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
 | `kClientAcknowledgmentStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
 | `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); grid distance at most 1 (`GridDistance`) from an authorized coord, that coord or one of its six edge neighbours (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
@@ -386,7 +386,7 @@ gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The 
 request packets that name a fleet address it by its stable `FleetGuid` rather
 than a vector index; `kClientUnsubscribe` carries a slot index plus
 epoch, and Hello carries an 8-byte integrity token derived from the ordered
-Islands manifest `ChunkLocation` table. The gate runs pre-sim and
+Islands then Model manifest `ChunkLocation` tables. The gate runs pre-sim and
 server-authoritative — no deterministic simulation/shared-CRC exposure; the
 client ack throttle is send-timing only (acks are not CRC'd).
 

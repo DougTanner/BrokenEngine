@@ -140,7 +140,8 @@ and foreground.
 ## Source metadata authoring
 
 The right window's Flight tab edits XYZ scale, rotation in degrees and offset,
-and offers explicit Save to the selected source's adjacent `.model.json`. The
+and offers explicit Save to the selected source's adjacent `.model.json`; no
+control edits the hitbox setting, so Save writes back the loaded one. The
 [exporter owns the metadata format](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
 Geometry and animation still come from packs; alignment always comes from this
 checkout's source metadata on startup and actual model selection, with no packed
