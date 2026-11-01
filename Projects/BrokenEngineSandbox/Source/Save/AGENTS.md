@@ -2,7 +2,7 @@
 
 ## Overview
 
-This subsystem supplies the game half of the engine-owned server save/load, grid save, and replay contracts (`../../../../Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`). Files are versioned by `game::Frame::kiVersion`; navigation and elevation are derived and are not persisted.
+This subsystem supplies the game half of the engine-owned server save/load, grid save, and replay contracts (`../../../../Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`). Files are versioned by `game::Frame::kiVersion`, and the replay metadata file also by its own `ReplayMeta::kiVersion` header; navigation and elevation are derived and are not persisted.
 
 ## Save and Load
 

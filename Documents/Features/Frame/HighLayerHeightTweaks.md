@@ -5,9 +5,10 @@ Revisit When: the user schedules live tuning of the High flight layer.
 ## Request and scope
 
 Expose the High layer's height as an easy-to-adjust developer control from
-0.0 to 200.0 meters, initially 100.0. Ships may fly through terrain when it
-is set too low; the user explicitly accepts this. High may also be below or
-equal to Low (2 m) or Medium (25 m). Keep their heights unchanged.
+0.0 to 200.0 meters, initially the data-derived default (tallest island peak
++ 5 m). Ships may fly through terrain when it is set too low; the user
+explicitly accepts this. High may also be below or equal to Low (5 m). Keep
+Low's height unchanged.
 
 This is a manually executed feature under `Documents/Features`. Saving this
 document authorizes no runtime implementation and creates no scheduler claim.
@@ -38,7 +39,7 @@ Apply live on a server-selected fixed tick. Existing ships targeting High
 smoothly move toward its new height using their existing climb rate; do not
 snap their position, alter XY, or change their target-plane orders. New High
 spawns use the accepted height. A subsequent adjustment retargets the current
-climb from its current position. A ship moving to Low or Medium keeps that
+climb from its current position. A ship moving to Low keeps that
 target. Use `kuiNoFlightPlane` while moving and restore the target identity
 on arrival, including when the target identity stayed High but its height
 changed. These are author recommendations to confirm during implementation
@@ -73,9 +74,9 @@ ordinary serialization, CRC, difference logging, and snapshot treatment.
 Frame input records the transition so reconciliation and replay use the
 historically correct value. The server seeds newly activated cells from the
 current accepted value; late joins, resubscriptions, and cell transfers must
-not restore the compile-time 100 m default or revert an accepted setting.
+not restore the data-derived default or revert an accepted setting.
 Render consumers use the height belonging to the displayed frame. Start a
-new session at 100 m; do not add a separate user-settings persistence format.
+new session at the data-derived default; do not add a separate user-settings persistence format.
 Saved simulation state and replay restore the recorded height.
 
 There is no generic simulation-value Tweaks bridge in the inspected code:
@@ -89,15 +90,15 @@ a general configuration/admin system for this slider.
 ## Required propagation inventory
 
 - `Frame/FlightPlaneTable.h` and engine `Frame/FlightPlanes.{h,cpp}` currently
-  define positive, ascending heights and assert every island is below the
-  highest plane. Separate fixed plane identity/flags from effective height;
+  define positive, ascending heights and set the highest plane at boot to its
+  clearance above the tallest stored island peak. Separate fixed plane identity/flags from effective height;
   replace the assumptions this feature invalidates. User intent takes
   precedence over those existing invariants.
 - Game `Frame/Collections/Ships/ShipBehaviours.cpp`: climbing, exact-height
   lookup, `NavigationFlightPlane`, and `SkipsTerrainContact` currently infer
   behavior from ordered numeric heights. Make them correct for crossing and
-  coincident heights without changing High into Low or Medium. Preserve
-  existing Low/Medium navigation behavior; High uses its empty graph even
+  coincident heights without changing High into Low. Preserve
+  existing Low navigation behavior; High uses its empty graph even
   when lowered. Inspect intermediate climbs as well as settled ships.
 - Ship `PostRead` height bounds currently use `Lowest()`/`Highest()` and
   reject values outside those endpoints. Admit the full supported envelope,
@@ -111,12 +112,13 @@ a general configuration/admin system for this slider.
   without corrupt-stream rejection after an adjustment; do not silently
   teleport or remove them.
 - Engine `Main.cpp`, `IslandTerrain`, and per-plane `NavCellData` bake
-  height-dependent contours at startup. Low/Medium are unchanged and High
+  height-dependent contours at startup. Low is unchanged and High
   remains empty, so this feature needs no dynamic contour rebuild. Check
   that ordinal assumptions do not accidentally select another graph.
 - Engine `Graphics/FlightPlaneProjection.cpp`, camera/picking, smoke and wind
   plane consumers, shader-facing plane heights, and ship render/shadows:
-  inventory every `gpFlightPlanes`, `kFlightPlanes`, and fixed 100 m use;
+  inventory every `gpFlightPlanes`, `kFlightPlanes`, and boot-derived High
+  height use;
   update only consumers made incorrect by the effective High height.
 - Update owning AGENTS contracts that currently promise immutable ordered
   heights, above-terrain High, or endpoint-based admissible ship heights.
@@ -129,12 +131,13 @@ a general configuration/admin system for this slider.
 ## Acceptance criteria
 
 1. Only developer Tweaks > Misc > Ships exposes High Layer Height, with
-   range 0.0–200.0 m and session default 100.0 m; Low and Medium remain 2/25 m.
-2. Exercise 0, 2, 10, 25, 100, and 200 m, changing values repeatedly while
+   range 0.0–200.0 m and the data-derived session default (tallest island peak
+   + 5 m); Low remains 5 m.
+2. Exercise 0, 5, 100, and 200 m, changing values repeatedly while
    ships climb. Existing High-target ships move smoothly at their type's
    existing rate, new High ships use the accepted height, and unrelated
    targets and XY movement remain intact.
-3. At 0, 2, and 25 m, High retains its identity, empty navigation graph, and
+3. At 0 and 5 m, High retains its identity, empty navigation graph, and
    terrain exemption. Ships may pass through terrain; no ordering assertion,
    terrain clamp, accidental plane relabeling, or equal-height ambiguity occurs.
 4. Server and clients agree on accepted value, application tick, ship heights,

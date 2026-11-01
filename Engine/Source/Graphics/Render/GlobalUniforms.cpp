@@ -13,7 +13,6 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
-#include "Frame/FlightPlaneTable.h"
 #include "Graphics/Camera.h"
 
 namespace engine
@@ -436,16 +435,15 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 
 	// Object-shadow R and G hold ground coverage weighted toward the lowest and highest flight planes, so they blur with
 	// Low and High; B and A hold flight planes 1 and 2, whose sigma lerps Low to High by the same height fraction.
-	static_assert(game::kFlightPlanes.back().fHeightMeters > game::kFlightPlanes.front().fHeightMeters);
-	float fLowestPlaneHeight = game::kFlightPlanes.front().fHeightMeters;
-	float fObjectShadowsBlurHeightRangeInverse = 1.0f / (game::kFlightPlanes.back().fHeightMeters - fLowestPlaneHeight);
+	float fLowestPlaneHeight = gpFlightPlanes->Lowest().fHeightMeters;
+	float fObjectShadowsBlurHeightRangeInverse = 1.0f / (gpFlightPlanes->Highest().fHeightMeters - fLowestPlaneHeight);
 	rGlobalLayout.fObjectShadowsBlurHeightRangeInverse = fObjectShadowsBlurHeightRangeInverse;
 	float fObjectShadowsBlurSigmaLow = gObjectShadowsBlurSigmaLow.mfCurrent;
 	float fObjectShadowsBlurSigmaHigh = gObjectShadowsBlurSigmaHigh.mfCurrent;
 	float pfObjectShadowsBlurSigmas[4] {fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaLow};
-	for (int64_t i = 1; i < std::ssize(game::kFlightPlanes); ++i)
+	for (int64_t i = 1; i < gpFlightPlanes->Count(); ++i)
 	{
-		float fPlaneHeightFraction = (game::kFlightPlanes[i].fHeightMeters - fLowestPlaneHeight) * fObjectShadowsBlurHeightRangeInverse;
+		float fPlaneHeightFraction = (gpFlightPlanes->Plane(i).fHeightMeters - fLowestPlaneHeight) * fObjectShadowsBlurHeightRangeInverse;
 		pfObjectShadowsBlurSigmas[i + 1] = std::lerp(fObjectShadowsBlurSigmaLow, fObjectShadowsBlurSigmaHigh, fPlaneHeightFraction);
 	}
 	// Per-channel half-kernel for ObjectShadowsBlurH/V: offset i of radius R weighs exp(-0.5 * (i * sigma / R)^2), normalized

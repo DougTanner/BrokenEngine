@@ -12,7 +12,6 @@
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Omnis/Omnis.h"
-#include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 
@@ -572,55 +571,9 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 	rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
 }
 
-// Writes only the fleet's per-type plane, which its later spawns of that type take; live members keep their planes.
-static void CommandSetFleetFlightPlane(const nlohmann::json& rParameters)
-{
-	// Fleet state is not tick input, so a write during playback would be missing from the recording.
-	if (gpGame->mbReplaying)
-	{
-		throw std::runtime_error("cannot set fleet flight plane during replay playback");
-	}
-	for (const auto& [rKey, rValue] : rParameters.items())
-	{
-		if (rKey != "globalId" && rKey != "type" && rKey != "plane")
-		{
-			throw std::runtime_error("set_fleet_flight_plane unknown parameter '" + rKey + "'");
-		}
-	}
-	if (!rParameters.contains("globalId") || !rParameters.at("globalId").is_number_integer())
-	{
-		throw std::runtime_error("set_fleet_flight_plane requires integer 'globalId'");
-	}
-	ShipType eType {};
-	EnumFromToken(rParameters.contains("type") ? rParameters.at("type") : nlohmann::json(), "type", eType);
-	if (!rParameters.contains("plane") || !rParameters.at("plane").is_number_integer())
-	{
-		throw std::runtime_error("set_fleet_flight_plane requires integer 'plane'");
-	}
-	int64_t iFlightPlane = rParameters.at("plane").get<int64_t>();
-	if (!IsFlightPlaneAllowed(eType, iFlightPlane))
-	{
-		throw std::runtime_error(std::format("'plane' is not allowed for {}", EnumToken(eType)));
-	}
-
-	engine::GlobalId globalId {.iValue = rParameters.at("globalId").get<int64_t>()};
-	for (auto& [rClientGuid, rFleets] : gpServerSession->mpFleetManager->mFleets)
-	{
-		for (Fleet& rFleet : rFleets)
-		{
-			if (std::ranges::contains(rFleet.members, globalId, &FleetMember::globalId))
-			{
-				rFleet.targetFlightPlanes[std::to_underlying(eType)] = static_cast<uint8_t>(iFlightPlane);
-				return;
-			}
-		}
-	}
-	throw std::runtime_error("no fleet contains globalId");
-}
-
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command != "replay_transfer_capture" && command != "inject_payload" && command != "set_fleet_flight_plane")
+	if (command != "replay_transfer_capture" && command != "inject_payload")
 	{
 		return false;
 	}
@@ -633,11 +586,6 @@ bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nl
 	if (command == "inject_payload")
 	{
 		CommandInjectPayload(rParameters, rResult);
-		return true;
-	}
-	if (command == "set_fleet_flight_plane")
-	{
-		CommandSetFleetFlightPlane(rParameters);
 		return true;
 	}
 	return false;

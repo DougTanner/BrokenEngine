@@ -13,7 +13,7 @@ takes over `status`
 (`AgentCommandsServer.cpp`), `replay_transfer_capture` (the server
 simulation-harness-rig module), and `describe_scene` (`AgentScene.cpp`). The
 focused server simulation-harness-rig module owns the parsing, result assembly,
-and orchestration for `inject_payload`, `set_fleet_flight_plane`, and the
+and orchestration for `inject_payload` and the
 `replay_transfer_capture` counts; the focused server frame-edit module owns
 `edit_frame` and `read_frame`.
 
@@ -63,9 +63,6 @@ and orchestration for `inject_payload`, `set_fleet_flight_plane`, and the
   leave its fleet, because one never does (`../Frame/Collections/Battleships/AGENTS.md`).
   Connected clients resynchronize through the Save entry point
   (`../Save/AGENTS.md`). Command contract:
-  `../../Documents/AgentHarness/commands-server.md`.
-- `set_fleet_flight_plane` writes fleet state, not tick input, so it is refused
-  during playback, because no recording carries the write. Command contract:
   `../../Documents/AgentHarness/commands-server.md`.
 - The engine `create_cell` and the game `edit_frame` are the only writers of the engine pinned frame value `uiPinned` (what it keeps loaded: the active-set bullet of `../../../../Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`).
 - Commands that wait for a later frame, for the queue where messages wait for the renderer to pick them up, or for an input script use the engine deferred-response path. Ensure every deferred operation can resolve or fail without blocking the single in-flight channel.

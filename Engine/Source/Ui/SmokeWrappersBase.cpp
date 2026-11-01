@@ -32,7 +32,7 @@ Wrapper gWindDisplacementNoiseScale(1.0f, 0.0f, 4.0f);
 Wrapper gWindSmokeRetention(0.6f, 0.0f, 1.0f);
 Wrapper gWindSmokeAdvection(0.5f, 0.0f, 2.0f);
 
-Wrapper gSmokeObjectHeight(10.0f, 0.5f, 40.0f);
+Wrapper gSmokeObjectHeight(1.0f, 0.5f, 40.0f);
 
 // Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
 Wrapper gSmokeTrailsQuantity(800.0f, 0.0f, 2'000.0f);

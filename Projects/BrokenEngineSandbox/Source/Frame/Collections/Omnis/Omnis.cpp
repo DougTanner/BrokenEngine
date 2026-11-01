@@ -689,6 +689,10 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				{
 					SetTargetFlightPlane(orders, NearestFlightPlane(vecTarget));
 				}
+				else
+				{
+					SetTargetFlightPlane(orders, DefaultFlightPlane(ShipType::kOmni));
+				}
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))

@@ -183,7 +183,7 @@ void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 	// queued row.
 	int64_t iSpawnTick = gpGame->miTickCounter;
 	bool bIsFlagship = rMember.globalId == rFleet.flagshipGlobalId;
-	int64_t iTargetFlightPlane = rFleet.targetFlightPlanes.at(std::to_underlying(rMember.eType));
+	int64_t iTargetFlightPlane = DefaultFlightPlane(rMember.eType);
 
 	ShipOrders_t spawnOrders {};
 	if (bIsFlagship)

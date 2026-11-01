@@ -40,7 +40,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
   `kIsFlagship`, 2 `kTargetFlagship`, and the target flight plane index in
   bits 8-15), `targetFlightPlane` that index (0 the lowest plane; a Fighter
-  allows 0-2, an Omni 0-1, a Battleship 0), `flags` the integer `ShipFlags`
+  or an Omni allows 0-1, a Battleship 0), `flags` the integer `ShipFlags`
   mask, `lifecycleFlags` the integer lifecycle mask, and `arrivalGrace`
   seconds. `registryId` is the ship's frame registry handle
   and `registryTargetId` is the registry handle the missile is homing on, so a
@@ -211,8 +211,7 @@ adding the fields below; the other entries are its own commands. For the engine
   number of seconds; `engine::GridCoord` a `[q,r]` grid coordinate; `XMVECTOR`
   an `[x,y]` pair of finite numbers in the cell's local frame, a position being
   meters from the cell's center: a ship spawn's `vecPosition` takes z at the
-  height of its `orders` target flight plane (`orders` 256 names plane 1, 512
-  plane 2) and its `uiFlightPlane` that plane whatever the entry supplies, any
+  height of its `orders` target flight plane (`orders` 256 names plane 1) and its `uiFlightPlane` that plane whatever the entry supplies, any
   other `vecPosition` z at the lowest flight plane, both w 1,
   and every other vector z 0 and w 0; `engine::AlignmentIdentifier`
   `"fleet"` or `"random"`, the game's two alignments; a ship's `eController`
@@ -263,8 +262,7 @@ adding the fields below; the other entries are its own commands. For the engine
   which it then climbs or descends; a Fighter's own PostRender Update rewrites
   that plane from the next tick whenever it runs its
   [fleet or attack tactics](../../Source/Frame/Collections/Fighters/AGENTS.md),
-  a fleet Omni's on every tick outside its transfer lock, and a random-spawn
-  Omni's on every such tick it finds an enemy on an Omni plane
+  and a fleet or random-spawn Omni's on every tick outside its transfer lock
   ([Omni behavior](../../Source/Frame/Collections/Omnis/AGENTS.md)).
   Every `UpdateShip` entry also applies its `navigationDelaySeconds`, default
   included, and resets the ship's cell-change timer to that delay, so an entry
@@ -341,24 +339,6 @@ adding the fields below; the other entries are its own commands. For the engine
   record is written later in the same update.
 
   The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for ship spawn entries whose `eController` is `"Fleet"`, in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
-- `set_fleet_flight_plane`:
-  `{"globalId":int,"type":"Fighter"|"Omni"|"Battleship","plane":int}`; these
-  are the only keys. Sets the target flight plane that the fleet whose members
-  include `globalId` gives its later spawns of `type`, its joins and respawns:
-  an Omni or Battleship is born at that plane's height, and a Fighter launches
-  at its Battleship's height and plane but takes the plane set here as its
-  target flight plane, which its own
-  [tactics](../../Source/Frame/Collections/Fighters/AGENTS.md) rewrite once its
-  arrival grace ends; a fleet Omni's
-  [tactics](../../Source/Frame/Collections/Omnis/AGENTS.md) likewise rewrite
-  it once its transfer lock ends. It queues no status change and no
-  live member's plane changes (move a Battleship with an `inject_payload`
-  `UpdateShip` `uiTargetFlightPlane`; no tactic rewrites its plane). The value is saved with the fleet. The `result` is `null`.
-  Fails during replay playback (`cannot set fleet flight plane during replay
-  playback`), on an unknown key, on a non-integer `globalId` or `plane`, on an
-  unknown `type` (`'type' must be Fighter|Omni|Battleship`), on a `plane` the
-  type does not allow (`'plane' is not allowed for <type>`), and when no fleet
-  has `globalId` as a member (`no fleet contains globalId`).
 
 Every grid-coordinate parameter of this project's server commands (`coord`, `fleetWantedCoordinate`) follows the engine
 [grid-coordinate rule](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),

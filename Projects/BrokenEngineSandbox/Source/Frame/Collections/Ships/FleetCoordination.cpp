@@ -183,7 +183,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	{
 		rFlags.Set(ShipFlags::kVeerOff, false);
 		rRegistryTarget = {};
-		return {.iTargetFlightPlane = iHighestFlightPlane};
+		return {.iTargetFlightPlane = DefaultFlightPlane(eType)};
 	}
 
 	if (rView.eStance == FleetStance::kWeaponsFree)
@@ -216,7 +216,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	return
 	{
 		.vecDestination = EscortSlotPoint(eType, rPreviousFrame, rView, globalId),
-		.iTargetFlightPlane = iHighestFlightPlane,
+		.iTargetFlightPlane = DefaultFlightPlane(eType),
 		.bHasDestination = true,
 	};
 }

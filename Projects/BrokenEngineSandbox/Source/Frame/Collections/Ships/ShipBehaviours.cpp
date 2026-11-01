@@ -50,6 +50,11 @@ int64_t HighestFlightPlane(ShipType eType)
 	std::unreachable();
 }
 
+int64_t DefaultFlightPlane(ShipType eType)
+{
+	return eType == ShipType::kOmni ? 0 : HighestFlightPlane(eType);
+}
+
 bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane)
 {
 	return iFlightPlane >= 0 && iFlightPlane <= HighestFlightPlane(eType);

@@ -45,6 +45,8 @@ inline constexpr uint8_t kuiNoFlightPlane = 255;
 
 // The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
 [[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
+// The plane a ship of the type flies while not engaging: the lowest for Omnis, the type's highest otherwise.
+[[nodiscard]] int64_t DefaultFlightPlane(ShipType eType);
 [[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
 // The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height.
 [[nodiscard]] std::optional<int64_t> FlightPlaneAtHeight(float fHeight);

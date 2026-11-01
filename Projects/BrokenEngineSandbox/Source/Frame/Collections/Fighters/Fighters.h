@@ -33,7 +33,7 @@ inline constexpr float kfFighterMaxSpeed = 45.0f;
 inline constexpr float kfFighterMaxTurnRate = 8.0f;
 
 inline constexpr float kfFighterClimbRate = 25.0f;
-inline constexpr int64_t kiFighterHighestFlightPlane = 2;
+inline constexpr int64_t kiFighterHighestFlightPlane = 1;
 static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
 inline constexpr float kfFighterClimbTilt = 0.35f;

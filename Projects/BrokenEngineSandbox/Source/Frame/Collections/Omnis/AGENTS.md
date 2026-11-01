@@ -7,13 +7,13 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
 - Omnis fire only blasters, at the kept attack target when it is visible, within `kfBlasterTargetRange` on the Omni's stored plane, and in line of sight (`../Ships/AGENTS.md` `## Ship Invariants`), else at the nearest such enemy, one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire.
 - A fleet-controlled Omni in its flagship's cell steers by its fleet's stance
   through the fleet tactic it shares with fleet Fighters
-  (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`) on the highest
-  Omni plane: in escort it holds its own fixed slot `kfOmniEscortDistance` from the
+  (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`): in escort it
+  flies the lowest plane and holds its own fixed slot `kfOmniEscortDistance` from the
   flagship. The fleet's non-dying Omnis in the cell's previous frame share the
   circle evenly in global-ID order, slot 0 due East, and the slots never turn.
   Weapons free it attacks its kept attack target (`../Ships/AGENTS.md`
-  `## Ship Invariants`), ignoring enemies above the highest Omni plane, routes
-  to it while it is hidden, and while it is in line of sight within
+  `## Ship Invariants`) on that enemy's nearest plane, ignoring enemies above
+  the highest Omni plane, routes to it while it is hidden, and while it is in line of sight within
   `kfOmniCirclingDistance` of it in x/y circles it clockwise by chasing a point
   on that circle ahead of itself
   (`OmniCirclingPoint`), with no coordination among Omnis; it never
@@ -25,14 +25,14 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   along the unit AI direction. The escort route query runs every escort tick,
   an exception to the shared path-query cadence (`../Ships/AGENTS.md`
   `## Fleet Navigation Invariants`). Outside its flagship's cell it keeps the
-  shared fleet navigation. Outside transfer lock every tick writes its tactic's
+  shared fleet navigation on the lowest plane. Outside transfer lock every tick writes its tactic's
   target plane into its orders, overriding a spawn plane and a `kUpdateShip`
   plane.
 - A random-spawn Omni chases its kept attack target (`../Ships/AGENTS.md`
   `## Ship Invariants`), picked from itself in 3D among enemies on an Omni
   plane, circling it while it is in line of sight as a fleet Omni circles its
   target unless returning to an island, and, outside transfer lock, writes that
-  enemy's plane into its orders; with no such enemy its target plane stays. A
+  enemy's plane into its orders; with no such enemy it targets the lowest plane. A
   `kTargetFlagship` row (`../Ships/AGENTS.md`) whose enemy flagship is at or
   below the highest Omni plane keeps that flagship as its kept attack target
   instead and chases and circles it the same way, with no flee or return to an

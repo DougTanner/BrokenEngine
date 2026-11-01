@@ -9,23 +9,26 @@ namespace engine
 
 FlightPlanes::FlightPlanes()
 : common::Singleton<FlightPlanes>(gpFlightPlanes, this)
-, mPlanes(game::kFlightPlanes)
+, mPlanes(game::kFlightPlanes.begin(), game::kFlightPlanes.end())
 {
-	// Every height is positive and above its predecessor. These run first because the terrain check below reads
-	// Highest(), which needs a non-empty table.
+	// These run first because raising the highest plane below needs a non-empty table.
 	ASSERT(!mPlanes.empty());
 	ASSERT(std::ssize(mPlanes) <= kiMaxFlightPlanes);
+
+	// The table's highest height is its clearance above the tallest stored island peak.
+	float fTallestPeakHeightMeters = 0.0f;
+	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
+	{
+		fTallestPeakHeightMeters = std::max(fTallestPeakHeightMeters, rTemplate.fPeakHeightMeters);
+	}
+	mPlanes.back().fHeightMeters += fTallestPeakHeightMeters;
+
+	// Every resolved height is positive and above its predecessor.
 	float fPreviousHeightMeters = 0.0f;
 	for (const FlightPlane& rPlane : mPlanes)
 	{
 		ASSERT(rPlane.fHeightMeters > fPreviousHeightMeters);
 		fPreviousHeightMeters = rPlane.fHeightMeters;
-	}
-
-	// The quantized stored peak is the highest resident heightmap texel, so no terrain reaches the highest plane.
-	for ([[maybe_unused]] const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
-	{
-		ASSERT(DirectX::PackedVector::XMConvertHalfToFloat(DirectX::PackedVector::XMConvertFloatToHalf(rTemplate.fPeakHeightMeters)) < Highest().fHeightMeters);
 	}
 }
 

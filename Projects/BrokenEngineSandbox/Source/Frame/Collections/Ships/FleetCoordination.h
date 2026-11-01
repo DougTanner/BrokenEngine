@@ -57,7 +57,7 @@ struct ShipTactic
 
 // For fleet Fighters and Omnis (eType). Escort flies to the ship's own slot around its flagship; while the fleet is weapons
 // free, Attack and Veer-off take over for Fighters and plain Attack for Omnis; a ship outside its flagship's cell
-// navigates on its type's highest plane.
+// navigates on its type's default plane (DefaultFlightPlane), which escort also flies.
 // Attack targets the kept attack target rRegistryTarget (FindAttackTarget, picked from the flagship in x/y, sight from
 // the stored plane uiFlightPlane) and routes to its next waypoint while it is hidden; escort leaves it untouched, and only
 // the outside-the-cell branch and FindAttackTarget's drop of a kept target above the highest plane clear it. No tactic

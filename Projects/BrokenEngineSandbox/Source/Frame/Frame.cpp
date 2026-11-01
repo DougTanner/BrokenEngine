@@ -103,7 +103,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 149 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 150 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -260,8 +260,8 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 
 	// The wave's type: one equal-odds draw over the three types, whose radius sets the wave's clearance and spacing.
 	ShipType eWaveType = static_cast<ShipType>(common::Random(2i64, rFrame.postRender.randomEngine));
-	// The wave starts settled on its type's highest flight plane.
-	int64_t iWaveFlightPlane = HighestFlightPlane(eWaveType);
+	// The wave starts settled on its type's default flight plane.
+	int64_t iWaveFlightPlane = DefaultFlightPlane(eWaveType);
 	// The type draw happens even when it has no room, so a full type does not shift later draws.
 	int64_t iShipCount = std::clamp(kiRandomSpawnsPerFleetShip * fleetCounts[std::to_underlying(eWaveType)] - randomSpawnCounts[std::to_underlying(eWaveType)], 0i64, kiMaximumFleetSize);
 	if (iShipCount == 0)
