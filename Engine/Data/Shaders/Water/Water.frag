@@ -183,7 +183,7 @@ void main()
 	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, f2LightingTexcoordBaseHeight);
 
 	// Ambient sample — straight-down base-height projection, no reflection offset.
-	// Uses the precomputed direction-averaged ambient texture (single fetch replaces three EWNS samples).
+	// Uses the precomputed direction-averaged ambient texture from a single fetch.
 	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4LightingArea);
 	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeightAmbient);
 
@@ -227,8 +227,10 @@ void main()
 	return;
 #endif
 
-	// Additive smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
-	// decouples smoke from wave normals)
+	// Blend smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
+	// decouples smoke from wave normals). Every plane is shadowed by the object shadow above it at the base-height
+	// projected position, read once because that position does not vary with the plane.
+	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane));
@@ -236,6 +238,6 @@ void main()
 		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout);
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
 	}
 }

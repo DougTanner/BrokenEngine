@@ -4,7 +4,7 @@ Revisit When: smoke from different sources needs to read as different things fro
 
 ## Context
 
-Smoke is a client-only 2D density field (`Engine/Data/Shaders/Smoke/AGENTS.md`): one `R16_SFLOAT` channel per texel (`shaders::kVkFormatSmoke`), deposited additively through `Smoke.frag` by the `SmokeTrails` and `Puffs` collections, advected and diffused by the two spread passes, and composited in `Engine/Data/Shaders/ShaderFunctions.h` by `AddSmoke` (`Model.frag`) and `BlendSmokePrecomputed` (`Terrain.frag`, `Water.frag`). `BlendSmoke` has no caller, and `SmokeShadow` reads density only.
+Smoke is a client-only 2D density field per flight plane (`Engine/Data/Shaders/Smoke/AGENTS.md`): one `R16_SFLOAT` channel per texel (`shaders::kVkFormatSmoke`), deposited additively through `Smoke.frag` by the `SmokeTrails` and `Puffs` collections, advected and diffused by the two spread passes, and composited in `Engine/Data/Shaders/ShaderFunctions.h` by `AddSmoke` (`Model.frag`) and `BlendSmokePrecomputed` (`Terrain.frag`, `Water.frag`). `SmokeShadow` reads density only.
 
 The only color variation today is by density: `fSmokeColorMin + fSmokeColorMultiplier * density` scales the lit smoke color, capped at 1.25, so thin smoke reads darker than thick smoke. Every source makes the same grey smoke.
 
@@ -40,7 +40,7 @@ forward it and `Smoke.frag` writes density only.
 
 - Client-only rendering; smoke is not CRC'd, so no determinism exposure.
 - A second channel doubles the smoke textures' memory and the spread passes' texture bandwidth.
-- `Documents/Plans/Engine/SmokePerFlightPlane.md` turns the smoke textures into one field per flight plane; whichever lands second carries the shade channel across every plane's texture.
+- Each flight plane owns its own smoke textures, so the shade channel goes into every plane's textures.
 - References:
   - Fedkiw, Stam, Jensen, "Visual Simulation of Smoke" (SIGGRAPH 2001), https://www.graphics.stanford.edu/papers/smoke/ — vorticity confinement restores small rolling detail lost on coarse grids.
   - Forney, Smokeview/FDS (2011), https://files.thunderheadeng.com/femtc/2011_d1-07-forney-presentation.pdf — color and opacity driven from separate soot and temperature quantities, the closest published analogue to a shade channel.

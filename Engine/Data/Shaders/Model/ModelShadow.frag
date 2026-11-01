@@ -34,7 +34,8 @@ void main()
 {
 	// Coverage merged by MAX blending. R and G split ground coverage by ship height above the ground below it, between
 	// the lowest and highest flight-plane heights, and blur with Sigma Low and High, so the ground blur varies smoothly
-	// with height. B and A hold ships on flight planes 1 and 2 only, for ship-on-ship shadows; no model reads plane 0's.
+	// with height. B and A hold ships on flight planes 1 and 2 only, for shadows on ships and smoke below them; nothing
+	// reads plane 0's.
 	float fHeightFraction = clamp(fInHeightAboveBase * globalLayout.fObjectShadowsBlurHeightRangeInverse, 0.0f, 1.0f);
 	f4OutColor = vec4(1.0f - fHeightFraction, fHeightFraction, equal(ivec2(1, 2), ivec2(iInLayer)));
 }

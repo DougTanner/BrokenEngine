@@ -228,6 +228,14 @@ float SampleTerrainShadow(sampler2D shadowTextureSampler, vec2 f2Uv)
 	return textureLod(shadowTextureSampler, f2Uv, 0.0f).x;
 }
 
+// Object shadow B and A hold only ships on flight planes 1 and 2: the darker lit factor of those above iPlane, or 1 when
+// no plane lies above.
+float ObjectShadowAbove(vec4 f4ObjectShadows, int iPlane)
+{
+	vec2 f2ObjectShadowsAbove = mix(vec2(1.0f), f4ObjectShadows.zw, lessThan(ivec2(iPlane), ivec2(1, 2)));
+	return min(f2ObjectShadowsAbove.x, f2ObjectShadowsAbove.y);
+}
+
 // Vertical, sun-independent attenuation at the fragment XY: the product of every flight plane's factor, each in
 // [0, 1], so overlapping planes never shade lighter than either alone and an empty plane multiplies by exactly 1.
 float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float fMulti)
@@ -260,7 +268,8 @@ float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D p
 	return fShadow;
 }
 
-vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax, vec4 pf4Lighting[3])
+// fObjectShadow darkens only the sun/moon and ambient base lighting; the EWNS light deposits stay unshadowed.
+vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax, vec4 pf4Lighting[3], float fObjectShadow)
 {
 	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2InPosition);
 	float fSmoke = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
@@ -274,30 +283,19 @@ vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, samp
 	// fSmokeLightingCombinedMultiplier (= fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier) and
 	// f4SmokeBaseLighting (max(sun,moon) sky term + ambient) are folded CPU-side (GlobalUniforms.cpp).
 	vec3 f3Final = vec3(fRed, fGreen, fBlue) * globalLayout.fSmokeLightingCombinedMultiplier;
-	f3Final += globalLayout.f4SmokeBaseLighting.xyz;
+	f3Final += fObjectShadow * globalLayout.f4SmokeBaseLighting.xyz;
 
 	f3Final = min(vec3(1.0f, 1.0f, 1.0f), f3Final);
 	return (1.0f - fSmoke) * f3InColor + fSmoke * f3Final * min(vec3(1.25f, 1.25f, 1.25f), vec3(fDensity, fDensity, fDensity));
 }
 
-vec3 BlendSmoke(vec3 f3Color, float fSmokePow, vec4 pf4Lighting[3], GlobalLayout globalLayout)
-{
-	float fSmokeDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmokePow;
-	float fRed = IntensityLighting(pf4Lighting[0]);
-	float fGreen = IntensityLighting(pf4Lighting[1]);
-	float fBlue = IntensityLighting(pf4Lighting[2]);
-	vec3 f3SmokeLighting = vec3(fRed, fGreen, fBlue) * globalLayout.fSmokeLightingMultiplier * globalLayout.fLightingTimeOfDayMultiplier;
-	f3SmokeLighting += max(globalLayout.fSunIntensitySmoke * globalLayout.f4SunColor.xyz, globalLayout.fMoonIntensitySmoke * globalLayout.f4MoonColor.xyz) + globalLayout.f4AmbientColor.xyz;
-	f3SmokeLighting = min(vec3(1.0f), f3SmokeLighting);
-	return (1.0f - fSmokePow) * f3Color + fSmokePow * f3SmokeLighting * min(vec3(1.25f), vec3(fSmokeDensity));
-}
-
 // Caller passes 4.0 * mAmbientCombineTexture sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
-vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, GlobalLayout globalLayout)
+// fObjectShadow darkens only the base lighting, as in AddSmoke.
+vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, GlobalLayout globalLayout, float fObjectShadow)
 {
 	float fSmokeDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmokePow;
 	vec3 f3SmokeLighting = f3LightingSum * globalLayout.fSmokeLightingCombinedMultiplier;
-	f3SmokeLighting += globalLayout.f4SmokeBaseLighting.xyz;
+	f3SmokeLighting += fObjectShadow * globalLayout.f4SmokeBaseLighting.xyz;
 	f3SmokeLighting = min(vec3(1.0f), f3SmokeLighting);
 	return (1.0f - fSmokePow) * f3Color + fSmokePow * f3SmokeLighting * min(vec3(1.25f), vec3(fSmokeDensity));
 }

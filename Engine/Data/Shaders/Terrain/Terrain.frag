@@ -123,7 +123,7 @@ void main()
 	ReadLighting(pf4Lighting, pLightingSamplers, f2LightingTexcoord);
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, f3InPosition);
 	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4LightingArea);
-	// Direction-averaged base-height lighting (single fetch replaces three EWNS samples — feeds both ambient and BlendSmoke).
+	// Direction-averaged base-height lighting from a single fetch; feeds both ambient and BlendSmokePrecomputed.
 	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeight);
 
 	// Apply directional and ambient lighting
@@ -152,7 +152,9 @@ void main()
 	f4OutColor.xyz += f3Lighting * mix(f3Color, vec3(1.0f), globalLayout.fLightingAddTerrain);
 
 	// Sample each flight plane's smoke at that plane's eye-ray projected position, lowest first so the plane nearest the
-	// eye blends last; every plane is lit by the lighting at the base-height projected position.
+	// eye blends last; every plane is lit by the lighting, and shadowed by the object shadow above it, at the base-height
+	// projected position. The object shadow is read once because that position does not vary with the plane.
+	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], FlightPlanePosition(globalLayout, mainLayout, f3InPosition, iPlane));
@@ -160,6 +162,6 @@ void main()
 		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout);
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
 	}
 }

@@ -265,11 +265,9 @@ void main()
 	float fShadow = max(mainLayout.fPhysicallyBasedRenderingShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
-	// Object shadow B and A hold only ships on flight planes 1 and 2, so the darker of those above iInLayer shades this
-	// ship; the result stays 1 when no plane lies above. Sampled before the select to keep implicit derivatives uniform.
+	// Only ships on the planes above iInLayer shade this ship; the smoke loop below reuses this sample.
 	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2VisibleAreaPosition);
-	vec2 f2ObjectShadowsAbove = mix(vec2(1.0f), f4ObjectShadows.zw, lessThan(ivec2(iInLayer), ivec2(1, 2)));
-	float fObjectShadow = min(f2ObjectShadowsAbove.x, f2ObjectShadowsAbove.y);
+	float fObjectShadow = ObjectShadowAbove(f4ObjectShadows, iInLayer);
 	fShadow *= fObjectShadow;
 	float fShadowMoon = fObjectShadow;
 
@@ -395,7 +393,7 @@ void main()
 			float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
 			fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
 		}
-		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
+		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting, ObjectShadowAbove(f4ObjectShadows, iPlane));
 	}
 #endif
 

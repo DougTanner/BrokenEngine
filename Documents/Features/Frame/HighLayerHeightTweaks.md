@@ -7,7 +7,7 @@ Revisit When: the user schedules live tuning of the High flight layer.
 Expose the High layer's height as an easy-to-adjust developer control from
 0.0 to 200.0 meters, initially the data-derived default (tallest island peak
 + 5 m). Ships may fly through terrain when it is set too low; the user
-explicitly accepts this. High may also be below or equal to Low (5 m). Keep
+explicitly accepts this. High may also be below or equal to Low (3 m). Keep
 Low's height unchanged.
 
 This is a manually executed feature under `Documents/Features`. Saving this
@@ -132,12 +132,12 @@ a general configuration/admin system for this slider.
 
 1. Only developer Tweaks > Misc > Ships exposes High Layer Height, with
    range 0.0–200.0 m and the data-derived session default (tallest island peak
-   + 5 m); Low remains 5 m.
-2. Exercise 0, 5, 100, and 200 m, changing values repeatedly while
+   + 5 m); Low remains 3 m.
+2. Exercise 0, 3, 100, and 200 m, changing values repeatedly while
    ships climb. Existing High-target ships move smoothly at their type's
    existing rate, new High ships use the accepted height, and unrelated
    targets and XY movement remain intact.
-3. At 0 and 5 m, High retains its identity, empty navigation graph, and
+3. At 0 and 3 m, High retains its identity, empty navigation graph, and
    terrain exemption. Ships may pass through terrain; no ordering assertion,
    terrain clamp, accidental plane relabeling, or equal-height ambiguity occurs.
 4. Server and clients agree on accepted value, application tick, ship heights,
