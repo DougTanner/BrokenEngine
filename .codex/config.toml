@@ -22,3 +22,8 @@ additionalContextLimit = 0
 type = "command"
 command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 3"
 additionalContextLimit = 0
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 4"
+additionalContextLimit = 0

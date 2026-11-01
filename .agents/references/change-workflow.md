@@ -99,7 +99,7 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 - Hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
 - Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.
 
-<!-- session-context-part: Change Workflow, Steps 1-5 (continues in the next part) -->
+<!-- session-context-part: Change Workflow, Steps 1-3 (continues in the next part) -->
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
 This workflow governs every tracked artifact. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
@@ -164,6 +164,7 @@ Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-ex
 
 At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval per `/next-plan` `### Implementation approval`; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
+<!-- session-context-part: Change Workflow, Steps 4-6 (continued from the previous part; continues in the next part) -->
 #### Step 4 — Implement and propagate
 
 Order: the acceptance checks the execution card marks `before the first edit` run first, on the unedited tree; then the slices run in parallel; `/update-affected-code` runs after them.
@@ -195,7 +196,6 @@ a block that opens with a `// TEMP START` line and closes with a `// TEMP END`
 line. Removing a block also restores any pre-existing line its edit changed to
 its baseline text, which Git holds.
 
-<!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
 
 Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
@@ -244,6 +244,7 @@ by putting it to the user before Step 9 under `### User Interaction`; an
 accepted one follows the Step 8 Leftovers rule, and one the user does not accept
 is logged at Step 9, where one still unanswered counts as not accepted.
 
+<!-- session-context-part: Change Workflow, Steps 7-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 7 — Apply the triggered cleanup
 
 Order: all run in parallel, except `/progressive-disclosure-review` runs after `/update-claude-docs` so the prose that step generates is in scope.
