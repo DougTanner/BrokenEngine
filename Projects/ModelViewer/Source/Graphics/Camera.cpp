@@ -15,8 +15,7 @@ void Camera::Update()
 {
 	float fHalfFov = std::min(XM_PIDIV4 * 0.5f, std::atan(std::tan(XM_PIDIV4 * 0.5f) * engine::gpSwapchainManager->mfAspectRatio));
 	float fDistance = mfZoom * 1.1f * mfRadius / std::sin(fHalfFov);
-	glm::mat3 initialBasis(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, std::sin(kfInitialPitch), std::cos(kfInitialPitch)), glm::vec3(0.0f, -std::cos(kfInitialPitch), std::sin(kfInitialPitch)));
-	glm::mat3 orientation = initialBasis * glm::mat3(mArcBall.getTransformation());
+	glm::mat3 orientation = glm::mat3(mArcBall.getTransformation());
 	glm::vec3 toEye = orientation[2];
 	glm::vec3 up = orientation[1];
 	XMVECTOR vecToEyeNormal = XMVectorSet(toEye.x, toEye.y, toEye.z, 0.0f);
@@ -37,6 +36,7 @@ void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 	mfRadius = fRadius;
 	mArcBall = arc_ball::ArcBall(glm::vec3(0.0f), 0.75f, glm::mat4(1.0f));
 	mfZoom = 1.0f;
+	mModelSunRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 void Camera::UpdateFlight(const engine::FrameInterpolateBase& rFrame, FXMVECTOR vecTarget, float fDeltaTime)

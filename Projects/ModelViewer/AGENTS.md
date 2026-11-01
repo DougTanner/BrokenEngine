@@ -107,7 +107,8 @@ The viewer owns clip selection, playback time and play/pause state; selected
 clips use the engine's indexed pose evaluation. Rest pose uses cached authored
 node matrices and skinning; an animation's first key is not a rest-pose
 substitute. Camera fitting uses bounds from that rest geometry. Model changes
-reset to Rest pose and refit the camera; clip changes restart playback without
+reset to Rest pose, refit the camera, and reset the orbit camera rotation;
+clip changes restart playback without
 refitting. UI mouse capture takes precedence over camera and sun gestures.
 
 In orbit, left drags rotate the camera; right drags rotate only the model sun
@@ -159,7 +160,7 @@ Only an absent sidecar supplies identity alignment and permits Save to create
 it. An unreadable, malformed, unsupported or invalid present sidecar shows a
 load error, applies no partial record and disables Save until a successful
 reload. Invalid edits stay visible with a reason and disable Save while the
-last valid complete alignment remains in the flight preview. Validate derived
+last valid complete alignment remains in both previews. Validate derived
 alignment and its inverse-transpose normal matrix as finite and invertible
 before accepting edits; valid scalar fields alone are insufficient.
 
@@ -172,13 +173,16 @@ agents work, mutating tracked source metadata in either main or session
 checkouts. Treat these changes as user-owned and preserve them; never assume
 every dirty sidecar is agent-authored or silently revert it.
 
-Authored alignment affects flight presentation only, leaving body movement,
+Authored alignment affects model presentation only, leaving body movement,
 camera tracking, raw rest bounds and animation evaluation unchanged.
-Compose offset, authored XYZ scale times the existing flight radius, XYZ
+In flight, compose offset, authored XYZ scale times the existing flight radius, XYZ
 rotation, then flight orientation and body translation, matching Fighter order.
 Save only authored scale, excluding the radius multiplier. Keep the shadow
-origin at body center despite authored offset. Orbit retains raw geometry and
-its fitted camera while preserving edits for flight.
+origin at body center despite authored offset. Orbit applies only the authored
+XYZ rotation, about the rest-bounds center with no offset or scale, so the
+camera fitted to the raw rest bounds still frames the model. The orbit camera
+starts looking straight down with the aligned front (+x after the authored
+rotation) to screen right and +y to screen up.
 
 ## Engine integration
 
@@ -213,7 +217,7 @@ from `engine::CameraBase`. Model
 illumination uses the game's shared sun/day cycle, ambient and model skybox
 environment for equal sun input and shared defaults. Right-drag
 sun rotation changes only the model direction and persists in world space across
-Sun angle edits, model changes and Graphics recreation. Sun angle still drives
+Sun angle edits and Graphics recreation; model changes reset it. Sun angle still drives
 shared day-cycle colors and brightness and the base direction for world and model.
 Orbit preview isolation excludes world lighting deposits, smoke and terrain
 occlusion from model shading; flight uses ordinary world shading and depth.

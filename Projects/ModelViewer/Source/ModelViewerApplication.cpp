@@ -180,6 +180,7 @@ void ModelViewerApplication::ValidateModelAlignment()
 		return;
 	}
 	mMatModelAlignment = matAlignment;
+	mMatModelPreRotate = alignment.matPreRotate;
 	mFlags.Set(ViewerFlags::kMetadataValid);
 }
 
@@ -656,7 +657,8 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		}
 		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
 		rLayout = {};
-		XMMATRIX matTransform = XMMatrixIdentity();
+		XMVECTOR vecCenter = XMLoadFloat3A(&rPreview.f3Center);
+		XMMATRIX matTransform = XMMatrixTranslationFromVector(XMVectorNegate(vecCenter)) * mMatModelPreRotate * XMMatrixTranslationFromVector(vecCenter);
 		if (mFlags & ViewerFlags::kFlying)
 		{
 			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));

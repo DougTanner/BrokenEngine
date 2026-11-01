@@ -23,7 +23,6 @@ public:
 	XMVECTOR mVecModelEyePosition {};
 
 private:
-	static constexpr float kfInitialPitch = 0.5404195f;
 	float mfRadius = 1.0f;
 	float mfZoom = 1.0f;
 };
