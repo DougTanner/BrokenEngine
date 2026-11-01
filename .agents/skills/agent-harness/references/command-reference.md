@@ -162,7 +162,16 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   `cancelAcknowledged` is true when the cancelled entry was freed at that point;
   `existing_queued` for a whole-chunk load queued from the main thread; and
   `existing_complete` for a finished whole-chunk or range load.
-- `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list valid names. Single-channel output normalizes to grayscale PNG; four-byte RGBA writes direct PNG; float formats require raw `.bin`. The default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
+- `dump_render_target`:
+  `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list
+  valid names. `Combine` and `LightingHistory` take `index` =
+  lighting layer * 3 + color (0-5), and `AmbientCombine` and `AmbientHistory`
+  the lighting layer (0-1); `Lighting`, `Spread`, and `SpreadOnly` are the
+  one scratch chain the refreshing layer reuses, so `Lighting` reads blank on
+  a frame with no lighting refresh. Single-channel output normalizes to grayscale PNG;
+  four-byte RGBA writes direct PNG; float formats require raw `.bin`. The
+  default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires
+  `kbScreenshots`.
 - `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
   Tweaks overlay is shown), game flags, framebuffer, windows, and labeled
   items with rect/disabled/checked/inputable/visible fields. Items include
@@ -259,7 +268,8 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns
   `{"publishedFrames":int,"basisCoord":[q,r],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
-  plus a `shadow`, `lighting`, and `smoke` object each shaped
+  plus a `shadow` and `smoke` object and a `lighting` array of one such object
+  per lighting layer, layer 0 first, each shaped
   `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`;
   `smoke` reports flight plane 0's area pair, the pair wind reads. Take
   every sample with the client restored (`window_state {"minimized":false}`): a

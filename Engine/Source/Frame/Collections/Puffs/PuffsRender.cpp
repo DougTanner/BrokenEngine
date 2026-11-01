@@ -17,7 +17,7 @@ void PuffsInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kCrc, i);
+		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
 		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
 		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0]);
 	}
@@ -44,7 +44,7 @@ void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 	// Each puff adds at most one quad per plane, so every plane's buffer takes the full capacity.
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kCrc, i);
+		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
 		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
 			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
@@ -66,7 +66,7 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 	shaders::AxisAlignedQuadLayout* ppPuffsLayouts[shaders::kiMaxFlightPlanes] {};
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		auto [pPuffsLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(DynamicPipelines::SmokeDepositKey(kCrc, i), kBufferMain, iCommandBuffer);
+		auto [pPuffsLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(DynamicPipelines::FlightPlaneDepositKey(kCrc, i), kBufferMain, iCommandBuffer);
 		ASSERT(spiRendered[i] + rCurrent.iCount <= iBufferCapacity);
 		ppPuffsLayouts[i] = pPuffsLayouts;
 	}
@@ -121,7 +121,7 @@ void PuffsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(DynamicPipelines::SmokeDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(DynamicPipelines::FlightPlaneDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
 	}
 }
 

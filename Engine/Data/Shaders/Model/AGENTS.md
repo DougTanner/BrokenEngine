@@ -23,7 +23,11 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is
   shared, so every model pipeline binds that texture.
 - A model's height above the lowest flight plane fades the terrain shadow it
-  receives and moves its lighting sample.
+  receives and moves its lighting sample: each lighting layer is sampled along
+  the eye line by the model centre's height above that layer's plane. The
+  fragment blends the low and high layers by its own height between the two
+  planes, reading only the layers its weight needs, and plane k's smoke is lit
+  by layer k, a skipped layer being read only where that plane's smoke shows.
 - A model takes no smoke from planes below its own flight plane, smoke faded by
   the fragment's height above its own plane so it pokes through, and full smoke
   from every plane above. Its own plane is the one nearest its centre height

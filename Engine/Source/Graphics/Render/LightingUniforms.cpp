@@ -20,9 +20,11 @@ static bool IsVisibleAreaInsideHeldCombineCrop(const XMFLOAT4& rf4VisibleArea, c
 	    && rf4VisibleArea.y <= rf4HeldVisibleArea.y + fHeldCombineTexelY && rf4VisibleArea.w >= rf4HeldVisibleArea.w - fHeldCombineTexelY;
 }
 
-static bool sbLightingRefreshFrame = true; // Cached before global lighting publication so the spread, combine, and temporal chain share one refresh epoch
+// The pending-layer rule below names "the other layer" as 1 - layer.
+static_assert(shaders::kiLightingLayers == 2);
 
-static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, bool bScheduledRefresh, bool bLightingEnabled)
+// iScheduledLayer is the layer the cadence schedules this frame, or -1 for none.
+static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int64_t iScheduledLayer, bool bLightingEnabled)
 {
 	// Lighting mirrors the shadow area's raw-frustum-safe framing reference. RenderTargetTextures sizes deposit/spread/combine through
 	// LightingDetailTextureSize with kfLightingHeadroomMultiplier; textureWidth / that multiplier pixels span the framing's reference-angle
@@ -32,52 +34,94 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// Spread/combine/temporal resample that world rectangle at their own resolutions.
 	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.width);
 	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.height);
-	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.width);
-	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.height);
+	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0].mInfo.vkExtent3D.width);
+	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0].mInfo.vkExtent3D.height);
 	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 
 	XMVECTOR vecFootprintCenter = XMVectorAdd(engine::gpCamera->mVecPosition, XMVectorSet(0.0f, engine::gpCamera->mfTexelCenterOffsetNorth, 0.0f, 0.0f));
 	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelFraming, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
 
-	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
-	static TemporalAreaLatch sTemporalAreaLatch {};
-	static XMFLOAT4 sf4HeldVisibleArea {};
-	static bool sbHeldVisibleArea = false;
+	// Each layer's temporal accumulation publishes the current and previous world areas from that layer's own refresh
+	// epoch, so its temporal pass reprojects only from its own previous refresh; a skip retains both.
+	static TemporalAreaLatch spTemporalAreaLatches[shaders::kiLightingLayers] {};
+	static XMFLOAT4 spf4HeldVisibleAreas[shaders::kiLightingLayers] {};
+	static bool spbHeldVisibleAreas[shaders::kiLightingLayers] {};
+	static bool spbTemporalResets[shaders::kiLightingLayers] {};
+	// The layer that also needed a refresh on a frame another layer took, or -1; it refreshes first next frame, so a
+	// fast pan escaping both crops every frame alternates the layers instead of starving one.
+	static int64_t siPendingLayer = -1;
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
 	// the refresh test compares them with this frame's areas, and let a multi-cell jump take the existing reset.
 	static RetainedAreaBasis sRetainedAreaBasis {};
 	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
-		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *optionalShift);
-		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *optionalShift);
-		ShiftArea(sf4HeldVisibleArea, *optionalShift);
+		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+		{
+			ShiftArea(spTemporalAreaLatches[i].f4CurrentArea, *optionalShift);
+			ShiftArea(spTemporalAreaLatches[i].f4PreviousArea, *optionalShift);
+			ShiftArea(spf4HeldVisibleAreas[i], *optionalShift);
+		}
 	}
 	else
 	{
 		gbLightingTemporalReset = true;
-		sbHeldVisibleArea = false;
-		++gPresentationContinuity.lighting.iHistoryResets;
+		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+		{
+			spbHeldVisibleAreas[i] = false;
+			++gPresentationContinuity.pLighting[i].iHistoryResets;
+		}
 	}
-	sbLightingRefreshFrame = bScheduledRefresh || !sbHeldVisibleArea
-	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rf4VisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
-	if (sbLightingRefreshFrame)
+	if (gbLightingTemporalReset)
 	{
-		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbLightingTemporalReset, gLightingTemporalBlend.mfCurrent, rGlobalLayout.f4LightingAreaPrevious);
-		rGlobalLayout.f4LightingArea = sTemporalAreaLatch.f4CurrentArea;
-		sf4HeldVisibleArea = rf4VisibleArea;
-		sbHeldVisibleArea = true;
+		gbLightingTemporalReset = false;
+		std::ranges::fill(spbTemporalResets, true);
+	}
+
+	bool pbNeedsRefresh[shaders::kiLightingLayers] {};
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		pbNeedsRefresh[i] = spbTemporalResets[i] || !spbHeldVisibleAreas[i] || i == iScheduledLayer
+		                 || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rf4VisibleArea, spf4HeldVisibleAreas[i], spTemporalAreaLatches[i].f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
+	}
+	// The shared deposit and spread chain refreshes at most one layer per frame.
+	int64_t iRefreshLayer = siPendingLayer;
+	for (int64_t i = 0; i < shaders::kiLightingLayers && iRefreshLayer < 0; ++i)
+	{
+		if (pbNeedsRefresh[i])
+		{
+			iRefreshLayer = i;
+		}
+	}
+	siPendingLayer = iRefreshLayer >= 0 && pbNeedsRefresh[1 - iRefreshLayer] ? 1 - iRefreshLayer : -1;
+	giLightingRefreshLayer = iRefreshLayer;
+
+	if (iRefreshLayer >= 0)
+	{
+		TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[iRefreshLayer];
+		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent, rGlobalLayout.f4LightingAreaPrevious);
+		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
+		spf4HeldVisibleAreas[iRefreshLayer] = rf4VisibleArea;
+		spbHeldVisibleAreas[iRefreshLayer] = true;
 	}
 	else
 	{
-		rGlobalLayout.f4LightingArea = sTemporalAreaLatch.f4CurrentArea;
-		rGlobalLayout.f4LightingAreaPrevious = sTemporalAreaLatch.f4PreviousArea;
-		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.fBlend;
+		// No deposit or chain work runs; the chain fields carry layer 0's held values.
+		const TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[0];
+		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
+		rGlobalLayout.f4LightingAreaPrevious = rTemporalAreaLatch.f4PreviousArea;
+		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.fBlend;
 	}
-	gPresentationContinuity.lighting.f4CurrentArea = sTemporalAreaLatch.f4CurrentArea;
-	gPresentationContinuity.lighting.f4PreviousArea = sTemporalAreaLatch.f4PreviousArea;
+	int64_t iChainLayer = std::max(iRefreshLayer, 0i64);
+	rGlobalLayout.uiLightingRefreshLayer = static_cast<uint32_t>(iChainLayer);
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		rGlobalLayout.pf4LightingAreas[i] = spTemporalAreaLatches[i].f4CurrentArea;
+		gPresentationContinuity.pLighting[i].f4CurrentArea = spTemporalAreaLatches[i].f4CurrentArea;
+		gPresentationContinuity.pLighting[i].f4PreviousArea = spTemporalAreaLatches[i].f4PreviousArea;
+	}
 
 	// Lighting-area extent reciprocal (LightingSpread.frag world->texcoord multiply).
-	const XMFLOAT4& rf4LightingArea = sTemporalAreaLatch.f4CurrentArea;
+	const XMFLOAT4& rf4LightingArea = spTemporalAreaLatches[iChainLayer].f4CurrentArea;
 	float fLightingAreaWidth = rf4LightingArea.z - rf4LightingArea.x;
 	float fLightingAreaHeight = rf4LightingArea.y - rf4LightingArea.w;
 	rGlobalLayout.f2LightingAreaExtentInverse.x = 1.0f / fLightingAreaWidth;
@@ -102,8 +146,11 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 		gbLightingTemporalReset = true;
 	}
 
+	// Scheduled refresh frames are the cadence's multiples, which the terrain shadow phase avoids when the cadences
+	// share a factor, and the layers take turns on them.
 	int64_t iLightingUpdateCadence = gLightingUpdateCadence.Get<int64_t>();
-	bool bScheduledLightingRefresh = gbLightingTemporalReset || (bLightingEnabled && gpGraphics->miFrameCounter % iLightingUpdateCadence == 0);
+	bool bScheduledFrame = bLightingEnabled && gpGraphics->miFrameCounter % iLightingUpdateCadence == 0;
+	int64_t iScheduledLayer = bScheduledFrame ? (gpGraphics->miFrameCounter / iLightingUpdateCadence) % shaders::kiLightingLayers : -1;
 
 	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
 	static const uint32_t suiRandomSeed = []
@@ -198,7 +245,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 		rfSpreadRingRotation = common::Random<XM_2PI>(ringRandomEngine);
 	}
 
-	PopulateLightingParameters(rGlobalLayout, bScheduledLightingRefresh, bLightingEnabled);
+	PopulateLightingParameters(rGlobalLayout, iScheduledLayer, bLightingEnabled);
 }
 
 void RenderLightingMain(int64_t iCommandBuffer)
@@ -321,7 +368,7 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 {
 	// A disabled refresh still runs combine/temporal/history once to publish black, but the unconditional spread
 	// attachment clears already provide its zero inputs, so no spread draw is needed.
-	int64_t iInstanceCount = sbLightingRefreshFrame && gLightingEnabled.Get<bool>() ? 1 : 0;
+	int64_t iInstanceCount = giLightingRefreshLayer >= 0 && gLightingEnabled.Get<bool>() ? 1 : 0;
 
 	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
 	// CreateHostVisibleIndirectBuffer zeroes slots during pipeline recreation, so recorded passes need their instance counts restored.
@@ -331,15 +378,18 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 		rPipeline.WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
 	}
 
-	// The combine-sized chain covers the whole texture; the refresh predicate suppresses it by zeroing the Z group
-	// count, so a skip dispatches nothing without re-recording the Main CB.
-	VkExtent3D vkCombineExtent = gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D;
+	// The combine-sized chain covers the whole texture; the refresh predicate suppresses each layer's chain by zeroing its
+	// Z group count, so only the refreshing layer dispatches, without re-recording the Main CB.
+	VkExtent3D vkCombineExtent = gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0].mInfo.vkExtent3D;
 	int64_t iCombineGroupsX = TileCount(vkCombineExtent.width);
 	int64_t iCombineGroupsY = TileCount(vkCombineExtent.height);
-	int64_t iCombineGroupsZ = sbLightingRefreshFrame ? 1 : 0;
-	gpPipelineManager->mCombinePipeline.WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
-	gpPipelineManager->mLightingTemporalPipeline.WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
-	gpPipelineManager->mLightingHistoryCopyPipeline.WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		int64_t iCombineGroupsZ = i == giLightingRefreshLayer ? 1 : 0;
+		gpPipelineManager->mpCombinePipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
+		gpPipelineManager->mpLightingTemporalPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
+		gpPipelineManager->mpLightingHistoryCopyPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
+	}
 }
 
 } // namespace engine

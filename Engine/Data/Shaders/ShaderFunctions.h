@@ -111,17 +111,19 @@ float IntensityLighting(vec4 f4Lighting)
 	return f4Lighting.x + f4Lighting.y + f4Lighting.z + f4Lighting.w;
 }
 
-// The transparent-black border sampler returns no lighting outside the footprint, so these are plain reads.
-void ReadLighting(inout vec4 pf4Lighting[3], sampler2D pLightingSamplers[3], vec2 f2Texcoord)
+// The transparent-black border sampler returns no lighting outside the footprint, so these are plain reads of lighting
+// layer iLayer. Explicit level 0 (every lighting target has one mip) keeps them valid inside the non-uniform branches
+// that skip a layer the height blend does not need.
+void ReadLighting(inout vec4 pf4Lighting[3], sampler2D pLightingSamplers[kiLightingLayers * 3], int iLayer, vec2 f2Texcoord)
 {
-	pf4Lighting[0] = texture(pLightingSamplers[0], f2Texcoord);
-	pf4Lighting[1] = texture(pLightingSamplers[1], f2Texcoord);
-	pf4Lighting[2] = texture(pLightingSamplers[2], f2Texcoord);
+	pf4Lighting[0] = textureLod(pLightingSamplers[3 * iLayer + 0], f2Texcoord, 0.0f);
+	pf4Lighting[1] = textureLod(pLightingSamplers[3 * iLayer + 1], f2Texcoord, 0.0f);
+	pf4Lighting[2] = textureLod(pLightingSamplers[3 * iLayer + 2], f2Texcoord, 0.0f);
 }
 
-vec3 ReadAmbientLighting(sampler2D ambientLightingSampler, vec2 f2Texcoord)
+vec3 ReadAmbientLighting(sampler2D ambientLightingSamplers[kiLightingLayers], int iLayer, vec2 f2Texcoord)
 {
-	return texture(ambientLightingSampler, f2Texcoord).xyz;
+	return textureLod(ambientLightingSamplers[iLayer], f2Texcoord, 0.0f).xyz;
 }
 
 float Sum(vec4 pf4Lighting[3])
@@ -190,7 +192,7 @@ vec3 WaterLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fSoften, float fOne
 	return mix(f3LumResult, f3AvgResult, fPowerMode);
 }
 
-// Operates on a precomputed direction-averaged sum (e.g. mAmbientCombineTexture sample).
+// Operates on a precomputed direction-averaged sum (e.g. an mpAmbientCombineTextures sample).
 vec3 AmbientLightingPrecomputed(vec3 f3Result, float fIntensity, float fPower, float fPowerMode)
 {
 	// Skip the pow for whichever branch the mode discards at its extremes (fPowerMode is a uniform, so the branch is warp-coherent)
@@ -268,12 +270,17 @@ float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D p
 	return fShadow;
 }
 
-// fObjectShadow darkens only the sun/moon and ambient base lighting; the EWNS light deposits stay unshadowed.
-vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax, vec4 pf4Lighting[3], float fObjectShadow)
+// Plane iPlane's smoke amount at f2InPosition, read before AddSmoke so a caller can skip the lighting read where it is zero.
+float ReadSmoke(GlobalLayout globalLayout, vec2 f2InPosition, sampler2D smokeSampler, int iPlane)
 {
 	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2InPosition);
 	float fSmoke = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
-	fSmoke = clamp(pow(fSmoke, globalLayout.fSmokePower), 0.0f, 1.0f);
+	return clamp(pow(fSmoke, globalLayout.fSmokePower), 0.0f, 1.0f);
+}
+
+// fObjectShadow darkens only the sun/moon and ambient base lighting; the EWNS light deposits stay unshadowed.
+vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, float fSmoke, float fInMax, vec4 pf4Lighting[3], float fObjectShadow)
+{
 	float fDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmoke;
 	fSmoke *= fInMax;
 
@@ -289,7 +296,7 @@ vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, samp
 	return (1.0f - fSmoke) * f3InColor + fSmoke * f3Final * min(vec3(1.25f, 1.25f, 1.25f), vec3(fDensity, fDensity, fDensity));
 }
 
-// Caller passes 4.0 * mAmbientCombineTexture sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
+// Caller passes 4.0 * an mpAmbientCombineTextures sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
 // fObjectShadow darkens only the base lighting, as in AddSmoke.
 vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, GlobalLayout globalLayout, float fObjectShadow)
 {

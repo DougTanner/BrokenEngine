@@ -6,6 +6,7 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
+#include "Ui/SmokeWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
 namespace engine
@@ -25,7 +26,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 21;
+	static constexpr int64_t kiVersion = 22;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -48,6 +49,7 @@ struct GraphicsSettings
 	uint8_t uiOrthographicProjection = 0;
 	uint8_t puiProjectionPadding[1] {};
 	float fFieldOfView = 15.0f;
+	float fSmokeUpdateCadence = 2.0f;
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -70,7 +72,8 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterFoamEnabled) == 41, "Graphics
 static_assert(BT_OFFSETOF(GraphicsSettings, uiOrthographicProjection) == 42, "GraphicsSettings::uiOrthographicProjection offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 43, "GraphicsSettings padding changed — fFieldOfView must stay four-byte aligned");
 static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 44, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
-static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeUpdateCadence) == 48, "GraphicsSettings::fSmokeUpdateCadence offset changed — existing setting bytes move");
+static_assert(sizeof(GraphicsSettings) == 52, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -96,6 +99,7 @@ void SaveGraphicsSettings()
 		.uiWaterFoamEnabled = static_cast<uint8_t>(gWaterFoamSystemEnabled.Get<bool>()),
 		.uiOrthographicProjection = static_cast<uint8_t>(gOrthographicProjection.Get<bool>()),
 		.fFieldOfView = gFieldOfView.mfCurrent,
+		.fSmokeUpdateCadence = gSmokeUpdateCadence.mfCurrent,
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -151,6 +155,11 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 	if (!gShadowUpdateCadence.IsInRange(rGraphicsSettings.fShadowUpdateCadence))
 	{
 		return "fShadowUpdateCadence";
+	}
+
+	if (!gSmokeUpdateCadence.IsInRange(rGraphicsSettings.fSmokeUpdateCadence))
+	{
+		return "fSmokeUpdateCadence";
 	}
 
 	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiWaterLevel))
@@ -236,6 +245,7 @@ bool LoadGraphicsSettings()
 		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
 		gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
 		gShadowUpdateCadence.Set(graphicsSettings.fShadowUpdateCadence);
+		gSmokeUpdateCadence.Set(graphicsSettings.fSmokeUpdateCadence);
 		gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
 		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
@@ -273,6 +283,7 @@ void ResetGraphicsSettings()
 	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;
 	gLightingUpdateCadence.mfCurrent = gLightingUpdateCadence.mfDefault;
 	gShadowUpdateCadence.mfCurrent = gShadowUpdateCadence.mfDefault;
+	gSmokeUpdateCadence.mfCurrent = gSmokeUpdateCadence.mfDefault;
 	gWindEnabled.mfCurrent = gWindEnabled.mfDefault;
 	gLightingEnabled.mfCurrent = gLightingEnabled.mfDefault;
 

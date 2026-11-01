@@ -12,9 +12,7 @@ primary advances during creation or that baseline cannot run, stop and reconcile
 through the supported wrapper workflow before implementation or comparison runs. Do not use an
 arbitrary checkout or adopt or delete worktrees to force a match. All five candidates use identical
 renderer and fixture baselines, the same fixture specification, and no dependency on another
-candidate. Record baseline and candidate executable/pack byte hashes. The historical
-[per-flight-plane investigation](../../Investigations/Engine/LightingPerFlightPlane.md) is context,
-not a user-approved design or authority for current gameplay.
+candidate. Record baseline and candidate executable/pack byte hashes.
 
 Current point/area uploads project emitters to the base plane; deposit/spread uses horizontal EWNS, MAX blending, and an rgba8 combine. The candidate must preserve real XYZ and evaluate the complete normal. A brighter additive result alone is not evidence of better directional quality.
 

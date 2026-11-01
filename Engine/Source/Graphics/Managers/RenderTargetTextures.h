@@ -49,18 +49,21 @@ public:
 	VkRenderPass mSpreadVkRenderPass = VK_NULL_HANDLE;
 	VkFramebuffer mpSpreadVkFramebuffers[shaders::kiMaxSpreadPasses] {};
 
-	Texture mpCombineTextures[3];
-	Texture* mppLightingFinalTextures[3] {};
+	// Combine outputs and history persist per lighting layer [layer][color]; the deposit and spread textures above are
+	// one scratch chain the refreshing layer reuses.
+	Texture mpCombineTextures[shaders::kiLightingLayers][3];
+	Texture* mppLightingFinalTextures[shaders::kiLightingLayers * 3] {}; // Layer-major sampler-array binding
 
 	// Direction-averaged 0.25*(E+W+N+S) of the tone-mapped per-direction values.
 	// Terrain/Water read it with one texture sample in the ambient path.
-	Texture mAmbientCombineTexture;
+	Texture mpAmbientCombineTextures[shaders::kiLightingLayers];
+	Texture* mppAmbientCombineTextures[shaders::kiLightingLayers] {}; // Sampler-array binding
 
 	// Persistent last-refresh combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
 	// de-flicker the texel-ramp resample (mirror of mShadowHistoryTexture). LightingHistoryCopy.comp publishes the
 	// temporal result over the whole texture on refresh.
-	Texture mpLightingHistoryTextures[3];
-	Texture mAmbientHistoryTexture;
+	Texture mpLightingHistoryTextures[shaders::kiLightingLayers][3];
+	Texture mpAmbientHistoryTextures[shaders::kiLightingLayers];
 
 	// Debug texture array (channels A/B/C used by formats needing 3 textures per slot, e.g., spread direction combined)
 	int64_t miDebugTextureCount = 0;

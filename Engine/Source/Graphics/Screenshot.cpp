@@ -210,7 +210,7 @@ static int64_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view n
 
 constexpr const char* kpcValidDumpNames =
 	"Log, TerrainElevation, SmokeGradient, SmokeOne[0-N], SmokeTwo[0-N], WindOne, WindTwo, "
-	"Lighting[0-2], Combine[0-2], AmbientCombine, LightingHistory[0-2], AmbientHistory, "
+	"Lighting[0-2], Combine[0-5], AmbientCombine[0-1], LightingHistory[0-5], AmbientHistory[0-1], "
 	"Spread[0-N][0-2], SpreadOnly[0-N][0-2], "
 	"ShadowElevation, Shadow, ShadowBlur, ShadowBlurIntermediate, ShadowHistory, "
 	"ObjectShadows, ObjectShadowsBlur, ObjectShadowsBlurIntermediate, WaterDisplacement, WaterDisplacementNormal";
@@ -251,11 +251,11 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	}
 	if (name == "AmbientCombine")
 	{
-		return &rRenderTargetTextures.mAmbientCombineTexture;
+		return &rRenderTargetTextures.mpAmbientCombineTextures[CheckDumpIndex(iIndex, shaders::kiLightingLayers, name)];
 	}
 	if (name == "AmbientHistory")
 	{
-		return &rRenderTargetTextures.mAmbientHistoryTexture;
+		return &rRenderTargetTextures.mpAmbientHistoryTextures[CheckDumpIndex(iIndex, shaders::kiLightingLayers, name)];
 	}
 	if (name == "ShadowElevation")
 	{
@@ -302,13 +302,16 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	{
 		return &rRenderTargetTextures.mpLightingTextures[CheckDumpIndex(iIndex, 3, name)];
 	}
+	// Index = lighting layer * 3 + color.
 	if (name == "Combine")
 	{
-		return &rRenderTargetTextures.mpCombineTextures[CheckDumpIndex(iIndex, 3, name)];
+		int64_t iLayerColor = CheckDumpIndex(iIndex, shaders::kiLightingLayers * 3, name);
+		return &rRenderTargetTextures.mpCombineTextures[iLayerColor / 3][iLayerColor % 3];
 	}
 	if (name == "LightingHistory")
 	{
-		return &rRenderTargetTextures.mpLightingHistoryTextures[CheckDumpIndex(iIndex, 3, name)];
+		int64_t iLayerColor = CheckDumpIndex(iIndex, shaders::kiLightingLayers * 3, name);
+		return &rRenderTargetTextures.mpLightingHistoryTextures[iLayerColor / 3][iLayerColor % 3];
 	}
 
 	if (name == "Spread")

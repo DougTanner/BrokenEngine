@@ -177,6 +177,8 @@ CONSTEXPR int kiComputeTileSize = 8;
 // Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes
 // (static_assert in RenderTargetTextures.cpp).
 CONSTEXPR int kiMaxFlightPlanes = 8;
+// One world-lighting layer per flight plane; the client requires exactly this many planes (CreateLightingTextures).
+CONSTEXPR int kiLightingLayers = 2;
 CONSTEXPR int kiOccupancyDilateGroupSize = 256;
 CONSTEXPR int kiParticleUpdateGroupSize = 32;
 

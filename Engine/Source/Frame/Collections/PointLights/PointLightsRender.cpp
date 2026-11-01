@@ -17,18 +17,24 @@ constexpr int64_t kiDynamicBufferInitialCapacity = 8'192;
 
 void PointLightsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
-	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, kCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
+		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
+		gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
+	}
 	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), kiDynamicBufferInitialCapacity);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineVisibleLights(kCrc, kpcName, pVisibleLightsBuffers);
 }
 
-static int64_t siRendered = 0;
+static int64_t siRendered = 0; // Visible-sprite cursor
+static int64_t spiDepositsRendered[shaders::kiLightingLayers] {}; // Deposit cursor per lighting layer
 static int64_t siTotalCount = 0;
 
 void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
 {
 	siRendered = 0;
+	std::ranges::fill(spiDepositsRendered, 0);
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate&
@@ -41,9 +47,14 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+	// Each light deposits into one layer, and any layer may receive every light, so every layer's buffer takes the full capacity.
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc), iCommandBuffer, 1, pBuffer);
+		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
+		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+		{
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
+		}
 	}
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
@@ -62,9 +73,14 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		return;
 	}
 
-	auto [pPointLightsLayouts, iPointLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kCrc, kBufferMain, iCommandBuffer);
+	shaders::AxisAlignedQuadLayout* ppPointLightsLayouts[shaders::kiLightingLayers] {};
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		auto [pPointLightsLayouts, iPointLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(DynamicPipelines::FlightPlaneDepositKey(kCrc, i), kBufferMain, iCommandBuffer);
+		ASSERT(spiDepositsRendered[i] + rCurrent.iCount <= iPointLightsBufferCapacity);
+		ppPointLightsLayouts[i] = pPointLightsLayouts;
+	}
 	auto [pVisibleLightsLayouts, iVisibleLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::VisibleLightQuadLayout>(kCrc, kBufferVisibleLights, iCommandBuffer);
-	ASSERT(siRendered + rCurrent.iCount <= iPointLightsBufferCapacity);
 	ASSERT(siRendered + rCurrent.iCount <= iVisibleLightsBufferCapacity);
 
 	XMVECTOR vecCameraRightNormal = XMVector3Normalize(XMMatrixTranspose(engine::gpCamera->mMatView).r[0]);
@@ -96,10 +112,12 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			continue;
 		}
 
-		// The visible sprite uses the position in the camera cell's frame before base-height projection.
+		// The visible sprite uses the position in the camera cell's frame before flight-plane projection.
 		XMFLOAT4A f4VisiblePosition = f4Position;
 
-		XMStoreFloat4A(&f4Position, ProjectToBaseHeight(vecLocalPosition, rBasis));
+		// The deposit goes to the lighting layer of the flight plane nearest the light, projected onto that plane.
+		int64_t iLayer = gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecLocalPosition));
+		XMStoreFloat4A(&f4Position, ProjectToFlightPlane(vecLocalPosition, rBasis, iLayer));
 
 		int64_t iTextureIndex = gpTextureManager->mTextureDescriptors.CrcToIndex(rType.uiCrc);
 		float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
@@ -107,7 +125,8 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		f4Parameters.x = fBlurredTextureIndex;
 		f4Parameters.y = fLightingIntensity;
 		f4Parameters.z = fRotation;
-		BuildAxisAlignedQuad(pPointLightsLayouts[siRendered], f4Position, fLightingArea, f4Parameters, rType.uiColor);
+		BuildAxisAlignedQuad(ppPointLightsLayouts[iLayer][spiDepositsRendered[iLayer]], f4Position, fLightingArea, f4Parameters, rType.uiColor);
+		++spiDepositsRendered[iLayer];
 
 		float fVisibleArea = rCurrent.pfVisibleAreas[i];
 
@@ -164,7 +183,11 @@ void PointLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterPointLightsRendered).iCount = siRendered;
 	}
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
+	// Only the refreshing lighting layer deposits; a frame with no refresh deposits nothing.
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(DynamicPipelines::FlightPlaneDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() && i == giLightingRefreshLayer ? spiDepositsRendered[i] : 0);
+	}
 	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 

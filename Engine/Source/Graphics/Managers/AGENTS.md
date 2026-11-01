@@ -193,7 +193,7 @@ present family, so concurrent submissions do not share that queue.
 
 Loads SPIR-V from pack chunks and owns fixed engine pipelines plus CRC-keyed dynamic collection pipelines. Pipelines retain pointers into the manager's stable shader map.
 
-- Fixed pipelines implement renderer passes and utility compute work. Lighting follows deposit, spread, combine, then temporal accumulation; separable blur pipelines pre-process registered light textures.
+- Fixed pipelines implement renderer passes and utility compute work. Lighting follows deposit, spread, combine, then temporal accumulation: deposit and spread are one scratch chain, while combine, temporal, and history copy have one pipeline per lighting layer over that layer's own outputs; separable blur pipelines pre-process registered light textures.
 - Collections register dynamic pipelines by behavior and model role; these maps repopulate lazily after pipeline-tier recreation, so a new renderable collection must use the established idempotent registration path rather than requiring command-buffer re-recording per scene CRC.
 - Pipeline construction registers texture consumers with the texture-descriptor registry, which owns descriptor-generation verification.
 

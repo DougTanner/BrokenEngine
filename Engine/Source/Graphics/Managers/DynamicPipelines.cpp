@@ -275,7 +275,7 @@ void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::
 	});
 }
 
-common::crc_t DynamicPipelines::SmokeDepositKey(common::crc_t crc, int64_t iPlane)
+common::crc_t DynamicPipelines::FlightPlaneDepositKey(common::crc_t crc, int64_t iPlane)
 {
 	int64_t piKeyValues[] = {static_cast<int64_t>(crc), iPlane};
 	return common::Crc(std::span<const int64_t>(piKeyValues));

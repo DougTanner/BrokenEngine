@@ -138,10 +138,13 @@ struct GlobalLayout
 
 	float fLightingAddTerrain INIT;
 	float fSpreadDirectionalityStart INIT;
-	vec4 f4LightingArea INIT;
-	vec4 f4LightingAreaPrevious INIT; // f4LightingArea as it stood before the latest refresh, for LightingTemporal.comp reprojection
-	vec2 f2LightingAreaExtentInverse INIT; // 1 / lighting-area extent (LightingSpread.frag world->texcoord)
-	float fLightingTemporalBlend INIT; // EMA weight toward current; 1.0 on the first frame so seeded history is never shown
+	vec4 f4LightingArea INIT; // The refreshing layer's current area (deposit, spread, temporal)
+	vec4 f4LightingAreaPrevious INIT; // The refreshing layer's area before this refresh, for LightingTemporal.comp reprojection
+	vec2 f2LightingAreaExtentInverse INIT; // 1 / the refreshing layer's area extent (LightingSpread.frag world->texcoord)
+	float fLightingTemporalBlend INIT; // The refreshing layer's EMA weight toward current; 1.0 on its first refresh so seeded history is never shown
+	uint32_t uiLightingRefreshLayer INIT; // The layer the deposit/spread/combine chain refreshes this frame; 0 on a frame with no refresh
+	vec4 pf4LightingAreas[kiLightingLayers] INIT; // Per lighting layer: the area its combine outputs cover (consumer reads)
+	float fLightingLayerHeightInverse INIT; // 1 / (pfFlightPlaneHeights[1] - pfFlightPlaneHeights[0]) (Terrain/Model layer blend weight)
 	vec2 f2LightingDepositSizeInverse INIT; // 1 / (lightTiles * kiComputeTileSize) (LightingDepositEdgeFade)
 
 	// Spread Start (radial directional spread)

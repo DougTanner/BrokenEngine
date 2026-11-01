@@ -1,11 +1,11 @@
 # PointLights - Circular Point Lights
 
-Client-only point lights support owner-driven and fire-and-forget controlled lifecycles. Each visible light emits a projected lighting deposit and a visible sprite from lockstep buffers.
+Client-only point lights support owner-driven and fire-and-forget controlled lifecycles. Each visible light emits a projected lighting deposit and a visible sprite.
 
 ## Invariants
 
-- Culling must keep the deposit and sprite cursors aligned. The deposit projects to terrain or ocean base height; the sprite remains at the original world position.
-- The player-facing Lighting toggle gates only the deposit indirect count; the visible sprite retains the shared rendered count.
+- Deposits pack into one buffer and cursor per lighting layer (`FlightPlaneDepositKey`), independent of the single sprite cursor. A light deposits into the layer of the flight plane nearest it (`NearestPlaneIndex`), projected onto that plane; the sprite remains at the original world position.
+- Only the refreshing lighting layer publishes its deposit indirect count, and the player-facing Lighting toggle gates it; the visible sprite retains the full rendered count.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The deposit is always world-axis-aligned and samples the blurred texture; the sprite samples the unblurred texture.
 - Clamp deposit area to the renderer's minimum detail-texel footprint using the un-bumped detail texture size.
 - Controller wrappers apply when controlled lights are seeded and animated. A light with no controller takes its visible intensity, lighting area, and lighting intensity from its type at render, through the type's tuning wrapper when one is set; owner `Sync` writes only position, visible area, and rotation.

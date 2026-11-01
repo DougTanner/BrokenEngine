@@ -10,6 +10,15 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-01 claude/c5401001-5b07-4667-9379-a63c2a27c40a — Engine/Source/Graphics/Render/LightingUniforms.cpp:48 —
+  remove the per-layer held flag and let the per-layer reset flag alone mean "no held area". The held flag is
+  cleared at only one site (line 70), and that same branch sets gbLightingTemporalReset, which sets every layer's
+  spbTemporalResets. CreateLightingTextures also sets gbLightingTemporalReset before the first frame. The two
+  flags are cleared and set together (TemporalAreaLatch::Update clears the reset at line 101 and line 104 sets
+  held), so "!held" never holds without "reset" also holding. The old single-layer code had the same redundancy.
+  Plan item 5 names a "held flag" per layer, so removing it needs the user to change the plan. — makes
+  unnecessary: LightingUniforms.cpp:48, :70, :83 (the !spbHeldVisibleAreas[i] term), :104
+
 - 2026-11-01 claude/2c5731e6-262d-48d2-b0f4-773cd3d679ee — refactor observation —
   Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:463 — RampBattleshipTurnRate
   and SteerBattleshipHeading are Battleship-local, while Fighters keep the signed-max cone branch plus

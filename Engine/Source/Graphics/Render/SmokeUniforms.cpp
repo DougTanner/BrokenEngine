@@ -197,13 +197,17 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 0);
 	gpPipelineManager->mpPipelines[kPipelineSmokeClearB].WriteIndirectBuffer(iCommandBuffer, 0);
 
-	// With the stagger on, one plane per frame refreshes on schedule; with it off, every plane refreshes every frame. A
-	// plane also refreshes early once the camera leaves its held area so no unsimulated edge comes into view.
+	// Planes refresh on the cadence's multiples, the rule lighting's layers follow: with the stagger on, one plane per
+	// such frame in turn; with it off, every plane. A plane also refreshes early once the camera leaves its held area so
+	// no unsimulated edge comes into view.
 	bool bSmokeLayerStagger = gSmokeLayerStagger.Get<bool>();
-	int64_t iScheduledPlane = gpGraphics->miFrameCounter % iPlaneCount;
+	int64_t iSmokeUpdateCadence = gSmokeUpdateCadence.Get<int64_t>();
+	bool bScheduledFrame = gpGraphics->miFrameCounter % iSmokeUpdateCadence == 0;
+	int64_t iScheduledPlane = (gpGraphics->miFrameCounter / iSmokeUpdateCadence) % iPlaneCount;
 	for (int64_t i = 0; i < iPlaneCount; ++i)
 	{
-		if (bSmokeLayerStagger && i != iScheduledPlane && IsVisibleAreaInsideHeldArea(rf4Visible, spf4PreviousSmokeAreas[i]))
+		bool bScheduled = bScheduledFrame && (!bSmokeLayerStagger || i == iScheduledPlane);
+		if (!bScheduled && IsVisibleAreaInsideHeldArea(rf4Visible, spf4PreviousSmokeAreas[i]))
 		{
 			// Skip: the plane's remap reduces to the identity over its held area (for plane 0, wind's too), and its
 			// next refresh remaps held -> current.

@@ -4,6 +4,7 @@ Dynamic lights follow `deposit -> spread -> combine -> temporal`. Deposit shader
 
 ## Pipeline Contracts
 
+- Readers sample lighting layer k through `pf4LightingAreas[k]`; `f4LightingArea` holds the area of the refreshing layer, `uiLightingRefreshLayer`. The spread's terrain height fade applies only to layer 0; layer 1's plane lies above every island. Which passes the layers share and which targets each keeps is owned by Render (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
 - Area and point deposits fade against the padded lighting-texture boundary, not the visible-area edge. Rotation can move point-light texture coordinates outside `[0,1]`, so that path uses clamped sampling. The deposit render pass clears its attachments through its load operation every frame.
 - Each spread pass carries an accumulation chain for the next pass and emits a separate pre-accumulation snapshot weighted by the combine curve. Combine sums the snapshots; substituting accumulated outputs changes the intended multi-pass weighting.
 - Combine normalizes the snapshots, tone maps them into the scene-lighting

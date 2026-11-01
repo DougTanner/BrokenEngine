@@ -102,18 +102,18 @@ public:
 	// mirrors mShadowPipelineNames in DynamicPipelines)
 	std::string mpSpreadPipelineNames[shaders::kiMaxSpreadPasses];
 
-	// Combine pipeline (tone map accumulate → UNORM, all 3 colors in one dispatch)
-	Pipeline mCombinePipeline;
+	// Combine pipelines [layer] (tone map accumulate → UNORM, all 3 colors in one dispatch)
+	Pipeline mpCombinePipelines[shaders::kiLightingLayers];
 
-	// Temporal-accumulation pass after combine: reprojects + EMA-blends the 4 combine outputs in place against history
-	Pipeline mLightingTemporalPipeline;
+	// Temporal-accumulation pass after combine [layer]: reprojects + EMA-blends the layer's 4 combine outputs in place against its history
+	Pipeline mpLightingTemporalPipelines[shaders::kiLightingLayers];
 
-	// Publishes the temporal-blended combine outputs into the distinct persistent history images.
-	Pipeline mLightingHistoryCopyPipeline;
+	// Publishes a layer's temporal-blended combine outputs into its distinct persistent history images [layer].
+	Pipeline mpLightingHistoryCopyPipelines[shaders::kiLightingLayers];
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
+	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mpCombinePipelines, mpLightingTemporalPipelines, mpLightingHistoryCopyPipelines, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;

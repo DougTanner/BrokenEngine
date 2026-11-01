@@ -14,7 +14,7 @@ layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
 	MainLayout mainLayout;
 };
 
-layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[3];
+layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
 layout (set = 1, binding = 3) uniform sampler2D shadowTextureSampler;
 layout (set = 1, binding = 4) uniform sampler2D objectShadowsTextureSampler;
 layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
@@ -23,7 +23,7 @@ layout (set = 1, binding = 7) uniform sampler2D noiseTextureSampler;
 layout (set = 1, binding = 8) uniform sampler2D pWaterNormalSamplers[kiWaterNormalCount];
 layout (set = 1, binding = 9) uniform sampler2D depthLutSampler;
 layout (set = 1, binding = 10) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
-layout (set = 1, binding = 11) uniform sampler2D ambientLightingSampler;
+layout (set = 1, binding = 11) uniform sampler2D ambientLightingSamplers[kiLightingLayers];
 layout (set = 1, binding = kiWaterBindingFoam) uniform sampler2D foamTextureSampler;
 layout (set = 1, binding = kiWaterBindingFoamColor) uniform sampler2D pFoamColorTextureSamplers[kiWaterFoamTextureCount];
 layout (set = 1, binding = kiWaterBindingFoamBreakup) uniform sampler2D pFoamBreakupTextureSamplers[kiWaterFoamBreakupTextureCount];
@@ -174,18 +174,18 @@ void main()
 	// Terrain elevation (for water transparency)
 	f4OutColor.w = clamp(-fTerrainElevation * globalLayout.fWaterTerrainFadeInverse, 0.0f, 1.0f);
 
-	// Sample lighting texture at projected base-height x/y
+	// Sample the low lighting layer at projected base-height x/y; water reads the high layer only for high-plane smoke.
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f));
 	vec2 f2PositionAtBaseHeightFinal = ProjectWaterReflection(normalResult, f2WorldInitialPosition, f2PositionAtBaseHeight);
 
-	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.f4LightingArea);
+	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.pf4LightingAreas[0]);
 	vec4 pf4LightingBaseHeight[3];
-	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, f2LightingTexcoordBaseHeight);
+	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, 0, f2LightingTexcoordBaseHeight);
 
 	// Ambient sample — straight-down base-height projection, no reflection offset.
 	// Uses the precomputed direction-averaged ambient texture from a single fetch.
-	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4LightingArea);
-	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeightAmbient);
+	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSamplers, 0, f2LightingTexcoordBaseHeightAmbient);
 
 	// Scale base-height lighting (hue-preserving: pow applied to per-direction luminance/average scalar)
 	float fWaterEwnsPowMode = mainLayout.fLightingWaterEastWestNorthSouthPowerMode;
@@ -228,16 +228,24 @@ void main()
 #endif
 
 	// Blend smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
-	// decouples smoke from wave normals). Every plane is shadowed by the object shadow above it at the base-height
-	// projected position, read once because that position does not vary with the plane.
+	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
+	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Every plane
+	// is shadowed by the object shadow above it at the base-height projected position, read once because that position
+	// does not vary with the plane.
 	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
-		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane));
+		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane);
+		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2PositionAtPlane);
 		float fSmokeRaw = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
+		vec3 f3SmokeAmbientSum = f3AmbientSum;
+		if (iPlane > 0 && fSmokePow > 0.0f)
+		{
+			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pf4LightingAreas[iPlane]));
+		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
 	}
 }

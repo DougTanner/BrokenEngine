@@ -66,6 +66,6 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 - Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height lighting and smoke projections keep the true eye line (`ToEyeLine`).
-- Lighting samples at a base-height projection and smoke at each flight plane's projection, both derived from the undisplaced world position, keeping them stable under wave animation.
+- Lighting samples the low lighting layer at a base-height projection and smoke at each flight plane's projection, both derived from the undisplaced world position, keeping them stable under wave animation. Plane k's smoke is lit by layer k's ambient at that plane's projection; the high layer is read only where its plane's smoke shows.
 - Sun-driven energy and skybox sun/moon specular use full effective shadow. Sky ambient uses the separately controlled ambient-shadow mix; EWNS (defined in the shader hub) and ambient emitter deposits remain unshadowed.
 - Terrain ray-march shadow attenuates the sun component but not moon light. Object shadow and smoke attenuation apply to both.

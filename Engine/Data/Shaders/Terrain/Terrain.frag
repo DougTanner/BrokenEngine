@@ -16,7 +16,7 @@ layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
 	MainLayout mainLayout;
 };
 
-layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[3];
+layout (set = 1, binding = 2) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
 layout (set = 1, binding = 3) uniform sampler2D shadowTextureSampler;
 layout (set = 1, binding = 4) uniform sampler2D objectShadowsTextureSampler;
 layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
@@ -34,7 +34,7 @@ layout (set = 1, binding = 14) uniform sampler2D sandSampler;
 layout (set = 1, binding = 15) uniform sampler2D rockNormalsSampler0;
 layout (set = 1, binding = 16) uniform sampler2D rockNormalsSampler1;
 layout (set = 1, binding = 17) uniform sampler2D rockNormalsSampler2;
-layout (set = 1, binding = 18) uniform sampler2D ambientLightingSampler;
+layout (set = 1, binding = 18) uniform sampler2D ambientLightingSamplers[kiLightingLayers];
 // Per-island material masks (BC7 RGBA). R=Rock, G=Sand, B=Snow, A=Flow (reserved) — drives material
 // detail blending. Bound at binding 20 — the SSBO at
 // binding 19 is owned by Terrain.vert (AxisAlignedQuadLayout instance buffer).
@@ -117,14 +117,28 @@ void main()
 	// f4TerrainSnowSunNormal = fTerrainSnowBlend * f4SunMoonNormal (uniform product folded CPU-side).
 	vec3 f3SunNormal = normalize(f3Normal + fSnowPercent * globalLayout.f4TerrainSnowSunNormal.xyz);
 
-	// Sample lighting texture, at world x/y and at projected base-height x/y
-	vec2 f2LightingTexcoord = WorldToVisibleArea(f3InPosition, globalLayout.f4LightingArea);
-	vec4 pf4Lighting[3];
-	ReadLighting(pf4Lighting, pLightingSamplers, f2LightingTexcoord);
+	// Blend the low and high lighting layers by the fragment's height between their flight planes, reading only the layers
+	// the weight needs. The low layer samples at world x/y and at projected base-height x/y; the high layer at the eye-ray
+	// position on its plane.
+	float fLayerBlend = clamp((f3InPosition.z - globalLayout.fBaseHeight) * globalLayout.fLightingLayerHeightInverse, 0.0f, 1.0f);
+	vec4 pf4LightingLow[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
+	vec4 pf4LightingHigh[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
+	vec3 f3AmbientSumLow = vec3(0.0f);
+	vec3 f3AmbientSumHigh = vec3(0.0f);
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, f3InPosition);
-	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4LightingArea);
-	// Direction-averaged base-height lighting from a single fetch; feeds both ambient and BlendSmokePrecomputed.
-	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSampler, f2LightingTexcoordBaseHeight);
+	if (fLayerBlend < 1.0f)
+	{
+		ReadLighting(pf4LightingLow, pLightingSamplers, 0, WorldToVisibleArea(f3InPosition, globalLayout.pf4LightingAreas[0]));
+		f3AmbientSumLow = ReadAmbientLighting(ambientLightingSamplers, 0, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pf4LightingAreas[0]));
+	}
+	if (fLayerBlend > 0.0f)
+	{
+		vec2 f2HighTexcoord = WorldToVisibleArea(vec3(FlightPlanePosition(globalLayout, mainLayout, f3InPosition, 1), 0.0f), globalLayout.pf4LightingAreas[1]);
+		ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2HighTexcoord);
+		f3AmbientSumHigh = ReadAmbientLighting(ambientLightingSamplers, 1, f2HighTexcoord);
+	}
+	vec4 pf4Lighting[3] = vec4[3](mix(pf4LightingLow[0], pf4LightingHigh[0], fLayerBlend), mix(pf4LightingLow[1], pf4LightingHigh[1], fLayerBlend), mix(pf4LightingLow[2], pf4LightingHigh[2], fLayerBlend));
+	vec3 f3AmbientSum = mix(f3AmbientSumLow, f3AmbientSumHigh, fLayerBlend);
 
 	// Apply directional and ambient lighting
 	vec3 f3Directional = DirectionalLighting(pf4Lighting, f3Normal, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
@@ -152,16 +166,25 @@ void main()
 	f4OutColor.xyz += f3Lighting * mix(f3Color, vec3(1.0f), globalLayout.fLightingAddTerrain);
 
 	// Sample each flight plane's smoke at that plane's eye-ray projected position, lowest first so the plane nearest the
-	// eye blends last; every plane is lit by the lighting, and shadowed by the object shadow above it, at the base-height
-	// projected position. The object shadow is read once because that position does not vary with the plane.
+	// eye blends last; plane k is lit by lighting layer k's ambient at that same position, which is where the blend above
+	// read it, so a layer the blend skipped is read here only where its plane's smoke shows. Every plane is shadowed by the
+	// object shadow above it at the base-height projected position, read once because that position does not vary with
+	// the plane.
 	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
-		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], FlightPlanePosition(globalLayout, mainLayout, f3InPosition, iPlane));
+		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InPosition, iPlane);
+		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2PositionAtPlane);
 		float fSmokeRaw = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
+		vec3 f3SmokeAmbientSum = iPlane == 0 ? f3AmbientSumLow : f3AmbientSumHigh;
+		bool bLayerRead = iPlane == 0 ? fLayerBlend < 1.0f : fLayerBlend > 0.0f;
+		if (!bLayerRead && fSmokePow > 0.0f)
+		{
+			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pf4LightingAreas[iPlane]));
+		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
 	}
 }

@@ -58,7 +58,7 @@ layout (scalar, set = 2, binding = 8) buffer readonly pbrMaterialsUniform
 };
 
 // Engine-specific textures
-layout (set = 1, binding = 9) uniform sampler2D pLightingSamplers[3];
+layout (set = 1, binding = 9) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
 layout (set = 1, binding = 10) uniform sampler2D shadowTextureSampler;
 layout (set = 1, binding = 11) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 layout (set = 1, binding = 12) uniform sampler2D objectShadowsTextureSampler;
@@ -306,13 +306,26 @@ void main()
 #endif
 
 	#if 1
-	// Sample lighting where this model's own lights deposit: the eye line through the model, continued down to the
-	// lowest flight plane. Zero height samples the raw XY exactly.
+	// Sample each lighting layer where lights on its flight plane deposit: along the eye line, by the model centre's height
+	// above that plane. Zero height samples the raw XY exactly. The fragment blends the low and high layers by its height
+	// between the two planes, reading only the layers the weight needs.
 	vec3 f3ToEye = ToEyeLine(mainLayout, f3InWorldPosition);
 	vec2 f2LightingWorldPosition = f3InWorldPosition.xy - (fInHeightAboveBase / f3ToEye.z) * f3ToEye.xy;
-	vec2 f2LightingTexcoord = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.f4LightingArea);
-	vec4 pf4Lighting[3];
-	ReadLighting(pf4Lighting, pLightingSamplers, f2LightingTexcoord);
+	vec2 f2LightingTexcoordLow = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec2 f2LightingWorldPositionHigh = f3InWorldPosition.xy - ((fInHeightAboveBase + globalLayout.fBaseHeight - globalLayout.pfFlightPlaneHeights[1]) / f3ToEye.z) * f3ToEye.xy;
+	vec2 f2LightingTexcoordHigh = WorldToVisibleArea(vec3(f2LightingWorldPositionHigh, 0.0f), globalLayout.pf4LightingAreas[1]);
+	float fLayerBlend = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fLightingLayerHeightInverse, 0.0f, 1.0f);
+	vec4 pf4LightingLow[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
+	vec4 pf4LightingHigh[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
+	if (fLayerBlend < 1.0f)
+	{
+		ReadLighting(pf4LightingLow, pLightingSamplers, 0, f2LightingTexcoordLow);
+	}
+	if (fLayerBlend > 0.0f)
+	{
+		ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2LightingTexcoordHigh);
+	}
+	vec4 pf4Lighting[3] = vec4[3](mix(pf4LightingLow[0], pf4LightingHigh[0], fLayerBlend), mix(pf4LightingLow[1], pf4LightingHigh[1], fLayerBlend), mix(pf4LightingLow[2], pf4LightingHigh[2], fLayerBlend));
 
 	// Apply directional lighting
 	vec3 f3Directional = DirectionalLighting(pf4Lighting, n, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
@@ -320,15 +333,15 @@ void main()
 	vec3 directionalLighting = f3Lighting * mix(baseColor.rgb, vec3(1.0f), globalLayout.fLightingObjectsAdd);
 	#else
 	// Engine directional lighting
-	vec2 f2DirectTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
+	vec2 f2DirectTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.pf4LightingAreas[0]);
 	vec4 pf4DirectLighting[3];
-	ReadLighting(pf4DirectLighting, pLightingSamplers, f2DirectTexcoord);
+	ReadLighting(pf4DirectLighting, pLightingSamplers, 0, f2DirectTexcoord);
 	vec3 f3Direct = DirectionalLighting(pf4DirectLighting, n, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
 
 	vec2 f2AmbientPosition = BaseHeightPosition(globalLayout, mainLayout, f3InWorldPosition);
-	vec2 f2AmbientTexcoord = WorldToVisibleArea(vec3(f2AmbientPosition, 0.0f), globalLayout.f4LightingArea);
+	vec2 f2AmbientTexcoord = WorldToVisibleArea(vec3(f2AmbientPosition, 0.0f), globalLayout.pf4LightingAreas[0]);
 	vec4 pf4Lighting[3];
-	ReadLighting(pf4Lighting, pLightingSamplers, f2AmbientTexcoord);
+	ReadLighting(pf4Lighting, pLightingSamplers, 0, f2AmbientTexcoord);
 	vec3 f3Ambient = AmbientLighting(pf4Lighting, mainLayout.fLightingAmbientIntensity, mainLayout.fLightingAmbientPower, mainLayout.fLightingAmbientPowerMode);
 	pf4Lighting[0] *= mainLayout.fLightingAmbientIntensity;
 	pf4Lighting[1] *= mainLayout.fLightingAmbientIntensity;
@@ -378,7 +391,8 @@ void main()
 	// Apply smoke/fog per flight plane, lowest first, projecting the position to each plane. Planes below the model's
 	// own plane are skipped; its own plane fades with the fragment's height above it so the model pokes through; planes
 	// above apply in full. The loop counter is the sampler index, so it counts from plane 0 and skips lower planes:
-	// instances in one draw can sit on different planes.
+	// instances in one draw can sit on different planes. Plane k is lit by lighting layer k; a layer the height blend
+	// skipped is read only where its plane's smoke shows.
 #if ENABLE_SMOKE
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
@@ -393,7 +407,27 @@ void main()
 			float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
 			fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
 		}
-		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting, ObjectShadowAbove(f4ObjectShadows, iPlane));
+		float fSmoke = ReadSmoke(globalLayout, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane);
+		float fSmokeMax = fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke;
+		if (fSmoke * fSmokeMax > 0.0f)
+		{
+			if (iPlane == 0)
+			{
+				if (fLayerBlend == 1.0f)
+				{
+					ReadLighting(pf4LightingLow, pLightingSamplers, 0, f2LightingTexcoordLow);
+				}
+				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingLow, ObjectShadowAbove(f4ObjectShadows, iPlane));
+			}
+			else
+			{
+				if (fLayerBlend == 0.0f)
+				{
+					ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2LightingTexcoordHigh);
+				}
+				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingHigh, ObjectShadowAbove(f4ObjectShadows, iPlane));
+			}
+		}
 	}
 #endif
 

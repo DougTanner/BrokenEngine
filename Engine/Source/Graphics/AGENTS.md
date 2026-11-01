@@ -6,7 +6,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 - Frames submit Global, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
 - A world-hidden frame, one the game's map overlay fully covers (`GameBase::Render`), waits only its own fence and submits only ImGui.
-  It runs no descriptor churn, other-framebuffer publication, or retired-resource destruction, so that pending work waits for the next world frame, and it does not advance `miFrameCounter` (the island LRU clock and the lighting, terrain-shadow, and smoke-stagger cadence clock).
+  It runs no descriptor churn, other-framebuffer publication, or retired-resource destruction, so that pending work waits for the next world frame, and it does not advance `miFrameCounter` (the island LRU clock and the lighting, terrain-shadow, and smoke cadence clock).
   On the frame the world hides, `GameBase::Render` clears the retained camera-relative effects so they restart clean when the world returns.
 - Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
 - Model depth ordering and the HDR clear color are runtime host policy in

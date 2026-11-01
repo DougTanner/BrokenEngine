@@ -98,7 +98,8 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   render consumer reads, and `NearestPlaneIndex` is the one rule for which
   plane a height is nearest (an exact midpoint takes the lower plane).
   Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes
-  with positive, strictly ascending heights.
+  with positive, strictly ascending heights; the client additionally requires
+  exactly two, one per world-lighting layer (`CreateLightingTextures`).
 
 ## Frame Registry
 

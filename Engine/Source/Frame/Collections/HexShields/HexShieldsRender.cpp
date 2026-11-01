@@ -15,17 +15,22 @@ constexpr int64_t kiDynamicBufferInitialCapacity = 256;
 
 void HexShieldsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), kiDynamicBufferInitialCapacity);
-	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShields(kuiCrc, kpcName);
-	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShieldsLighting(kuiCrc, kpcName);
+	// One buffer per lighting layer, shared by that layer's main and lighting pipelines.
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		common::crc_t uiLayerKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
+		gpBufferManager->CreateDynamicBuffer(uiLayerKey, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), kiDynamicBufferInitialCapacity);
+		gpPipelineManager->mDynamicPipelines.CreatePipelineHexShields(uiLayerKey, kpcName);
+		gpPipelineManager->mDynamicPipelines.CreatePipelineHexShieldsLighting(uiLayerKey, kpcName);
+	}
 }
 
-static int64_t siRendered = 0;
+static int64_t spiRendered[shaders::kiLightingLayers] {}; // Cursor per lighting layer
 static int64_t siTotalCount = 0;
 
 void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
-	siRendered = 0;
+	std::ranges::fill(spiRendered, 0);
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const HexShieldsInterpolate&
@@ -38,10 +43,15 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+	// Each shield goes to one layer, and any layer may receive every shield, so every layer's buffer takes the full capacity.
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc), iCommandBuffer, 2, pBuffer);
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		common::crc_t uiLayerKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
+		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiLayerKey, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+		{
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(uiLayerKey), iCommandBuffer, 2, pBuffer);
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(uiLayerKey), iCommandBuffer, 2, pBuffer);
+		}
 	}
 }
 
@@ -56,8 +66,13 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		return;
 	}
 
-	auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::HexShieldLayout>(kuiCrc, kBufferMain, iCommandBuffer);
-	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
+	shaders::HexShieldLayout* ppLayouts[shaders::kiLightingLayers] {};
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::HexShieldLayout>(DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i), kBufferMain, iCommandBuffer);
+		ASSERT(spiRendered[i] + rCurrent.iCount <= iBufferCapacity);
+		ppLayouts[i] = pLayouts;
+	}
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -72,7 +87,9 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			continue;
 		}
 
-		shaders::HexShieldLayout& rLayout = pLayouts[siRendered];
+		// The shield deposits into the lighting layer of the flight plane nearest it.
+		int64_t iLayer = gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecLocalPosition));
+		shaders::HexShieldLayout& rLayout = ppLayouts[iLayer][spiRendered[iLayer]];
 		rLayout.f4Position = f4Position;
 		rLayout.f3x4Transform[0] = rCurrent.pf4Transforms[0][i];
 		rLayout.f3x4Transform[1] = rCurrent.pf4Transforms[1][i];
@@ -106,7 +123,7 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		rLayout.fColorMix = rCurrent.pfColorMixes[i];
 		rLayout.fMinimumIntensity = rType.fMinimumIntensity;
 
-		++siRendered;
+		++spiRendered[iLayer];
 	}
 }
 
@@ -118,10 +135,15 @@ void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	if constexpr (kbProfiling)
 	{
-		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = siRendered;
+		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});
 	}
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
+	// Every layer's shields draw in the main pass; only the refreshing lighting layer deposits.
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		common::crc_t uiLayerKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(uiLayerKey)->WriteIndirectBuffer(iCommandBuffer, spiRendered[i]);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(uiLayerKey)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() && i == giLightingRefreshLayer ? spiRendered[i] : 0);
+	}
 }
 
 } // namespace engine

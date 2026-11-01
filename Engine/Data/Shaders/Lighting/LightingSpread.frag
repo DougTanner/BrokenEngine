@@ -70,16 +70,20 @@ void main()
 	float fOutputThreshold = mix(globalLayout.fSpreadOutputThresholdStart, globalLayout.fSpreadOutputThresholdEnd, fT);
 	float fOutputCompress = mix(globalLayout.fSpreadOutputCompressStart, globalLayout.fSpreadOutputCompressEnd, fT);
 
-	// World position of this spread texel and its on-screen (visible-area) UV for the height-fade elevation sample.
-	vec2 f2WorldPos = VisibleAreaToWorld(f2InTexcoord, globalLayout.f4LightingArea);
-	vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.f4VisibleArea);
+	// Height fade: attenuate spread above base height. Only the low layer spreads over terrain; the high layer's plane lies
+	// above every island, so it keeps the unfaded distance and decay.
+	if (globalLayout.uiLightingRefreshLayer == 0u)
+	{
+		// World position of this spread texel and its on-screen (visible-area) UV for the height-fade elevation sample.
+		vec2 f2WorldPos = VisibleAreaToWorld(f2InTexcoord, globalLayout.f4LightingArea);
+		vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.f4VisibleArea);
 
-	// Height fade: attenuate spread above base height
-	float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
-	float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
-	float fHeightFade = pow(fHeightT, globalLayout.fSpreadHeightPower) * globalLayout.fSpreadHeightMultiplier;
-	fSpreadDistance *= 1.0f - fHeightFade;
-	fDecay *= 1.0f - fHeightFade;
+		float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
+		float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
+		float fHeightFade = pow(fHeightT, globalLayout.fSpreadHeightPower) * globalLayout.fSpreadHeightMultiplier;
+		fSpreadDistance *= 1.0f - fHeightFade;
+		fDecay *= 1.0f - fHeightFade;
+	}
 
 	// World-to-texcoord conversion: texcoord 0-1 covers the lighting area
 	float fAspectRatioX = globalLayout.f2LightingAreaExtentInverse.x;

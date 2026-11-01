@@ -165,49 +165,56 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 	}
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingSpread);
 
-	// Phase 2: Combine (tone map accumulate float16 → UNORM)
+	// Phase 2: Combine (tone map accumulate float16 → UNORM). Every layer records its own transitions and dispatch; only
+	// the refreshing layer's indirect dispatch is nonzero.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingCombine);
-	for (Texture& rCombineTexture : rRenderTargetTextures.mpCombineTextures)
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		rCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	}
-	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
+		for (Texture& rCombineTexture : rRenderTargetTextures.mpCombineTextures[i])
+		{
+			rCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
+		}
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 
-	gpPipelineManager->mCombinePipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+		gpPipelineManager->mpCombinePipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+	}
 
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingCombine);
 
 	// Phase 3: Temporal accumulation reprojects + EMA-blends the previous history into the 4 combine outputs in place,
 	// then the history-copy compute pipeline publishes the blended result into distinct history images.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
-	for (int64_t i = 0; i < 3; ++i)
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		rRenderTargetTextures.mpCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-		rRenderTargetTextures.mpLightingHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
-	}
-	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-	rRenderTargetTextures.mAmbientHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
+		for (int64_t j = 0; j < 3; ++j)
+		{
+			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
+			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
+		}
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
+		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
 
-	gpPipelineManager->mLightingTemporalPipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+		gpPipelineManager->mpLightingTemporalPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
-	// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
-	// preserve temporal's no-sampled/output-alias contract.
-	for (int64_t i = 0; i < 3; ++i)
-	{
-		rRenderTargetTextures.mpCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-		rRenderTargetTextures.mpLightingHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
-	}
-	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-	rRenderTargetTextures.mAmbientHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
-	gpPipelineManager->mLightingHistoryCopyPipeline.RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
+		// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
+		// preserve temporal's no-sampled/output-alias contract.
+		for (int64_t j = 0; j < 3; ++j)
+		{
+			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
+			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
+		}
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
+		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
+		gpPipelineManager->mpLightingHistoryCopyPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
-	for (int64_t i = 0; i < 3; ++i)
-	{
-		rRenderTargetTextures.mpCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-		rRenderTargetTextures.mpLightingHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		for (int64_t j = 0; j < 3; ++j)
+		{
+			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		}
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	}
-	rRenderTargetTextures.mAmbientCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-	rRenderTargetTextures.mAmbientHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
 
 	// Final barrier: compute → fragment (combine textures are now readable by fragment shaders)

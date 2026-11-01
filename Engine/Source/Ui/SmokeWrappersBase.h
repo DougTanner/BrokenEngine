@@ -9,6 +9,7 @@ extern Wrapper gSmokeMaximum;
 extern Wrapper gSmokePower;
 extern Wrapper gSmokeDecay;
 extern Wrapper gSmokeEdgeDecayDistance;
+extern Wrapper gSmokeUpdateCadence;
 
 extern Wrapper gSmokeColorMinimum;
 extern Wrapper gSmokeColorMultiplier;
