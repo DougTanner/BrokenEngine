@@ -165,9 +165,7 @@ public:
 	bool mbFramingOverride = false;
 	bool mbFramingOverrideReleasing = false;
 	float mfOverrideFraming = 0.0f;
-	float mfOverrideVelocity = 0.0f;
 	float mfOverrideStart = 0.0f;
-	float mfOverrideStartVelocity = 0.0f;
 	float mfOverrideStartTime = 0.0f;
 	float mfOverrideBlendDuration = 0.0f;
 	float mfOverrideTarget = 0.0f;
@@ -195,10 +193,12 @@ public:
 
 	void ResetForSession();
 	void RestoreFraming(float fFraming);
-	// Eases the rendered framing at rest from its current value to fTarget over fBlendDuration seconds of camera time.
+	// A call during the other's unfinished ease retraces it backward, keeping the framing and speed with the direction
+	// reversed; otherwise the ease starts at rest from the current rendered framing.
+	// Eases the rendered framing to fTarget over fBlendDuration seconds of camera time.
 	void SetFramingOverride(float fTarget, float fBlendDuration);
-	// Eases the rendered framing, carrying its velocity, back to the world framing over fBlendDuration seconds of camera
-	// time, then ends the override.
+	// Eases the rendered framing back to the world framing over fBlendDuration seconds of camera time, then ends the
+	// override.
 	void ReleaseFramingOverride(float fBlendDuration);
 
 	float RenderFraming() const
@@ -240,6 +240,7 @@ private:
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);
 	void UpdateFraming();
 	void UpdateFramingOverride();
+	void RestartOverrideEase(bool bReversing, float fPreviousEnd, float fBlendDuration);
 
 	XMFLOAT2 mf2LatchedQuadSize {};
 	// Zero is below every real framing bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.

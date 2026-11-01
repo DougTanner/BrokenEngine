@@ -379,7 +379,6 @@ void CameraBase::UpdateFramingOverride()
 	if (fOverrideElapsed >= mfOverrideBlendDuration)
 	{
 		mfOverrideFraming = fTarget;
-		mfOverrideVelocity = 0.0f;
 		if (mbFramingOverrideReleasing)
 		{
 			mbFramingOverride = false;
@@ -387,8 +386,27 @@ void CameraBase::UpdateFramingOverride()
 	}
 	else
 	{
-		mfOverrideFraming = EvaluateFramingEase(mfOverrideStart, mfOverrideStartVelocity, fTarget, fOverrideElapsed, mfOverrideBlendDuration, mfOverrideVelocity);
+		float fVelocity = 0.0f;
+		mfOverrideFraming = EvaluateFramingEase(mfOverrideStart, 0.0f, fTarget, fOverrideElapsed, mfOverrideBlendDuration, fVelocity);
 	}
+}
+
+void CameraBase::RestartOverrideEase(bool bReversing, float fPreviousEnd, float fBlendDuration)
+{
+	float fPreviousFraction = bReversing ? (mfTime - mfOverrideStartTime) / mfOverrideBlendDuration : 1.0f;
+	if (fPreviousFraction < 1.0f)
+	{
+		// The ease is symmetric in time, so starting from the previous end at the mirrored point keeps the framing and the
+		// speed, only reversed.
+		mfOverrideStart = fPreviousEnd;
+		mfOverrideStartTime = mfTime - (1.0f - fPreviousFraction) * fBlendDuration;
+	}
+	else
+	{
+		mfOverrideStart = mfOverrideFraming;
+		mfOverrideStartTime = mfTime;
+	}
+	mfOverrideBlendDuration = fBlendDuration;
 }
 
 void CameraBase::SetFramingOverride(float fTarget, float fBlendDuration)
@@ -397,22 +415,16 @@ void CameraBase::SetFramingOverride(float fTarget, float fBlendDuration)
 	{
 		mfOverrideFraming = mfCameraFraming;
 		mbFramingOverride = true;
+		mbFramingOverrideReleasing = false;
 	}
-	// Start from rest, so no carried velocity is scaled by a longer ease.
+	RestartOverrideEase(mbFramingOverrideReleasing, mfCameraFraming, fBlendDuration);
 	mbFramingOverrideReleasing = false;
-	mfOverrideStart = mfOverrideFraming;
-	mfOverrideStartVelocity = 0.0f;
-	mfOverrideStartTime = mfTime;
-	mfOverrideBlendDuration = fBlendDuration;
 	mfOverrideTarget = fTarget;
 }
 
 void CameraBase::ReleaseFramingOverride(float fBlendDuration)
 {
-	mfOverrideStart = mfOverrideFraming;
-	mfOverrideStartVelocity = mfOverrideVelocity;
-	mfOverrideStartTime = mfTime;
-	mfOverrideBlendDuration = fBlendDuration;
+	RestartOverrideEase(!mbFramingOverrideReleasing, mfOverrideTarget, fBlendDuration);
 	mbFramingOverrideReleasing = true;
 }
 
