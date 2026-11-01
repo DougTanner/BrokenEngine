@@ -30,13 +30,8 @@ inline constexpr float kfOmniBlastersSpeed = 225.0f;
 inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.2f);
 inline constexpr float kfBlasterTargetRange = 120.0f;
 
-// A healing fleet Omni regains armor and shield only within the arrival distance of its escort slot, in x/y.
+// A healing fleet Omni regains armor and shield only within kfOmniPatrolRadius of its flagship, in x/y.
 inline constexpr float kfOmniHealRate = 5.0f;
-inline constexpr float kfOmniEscortArrivalDistance = 10.0f;
-// Escort steering is a damped arrival toward the slot: the wanted velocity is the slot offset times the gain, and the
-// velocity error over the scale saturates at full acceleration. Settles near critical damping across the jitter range.
-inline constexpr float kfOmniEscortPositionGain = 3.0f;
-inline constexpr float kfOmniEscortVelocityScale = 7.5f;
 // The heal beam's intensity pulses between the minimum and 1 at this frequency in hertz.
 inline constexpr float kfOmniHealBeamPulseFrequency = 1.5f;
 inline constexpr float kfOmniHealBeamPulseMinimum = 0.35f;
@@ -139,7 +134,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	float* __restrict pfRotationAccelerationYs = nullptr;
 	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 	engine::hex_shields_t* __restrict pHexShields = nullptr;
-	// Held only while the row heals at its escort slot; PostRender Update adds and releases it.
+	// Held only while the row heals near its flagship; PostRender Update adds and releases it.
 	engine::area_lights_t* __restrict pHealBeamAreaLights = nullptr;
 	float* __restrict pfShieldRotations = nullptr;
 	float* __restrict pfShieldShrinks = nullptr;

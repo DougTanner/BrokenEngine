@@ -55,14 +55,13 @@ struct ShipTactic
 	bool bAttacking = false;
 };
 
-// For fleet Fighters and Omnis (eType). Escort flies to the ship's own slot around its flagship; while the fleet is weapons
-// free, Attack and Veer-off take over for Fighters and plain Attack for Omnis; a ship outside its flagship's cell
-// navigates on its type's default plane (DefaultFlightPlane), which escort also flies.
-// Attack targets the kept attack target rRegistryTarget (FindAttackTarget, picked from the flagship in x/y, sight from
-// the stored plane uiFlightPlane) and routes to its next waypoint on the type's clearance tier's graph while it is hidden
-// from the pick or on that tier; escort leaves it untouched, and only the outside-the-cell branch and FindAttackTarget's
-// drop of a kept target above the highest plane clear it. No tactic targets a plane above the type's highest one. Reads
-// only the previous frame.
+// For fleet Fighters and Omnis (eType). Escort flies a Fighter to its own slot around its flagship and gives an Omni no
+// destination, so ComputeNavigation patrols it; weapons free, Attack and Veer-off take over for Fighters and plain Attack
+// for Omnis; outside its flagship's cell a ship navigates on its type's default plane (DefaultFlightPlane), as escort
+// does. Attack targets rRegistryTarget (FindAttackTarget, picked from the flagship in x/y, sight from stored plane
+// uiFlightPlane), routing to its next waypoint on the type's clearance tier's graph while hidden from the pick or on that
+// tier. Escort leaves rRegistryTarget untouched; only the outside-the-cell branch and FindAttackTarget's drop of a target
+// above the highest plane clear it. No tactic targets above the type's highest plane.
 [[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
 
 // Veer-off until 150 m from the veer-off point, else Attack its kept attack target rRegistryTarget (FindAttackTarget,

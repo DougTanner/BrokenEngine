@@ -77,7 +77,7 @@ inline void SetTargetFlightPlane(ShipOrders_t& rOrders, int64_t iFlightPlane)
 enum class ShipFlags : uint16_t
 {
 	kVeerOff              = 0x0001,
-	// A fleet Omni at zero armor: it holds no fire and escorts until healed back to full armor.
+	// A fleet Omni at zero armor: it holds no fire and patrols until healed back to full armor.
 	kHealing              = 0x0002,
 	kFireBlaster          = 0x0004,
 	kBlasterSpawnLeft     = 0x0008,

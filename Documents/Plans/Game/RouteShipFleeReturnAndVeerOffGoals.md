@@ -39,10 +39,9 @@ Per-clearance-tier navigation graphs have landed (`Collections/Ships/AGENTS.md`
 The author recommends the following; each choice carries its rationale.
 
 - Routing query: only `NextRouteWaypoint`. It already snaps its destination to the nearest point
-  outside every navigation polygon (`NavQueryDirection` snaps with `SnapOutsidePolygon`), the
-  mechanism the Omni escort route relies on for a slot inside terrain, so no separate snap and no
-  new pathfinding is needed. It reads whichever graph `NavigationPlaneData` returns for the ship's
-  navigated plane, and takes the ship's clearance tier.
+  outside every navigation polygon (`NavQueryDirection` snaps with `SnapOutsidePolygon`), so no
+  separate snap and no new pathfinding is needed. It reads whichever graph `NavigationPlaneData`
+  returns for the ship's navigated plane, and takes the ship's clearance tier.
 - Island-center goal: route inside `ComputeFleeOrReturnDestination`, so one site covers all three
   types. It gains the cell static data, the ship's clearance tier, and the ship's target flight
   plane; when it returns the island center it returns `NextRouteWaypoint` toward that center

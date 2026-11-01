@@ -28,6 +28,11 @@ constexpr int64_t kiNavigationRecomputeInterval = 16;
 
 constexpr float kfNavigationLookahead = 8.0f;
 
+// A stored patrol point lies this far inside the cell, so an Omni overshooting it stays in the cell: the 10 m arrival
+// radius plus kfOmniMaximumSpeed over kfOmniDrag times the lowest decay multiplier is 57.6 m. Assumes the next tick's
+// pick succeeds.
+constexpr float kfOmniPatrolCellInset = 60.0f;
+
 // Flee/return hysteresis
 constexpr float kfFleeStartDistance = 15.0f;
 constexpr float kfFleeEndDistance = 25.0f;
@@ -323,7 +328,21 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, ShipTypeClearanceTier(self.eType), iNavigationPlane);
 
-	UpdateFleetAndFlagshipNavigation(rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
+	// A fleet Omni with its flagship in the cell patrols around it in mode 6, preempting fleet navigation as the in-cell
+	// fleet tactic does; running the fleet override first would reset the mode and destination every tick.
+	std::optional<ShipLocator> optionalPatrolFlagship;
+	if (self.eType == ShipType::kOmni)
+	{
+		optionalPatrolFlagship = FindShipByGlobalId(rPreviousFrame, flagshipGlobalId);
+	}
+	if (optionalPatrolFlagship)
+	{
+		riNavigationDirection = 6;
+	}
+	else
+	{
+		UpdateFleetAndFlagshipNavigation(rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
+	}
 
 	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rNavData);
 
@@ -333,7 +352,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		// dies, so a follower stalls until that row is back in this cell or the fleet override moves it on.
 		// Agent-injected ships have no Fleet updates. Mode 7 follows without arrival or missing-flagship fallback.
 		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 6 draws only when
-		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.
+		// selecting a destination. Both skip draws without islands, except mode 6's fleet Omni patrol pick, which draws
+		// two per attempt in any cell; a fleet Omni never enters mode 7. Every Random call advances once regardless of bound.
 		if (!rStaticData.islands.empty())
 		{
 			common::Random(std::ssize(rStaticData.islands) - 1, rFrame.postRender.randomEngine);
@@ -353,11 +373,32 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		// Navigate to island destination
 		if (XMVectorGetW(rVecIslandDestination) == 0.0f)
 		{
-			// Waypoints select the largest, smallest, then random island by quad-footprint area.
+			// A patrolling fleet Omni samples a point uniformly in the kfOmniPatrolRadius disc around its flagship, two
+			// draws per attempt in any cell. A snapped point outside the cell inset is dropped and the tick keeps its
+			// cached steering, since a recompute would aim at the zero destination; the next tick draws again.
+			// Otherwise waypoints select the largest, smallest, then random island by quad-footprint area.
 			// All waypoint indices consume the island-pick draw before the two footprint draws, keeping each
 			// destination selection at three draws. The sampled point lies in the selected island's quad-footprint
 			// AABB; island-free cells skip draws and target the cell center.
-			if (rStaticData.islands.empty())
+			if (optionalPatrolFlagship)
+			{
+				XMVECTOR vecFlagshipPosition = ShipPosition(rPreviousFrame.interpolate, *optionalPatrolFlagship);
+				float fAngle = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
+				float fRadius = kfOmniPatrolRadius * std::sqrt(common::Random<1.0f>(rFrame.postRender.randomEngine));
+				common::SinCos rotation = common::DeterministicSinCos(fAngle);
+				XMVECTOR vecPatrolPoint = XMVectorSetZ(XMVectorAdd(vecFlagshipPosition, XMVectorSet(rotation.fCos * fRadius, rotation.fSin * fRadius, 0.0f, 0.0f)), engine::gpFlightPlanes->Lowest().fHeightMeters);
+				vecPatrolPoint = engine::NavQuerySnapToNavigable(vecPatrolPoint, rNavData);
+				if (common::IsInsideHex(vecPatrolPoint, engine::kCellDirections, kfOmniPatrolCellInset))
+				{
+					rVecIslandDestination = vecPatrolPoint;
+					bRecompute = true;
+				}
+				else
+				{
+					bRecompute = false;
+				}
+			}
+			else if (rStaticData.islands.empty())
 			{
 				rVecIslandDestination = vecCellCenter;
 				bRecompute = true;

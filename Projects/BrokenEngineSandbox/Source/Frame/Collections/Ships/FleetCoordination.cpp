@@ -8,7 +8,6 @@ namespace game
 
 constexpr float kfWeaponsFreeDistanceSquared = 100.0f * 100.0f;
 constexpr float kfEscortDistance = 50.0f;
-constexpr float kfOmniEscortDistance = 25.0f;
 // A slot then moves at about 90% of the Fighters' steady speed on the escort circle, so a Fighter behind its slot can catch up.
 constexpr int64_t kiEscortLapTicks = 480;
 constexpr float kfVeerOffStartDistanceSquared = 20.0f * 20.0f;
@@ -90,49 +89,38 @@ static ShipTactic XM_CALLCONV RouteTactic(const engine::CellStaticData& rStaticD
 	};
 }
 
-// The fleet's non-dying ships of eType in the previous frame share their type's escort circle evenly in global-ID order,
-// clockwise from slot 0 due East. The Fighters' clock turns clockwise once per kiEscortLapTicks; the Omnis' stays fixed.
-static XMVECTOR XM_CALLCONV EscortSlotPoint(ShipType eType, const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId)
+// The fleet's non-dying Fighters in the previous frame share the escort circle evenly in global-ID order, clockwise from
+// slot 0 due East, on a clock that turns clockwise once per kiEscortLapTicks.
+static XMVECTOR XM_CALLCONV EscortSlotPoint(const Frame& rPreviousFrame, const FleetView& rView, engine::GlobalId globalId)
 {
 	int64_t iCount = 0;
 	int64_t iSlot = 0;
-	auto CountSlots = [&](const auto& rShips)
+	const FightersPostRender& rFighters = *rPreviousFrame.postRender.pFighters;
+	for (int64_t i = 0; i < rFighters.iCount; ++i)
 	{
-		for (int64_t i = 0; i < rShips.iCount; ++i)
+		if (rFighters.pFlagshipGlobalIds[i] != rView.flagshipGlobalId)
 		{
-			if (rShips.pFlagshipGlobalIds[i] != rView.flagshipGlobalId)
-			{
-				continue;
-			}
-
-			if (rShips.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
-			{
-				continue;
-			}
-			++iCount;
-			if (rShips.pGlobalIds[i].iValue < globalId.iValue)
-			{
-				++iSlot;
-			}
+			continue;
 		}
-	};
-	if (eType == ShipType::kFighter)
-	{
-		CountSlots(*rPreviousFrame.postRender.pFighters);
-	}
-	else
-	{
-		CountSlots(*rPreviousFrame.postRender.pOmnis);
+
+		if (rFighters.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		{
+			continue;
+		}
+		++iCount;
+		if (rFighters.pGlobalIds[i].iValue < globalId.iValue)
+		{
+			++iSlot;
+		}
 	}
 
-	// The escorting ship counts itself, so iCount >= 1. The integer phase keeps the angle in [0, 2*pi) and exact over any
-	// run length.
-	int64_t iLapTick = eType == ShipType::kFighter ? rPreviousFrame.interpolate.iTick % kiEscortLapTicks : 0;
-	float fEscortDistance = eType == ShipType::kFighter ? kfEscortDistance : kfOmniEscortDistance;
+	// The escorting Fighter counts itself, so iCount >= 1. The integer phase keeps the angle in [0, 2*pi) and exact over
+	// any run length.
+	int64_t iLapTick = rPreviousFrame.interpolate.iTick % kiEscortLapTicks;
 	int64_t iPeriod = kiEscortLapTicks * iCount;
 	int64_t iPhase = (iLapTick * iCount + iSlot * kiEscortLapTicks) % iPeriod;
 	common::SinCos rotation = common::DeterministicSinCos(XM_2PI * static_cast<float>(iPhase) / static_cast<float>(iPeriod));
-	return XMVectorAdd(rView.vecFlagshipPosition, XMVectorSet(rotation.fCos * fEscortDistance, -rotation.fSin * fEscortDistance, 0.0f, 0.0f));
+	return XMVectorAdd(rView.vecFlagshipPosition, XMVectorSet(rotation.fCos * kfEscortDistance, -rotation.fSin * kfEscortDistance, 0.0f, 0.0f));
 }
 
 FleetBoard::FleetBoard(const Frame& rPreviousFrame)
@@ -217,9 +205,13 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	}
 
 	rFlags.Set(ShipFlags::kVeerOff, false);
+	if (eType == ShipType::kOmni)
+	{
+		return {.iTargetFlightPlane = DefaultFlightPlane(eType)};
+	}
 	return
 	{
-		.vecDestination = EscortSlotPoint(eType, rPreviousFrame, rView, globalId),
+		.vecDestination = EscortSlotPoint(rPreviousFrame, rView, globalId),
 		.iTargetFlightPlane = DefaultFlightPlane(eType),
 		.bHasDestination = true,
 	};

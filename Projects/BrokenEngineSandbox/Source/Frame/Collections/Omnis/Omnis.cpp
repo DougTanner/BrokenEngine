@@ -597,8 +597,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
 		engine::registry_id_t registryTarget = rPrevious.pRegistryTargets[i];
 		XMVECTOR vecPosition = rPreviousInterpolate.pVecPositions[i];
-		// Within the arrival distance of its slot on this tick's escort; only a healing omni there heals.
-		bool bAtEscortSlot = false;
+		// Within kfOmniPatrolRadius of its flagship in x/y on a tick outside transfer lock; only a healing omni there heals.
+		bool bWithinPatrolRadius = false;
 
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
@@ -620,11 +620,9 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 		else
 		{
-			// An escort tick accelerates along this instead of the AI direction.
-			std::optional<XMVECTOR> optionalEscortSteering;
 			if (rPrevious.pController[i] == ShipController::kFleet)
 			{
-				// A healing omni escorts whatever its fleet's stance.
+				// A healing omni patrols whatever its fleet's stance.
 				FleetView view = fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]);
 				if (flags & ShipFlags::kHealing)
 				{
@@ -645,31 +643,12 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					XMVECTOR vecToDestination = XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f);
 					vecAiDirection = XMVector2Normalize(vecToDestination);
 					iNavigationDirection = -1;
-					if (view.eStance == FleetStance::kEscort)
-					{
-						// Routed around terrain to the slot, or to the nearest clear point when the slot lies inside terrain.
-						bool bFinalWaypoint = false;
-						XMVECTOR vecWaypoint = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, tactic.vecDestination, tactic.iTargetFlightPlane, bFinalWaypoint);
-						XMVECTOR vecToWaypoint = XMVectorSetZ(XMVectorSubtract(vecWaypoint, vecPosition), 0.0f);
-						if (bFinalWaypoint)
-						{
-							// Damped arrival: steer the velocity toward the waypoint offset times the gain, saturating at full
-							// acceleration. vecVelocity is still the previous tick's.
-							XMVECTOR vecSteering = XMVectorSetZ(XMVectorDivide(XMVectorSubtract(XMVectorScale(vecToWaypoint, kfOmniEscortPositionGain), vecVelocity), XMVectorReplicate(kfOmniEscortVelocityScale)), 0.0f);
-							float fSteeringLength = XMVectorGetX(XMVector2Length(vecSteering));
-							optionalEscortSteering = fSteeringLength > 1.0f ? XMVectorScale(vecSteering, 1.0f / fSteeringLength) : vecSteering;
-						}
-						else
-						{
-							optionalEscortSteering = XMVector2Normalize(vecToWaypoint);
-						}
-						bAtEscortSlot = XMVectorGetX(XMVector2LengthSq(vecToDestination)) <= kfOmniEscortArrivalDistance * kfOmniEscortArrivalDistance;
-					}
 				}
 				else
 				{
 					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
+				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
 			}
 			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
 			{
@@ -714,7 +693,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
-			ApplyAcceleratedMovement(iNavigationDirection, optionalEscortSteering.value_or(vecAiDirection), deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
+			ApplyAcceleratedMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
 
 			if (bLookTargetFound)
 			{
@@ -722,7 +701,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			}
 		}
 
-		bool bHealing = bAtEscortSlot && (flags & ShipFlags::kHealing);
+		bool bHealing = bWithinPatrolRadius && (flags & ShipFlags::kHealing);
 		if (bHealing)
 		{
 			fArmor = std::min(fArmor + kfOmniHealRate * deltaTime.count(), kfOmniArmor);

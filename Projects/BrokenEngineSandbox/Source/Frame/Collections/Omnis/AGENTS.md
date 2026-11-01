@@ -7,27 +7,22 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
 - Omnis fire only blasters, at the kept attack target when it is visible, within `kfBlasterTargetRange` on the Omni's stored plane, and in line of sight (`../Ships/AGENTS.md` `## Ship Invariants`), else at the nearest such enemy, one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire.
 - A fleet-controlled Omni in its flagship's cell steers by its fleet's stance
   through the fleet tactic it shares with fleet Fighters
-  (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`): in escort it
-  flies the lowest plane and holds its own fixed slot `kfOmniEscortDistance` from the
-  flagship. The fleet's non-dying Omnis in the cell's previous frame share the
-  circle evenly in global-ID order, slot 0 due East, and the slots never turn.
+  (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`): in escort the
+  tactic gives it no destination and it patrols on the lowest plane
+  (`../Ships/AGENTS.md` `## Fleet Navigation Invariants`): it picks a random point within
+  `kfOmniPatrolRadius` of the flagship's previous-frame position in x/y,
+  snapped clear of terrain, keeps it only when it lies `kfOmniPatrolCellInset`
+  inside the cell, else draws again next tick, flies to it, and picks another on
+  arrival. A stored point stays until arrival even when the flagship moves.
   Weapons free it attacks its kept attack target (`../Ships/AGENTS.md`
   `## Ship Invariants`) on that enemy's nearest plane, ignoring enemies above
   the highest Omni plane, routes to it while it is hidden, and while it is in line of sight within
   `kfOmniCirclingDistance` of it in x/y circles it clockwise by chasing a point
   on that circle ahead of itself
-  (`OmniCirclingPoint`), with no coordination among Omnis; it never
-  circles its escort slot. An
-  escort tick routes around terrain on its navigated plane's graph
-  (`NextRouteWaypoint`) to the slot, or to the nearest clear point when the slot
-  lies inside terrain, and accelerates along a damped arrival on that final
-  waypoint, or at full acceleration toward an earlier route waypoint, instead of
-  along the unit AI direction. The escort route query runs every escort tick,
-  an exception to the shared path-query cadence (`../Ships/AGENTS.md`
-  `## Fleet Navigation Invariants`). Outside its flagship's cell it keeps the
-  shared fleet navigation on the lowest plane. Outside transfer lock every tick writes its tactic's
-  target plane into its orders, overriding a spawn plane and a `kUpdateShip`
-  plane.
+  (`OmniCirclingPoint`), with no coordination among Omnis. Outside its
+  flagship's cell it keeps the shared fleet navigation on the lowest plane.
+  Outside transfer lock every tick writes its tactic's target plane into its
+  orders, overriding a spawn plane and a `kUpdateShip` plane.
 - A random-spawn Omni chases its kept attack target (`../Ships/AGENTS.md`
   `## Ship Invariants`), picked from itself in 3D among enemies on an Omni
   plane, circling it while it is in line of sight as a fleet Omni circles its
@@ -45,14 +40,13 @@ Omnis are the armored, shielded ship type; fleet navigation, flagship identity, 
   armor at 0, sets `ShipFlags::kHealing`, and starts no explosion; it still
   marks itself for transfer when it leaves the cell. A random-spawn Omni
   explodes, and the random-spawn waves replace it.
-- While `kHealing` is set an Omni fires nothing and escorts whatever its
-  fleet's stance. On a tick it is within `kfOmniEscortArrivalDistance` in x/y of
-  its slot, its armor and its shield each rise by `kfOmniHealRate` per second up
-  to `kfOmniArmor` and `kfOmniShield`; both full clears `kHealing`, and it
-  fires again in the same tick's Spawn phase. An Omni waiting at the nearest
-  clear point to a slot inside terrain heals only when that point lies within
-  the arrival distance of the slot itself. `kHealing` carries across a
-  transfer. The shield also keeps its passive regeneration.
+- While `kHealing` is set an Omni fires nothing and patrols whatever its
+  fleet's stance. On a tick outside transfer lock on which its flagship is in
+  the cell and it is within `kfOmniPatrolRadius` of that flagship in x/y, its
+  armor and its shield each rise by `kfOmniHealRate` per second up to
+  `kfOmniArmor` and `kfOmniShield`; both full clears `kHealing`, and it fires
+  again in the same tick's Spawn phase. `kHealing` carries across a transfer.
+  The shield also keeps its passive regeneration.
 
 ## Heal Beam
 

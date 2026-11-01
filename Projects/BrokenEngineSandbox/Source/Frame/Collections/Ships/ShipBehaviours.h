@@ -47,6 +47,9 @@ inline constexpr uint8_t kuiNoFlightPlane = 255;
 // the ship type's own tier (ShipTypeClearanceTier, TerrainUtils.h).
 inline constexpr int64_t kiFiringClearanceTier = 0;
 
+// A fleet Omni in its flagship's cell patrols random points within this x/y distance of the flagship, and heals within it.
+inline constexpr float kfOmniPatrolRadius = 100.0f;
+
 // The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
 [[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
 // The plane a ship of the type flies while not engaging: the lowest for Omnis, the type's highest otherwise.
@@ -70,7 +73,8 @@ void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 // The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.
 [[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal);
 
-// Fleet navigation: roaming, cross-cell movement, island destinations, and following the row's own flagship.
+// Fleet navigation: roaming, cross-cell movement, island destinations, following the row's own flagship, and a fleet
+// Omni's patrol around its flagship while that flagship is in the cell.
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
 
 // Random-spawn steering destination: return to the nearest island, else the nearest enemy. Updates the kFlee and

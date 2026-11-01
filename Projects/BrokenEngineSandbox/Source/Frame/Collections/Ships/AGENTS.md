@@ -27,7 +27,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
   death shrink.
-- A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter or Omni in its flagship's cell (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
+- A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter in its flagship's cell and a fleet Omni there on a tick its tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
   its cell's previous frame holds an enemy `kIsFlagship` Battleship row past
@@ -106,10 +106,11 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   (`FleetCoordination.cpp`), escort otherwise. Only a flagship row in the cell
   gives its fleet a stance and position; enemies in other cells are not seen.
 - Fleet Fighters and fleet Omnis steer by the stance through one shared tactic
-  function keyed by ship type (`ChooseFleetTactic`): escort at the ship's own
-  slot among its type's fleet rows; while weapons free, Attack and Veer-off for
+  function keyed by ship type (`ChooseFleetTactic`): escort at a Fighter's own
+  slot among the fleet's Fighters, and no destination for an Omni, which then
+  patrols (`../Omnis/AGENTS.md`); while weapons free, Attack and Veer-off for
   Fighters and Attack for Omnis, whose script circles the target
-  (`../Omnis/AGENTS.md`). Each type's `AGENTS.md` documents its slots.
+  (`../Omnis/AGENTS.md`). `../Fighters/AGENTS.md` documents the slots.
 - A weapons-free fleet Omni, or fleet Fighter not finishing a veer-off, attacks
   its kept attack target (`## Ship Invariants`), picked from its flagship in
   x/y. Escort and veer-off leave the id untouched, so a target that died or left
@@ -130,13 +131,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   uses ordinary steering smoothing. A fleet Battleship turns as
   `../Battleships/AGENTS.md` `## Turning Invariants` states. This rule does not
   apply to Omnis or random-spawn ships.
-- Navigation covers roaming, cross-cell movement, island destinations, and flagship following. Mode transitions depend only on shared state.
+- Navigation covers roaming, cross-cell movement, island destinations, flagship following, and a fleet Omni's patrol around its flagship (`../Omnis/AGENTS.md`). The patrol runs in the island-destination mode (mode 6) and, on a tick the Omni's flagship is in its cell, replaces the fleet override, flagship following, and the cell-change timer. Mode transitions depend only on shared state.
 - Flagship following has no frame-local exit when the flagship row is not in
   the follower's cell, and the server never reassigns the flagship: a fleet's
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
   a follower stalls until that row is in its cell again or a fleet wanted cell
   other than its own sends it cross-cell.
-- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes.
+- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes. A tick a fleet Omni's patrol pick is dropped (`../Omnis/AGENTS.md`) keeps the cached steering with no recompute.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current
   position. Both tests are needed: containment ahead does not imply containment
@@ -149,8 +150,10 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   draws on any tick they can flip between, so mode 7 mirrors mode 6's three
   entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
   a cell with no islands neither mode draws: mode 7 skips the mirror and mode 6
-  navigates to the cell center instead of an island. Only the draw count matters
-  — each `common::Random` advances the shared random stream once no matter what
+  navigates to the cell center instead of an island. A fleet Omni's patrol pick
+  instead draws two values per attempt in any cell; a fleet Omni never enters
+  mode 7, so none of its ticks can flip between the modes. Only the draw count
+  matters — each `common::Random` advances the shared random stream once no matter what
   bound it is given — so mode 7's mirror draws are load-bearing, not dead code,
   even though it throws their results away.
 - Spawning always consumes its cell-change random draw.
