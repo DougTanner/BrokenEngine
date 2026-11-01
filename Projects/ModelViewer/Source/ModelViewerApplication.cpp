@@ -194,6 +194,7 @@ void ModelViewerApplication::LoadModelMetadata()
 	mf3ModelRotation = {};
 	mf3ModelOffset = {};
 	meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+	mMissileTubes.clear();
 	ValidateModelAlignment();
 	mModelMetadataPath.clear();
 	try
@@ -227,6 +228,7 @@ void ModelViewerApplication::LoadModelMetadata()
 			mf3ModelRotation = metadata.f3RotationDegrees;
 			mf3ModelOffset = metadata.f3Offset;
 			meModelHitboxLevel = metadata.eHitboxLevel;
+			mMissileTubes = std::move(metadata.missileTubes);
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
 			{
@@ -246,6 +248,7 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
 		meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+		mMissileTubes.clear();
 		ValidateModelAlignment();
 		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
@@ -256,7 +259,12 @@ void ModelViewerApplication::SaveModelMetadata()
 	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
 	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
-	std::string content = std::format("{{\n\t\"version\": 2,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\"\n}}\n", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
+	std::string content = std::format("{{\n\t\"version\": 3,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\",\n\t\"missileTubes\": [", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
+	for (const auto& [i, rTube] : std::views::enumerate(std::as_const(mMissileTubes)))
+	{
+		std::format_to(std::back_inserter(content), "{}\n\t\t{{\"position\": [{}, {}, {}], \"direction\": [{}, {}, {}]}}", i == 0 ? "" : ",", rTube.f3Position.x, rTube.f3Position.y, rTube.f3Position.z, rTube.f3Direction.x, rTube.f3Direction.y, rTube.f3Direction.z);
+	}
+	content += mMissileTubes.empty() ? "]\n}\n" : "\n\t]\n}\n";
 	std::filesystem::path stagingPath = mModelMetadataPath;
 	stagingPath += ".tmp";
 	std::ofstream stream(stagingPath, std::ios::binary);
@@ -394,33 +402,13 @@ void ModelViewerApplication::ResetLightingPreset()
 	SaveLightingPreset(values);
 }
 
-void ModelViewerApplication::PreparePreview(Preview& rPreview)
+// Visits the rest position of every drawn index in draw order, so each consecutive triple is one drawn triangle.
+template <typename VISITOR>
+void ModelViewerApplication::ForEachRestPosition(const Preview& rPreview, VISITOR&& rVisitor) const
 {
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunks = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const engine::EagerChunk& rScene = rChunks.at(rPreview.crc);
 	const common::SceneHeader& rSceneHeader = rScene.pHeader->sceneHeader;
-	if (std::cmp_greater(rSceneHeader.uiTextureCount, common::SceneHeader::kiMaxTextures) || std::cmp_greater(rSceneHeader.uiMaterialCount, common::SceneHeader::kiMaxMaterials))
-	{
-		throw std::ios_base::failure("ModelViewer scene counts");
-	}
-	if (rSceneHeader.bHasAnimation)
-	{
-		const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
-		auto matrices = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMMATRIX*>(rAnimation.mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMMATRIX)));
-		for (int64_t i = 0; std::cmp_less(i, rAnimation.mHeader.skeleton.uiNodeCount); ++i)
-		{
-			int64_t iParent = rAnimation.mpNodes[i].iParentIndex;
-			matrices.mpData[i] = iParent < 0 ? rAnimation.mpBindPoseLocalMatrices[i] : rAnimation.mpBindPoseLocalMatrices[i] * matrices.mpData[iParent];
-		}
-		rPreview.meshData.resize(rSceneHeader.uiMaterialCount);
-		rPreview.jointMatrices.resize(rAnimation.SkinnedMaterialCount(rSceneHeader.uiMaterialCount) * rAnimation.mHeader.skeleton.uiSkinJointCount);
-		int64_t iJointOffset = 0;
-		for (int64_t i = 0; std::cmp_less(i, rSceneHeader.uiMaterialCount); ++i)
-		{
-			rAnimation.EvaluateMaterial(i, matrices.mpData, &rPreview.meshData.at(i), rPreview.jointMatrices.data(), iJointOffset);
-			iJointOffset += rPreview.meshData.at(i).uiJointCount;
-		}
-	}
 	const engine::EagerChunk& rModel = rChunks.at(rSceneHeader.modelCrc);
 	const common::ModelHeader& rModelHeader = rModel.pHeader->modelHeader;
 	int64_t iIndexSize = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? sizeof(uint16_t) : sizeof(uint32_t);
@@ -439,9 +427,6 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 		throw std::ios_base::failure("ModelViewer material extent");
 	}
 	const uint32_t* puiStarts = reinterpret_cast<const uint32_t*>(rScene.pData + iStartsOffset);
-	XMVECTOR vecMin = XMVectorReplicate(std::numeric_limits<float>::max());
-	XMVECTOR vecMax = XMVectorReplicate(-std::numeric_limits<float>::max());
-	int64_t iDrawnVertices = 0;
 	for (int64_t i = 0; std::cmp_less(i, rSceneHeader.uiMaterialCount); ++i)
 	{
 		int64_t iEnd = std::cmp_equal(i + 1, rSceneHeader.uiMaterialCount) ? rModelHeader.iIndexCount : puiStarts[i + 1];
@@ -497,11 +482,47 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 			{
 				throw std::ios_base::failure("ModelViewer bounds position");
 			}
-			vecMin = XMVectorMin(vecMin, vecPosition);
-			vecMax = XMVectorMax(vecMax, vecPosition);
-			++iDrawnVertices;
+			rVisitor(vecPosition);
 		}
 	}
+}
+
+void ModelViewerApplication::PreparePreview(Preview& rPreview)
+{
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunks = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const engine::EagerChunk& rScene = rChunks.at(rPreview.crc);
+	const common::SceneHeader& rSceneHeader = rScene.pHeader->sceneHeader;
+	if (std::cmp_greater(rSceneHeader.uiTextureCount, common::SceneHeader::kiMaxTextures) || std::cmp_greater(rSceneHeader.uiMaterialCount, common::SceneHeader::kiMaxMaterials))
+	{
+		throw std::ios_base::failure("ModelViewer scene counts");
+	}
+	if (rSceneHeader.bHasAnimation)
+	{
+		const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
+		auto matrices = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMMATRIX*>(rAnimation.mHeader.skeleton.uiNodeCount * static_cast<int64_t>(sizeof(XMMATRIX)));
+		for (int64_t i = 0; std::cmp_less(i, rAnimation.mHeader.skeleton.uiNodeCount); ++i)
+		{
+			int64_t iParent = rAnimation.mpNodes[i].iParentIndex;
+			matrices.mpData[i] = iParent < 0 ? rAnimation.mpBindPoseLocalMatrices[i] : rAnimation.mpBindPoseLocalMatrices[i] * matrices.mpData[iParent];
+		}
+		rPreview.meshData.resize(rSceneHeader.uiMaterialCount);
+		rPreview.jointMatrices.resize(rAnimation.SkinnedMaterialCount(rSceneHeader.uiMaterialCount) * rAnimation.mHeader.skeleton.uiSkinJointCount);
+		int64_t iJointOffset = 0;
+		for (int64_t i = 0; std::cmp_less(i, rSceneHeader.uiMaterialCount); ++i)
+		{
+			rAnimation.EvaluateMaterial(i, matrices.mpData, &rPreview.meshData.at(i), rPreview.jointMatrices.data(), iJointOffset);
+			iJointOffset += rPreview.meshData.at(i).uiJointCount;
+		}
+	}
+	XMVECTOR vecMin = XMVectorReplicate(std::numeric_limits<float>::max());
+	XMVECTOR vecMax = XMVectorReplicate(-std::numeric_limits<float>::max());
+	int64_t iDrawnVertices = 0;
+	ForEachRestPosition(rPreview, [&vecMin, &vecMax, &iDrawnVertices](FXMVECTOR vecPosition)
+	{
+		vecMin = XMVectorMin(vecMin, vecPosition);
+		vecMax = XMVectorMax(vecMax, vecPosition);
+		++iDrawnVertices;
+	});
 	XMVECTOR vecCenter = XMVectorScale(XMVectorAdd(vecMin, vecMax), 0.5f);
 	XMStoreFloat3A(&rPreview.f3Center, vecCenter);
 	rPreview.fRadius = XMVectorGetX(XMVector3Length(XMVectorSubtract(vecMax, vecCenter)));
@@ -510,6 +531,56 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 		throw std::ios_base::failure("ModelViewer empty bounds");
 	}
 	LOG(kGraphics, kInfo, "ModelViewer rest preview {}: materials {}, joints {}, center ({}, {}, {}), radius {}", rPreview.pcPath, rSceneHeader.uiMaterialCount, std::ssize(rPreview.jointMatrices), rPreview.f3Center.x, rPreview.f3Center.y, rPreview.f3Center.z, rPreview.fRadius);
+}
+
+XMMATRIX ModelViewerApplication::OrbitTransform(const Preview& rPreview) const
+{
+	XMVECTOR vecCenter = XMLoadFloat3A(&rPreview.f3Center);
+	return XMMatrixTranslationFromVector(XMVectorNegate(vecCenter)) * mMatModelPreRotate * XMMatrixTranslationFromVector(vecCenter);
+}
+
+void ModelViewerApplication::PickMissileTube()
+{
+	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
+	const Camera* pCamera = static_cast<const Camera*>(engine::gpCamera);
+	const Preview& rPreview = mPreviews.at(miSelected);
+	XMMATRIX matWorld = OrbitTransform(rPreview);
+	const ImVec2& rMousePosition = ImGui::GetIO().MousePos;
+	XMVECTOR vecOrigin = XMVector3Unproject(XMVectorSet(rMousePosition.x, rMousePosition.y, 0.0f, 1.0f), pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
+	XMVECTOR vecFar = XMVector3Unproject(XMVectorSet(rMousePosition.x, rMousePosition.y, 1.0f, 1.0f), pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
+	XMVECTOR vecDirection = XMVector3Normalize(XMVectorSubtract(vecFar, vecOrigin));
+	XMVECTOR pVecTriangle[3] {};
+	int64_t iCorner = 0;
+	float fNearestDistance = std::numeric_limits<float>::max();
+	XMVECTOR vecNearestCross = XMVectorZero();
+	ForEachRestPosition(rPreview, [&](FXMVECTOR vecPosition)
+	{
+		pVecTriangle[iCorner] = vecPosition;
+		iCorner = (iCorner + 1) % 3;
+		if (iCorner != 0)
+		{
+			return;
+		}
+		// Counter-clockwise winding is the front face the kCullBack model pipelines draw.
+		XMVECTOR vecCross = XMVector3Cross(XMVectorSubtract(pVecTriangle[1], pVecTriangle[0]), XMVectorSubtract(pVecTriangle[2], pVecTriangle[0]));
+		float fDistance = 0.0f;
+		if (XMVectorGetX(XMVector3Dot(vecCross, vecDirection)) < 0.0f && TriangleTests::Intersects(vecOrigin, vecDirection, pVecTriangle[0], pVecTriangle[1], pVecTriangle[2], fDistance) && fDistance < fNearestDistance)
+		{
+			fNearestDistance = fDistance;
+			vecNearestCross = vecCross;
+		}
+	});
+	if (fNearestDistance == std::numeric_limits<float>::max())
+	{
+		return;
+	}
+	common::ModelMissileTube& rTube = mMissileTubes.emplace_back();
+	XMStoreFloat3A(&rTube.f3Position, XMVectorMultiplyAdd(XMVectorReplicate(fNearestDistance), vecDirection, vecOrigin));
+	XMStoreFloat3A(&rTube.f3Direction, XMVector3Normalize(vecNearestCross));
+	if (mFlags & ViewerFlags::kMetadataLoaded)
+	{
+		mModelMetadataStatus = "Unsaved source edits";
+	}
 }
 
 void ModelViewerApplication::GenerateIslands()
@@ -661,8 +732,7 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		}
 		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
 		rLayout = {};
-		XMVECTOR vecCenter = XMLoadFloat3A(&rPreview.f3Center);
-		XMMATRIX matTransform = XMMatrixTranslationFromVector(XMVectorNegate(vecCenter)) * mMatModelPreRotate * XMMatrixTranslationFromVector(vecCenter);
+		XMMATRIX matTransform = OrbitTransform(rPreview);
 		if (mFlags & ViewerFlags::kFlying)
 		{
 			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
@@ -794,6 +864,10 @@ void ModelViewerApplication::RenderUi()
 	// Heap: ImGui retains window and draw storage between frames and rebuilds it after recreation.
 	ScopedSuppressAllocationTracking suppress;
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
+	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
+	// True only on a frame whose drawn right window selects the Edit Hardpoints tab in orbit with Rest pose: the one
+	// gate for picking and tube markers, whose entries are rest-pose coordinates drawn through OrbitTransform.
+	bool bHardpointsActive = false;
 	if (!engine::gbShowImGui)
 	{
 		float fScale = engine::UiScale();
@@ -972,6 +1046,23 @@ void ModelViewerApplication::RenderUi()
 		std::snprintf(pcLightingTitle, sizeof(pcLightingTitle), "Preset: %c###Lighting", "WER"[miSelectedLightingPreset]);
 		if (ImGui::Begin(pcLightingTitle, nullptr, iWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
+			auto SourceMetadataControls = [this]()
+			{
+				ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
+				ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
+				if (ImGui::Button("Save"))
+				{
+					SaveModelMetadata();
+				}
+				ImGui::EndDisabled();
+				ImGui::SameLine();
+				ImGui::TextWrapped("%s", mModelMetadataStatus.c_str());
+				if (!mModelAlignmentError.empty())
+				{
+					ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
+				}
+				ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
+			};
 			if (ImGui::BeginTabBar("Panels", ImGuiTabBarFlags_AutoSelectNewTabs))
 			{
 				if (ImGui::BeginTabItem("Lighting"))
@@ -1057,20 +1148,41 @@ void ModelViewerApplication::RenderUi()
 					{
 						mfFlightHeight = fFlightHeight;
 					}
-					ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
-					ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
-					if (ImGui::Button("Save"))
+					SourceMetadataControls();
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("Edit Hardpoints"))
+				{
+					bHardpointsActive = !(mFlags & ViewerFlags::kFlying) && miSelectedAnimation < 0;
+					ImGui::SeparatorText("Missile tubes");
+					ImGui::BeginDisabled(!bHardpointsActive);
+					bool bPicking = mFlags & ViewerFlags::kPicking;
+					if (ImGui::Checkbox("Pick", &bPicking))
 					{
-						SaveModelMetadata();
+						mFlags.Set(ViewerFlags::kPicking, bPicking);
 					}
 					ImGui::EndDisabled();
-					ImGui::SameLine();
-					ImGui::TextWrapped("%s", mModelMetadataStatus.c_str());
-					if (!mModelAlignmentError.empty())
+					int64_t iDeleted = -1;
+					for (const auto& [i, rTube] : std::views::enumerate(std::as_const(mMissileTubes)))
 					{
-						ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
+						ImGui::PushID(static_cast<int>(i));
+						if (ImGui::SmallButton("X"))
+						{
+							iDeleted = i;
+						}
+						ImGui::SameLine();
+						ImGui::Text("(%.3f, %.3f, %.3f) dir (%.3f, %.3f, %.3f)", rTube.f3Position.x, rTube.f3Position.y, rTube.f3Position.z, rTube.f3Direction.x, rTube.f3Direction.y, rTube.f3Direction.z);
+						ImGui::PopID();
 					}
-					ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
+					if (iDeleted >= 0)
+					{
+						mMissileTubes.erase(mMissileTubes.begin() + iDeleted);
+						if (mFlags & ViewerFlags::kMetadataLoaded)
+						{
+							mModelMetadataStatus = "Unsaved source edits";
+						}
+					}
+					SourceMetadataControls();
 					ImGui::EndTabItem();
 				}
 				ImGui::EndTabBar();
@@ -1078,13 +1190,31 @@ void ModelViewerApplication::RenderUi()
 			engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 		}
 		ImGui::End();
+		if (bHardpointsActive && !mPreviews.empty())
+		{
+			// Viewer-written tubes need no near-plane clipping: the orbit eye stays over 1.4 radii from the rest-bounds center,
+			// and a picked surface position plus its unit direction scaled by 0.1 radius lies within 1.1 radii of it.
+			const Preview& rPreview = mPreviews.at(miSelected);
+			XMMATRIX matWorld = OrbitTransform(rPreview);
+			ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
+			ImU32 uiMarkerColor = IM_COL32(255, 96, 0, 255);
+			for (const common::ModelMissileTube& rTube : mMissileTubes)
+			{
+				XMVECTOR vecPosition = XMVectorSetW(XMLoadFloat3A(&rTube.f3Position), 1.0f);
+				XMVECTOR vecEnd = XMVectorMultiplyAdd(XMLoadFloat3A(&rTube.f3Direction), XMVectorReplicate(0.1f * rPreview.fRadius), vecPosition);
+				XMVECTOR vecScreenPosition = XMVector3Project(vecPosition, pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
+				XMVECTOR vecScreenEnd = XMVector3Project(vecEnd, pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
+				ImVec2 screenPosition(XMVectorGetX(vecScreenPosition), XMVectorGetY(vecScreenPosition));
+				pDrawList->AddLine(screenPosition, ImVec2(XMVectorGetX(vecScreenEnd), XMVectorGetY(vecScreenEnd)), uiMarkerColor, 2.0f * fScale);
+				pDrawList->AddCircleFilled(screenPosition, 4.0f * fScale, uiMarkerColor);
+			}
+		}
 	}
 	// Rewritten every frame because a surface-tier recreation replaces the manager and its text areas.
 	engine::gpImGuiManager->UpdateTextArea(engine::kTextDebug, (mFlags & ViewerFlags::kPaused) ? "PAUSED" : "");
 	engine::gpImGuiManager->RenderTextAreas();
 	const ImGuiIO& rInputOutput = ImGui::GetIO();
 	bool bCaptureMouse = rInputOutput.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
-	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
 	float fViewportSize = std::min(pViewport->Size.x, pViewport->Size.y);
 	if (bCaptureMouse || mPreviews.empty() || !ImGui::IsMousePosValid(&rInputOutput.MousePos) || fViewportSize <= 0.0f)
 	{
@@ -1099,7 +1229,12 @@ void ModelViewerApplication::RenderUi()
 		}
 		else if (miDragButton < 0)
 		{
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+			// A picking click starts no drag, so neither the click nor holding it afterwards orbits.
+			if (bHardpointsActive && (mFlags & ViewerFlags::kPicking) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				PickMissileTube();
+			}
+			else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 			{
 				miDragButton = ImGui::IsMouseClicked(ImGuiMouseButton_Left) ? ImGuiMouseButton_Left : ImGuiMouseButton_Right;
 				mPreviousMousePosition = mousePosition;

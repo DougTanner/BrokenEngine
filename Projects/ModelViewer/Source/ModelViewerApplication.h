@@ -33,6 +33,7 @@ private:
 		kMetadataLoaded = 0x08,
 		kMetadataValid = 0x10,
 		kPaused = 0x20,
+		kPicking = 0x40,
 	};
 	struct FlightBody
 	{
@@ -55,6 +56,10 @@ private:
 		float fRadius = 0.0f;
 	};
 	void PreparePreview(Preview& rPreview);
+	template <typename VISITOR>
+	void ForEachRestPosition(const Preview& rPreview, VISITOR&& rVisitor) const;
+	XMMATRIX OrbitTransform(const Preview& rPreview) const;
+	void PickMissileTube();
 	void LoadModelMetadata();
 	void SaveModelMetadata();
 	void ValidateModelAlignment();
@@ -92,6 +97,7 @@ private:
 	XMFLOAT3A mf3ModelOffset {};
 	// Not editable; Save writes back the loaded setting.
 	common::ModelHitboxLevel meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+	std::vector<common::ModelMissileTube> mMissileTubes;
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
 	XMMATRIX mMatModelPreRotate = XMMatrixIdentity();

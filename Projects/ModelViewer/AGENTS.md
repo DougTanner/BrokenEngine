@@ -111,11 +111,15 @@ node matrices and skinning; an animation's first key is not a rest-pose
 substitute. Camera fitting uses bounds from that rest geometry. Model changes
 reset to Rest pose, refit the camera, and reset the orbit camera rotation;
 clip changes restart playback without
-refitting. UI mouse capture takes precedence over camera and sun gestures.
+refitting. UI mouse capture takes precedence over camera, sun and picking
+gestures.
 
-In orbit, left drags rotate the camera; right drags rotate only the model sun
-about the active camera's screen axes in either mode with the same continuous
-feel. Both gestures allow edge roll and cross poles
+In orbit, left drags rotate the camera, except that while picking mode is on,
+the Edit Hardpoints tab is selected and Rest pose is shown a left click picks a
+missile tube and never orbits
+([Source metadata authoring](#source-metadata-authoring)); right
+drags rotate only the model sun about the active camera's screen axes in either
+mode with the same continuous feel. Both gestures allow edge roll and cross poles
 without clamping. Orientation accumulates along the drag path; returning
 the pointer to its starting position need not restore the starting orientation.
 Pointer coordinates use the viewport's shorter dimension so non-square viewports
@@ -142,14 +146,28 @@ and foreground.
 ## Source metadata authoring
 
 The right window's Flight tab edits XYZ scale, rotation in degrees and offset,
-and offers explicit Save to the selected source's adjacent `.model.json`; no
-control edits the hitbox setting, so Save writes back the loaded one. The
+and the Edit Hardpoints tab edits missile tubes; both tabs offer the same
+explicit Save to the selected source's adjacent `.model.json`. No control edits
+the hitbox setting, so Save writes back the loaded one. The
 [exporter owns the metadata format](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
-Geometry and animation still come from packs; alignment always comes from this
-checkout's source metadata on startup and actual model selection, with no packed
-alignment fallback. Selection discards unsaved edits; reselecting or restarting
-reloads saved values without packing. Mode changes, Reroll and Graphics
-recreation retain active edits. There is no source watcher.
+Geometry and animation still come from packs; alignment and tubes always come
+from this checkout's source metadata on startup and actual model selection,
+with no packed fallback. Selection discards unsaved alignment and tube edits;
+reselecting or restarting reloads saved values without packing. Mode changes,
+Reroll and Graphics recreation retain active edits. There is no source watcher.
+
+The Edit Hardpoints tab, present in both modes, lists the tubes, each with an X
+that deletes it. Its Pick checkbox is picking mode, active only while that tab
+is selected in the shown right window, in orbit with Rest pose; there a left
+click outside the panels always picks and never orbits. A pick adds the nearest
+front-facing (counter-clockwise) rest-geometry triangle hit under the pointer:
+its hit position and its unflipped unit winding normal as the direction; a miss
+adds nothing. In flight or with a clip selected the Pick setting is kept but
+inactive and its checkbox disabled, and picking resumes on return to orbit with
+Rest pose. Only while that tab is selected in orbit with Rest pose, each tube
+draws as a dot at its position with a short line along its direction, through
+the orbit model transform, over the scene and under the panels with no depth
+test.
 
 The executable's containing checkout owns source reads and Save, in both main
 checkouts and linked worktrees, independently of working directory and packed

@@ -190,20 +190,27 @@ without modifying the source.
 `ExportModel` owns optional adjacent `<source-filename>.model.json` metadata:
 remove only the generated final `.MODEL` extension before appending
 `.model.json`, so `scene.gltf.MODEL` uses `scene.gltf.model.json`.
-Present metadata requires integer `version: 2`, complete `rotationDegrees`,
+Present metadata requires integer `version: 3`, complete `rotationDegrees`,
 `scale`, and `offset` arrays, each with exactly three numeric components that
-fit finite floats, and a `hitbox` string of `sphere`, `box`, or `outline`;
-every scale component must remain strictly positive after conversion. Invalid
-present metadata fails through the export aggregate; absence alone supplies
-zero rotation and offset with unit scale and the `sphere` hitbox setting.
+fit finite floats, a `hitbox` string of `sphere`, `box`, or `outline`, and a
+`missileTubes` array, possibly empty, of objects; every scale component must
+remain strictly positive after conversion. Each tube entry requires `position`
+and `direction` arrays under the same three-component rule, both in
+pre-alignment rest model coordinates (the space of `offset`), and ignores other
+keys; `direction` must have nonzero length, which is its whole contract:
+ModelViewer writes unit vectors and the reader stores the value without
+normalizing it. Invalid present metadata fails through the export aggregate;
+absence alone supplies zero rotation and offset with unit scale, the `sphere`
+hitbox setting and no missile tubes.
 `common::ReadModelMetadata` (`Common/ModelMetadata.h`) is the one reader and
 validator, shared with ModelViewer authoring.
 
 Export converts degrees to radians once and stores rotation, scale, and offset
-separately in `ModelHeader`, leaving geometry and animation unchanged. Rotation
-composes X, then Y, then Z; offset is in exported model coordinates. Alignment
-describes the asset's visual basis, scale, and pivot; gameplay sizing and dynamic
-render transforms remain consumer-owned.
+separately in `ModelHeader`, leaving geometry and animation unchanged; missile
+tubes are validated but not packed. Rotation composes X, then Y, then Z; offset
+is in exported model coordinates. Alignment describes the asset's visual basis,
+scale, and pivot; gameplay sizing and dynamic render transforms remain
+consumer-owned.
 
 Every model chunk, whatever its hitbox setting, ends in a `common::ModelOutline`
 section: the top-down convex hull and z range of the vertices after alignment,

@@ -3,14 +3,23 @@
 namespace common
 {
 
-// An adjacent `.model.json` sidecar holding alignment and the hitbox setting, read by DataPacker export and ModelViewer
-// authoring.
+// Both vectors are in pre-alignment rest model coordinates, the space of ModelMetadata::f3Offset. The direction is
+// stored as read: nonzero, not necessarily unit length.
+struct ModelMissileTube
+{
+	XMFLOAT3A f3Position {};
+	XMFLOAT3A f3Direction {};
+};
+
+// An adjacent `.model.json` sidecar holding alignment, the hitbox setting and missile tubes, read by DataPacker export
+// and ModelViewer authoring.
 struct ModelMetadata
 {
 	XMFLOAT3A f3RotationDegrees {};
 	XMFLOAT3A f3Scale {1.0f, 1.0f, 1.0f};
 	XMFLOAT3A f3Offset {};
 	ModelHitboxLevel eHitboxLevel = ModelHitboxLevel::kSphere;
+	std::vector<ModelMissileTube> missileTubes;
 };
 
 // The sidecar "hitbox" values, indexed by ModelHitboxLevel.
@@ -46,9 +55,9 @@ inline ModelMetadata ReadModelMetadata(const std::filesystem::path& rMetadataPat
 	std::vector<std::byte> metadataBytes = ReadEntireFile(rMetadataPath);
 	const char* pcMetadata = reinterpret_cast<const char*>(metadataBytes.data());
 	nlohmann::json metadata = nlohmann::json::parse(pcMetadata, pcMetadata + metadataBytes.size());
-	if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 2)
+	if (!metadata.is_object() || !metadata.at("version").is_number_integer() || metadata.at("version") != 3)
 	{
-		throw std::runtime_error(std::format("\"{}\" must contain model metadata version 2", rMetadataPath.string()));
+		throw std::runtime_error(std::format("\"{}\" must contain model metadata version 3", rMetadataPath.string()));
 	}
 	const char* const* ppcHitboxLevelName = std::find(std::begin(kpcModelHitboxLevelNames), std::end(kpcModelHitboxLevelNames), metadata.at("hitbox"));
 	if (ppcHitboxLevelName == std::end(kpcModelHitboxLevelNames))
@@ -65,6 +74,24 @@ inline ModelMetadata ReadModelMetadata(const std::filesystem::path& rMetadataPat
 	if (modelMetadata.f3Scale.x <= 0.0f || modelMetadata.f3Scale.y <= 0.0f || modelMetadata.f3Scale.z <= 0.0f)
 	{
 		throw std::runtime_error(std::format("\"{}\" scale components must be positive", rMetadataPath.string()));
+	}
+	const nlohmann::json& rMissileTubes = metadata.at("missileTubes");
+	if (!rMissileTubes.is_array())
+	{
+		throw std::runtime_error(std::format("\"{}\" missileTubes must be an array", rMetadataPath.string()));
+	}
+	modelMetadata.missileTubes.reserve(rMissileTubes.size());
+	for (const nlohmann::json& rMissileTube : rMissileTubes)
+	{
+		if (!rMissileTube.is_object())
+		{
+			throw std::runtime_error(std::format("\"{}\" missileTubes entries must be objects", rMetadataPath.string()));
+		}
+		ModelMissileTube& rTube = modelMetadata.missileTubes.emplace_back(ModelMissileTube {.f3Position = ReadModelMetadataVector(rMissileTube, "position", rMetadataPath), .f3Direction = ReadModelMetadataVector(rMissileTube, "direction", rMetadataPath), });
+		if (rTube.f3Direction.x == 0.0f && rTube.f3Direction.y == 0.0f && rTube.f3Direction.z == 0.0f)
+		{
+			throw std::runtime_error(std::format("\"{}\" missileTubes direction must be nonzero", rMetadataPath.string()));
+		}
 	}
 	return modelMetadata;
 }
