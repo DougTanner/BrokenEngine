@@ -36,8 +36,16 @@ vec3 ACESFilm(vec3 x)
 
 void main()
 {
+	vec4 texel = texture(hdrSampler, f2InTexcoord);
+	// Only the clear writes a negative alpha, marking a texel to show ungraded; additive blends that leave the alpha negative also show ungraded.
+	if (texel.a < 0.0f)
+	{
+		f4OutColor = vec4(texel.rgb, 1.0f);
+		return;
+	}
+
 	// Exposure -> ACES tone map the accumulated HDR scene
-	vec3 hdr = texture(hdrSampler, f2InTexcoord).rgb;
+	vec3 hdr = texel.rgb;
 	hdr = min(hdr, vec3(65000.0f)); // Kill F16 Inf
 	hdr *= mainLayout.fPhysicallyBasedRenderingExposure;
 	vec3 mapped = ACESFilm(hdr);

@@ -124,6 +124,8 @@ public:
 	int64_t miFrameCounter = 0;
 	VkExtent2D mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
 	GraphicsFlags_t mFlags = kbDrawModelsOverWorld ? GraphicsFlags_t {GraphicsFlags::kDrawModelsOverWorld} : GraphicsFlags_t {};
+	// Runtime host policy like mFlags, initialized from game::kVkHdrClearColor.
+	VkClearColorValue mHdrVkClearColorValue;
 
 	DestroyType meDestroyType = DestroyType::kNone;
 	DestroyFlags_t mDestroyFlags;

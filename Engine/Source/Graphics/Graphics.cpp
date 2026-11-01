@@ -81,6 +81,7 @@ float SmokeSimulationPixelsY()
 
 Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
 : common::Singleton<Graphics>(gpGraphics, this)
+, mHdrVkClearColorValue(game::kVkHdrClearColor)
 {
 	mHinstance = hinstance;
 	mHwnd = hwnd;

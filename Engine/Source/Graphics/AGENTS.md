@@ -9,8 +9,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   It runs no descriptor churn, other-framebuffer publication, or retired-resource destruction, so that pending work waits for the next world frame, and it does not advance `miFrameCounter` (the island LRU clock and the lighting, terrain-shadow, and smoke-stagger cadence clock).
   On the frame the world hides, `GameBase::Render` clears the retained camera-relative effects so they restart clean when the world returns.
 - Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
-- Model depth ordering is runtime host policy in `Graphics::mFlags`, initialized
-  from the host's `kbDrawModelsOverWorld` default. Change it only on the owning
+- Model depth ordering and the HDR clear color are runtime host policy in
+  `Graphics`, initialized from the host's `kbDrawModelsOverWorld` and
+  `game::kVkHdrClearColor` defaults. Change either only on the owning
   main thread and request at least command-buffer recreation; complete that
   recreation before publishing or submitting a frame for the new policy. Never
   mutate the policy concurrently with command-buffer recording.

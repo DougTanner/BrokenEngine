@@ -62,6 +62,7 @@ constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.b
 
 ModelViewerApplication::ModelViewerApplication()
 : common::Singleton<ModelViewerApplication>(gpModelViewerApplication, this)
+, mfBackgroundGray(kVkHdrClearColor.float32[0])
 {
 	mSeedRandomEngine.TimeSeed();
 	// Strict comparison over the CRC-sorted list keeps the lowest CRC on a tie.
@@ -709,6 +710,15 @@ bool ModelViewerApplication::Render()
 		engine::gpGraphics->mFlags.Set(engine::GraphicsFlags::kDrawModelsOverWorld, bDrawOverWorld);
 		engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
 	}
+	VkClearColorValue& rVkHdrClearColor = engine::gpGraphics->mHdrVkClearColorValue;
+	if (rVkHdrClearColor.float32[0] != mfBackgroundGray)
+	{
+		// Alpha keeps its initial ungraded marker.
+		rVkHdrClearColor.float32[0] = mfBackgroundGray;
+		rVkHdrClearColor.float32[1] = mfBackgroundGray;
+		rVkHdrClearColor.float32[2] = mfBackgroundGray;
+		engine::gpGraphics->meDestroyType = std::max(engine::gpGraphics->meDestroyType, engine::DestroyType::kCommandBuffers);
+	}
 	engine::gpGraphics->Refresh();
 	if (engine::gpGraphics->mbSwapchainRecreateDeferred || engine::gpGraphics->meDestroyType != engine::DestroyType::kNone)
 	{
@@ -829,6 +839,16 @@ void ModelViewerApplication::RenderUi()
 		}
 		if (ImGui::Begin("Model Viewer", nullptr, iPanelWindowFlags))
 		{
+			ImGui::BeginDisabled(mFlags & ViewerFlags::kFlying);
+			ImGui::Checkbox("World background", &mbWorldBackground);
+			ImGui::EndDisabled();
+			ImGui::BeginDisabled(WorldVisible());
+			ImGui::TextUnformatted("Background gray");
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+			// Reversed range puts white at the left.
+			ImGui::SliderFloat("##Background gray", &mfBackgroundGray, 1.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoInput);
+			ImGui::EndDisabled();
+			ImGui::Separator();
 			if (!mPreviews.empty())
 			{
 				const Preview& rPreview = mPreviews.at(miSelected);
@@ -912,9 +932,6 @@ void ModelViewerApplication::RenderUi()
 			ImGui::SeparatorText("Islands");
 			ImGui::TextUnformatted((mFlags & ViewerFlags::kFlying) ? "TAB: orbit preview" : "TAB: autonomous flight");
 			ImGui::TextUnformatted((mFlags & ViewerFlags::kPaused) ? "SPACE: resume" : "SPACE: pause");
-			ImGui::BeginDisabled(mFlags & ViewerFlags::kFlying);
-			ImGui::Checkbox("World background", &mbWorldBackground);
-			ImGui::EndDisabled();
 			if (ImGui::Button("Reroll"))
 			{
 				mIslandSeed = engine::GridCoord::FromKey(common::RandomNext(mSeedRandomEngine));

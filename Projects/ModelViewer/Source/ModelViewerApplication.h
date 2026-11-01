@@ -22,6 +22,7 @@ public:
 	void CreateGraphicsResources();
 	void RenderModel(int64_t iCommandBuffer);
 	bool mbWorldBackground = true;
+	float mfBackgroundGray;
 
 private:
 	enum class ViewerFlags : uint8_t

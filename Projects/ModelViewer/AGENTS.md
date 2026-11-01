@@ -6,9 +6,11 @@ ModelViewer is a separate client executable. Viewer policy and game contracts
 belong here; shared rendering mechanisms remain engine-owned. The selected scene
 draws over a seeded terrain and water background centered on a verified clear-water
 footprint near island context by default. In orbit, disabling World
-background switches to the original HDR gray clear color, graded by current controls
-([Top-Level Shaders](../../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
-World background and Reroll are viewer-owned, unsaved controls outside
+background shows the HDR clear at exactly the Background gray slider's value,
+white to black, independent of exposure and grading
+([Top-Level Shaders](../../Engine/Data/Shaders/AGENTS.md#top-level-shaders));
+the slider is disabled while the world is visible.
+World background, Background gray and Reroll are viewer-owned, unsaved controls outside
 presets and Q comparison. Reroll remains usable with the world hidden; enabling
 World background restores that layout. At load the viewer picks the template with the tallest
 stored peak (`IslandHeader`). Startup steps the seed forward from the origin,
@@ -229,14 +231,15 @@ evaluation. Publish paired main/shadow counts for every catalog identity each
 acquired framebuffer, zeroing unselected identities and suppressing the selected
 shadow in orbit so selection and mode changes leave no stale coverage.
 Shared sun and ambient controls affect the world; IBL and
-BRDF controls remain model-only. HDR grading affects both world and gray modes.
+BRDF controls remain model-only. HDR grading affects fully covered drawn pixels
+in both modes.
 Auxiliary world render targets retain their normal initialization and transitions;
-the image pass retains its HDR gray and depth clears in both modes. Main uniforms
+the image pass clears to the Background gray and clears depth in both modes. Main uniforms
 publish water when effectively visible and explicitly write zero water instances
 otherwise on every acquired framebuffer. Orbit draws models after clearing
 world depth; flight retains world depth. Both precede UI and HDR resolve.
 
-Apply the retained mode's renderer policy before flight/camera updates, island
+Apply the retained mode's renderer policy and the Background gray clear before flight/camera updates, island
 or uniform publication, and submission, including after full Graphics replacement.
 Complete pending recreation there through the engine lifecycle. Rebuilds below
 the swapchain tier retain the current acquisition; swapchain rebuilds reacquire
