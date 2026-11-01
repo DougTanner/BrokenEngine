@@ -342,6 +342,13 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 			throw std::runtime_error(std::format("Scene primitive {} has {} indices, which is not a multiple of three.", i, rModel.accessors.at(rPrimitive.indices).count));
 		}
 
+		// A BLEND material with base color alpha 0 draws nothing, so its primitive must not size the model's bounds or hitbox
+		const tinygltf::Material& rSourceMaterial = rModel.materials.at(rPrimitive.material);
+		if (rSourceMaterial.alphaMode == "BLEND" && rSourceMaterial.pbrMetallicRoughness.baseColorFactor.at(3) == 0.0)
+		{
+			continue;
+		}
+
 		ASSERT(rPrimitive.attributes.find("POSITION") != rPrimitive.attributes.end());
 		if (rPrimitive.attributes.contains("COLOR_0"))
 		{

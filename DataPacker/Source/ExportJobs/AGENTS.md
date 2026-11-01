@@ -159,10 +159,11 @@ Scene texture pre-export deduplicates attempts by source and output format. Each
 
 A scene pack supports one node-referenced skin, and a scene whose nodes reference
 more than one skin is rejected. A vertex joint index is bounded by that skin's
-full joint count: a scene with a weighted joint index at or above that count, or
-any joint index at or above it when the primitive carries no weights, is rejected;
-a zero-weight slot is not checked. CPU and GPU consumers must skip zero-weight
-slots before dereferencing their unused joint indices.
+full joint count: a scene whose exported primitive has a weighted joint index at
+or above that count, or any joint index at or above it when the primitive
+carries no weights, is rejected; a zero-weight slot is not checked. CPU and GPU
+consumers must skip zero-weight slots before dereferencing their unused joint
+indices.
 
 Exported default-pose geometry is centered at the origin with its longest
 extent spanning -1..1, so game render scales are plain sizes. For glTF,
@@ -173,9 +174,10 @@ skeleton's node index is the source index plus one. Static exports bake node 0
 into their vertices; skeleton exports ship it as the hierarchy root and keep
 vertices mesh-local and inverse-bind matrices and keyframes as authored. Bounds
 cover only drawn vertices at their runtime default-pose positions; no drawn
-vertex, non-finite bounds, or a zero extent fails the export. A skin whose
-joints lie outside the default scene does not inherit node 0, so its geometry
-exports un-normalized.
+vertex, non-finite bounds, or a zero extent fails the export. A glTF primitive
+whose material is `BLEND` with base color alpha 0 is not exported, so it sizes
+neither the bounds nor the outline. A skin whose joints lie outside the default
+scene does not inherit node 0, so its geometry exports un-normalized.
 
 When multiple mesh nodes reuse one source material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
 
