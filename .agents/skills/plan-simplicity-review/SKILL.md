@@ -42,9 +42,8 @@ Dispatch it once per `../../references/subagent-reporting.md`
 standalone where it does not (Tier 1, and the save-time dispatch from
 `/save-plan`).
 
-If later planning adds substantial implementation complexity, main runs this
-skill once more on the final plan before implementation; it does not loop, and
-any further expansion is a separately approved planning stage.
+The Change Workflow Plan review step owns the one difference rerun; any further
+expansion is a separately approved planning stage.
 
 ### Trigger: when a skill edit is behavior
 
@@ -59,15 +58,14 @@ retitles, or clarifies behavior that stays exactly as it was.
 
 - `/save-plan`: the final unsaved Plan body snapshot, supplied inline or by
   exact file path.
-- Change Workflow preparation or a bounded final rerun: the manager supplies
-  the final complete plan presented for implementation, including the
-  execution card and exact refinements when they carry resolved work, inline
-  or by exact file path; on a bounded final rerun, treat that supplied final
-  plan as the review input.
+- Change Workflow preparation: the manager supplies the final complete plan
+  presented for implementation, including the execution card and exact
+  refinements when they carry resolved work, inline or by exact file path.
+- Difference rerun: the manager supplies the plan snapshot after the accepted
+  findings were written in and the difference those findings added; review
+  only that difference, reading the rest of the plan as context.
 - The manager's trigger evidence: which plan steps add code or modify
   non-documentation artifacts.
-- On a bounded final rerun, the manager's trigger evidence and classification
-  also identify which steps materially enlarge the solution.
 - User intent and known residuals.
 
 ## Handoff

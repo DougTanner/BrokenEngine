@@ -29,7 +29,13 @@ This table is the authoritative spawned-agent routing policy; native role defini
 - Do not follow review findings blindly. Use judgement on each one: accept it
   when the failure is real and reachable, and be especially careful with
   findings that add guards, options, or machinery for cases nobody has observed
-  (YAGNI and over-engineering).
+  (YAGNI and over-engineering). Reject a finding only with evidence the
+  reviewer could have read — a file and line, or a recorded user decision; that
+  main prefers the plan, or wants to reject the finding, is not evidence. When
+  the reason lies outside the repository and is not yet recorded, put the
+  finding to the user instead of rejecting it. Never add plan or document text
+  only because a reviewer lacked context; add context only when a human reader
+  or the implementer needs it.
 
 ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
@@ -147,13 +153,14 @@ Order: `/prepare-change` first at Tier 2+, because the alternative investigation
 
 #### Step 3 — Plan review
 
-Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-external-claims` for the requests the audit handoff raises; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds.
+Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-external-claims` for the requests the audit handoff raises; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds; then, when it triggers, the difference `/plan-simplicity-review` after the accepted findings are last written into the plan snapshot.
 
 - `reviewer` runs `/plan-audit` — Tier 2+; Tier 1 skips it.
 - fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
 - `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and at Tier 3 also for the claims a grill round raises.
 - fresh `implementer` carrying a continuation capsule from the preparation writes the Plan review findings main accepts into the plan snapshot; main does not write those findings into the snapshot itself — Tier 1-2 with a plan snapshot, after main accepts a finding; Tier 3 follows `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
+- fresh `reviewer` runs `/plan-simplicity-review` over only the difference those findings added to the plan snapshot — Tier 2+, once per Plan review and never repeated, when the findings main accepted from `/plan-audit` or a Tier-3 grill round add mechanism (a new guard, check, option, or code path) rather than only correcting statements.
 
 At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval per `/next-plan` `### Implementation approval`; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
@@ -222,8 +229,14 @@ its own fix.
 Main dispatches one fresh `reviewer` per changed artifact type, plus the
 `mechanic` for `/comment-review` and, for C++, the `/over-engineering-review`
 finder `reviewer` and validator `implementer`, scoped to the changed bytes and
-the rules they touch. Main decides each finding once. `/over-engineering-review`
-candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the
+the rules they touch. Main decides each finding once. A finding a later round's
+reviewer raises again at the same site for the same issue stays rejected when
+main rejected it, and is not decided again; when it was fixed, the re-raise
+counts as a fix that failed its retest, and main decides it as a new finding.
+Churn — a new finding at the site of an applied fix that undoing that fix would
+resolve — is resolved by first considering undoing or reworking that fix rather
+than patching on top of it.
+`/over-engineering-review` candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the
 pair as one review row from the validator handoff, or the finder's when the
 validator is skipped, and the later reviews check the applied removals like any
 other changed bytes. Main decides each design suggestion from either pass once,
