@@ -67,6 +67,8 @@ void InitializeShipHitboxes()
 			}
 			float fHeightSquared = std::max(rHitbox.fMinimumZ * rHitbox.fMinimumZ, rHitbox.fMaximumZ * rHitbox.fMaximumZ);
 			rShape.fRadius = std::sqrt(fHorizontalLengthSquared + fHeightSquared);
+			rShape.fPusherRadius = rShape.fRadius * rType.fPusherRadiusScale;
+			gfLargestShipPusherRadius = std::max(gfLargestShipPusherRadius, rShape.fPusherRadius);
 		}
 	}
 }

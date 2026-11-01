@@ -374,7 +374,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
 			.vecPosition = vecPosition,
-			.fRadius = kfOmniPusherRadius,
+			.fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kOmni)][std::to_underlying(rPreviousPostRender.pController[i])].fPusherRadius,
 			.fIntensity = kfOmniPusherIntensity,
 			.fPower = kfOmniPusherPower,
 			.flags = {engine::PusherFlags::kTypeDefault},

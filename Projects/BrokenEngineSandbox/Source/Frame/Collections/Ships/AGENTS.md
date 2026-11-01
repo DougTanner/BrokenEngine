@@ -26,7 +26,8 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   PreCollision writes every row's radius and posed hitbox from its current pose
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
-  death shrink.
+  death shrink. A row's pusher radius is its hitbox sphere radius times its
+  type's `kShipHitboxTypes` pusher radius scale.
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter in its flagship's cell and a fleet Omni there on a tick its tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick

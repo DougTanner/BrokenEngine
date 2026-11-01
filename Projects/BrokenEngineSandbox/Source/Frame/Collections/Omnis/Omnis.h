@@ -61,7 +61,6 @@ inline constexpr AcceleratedMovementConstants kOmniMovement
 	.fCatchUpMaximumSpeed = kfOmniCatchUpMaximumSpeed,
 };
 
-inline constexpr float kfOmniPusherRadius = kfOmniRadius * 3.3333f;
 inline constexpr float kfOmniPusherIntensity = 50.0f;
 inline constexpr float kfOmniPusherPower = 2.0f;
 inline constexpr float kfOmniMaximumPusherPushVelocity = kfOmniMaximumSpeed * 0.5f;

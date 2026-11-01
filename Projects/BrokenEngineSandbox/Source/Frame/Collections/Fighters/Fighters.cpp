@@ -9,6 +9,7 @@
 #include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Ships/FleetCoordination.h"
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -112,12 +113,12 @@ void FightersInterpolate::Register()
 }
 
 // The registry binds this collection's position column directly, so its ID needs no per-tick sync.
-static void XM_CALLCONV SyncFighter(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition)
+static void XM_CALLCONV SyncFighter(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition, ShipController eController)
 {
 	engine::PushersInterpolate::Sync(rFrameInterpolate, uiPusher,
 	{
 		.vecPosition = vecPosition,
-		.fRadius = kfFighterPusherRadius,
+		.fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kFighter)][std::to_underlying(eController)].fPusherRadius,
 		.fIntensity = kfFighterPusherIntensity,
 		.fPower = kfFighterPusherPower,
 		.flags = {engine::PusherFlags::kTypeDefault},
@@ -277,7 +278,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 #endif
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
-		SyncFighter(rCurrentFrameInterpolate, rCurrent.pPushers[i], vecPosition);
+		SyncFighter(rCurrentFrameInterpolate, rCurrent.pPushers[i], vecPosition, rPreviousPostRender.pController[i]);
 
 #if defined(BT_CLIENT)
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
@@ -491,7 +492,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 #endif // BT_CLIENT
 
 	// Sync owned objects after Add()
-	SyncFighter(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition);
+	SyncFighter(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition, rInfo.eController);
 
 	return true;
 }

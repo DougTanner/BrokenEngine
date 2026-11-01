@@ -49,7 +49,6 @@ inline constexpr HeadingMovementConstants kBattleshipMovement
 	.fVelocityToDirection = 4.0f,
 };
 
-inline constexpr float kfBattleshipPusherRadius = kfBattleshipRadius * 1.5f;
 inline constexpr float kfBattleshipPusherIntensity = 36.0f;
 inline constexpr float kfBattleshipPusherPower = 3.0f;
 inline constexpr float kfBattleshipMaxPusherPushVelocity = kfBattleshipMaxSpeed * 0.5f;

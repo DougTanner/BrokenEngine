@@ -1,6 +1,6 @@
 # Omnis - Armored Shielded Ships
 
-Omnis are the armored, shielded ship type; fleet navigation, flagship identity, and the other shared ship rules are in `../Ships/AGENTS.md`. Terrain-push and pusher sizing derive from the shared omni radius, and the collision hitbox scales the model's outline by it (`../Ships/AGENTS.md`), so tuning size means changing that one constant.
+Omnis are the armored, shielded ship type; fleet navigation, flagship identity, and the other shared ship rules are in `../Ships/AGENTS.md`. Terrain-push sizing derives from the shared omni radius, and the collision hitbox, whose sphere sets the pusher radius, scales the model's outline by it (`../Ships/AGENTS.md`), so tuning size means changing that one constant.
 
 ## Behavior Invariants
 

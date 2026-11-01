@@ -7,6 +7,7 @@
 #include "Frame/CellStaticData.h"
 #include "Ui/WrapperBase.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -99,12 +100,12 @@ void BattleshipsInterpolate::Register()
 }
 
 // The registry binds this collection's position column directly, so its ID needs no per-tick sync.
-static void XM_CALLCONV SyncBattleship(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition)
+static void XM_CALLCONV SyncBattleship(FrameInterpolate& rFrameInterpolate, engine::pusher_t uiPusher, FXMVECTOR vecPosition, ShipController eController)
 {
 	engine::PushersInterpolate::Sync(rFrameInterpolate, uiPusher,
 	{
 		.vecPosition = vecPosition,
-		.fRadius = kfBattleshipPusherRadius,
+		.fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(eController)].fPusherRadius,
 		.fIntensity = kfBattleshipPusherIntensity,
 		.fPower = kfBattleshipPusherPower,
 		.flags = {engine::PusherFlags::kTypeDefault},
@@ -254,7 +255,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 #endif
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
-		SyncBattleship(rCurrentFrameInterpolate, rCurrent.pPushers[i], vecPosition);
+		SyncBattleship(rCurrentFrameInterpolate, rCurrent.pPushers[i], vecPosition, rPreviousPostRender.pController[i]);
 
 #if defined(BT_CLIENT)
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
@@ -456,7 +457,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 #endif // BT_CLIENT
 
 	// Sync owned objects after Add()
-	SyncBattleship(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition);
+	SyncBattleship(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition, rInfo.eController);
 
 	return true;
 }

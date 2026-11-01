@@ -186,7 +186,7 @@ Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'
 	Select-Object ProcessId, Name
 ```
 
-If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules, adding `-Configuration <name>` only for a build other than `Debug`:
+If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules. A normal launch always uses the `Debug` build, never Profile or Release, because only Debug compiles in the debug keys and server debug controls (`kbDebugInput`) the user tests with:
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project '<Project>'
@@ -207,7 +207,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
   (`currentOwner`, or the server PIDs) to the user and launch nothing.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
-Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the `## Machine-readable launch configuration` of the project hub, `Projects/<Project>/Documents/AgentHarness.md`; its executable names are the Debug ones, so under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:
+Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the `## Machine-readable launch configuration` of the project hub, `Projects/<Project>/Documents/AgentHarness.md`, whose executable names are the Debug ones:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'

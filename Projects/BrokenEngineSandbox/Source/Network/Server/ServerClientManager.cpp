@@ -5,6 +5,7 @@
 #include "Frame/IslandChainPlacement.h"
 #include "Network/Server/ServerTransferManager.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -21,7 +22,7 @@ namespace game
 constexpr float kfFleetSpawnSearchStepMeters = 10.0f;
 
 // Every spawning Omni or Battleship is treated as a Battleship, the largest ship, so one list serves both. A candidate
-// lies inside the hexagon inset by kfBattleshipPusherRadius (so a spawn there passes IsInsideCell) and more than
+// lies inside the hexagon inset by the largest ship pusher radius (so a spawn there passes IsInsideCell) and more than
 // kfBattleshipRadius outside every footprint rectangle of the origin's generated islands. Ring k holds the lattice
 // points k steps out, walked south to north and each row west to east; the rings stop at the first one lying wholly
 // past the circumradius.
@@ -40,7 +41,7 @@ static std::vector<XMFLOAT2> ComputeFleetSpawnCandidates()
 			for (int64_t i = -k; i <= k; i += iStep)
 			{
 				XMFLOAT2A f2Candidate(static_cast<float>(i) * kfFleetSpawnSearchStepMeters, static_cast<float>(j) * kfFleetSpawnSearchStepMeters);
-				if (!common::IsInsideHex(XMLoadFloat2A(&f2Candidate), engine::kCellDirections, kfBattleshipPusherRadius))
+				if (!common::IsInsideHex(XMLoadFloat2A(&f2Candidate), engine::kCellDirections, gfLargestShipPusherRadius))
 				{
 					continue;
 				}
@@ -66,19 +67,18 @@ static std::vector<XMFLOAT2> ComputeFleetSpawnCandidates()
 }
 
 // The first candidate whose horizontal distance from every ship row of the origin's committed frame and from every
-// point an earlier spawn of this TickRespawnTimers pass took exceeds two Battleship pusher radii, which no other pair
-// of pusher radii exceeds, so no pusher acts on the new ship at its spawn; none when every candidate is crowded.
-// A pure function of its inputs, so replay playback, which reruns the fleet step, reaches the recording's
-// spawn-or-wait decision.
+// point an earlier spawn of this TickRespawnTimers pass took exceeds the largest ship pusher radius; none when every
+// candidate is crowded. A pusher acts only on rows within its own radius, so that leaves the new ship outside every
+// pusher, and every row outside the new ship's pusher, at its spawn. A pure function of its inputs, so replay playback,
+// which reruns the fleet step, reaches the recording's spawn-or-wait decision.
 static std::optional<XMFLOAT2> FindFleetSpawnPoint(const std::vector<XMFLOAT2>& rCandidates, const Frame& rOriginFrame, std::span<const XMFLOAT2> takenSpawnPoints)
 {
-	static constexpr float kfClearance = 2.0f * kfBattleshipPusherRadius;
 	for (const XMFLOAT2& rCandidate : rCandidates)
 	{
 		XMVECTOR vecCandidate = XMLoadFloat2(&rCandidate);
 		auto IsClear = [&](FXMVECTOR vecOther)
 		{
-			return XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecCandidate, vecOther))) > kfClearance * kfClearance;
+			return XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecCandidate, vecOther))) > gfLargestShipPusherRadius * gfLargestShipPusherRadius;
 		};
 		bool bClear = std::ranges::all_of(takenSpawnPoints, [&](const XMFLOAT2& rTakenSpawnPoint)
 		{

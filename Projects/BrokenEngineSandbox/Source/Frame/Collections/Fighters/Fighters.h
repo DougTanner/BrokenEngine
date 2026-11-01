@@ -52,7 +52,6 @@ inline constexpr HeadingMovementConstants kFighterMovement
 	.fVelocityToDirection = 4.0f,
 };
 
-inline constexpr float kfFighterPusherRadius = kfFighterRadius * 1.5f;
 inline constexpr float kfFighterPusherIntensity = 36.0f;
 inline constexpr float kfFighterPusherPower = 3.0f;
 inline constexpr float kfFighterMaxPusherPushVelocity = kfFighterMaxSpeed * 0.5f;
