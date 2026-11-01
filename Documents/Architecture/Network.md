@@ -319,8 +319,10 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 42, which added the
-missile cooldown `nextMissileFireTime` to the Battleship `SpawnInfo`
+client-sendable). The current wire-protocol version is 43, which made the
+`kServerCoordinateStaticData` count one navigation graph per game `kNavigationGraphs` entry
+(clearance tier and flight plane) instead of one per flight plane; version 42
+added the missile cooldown `nextMissileFireTime` to the Battleship `SpawnInfo`
 `Fields()`; version 41 removed the
 client update-owned-entity request, so every later game packet type moved down
 one value, and dropped the weapon-mode fields from the `UpdateShip` payload and

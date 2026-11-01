@@ -31,8 +31,8 @@ hysteresis, but no Omni steering or movement reads it (`ApplyAcceleratedMovement
 its only reader is the `describe_scene` flag list (`Projects/BrokenEngineSandbox/Source/Agent/AgentScene.cpp`), so there is
 no Omni flee to route.
 
-`Documents/Investigations/Engine/ShipNavigationClearance.md` records per-size-class navigation
-graphs, a separate change this Plan does not depend on.
+Per-clearance-tier navigation graphs have landed (`Collections/Ships/AGENTS.md`
+`## Ship Invariants`), and `NextRouteWaypoint` takes the ship's clearance tier.
 
 ## Design
 
@@ -42,19 +42,20 @@ The author recommends the following; each choice carries its rationale.
   outside every navigation polygon (`NavQueryDirection` snaps with `SnapOutsidePolygon`), the
   mechanism the Omni escort route relies on for a slot inside terrain, so no separate snap and no
   new pathfinding is needed. It reads whichever graph `NavigationPlaneData` returns for the ship's
-  navigated plane, so it works unchanged with a later per-class graph.
+  navigated plane, and takes the ship's clearance tier.
 - Island-center goal: route inside `ComputeFleeOrReturnDestination`, so one site covers all three
-  types. It gains the cell static data and the ship's target flight plane; when it returns the
-  island center it returns `NextRouteWaypoint` toward that center instead. Its hysteresis keeps
-  measuring the raw center, so `kfReturnDistance` and `kfReturnedDistance` keep their meaning.
+  types. It gains the cell static data, the ship's clearance tier, and the ship's target flight
+  plane; when it returns the island center it returns `NextRouteWaypoint` toward that center
+  instead. Its hysteresis keeps measuring the raw center, so `kfReturnDistance` and
+  `kfReturnedDistance` keep their meaning.
   Callers pass `GetTargetFlightPlane` of the row's orders: the center sits at the lowest plane's
   height, and its nearest plane would route a higher Fighter or Omni around the lowest plane's
   larger contours although a return does not change plane. The Omni's in-sight override
   (`OmniCirclingPoint` of the enemy) and the Battleship flee and hidden-target overrides still
   replace the result where they apply today.
 - Away goal: one shared helper beside `NextRouteWaypoint` in `ShipBehaviours.h/.cpp`, for example
-  `FleeRouteWaypoint(rStaticData, vecPosition, vecThreat, iTargetFlightPlane)`. It returns
-  `NextRouteWaypoint` toward the point `kfFleeEndDistance` from the ship along the horizontal
+  `FleeRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecThreat, iTargetFlightPlane)`.
+  It returns `NextRouteWaypoint` toward the point `kfFleeEndDistance` from the ship along the horizontal
   direction away from `vecThreat`. Rationale: the existing constant measured from the ship puts the
   point past the flee end distance from the threat (the ship flees from inside it), so it never
   degenerates to the ship's own position as a point at `kfFleeEndDistance` from the threat would
@@ -111,10 +112,9 @@ The author recommends the following; each choice carries its rationale.
   sight already means the straight segment clears the navigation polygons.
 - Fleet Fighter escort slots: they fly the highest Fighter plane, whose graph is empty.
 - `ComputeNavigation`, fleet modes, and the path-query cadence.
-- `NavQuery`, the navigation bake, clearance, and per-size-class graphs.
+- `NavQuery`, the navigation bake, clearance, and clearance tiers.
 - Flee, return, and veer-off distances, turn rates, and accelerations; new constants or columns.
 - Debug waypoint rendering for these routes.
-- The clearance investigation record above.
 
 ## Risk and invariants
 

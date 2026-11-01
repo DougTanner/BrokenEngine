@@ -5,6 +5,7 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
+#include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -150,7 +151,6 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 		return;
 	}
 
-	static constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
 	static constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
@@ -164,12 +164,17 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 		// Nav vertices are local to this cell; the two draw sites below are this helper's conversion point.
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 
-		// A cell whose static data has not arrived holds no per-plane entries.
-		const std::vector<NavData>& rPlaneNavigationData = it->second.staticData.navigationData;
-		for (int64_t i = 0; i < std::ssize(rPlaneNavigationData); ++i)
+		// A cell whose static data has not arrived holds no per-graph entries.
+		const std::vector<NavData>& rGraphNavigationData = it->second.staticData.navigationData;
+		for (int64_t i = 0; i < std::ssize(rGraphNavigationData); ++i)
 		{
-			const NavData& rNavigationData = rPlaneNavigationData.at(i);
-			float fZ = gpFlightPlanes->Plane(i).fHeightMeters;
+			const NavData& rNavigationData = rGraphNavigationData.at(i);
+			const game::NavigationGraph& rGraph = game::kNavigationGraphs.at(i);
+			float fZ = gpFlightPlanes->Plane(rGraph.iFlightPlane).fHeightMeters;
+
+			// Yellow at tier 0 blending to cyan at the last tier, so overlapping tiers stay distinguishable.
+			float fTierBlend = static_cast<float>(rGraph.iClearanceTier) / static_cast<float>(game::kiNavigationClearanceTierCount - 1);
+			XMFLOAT4A f4PolygonColor = {1.0f - fTierBlend, 1.0f, fTierBlend, 1.0f};
 
 			for (int64_t j = 0; j < std::ssize(rNavigationData.polygonOffsets); ++j)
 			{
@@ -181,7 +186,7 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 					int64_t iNext = (k + 1 < iEnd) ? k + 1 : iStart;
 					XMFLOAT3A f3StartVertex = {rNavigationData.vertices.at(k).x + f2Offset.x, rNavigationData.vertices.at(k).y + f2Offset.y, fZ};
 					XMFLOAT3A f3EndVertex = {rNavigationData.vertices.at(iNext).x + f2Offset.x, rNavigationData.vertices.at(iNext).y + f2Offset.y, fZ};
-					DebugRender::Line(f3StartVertex, f3EndVertex, kf4PolygonColor);
+					DebugRender::Line(f3StartVertex, f3EndVertex, f4PolygonColor);
 				}
 			}
 

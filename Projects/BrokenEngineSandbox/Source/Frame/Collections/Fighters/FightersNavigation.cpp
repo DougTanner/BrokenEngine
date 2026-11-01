@@ -44,7 +44,7 @@ void FightersPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFrame,
 			{
 				XMVECTOR vecToEnemyNormal = XMVector3Normalize(vecToEnemy);
 				float fAngleToEnemy = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToEnemyNormal));
-				if (fAngleToEnemy < kfFighterAvoidTerrainEnemyAngle && HasLineOfSight(rStaticData, rCurrentInterpolate.puiFlightPlanes[i], rCurrentInterpolate.pVecPositions[i], vecNearestEnemy))
+				if (fAngleToEnemy < kfFighterAvoidTerrainEnemyAngle && HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), rCurrentInterpolate.puiFlightPlanes[i], rCurrentInterpolate.pVecPositions[i], vecNearestEnemy))
 				{
 					continue;
 				}

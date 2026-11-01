@@ -1,6 +1,7 @@
 #include "FleetCoordination.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
+#include "Frame/TerrainUtils.h"
 
 namespace game
 {
@@ -77,13 +78,13 @@ static ShipTactic XM_CALLCONV AttackOrStartVeerOff(FXMVECTOR vecPosition, FXMVEC
 }
 
 // For a target hidden from the ship: the next route waypoint toward it on its nearest plane.
-static ShipTactic XM_CALLCONV RouteTactic(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecTargetPosition)
+static ShipTactic XM_CALLCONV RouteTactic(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecTargetPosition)
 {
 	int64_t iTargetFlightPlane = NearestFlightPlane(vecTargetPosition);
 	bool bFinalWaypoint = false;
 	return
 	{
-		.vecDestination = NextRouteWaypoint(rStaticData, vecPosition, vecTargetPosition, iTargetFlightPlane, bFinalWaypoint),
+		.vecDestination = NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecTargetPosition, iTargetFlightPlane, bFinalWaypoint),
 		.iTargetFlightPlane = iTargetFlightPlane,
 		.bHasDestination = true,
 	};
@@ -200,9 +201,12 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 		bool bInLineOfSight = false;
 		if (FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, rView.vecFlagshipPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 		{
-			if (!bInLineOfSight)
+			// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the type's own tier,
+			// which is the pick's when the two match.
+			int64_t iClearanceTier = ShipTypeClearanceTier(eType);
+			if (!bInLineOfSight || (iClearanceTier != kiFiringClearanceTier && !HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition)))
 			{
-				return RouteTactic(rStaticData, vecPosition, vecTargetPosition);
+				return RouteTactic(rStaticData, iClearanceTier, vecPosition, vecTargetPosition);
 			}
 			if (eType == ShipType::kFighter)
 			{
@@ -221,7 +225,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	};
 }
 
-bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
+bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
 {
 	if (ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, rTactic))
 	{
@@ -232,14 +236,19 @@ bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::C
 	bool bInLineOfSight = false;
 	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition))
 	{
-		bInLineOfSight = HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecTargetPosition);
+		bInLineOfSight = HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
 	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 	{
 		return false;
 	}
+	else if (bInLineOfSight)
+	{
+		// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on iClearanceTier.
+		bInLineOfSight = HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
+	}
 
-	rTactic = bInLineOfSight ? AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint) : RouteTactic(rStaticData, vecPosition, vecTargetPosition);
+	rTactic = bInLineOfSight ? AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint) : RouteTactic(rStaticData, iClearanceTier, vecPosition, vecTargetPosition);
 	return true;
 }
 

@@ -40,9 +40,9 @@ void CellStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 	}
 	if (bIncludeNavigationData)
 	{
-		int32_t iPlaneCount = 0;
-		common::Read(rStream, iPlaneCount);
-		navigationData.resize(iPlaneCount);
+		int32_t iGraphCount = 0;
+		common::Read(rStream, iGraphCount);
+		navigationData.resize(iGraphCount);
 		for (NavData& rNavData : navigationData)
 		{
 			rNavData.Read(rStream);

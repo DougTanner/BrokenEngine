@@ -11,6 +11,7 @@
 #include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
+#include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -600,7 +601,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			else
 			{
 				ShipTactic tactic {};
-				if (ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i] & ShipOrders::kTargetFlagship, flags, vecVeerOffPoint, registryTarget, tactic))
+				if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i] & ShipOrders::kTargetFlagship, flags, vecVeerOffPoint, registryTarget, tactic))
 				{
 					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 				}

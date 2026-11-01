@@ -9,6 +9,7 @@
 
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
+#include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -563,20 +564,21 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 					flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 					vecDestination = vecTarget;
 					bHasDestination = true;
-					bRouteToTarget = !HasLineOfSight(rStaticData, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+					bRouteToTarget = !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
 				}
 				else
 				{
 					bool bInLineOfSight = false;
 					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
 					vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
-					// A fleeing Battleship turns away from the enemy itself.
-					bRouteToTarget = bEnemyFound && !bInLineOfSight && !(flags & ShipFlags::kReturnToIslandCenter) && !(flags & ShipFlags::kFlee);
+					// A fleeing Battleship turns away from the enemy itself. The pick tests sight on kiFiringClearanceTier; flying
+					// at the target also needs sight on the Battleship's own tier.
+					bRouteToTarget = bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter) && !(flags & ShipFlags::kFlee) && (!bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget));
 				}
 				if (bRouteToTarget)
 				{
 					bool bFinalWaypoint = false;
-					vecDestination = NextRouteWaypoint(rStaticData, vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				// The stored wanted heading feeds only the heading capture: random-spawn rows run no fleet navigation or cone test.
 				vecAiDirection = XMVectorZero();

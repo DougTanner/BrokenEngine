@@ -291,7 +291,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			{
 				return;
 			}
-			if (!HasLineOfSight(rStaticData, uiFlightPlane, vecShipPosition, vecEnemyPosition))
+			if (!HasLineOfSight(rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShipPosition, vecEnemyPosition))
 			{
 				return;
 			}

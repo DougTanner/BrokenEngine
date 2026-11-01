@@ -649,7 +649,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					{
 						// Routed around terrain to the slot, or to the nearest clear point when the slot lies inside terrain.
 						bool bFinalWaypoint = false;
-						XMVECTOR vecWaypoint = NextRouteWaypoint(rStaticData, vecPosition, tactic.vecDestination, tactic.iTargetFlightPlane, bFinalWaypoint);
+						XMVECTOR vecWaypoint = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, tactic.vecDestination, tactic.iTargetFlightPlane, bFinalWaypoint);
 						XMVECTOR vecToWaypoint = XMVectorSetZ(XMVectorSubtract(vecWaypoint, vecPosition), 0.0f);
 						if (bFinalWaypoint)
 						{
@@ -677,7 +677,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 				bool bFinalWaypoint = false;
-				XMVECTOR vecDestination = HasLineOfSight(rStaticData, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, vecPosition, vecFlagship, NearestFlightPlane(vecFlagship), bFinalWaypoint);
+				XMVECTOR vecDestination = HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, NearestFlightPlane(vecFlagship), bFinalWaypoint);
 				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
 			}
 			else
@@ -697,8 +697,10 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
+					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.
+					static_assert(ShipTypeClearanceTier(ShipType::kOmni) == kiFiringClearanceTier);
 					bool bFinalWaypoint = false;
-					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				if (bHasDestination)
 				{

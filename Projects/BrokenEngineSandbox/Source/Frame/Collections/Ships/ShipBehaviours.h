@@ -43,6 +43,10 @@ struct HeadingMovementConstants
 // A ship's stored flight plane while it climbs between planes.
 inline constexpr uint8_t kuiNoFlightPlane = 255;
 
+// Firing and target picking test line of sight on this clearance tier's graphs for every shooter; movement decisions use
+// the ship type's own tier (ShipTypeClearanceTier, TerrainUtils.h).
+inline constexpr int64_t kiFiringClearanceTier = 0;
+
 // The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
 [[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
 // The plane a ship of the type flies while not engaging: the lowest for Omnis, the type's highest otherwise.
@@ -63,8 +67,8 @@ inline constexpr uint8_t kuiNoFlightPlane = 255;
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 
-// The next route waypoint toward vecDestination on the NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.
-[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal);
+// The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.
+[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal);
 
 // Fleet navigation: roaming, cross-cell movement, island destinations, and following the row's own flagship.
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
@@ -99,9 +103,10 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 // shooter holds fire. The look position leads the nearest such target, preferring the kept attack target registryTarget
 // when it qualifies, else is the nearest enemy in line of sight at any range.
 void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
-// No terrain on the shooter's plane graph crosses the segment between the two positions, each first snapped clear of
-// terrain as a route destination is; always true on a plane without terrain collision.
-[[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
+// No terrain on clearance tier iClearanceTier's graph of the shooter's plane crosses the segment between the two
+// positions, each first snapped clear of terrain as a route destination is; always true on a plane without terrain
+// collision.
+[[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield);
 

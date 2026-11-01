@@ -97,7 +97,7 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 		return false;
 	}
 
-	if (bKept && HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecKeptPosition))
+	if (bKept && HasLineOfSight(rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecKeptPosition))
 	{
 		rVecResult = vecKeptPosition;
 		rbInLineOfSight = true;
@@ -116,7 +116,7 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 			return;
 		}
 		float fDistanceSquared = PickDistanceSquared(vecEnemyPosition);
-		if ((!bVisibleFound || fDistanceSquared < fVisibleDistanceSquared) && HasLineOfSight(rStaticData, uiFlightPlane, vecPosition, vecEnemyPosition))
+		if ((!bVisibleFound || fDistanceSquared < fVisibleDistanceSquared) && HasLineOfSight(rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecEnemyPosition))
 		{
 			bVisibleFound = true;
 			fVisibleDistanceSquared = fDistanceSquared;

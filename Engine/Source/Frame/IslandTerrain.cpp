@@ -129,7 +129,7 @@ IslandTerrain::IslandTerrain()
 }
 
 #if defined(BT_SERVER)
-void IslandTerrain::WaitForElevationMaps(std::span<const float> navigationThresholds, float fNavigationClearanceMeters)
+void IslandTerrain::WaitForElevationMaps(std::span<const NavigationGraphBake> navigationGraphs)
 #else
 void IslandTerrain::WaitForElevationMaps()
 #endif
@@ -227,9 +227,9 @@ void IslandTerrain::WaitForElevationMaps()
 	}
 
 #if defined(BT_SERVER)
-	// Build one NavContour per terrain-collision flight plane for every template so multi-template cells produce
-	// correct nav data.
-	ASSERT(std::ssize(navigationThresholds) == gpFlightPlanes->Count());
+	// Build one NavContour per NavigationGraphBake entry on a terrain-collision flight plane for every template so multi-template
+	// cells produce correct nav data.
+	miNavigationGraphCount = std::ssize(navigationGraphs);
 	LOG(kLoading, kInfo, "Building NavContour for {} island templates", mIslands.size());
 	ScopedBootTimer scopedTimer(kBootTimerIslands);
 	for (auto& [rCrc, rTemplate] : mIslands)
@@ -239,12 +239,12 @@ void IslandTerrain::WaitForElevationMaps()
 		int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight);
 		std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
 		DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.puiHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
-		rTemplate.navContours.resize(static_cast<size_t>(gpFlightPlanes->Count()));
-		for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+		rTemplate.navContours.resize(static_cast<size_t>(miNavigationGraphCount));
+		for (const auto& [i, rGraph] : std::views::enumerate(navigationGraphs))
 		{
-			if (gpFlightPlanes->Plane(i).flags & FlightPlaneFlags::kTerrainCollision)
+			if (gpFlightPlanes->Plane(rGraph.iFlightPlane).flags & FlightPlaneFlags::kTerrainCollision)
 			{
-				BuildNavContour(rTemplate.navContours.at(i), heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, navigationThresholds[static_cast<size_t>(i)], fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
+				BuildNavContour(rTemplate.navContours.at(i), heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, rGraph.fThresholdElevation, rGraph.fClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
 			}
 		}
 	}

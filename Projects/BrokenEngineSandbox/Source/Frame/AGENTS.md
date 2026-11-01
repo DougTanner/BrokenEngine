@@ -28,7 +28,14 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   The [shared ship policy](Collections/Ships/AGENTS.md#ship-invariants) owns the
   death transition. Also reject a flying missile — neither falling nor dying —
   whose height is no flight plane's or whose velocity Z is nonzero.
-- Navigation and elevation are deterministic derived data excluded from both the CRC and persisted frame payload. The game derives the clearance distance and, from each flight plane's height, that plane's elevation threshold for the engine's contour bake (`TerrainUtils.h`, server-only) and hands them to engine startup, the only way engine navigation gets them. The engine copies the game's flight-plane table (`FlightPlaneTable.h`, both builds) at boot and raises its highest plane by the tallest stored island peak (`../../../../Engine/Source/Frame/AGENTS.md`).
+- Navigation and elevation are deterministic derived data excluded from both the
+  CRC and persisted frame payload. The game derives the clearance tiers, the
+  planes each tier has graphs on, and each graph's clearance and elevation
+  threshold for its contour bake (`TerrainUtils.h`; the threshold server-only)
+  and hands them to engine startup, the only way engine navigation gets them.
+  The engine copies the game's flight-plane table (`FlightPlaneTable.h`, both
+  builds) at boot, where the highest entry is a clearance above the tallest
+  stored island peak (`../../../../Engine/Source/Frame/AGENTS.md`).
 - Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`, and `kDestroyShip` in Update, after every ship Update; spawn and transfer status changes in the post-tick batch, outside the tick phases, through `ApplySpawnStatusChange` (`StatusChange.h`). Their serialized tags and wire rule are owned by game Network (`../Network/AGENTS.md`).
 - `FrameInput` — the per-tick deterministic unit, a versioned serializable list
   of `StatusChange`s — is declared here (`FrameInput.h/.cpp`) and serialized by

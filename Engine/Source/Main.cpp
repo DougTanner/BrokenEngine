@@ -216,12 +216,17 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		return 1;
 	}
-	std::vector<float> navigationThresholds(static_cast<size_t>(gpFlightPlanes->Count()));
-	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	std::vector<NavigationGraphBake> navigationGraphs(game::kNavigationGraphs.size());
+	for (const auto& [i, rGraph] : std::views::enumerate(game::kNavigationGraphs))
 	{
-		navigationThresholds.at(i) = game::NavigationThresholdElevation(gpFlightPlanes->Plane(i).fHeightMeters);
+		navigationGraphs.at(i) =
+		{
+			.iFlightPlane = rGraph.iFlightPlane,
+			.fThresholdElevation = game::NavigationThresholdElevation(rGraph.iClearanceTier, gpFlightPlanes->Plane(rGraph.iFlightPlane).fHeightMeters),
+			.fClearanceMeters = game::NavigationClearanceMeters(rGraph.iClearanceTier),
+		};
 	}
-	gpIslandTerrain->WaitForElevationMaps(navigationThresholds, game::NavigationClearanceMeters());
+	gpIslandTerrain->WaitForElevationMaps(navigationGraphs);
 
 	auto pGame = std::make_unique<game::Game>();
 	auto pServerMonitorHost = std::make_unique<ServerMonitorHost>();

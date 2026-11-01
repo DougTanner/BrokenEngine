@@ -56,7 +56,7 @@ struct IslandTemplate
 	float fQuadFootprintX = 0.0f;
 	float fQuadFootprintY = 0.0f;
 
-	std::vector<NavContour> navContours;   // one per flight plane, index-parallel with gpFlightPlanes; empty without kTerrainCollision
+	std::vector<NavContour> navContours;   // one per baked graph, index-parallel with the server's NavigationGraphBake entries; empty on a plane without kTerrainCollision
 
 	int64_t iTextureSlot = -1;
 
@@ -129,6 +129,16 @@ struct CellElevationSampler
 	[[nodiscard]] float XM_CALLCONV Sample(FXMVECTOR vecLocalPosition) const;
 };
 
+#if defined(BT_SERVER)
+// The contour-bake input of one cell navigation graph.
+struct NavigationGraphBake
+{
+	int64_t iFlightPlane = 0;
+	float fThresholdElevation = 0.0f;
+	float fClearanceMeters = 0.0f;
+};
+#endif
+
 class IslandTerrain : public common::Singleton<IslandTerrain>
 {
 public:
@@ -136,7 +146,7 @@ public:
 	IslandTerrain();
 
 #if defined(BT_SERVER)
-	void WaitForElevationMaps(std::span<const float> navigationThresholds, float fNavigationClearanceMeters); // size == gpFlightPlanes->Count()
+	void WaitForElevationMaps(std::span<const NavigationGraphBake> navigationGraphs);
 #else
 	void WaitForElevationMaps();
 #endif
@@ -184,6 +194,10 @@ public:
 	// Open-ocean samples share the elevation render target's sea-floor depth to avoid blends at island edges.
 	// Island heightmaps already store negative depths in engine meters.
 	float mfSeaFloorElevation = common::kfSeaBottomMeters;
+
+	// Number of cell navigation graphs, one per NavigationGraphBake entry. Declared in both builds because BuildCellNavigationData
+	// compiles in both; only the server's WaitForElevationMaps writes it.
+	int64_t miNavigationGraphCount = 0;
 };
 
 inline IslandTerrain* gpIslandTerrain = nullptr;
