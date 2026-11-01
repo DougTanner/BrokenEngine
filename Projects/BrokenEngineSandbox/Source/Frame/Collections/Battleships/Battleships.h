@@ -29,16 +29,15 @@ inline constexpr float kfBattleshipRadius = 4.5f;
 inline constexpr float kfBattleshipAcceleration = 4.0f;
 inline constexpr float kfBattleshipDrag = 0.25f;
 inline constexpr float kfBattleshipMaxSpeed = 15.0f;
-inline constexpr float kfBattleshipMaxTurnRate = 1.0f;
+inline constexpr float kfBattleshipMaxTurnRate = 0.25f;
+inline constexpr float kfBattleshipTurnAcceleration = 0.25f;
+
+// Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
+float RampBattleshipTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime);
 
 inline constexpr float kfBattleshipClimbRate = 5.0f;
 inline constexpr int64_t kiBattleshipHighestFlightPlane = 0;
 static_assert(kiBattleshipHighestFlightPlane < std::ssize(kFlightPlanes));
-
-inline constexpr float kfBattleshipSteeringSmoothing = 0.064f;
-inline constexpr float kfBattleshipSteeringDecay = 6.0f;
-inline constexpr float kfBattleshipChaseTurnRate = 8.0f;
-inline constexpr float kfBattleshipFleeTurnRate = 8.0f;
 
 inline constexpr HeadingMovementConstants kBattleshipMovement
 {

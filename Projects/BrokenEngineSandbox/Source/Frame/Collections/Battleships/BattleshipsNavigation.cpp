@@ -52,9 +52,10 @@ void BattleshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFra
 		}
 
 		int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]), GetTargetFlightPlane(rCurrentPostRender.pOrders[i]));
-		rCurrentInterpolate.pfDeltaRotations[i] = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i], iNavigationPlane);
+		float fAvoidanceDeltaRotation = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i], iNavigationPlane);
 
-		rCurrentInterpolate.pfDeltaRotations[i] = common::ClampMagnitude(rCurrentInterpolate.pfDeltaRotations[i], kfBattleshipMaxTurnRate);
+		// Rows still align with the previous frame here: Update calls this before Transfer, Destroy, and Spawn.
+		rCurrentInterpolate.pfDeltaRotations[i] = RampBattleshipTurnRate(rPreviousFrame.interpolate.pBattleships->pfDeltaRotations[i], fAvoidanceDeltaRotation, std::chrono::duration<float>(rFrame.interpolate.fDeltaTime));
 	}
 }
 

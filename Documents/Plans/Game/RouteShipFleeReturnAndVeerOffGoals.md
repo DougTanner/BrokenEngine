@@ -15,12 +15,13 @@ drive a ship into terrain on a plane with terrain collision; evidence checked at
 - Island-center goal, random-spawn rows of all three types. `ComputeFleeOrReturnDestination`
   (`ShipBehaviours.cpp`) returns the nearest island center while `kReturnToIslandCenter` is set or
   no enemy is found. Fighters (`Fighters.cpp`, the `ChooseAttackTactic` false branch), Battleships
-  (`Battleships.cpp`, `SteerHeadingTowards` after `ComputeFleeOrReturnDestination`) and Omnis
+  (`Battleships.cpp`, the wanted heading `vecAiDirection` toward the destination after
+  `ComputeFleeOrReturnDestination`) and Omnis
   (`Omnis.cpp`, `vecAiDirection` from that destination) steer straight at it. An island center lies
   over terrain by construction.
-- Random-spawn Battleship flee. With `kFlee` set and not returning, `Battleships.cpp` passes the
-  enemy as the destination with `-kfBattleshipFleeTurnRate`, turning away from the threat with no
-  goal point.
+- Random-spawn Battleship flee. With `kFlee` set and not returning, `Battleships.cpp` takes the
+  enemy as the destination and negates the wanted heading toward it, turning away from the threat
+  with no goal point.
 - Fighter veer-off, fleet and random-spawn. `VeerOffTactic` (`FleetCoordination.cpp`) sets the
   destination one meter from the ship directly away from `pVecVeerOffPoints`, reached through
   `ContinueVeerOff` and `AttackOrStartVeerOff`.
@@ -63,9 +64,9 @@ The author recommends the following; each choice carries its rationale.
   version for no gain. A zero horizontal offset yields the ship's own position, as `VeerOffTactic`
   does today.
 - Battleship flee: while `kFlee` is set and the row is not returning, the destination becomes
-  `FleeRouteWaypoint` from the kept target on the row's target flight plane, steered with a
-  positive `kfBattleshipFleeTurnRate`. This also covers an island-free cell, where the enemy is
-  the only destination.
+  `FleeRouteWaypoint` from the kept target on the row's target flight plane, with the wanted
+  heading toward it left unnegated. This also covers an island-free cell, where the enemy is the
+  only destination.
 - Veer-off: `VeerOffTactic` takes the cell static data and returns `FleeRouteWaypoint` from the
   veer-off point on the plane it already selects (`NearestFlightPlane` of the point). Rationale:
   veer-off is the same fly-away-from-a-point goal, so the same helper covers it; `ContinueVeerOff`
@@ -95,7 +96,7 @@ The author recommends the following; each choice carries its rationale.
 - `VeerOffTactic`, `ContinueVeerOff`, `AttackOrStartVeerOff` signatures and call sites inside
   `FleetCoordination.cpp`.
 - The random-spawn branch of `FightersPostRender` Update, of `BattleshipsPostRender` Update (flee
-  destination and turn-rate sign), and of `OmnisPostRender` Update: the
+  destination and wanted-heading negation), and of `OmnisPostRender` Update: the
   `ComputeFleeOrReturnDestination` calls and the Battleship flee destination.
 - The `Frame::kiVersion` base.
 - `/update-claude-docs` sync of the hidden-target route exception in

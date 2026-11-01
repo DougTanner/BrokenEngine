@@ -10,7 +10,20 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
-- 2026-11-01 claude/8bce67c8-8b83-4559-a8bd-9856a639aa8b — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.cpp:28 — InitializeShipHitboxes could read each controller's model CRC from the scene chunk named in that type's Render model table (SceneHeader::modelCrc), instead of keeping its own parallel model CRC table; the hitbox model and the drawn model would then share one source and could not disagree — makes unnecessary: Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsRender.cpp:132, Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/FightersRender.cpp:132, Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisRender.cpp:149
+- 2026-11-01 claude/2c5731e6-262d-48d2-b0f4-773cd3d679ee — refactor observation —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:463 — RampBattleshipTurnRate
+  and SteerBattleshipHeading are Battleship-local, while Fighters keep the signed-max cone branch plus
+  SteerHeadingTowards pair that gave Battleships two alternating turn rates (Fighters.cpp:587) — one shared
+  ramped soft-clamp turn in ShipBehaviours, parameterized by type constants, would let Fighters use it and keep
+  the two collections parallel
+- 2026-11-01 claude/8bce67c8-8b83-4559-a8bd-9856a639aa8b —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.cpp:28 — InitializeShipHitboxes could
+  read each controller's model CRC from the scene chunk named in that type's Render model table
+  (SceneHeader::modelCrc), instead of keeping its own parallel model CRC table; the hitbox model and the drawn
+  model would then share one source and could not disagree — makes unnecessary:
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsRender.cpp:132,
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/FightersRender.cpp:132,
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisRender.cpp:149
 - 2026-10-31 claude/4651544d-53aa-4a04-b074-f08eb3cea56e — refactor observation — Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp:678 — a random-spawn Omni scans its enemies with line-of-sight tests twice per tick, once in FindAttackTarget for steering and once in AcquireTarget (:698) for fire and look — one per-row targeting pass whose result feeds both steering and the blaster and look picks would remove the repeated scan and sight tests
 - 2026-10-31 claude/6474a6e5-0b43-47ad-81ad-b041b5850efe — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/FleetCoordination.cpp:249 — let `ChooseFleetTactic` return only the plain Attack tactic for both types
   and move the veer-off start and continuation into the Fighter script (`Fighters.cpp`, which already owns

@@ -2,18 +2,19 @@
 
 Battleships are a copy of Fighters with larger, slower constants
 (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with
-the Battleship names. Keep the two collections parallel; only the tube missiles
-and fleet health below and the Fighters' beam, client-only climb tilt, fleet
-tactics, `pVecVeerOffPoints`, and lack of flee differ: a random-spawn
-Battleship, when island candidates are available, prioritizes returning to an
-island, fleeing its enemy ship when nearby, then chasing it; in a cell with no
-island candidates, it clears the return-to-island state and uses flee/chase
-steering for an enemy ship or only decays the current turn otherwise. Return
-and flee transitions use distance hysteresis. That enemy is its kept attack
-target (`../Ships/AGENTS.md` `## Ship Invariants`), picked from itself in 3D at
-or below plane 0. A `kTargetFlagship` row's kept attack target is the enemy
-flagship, which it chases with neither return nor flee (`../Ships/AGENTS.md`);
-its missiles keep the rule below, which already covers the flagship.
+the Battleship names. Keep the two collections parallel; only the tube missiles,
+turning, and fleet health below and the Fighters' beam, client-only climb tilt
+and turn roll, fleet tactics, `pVecVeerOffPoints`, and lack of flee differ: a
+random-spawn Battleship, when island candidates are available, prioritizes
+returning to an island, fleeing its enemy ship when nearby, then chasing it; in
+a cell with no island candidates, it clears the return-to-island state and uses
+flee/chase steering for an enemy ship or ramps its turn rate to zero otherwise.
+Return and flee transitions use distance hysteresis. That enemy is its kept
+attack target (`../Ships/AGENTS.md` `## Ship Invariants`), picked from itself in
+3D at or below plane 0. A `kTargetFlagship` row's kept attack target is the
+enemy flagship, which it chases with neither return nor flee
+(`../Ships/AGENTS.md`); its missiles keep the rule below, which already covers
+the flagship.
 
 ## Weapon Invariants
 
@@ -44,6 +45,22 @@ its missiles keep the rule below, which already covers the flagship.
   leaves the cooldown unchanged, and launches nothing that tick.
 - The tube slot transfers with the ship, and the PostRender `PostRead` rejects a
   slot at or above `kiBattleshipMissileTubeSlots` on every Frame read.
+
+## Turning Invariants
+
+- Every Battleship turns at one maximum rate, `kfBattleshipMaxTurnRate`.
+  Each tick PostRender Update moves the turn rate toward a wanted rate by at
+  most `kfBattleshipTurnAcceleration` times the tick time
+  (`RampBattleshipTurnRate`), and terrain bounce and terrain avoidance pass
+  through that same ramp instead of setting the rate directly. The wanted rate
+  is zero within the heading capture angle of the wanted heading.
+- Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet
+  rows their navigation bearing, random-spawn rows the normalized horizontal
+  direction to their destination, negated while fleeing and not returning, or
+  zero without a destination, in which case the wanted rate is zero.
+- Interpolate Update, while the previous turn rate is exactly 0 and the
+  previous wanted heading is nonzero and within the capture angle, rotates the
+  direction a fixed percent toward it each tick.
 
 ## Fleet Health Invariants
 

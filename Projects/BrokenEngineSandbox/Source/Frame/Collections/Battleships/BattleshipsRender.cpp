@@ -16,8 +16,6 @@ namespace game
 extern const common::crc_t kBattleshipFleetModel = data::kModelsBattleshipJesterz86scenegltfCrc;
 extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceBattleshipAquamarinescenegltfCrc;
 
-constexpr float kfRoll = 0.2f;
-
 // One model pipeline per ShipController, indexed by it.
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"BattleshipsFleet", "BattleshipsRandom"};
@@ -153,10 +151,9 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			XMStoreFloat4A(&f4Position, vecPosition);
 
 			XMMATRIX matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
-			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matRoll * matYaw * matTranslation;
+			XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4PositionLayer = f4Position;
