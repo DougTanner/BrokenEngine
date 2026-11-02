@@ -58,10 +58,10 @@ private:
 	void PreparePreview(Preview& rPreview);
 	template <typename VISITOR>
 	void ForEachRestPosition(const Preview& rPreview, VISITOR&& rVisitor) const;
-	XMMATRIX OrbitTransform(const Preview& rPreview) const;
 	void PickMissileTube();
 	void LoadModelMetadata();
 	void SaveModelMetadata();
+	void GetAlignedPreviewBounds(FXMMATRIX matAlignment, XMFLOAT3A& rf3Center, float& rfRadius) const;
 	void ValidateModelAlignment();
 	void GenerateIslands();
 	bool DiscClear(FXMVECTOR vecPosition, float fHeight) const;
@@ -100,7 +100,6 @@ private:
 	std::vector<common::ModelMissileTube> mMissileTubes;
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
-	XMMATRIX mMatModelPreRotate = XMMatrixIdentity();
 	std::filesystem::path mModelMetadataPath;
 	std::string mModelMetadataStatus;
 	std::string mModelAlignmentError;

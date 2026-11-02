@@ -36,7 +36,8 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   staged explosion sequence. Separation and pusher death ownership follow the
   [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The nose climb tilt is client-only render state: Interpolate Update derives it from the tick's height change and Render pitches the model by it, while the simulated heading stays yaw-only.
-- Body, effect, and model sizing derive from `kfFighterRadius`, and so does the collision hitbox, which scales the model's outline by it (`../Ships/AGENTS.md`).
+- Body and effect sizing derive from `kfFighterRadius`; collision dimensions
+  follow the [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn sentinel or in [0, `kFighterDestroyTime`]. The Interpolate `PostRead` rejects any other row on every Frame read.
 - Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules),
   arrival grace and the beam cooldown count down unconditionally before

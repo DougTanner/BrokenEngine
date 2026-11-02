@@ -147,6 +147,14 @@ static std::filesystem::path FindExecutableCheckout()
 	}
 }
 
+void ModelViewerApplication::GetAlignedPreviewBounds(FXMMATRIX matAlignment, XMFLOAT3A& rf3Center, float& rfRadius) const
+{
+	const Preview& rPreview = mPreviews.at(miSelected);
+	XMStoreFloat3A(&rf3Center, XMVector3TransformCoord(XMLoadFloat3A(&rPreview.f3Center), matAlignment));
+	float fMaximumScale = std::max({XMVectorGetX(XMVector3Length(matAlignment.r[0])), XMVectorGetX(XMVector3Length(matAlignment.r[1])), XMVectorGetX(XMVector3Length(matAlignment.r[2])), });
+	rfRadius = rPreview.fRadius * fMaximumScale;
+}
+
 void ModelViewerApplication::ValidateModelAlignment()
 {
 	mFlags.Set(ViewerFlags::kMetadataValid, false);
@@ -170,8 +178,7 @@ void ModelViewerApplication::ValidateModelAlignment()
 		.f3Scale = mf3ModelScale,
 		.f3Offset = mf3ModelOffset,
 	};
-	common::ModelAlignment alignment = common::GetModelAlignment(modelHeader);
-	XMMATRIX matAlignment = alignment.matPreMove * XMMatrixScaling(kfFlightRadius * alignment.f3Scale.x, kfFlightRadius * alignment.f3Scale.y, kfFlightRadius * alignment.f3Scale.z) * alignment.matPreRotate;
+	XMMATRIX matAlignment = common::GetModelAlignment(modelHeader);
 	XMVECTOR vecDeterminant;
 	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(&vecDeterminant, matAlignment));
 	float fDeterminant = XMVectorGetX(vecDeterminant);
@@ -180,8 +187,16 @@ void ModelViewerApplication::ValidateModelAlignment()
 		mModelAlignmentError = "Derived alignment and normal matrix must be finite and invertible";
 		return;
 	}
+	XMFLOAT3A f3Center {};
+	float fRadius = 0.0f;
+	GetAlignedPreviewBounds(matAlignment, f3Center, fRadius);
+	if (!std::isfinite(f3Center.x) || !std::isfinite(f3Center.y) || !std::isfinite(f3Center.z) || !std::isfinite(fRadius) || fRadius <= 0.0f)
+	{
+		mModelAlignmentError = "Derived preview bounds must be finite with a positive radius";
+		return;
+	}
 	mMatModelAlignment = matAlignment;
-	mMatModelPreRotate = alignment.matPreRotate;
+	miFittedSelection = -1;
 	mFlags.Set(ViewerFlags::kMetadataValid);
 }
 
@@ -533,18 +548,12 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 	LOG(kGraphics, kInfo, "ModelViewer rest preview {}: materials {}, joints {}, center ({}, {}, {}), radius {}", rPreview.pcPath, rSceneHeader.uiMaterialCount, std::ssize(rPreview.jointMatrices), rPreview.f3Center.x, rPreview.f3Center.y, rPreview.f3Center.z, rPreview.fRadius);
 }
 
-XMMATRIX ModelViewerApplication::OrbitTransform(const Preview& rPreview) const
-{
-	XMVECTOR vecCenter = XMLoadFloat3A(&rPreview.f3Center);
-	return XMMatrixTranslationFromVector(XMVectorNegate(vecCenter)) * mMatModelPreRotate * XMMatrixTranslationFromVector(vecCenter);
-}
-
 void ModelViewerApplication::PickMissileTube()
 {
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
 	const Camera* pCamera = static_cast<const Camera*>(engine::gpCamera);
 	const Preview& rPreview = mPreviews.at(miSelected);
-	XMMATRIX matWorld = OrbitTransform(rPreview);
+	XMMATRIX matWorld = mMatModelAlignment;
 	const ImVec2& rMousePosition = ImGui::GetIO().MousePos;
 	XMVECTOR vecOrigin = XMVector3Unproject(XMVectorSet(rMousePosition.x, rMousePosition.y, 0.0f, 1.0f), pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
 	XMVECTOR vecFar = XMVector3Unproject(XMVectorSet(rMousePosition.x, rMousePosition.y, 1.0f, 1.0f), pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
@@ -732,7 +741,7 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		}
 		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
 		rLayout = {};
-		XMMATRIX matTransform = OrbitTransform(rPreview);
+		XMMATRIX matTransform = mMatModelAlignment;
 		if (mFlags & ViewerFlags::kFlying)
 		{
 			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
@@ -815,7 +824,10 @@ bool ModelViewerApplication::Render()
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
 	if (!mPreviews.empty() && miFittedSelection != miSelected)
 	{
-		pCamera->Fit(mPreviews.at(miSelected).f3Center, mPreviews.at(miSelected).fRadius);
+		XMFLOAT3A f3Center {};
+		float fRadius = 0.0f;
+		GetAlignedPreviewBounds(mMatModelAlignment, f3Center, fRadius);
+		pCamera->Fit(f3Center, fRadius);
 		miFittedSelection = miSelected;
 	}
 	if (mFlags & ViewerFlags::kFlying)
@@ -866,7 +878,7 @@ void ModelViewerApplication::RenderUi()
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
 	// True only on a frame whose drawn right window selects the Edit Hardpoints tab in orbit with Rest pose: the one
-	// gate for picking and tube markers, whose entries are rest-pose coordinates drawn through OrbitTransform.
+	// gate for picking and tube markers, whose entries are rest-pose coordinates drawn through the accepted alignment.
 	bool bHardpointsActive = false;
 	if (!engine::gbShowImGui)
 	{
@@ -1192,10 +1204,10 @@ void ModelViewerApplication::RenderUi()
 		ImGui::End();
 		if (bHardpointsActive && !mPreviews.empty())
 		{
-			// Viewer-written tubes need no near-plane clipping: the orbit eye stays over 1.4 radii from the rest-bounds center,
-			// and a picked surface position plus its unit direction scaled by 0.1 radius lies within 1.1 radii of it.
+			// Picked tubes need no near-plane clipping: the orbit eye stays over 1.4 fitted radii from the aligned center,
+			// and a picked surface position plus its unit direction scaled by 0.1 rest radius lies within 1.1 fitted radii.
 			const Preview& rPreview = mPreviews.at(miSelected);
-			XMMATRIX matWorld = OrbitTransform(rPreview);
+			XMMATRIX matWorld = mMatModelAlignment;
 			ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
 			ImU32 uiMarkerColor = IM_COL32(255, 96, 0, 255);
 			for (const common::ModelMissileTube& rTube : mMissileTubes)

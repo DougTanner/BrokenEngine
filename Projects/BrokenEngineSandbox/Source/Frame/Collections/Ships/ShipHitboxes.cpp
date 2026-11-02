@@ -18,7 +18,7 @@ void InitializeShipHitboxes()
 		{
 			const engine::EagerChunk& rChunk = rChunkMap.at(rType.models[j]);
 			const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
-			// The Omni render chain scales after its yaw, so the hitbox matches the drawn model only for a uniform scale.
+			// Ship models require uniform authored scale.
 			ASSERT(rModelHeader.f3Scale.x == rModelHeader.f3Scale.y && rModelHeader.f3Scale.x == rModelHeader.f3Scale.z);
 
 			int64_t iOutlineOffset = common::ModelHeader::OutlineOffset(rChunk.pHeader->iSize);
@@ -29,8 +29,8 @@ void InitializeShipHitboxes()
 			ShipHitboxShape& rShape = gShipHitboxShapes[i][j];
 			engine::CollisionHitbox& rHitbox = rShape.hitbox;
 			rHitbox.eHitboxLevel = rOutline.eHitboxLevel;
-			rHitbox.fMinimumZ = rOutline.fMinimumZ * rType.fGameplayRadius;
-			rHitbox.fMaximumZ = rOutline.fMaximumZ * rType.fGameplayRadius;
+			rHitbox.fMinimumZ = rOutline.fMinimumZ;
+			rHitbox.fMaximumZ = rOutline.fMaximumZ;
 			rHitbox.iHullVertexCount = rOutline.iHullVertexCount;
 
 			// The exact quarter turn (x, y) -> (-y, x) takes a -Y-facing model into the +X-forward frame and keeps the hull CCW.
@@ -39,8 +39,8 @@ void InitializeShipHitboxes()
 			float fHullLengthSquared = 0.0f;
 			for (int64_t k = 0; k < rHitbox.iHullVertexCount; ++k)
 			{
-				float fX = rOutline.pf2HullVertices[k].x * rType.fGameplayRadius;
-				float fY = rOutline.pf2HullVertices[k].y * rType.fGameplayRadius;
+				float fX = rOutline.pf2HullVertices[k].x;
+				float fY = rOutline.pf2HullVertices[k].y;
 				XMFLOAT2 f2Vertex = rType.bFacesNegativeY ? XMFLOAT2 {-fY, fX} : XMFLOAT2 {fX, fY};
 				rHitbox.pf2HullVertices[k] = f2Vertex;
 				f2BoxMinimum.x = std::min(f2BoxMinimum.x, f2Vertex.x);

@@ -147,7 +147,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kOmni)].models[iPipeline]);
-	common::ModelAlignment alignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -157,25 +157,22 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 			continue;
 		}
 
-		XMFLOAT3A f3Size {kfOmniRadius * alignment.f3Scale.x, kfOmniRadius * alignment.f3Scale.y, kfOmniRadius * alignment.f3Scale.z};
+		float fDeathScale = 1.0f;
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
-			f3Size.x *= fDeathScale;
-			f3Size.y *= fDeathScale;
-			f3Size.z *= fDeathScale;
+			fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
 		}
 
 		// The position is local to the rendered cell; one conversion into the camera cell's frame feeds both the
 		// model translation and the layout position.
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 
-		auto matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
+		auto matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 		auto matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
-		auto matTransform = XMMatrixMultiply(alignment.matPreMove, XMMatrixMultiply(alignment.matPreRotate, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
+		auto matTransform = matAlignment * matScaling * matRotationZ * matRotationAccelerationX * matRotationAccelerationY * matTranslation;
 
 		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
 		XMStoreFloat4(&rOmniLayout.f4PositionLayer, vecPosition);

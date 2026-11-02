@@ -207,10 +207,12 @@ validator, shared with ModelViewer authoring.
 
 Export converts degrees to radians once and stores rotation, scale, and offset
 separately in `ModelHeader`, leaving geometry and animation unchanged; missile
-tubes are validated but not packed. Rotation composes X, then Y, then Z; offset
-is in exported model coordinates. Alignment describes the asset's visual basis,
-scale, and pivot; gameplay sizing and dynamic render transforms remain
-consumer-owned.
+tubes are validated but not packed. `common::GetModelAlignment` owns the complete
+matrix `(offset translation * authored XYZ scale) * XYZ pre-rotation` in
+exported model coordinates, with rotation ordered X, then Y, then Z. Apply it
+once in the outline bake, ModelViewer and game rendering; metadata alone sets
+static model scale after source normalization. Dynamic render transforms and
+independent gameplay dimensions remain consumer-owned.
 
 Every model chunk, whatever its hitbox setting, ends in a `common::ModelOutline`
 section: the top-down convex hull and z range of the vertices after alignment,

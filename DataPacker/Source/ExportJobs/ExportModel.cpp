@@ -119,10 +119,8 @@ void ExportModel::Export()
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(vertices.data()), static_cast<size_t>(uiVertexBytes)), kpcContext);
 	fileStream.close();
 
-	// The outline is the aligned model's top-down hull, aligned in offset, scale, then pre-rotation order as the Fighters
-	// and Battleships render chains do.
-	common::ModelAlignment alignment = common::GetModelAlignment(modelHeader);
-	XMMATRIX matAlignment = XMMatrixMultiply(XMMatrixMultiply(alignment.matPreMove, XMMatrixScalingFromVector(XMLoadFloat3A(&alignment.f3Scale))), alignment.matPreRotate);
+	// Bake the outline in the same authored alignment used to render the model.
+	XMMATRIX matAlignment = common::GetModelAlignment(modelHeader);
 	const common::ModelVertex* pVertices = reinterpret_cast<const common::ModelVertex*>(vertices.data());
 	std::vector<XMFLOAT2> hullPoints(uiVertexCount);
 	outline.fMinimumZ = std::numeric_limits<float>::max();

@@ -76,7 +76,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kMissileModelCrc).pHeader->sceneHeader;
-	common::ModelAlignment alignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
@@ -99,19 +99,16 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 			continue;
 		}
 
-		XMFLOAT3A f3Scale = alignment.f3Scale;
+		float fDeathScale = 1.0f;
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
-			f3Scale.x *= fDeathScale;
-			f3Scale.y *= fDeathScale;
-			f3Scale.z *= fDeathScale;
+			fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
 		}
 
-		XMMATRIX matScaling = XMMatrixScaling(f3Scale.x, f3Scale.y, f3Scale.z);
+		XMMATRIX matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 		XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-		XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matYaw * matTranslation;
+		XMMATRIX matTransform = matAlignment * matScaling * matYaw * matTranslation;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
 		rModelLayout.f4PositionLayer = f4Position;

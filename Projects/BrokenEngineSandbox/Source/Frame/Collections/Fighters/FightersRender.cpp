@@ -130,7 +130,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kFighter)].models[iPipeline]);
-	common::ModelAlignment alignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -139,26 +139,23 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 		{
 			int64_t i = piVisibleIndices[j];
 
-			XMFLOAT3A f3Size {kfFighterRadius * alignment.f3Scale.x, kfFighterRadius * alignment.f3Scale.y, kfFighterRadius * alignment.f3Scale.z};
+			float fDeathScale = 1.0f;
 			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 			{
-				float fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kFighterDestroyTime, 0.75f);
-				f3Size.x *= fDeathScale;
-				f3Size.y *= fDeathScale;
-				f3Size.z *= fDeathScale;
+				fDeathScale = std::pow(rCurrent.pDestroyedTimes[i] / kFighterDestroyTime, 0.75f);
 			}
 
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 			XMFLOAT4A f4Position {};
 			XMStoreFloat4A(&f4Position, vecPosition);
 
-			XMMATRIX matScaling = XMMatrixScaling(f3Size.x, f3Size.y, f3Size.z);
+			XMMATRIX matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			// Negated so a positive climb tilt raises the +X nose.
 			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = alignment.matPreMove * matScaling * alignment.matPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
+			XMMATRIX matTransform = matAlignment * matScaling * matRoll * matClimbTilt * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4PositionLayer = f4Position;

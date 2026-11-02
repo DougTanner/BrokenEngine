@@ -20,9 +20,10 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   ordinary owned-handle cleanup. Fleet Battleships follow their
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
   fleet Omnis theirs (`../Omnis/AGENTS.md`).
-- A ship's collision and missile-damage shape is its model's baked outline
-  scaled by the type's gameplay radius, at the depth its sidecar hitbox setting
-  names. `kShipHitboxTypes` must name each controller's Render model. Each ship
+- A ship's collision and missile-damage shape uses its model's already aligned
+  baked outline directly, at the depth its sidecar hitbox setting names. Ship
+  models require uniform authored scale. `kShipHitboxTypes` must name each
+  controller's Render model. Each ship
   PreCollision writes every row's radius and posed hitbox from its current pose
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and

@@ -374,23 +374,13 @@ struct ModelOutline
 };
 static_assert(sizeof(ModelOutline) == 784, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
 
-// A packed model's asset alignment; each consumer fixes where matPreMove, its own scaling built from f3Scale, and
-// matPreRotate sit in its transform chain.
-struct ModelAlignment
+// Complete authored alignment in exported model coordinates: offset, XYZ scale, then XYZ pre-rotation.
+inline XMMATRIX GetModelAlignment(const ModelHeader& rModelHeader)
 {
-	XMMATRIX matPreMove {};
-	XMMATRIX matPreRotate {};
-	XMFLOAT3A f3Scale {};
-};
-
-inline ModelAlignment GetModelAlignment(const ModelHeader& rModelHeader)
-{
-	return
-	{
-		.matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset)),
-		.matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z),
-		.f3Scale = {rModelHeader.f3Scale.x, rModelHeader.f3Scale.y, rModelHeader.f3Scale.z},
-	};
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
+	XMMATRIX matScaling = XMMatrixScalingFromVector(XMLoadFloat3(&rModelHeader.f3Scale));
+	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
+	return XMMatrixMultiply(XMMatrixMultiply(matPreMove, matScaling), matPreRotate);
 }
 
 struct ShaderHeader

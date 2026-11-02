@@ -108,8 +108,10 @@ The catalog includes every packed scene with materials, sorted by packed path.
 The viewer owns clip selection, playback time and play/pause state; selected
 clips use the engine's indexed pose evaluation. Rest pose uses cached authored
 node matrices and skinning; an animation's first key is not a rest-pose
-substitute. Camera fitting uses bounds from that rest geometry. Model changes
-reset to Rest pose, refit the camera, and reset the orbit camera rotation;
+substitute. Camera fitting transforms the rest-bounds center through accepted
+alignment and scales its radius by the largest 3D linear-row length, enclosing
+positive anisotropic scales. Model changes reset to Rest pose, refit the camera,
+and reset the orbit camera rotation. Accepted alignment edits also refit;
 clip changes restart playback without
 refitting. UI mouse capture takes precedence over camera, sun and picking
 gestures.
@@ -166,7 +168,7 @@ adds nothing. In flight or with a clip selected the Pick setting is kept but
 inactive and its checkbox disabled, and picking resumes on return to orbit with
 Rest pose. Only while that tab is selected in orbit with Rest pose, each tube
 draws as a dot at its position with a short line along its direction, through
-the orbit model transform, over the scene and under the panels with no depth
+the accepted alignment, over the scene and under the panels with no depth
 test.
 
 The executable's containing checkout owns source reads and Save, in both main
@@ -182,8 +184,10 @@ it. An unreadable, malformed, unsupported or invalid present sidecar shows a
 load error, applies no partial record and disables Save until a successful
 reload. Invalid edits stay visible with a reason and disable Save while the
 last valid complete alignment remains in both previews. Validate derived
-alignment and its inverse-transpose normal matrix as finite and invertible
-before accepting edits; valid scalar fields alone are insufficient.
+alignment and its inverse-transpose normal matrix as finite and invertible,
+and derived preview bounds as finite with positive radius, before accepting
+edits; invalid edits retain the accepted draw and camera fit. Valid scalar
+fields alone are insufficient.
 
 Only explicit Save writes metadata, in the tracked sidecars' layout, so an
 unedited Save leaves a shortest-form sidecar byte-identical. Replace the
@@ -194,16 +198,15 @@ agents work, mutating tracked source metadata in either main or session
 checkouts. Treat these changes as user-owned and preserve them; never assume
 every dirty sidecar is agent-authored or silently revert it.
 
-Authored alignment affects model presentation only, leaving body movement,
-camera tracking, raw rest bounds and animation evaluation unchanged.
-In flight, compose offset, authored XYZ scale times the existing flight radius, XYZ
-rotation, then flight orientation and body translation, matching Fighter order.
-Save only authored scale, excluding the radius multiplier. Keep the shadow
-origin at body center despite authored offset. Orbit applies only the authored
-XYZ rotation, about the rest-bounds center with no offset or scale, so the
-camera fitted to the raw rest bounds still frames the model. The orbit camera
-starts looking straight down with the aligned front (+x after the authored
-rotation) to screen right and +y to screen up.
+Both modes draw through the complete shared alignment under the
+[exporter's contract](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
+Orbit picking and tube markers use that same accepted matrix; tube values stay
+in pre-alignment rest coordinates. Flight appends its orientation and body
+translation. Keep the shadow origin at body center despite authored offset.
+Body movement, camera tracking, raw rest bounds and animation evaluation remain
+independent of alignment. The orbit camera starts looking straight down with
+the aligned front (+x after the authored rotation) to screen right and +y to
+screen up.
 
 ## Engine integration
 
