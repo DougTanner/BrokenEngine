@@ -29,8 +29,6 @@ template struct Collection<game::BattleshipsPostRender>;
 namespace game
 {
 
-constexpr float kfDeathKnockbackSpeed = 20.0f;
-
 // Within this angle of its wanted heading a Battleship stops turning and Interpolate Update rotates it the rest of the way.
 constexpr float kfBattleshipHeadingCaptureAngle = XM_PI / 180.0f;
 constexpr float kfBattleshipHeadingCaptureRate = 4.0f;
@@ -352,7 +350,8 @@ void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[m
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
 
 			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kBattleshipDestroyTime;
-			XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
+			// A dying Battleship holds still, so each explosion flies away from the damage direction.
+			XMVECTOR vecDirection = XMVector3Normalize(XMVectorSetZ(XMVectorNegate(rCurrentPostRender.pVecDamageDirections[i]), 0.0f));
 			SpawnBattleshipExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
 		}
 	}
@@ -597,17 +596,14 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 		}
-		else
-		{
-			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
-		}
 
-		if (!SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
+		// A dying Battleship holds still, so it skips terrain contact.
+		if (!(lifecycleFlags & engine::LifecycleFlags::kDying) && !SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
 		{
 			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
 		}
 		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
-		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
+		// Last velocity write, after pusher response and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 

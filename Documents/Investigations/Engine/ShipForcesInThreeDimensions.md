@@ -24,9 +24,9 @@ The user's decisions for that change also cover this work: collisions and explos
 - **Pushers.** `ApplyPusherPush` (`Frame/Ships/ShipBehaviours.cpp:624-633`) takes the 3D push from `engine::PushersInterpolate::ApplyPush`, which uses 3D falloff (`Engine/Source/Frame/Collections/Pushers/AGENTS.md`).
   It applies that push through `engine::ApplyClampedPush` (`:631`), and the clearing of velocity Z then throws the Z component away (the Omni comment at `Omnis.cpp:601` says so).
   Two ships at exactly the same height produce a push with no Z component, so the vertical part only shows up between ships at different heights, which mostly means ships that are climbing.
-- **Death knockback.** A dying Fighter or Battleship replaces its velocity with `-pVecDamageDirections[i] * kfDeathKnockbackSpeed` (20 m/s) (`Fighters.cpp:623`, `Battleships.cpp:618`).
+- **Death knockback.** A dying Fighter replaces its velocity with `-pVecDamageDirections[i] * kfDeathKnockbackSpeed` (20 m/s) (`Fighters.cpp:623`); a dying Battleship instead stops in place, because `BeginExplosion` zeroes its velocity (`Frame/Battleships/BattleshipsCombat.cpp`, after this baseline).
   The damage direction is 3D: it is the reversed velocity of the blaster that hit the ship, or the direction to the nearest area-damage source (`Frame/Fighters/FightersCombat.cpp:120,164`).
-  Its Z component is cleared at `:632` and `:627`. Omnis have no knockback, and a dying Omni does not integrate velocity at all (`Omnis.cpp:324`).
+  Its Z component is cleared at `Fighters.cpp:632`. Omnis have no knockback, and a dying Omni does not integrate velocity at all (`Omnis.cpp:324`).
 - **Explosions apply no impulse.** `engine::AreaDamage::Get` (`Engine/Source/Frame/AreaDamage.cpp:24-56`) returns only the summed damage with 3D linear falloff, plus the nearest source position.
   Each ship type's `AreaDamage` phase body (`FightersCombat.cpp:135-168`, `Frame/Omnis/OmnisCombat.cpp:187`, `Frame/Battleships/BattleshipsCombat.cpp:135`) subtracts health and, on a kill, sets the damage direction.
   A living ship's velocity is never changed.

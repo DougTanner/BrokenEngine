@@ -4,10 +4,10 @@ Revisit When: ship deaths feel abrupt in playtests, or after `Documents/Features
 
 ## Context
 
-A destroyed spaceship explodes in place and vanishes; nothing outlives it:
+A destroyed spaceship explodes in place and vanishes; nothing outlives it except a Battleship, whose model stays as a client-only wreck:
 
 - A lethal blaster hit (collision) or missile splash (area damage) calls `BeginExplosion` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/SpaceshipsCombat.cpp`). It sets `kDying`, starts `pDestroyedTimes` at `kSpaceshipDestroyTime` (`Spaceships.h`), plays the death sound, and spawns the first explosion.
-- While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces its velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks the model by the remaining destroy fraction.
+- While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces a Fighter's velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks a Fighter or Omni model by the remaining destroy fraction. A dying Battleship holds still and is not shrunk.
 - `SpaceshipsPostRender::Destroy` marks the row `kDestroy` once `pDestroyedTimes` reaches zero, and the compaction ending the same Destroy phase removes it.
 
 No message tells the client about a destruction. The client runs the same
@@ -16,10 +16,13 @@ mismatches the server's (`Documents/Architecture/GameReconciliation.md`),
 marking replayed ticks with `FrameFlags::kRecalculated`
 (`Engine/Source/Frame/FrameBase.h`). At both `BeginExplosion` and `Destroy` the
 client has the ship's position and `SpaceshipsPostRender::pVecVelocities`, which
-is shared PostRender state. By `Destroy` that velocity is the knockback; the
-ship's flight velocity was overwritten on the first exploding tick.
+is shared PostRender state. By `Destroy` a Fighter's velocity is the knockback
+and a Battleship's is zero; the ship's flight velocity was overwritten on the
+first exploding tick.
 
 Client-only effect collections (`Puffs`, `PointLights`, `SmokeTrails`, and others) live in the frame under `BT_CLIENT`, so they roll back and replay with it. Effects outside the frame, such as GPU particles and audio one-shots, skip `kRecalculated` ticks instead. `Explosions` is shared: its rows are CRC'd and spawning one draws from the frame random engine (`Engine/Source/Frame/Collections/Explosions/AGENTS.md`).
+
+This feature is a more advanced version of the Battleship wreck list, `sWrecks` in `Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsRender.cpp`.
 
 ## Design
 

@@ -3,7 +3,7 @@
 Battleships are a copy of Fighters with larger, slower constants
 (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with
 the Battleship names. Keep the two collections parallel; only the tube missiles,
-turning, and fleet health below and the Fighters' beam, client-only climb tilt
+turning, fleet health, and death below and the Fighters' beam, client-only climb tilt
 and turn roll, fleet tactics, `pVecVeerOffPoints`, and lack of flee differ: a
 random-spawn Battleship, when island candidates are available, prioritizes
 returning to an island, fleeing its enemy ship when nearby, then chasing it; in
@@ -14,7 +14,9 @@ attack target (`../Ships/AGENTS.md` `## Ship Invariants`), picked from itself in
 3D at or below plane 0. A `kTargetFlagship` row's kept attack target is the
 enemy flagship, which it chases with neither return nor flee
 (`../Ships/AGENTS.md`); its missiles keep the rule below, which already covers
-the flagship.
+the flagship. A dying Battleship has neither the Fighters' death knockback nor
+their shrink: it holds still, skips terrain contact, and the client draws its
+model as a wreck (`## Wreck Invariants`).
 
 ## Weapon Invariants
 
@@ -65,3 +67,34 @@ the flagship.
 ## Fleet Health Invariants
 
 - A fleet-controlled Battleship never dies, a harness-injected one included: when collision, area, or beam damage takes its health to 0 or below, PostRender holds its health at 0 and starts no explosion, and it otherwise behaves as any Battleship. Its health is never refilled.
+
+## Wreck Invariants
+
+- Wrecks are client-only render state, the `sWrecks` list in
+  `BattleshipsRender.cpp`, outside every Frame, CRC, save, and the wire, keyed
+  by `(GridCoord, battleship_t)`. `BeginRender` captures, once per key, each row
+  whose interpolated `pDestroyedTimes` is at or above zero in a visible cell, so
+  only a combat death makes one; a `kDestroyShip` or harness `kDestroy` removal
+  leaves none.
+- A cell is visible while it is active, has a render interpolate, and its
+  hexagon overlaps the non-map camera's `mf4WorldVisibleArea` by the client
+  subscription's `RectangleOverlapsHex` test. Each `BeginRender` drops every
+  wreck whose cell is not visible and every sinking wreck whose hull top is
+  below the water.
+- Capture samples the cell's elevation under the hull box's center and four
+  corners. A wreck with open seafloor under all five sinks; any other rests its
+  box bottom on the highest sample, never above its start height, tilted to the
+  terrain normal at the center by the fraction of its fall completed.
+- A wreck falls straight down, its gravity ramping up over
+  `kBattleshipWreckPowerLossTime`, then brakes hard once its center reaches
+  z = 0 to `kfBattleshipWreckSinkSpeed`, stepped by the sim-scaled render delta
+  and not at all while paused. Capture, motion, and prune run only in
+  `BeginRender`, so map view's world-hidden frames freeze wrecks, and a death
+  wholly inside map view leaves none.
+- `Game::ResetGameState` and `ClientSession::OnServerLoad` clear the list,
+  because cell-local Ids restart there.
+- Dying rows are not drawn. A coordinate and pipeline's visible wrecks take the
+  slots after its rows and share its single skinning reservation
+  (`../Fighters/AGENTS.md` `## Rendering Invariants`), and the buffer capacity
+  adds the wreck count. The `Wrecks` counter counts drawn wrecks; `Rendered`
+  excludes them.

@@ -168,6 +168,7 @@ void Game::ResetGameState()
 	mClientOwnedEntityCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
+	BattleshipsInterpolate::ClearWrecks();
 	// Close the map with no ease, so no world-hidden frame runs over the menu.
 	engine::gpCamera->mbFramingOverride = false;
 #endif

@@ -11,7 +11,8 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   disc from the previous to the current Interpolate position against the cell's
   elevation grid, blocked at the current position's height, and writes the
   resolved position back to the current Interpolate row. A ship on a flight
-  plane without terrain collision skips terrain contact. On contact Omnis slide along
+  plane without terrain collision skips terrain contact, and so does a dying
+  Battleship. On contact Omnis slide along
   the terrain once and Fighters and Battleships bounce off it. A start already inside terrain
   logs a warning; spawn sites test at most the body's center against terrain, so
   a warning right after a spawn is expected. The

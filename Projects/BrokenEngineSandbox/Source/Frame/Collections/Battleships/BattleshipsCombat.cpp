@@ -47,7 +47,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	rCurrentInterpolate.pDestroyedTimes[i] = kBattleshipDestroyTime;
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
 
-	// Store damage direction for knockback
+	// The staggered death explosions in the Spawn hook fly away from this direction.
 	rCurrentPostRender.pVecDamageDirections[i] = vecDamageDirection;
 
 	// Clear the registry id so missiles stop tracking
@@ -58,6 +58,8 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 #endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
+	// The dying ship holds still from its death tick on.
+	rCurrentPostRender.pVecVelocities[i] = XMVectorZero();
 	SpawnBattleshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 

@@ -197,6 +197,9 @@ void ClientSession::OnServerLoad()
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();
+
+	// The loaded cells restart their Ids, so a kept wreck could block capturing a new row.
+	BattleshipsInterpolate::ClearWrecks();
 }
 
 void ClientSession::SendCreateFleetRequest()

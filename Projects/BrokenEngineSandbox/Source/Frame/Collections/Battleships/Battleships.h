@@ -158,6 +158,10 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
+#if defined(BT_CLIENT)
+	// Drops every wreck; called where cell-local Ids restart (session reset, server load).
+	static void ClearWrecks();
+#endif
 };
 
 using battleship_t = engine::Id<BattleshipsInterpolate>;

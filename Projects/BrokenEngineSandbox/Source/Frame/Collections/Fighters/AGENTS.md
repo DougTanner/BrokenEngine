@@ -80,8 +80,8 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   exact distance tie keeps the first row in `ForEachShipType` order, and a
   later shooter sees an earlier shooter's kill.
 - A hit deals `kfFighterBeamDamage` at once through the target type's
-  `ApplyBeamDamage` death path, and a Fighter's or Battleship's death knockback
-  pushes it away from the shooter.
+  `ApplyBeamDamage` death path, and a Fighter's death knockback pushes it away
+  from the shooter.
 - The beam line is client-only: the shot syncs the `pBeamAreaLights` area light
   toward the stored `pVecBeamEnds`, and Interpolate Update fades it from the
   shared cooldown alone. PostRender Update releases that light and clears its

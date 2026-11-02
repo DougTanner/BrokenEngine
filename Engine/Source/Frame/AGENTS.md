@@ -141,7 +141,14 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   by the generator's edge margin. Keep world/local transforms, the placement
   bound, and the west/east/north/south convention consistent across CPU
   sampling and shaders.
-- Two terrain-sampling paths exist and must not be mixed. Simulation code calls `CellElevationSampler::Sample`/`CellNormal`, which read only the cell's own `CellStaticData` elevation grid, never `mCells` or a neighbouring cell, so parallel per-cell ticks cannot race the tick-time grid build. Render code reaches the other path through the client-only `ProjectToFlightPlane`/`ProjectToBaseHeight`, whose elevation query walks `mCells` and must never run from frame-tick code; it asserts on it.
+- Two terrain-sampling paths exist and must not be mixed. Simulation code calls
+  `CellElevationSampler::Sample`/`CellNormal`, which read only the cell's own
+  `CellStaticData` elevation grid, never `mCells` or a neighbouring cell, so
+  parallel per-cell ticks cannot race the tick-time grid build. Client render
+  code may also call them on one cell's own static data, since render runs after
+  the tick join. Render code reaches the other path through the client-only
+  `ProjectToFlightPlane`/`ProjectToBaseHeight`, whose elevation query walks
+  `mCells` and must never run from frame-tick code; it asserts on it.
 - `ResolveDiscAgainstTerrain`, the simulation's swept-disc terrain query,
   resolves an overlapped start with the navigation snap (its declaration comment
   in `TerrainCollisionUtils.h` owns the snap and cell-exclusion behavior), but
