@@ -404,8 +404,7 @@ void main()
 		float fSmokeFade = 1.0f;
 		if (iPlane == iInLayer)
 		{
-			float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-			fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+			fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InWorldPosition.z, iPlane);
 		}
 		float fSmoke = ReadSmoke(globalLayout, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane);
 		float fSmokeMax = fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke;

@@ -62,7 +62,6 @@ constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.b
 
 ModelViewerApplication::ModelViewerApplication()
 : common::Singleton<ModelViewerApplication>(gpModelViewerApplication, this)
-, mfBackgroundGray(kVkHdrClearColor.float32[0])
 {
 	mSeedRandomEngine.TimeSeed();
 	// Strict comparison over the CRC-sorted list keeps the lowest CRC on a tie.
@@ -209,7 +208,9 @@ void ModelViewerApplication::LoadModelMetadata()
 	mf3ModelRotation = {};
 	mf3ModelOffset = {};
 	meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
-	mMissileTubes.clear();
+	mHardpoints.clear();
+	meSelectedHardpointKind = common::ModelHardpointKind::kMissileTube;
+	mFlags.Set(ViewerFlags::kResetHardpointTab);
 	ValidateModelAlignment();
 	mModelMetadataPath.clear();
 	try
@@ -243,7 +244,7 @@ void ModelViewerApplication::LoadModelMetadata()
 			mf3ModelRotation = metadata.f3RotationDegrees;
 			mf3ModelOffset = metadata.f3Offset;
 			meModelHitboxLevel = metadata.eHitboxLevel;
-			mMissileTubes = std::move(metadata.missileTubes);
+			mHardpoints = std::move(metadata.hardpoints);
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
 			{
@@ -263,7 +264,7 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
 		meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
-		mMissileTubes.clear();
+		mHardpoints.clear();
 		ValidateModelAlignment();
 		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
@@ -274,12 +275,12 @@ void ModelViewerApplication::SaveModelMetadata()
 	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
 	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
-	std::string content = std::format("{{\n\t\"version\": 3,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\",\n\t\"missileTubes\": [", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
-	for (const auto& [i, rTube] : std::views::enumerate(std::as_const(mMissileTubes)))
+	std::string content = std::format("{{\n\t\"version\": 4,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\",\n\t\"hardpoints\": [", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
+	for (const auto& [i, rHardpoint] : std::views::enumerate(std::as_const(mHardpoints)))
 	{
-		std::format_to(std::back_inserter(content), "{}\n\t\t{{\"position\": [{}, {}, {}], \"direction\": [{}, {}, {}]}}", i == 0 ? "" : ",", rTube.f3Position.x, rTube.f3Position.y, rTube.f3Position.z, rTube.f3Direction.x, rTube.f3Direction.y, rTube.f3Direction.z);
+		std::format_to(std::back_inserter(content), "{}\n\t\t{{\"kind\": \"{}\", \"position\": [{}, {}, {}], \"direction\": [{}, {}, {}]}}", i == 0 ? "" : ",", common::kpcModelHardpointKindNames[static_cast<size_t>(rHardpoint.eKind)], rHardpoint.f3Position.x, rHardpoint.f3Position.y, rHardpoint.f3Position.z, rHardpoint.f3Direction.x, rHardpoint.f3Direction.y, rHardpoint.f3Direction.z);
 	}
-	content += mMissileTubes.empty() ? "]\n}\n" : "\n\t]\n}\n";
+	content += mHardpoints.empty() ? "]\n}\n" : "\n\t]\n}\n";
 	std::filesystem::path stagingPath = mModelMetadataPath;
 	stagingPath += ".tmp";
 	std::ofstream stream(stagingPath, std::ios::binary);
@@ -548,7 +549,7 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 	LOG(kGraphics, kInfo, "ModelViewer rest preview {}: materials {}, joints {}, center ({}, {}, {}), radius {}", rPreview.pcPath, rSceneHeader.uiMaterialCount, std::ssize(rPreview.jointMatrices), rPreview.f3Center.x, rPreview.f3Center.y, rPreview.f3Center.z, rPreview.fRadius);
 }
 
-void ModelViewerApplication::PickMissileTube()
+void ModelViewerApplication::PickHardpoint()
 {
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
 	const Camera* pCamera = static_cast<const Camera*>(engine::gpCamera);
@@ -583,9 +584,10 @@ void ModelViewerApplication::PickMissileTube()
 	{
 		return;
 	}
-	common::ModelMissileTube& rTube = mMissileTubes.emplace_back();
-	XMStoreFloat3A(&rTube.f3Position, XMVectorMultiplyAdd(XMVectorReplicate(fNearestDistance), vecDirection, vecOrigin));
-	XMStoreFloat3A(&rTube.f3Direction, XMVector3Normalize(vecNearestCross));
+	common::ModelHardpoint& rHardpoint = mHardpoints.emplace_back();
+	rHardpoint.eKind = meSelectedHardpointKind;
+	XMStoreFloat3A(&rHardpoint.f3Position, XMVectorMultiplyAdd(XMVectorReplicate(fNearestDistance), vecDirection, vecOrigin));
+	XMStoreFloat3A(&rHardpoint.f3Direction, XMVector3Normalize(vecNearestCross));
 	if (mFlags & ViewerFlags::kMetadataLoaded)
 	{
 		mModelMetadataStatus = "Unsaved source edits";
@@ -878,7 +880,7 @@ void ModelViewerApplication::RenderUi()
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
 	// True only on a frame whose drawn right window selects the Edit Hardpoints tab in orbit with Rest pose: the one
-	// gate for picking and tube markers, whose entries are rest-pose coordinates drawn through the accepted alignment.
+	// gate for picking and hardpoint markers, whose entries are rest-pose coordinates drawn through the accepted alignment.
 	bool bHardpointsActive = false;
 	if (!engine::gbShowImGui)
 	{
@@ -1166,33 +1168,61 @@ void ModelViewerApplication::RenderUi()
 				if (ImGui::BeginTabItem("Edit Hardpoints"))
 				{
 					bHardpointsActive = !(mFlags & ViewerFlags::kFlying) && miSelectedAnimation < 0;
-					ImGui::SeparatorText("Missile tubes");
-					ImGui::BeginDisabled(!bHardpointsActive);
-					bool bPicking = mFlags & ViewerFlags::kPicking;
-					if (ImGui::Checkbox("Pick", &bPicking))
+					if (ImGui::BeginTabBar("Hardpoint categories"))
 					{
-						mFlags.Set(ViewerFlags::kPicking, bPicking);
-					}
-					ImGui::EndDisabled();
-					int64_t iDeleted = -1;
-					for (const auto& [i, rTube] : std::views::enumerate(std::as_const(mMissileTubes)))
-					{
-						ImGui::PushID(static_cast<int>(i));
-						if (ImGui::SmallButton("X"))
+						auto EditHardpoints = [&](common::ModelHardpointKind eKind)
 						{
-							iDeleted = i;
-						}
-						ImGui::SameLine();
-						ImGui::Text("(%.3f, %.3f, %.3f) dir (%.3f, %.3f, %.3f)", rTube.f3Position.x, rTube.f3Position.y, rTube.f3Position.z, rTube.f3Direction.x, rTube.f3Direction.y, rTube.f3Direction.z);
-						ImGui::PopID();
-					}
-					if (iDeleted >= 0)
-					{
-						mMissileTubes.erase(mMissileTubes.begin() + iDeleted);
-						if (mFlags & ViewerFlags::kMetadataLoaded)
+							meSelectedHardpointKind = eKind;
+							ImGui::PushID(static_cast<int>(eKind));
+							ImGui::BeginDisabled(!bHardpointsActive);
+							bool bPicking = mFlags & ViewerFlags::kPicking;
+							if (ImGui::Checkbox("Pick", &bPicking))
+							{
+								mFlags.Set(ViewerFlags::kPicking, bPicking);
+							}
+							ImGui::EndDisabled();
+							int64_t iDeleted = -1;
+							for (const auto& [i, rHardpoint] : std::views::enumerate(std::as_const(mHardpoints)))
+							{
+								if (rHardpoint.eKind != eKind)
+								{
+									continue;
+								}
+								ImGui::PushID(static_cast<int>(i));
+								if (ImGui::SmallButton("X"))
+								{
+									iDeleted = i;
+								}
+								ImGui::SameLine();
+								ImGui::Text("(%.3f, %.3f, %.3f) dir (%.3f, %.3f, %.3f)", rHardpoint.f3Position.x, rHardpoint.f3Position.y, rHardpoint.f3Position.z, rHardpoint.f3Direction.x, rHardpoint.f3Direction.y, rHardpoint.f3Direction.z);
+								ImGui::PopID();
+							}
+							if (iDeleted >= 0)
+							{
+								mHardpoints.erase(mHardpoints.begin() + iDeleted);
+								if (mFlags & ViewerFlags::kMetadataLoaded)
+								{
+									mModelMetadataStatus = "Unsaved source edits";
+								}
+							}
+							ImGui::PopID();
+						};
+						if (ImGui::BeginTabItem("Missile tubes", nullptr, (mFlags & ViewerFlags::kResetHardpointTab) ? ImGuiTabItemFlags_SetSelected : 0))
 						{
-							mModelMetadataStatus = "Unsaved source edits";
+							EditHardpoints(common::ModelHardpointKind::kMissileTube);
+							mFlags.Set(ViewerFlags::kResetHardpointTab, false);
+							ImGui::EndTabItem();
 						}
+						if (ImGui::BeginTabItem("Fighter launch bays"))
+						{
+							if (!(mFlags & ViewerFlags::kResetHardpointTab))
+							{
+								EditHardpoints(common::ModelHardpointKind::kFighterLaunchBay);
+							}
+							ImGui::EndTabItem();
+						}
+						bHardpointsActive = bHardpointsActive && !(mFlags & ViewerFlags::kResetHardpointTab);
+						ImGui::EndTabBar();
 					}
 					SourceMetadataControls();
 					ImGui::EndTabItem();
@@ -1204,16 +1234,16 @@ void ModelViewerApplication::RenderUi()
 		ImGui::End();
 		if (bHardpointsActive && !mPreviews.empty())
 		{
-			// Picked tubes need no near-plane clipping: the orbit eye stays over 1.4 fitted radii from the aligned center,
+			// Picked hardpoints need no near-plane clipping: the orbit eye stays over 1.4 fitted radii from the aligned center,
 			// and a picked surface position plus its unit direction scaled by 0.1 rest radius lies within 1.1 fitted radii.
 			const Preview& rPreview = mPreviews.at(miSelected);
 			XMMATRIX matWorld = mMatModelAlignment;
 			ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
-			ImU32 uiMarkerColor = IM_COL32(255, 96, 0, 255);
-			for (const common::ModelMissileTube& rTube : mMissileTubes)
+			for (const common::ModelHardpoint& rHardpoint : mHardpoints)
 			{
-				XMVECTOR vecPosition = XMVectorSetW(XMLoadFloat3A(&rTube.f3Position), 1.0f);
-				XMVECTOR vecEnd = XMVectorMultiplyAdd(XMLoadFloat3A(&rTube.f3Direction), XMVectorReplicate(0.1f * rPreview.fRadius), vecPosition);
+				ImU32 uiMarkerColor = rHardpoint.eKind == common::ModelHardpointKind::kMissileTube ? IM_COL32(255, 96, 0, 255) : IM_COL32(0, 224, 255, 255);
+				XMVECTOR vecPosition = XMVectorSetW(XMLoadFloat3A(&rHardpoint.f3Position), 1.0f);
+				XMVECTOR vecEnd = XMVectorMultiplyAdd(XMLoadFloat3A(&rHardpoint.f3Direction), XMVectorReplicate(0.1f * rPreview.fRadius), vecPosition);
 				XMVECTOR vecScreenPosition = XMVector3Project(vecPosition, pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
 				XMVECTOR vecScreenEnd = XMVector3Project(vecEnd, pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, matWorld);
 				ImVec2 screenPosition(XMVectorGetX(vecScreenPosition), XMVectorGetY(vecScreenPosition));
@@ -1244,7 +1274,7 @@ void ModelViewerApplication::RenderUi()
 			// A picking click starts no drag, so neither the click nor holding it afterwards orbits.
 			if (bHardpointsActive && (mFlags & ViewerFlags::kPicking) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				PickMissileTube();
+				PickHardpoint();
 			}
 			else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 			{

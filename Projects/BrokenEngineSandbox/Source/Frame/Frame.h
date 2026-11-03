@@ -61,7 +61,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	std::unique_ptr<BattleshipsInterpolate> pBattleships;
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
-	static auto Values()
+	static engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> Values()
 	{
 		return engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> {};
 	}
@@ -106,7 +106,7 @@ struct FramePostRender : public engine::FramePostRenderBase
 	std::unique_ptr<BattleshipsPostRender> pBattleships;
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
-	static auto Values()
+	static engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> Values()
 	{
 		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> {};
 	}

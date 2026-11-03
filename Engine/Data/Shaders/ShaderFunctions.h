@@ -240,7 +240,7 @@ float ObjectShadowAbove(vec4 f4ObjectShadows, int iPlane)
 
 // Vertical, sun-independent attenuation at the fragment XY: the product of every flight plane's factor, each in
 // [0, 1], so overlapping planes never shade lighter than either alone and an empty plane multiplies by exactly 1.
-float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float fMulti)
+float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float pfIntensities[kiMaxFlightPlanes])
 {
 	float fShadow = 1.0f;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
@@ -248,9 +248,15 @@ float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmoke
 		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
 		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
-		fShadow *= 1.0f - fMulti * fSmokeShadow;
+		fShadow *= 1.0f - pfIntensities[iPlane] * fSmokeShadow;
 	}
 	return fShadow;
+}
+
+float SmokeObjectHeightFade(GlobalLayout globalLayout, float fHeight, int iPlane)
+{
+	float fHeightFraction = clamp((fHeight - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
+	return 1.0f - pow(fHeightFraction, globalLayout.fSmokeObjectHeightPower);
 }
 
 // SmokeShadow with each plane's factor faded by the fragment's height above that plane: full for planes above the
@@ -261,8 +267,7 @@ float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D p
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
-		float fHeightFraction = clamp((f3InPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+		float fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InPosition.z, iPlane);
 		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
 		fShadow *= 1.0f - fSmokeFade * fSmokeShadow;

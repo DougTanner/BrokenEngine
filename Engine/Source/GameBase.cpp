@@ -916,7 +916,7 @@ bool GameBase::HandleDeferredSwapchain()
 			std::chrono::nanoseconds remainingNanoseconds = budgetNanoseconds - elapsedNanoseconds;
 			if (remainingNanoseconds > 0ns)
 			{
-				LARGE_INTEGER dueTime {.QuadPart = -(remainingNanoseconds.count() / 100),}; // Negative = relative, 100ns units.
+				LARGE_INTEGER dueTime {.QuadPart = -(remainingNanoseconds.count() / 100), }; // Negative = relative, 100ns units.
 				if (mHandleMinimizedThrottleTimer != nullptr && SetWaitableTimerEx(mHandleMinimizedThrottleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0) != 0)
 				{
 					WaitForSingleObject(mHandleMinimizedThrottleTimer, INFINITE);
@@ -988,6 +988,7 @@ void GameBase::Render()
 
 	// Pack island instances after the current camera update and only once the acquired framebuffer index is valid.
 	UpdateActiveIslands();
+	gbGameplayPaused = mGameFlags & GameFlags::kPaused;
 	gpGraphics->RenderGlobal(elapsedTime);
 
 	// Capture command buffer index before async launch to avoid re-reading in async thread

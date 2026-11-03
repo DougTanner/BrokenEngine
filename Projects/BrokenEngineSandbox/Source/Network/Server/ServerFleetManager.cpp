@@ -145,6 +145,10 @@ void ServerFleetManager::TickRespawnTimers()
 	{
 		for (Fleet& rFleet : mFleets.at(rGuid))
 		{
+			int64_t iNextFighterLaunchBay = 0;
+			auto nextLaunchIt = gpServerSession->mpClientManager->mNextFighterLaunchTicks.find(rFleet.guid);
+			bool bFighterLaunchReady = nextLaunchIt == gpServerSession->mpClientManager->mNextFighterLaunchTicks.end() || nextLaunchIt->second <= gpGame->miTickCounter;
+			bool bAnyFighterLaunched = false;
 			for (FleetMember& rMember : rFleet.members)
 			{
 				if (!(rMember.flags & FleetMemberFlags::kIsDead))
@@ -158,8 +162,21 @@ void ServerFleetManager::TickRespawnTimers()
 					continue;
 				}
 
-				gpServerSession->mpClientManager->SpawnFleetMember(rGuid, rFleet, rMember, takenSpawnPoints);
+				if (rMember.eType == ShipType::kFighter && !bFighterLaunchReady)
+				{
+					continue;
+				}
+
+				bool bSpawned = gpServerSession->mpClientManager->SpawnFleetMember(rGuid, rFleet, rMember, iNextFighterLaunchBay, takenSpawnPoints);
+				if (rMember.eType == ShipType::kFighter && bSpawned)
+				{
+					bAnyFighterLaunched = true;
+				}
 				LOG(kNetwork, kVerbose, "ServerFleetManager::TickRespawnTimers Guid: ({},{}) FleetGuid: ({},{}) Member: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, rMember.globalId.iValue);
+			}
+			if (bAnyFighterLaunched)
+			{
+				gpServerSession->mpClientManager->mNextFighterLaunchTicks.insert_or_assign(rFleet.guid, gpGame->miTickCounter + static_cast<int64_t>(kfShipSpawnInterval * engine::kiTickRate));
 			}
 		}
 	}

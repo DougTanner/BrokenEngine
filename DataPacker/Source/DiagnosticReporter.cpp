@@ -89,7 +89,7 @@ ButtonResult Report(const Record& rRecord)
 	}
 	// Automated runs skip modal input; cancelling the up-front locked pack prompt fails the run, and cancelling a later
 	// per-type one fails that asset type.
-	static const bool sbNoninteractiveEnvironment = []()
+	static bool sbNoninteractiveEnvironment = []()
 	{
 		wchar_t pcNoninteractive[2] {};
 		int64_t iNoninteractiveLength = GetEnvironmentVariableW(L"BT_DATAPACKER_NONINTERACTIVE", pcNoninteractive, static_cast<DWORD>(std::size(pcNoninteractive)));

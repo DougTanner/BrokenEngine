@@ -1,0 +1,3252 @@
+[
+  {
+    "candidateKey": "01-common|Common/Determinism.h|48|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Determinism.h|54|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/FileUtils.h|143|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|104|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|105|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|106|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/Log.h|112|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/LogFormatters.h|60|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "01-common|Common/Log/LogFormatters.h|70|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/BlenderExport.cpp|45|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/FileManager.cpp|51|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/Main.cpp|317|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/Main.cpp|332|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/ExportIsland.cpp|618|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/ExportScene.cpp|135|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/ExportScene.cpp|148|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Island/BakeRoute.cpp|101|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Island/BakeRoute.cpp|103|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Island/BakeRoute.cpp|194|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Island/GaeaArchetype.cpp|140|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Scene/GltfSceneDecoder.cpp|140|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp|10|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp|128|style-rule-17",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Texture/MigrateLegacyIntermediates.cpp|61|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Texture/MigrateLegacyIntermediates.cpp|78|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Texture/MigrateLegacyIntermediates.cpp|104|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Texture/MigrateLegacyIntermediates.cpp|122|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/AgentHarness/AgentHarness.cpp|352|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/AgentHarness/AgentHarness.cpp|358|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/AgentHarness/HarnessLockCommands.cpp|274|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/ToolCommon/CoordinationStore.cpp|213|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/ToolCommon/CoordinationStore.cpp|238|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/ToolCommon/CoordinationStore.cpp|357|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "09-tools-other|Tools/ToolCommon/ToolCliCommon.cpp|358|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|49|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|199|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|315|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|328|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|424|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/BuildCommand.cpp|509|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/LandingLockLifecycle.cpp|45|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/LandingLockLifecycle.cpp|54|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/LandingLockLifecycle.cpp|71|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/LandingLockLifecycle.cpp|188|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanMetadata.cpp|291|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanMetadata.cpp|319|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|53|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|55|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|229|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|321|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|368|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|393|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|411|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|417|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|560|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|657|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|683|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|687|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|691|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|706|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|760|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|806|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|856|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "10-worktreecli|Tools/WorktreeCli/PlanScheduler.cpp|933|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "03-engine-frame|Engine/Source/Frame/Alignments.cpp|42|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "03-engine-frame|Engine/Source/Frame/IslandTerrainResidency.cpp|45|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "04-engine-graphics|Engine/Source/Graphics/Screenshot.cpp|60|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "04-engine-graphics|Engine/Source/Graphics/Managers/TextureDescriptors.cpp|299|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "04-engine-graphics|Engine/Source/Graphics/Managers/TextureUploadManager.cpp|162|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsQualityWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsQualityWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsQualityWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsQualityWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsQualityWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/GraphicsSettingsWrappersBase.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/HexShieldWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|45|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|46|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|47|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|48|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|49|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|50|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|51|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|52|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|53|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|54|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|55|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|56|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|57|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|60|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|61|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|62|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|65|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|66|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|67|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|68|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|69|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|70|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|71|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|72|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|73|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|75|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|76|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|77|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|81|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|82|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|83|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|84|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|85|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|86|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|87|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|88|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|89|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|90|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|91|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|92|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|93|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|94|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|97|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|98|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|99|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|100|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|101|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|102|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|103|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|104|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|105|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|106|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|107|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|108|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|109|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|110|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|111|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|112|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|115|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|116|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|117|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|118|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|119|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|120|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/LightingWrappersBase.h|121|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/MenuUtils.cpp|301|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/MenuUtils.h|97|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|8|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/PbrWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|8|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/ShadowWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|8|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|43|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SmokeWrappersBase.h|44|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|43|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|44|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|45|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/SunMoonWrappersBase.h|46|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/TerrainWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|43|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|44|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|45|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|46|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|47|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|48|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|49|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|50|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|51|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|52|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|55|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|56|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|57|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|58|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|61|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|62|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|63|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|64|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|65|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|66|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|67|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|68|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|69|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|70|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|71|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|72|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|75|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|76|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|77|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|78|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|79|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|80|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|81|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|82|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|83|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|84|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|85|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|88|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|89|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|90|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|91|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|92|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|93|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|94|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|95|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|96|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|97|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|98|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|99|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|100|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|101|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|102|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|103|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|104|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|107|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|108|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|109|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|110|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|111|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|112|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|113|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|116|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|117|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|118|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|119|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|120|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|121|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|122|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|123|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|124|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|125|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|126|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|127|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WaterWrappersBase.h|128|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|8|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WindWrappersBase.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|218|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|220|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|221|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|222|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|224|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|227|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/WrapperBase.h|228|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/Screens/MainMenuScreen.cpp|44|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "05-engine-ui|Engine/Source/Ui/Screens/PauseMenuScreen.cpp|15|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Data/Shaders/ShaderLayoutsBase.h|141|style-rule-34",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Data/Shaders/ShaderLayoutsBase.h|310|style-rule-34",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Data/Shaders/ShaderLayoutsBase.h|311|style-rule-34",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/CrashReport.cpp|270|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/CrashReport.cpp|287|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/CrashReport.cpp|293|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/CrashReport.cpp|299|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/CrashReport.cpp|475|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentCommandsClientGeneric.cpp|28|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentCommandsClientGeneric.cpp|544|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentCommandsClientGeneric.cpp|610|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.cpp|11|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.cpp|81|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.cpp|130|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.cpp|149|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.h|50|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Agent/AgentUiRegistry.h|54|style-rule-40",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Audio/AudioManager.cpp|345|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Audio/StaticVoices.cpp|310|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Audio/StaticVoices.cpp|311|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/DifferenceStream.h|483|style-rule-37",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/DifferenceStream.h|483|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/DifferenceStream.h|488|style-rule-37",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/DifferenceStream.h|505|style-rule-37",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/DifferenceStream.h|507|style-rule-37",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/FileManager.cpp|237|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/PackChunks.cpp|82|style-rule-5",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/File/PackChunks.cpp|453|style-rule-5",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Memory/GlobalAllocator.h|3|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Memory/GlobalAllocator.h|5|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Network/NetworkDiscoveryScanner.cpp|91|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Network/NetworkMessages.h|257|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Network/Client/ClientDesyncCore.cpp|84|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "06-engine-other|Engine/Source/Network/Client/ReconcileReplay.h|128|style-rule-62",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|43|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|44|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|45|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|46|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|47|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|48|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|49|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|50|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|51|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|52|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|55|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|56|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|57|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|60|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|61|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|62|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|63|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|64|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|65|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|66|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|67|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|70|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|71|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|73|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|74|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|75|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|78|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|79|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|80|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|81|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|82|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|83|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|84|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/LightingWrappers.h|85|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/MapWrappers.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/MapWrappers.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/MapWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|27|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|28|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|33|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|41|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|42|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|43|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|44|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|45|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|46|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|47|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|48|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|49|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|50|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|51|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|52|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/ParticleWrappers.h|53|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|20|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|25|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|32|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|36|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SmokeWrappers.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|19|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|21|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|22|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|23|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|24|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|26|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|29|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|30|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|31|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|34|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|35|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|37|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|38|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|39|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/SoundWrappers.h|40|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|8|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|9|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|10|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|11|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|12|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|13|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|14|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|15|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|16|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|17|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  },
+  {
+    "candidateKey": "|Projects/BrokenEngineSandbox/Source/Ui/WindDepositsWrappers.h|18|style-rule-36",
+    "baselineFormPresent": true,
+    "remainingFormPresent": true
+  }
+]

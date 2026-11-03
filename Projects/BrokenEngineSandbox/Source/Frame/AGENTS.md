@@ -33,9 +33,8 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   planes each tier has graphs on, and each graph's clearance and elevation
   threshold for its contour bake (`TerrainUtils.h`; the threshold server-only)
   and hands them to engine startup, the only way engine navigation gets them.
-  The engine copies the game's flight-plane table (`FlightPlaneTable.h`, both
-  builds) at boot, where the highest entry is a clearance above the tallest
-  stored island peak (`../../../../Engine/Source/Frame/AGENTS.md`).
+  `FlightPlaneTable.h` supplies the game's heights under the engine's flight-plane
+  contract (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`).
 - Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`, and `kDestroyShip` in Update, after every ship Update; spawn and transfer status changes in the post-tick batch, outside the tick phases, through `ApplySpawnStatusChange` (`StatusChange.h`). Their serialized tags and wire rule are owned by game Network (`../Network/AGENTS.md`).
 - `FrameInput` — the per-tick deterministic unit, a versioned serializable list
   of `StatusChange`s — is declared here (`FrameInput.h/.cpp`) and serialized by

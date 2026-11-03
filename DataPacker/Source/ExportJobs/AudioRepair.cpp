@@ -8,7 +8,7 @@ constexpr float kfDcOffsetThreshold = 0.002f;
 constexpr float kfPeakNormalizeThreshold = 1.001f; // a legit -32768 16-bit sample lands at 1.00003 after /32767 — don't rescale a whole file for one LSB
 constexpr float kfEdgeAmplitudeThreshold = 0.01f;
 constexpr int64_t kiEdgeProbeFrames = 8; // sub-0.2ms attack is a click even when frame 0 is small
-constexpr std::chrono::duration<float> kfEdgeFadeDuration = std::chrono::duration<float>{0.003f}; // raised cosine; 132 samples @ 44.1kHz
+constexpr std::chrono::duration<float> kfEdgeFadeDuration = std::chrono::duration<float> {0.003f}; // raised cosine; 132 samples @ 44.1kHz
 constexpr int64_t kiEdgeFadeMinSamples = 16;
 
 // Declip detection — shared by the fix path and every warn-only branch so reported numbers mean

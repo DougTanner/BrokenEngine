@@ -165,6 +165,9 @@ inline bool gbWaterFoamReset = true; // Re-armed when the retained foam textures
 // Recorded foam commands and published foam uniforms must both follow this predicate.
 bool WaterFoamActive();
 
+// GameBase publishes gameplay pause before Global so render publishers share one client-only decision.
+inline bool gbGameplayPaused = false;
+
 inline bool gbSmokeClear = true;
 
 void RenderSmokeGlobal(int64_t iCommandBuffer);

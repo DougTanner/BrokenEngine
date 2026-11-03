@@ -185,7 +185,7 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		static constexpr float kfNightSpeedEnd = XM_2PI;
 		if (mfSunAngle >= kfNightSpeedStart && mfSunAngle < kfNightSpeedEnd)
 		{
-			mfSunAngle = mfSunAngle + fSunDeltaTime * 0.075f;
+			mfSunAngle = mfSunAngle + fSunDeltaTime * 0.15f;
 		}
 		else
 		{

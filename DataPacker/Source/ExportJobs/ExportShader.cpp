@@ -5,7 +5,7 @@
 
 static const std::filesystem::path& GetVulkanSdkBinariesDirectory()
 {
-	static const std::filesystem::path sPath = []()
+	static std::filesystem::path sPath = []()
 	{
 		wchar_t pcDirectory[MAX_PATH] {};
 		int64_t iResult = GetEnvironmentVariableW(L"VK_SDK_PATH", pcDirectory, static_cast<DWORD>(std::size(pcDirectory) - 1));
@@ -68,12 +68,12 @@ static void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource
 	{
 		int64_t iBinding = rCompiler.get_decoration(rResource.id, spv::DecorationBinding);
 		int64_t iSet = rCompiler.get_decoration(rResource.id, spv::DecorationDescriptorSet);
-		LOG(kDefault, kVerbose,"   {} {} {} set {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, iSet, iBinding);
+		LOG(kDefault, kVerbose, "   {} {} {} set {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, iSet, iBinding);
 
 		const spirv_cross::SPIRType& rSpirvType = rCompiler.get_type(rResource.type_id);
 		if (!rSpirvType.array.empty())
 		{
-			LOG(kDefault, kVerbose,"   Array size: {}", rSpirvType.array[0]);
+			LOG(kDefault, kVerbose, "   Array size: {}", rSpirvType.array[0]);
 		}
 
 		WriteBinding(rTable, iBinding, iSet, vkDescriptorType, countFn(rSpirvType));
@@ -247,7 +247,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 	for (const auto& [iLocation, pResource] : sortedStageInputs)
 	{
 		const spirv_cross::SPIRType& rSpirvType = spirvCrossCompiler.get_type(pResource->type_id);
-		LOG(kDefault, kVerbose,"   {} {} {} size {}", static_cast<uint32_t>(pResource->type_id), static_cast<uint32_t>(pResource->base_type_id), pResource->name, rSpirvType.vecsize);
+		LOG(kDefault, kVerbose, "   {} {} {} size {}", static_cast<uint32_t>(pResource->type_id), static_cast<uint32_t>(pResource->base_type_id), pResource->name, rSpirvType.vecsize);
 
 		ASSERT(iLocation < common::ShaderHeader::kiMaxVertexInputAttributeDescriptions);
 		// Format mapping below assumes 32-bit float inputs (SPIRV-Cross Half/Double are distinct basetypes) — an int attribute would be silently mis-typed.
@@ -260,7 +260,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 		rVkVertexInputAttributeDescription.offset = static_cast<uint32_t>(iVertexInputStride);
 		++iAttributeCount;
 
-		LOG(kDefault, kVerbose,"       location {} binding {} format {} offset {}", rVkVertexInputAttributeDescription.location, rVkVertexInputAttributeDescription.binding, static_cast<int64_t>(rVkVertexInputAttributeDescription.format), rVkVertexInputAttributeDescription.offset);
+		LOG(kDefault, kVerbose, "       location {} binding {} format {} offset {}", rVkVertexInputAttributeDescription.location, rVkVertexInputAttributeDescription.binding, static_cast<int64_t>(rVkVertexInputAttributeDescription.format), rVkVertexInputAttributeDescription.offset);
 
 		iVertexInputStride += rSpirvType.vecsize * sizeof(float);
 	}
@@ -268,11 +268,11 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 
 	if (std::ssize(shaderResources.stage_outputs) > 0)
 	{
-		LOG(kDefault, kVerbose,"Stage outputs:");
+		LOG(kDefault, kVerbose, "Stage outputs:");
 		for (const spirv_cross::Resource& rResource : shaderResources.stage_outputs)
 		{
 			int64_t iBinding = spirvCrossCompiler.get_decoration(rResource.id, spv::DecorationBinding);
-			LOG(kDefault, kVerbose,"   {} {} {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, iBinding);
+			LOG(kDefault, kVerbose, "   {} {} {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, iBinding);
 		}
 	}
 

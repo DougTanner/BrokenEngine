@@ -27,7 +27,7 @@ static void PublishSmokeContinuity(int64_t iPlane, const XMFLOAT4& rf4CurrentAre
 	}
 }
 
-// One refresh advances the plane's smoke by every frame since its previous refresh. The decay is an integer power by
+// One refresh advances the plane's smoke by every unpaused frame since its previous refresh. The decay is an integer power by
 // repeated multiplication so a single step publishes gSmokeDecay exactly.
 static void PublishSmokeStep(shaders::GlobalLayout& rGlobalLayout, int64_t iPlane, int64_t iStepCount)
 {
@@ -60,13 +60,13 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSmokeLightingMultiplier = gSmokeLightingMultiplier.mfCurrent;
 	rGlobalLayout.fSmokeIntensityFalloff = gSmokeIntensityFalloff.mfCurrent;
 	rGlobalLayout.fSmokeWindNoiseScale = gSmokeWindNoiseScale.mfCurrent;
-	rGlobalLayout.fSmokeWindNoiseQuantity = gSmokeWindNoiseQuantity.mfCurrent;
 	rGlobalLayout.fSmokeNoiseQuantity = gSmokeNoiseQuantity.mfCurrent;
 
 	rGlobalLayout.fSmokeNoiseScaleOne = gSmokeNoiseScaleOne.mfCurrent;
 	rGlobalLayout.fSmokeNoiseScaleTwo = gSmokeNoiseScaleTwo.mfCurrent;
 	rGlobalLayout.fSmokeCurlScale = gSmokeCurlScale.mfCurrent;
 	rGlobalLayout.fSmokeObjectHeightInverse = 1.0f / gSmokeObjectHeight.mfCurrent;
+	rGlobalLayout.fSmokeObjectHeightPower = gSmokeObjectHeightPower.mfCurrent;
 	rGlobalLayout.fSmokeEdgeDecayDistanceInverse = 1.0f / gSmokeEdgeDecayDistance.mfCurrent;
 
 	// Every plane's smoke textures share plane 0's extent, so its tile counts serve every plane.
@@ -113,6 +113,13 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	}
 
 	int64_t iPlaneCount = gpFlightPlanes->Count();
+	float fWindNoiseQuantityBottom = gSmokeWindNoiseQuantityBottom.mfCurrent;
+	float fWindNoiseQuantityTop = gSmokeWindNoiseQuantityTop.mfCurrent;
+	for (int64_t i = 0; i < iPlaneCount; ++i)
+	{
+		float fPlaneFraction = iPlaneCount > 1 ? static_cast<float>(i) / static_cast<float>(iPlaneCount - 1) : 0.0f;
+		rGlobalLayout.pfSmokeWindNoiseQuantities[i] = std::lerp(fWindNoiseQuantityBottom, fWindNoiseQuantityTop, fPlaneFraction);
+	}
 
 	// Persisted across frames so the next frame's spread starts with previous == current
 	// after a clear/disabled span — avoids divide-by-zero in WorldToSmokeTexcoord(zero, ...)
@@ -144,13 +151,16 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		++gPresentationContinuity.smoke.iHistoryResets;
 	}
 
-	// A plane's refresh runs its dilates and spreads once, advancing its smoke by every frame since its previous
+	// A plane's refresh runs its dilates and spreads once, advancing its smoke by every unpaused frame since its previous
 	// refresh. Between refreshes only deposits change that plane's smoke texture and its occupancy, and its held area
 	// (spf4PreviousSmokeAreas) stays as its last refresh left it.
 	static int64_t spiSmokeFramesSinceRefresh[shaders::kiMaxFlightPlanes] {};
-	for (int64_t i = 0; i < iPlaneCount; ++i)
+	if (!gbGameplayPaused)
 	{
-		++spiSmokeFramesSinceRefresh[i];
+		for (int64_t i = 0; i < iPlaneCount; ++i)
+		{
+			++spiSmokeFramesSinceRefresh[i];
+		}
 	}
 
 	if (gbSmokeClear)
@@ -207,7 +217,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	for (int64_t i = 0; i < iPlaneCount; ++i)
 	{
 		bool bScheduled = bScheduledFrame && (!bSmokeLayerStagger || i == iScheduledPlane);
-		if (!bScheduled && IsVisibleAreaInsideHeldArea(rf4Visible, spf4PreviousSmokeAreas[i]))
+		if (gbGameplayPaused || (!bScheduled && IsVisibleAreaInsideHeldArea(rf4Visible, spf4PreviousSmokeAreas[i])))
 		{
 			// Skip: the plane's remap reduces to the identity over its held area (for plane 0, wind's too), and its
 			// next refresh remaps held -> current.

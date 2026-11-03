@@ -10,8 +10,10 @@
 
 namespace engine
 {
+
 struct CellStaticData;
 class Wrapper;
+
 } // namespace engine
 
 namespace game
@@ -107,7 +109,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		engine::AlignmentIdentifier alignment {};
 
 		// Status-change payload members.
-		static constexpr auto Fields()
+		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, alignment)> Fields()
 		{
 			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, alignment)> {};
 		}
@@ -120,6 +122,8 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 
 namespace engine
 {
+
 extern template struct Collection<game::BlastersInterpolate>;
 extern template struct Collection<game::BlastersPostRender>;
+
 } // namespace engine

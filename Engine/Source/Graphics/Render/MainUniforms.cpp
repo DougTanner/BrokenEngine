@@ -85,8 +85,8 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 			};
 
 			XMFLOAT3A f3Corner0 = Rotate(-fHalfX, -fHalfY);
-			XMFLOAT3A f3Corner1 = Rotate( fHalfX, -fHalfY);
-			XMFLOAT3A f3Corner2 = Rotate( fHalfX,  fHalfY);
+			XMFLOAT3A f3Corner1 = Rotate(fHalfX, -fHalfY);
+			XMFLOAT3A f3Corner2 = Rotate(fHalfX,  fHalfY);
 			XMFLOAT3A f3Corner3 = Rotate(-fHalfX,  fHalfY);
 
 			DebugRender::Line(f3Corner0, f3Corner1, kf4BoundaryColor);
@@ -236,6 +236,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 {
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 	RenderWaterMain(iCommandBuffer, currentTime);
+	RenderLightingMain(iCommandBuffer);
 
 	if (rActiveCoordinates.empty() || !rRenderInterpolates.contains(cameraCoordinate))
 	{
@@ -256,7 +257,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoordinate);
 
-	RenderLightingMain(iCommandBuffer);
 	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 
 	BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
@@ -317,9 +317,9 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	static constexpr float kfMaxPitch = 0.005f;
 	static constexpr float kfMaxYaw = 0.01f;
 	// Fixed-seed permutation tables are identical every frame — construct once (each ctor reshuffles a 256-entry table).
-	static const siv::BasicPerlinNoise<float> sPerlinRoll(0);
-	static const siv::BasicPerlinNoise<float> sPerlinPitch(1);
-	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
+	static siv::BasicPerlinNoise<float> sPerlinRoll(0);
+	static siv::BasicPerlinNoise<float> sPerlinPitch(1);
+	static siv::BasicPerlinNoise<float> sPerlinYaw(2);
 	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(rFrameInterpolate.iTick).time_since_epoch());
 	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
 

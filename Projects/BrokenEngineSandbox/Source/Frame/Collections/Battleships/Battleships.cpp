@@ -22,8 +22,10 @@
 
 namespace engine
 {
+
 template struct Collection<game::BattleshipsInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<game::BattleshipsPostRender>;
+
 } // namespace engine
 
 namespace game
@@ -299,7 +301,6 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.eController = rCurrentPostRender.pController[i],
 				.orders = rCurrentPostRender.pOrders[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
-				.uiNextMissileTube = rCurrentPostRender.puiNextMissileTubes[i],
 				.nextMissileFireTime = rCurrentPostRender.pNextMissileFireTimes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
@@ -436,7 +437,6 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfBattleshipHealth;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
-	rCurrentPostRender.puiNextMissileTubes[iIndex] = rInfo.uiNextMissileTube;
 	rCurrentPostRender.pNextMissileFireTimes[iIndex] = rInfo.nextMissileFireTime;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
@@ -669,7 +669,6 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
 		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
-		bEqual &= common::LogDifference<"puiNextMissileTubes">(i, puiNextMissileTubes[i], rOther.puiNextMissileTubes[i]);
 		bEqual &= common::LogDifference<"pNextMissileFireTimes">(i, pNextMissileFireTimes[i], rOther.pNextMissileFireTimes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);

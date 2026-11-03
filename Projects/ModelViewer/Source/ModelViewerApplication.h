@@ -2,6 +2,8 @@
 
 #include "Frame/CellStaticData.h"
 
+#include "Game.h"
+
 namespace game
 {
 
@@ -22,7 +24,7 @@ public:
 	void CreateGraphicsResources();
 	void RenderModel(int64_t iCommandBuffer);
 	bool mbWorldBackground = true;
-	float mfBackgroundGray;
+	float mfBackgroundGray = kVkHdrClearColor.float32[0];
 
 private:
 	enum class ViewerFlags : uint8_t
@@ -34,6 +36,7 @@ private:
 		kMetadataValid = 0x10,
 		kPaused = 0x20,
 		kPicking = 0x40,
+		kResetHardpointTab = 0x80,
 	};
 	struct FlightBody
 	{
@@ -58,7 +61,7 @@ private:
 	void PreparePreview(Preview& rPreview);
 	template <typename VISITOR>
 	void ForEachRestPosition(const Preview& rPreview, VISITOR&& rVisitor) const;
-	void PickMissileTube();
+	void PickHardpoint();
 	void LoadModelMetadata();
 	void SaveModelMetadata();
 	void GetAlignedPreviewBounds(FXMMATRIX matAlignment, XMFLOAT3A& rf3Center, float& rfRadius) const;
@@ -97,7 +100,8 @@ private:
 	XMFLOAT3A mf3ModelOffset {};
 	// Not editable; Save writes back the loaded setting.
 	common::ModelHitboxLevel meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
-	std::vector<common::ModelMissileTube> mMissileTubes;
+	std::vector<common::ModelHardpoint> mHardpoints;
+	common::ModelHardpointKind meSelectedHardpointKind = common::ModelHardpointKind::kMissileTube;
 	// Invalid edits retain the last complete renderable authored alignment.
 	XMMATRIX mMatModelAlignment = XMMatrixIdentity();
 	std::filesystem::path mModelMetadataPath;

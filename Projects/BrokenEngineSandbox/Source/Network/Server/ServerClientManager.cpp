@@ -2,6 +2,7 @@
 
 #include "Network/Server/ServerClientManager.h"
 
+#include "File/PackChunks.h"
 #include "Frame/IslandChainPlacement.h"
 #include "Network/Server/ServerTransferManager.h"
 
@@ -171,13 +172,7 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	}
 }
 
-// A launching Fighter starts this far ahead of its Battleship's center along the heading, fully inside the hull. By its
-// first spawning tick the Battleship's pusher has moved one tick ahead; it must still be behind the Fighter, or it pushes
-// the Fighter out the stern.
-constexpr float kfFighterLaunchOffset = kfBattleshipRadius - kfFighterRadius;
-static_assert(kfFighterLaunchOffset > kfBattleshipMaxSpeed * engine::kfDeltaTime);
-
-void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid, const Fleet& rFleet, FleetMember& rMember, common::ScopedWorkbufferArena& rTakenSpawnPoints)
+bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid, const Fleet& rFleet, FleetMember& rMember, int64_t& riNextFighterLaunchBay, common::ScopedWorkbufferArena& rTakenSpawnPoints)
 {
 	// The fleet step runs while miTickCounter names the tick being prepared; that tick's post-tick batch creates each
 	// queued row.
@@ -224,7 +219,7 @@ void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 				LOG(kNetwork, kWarning, "ServerClientManager::SpawnFleetMember no clear fleet spawn point in the origin cell, retrying each tick Type: {} Guid: ({},{}) GlobalId: {}", ShipTypeName(rMember.eType), rClientGuid.uiHigh, rClientGuid.uiLow, rMember.globalId.iValue);
 				mbFleetSpawnBlocked = true;
 			}
-			return;
+			return false;
 		}
 		mbFleetSpawnBlocked = false;
 		rTakenSpawnPoints.mBuffer.PushBack(*optionalSpawnPoint);
@@ -233,60 +228,77 @@ void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 		spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
 		spawnInfo.uiFlightPlane = 0;
 		QueueFleetSpawn(engine::kOriginCoordinate, spawnInfo);
+		return true;
 	};
 	switch (rMember.eType)
 	{
 		case ShipType::kFighter:
 		{
-			// At most one launch per fleet per kfShipSpawnInterval; a skipped Fighter stays dead and is tried again on the
-			// next tick.
-			auto nextLaunchIt = mNextFighterLaunchTicks.find(rFleet.guid);
-			if (nextLaunchIt != mNextFighterLaunchTicks.end() && nextLaunchIt->second > iSpawnTick)
-			{
-				return;
-			}
-
 			engine::GridCoord flagshipCoordinate = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId)->coordinate;
 			if (!gpGame->mCells.contains(flagshipCoordinate))
 			{
-				return;
+				return false;
 			}
 			const Frame& rBattleshipFrame = *gpGame->mCells.at(flagshipCoordinate).pCurrent;
 			std::optional<ShipLocator> optionalBattleship = FindShipByGlobalId(rBattleshipFrame, rFleet.flagshipGlobalId);
 			if (!optionalBattleship)
 			{
-				return;
+				return false;
 			}
 
 			const BattleshipsInterpolate& rBattleshipsInterpolate = *rBattleshipFrame.interpolate.pBattleships;
 			int64_t iBattleshipRow = optionalBattleship->iRow;
+			common::crc_t uiModel = kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[std::to_underlying(rBattleshipFrame.postRender.pBattleships->pController[iBattleshipRow])];
+			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(uiModel);
+			const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
+			ASSERT(rChunk.pHeader->iSize <= std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1) - static_cast<int64_t>(sizeof(common::ModelOutline)));
+			int64_t iTubesOffset = common::ModelHeader::MissileTubesOffset(rChunk.pHeader->iSize);
+			ASSERT(iTubesOffset <= rChunk.iDataSize);
+			ASSERT(static_cast<int64_t>(rModelHeader.uiMissileTubeCount) <= (rChunk.iDataSize - iTubesOffset) / static_cast<int64_t>(sizeof(common::PackedModelMissileTube)));
+			int64_t iBaysOffset = common::ModelHeader::FighterLaunchBaysOffset(rChunk.pHeader->iSize, rModelHeader.uiMissileTubeCount);
+			ASSERT(iBaysOffset <= rChunk.iDataSize);
+			ASSERT(static_cast<int64_t>(rModelHeader.uiFighterLaunchBayCount) <= (rChunk.iDataSize - iBaysOffset) / static_cast<int64_t>(sizeof(common::PackedModelFighterLaunchBay)));
+			std::span<const common::PackedModelFighterLaunchBay> bays(reinterpret_cast<const common::PackedModelFighterLaunchBay*>(rChunk.pData + iBaysOffset), rModelHeader.uiFighterLaunchBayCount);
+
 			XMVECTOR vecBattleshipDirection = rBattleshipsInterpolate.pVecDirections[iBattleshipRow];
-			XMVECTOR vecLaunchPosition = XMVectorMultiplyAdd(XMVectorReplicate(kfFighterLaunchOffset), vecBattleshipDirection, rBattleshipsInterpolate.pVecPositions[iBattleshipRow]);
-			vecLaunchPosition = XMVectorSetW(vecLaunchPosition, 1.0f);
-			// QueueSpawn asserts the spawn position is inside the cell.
-			if (!engine::IsInsideCell(vecLaunchPosition))
+			XMVECTOR vecBattleshipPosition = rBattleshipsInterpolate.pVecPositions[iBattleshipRow];
+			float fCos = XMVectorGetX(vecBattleshipDirection);
+			float fSin = XMVectorGetY(vecBattleshipDirection);
+			while (riNextFighterLaunchBay < std::ssize(bays))
 			{
-				return;
+				const common::PackedModelFighterLaunchBay& rBay = bays[static_cast<size_t>(riNextFighterLaunchBay++)];
+				const XMFLOAT3& rf3Position = rBay.f3Position;
+				XMVECTOR vecLaunchPosition = XMVectorSet((fCos * rf3Position.x - fSin * rf3Position.y) + XMVectorGetX(vecBattleshipPosition), (fSin * rf3Position.x + fCos * rf3Position.y) + XMVectorGetY(vecBattleshipPosition), XMVectorGetZ(vecBattleshipPosition), 1.0f);
+				// QueueSpawn asserts the spawn position is inside the cell.
+				if (!engine::IsInsideCell(vecLaunchPosition))
+				{
+					continue;
+				}
+				XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&rBay.f3Direction), 0.0f));
+				float fDirectionX = XMVectorGetX(vecAlignedDirection);
+				float fDirectionY = XMVectorGetY(vecAlignedDirection);
+				XMVECTOR vecLaunchDirection = XMVectorSet(fCos * fDirectionX - fSin * fDirectionY, fSin * fDirectionX + fCos * fDirectionY, 0.0f, 0.0f);
+				// Terrain admission uses the Fighter's own avoidance at its authored launch heading.
+				int64_t iLaunchNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecLaunchPosition), iTargetFlightPlane);
+				if (ComputeTerrainAvoidance(gpGame->mCells.at(flagshipCoordinate).staticData, vecLaunchPosition, vecLaunchDirection, 0.0f, iLaunchNavigationPlane) != 0.0f)
+				{
+					continue;
+				}
+				FightersPostRender::SpawnInfo spawnInfo
+				{
+					.vecPosition = vecLaunchPosition,
+					.vecDirection = vecLaunchDirection,
+					.vecVelocity = rBattleshipFrame.postRender.pBattleships->pVecVelocities[iBattleshipRow],
+					.uiFlightPlane = rBattleshipsInterpolate.puiFlightPlanes[iBattleshipRow],
+				};
+				QueueFleetSpawn(flagshipCoordinate, spawnInfo);
+				return true;
 			}
-			// Terrain too close ahead also waits: the launch pose must not trigger the Fighter's own terrain avoidance.
-			// With a current turn of 0 that function returns exactly 0 when it does not trigger.
-			int64_t iLaunchNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecLaunchPosition), iTargetFlightPlane);
-			if (ComputeTerrainAvoidance(gpGame->mCells.at(flagshipCoordinate).staticData, vecLaunchPosition, vecBattleshipDirection, 0.0f, iLaunchNavigationPlane) != 0.0f)
-			{
-				return;
-			}
-			FightersPostRender::SpawnInfo spawnInfo {};
-			spawnInfo.vecPosition = vecLaunchPosition;
-			spawnInfo.vecDirection = vecBattleshipDirection;
-			spawnInfo.vecVelocity = rBattleshipFrame.postRender.pBattleships->pVecVelocities[iBattleshipRow];
-			spawnInfo.uiFlightPlane = rBattleshipsInterpolate.puiFlightPlanes[iBattleshipRow];
-			QueueFleetSpawn(flagshipCoordinate, spawnInfo);
-			mNextFighterLaunchTicks.insert_or_assign(rFleet.guid, iSpawnTick + static_cast<int64_t>(kfShipSpawnInterval * engine::kiTickRate));
-			break;
+			return false;
 		}
-		case ShipType::kOmni:       QueueSpawnPointSpawn(OmnisPostRender::SpawnInfo {}); break;
-		case ShipType::kBattleship: QueueSpawnPointSpawn(BattleshipsPostRender::SpawnInfo {}); break;
-		case ShipType::kCount:
+		case ShipType::kOmni:       return QueueSpawnPointSpawn(OmnisPostRender::SpawnInfo {});
+		case ShipType::kBattleship: return QueueSpawnPointSpawn(BattleshipsPostRender::SpawnInfo {});
+		default:
 			ASSERT(false);
 			std::unreachable();
 	}

@@ -91,10 +91,9 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   side, and the other layer's radius should be 0. `AreaDamage::Get` also reads
   the hitbox.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
-- `FlightPlanes` copies the game's flight-plane table at boot on both builds
-  and sets the highest plane to the table's clearance above the tallest stored
-  island peak, so it follows `IslandTerrain` construction; the copy stays
-  immutable afterwards. Its lowest plane is the base height every simulation and
+- `FlightPlanes` borrows the game's immutable, static-lifetime flight-plane
+  table on both builds through a const span. Heights are absolute and independent
+  of terrain. Its lowest plane is the base height every simulation and
   render consumer reads, and `NearestPlaneIndex` is the one rule for which
   plane a height is nearest (an exact midpoint takes the lower plane).
   Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes

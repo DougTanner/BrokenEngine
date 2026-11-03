@@ -15,10 +15,10 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
 - Win32 Raw Input owns keyboard state for every binding; window events write
   scratch state and `Update()` publishes one coherent snapshot per display
   frame. The keyboard registers without `RIDEV_NOLEGACY`, so legacy keyboard and
-  IME messages also reach ImGui for text entry; no binding reads them. ImGui
+  IME messages also reach ImGui for text entry; no binding reads them. Tab key
+  and character messages are withheld from ImGui, reserving Tab for the map. ImGui
   keyboard navigation stays off, so arrows, Space, Enter, and Esc never move,
-  activate, or cancel menu focus; Tab tabbing and Ctrl+Tab window switching,
-  which ImGui keeps without keyboard navigation, remain. Gamepad navigation and
+  activate, or cancel menu focus. Gamepad navigation and
   agent-injected ImGui events use separate explicit paths.
 - Mouse state comes from DirectXTK's Win32 message path and gamepad state from XInput. The DirectXTK mouse object must exist before window creation, because synchronous window messages call its static processing path.
 - Wheel state is a lifetime accumulator consumers diff against the previous snapshot's baseline, seeded on the first poll so the first frame reports no delta. Mouse normalization uses the Vulkan framebuffer extent and may briefly leave the 0..1 range during resize.
@@ -29,7 +29,14 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
 - Debug/profile/screenshot/debug-render keys compile in via `if constexpr` on `kbDebugInput` / `kbProfiling` / `kbScreenshots` / `kbDebugRender`, free-camera WASD on `kbFreeCamera`. New debug-only keys belong inside those blocks.
 - Gamepad mode engages when either thumbstick's `|x| + |y|` exceeds the threshold; mouse movement or a KBM whitelist key (WASD, arrows, numpad 1/2/3/5, LMB/RMB) flips back. New movement keys must extend the whitelist or mode detection misses them.
 - While a menu is up, gamepad buttons / d-pad / left stick are pushed into ImGui's IO so menus are pad-navigable. `GameBase` supplies menu visibility as a `BeginPoll` argument, so the engine never reads a game global to decide it.
-- While an ImGui text field is being edited (`ImGuiContext::PlatformImeData.WantTextInput` from the last rendered frame), the keyboard belongs to the UI: `KeyboardPressed` reports no press and free-camera keys add no movement, so no engine or game key binding fires. Mouse, gamepad, the KBM-mode whitelist, and scroll ownership are unaffected, and the previous snapshot still advances. A key pressed before the field's first rendered active frame can still reach a binding.
+- While an ImGui text field is being edited
+  (`ImGuiContext::PlatformImeData.WantTextInput` from the last rendered frame),
+  the keyboard belongs to the UI: `KeyboardPressed` reports no press except for
+  Tab, and free-camera keys add no movement. The Tab exception retains raw
+  rising-edge detection and existing game eligibility, modal, and chat gates.
+  Mouse, gamepad, the KBM-mode whitelist, and scroll ownership are unaffected,
+  and the previous snapshot still advances. A key pressed before the field's
+  first rendered active frame can still reach a binding.
 
 ## Scroll Ownership
 

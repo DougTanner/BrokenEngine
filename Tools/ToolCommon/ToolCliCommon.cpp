@@ -6,382 +6,384 @@
 
 namespace toolcli
 {
-	static std::string sToolName = "ToolCli";
 
-	static void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
+static std::string sToolName = "ToolCli";
+
+static void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
+{
+	int64_t iError = ::GetLastError();
+	if (rOptions.FailureSink)
 	{
-		int64_t iError = ::GetLastError();
-		if (rOptions.FailureSink)
+		rOptions.FailureSink(std::string(operation) + " failed (Windows error " + std::to_string(iError) + ")");
+	}
+}
+
+Handle::Handle(HANDLE handle) :
+	mHandle(handle)
+{
+}
+
+Handle::~Handle()
+{
+	Reset();
+}
+
+Handle::Handle(Handle&& rOther) noexcept :
+	mHandle(rOther.Release())
+{
+}
+
+Handle& Handle::operator=(Handle&& rOther) noexcept
+{
+	if (this != &rOther)
+	{
+		Reset(rOther.Release());
+	}
+	return *this;
+}
+
+HANDLE Handle::Get() const
+{
+	return mHandle;
+}
+
+bool Handle::IsValid() const
+{
+	return mHandle != nullptr && mHandle != INVALID_HANDLE_VALUE;
+}
+
+HANDLE Handle::Release()
+{
+	HANDLE handle = mHandle;
+	mHandle = INVALID_HANDLE_VALUE;
+	return handle;
+}
+
+void Handle::Reset(HANDLE handle)
+{
+	if (IsValid())
+	{
+		::CloseHandle(mHandle);
+	}
+	mHandle = handle;
+}
+
+std::optional<ProcessResult> RunProcess(const std::filesystem::path* pExecutable, const std::vector<std::wstring>& rArguments, const RunProcessOptions& rOptions)
+{
+	Handle handleJob;
+	if (rOptions.bKillOnJobClose)
+	{
+		handleJob.Reset(::CreateJobObjectW(nullptr, nullptr));
+		if (!handleJob.IsValid())
 		{
-			rOptions.FailureSink(std::string(operation) + " failed (Windows error " + std::to_string(iError) + ")");
-		}
-	}
-
-	Handle::Handle(HANDLE handle) :
-		mHandle(handle)
-	{
-	}
-
-	Handle::~Handle()
-	{
-		Reset();
-	}
-
-	Handle::Handle(Handle&& rOther) noexcept :
-		mHandle(rOther.Release())
-	{
-	}
-
-	Handle& Handle::operator=(Handle&& rOther) noexcept
-	{
-		if (this != &rOther)
-		{
-			Reset(rOther.Release());
-		}
-		return *this;
-	}
-
-	HANDLE Handle::Get() const
-	{
-		return mHandle;
-	}
-
-	bool Handle::IsValid() const
-	{
-		return mHandle != nullptr && mHandle != INVALID_HANDLE_VALUE;
-	}
-
-	HANDLE Handle::Release()
-	{
-		HANDLE handle = mHandle;
-		mHandle = INVALID_HANDLE_VALUE;
-		return handle;
-	}
-
-	void Handle::Reset(HANDLE handle)
-	{
-		if (IsValid())
-		{
-			::CloseHandle(mHandle);
-		}
-		mHandle = handle;
-	}
-
-	std::optional<ProcessResult> RunProcess(const std::filesystem::path* pExecutable, const std::vector<std::wstring>& rArguments, const RunProcessOptions& rOptions)
-	{
-		Handle handleJob;
-		if (rOptions.bKillOnJobClose)
-		{
-			handleJob.Reset(::CreateJobObjectW(nullptr, nullptr));
-			if (!handleJob.IsValid())
-			{
-				ReportProcessFailure(rOptions, "create process job");
-				return std::nullopt;
-			}
-			JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInformation {};
-			jobInformation.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-			if (::SetInformationJobObject(handleJob.Get(), JobObjectExtendedLimitInformation, &jobInformation, sizeof(jobInformation)) == FALSE)
-			{
-				ReportProcessFailure(rOptions, "configure process job");
-				return std::nullopt;
-			}
-		}
-
-		SECURITY_ATTRIBUTES pipeAttributes
-		{
-			.nLength = sizeof(SECURITY_ATTRIBUTES),
-			.lpSecurityDescriptor = nullptr,
-			.bInheritHandle = TRUE,
-		};
-		HANDLE handleRawRead = INVALID_HANDLE_VALUE;
-		HANDLE handleRawWrite = INVALID_HANDLE_VALUE;
-		if (::CreatePipe(&handleRawRead, &handleRawWrite, &pipeAttributes, 0) == FALSE)
-		{
-			ReportProcessFailure(rOptions, "create output pipe");
+			ReportProcessFailure(rOptions, "create process job");
 			return std::nullopt;
 		}
-		Handle handlePipeRead(handleRawRead);
-		Handle handlePipeWrite(handleRawWrite);
-		if (::SetHandleInformation(handlePipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
+		JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInformation {};
+		jobInformation.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+		if (::SetInformationJobObject(handleJob.Get(), JobObjectExtendedLimitInformation, &jobInformation, sizeof(jobInformation)) == FALSE)
 		{
-			ReportProcessFailure(rOptions, "configure output pipe");
+			ReportProcessFailure(rOptions, "configure process job");
 			return std::nullopt;
 		}
+	}
 
-		STARTUPINFOW startupInfo {};
-		startupInfo.cb = sizeof(startupInfo);
-		startupInfo.dwFlags = STARTF_USESTDHANDLES;
-		startupInfo.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
-		startupInfo.hStdOutput = handlePipeWrite.Get();
-		startupInfo.hStdError = rOptions.bMergeStdError ? handlePipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
-		PROCESS_INFORMATION processInformation {};
-		std::wstring commandLine = BuildCommandLine(rArguments);
-		DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
-		if (::CreateProcessW(pExecutable != nullptr ? pExecutable->c_str() : nullptr, commandLine.data(), nullptr, nullptr, TRUE, uiCreationFlags, nullptr, nullptr, &startupInfo, &processInformation) == FALSE)
+	SECURITY_ATTRIBUTES pipeAttributes
+	{
+		.nLength = sizeof(SECURITY_ATTRIBUTES),
+		.lpSecurityDescriptor = nullptr,
+		.bInheritHandle = TRUE,
+	};
+	HANDLE handleRawRead = INVALID_HANDLE_VALUE;
+	HANDLE handleRawWrite = INVALID_HANDLE_VALUE;
+	if (::CreatePipe(&handleRawRead, &handleRawWrite, &pipeAttributes, 0) == FALSE)
+	{
+		ReportProcessFailure(rOptions, "create output pipe");
+		return std::nullopt;
+	}
+	Handle handlePipeRead(handleRawRead);
+	Handle handlePipeWrite(handleRawWrite);
+	if (::SetHandleInformation(handlePipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
+	{
+		ReportProcessFailure(rOptions, "configure output pipe");
+		return std::nullopt;
+	}
+
+	STARTUPINFOW startupInfo {};
+	startupInfo.cb = sizeof(startupInfo);
+	startupInfo.dwFlags = STARTF_USESTDHANDLES;
+	startupInfo.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
+	startupInfo.hStdOutput = handlePipeWrite.Get();
+	startupInfo.hStdError = rOptions.bMergeStdError ? handlePipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
+	PROCESS_INFORMATION processInformation {};
+	std::wstring commandLine = BuildCommandLine(rArguments);
+	DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
+	if (::CreateProcessW(pExecutable != nullptr ? pExecutable->c_str() : nullptr, commandLine.data(), nullptr, nullptr, TRUE, uiCreationFlags, nullptr, nullptr, &startupInfo, &processInformation) == FALSE)
+	{
+		ReportProcessFailure(rOptions, "launch process");
+		return std::nullopt;
+	}
+	Handle handleProcess(processInformation.hProcess);
+	Handle handleThread(processInformation.hThread);
+	if (rOptions.bKillOnJobClose)
+	{
+		if (::AssignProcessToJobObject(handleJob.Get(), handleProcess.Get()) == FALSE)
 		{
-			ReportProcessFailure(rOptions, "launch process");
+			ReportProcessFailure(rOptions, "assign process to job");
+			::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
 			return std::nullopt;
 		}
-		Handle handleProcess(processInformation.hProcess);
-		Handle handleThread(processInformation.hThread);
-		if (rOptions.bKillOnJobClose)
+		if (::ResumeThread(handleThread.Get()) == static_cast<DWORD>(-1))
 		{
-			if (::AssignProcessToJobObject(handleJob.Get(), handleProcess.Get()) == FALSE)
-			{
-				ReportProcessFailure(rOptions, "assign process to job");
-				::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
-				return std::nullopt;
-			}
-			if (::ResumeThread(handleThread.Get()) == static_cast<DWORD>(-1))
-			{
-				ReportProcessFailure(rOptions, "start process");
-				::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
-				return std::nullopt;
-			}
-		}
-		handleThread.Reset();
-		handlePipeWrite.Reset();
-
-		ProcessResult result;
-		char pBuffer[65'536] {};
-		DWORD uiRead = 0;
-		// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
-		while (::ReadFile(handlePipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
-		{
-			int64_t iRead = uiRead;
-			if (iRead == 0)
-			{
-				continue;
-			}
-			if (rOptions.OutputSink)
-			{
-				rOptions.OutputSink(std::span<const char>(pBuffer, static_cast<size_t>(iRead)));
-			}
-			else
-			{
-				result.output.append(pBuffer, static_cast<size_t>(iRead));
-			}
-		}
-		int64_t iReadError = ::GetLastError();
-		if (iReadError != ERROR_BROKEN_PIPE)
-		{
-			ReportProcessFailure(rOptions, "read process output");
-			handlePipeRead.Reset();
-			::WaitForSingleObject(handleProcess.Get(), INFINITE);
+			ReportProcessFailure(rOptions, "start process");
+			::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
 			return std::nullopt;
 		}
-		if (::WaitForSingleObject(handleProcess.Get(), INFINITE) != WAIT_OBJECT_0)
+	}
+	handleThread.Reset();
+	handlePipeWrite.Reset();
+
+	ProcessResult result;
+	char pBuffer[65'536] {};
+	DWORD uiRead = 0;
+	// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
+	while (::ReadFile(handlePipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
+	{
+		int64_t iRead = uiRead;
+		if (iRead == 0)
 		{
-			ReportProcessFailure(rOptions, "wait for process");
-			return std::nullopt;
+			continue;
 		}
-		if (::GetExitCodeProcess(handleProcess.Get(), &result.uiExitCode) == FALSE)
+		if (rOptions.OutputSink)
 		{
-			ReportProcessFailure(rOptions, "read process exit code");
-			return std::nullopt;
+			rOptions.OutputSink(std::span<const char>(pBuffer, static_cast<size_t>(iRead)));
 		}
-		return result;
+		else
+		{
+			result.output.append(pBuffer, static_cast<size_t>(iRead));
+		}
+	}
+	int64_t iReadError = ::GetLastError();
+	if (iReadError != ERROR_BROKEN_PIPE)
+	{
+		ReportProcessFailure(rOptions, "read process output");
+		handlePipeRead.Reset();
+		::WaitForSingleObject(handleProcess.Get(), INFINITE);
+		return std::nullopt;
+	}
+	if (::WaitForSingleObject(handleProcess.Get(), INFINITE) != WAIT_OBJECT_0)
+	{
+		ReportProcessFailure(rOptions, "wait for process");
+		return std::nullopt;
+	}
+	if (::GetExitCodeProcess(handleProcess.Get(), &result.uiExitCode) == FALSE)
+	{
+		ReportProcessFailure(rOptions, "read process exit code");
+		return std::nullopt;
+	}
+	return result;
+}
+
+std::optional<std::string> RunGit(const std::vector<std::wstring>& rArguments)
+{
+	std::vector<std::wstring> arguments { L"git.exe" };
+	arguments.append_range(rArguments);
+	RunProcessOptions options;
+	options.bMergeStdError = true;
+	options.bNoWindow = true;
+	std::optional<ProcessResult> optionalResult = RunProcess(nullptr, arguments, options);
+	if (!optionalResult)
+	{
+		return std::nullopt;
+	}
+	int64_t iExitCode = optionalResult->uiExitCode;
+	if (iExitCode != 0)
+	{
+		return std::nullopt;
+	}
+	return std::move(optionalResult->output);
+}
+
+void SetToolName(std::string_view name)
+{
+	sToolName = name;
+}
+
+int64_t PrintOwnerToken()
+{
+	unsigned char pBytes[16] {};
+	if (::BCryptGenRandom(nullptr, pBytes, static_cast<ULONG>(sizeof(pBytes)), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
+	{
+		Fail("token generation failed");
+		return kiExitFailure;
+	}
+	pBytes[6] = static_cast<unsigned char>((pBytes[6] & 0x0f) | 0x40);
+	pBytes[8] = static_cast<unsigned char>((pBytes[8] & 0x3f) | 0x80);
+	char pToken[37] {};
+	std::snprintf(pToken, sizeof(pToken), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", pBytes[0], pBytes[1], pBytes[2], pBytes[3], pBytes[4], pBytes[5], pBytes[6], pBytes[7], pBytes[8], pBytes[9], pBytes[10], pBytes[11], pBytes[12], pBytes[13], pBytes[14], pBytes[15]);
+	std::cout << pToken << '\n';
+	return kiExitOk;
+}
+
+void Fail(std::string_view message)
+{
+	std::cerr << sToolName << ": " << message << '\n';
+}
+
+void FailWindows(std::string_view operation)
+{
+	Fail(std::string(operation) + " failed (Windows error " + std::to_string(::GetLastError()) + ")");
+}
+
+std::string WideToUtf8(std::wstring_view value)
+{
+	if (value.empty())
+	{
+		return {};
 	}
 
-	std::optional<std::string> RunGit(const std::vector<std::wstring>& rArguments)
+	int64_t iLength = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+	if (iLength <= 0)
 	{
-		std::vector<std::wstring> arguments { L"git.exe" };
-		arguments.append_range(rArguments);
-		RunProcessOptions options;
-		options.bMergeStdError = true;
-		options.bNoWindow = true;
-		std::optional<ProcessResult> optionalResult = RunProcess(nullptr, arguments, options);
-		if (!optionalResult)
-		{
-			return std::nullopt;
-		}
-		int64_t iExitCode = optionalResult->uiExitCode;
-		if (iExitCode != 0)
-		{
-			return std::nullopt;
-		}
-		return std::move(optionalResult->output);
+		return {};
 	}
 
-	void SetToolName(std::string_view name)
+	std::string result(static_cast<size_t>(iLength), '\0');
+	if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength), nullptr, nullptr) != iLength)
 	{
-		sToolName = name;
+		return {};
+	}
+	return result;
+}
+
+std::wstring Utf8ToWide(std::string_view value)
+{
+	if (value.empty())
+	{
+		return {};
 	}
 
-	int64_t PrintOwnerToken()
+	int64_t iLength = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+	if (iLength <= 0)
 	{
-		unsigned char pBytes[16] {};
-		if (::BCryptGenRandom(nullptr, pBytes, static_cast<ULONG>(sizeof(pBytes)), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
-		{
-			Fail("token generation failed");
-			return kiExitFailure;
-		}
-		pBytes[6] = static_cast<unsigned char>((pBytes[6] & 0x0f) | 0x40);
-		pBytes[8] = static_cast<unsigned char>((pBytes[8] & 0x3f) | 0x80);
-		char pToken[37] {};
-		std::snprintf(pToken, sizeof(pToken), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", pBytes[0], pBytes[1], pBytes[2], pBytes[3], pBytes[4], pBytes[5], pBytes[6], pBytes[7], pBytes[8], pBytes[9], pBytes[10], pBytes[11], pBytes[12], pBytes[13], pBytes[14], pBytes[15]);
-		std::cout << pToken << '\n';
-		return kiExitOk;
+		return {};
 	}
 
-	void Fail(std::string_view message)
+	std::wstring result(static_cast<size_t>(iLength), L'\0');
+	if (::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength)) != iLength)
 	{
-		std::cerr << sToolName << ": " << message << '\n';
+		return {};
+	}
+	return result;
+}
+
+std::wstring QuoteCommandLineArgument(std::wstring_view argument)
+{
+	if (argument.empty())
+	{
+		return L"\"\"";
+	}
+	if (argument.find_first_of(L" \t\n\v\"") == std::wstring_view::npos)
+	{
+		return std::wstring(argument);
 	}
 
-	void FailWindows(std::string_view operation)
+	std::wstring result = L"\"";
+	int64_t iBackslashes = 0;
+	for (wchar_t cCharacter : argument)
 	{
-		Fail(std::string(operation) + " failed (Windows error " + std::to_string(::GetLastError()) + ")");
-	}
-
-	std::string WideToUtf8(std::wstring_view value)
-	{
-		if (value.empty())
+		if (cCharacter == L'\\')
 		{
-			return {};
+			++iBackslashes;
+			continue;
 		}
 
-		int64_t iLength = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-		if (iLength <= 0)
+		if (cCharacter == L'\"')
 		{
-			return {};
-		}
-
-		std::string result(static_cast<size_t>(iLength), '\0');
-		if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength), nullptr, nullptr) != iLength)
-		{
-			return {};
-		}
-		return result;
-	}
-
-	std::wstring Utf8ToWide(std::string_view value)
-	{
-		if (value.empty())
-		{
-			return {};
-		}
-
-		int64_t iLength = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
-		if (iLength <= 0)
-		{
-			return {};
-		}
-
-		std::wstring result(static_cast<size_t>(iLength), L'\0');
-		if (::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength)) != iLength)
-		{
-			return {};
-		}
-		return result;
-	}
-
-	std::wstring QuoteCommandLineArgument(std::wstring_view argument)
-	{
-		if (argument.empty())
-		{
-			return L"\"\"";
-		}
-		if (argument.find_first_of(L" \t\n\v\"") == std::wstring_view::npos)
-		{
-			return std::wstring(argument);
-		}
-
-		std::wstring result = L"\"";
-		int64_t iBackslashes = 0;
-		for (wchar_t cCharacter : argument)
-		{
-			if (cCharacter == L'\\')
-			{
-				++iBackslashes;
-				continue;
-			}
-
-			if (cCharacter == L'\"')
-			{
-				result.append(static_cast<size_t>(iBackslashes * 2 + 1), L'\\');
-				result.push_back(cCharacter);
-				iBackslashes = 0;
-				continue;
-			}
-
-			result.append(static_cast<size_t>(iBackslashes), L'\\');
-			iBackslashes = 0;
+			result.append(static_cast<size_t>(iBackslashes * 2 + 1), L'\\');
 			result.push_back(cCharacter);
+			iBackslashes = 0;
+			continue;
 		}
-		result.append(static_cast<size_t>(iBackslashes * 2), L'\\');
-		result.push_back(L'\"');
-		return result;
-	}
 
-	std::wstring BuildCommandLine(const std::vector<std::wstring>& rArguments)
+		result.append(static_cast<size_t>(iBackslashes), L'\\');
+		iBackslashes = 0;
+		result.push_back(cCharacter);
+	}
+	result.append(static_cast<size_t>(iBackslashes * 2), L'\\');
+	result.push_back(L'\"');
+	return result;
+}
+
+std::wstring BuildCommandLine(const std::vector<std::wstring>& rArguments)
+{
+	std::wstring commandLine;
+	for (const std::wstring& rArgument : rArguments)
 	{
-		std::wstring commandLine;
-		for (const std::wstring& rArgument : rArguments)
+		if (!commandLine.empty())
 		{
-			if (!commandLine.empty())
-			{
-				commandLine.push_back(L' ');
-			}
-			commandLine += QuoteCommandLineArgument(rArgument);
+			commandLine.push_back(L' ');
 		}
-		return commandLine;
+		commandLine += QuoteCommandLineArgument(rArgument);
+	}
+	return commandLine;
+}
+
+std::filesystem::path GetLocalApplicationDataPath()
+{
+	int64_t iRequired = ::GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+	if (iRequired == 0)
+	{
+		return {};
 	}
 
-	std::filesystem::path GetLocalApplicationDataPath()
+	std::wstring value(static_cast<size_t>(iRequired), L'\0');
+	int64_t iWritten = ::GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(), static_cast<DWORD>(iRequired));
+	if (iWritten == 0 || iWritten >= iRequired)
 	{
-		int64_t iRequired = ::GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
-		if (iRequired == 0)
+		return {};
+	}
+	value.resize(static_cast<size_t>(iWritten));
+	return std::filesystem::path(std::move(value));
+}
+
+std::filesystem::path ExtendedLengthPath(std::filesystem::path path)
+{
+	// Coordination and queue-store files nest hashed directories under LOCALAPPDATA and, in deep CI/test
+	// trees, can exceed MAX_PATH. std::filesystem forwards the path to Win32 unchanged, exactly like the raw
+	// Win32 file APIs (CreateFileW/MoveFileExW/DeleteFileW) and ifstream — prefix absolute drive paths for all.
+	// The raw prefix disables Win32 path normalization, so collapse redundant separators and dot components
+	// first; an empty component under \\?\ fails with ERROR_INVALID_NAME.
+	path.make_preferred();
+	const std::wstring& rNative = path.native();
+	if (rNative.size() < 2 || rNative.front() == L'\\' || !path.is_absolute())
+	{
+		return path;
+	}
+	return std::filesystem::path(LR"(\\?\)" + path.lexically_normal().native());
+}
+
+std::wstring ToLowerInvariant(std::wstring value)
+{
+	if (!value.empty())
+	{
+		int64_t iResult = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(), static_cast<int>(value.size()), value.data(), static_cast<int>(value.size()), nullptr, nullptr, 0);
+		if (iResult == 0)
 		{
 			return {};
 		}
-
-		std::wstring value(static_cast<size_t>(iRequired), L'\0');
-		int64_t iWritten = ::GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(), static_cast<DWORD>(iRequired));
-		if (iWritten == 0 || iWritten >= iRequired)
-		{
-			return {};
-		}
-		value.resize(static_cast<size_t>(iWritten));
-		return std::filesystem::path(std::move(value));
 	}
+	return value;
+}
 
-	std::filesystem::path ExtendedLengthPath(std::filesystem::path path)
+bool EndsWithCaseInsensitive(std::wstring_view value, std::wstring_view suffix)
+{
+	if (value.size() < suffix.size())
 	{
-		// Coordination and queue-store files nest hashed directories under LOCALAPPDATA and, in deep CI/test
-		// trees, can exceed MAX_PATH. std::filesystem forwards the path to Win32 unchanged, exactly like the raw
-		// Win32 file APIs (CreateFileW/MoveFileExW/DeleteFileW) and ifstream — prefix absolute drive paths for all.
-		// The raw prefix disables Win32 path normalization, so collapse redundant separators and dot components
-		// first; an empty component under \\?\ fails with ERROR_INVALID_NAME.
-		path.make_preferred();
-		const std::wstring& rNative = path.native();
-		if (rNative.size() < 2 || rNative.front() == L'\\' || !path.is_absolute())
-		{
-			return path;
-		}
-		return std::filesystem::path(LR"(\\?\)" + path.lexically_normal().native());
+		return false;
 	}
+	std::wstring valueEnd(value.substr(value.size() - suffix.size()));
+	return ToLowerInvariant(std::move(valueEnd)) == ToLowerInvariant(std::wstring(suffix));
+}
 
-	std::wstring ToLowerInvariant(std::wstring value)
-	{
-		if (!value.empty())
-		{
-			int64_t iResult = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(), static_cast<int>(value.size()), value.data(), static_cast<int>(value.size()), nullptr, nullptr, 0);
-			if (iResult == 0)
-			{
-				return {};
-			}
-		}
-		return value;
-	}
-
-	bool EndsWithCaseInsensitive(std::wstring_view value, std::wstring_view suffix)
-	{
-		if (value.size() < suffix.size())
-		{
-			return false;
-		}
-		std::wstring valueEnd(value.substr(value.size() - suffix.size()));
-		return ToLowerInvariant(std::move(valueEnd)) == ToLowerInvariant(std::wstring(suffix));
-	}
 } // namespace toolcli

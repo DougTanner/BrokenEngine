@@ -26,6 +26,7 @@ inline constexpr float kfBattleshipHealth = 300.0f;
 
 namespace CollisionCategory
 {
+
 inline constexpr uint16_t kuiNone       = 0x0000;
 inline constexpr uint16_t kuiBlaster    = 0x0001;
 inline constexpr uint16_t kuiFighter    = 0x0002;
@@ -34,10 +35,12 @@ inline constexpr uint16_t kuiBattleship = 0x0008;
 inline constexpr uint16_t kuiMissile    = 0x0010;
 
 inline constexpr uint16_t kuiShips = kuiFighter | kuiOmni | kuiBattleship;
+
 } // namespace CollisionCategory
 
 namespace CollidesWith
 {
+
 inline constexpr uint16_t kuiNone = CollisionCategory::kuiNone;
 
 // Alignment filters same-team collisions.
@@ -50,14 +53,18 @@ inline constexpr uint16_t kuiFighter = CollisionCategory::kuiBlaster | Collision
 inline constexpr uint16_t kuiOmni = CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
 
 inline constexpr uint16_t kuiBattleship = CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
+
 } // namespace CollidesWith
 
 // engine::AreaDamage categories of a missile blast, tagged by the side that fired it. They share no space with
 // CollisionCategory: only the missile explosion registers a blast.
+
 namespace BlastCategory
 {
+
 inline constexpr uint16_t kuiFleetFired  = 0x0001;
 inline constexpr uint16_t kuiRandomFired = 0x0002;
+
 } // namespace BlastCategory
 
 inline constexpr uint16_t FiredBlastCategory(engine::AlignmentIdentifier alignment, engine::AlignmentIdentifier fleetAlignment)

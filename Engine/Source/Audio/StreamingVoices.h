@@ -4,7 +4,9 @@
 
 namespace DirectX
 {
+
 class AudioEngine;
+
 } // namespace DirectX
 
 namespace engine

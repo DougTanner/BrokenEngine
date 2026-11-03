@@ -1,6 +1,6 @@
 ---
 name: code-style-review
-description: Reviews and auto-fixes provably meaning-preserving C++ style violations in session-changed ranges or an explicit cleanup scope, over a fixed subset of the `Documents/C++StyleGuide.txt` rules. Use after C++ changes or for a requested style, naming, or formatting cleanup; routes semantic candidates for classification instead of changing behavior.
+description: Reviews and auto-fixes provably meaning-preserving C++ style violations in session-changed C++ or an explicit cleanup scope, over a fixed subset of the `Documents/C++StyleGuide.txt` rules. Use after C++ changes or for a requested style, naming, or formatting cleanup; routes semantic candidates for classification instead of changing behavior.
 allowed-tools: [Read, Write, Edit, Grep, PowerShell]
 ---
 
@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Grep, PowerShell]
 ## Purpose
 
 Fixed violations of the `Documents/C++StyleGuide.txt` rule subset
-[`references/worker.md`](references/worker.md) names, in the selected ranges,
+[`references/worker.md`](references/worker.md) names, over its selected scope,
 plus the session's residue removed and semantic candidates routed to the caller.
 
 ## When to use
@@ -46,7 +46,7 @@ Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Handoffs`, extended with these fields placed before `Residuals`:
 
-- `Scope` — session-changed ranges or the caller-supplied cleanup scope; plus
+- `Scope` — session-changed scope or the caller-supplied cleanup scope; plus
   which of the ranges or the scan was unavailable, with its code.
 - `Fixes Applied` — one row per fix: file:line, Rule N, correction; or none.
 - `Renames and Required Builds` — one row per rename: old → new, propagated

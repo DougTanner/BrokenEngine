@@ -127,7 +127,7 @@ struct MainLayout
 	float fPhysicallyBasedRenderingCubemapLevelOfDetailPower INIT;
 	float fPhysicallyBasedRenderingCubemapLevelOfDetailOffset INIT;
 
-	float fSmokeShadowIntensity INIT;
+	float pfSmokeShadowIntensities[kiMaxFlightPlanes] INIT; // CPU-interpolated by normalized flight-plane index; avoids per-fragment interpolation.
 
 	float fHexShieldGrow INIT;
 	float fHexShieldEdgeDistance INIT;

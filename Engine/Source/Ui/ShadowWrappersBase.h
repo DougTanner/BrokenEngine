@@ -31,6 +31,7 @@ extern Wrapper gObjectShadowsBlurSigmaHigh;
 extern Wrapper gObjectShadowsBlurRadiusNoon;
 extern Wrapper gObjectShadowsBlurRadiusSunset;
 extern Wrapper gObjectShadowsTerrainShadowFade;
-extern Wrapper gSmokeShadowIntensity;
+inline Wrapper gSmokeShadowIntensityBottom(1.0f, 0.0f, 1.0f);
+inline Wrapper gSmokeShadowIntensityTop(0.7f, 0.0f, 1.0f);
 
 } // namespace engine

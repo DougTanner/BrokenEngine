@@ -7,7 +7,9 @@
 
 namespace DirectX
 {
+
 class AudioEngine;
+
 } // namespace DirectX
 
 namespace game

@@ -71,7 +71,7 @@ struct GlobalLayout
 	float fSmokeLightingMultiplier INIT;
 	float fSmokeIntensityFalloff INIT;
 	float fSmokeWindNoiseScale INIT;
-	float fSmokeWindNoiseQuantity INIT;
+	float pfSmokeWindNoiseQuantities[kiMaxFlightPlanes] INIT; // CPU-resolved bottom/top blend over normalized plane index; a single plane uses bottom
 	float fSmokeNoiseQuantity INIT;
 	float fSmokeNoiseScaleOne INIT;
 	float fSmokeNoiseScaleTwo INIT;
@@ -81,6 +81,7 @@ struct GlobalLayout
 	float fSmokeCurlStrengthLow INIT; // Calm-wind curl strength; left raw because SmokeCurlOffset blends it toward High by the per-invocation wind factor
 	float fSmokeCurlStrengthHigh INIT; // Strong-wind curl strength; left raw for the same per-invocation blend
 	float fSmokeObjectHeightInverse INIT;
+	float fSmokeObjectHeightPower INIT;
 	float fSmokeEdgeDecayDistanceInverse INIT;
 	uint32_t uiSmokeTilesX INIT;
 	uint32_t uiSmokeTilesY INIT;

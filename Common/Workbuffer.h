@@ -325,7 +325,7 @@ template <>
 struct std::formatter<common::ScopedWorkbufferArena> : std::formatter<std::string_view>
 {
 	template <typename CONTEXT>
-	auto format(const common::ScopedWorkbufferArena& rValue, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const common::ScopedWorkbufferArena& rValue, CONTEXT& rContext) const
 	{
 		return std::formatter<std::string_view>::format(rValue.mBuffer.View(), rContext);
 	}

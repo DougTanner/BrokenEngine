@@ -5,7 +5,7 @@
 namespace engine
 {
 
-// One zone grid per flight-plane layer. engine::gpFlightPlanes copies this table, so its Count() equals this.
+// One zone grid per flight-plane layer. engine::gpFlightPlanes borrows this table, so its Count() equals this.
 constexpr int64_t kiPusherLayers = std::ssize(game::kFlightPlanes);
 constexpr int64_t kiPusherZones = 50;
 constexpr int64_t kiMaxPushersPerZone = 512;

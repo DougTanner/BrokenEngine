@@ -350,15 +350,8 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			break;
 		}
 		case StatusChangeType::kSpawnBattleship:
-		{
-			BattleshipsPostRender::SpawnInfo& rData = ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
-			SeatShipSpawnHeight(rData, ShipType::kBattleship);
-			if (rData.uiNextMissileTube >= kiBattleshipMissileTubeSlots)
-			{
-				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(BattleshipsPostRender::SpawnInfo, uiNextMissileTube)::kName));
-			}
+			SeatShipSpawnHeight(ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kBattleship);
 			break;
-		}
 		case StatusChangeType::kSpawnBlaster:
 			ParseSpawnEntry<BlastersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
 			if (!IsAdoptableStatusChange(scheduled.change))

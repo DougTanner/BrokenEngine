@@ -12,7 +12,9 @@
 
 namespace engine
 {
-	struct CellStaticData;
+
+struct CellStaticData;
+
 } // namespace engine
 
 namespace game
@@ -198,7 +200,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 		bool bTransfer = false;
 
 		// Status-change payload members. uiTarget is a registry link only in-tick code may set, so it is not listed.
-		static constexpr auto Fields()
+		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, vecStoredDirection), FRAME_COLUMN(SpawnInfo, fAcceleration), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, deltaRotationDelay), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, fDeltaRotationMaximum), FRAME_COLUMN(SpawnInfo, fPitch), FRAME_COLUMN(SpawnInfo, time), FRAME_COLUMN(SpawnInfo, nextJitter), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
 			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, vecStoredDirection), FRAME_COLUMN(SpawnInfo, fAcceleration), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, deltaRotationDelay), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, fDeltaRotationMaximum), FRAME_COLUMN(SpawnInfo, fPitch), FRAME_COLUMN(SpawnInfo, time), FRAME_COLUMN(SpawnInfo, nextJitter), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
@@ -211,6 +213,8 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 
 namespace engine
 {
+
 extern template struct Collection<game::MissilesInterpolate>;
 extern template struct Collection<game::MissilesPostRender>;
+
 } // namespace engine

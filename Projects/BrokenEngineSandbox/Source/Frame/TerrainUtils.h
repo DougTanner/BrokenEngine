@@ -4,7 +4,9 @@
 
 namespace engine
 {
-	struct CellStaticData;
+
+struct CellStaticData;
+
 } // namespace engine
 
 namespace game

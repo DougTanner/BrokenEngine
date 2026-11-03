@@ -5,9 +5,9 @@ Revisit When: the user schedules live tuning of the High flight layer.
 ## Request and scope
 
 Expose the High layer's height as an easy-to-adjust developer control from
-0.0 to 200.0 meters, initially the data-derived default (tallest island peak
-+ 5 m). Ships may fly through terrain when it is set too low; the user
-explicitly accepts this. High may also be below or equal to Low (3 m). Keep
+0.0 to 200.0 meters, initially the fixed default (100 m). Ships may fly through
+terrain when it is set too low; the user
+explicitly accepts this. High may also be below or equal to Low (2 m). Keep
 Low's height unchanged.
 
 This is a manually executed feature under `Documents/Features`. Saving this
@@ -74,9 +74,9 @@ ordinary serialization, CRC, difference logging, and snapshot treatment.
 Frame input records the transition so reconciliation and replay use the
 historically correct value. The server seeds newly activated cells from the
 current accepted value; late joins, resubscriptions, and cell transfers must
-not restore the data-derived default or revert an accepted setting.
+not restore the fixed default or revert an accepted setting.
 Render consumers use the height belonging to the displayed frame. Start a
-new session at the data-derived default; do not add a separate user-settings persistence format.
+new session at the fixed default; do not add a separate user-settings persistence format.
 Saved simulation state and replay restore the recorded height.
 
 There is no generic simulation-value Tweaks bridge in the inspected code:
@@ -90,8 +90,8 @@ a general configuration/admin system for this slider.
 ## Required propagation inventory
 
 - `Frame/FlightPlaneTable.h` and engine `Frame/FlightPlanes.{h,cpp}` currently
-  define positive, ascending heights and set the highest plane at boot to its
-  clearance above the tallest stored island peak. Separate fixed plane identity/flags from effective height;
+  define positive, ascending absolute heights in an immutable borrowed table.
+  Separate fixed plane identity/flags from effective height;
   replace the assumptions this feature invalidates. User intent takes
   precedence over those existing invariants.
 - Game `Frame/Collections/Ships/ShipBehaviours.cpp`: climbing, exact-height
@@ -131,13 +131,12 @@ a general configuration/admin system for this slider.
 ## Acceptance criteria
 
 1. Only developer Tweaks > Misc > Ships exposes High Layer Height, with
-   range 0.0–200.0 m and the data-derived session default (tallest island peak
-   + 5 m); Low remains 3 m.
-2. Exercise 0, 3, 100, and 200 m, changing values repeatedly while
+   range 0.0–200.0 m and the fixed session default (100 m); Low remains 2 m.
+2. Exercise 0, 2, 100, and 200 m, changing values repeatedly while
    ships climb. Existing High-target ships move smoothly at their type's
    existing rate, new High ships use the accepted height, and unrelated
    targets and XY movement remain intact.
-3. At 0 and 3 m, High retains its identity, empty navigation graph, and
+3. At 0 and 2 m, High retains its identity, empty navigation graph, and
    terrain exemption. Ships may pass through terrain; no ordering assertion,
    terrain clamp, accidental plane relabeling, or equal-height ambiguity occurs.
 4. Server and clients agree on accepted value, application tick, ship heights,

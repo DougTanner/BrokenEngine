@@ -76,7 +76,7 @@ public:
 		return (uiCurrent & uiFlag) != 0;
 	}
 
-	auto operator<=>(const Flags&) const = default;
+	std::strong_ordering operator<=>(const Flags&) const = default;
 
 	inline void Write(std::ostream& rStream) const
 	{

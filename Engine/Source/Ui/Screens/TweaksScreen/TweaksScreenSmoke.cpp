@@ -24,7 +24,8 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Smoke Noise Scale Two", &gSmokeNoiseScaleTwo},
 	{"Smoke Wind Noise Scale", &gSmokeWindNoiseScale},
 	{"Smoke Noise Quantity", &gSmokeNoiseQuantity},
-	{"Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantity},
+	{"Bottom Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantityBottom},
+	{"Top Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantityTop},
 	{"Smoke Curl Strength Low", &gSmokeCurlStrengthLow},
 	{"Smoke Curl Strength High", &gSmokeCurlStrengthHigh},
 	{"Smoke Curl Scale", &gSmokeCurlScale},
@@ -35,6 +36,7 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Wind Smoke Retention", &gWindSmokeRetention},
 	{"Wind Smoke Advection", &gWindSmokeAdvection},
 	{"Smoke Object Height", &gSmokeObjectHeight},
+	{"Smoke Object Height Power", &gSmokeObjectHeightPower},
 	// Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
 	{"Smoke Trails Quantity", &gSmokeTrailsQuantity},
 	{"Smoke Trails Width Current", &gSmokeTrailsWidthCurrent},
@@ -69,12 +71,17 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Smoke Color Multiplier", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Lighting Multiplier", iSection, 1.0f);
 
+				rScreen.WrapperSeparatorText("Shadow");
+				rScreen.WrapperSlider("Bottom Smoke Shadow Intensity", iSection, 1.0f);
+				rScreen.WrapperSlider("Top Smoke Shadow Intensity", iSection, 1.0f);
+
 				rScreen.WrapperSeparatorText("Noise");
 				rScreen.WrapperSlider("Smoke Noise Scale One", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Scale Two", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Wind Noise Scale", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Quantity", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Wind Noise Quantity", iSection, 1.0f);
+				rScreen.WrapperSlider("Bottom Smoke Wind Noise Quantity", iSection, 1.0f);
+				rScreen.WrapperSlider("Top Smoke Wind Noise Quantity", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Strength Low", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Strength High", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Scale", iSection, 1.0f);
@@ -91,6 +98,7 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 
 				rScreen.WrapperSeparatorText("Object");
 				rScreen.WrapperSlider("Smoke Object Height", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Object Height Power", iSection, 1.0f);
 
 				ImGui::EndTable();
 			}

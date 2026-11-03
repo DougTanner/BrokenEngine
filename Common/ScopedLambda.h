@@ -24,7 +24,7 @@ public:
 				mReleaseFunction();
 			}
 		}
-		catch(...)
+		catch (...)
 		{
 		}
 	}

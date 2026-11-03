@@ -2,7 +2,9 @@
 
 namespace engine
 {
+
 struct CellStaticData;
+
 } // namespace engine
 
 namespace game

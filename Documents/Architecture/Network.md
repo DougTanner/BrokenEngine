@@ -319,7 +319,9 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 43, which made the
+client-sendable). The current wire-protocol version is 44, which removed the
+missile tube slot `uiNextMissileTube` from the Battleship `SpawnInfo` `Fields()`;
+version 43 made the
 `kServerCoordinateStaticData` count one navigation graph per game `kNavigationGraphs` entry
 (clearance tier and flight plane) instead of one per flight plane; version 42
 added the missile cooldown `nextMissileFireTime` to the Battleship `SpawnInfo`

@@ -34,7 +34,7 @@ engine::Wrapper gOmniImpactPuffAreaTwo(0.45f, 0.05f, 2.25f);
 engine::Wrapper gOmniImpactPuffIntensityOne(4.0f, 0.4f, 20.0f);
 engine::Wrapper gOmniImpactPuffIntensityTwo(0.0f, 0.0f, 20.0f);
 
-engine::Wrapper gMissileTrailIntensity(0.5f, 0.05f, 2.5f);
+engine::Wrapper gMissileTrailIntensity(0.2f, 0.05f, 1.0f);
 
 } // namespace game
 

@@ -480,9 +480,12 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 65. Close every named namespace with `} // namespace <name>` on its closing brace, with a nested name exactly as the opening declares it:
 
 	Good:
+
 	namespace engine::NetworkMessages
 	{
+
 	...
+
 	} // namespace engine::NetworkMessages
 
 66. Do not open an anonymous namespace. File-local functions, including
@@ -572,14 +575,19 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 	Foo(int64_t iCount) : miCount(iCount)
 	Key key { .uiKey = uiKey, .uiFlags = uiFlags, };
 
-74. Do not indent namespace contents. A nested namespace and its contents start at the enclosing namespace's indentation:
+74. Do not indent namespace contents. A nested namespace and its contents start at the enclosing namespace's indentation.
+    Leave an empty line above each namespace-block declaration and below its opening brace, and above and below each annotated namespace closing brace.
+    Whitespace-only lines count as empty. A terminal newline supplies an empty line at EOF and satisfies the closing-below requirement; the start of a file does not supply an empty line above a declaration.
+    Namespace aliases and using-namespace directives are outside this spacing rule:
 
 	namespace game
 	{
 
 	namespace CollisionCategory
 	{
+
 	inline constexpr uint16_t kuiNone = 0x0000;
+
 	} // namespace CollisionCategory
 
 	} // namespace game

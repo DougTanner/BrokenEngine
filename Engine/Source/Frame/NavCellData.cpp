@@ -17,7 +17,7 @@ static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationD
 		int64_t iPolygonCount = std::ssize(rNavigationData.polygonOffsets);
 		for (int64_t i = 0; i < iPolygonCount; ++i)
 		{
-			auto [iStartA, iEndA] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
+			auto [iStartA, iEndA] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 			int64_t iCountA = iEndA - iStartA;
 			if (iCountA < 2)
 			{
@@ -33,7 +33,7 @@ static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationD
 
 				for (int64_t k = i; k < iPolygonCount; ++k)
 				{
-					auto [iStartB, iEndB] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, k, iVertexCount)};
+					auto [iStartB, iEndB] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, k, iVertexCount)};
 					int64_t iCountB = iEndB - iStartB;
 					if (iCountB < 2)
 					{
@@ -143,7 +143,7 @@ static void BuildNavigationAdjacency(NavData& rNavigationData)
 	}
 	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
-		auto [iStart, iEnd] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 		if (iEnd - iStart < 2)
 		{
 			continue;
@@ -176,7 +176,7 @@ static void BuildNavigationAdjacency(NavData& rNavigationData)
 	}
 	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
-		auto [iStart, iEnd] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 		int64_t iCount = iEnd - iStart;
 		if (iCount < 2)
 		{
@@ -213,7 +213,7 @@ static void BuildCellVisibilityGraph(NavData& rNavigationData)
 	std::vector<bool> vertexConvex(static_cast<size_t>(iVertexCount), false);
 	for (int64_t i = 0; i < std::ssize(rNavigationData.polygonOffsets); ++i)
 	{
-		auto [iStart, iEnd] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 		int64_t iCount = iEnd - iStart;
 
 		// BuildCellNavigationData mirrors Y; rotation preserves orientation, so the CCW template contours
@@ -420,7 +420,7 @@ void BuildNavigationAcceleration(NavData& rNavigationData)
 	rNavigationData.edgeB.reserve(static_cast<size_t>(iVertexCount));
 	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
-		auto [iStart, iEnd] = std::pair<int64_t, int64_t>{PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 		int64_t iCount = iEnd - iStart;
 
 		float fPolygonMinX = std::numeric_limits<float>::max();

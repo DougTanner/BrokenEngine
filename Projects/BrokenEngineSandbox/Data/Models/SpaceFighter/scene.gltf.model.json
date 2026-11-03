@@ -1,8 +1,8 @@
 {
-	"version": 3,
+	"version": 4,
 	"rotationDegrees": [90, 0, 0],
-	"scale": [1, 1, 1],
+	"scale": [2, 2, 2],
 	"offset": [0, 0, 0],
 	"hitbox": "box",
-	"missileTubes": []
+	"hardpoints": []
 }

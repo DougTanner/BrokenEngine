@@ -19,7 +19,8 @@ extern Wrapper gSmokeNoiseScaleOne;
 extern Wrapper gSmokeNoiseScaleTwo;
 extern Wrapper gSmokeWindNoiseScale;
 extern Wrapper gSmokeNoiseQuantity;
-extern Wrapper gSmokeWindNoiseQuantity;
+inline Wrapper gSmokeWindNoiseQuantityBottom(0.00005f, 0.0f, 0.001f);
+inline Wrapper gSmokeWindNoiseQuantityTop(0.0001f, 0.0f, 0.001f);
 extern Wrapper gSmokeCurlStrengthLow;
 extern Wrapper gSmokeCurlStrengthHigh;
 extern Wrapper gSmokeCurlScale;
@@ -33,6 +34,7 @@ extern Wrapper gWindSmokeRetention;
 extern Wrapper gWindSmokeAdvection;
 
 extern Wrapper gSmokeObjectHeight;
+inline Wrapper gSmokeObjectHeightPower(0.75f, 0.25f, 4.0f);
 
 // Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
 extern Wrapper gSmokeTrailsQuantity;

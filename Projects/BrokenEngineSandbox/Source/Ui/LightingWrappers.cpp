@@ -44,7 +44,7 @@ engine::Wrapper gOmniImpactLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 // Omnis - Hex shield
 engine::Wrapper gHexShieldLightingIntensity(4.0f, 0.0f, 8.0f);
 
-engine::Wrapper gMissileExhaustLightingArea(2.0f, 1.0f, 4.0f);
+engine::Wrapper gMissileExhaustLightingArea(3.0f, 1.0f, 4.0f);
 engine::Wrapper gMissileExhaustLightingIntensity(3.5f, 0.0f, 5.0f);
 
 // Fighters - Hit flash

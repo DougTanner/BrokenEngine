@@ -382,7 +382,7 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 
 static bool UsesTexture(const tinygltf::ParameterMap& rParameters, std::string_view textureName, int64_t iIndex)
 {
-	auto it = rParameters.find(std::string{textureName});
+	auto it = rParameters.find(std::string {textureName});
 	return it != rParameters.end() && it->second.TextureIndex() == iIndex;
 }
 

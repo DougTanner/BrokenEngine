@@ -3,9 +3,9 @@
 Wind is a client-only 2D world-space velocity field that ping-pongs between two textures and drives Smoke (`../Smoke/AGENTS.md`). Objects deposit directional or radial velocity; active tiles spread once per frame through hierarchical indirect dispatch.
 
 Wind is purely visual. Its step is scaled by wall-clock delta time
-(`../../../Source/Graphics/Render/WindUniforms.cpp`), never by the fixed
+([Render pause policy](../../../Source/Graphics/Render/AGENTS.md#precision-and-history)), never by the fixed
 simulation tick, so the field must never feed back into deterministic frame
-state. Each step traces backward along the current velocity to find where the
+state. Each positive-time step traces backward along the current velocity to find where the
 flow came from (semi-Lagrangian advection), with that backward step clamped to
 three texels; then adds a swirl from noise sampled by world position so the
 pattern stays anchored as the camera moves, a simplified vorticity-confinement
@@ -21,6 +21,9 @@ curl strength Low/High, so retuning the thresholds also changes smoke swirl.
 ## Sparse Dispatch Invariants
 
 - Each texture has matching occupancy storage. Each spread variant reads the other texture's occupancy, while dilation writes the active list for its own output variant. Crossing those indices produces stale dispatch coverage.
+- A zero-time spread copies the exact source texel without filtering or field
+  evolution, returning zero outside the source image. It still rebuilds output
+  occupancy, preserving the retained field through ping-pong copies.
 - Camera movement and zoom require world-position remapping. Dilation remaps tile centers into the previous grid, and both spread variants remap samples through the previous area.
 - Occupancy is rebuilt from nonzero output, so decay must reach exact zero. Residual values prevent active tiles from retiring and turn sparse work into persistent work.
 - Stored velocity is world-oriented with +Y north. Every conversion between world velocity and texture UV flips Y, including advection and radial deposits.

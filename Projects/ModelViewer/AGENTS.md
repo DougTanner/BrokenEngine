@@ -118,7 +118,7 @@ gestures.
 
 In orbit, left drags rotate the camera, except that while picking mode is on,
 the Edit Hardpoints tab is selected and Rest pose is shown a left click picks a
-missile tube and never orbits
+hardpoint of the selected category and never orbits
 ([Source metadata authoring](#source-metadata-authoring)); right
 drags rotate only the model sun about the active camera's screen axes in either
 mode with the same continuous feel. Both gestures allow edge roll and cross poles
@@ -148,28 +148,34 @@ and foreground.
 ## Source metadata authoring
 
 The right window's Flight tab edits XYZ scale, rotation in degrees and offset,
-and the Edit Hardpoints tab edits missile tubes; both tabs offer the same
+and the Edit Hardpoints tab edits hardpoints; both tabs offer the same
 explicit Save to the selected source's adjacent `.model.json`. No control edits
 the hitbox setting, so Save writes back the loaded one. The
 [exporter owns the metadata format](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
-Geometry and animation still come from packs; alignment and tubes always come
+Geometry and animation still come from packs; alignment and hardpoints always come
 from this checkout's source metadata on startup and actual model selection,
-with no packed fallback. Selection discards unsaved alignment and tube edits;
+with no packed fallback. Selection discards unsaved alignment and hardpoint edits;
 reselecting or restarting reloads saved values without packing. Mode changes,
 Reroll and Graphics recreation retain active edits. There is no source watcher.
 
-The Edit Hardpoints tab, present in both modes, lists the tubes, each with an X
-that deletes it. Its Pick checkbox is picking mode, active only while that tab
-is selected in the shown right window, in orbit with Rest pose; there a left
-click outside the panels always picks and never orbits. A pick adds the nearest
+The Edit Hardpoints tab, present in both modes, has separate Missile tubes and
+Fighter launch bays category tabs sharing one ordered hardpoint list and the
+same editing and picking logic. Each lists only its category, with an X that
+deletes the original list entry while preserving all surviving order. Each
+category shows a Pick checkbox for one retained picking mode; switching category
+retargets it, and model load selects Missile tubes. Picking is active only while
+Edit Hardpoints is selected in the shown right window, in orbit with Rest pose;
+there a left click outside the panels always picks and never orbits. A pick
+appends the selected kind at the nearest
 front-facing (counter-clockwise) rest-geometry triangle hit under the pointer:
 its hit position and its unflipped unit winding normal as the direction; a miss
 adds nothing. In flight or with a clip selected the Pick setting is kept but
 inactive and its checkbox disabled, and picking resumes on return to orbit with
-Rest pose. Only while that tab is selected in orbit with Rest pose, each tube
-draws as a dot at its position with a short line along its direction, through
-the accepted alignment, over the scene and under the panels with no depth
-test.
+Rest pose. Only while Edit Hardpoints is selected in orbit with Rest pose, both
+categories draw together as dots at their positions with short lines along
+their directions: missile tubes orange and fighter launch bays cyan. One shared
+projection applies the accepted alignment, over the scene and under the panels
+with no depth test. Save preserves the shared list's order.
 
 The executable's containing checkout owns source reads and Save, in both main
 checkouts and linked worktrees, independently of working directory and packed
@@ -200,7 +206,7 @@ every dirty sidecar is agent-authored or silently revert it.
 
 Both modes draw through the complete shared alignment under the
 [exporter's contract](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
-Orbit picking and tube markers use that same accepted matrix; tube values stay
+Orbit picking and hardpoint markers use that same accepted matrix; hardpoint values stay
 in pre-alignment rest coordinates. Flight appends its orientation and body
 translation. Keep the shadow origin at body center despite authored offset.
 Body movement, camera tracking, raw rest bounds and animation evaluation remain

@@ -7,8 +7,10 @@
 
 namespace engine
 {
+
 template struct Collection<game::BlastersInterpolate>;
 template struct Collection<game::BlastersPostRender>;
+
 } // namespace engine
 
 namespace game

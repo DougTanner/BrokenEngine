@@ -12,6 +12,25 @@ ships on the planes above it (channel layout: `../Shadow/AGENTS.md`
 Terrain and water read that shadow at the base-height (plane-0) projection, and
 models at the fragment.
 
+## Shadow Intensity Contract
+
+Terrain and water smoke-shadow attenuation uses bottom and top intensity
+controls shared by the Shadows and Smoke panels through the same two Wrappers.
+Bottom defaults to 1.0 and top to 0.7, both with range [0, 1]. Render publishes
+each live plane's intensity in MainLayout by linear interpolation over
+normalized plane index; plane 0 uses bottom, the highest plane uses top, and a
+single plane uses bottom.
+Each intensity scales only its plane's factor in the shadow product. The
+separate height-faded particle shadow helper does not use these controls.
+
+## Natural Wind Contract
+
+Natural noise-map wind quantity has bottom and top controls. Render resolves
+each plane's quantity by linear interpolation over normalized plane index:
+plane 0 uses bottom, the highest plane uses top, and a single plane uses bottom.
+Both spread passes use that plane's quantity. This controls natural drift
+independently of the simulated wind field; noise scale and swirl remain shared.
+
 ## Frame and Remap Contract
 
 Each refresh runs pass B, pass A, then deposit. Pass B reads the previous refresh's pass-A output in previous-area coordinates without remapping. Pass A performs the single previous-area-to-current-area remap. Fresh deposits then enter pass A's output so consumers see them in the same frame.

@@ -3,25 +3,24 @@
 namespace engine
 {
 
-Wrapper gSmokeMaximum(0.2f, 0.0f, 1.0f);
-Wrapper gSmokePower(0.18f, 0.1f, 1.0f);
-Wrapper gSmokeDecay(0.998f, 0.990f, 1.0f);
+Wrapper gSmokeMaximum(0.4f, 0.0f, 1.0f);
+Wrapper gSmokePower(0.2f, 0.1f, 1.0f);
+Wrapper gSmokeDecay(0.9985f, 0.990f, 1.0f);
 Wrapper gSmokeEdgeDecayDistance(0.05f, 0.0f, 0.1f);
 Wrapper gSmokeUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
 
-Wrapper gSmokeColorMinimum(0.2f, 0.0f, 1.0f);
+Wrapper gSmokeColorMinimum(0.15f, 0.0f, 1.0f);
 Wrapper gSmokeColorMultiplier(2.0f, 0.1f, 4.0f);
 Wrapper gSmokeLightingMultiplier(1.0f, 0.0f, 2.0f);
 
 Wrapper gSmokeNoiseScaleOne(3.0f, 0.1f, 8.0f);
 Wrapper gSmokeNoiseScaleTwo(0.2f, 0.01f, 1.0f);
-Wrapper gSmokeWindNoiseScale(0.06f, 0.001f, 0.1f);
-Wrapper gSmokeNoiseQuantity(0.000055f, 0.00001f, 0.0002f);
-Wrapper gSmokeWindNoiseQuantity(0.00006f, 0.0f, 0.0001f);
+Wrapper gSmokeWindNoiseScale(0.015f, 0.001f, 0.1f);
+Wrapper gSmokeNoiseQuantity(0.00003f, 0.00001f, 0.0002f);
 // Each strength is the curl offset in smoke texels per step (SmokeCurlOffset blends between them). The per-refresh offset
 // is the strength times the step count, which reaches the flight-plane count times Smoke Update Cadence with the stagger
 // on (8 at cadence 4); once that passes the radius-2 tile (16 texel) dilate halo, strong-wind plume fronts thin.
-Wrapper gSmokeCurlStrengthLow(0.075f, 0.0f, 0.5f);
+Wrapper gSmokeCurlStrengthLow(0.05f, 0.0f, 0.5f);
 Wrapper gSmokeCurlStrengthHigh(2.0f, 0.0f, 5.0f);
 Wrapper gSmokeCurlScale(0.005f, 0.0001f, 0.01f);
 Wrapper gSmokeCurlSpeed(1.0f, 0.0f, 4.0f);
@@ -33,7 +32,7 @@ Wrapper gWindDisplacementNoiseScale(1.0f, 0.0f, 4.0f);
 Wrapper gWindSmokeRetention(0.6f, 0.0f, 1.0f);
 Wrapper gWindSmokeAdvection(0.5f, 0.0f, 2.0f);
 
-Wrapper gSmokeObjectHeight(1.0f, 0.5f, 40.0f);
+Wrapper gSmokeObjectHeight(2.5f, 0.5f, 8.0f);
 
 // Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
 Wrapper gSmokeTrailsQuantity(800.0f, 0.0f, 2'000.0f);

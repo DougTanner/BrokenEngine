@@ -17,11 +17,11 @@ Wrapper gSunMoonSunIntensityObjects(1.0f, 0.0f, 4.0f);
 Wrapper gSunMoonSunIntensitySmoke(1.0f, 0.0f, 4.0f);
 
 // Moon Intensity (per target) + Blue Tint
-Wrapper gSunMoonMoonIntensityTerrain(0.08f, 0.0f, 0.1f);
+Wrapper gSunMoonMoonIntensityTerrain(0.06f, 0.0f, 0.1f);
 Wrapper gSunMoonMoonIntensityWater(0.015f, 0.0f, 0.1f);
-Wrapper gSunMoonMoonIntensityObjects(0.05f, 0.0f, 1.0f);
+Wrapper gSunMoonMoonIntensityObjects(0.03f, 0.0f, 1.0f);
 Wrapper gSunMoonMoonIntensitySmoke(0.05f, 0.0f, 1.0f);
-Wrapper gSunMoonMoonBlueTint(1.8f, 1.0f, 4.0f);
+Wrapper gSunMoonMoonBlueTint(1.0f, 0.0f, 4.0f);
 
 // Moon Timing (radians)
 Wrapper gSunMoonMoonriseStart(3.05f, XM_PIDIV2, XM_2PI);

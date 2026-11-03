@@ -7,7 +7,9 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 ## Ordering and Publication
 
 - Main publishes water source dimensions, wave parameters, and displacement work
-  even when the camera interpolate is absent; water drawing still requires it.
+  and all Main lighting data even when the camera interpolate is absent; water
+  drawing still requires it. Main lighting publication runs every rendered
+  frame independently of lighting and smoke refresh cadence.
 - Global population precedes Main. Global is submitted, possibly on a worker thread, before `RenderFrameMain` runs, so nothing in Main's call tree writes GlobalLayout: a value Main produces for a shader, such as the water band counts and active quad dimensions, is published in MainLayout. Within Global, Smoke precedes Wind because wind consumes smoke's current and previous world areas.
 - Gameplay main rendering runs collection `BeginRender`, per-coord `Render`, collection `EndRender`, lighting-spread gate publication, then debug publication, with the camera coord first. The no-renderable-coord path, including an empty active set, still runs begin/end publication so every indirect count and per-render profile counter reaches zero instead of ghost-drawing or reporting prior-frame instances.
 - Lighting deposit clears its attachments through the render pass load operation every frame, so no separate clear pass is recorded.
@@ -76,9 +78,15 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   J range.
 - Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
+- GameBase publishes gameplay pause before Global. Paused smoke skips cadence
+  and crop refreshes while retaining its pending steps; held areas still follow
+  camera-cell basis shifts. Clear, disable, and recreation paths retain
+  precedence. Wind publishes zero delta and holds its accumulated time, but
+  keeps ping-pong and occupancy rebuilding active. All smoke and wind producers
+  publish zero deposit counts. Resume excludes paused frames and time.
 - Each flight plane's smoke keeps its own held area, step count, and decay.
   With `gSmokeLayerStagger` on, a scheduled frame (`## Ordering and
-  Publication`) refreshes only its scheduled plane, which steps by its frames
+  Publication`) refreshes only its scheduled plane, which steps by its unpaused frames
   since its last refresh; off, every live plane refreshes on each scheduled
   frame. A smoke clear and the disabled path refresh every plane, and crop
   safety refreshes plane k early once the live visible area leaves plane k's

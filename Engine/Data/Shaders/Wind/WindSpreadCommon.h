@@ -5,6 +5,16 @@
 vec2 WindSpread(GlobalLayout globalLayout, sampler2D windTextureSampler, sampler2D noiseTextureSampler, vec2 f2InputTextureCoordinate, vec2 f2WorldPosition, vec2 f2WindTextureSize)
 {
 	float fTimeScale = globalLayout.fWindTimeScale;
+	if (fTimeScale == 0.0f)
+	{
+		ivec2 i2SourceTexel = ivec2(floor(f2InputTextureCoordinate * f2WindTextureSize));
+		if (any(lessThan(i2SourceTexel, ivec2(0))) || any(greaterThanEqual(i2SourceTexel, ivec2(f2WindTextureSize))))
+		{
+			return vec2(0.0f);
+		}
+
+		return texelFetch(windTextureSampler, i2SourceTexel, 0).rg;
+	}
 
 	// Semi-Lagrangian advection: trace back along wind direction to find source
 	vec2 f2Wind = textureLod(windTextureSampler, f2InputTextureCoordinate, 0.0f).rg;

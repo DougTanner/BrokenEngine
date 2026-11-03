@@ -54,7 +54,7 @@ public:
 
 	bool KeyboardPressed(int64_t iKey) const
 	{
-		return !mbUserInterfaceOwnsKeyboard && mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
+		return (iKey == VK_TAB || !mbUserInterfaceOwnsKeyboard) && mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
 	}
 	bool MousePressed(MouseButtons eButton) const
 	{

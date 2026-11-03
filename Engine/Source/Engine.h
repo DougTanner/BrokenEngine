@@ -91,7 +91,7 @@ template<>
 struct std::formatter<engine::AlignmentIdentifier> : std::formatter<uint32_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::AlignmentIdentifier alignment, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::AlignmentIdentifier alignment, CONTEXT& rContext) const
 	{
 		return std::formatter<uint32_t>::format(alignment.uiValue, rContext);
 	}
@@ -101,7 +101,7 @@ template<>
 struct std::formatter<engine::Alignments> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	auto format(const engine::Alignments& rAlignments, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::Alignments& rAlignments, CONTEXT& rContext) const
 	{
 		char pcBuffer[48] {};
 		char* pWrite = pcBuffer;
@@ -119,7 +119,7 @@ template<>
 struct std::formatter<engine::Uuid> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::Uuid identifier, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::Uuid identifier, CONTEXT& rContext) const
 	{
 		return std::formatter<int64_t>::format(identifier.iValue, rContext);
 	}
@@ -129,7 +129,7 @@ template<typename T>
 struct std::formatter<engine::Id<T>> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::Id<T> identifier, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(const engine::Id<T> identifier, CONTEXT& rContext) const
 	{
 		return std::formatter<int64_t>::format(identifier.uuid.iValue, rContext);
 	}

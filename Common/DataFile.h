@@ -323,21 +323,25 @@ struct ModelHeader
 	XMFLOAT3 f3RotationRadians {};
 	XMFLOAT3 f3Scale {1.0f, 1.0f, 1.0f};
 	XMFLOAT3 f3Offset {};
+	uint32_t uiMissileTubeCount = 0;
+	uint32_t uiFighterLaunchBayCount = 0;
 	uint32_t uiPad = 0;
 
-	// Runtime model chunk layout: [indices ALIGN4] [vertices] [ModelOutline ALIGN16]. Single source for the writer
-	// (ExportModel.cpp) and the generic index+vertex bind reader (Buffer::RecordBindVertexBuffer).
+	// Runtime model chunk layout: [indices ALIGN4] [vertices] [ModelOutline ALIGN16]
+	// [PackedModelMissileTube[]] [PackedModelFighterLaunchBay[]].
 	static constexpr int64_t VerticesOffset(int64_t iIndexCount, int64_t iIndexElementSize)
 	{
 		return RoundUp<int64_t, 4>(iIndexCount * iIndexElementSize);
 	}
 
-	// The ModelOutline section sits past the chunk's iSize, so the GPU upload of iSize bytes excludes it.
+	// Appended sections sit past the chunk's iSize, so the GPU upload excludes them. Offsets are relative to chunk data.
 	// Single source for the writer (ExportModel.cpp) and the ship hitbox reader.
 	static constexpr int64_t OutlineOffset(int64_t iChunkSize)
 	{
 		return RoundUp<int64_t, kiAlignmentBytes>(iChunkSize);
 	}
+	static constexpr int64_t MissileTubesOffset(int64_t iChunkSize);
+	static constexpr int64_t FighterLaunchBaysOffset(int64_t iChunkSize, uint32_t uiMissileTubeCount);
 
 	// Single source for the `.MODEL` writer/reader (ExportScene/ExportModel) and the runtime index-type
 	// recovery (BufferManager) — all three must agree on the same threshold.
@@ -346,11 +350,13 @@ struct ModelHeader
 		return iVertexCount < UINT16_MAX;
 	}
 };
-static_assert(sizeof(ModelHeader) == 64, "ModelHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportModel::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
+static_assert(sizeof(ModelHeader) == 72, "ModelHeader layout changed — bump DataHeader::kiVersion; unless sizeof(ChunkHeader) also changed, bump ExportModel::kiVersion's raw version too (cached chunk headers aren't otherwise re-exported)");
 static_assert(BT_OFFSETOF(ModelHeader, f3RotationRadians) == 24, "ModelHeader rotation offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 static_assert(BT_OFFSETOF(ModelHeader, f3Scale) == 36, "ModelHeader scale offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 static_assert(BT_OFFSETOF(ModelHeader, f3Offset) == 48, "ModelHeader offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(BT_OFFSETOF(ModelHeader, uiPad) == 60, "ModelHeader padding changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, uiMissileTubeCount) == 60, "ModelHeader tube count offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, uiFighterLaunchBayCount) == 64, "ModelHeader fighter count offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(ModelHeader, uiPad) == 68, "ModelHeader pad offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
 
 // A model's hitbox levels, named by its `.model.json` "hitbox" key. Ordered, so a level at or above kBox has a box.
 enum class ModelHitboxLevel : uint32_t
@@ -373,6 +379,37 @@ struct ModelOutline
 	ModelHitboxLevel eHitboxLevel = ModelHitboxLevel::kSphere;
 };
 static_assert(sizeof(ModelOutline) == 784, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
+
+// Full authored alignment is baked into both vectors; directions exclude offset translation and remain unnormalized.
+struct PackedModelMissileTube
+{
+	XMFLOAT3 f3Position {};
+	XMFLOAT3 f3Direction {};
+};
+static_assert(sizeof(PackedModelMissileTube) == 24, "PackedModelMissileTube layout changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelMissileTube, f3Position) == 0, "PackedModelMissileTube position offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelMissileTube, f3Direction) == 12, "PackedModelMissileTube direction offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(std::is_trivially_copyable_v<PackedModelMissileTube>);
+
+struct PackedModelFighterLaunchBay
+{
+	XMFLOAT3 f3Position {};
+	XMFLOAT3 f3Direction {};
+};
+static_assert(sizeof(PackedModelFighterLaunchBay) == 24, "PackedModelFighterLaunchBay layout changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelFighterLaunchBay, f3Position) == 0, "PackedModelFighterLaunchBay position offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelFighterLaunchBay, f3Direction) == 12, "PackedModelFighterLaunchBay direction offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(std::is_trivially_copyable_v<PackedModelFighterLaunchBay>);
+
+constexpr int64_t ModelHeader::MissileTubesOffset(int64_t iChunkSize)
+{
+	return OutlineOffset(iChunkSize) + static_cast<int64_t>(sizeof(ModelOutline));
+}
+
+constexpr int64_t ModelHeader::FighterLaunchBaysOffset(int64_t iChunkSize, uint32_t uiMissileTubeCount)
+{
+	return MissileTubesOffset(iChunkSize) + static_cast<int64_t>(uiMissileTubeCount) * static_cast<int64_t>(sizeof(PackedModelMissileTube));
+}
 
 // Complete authored alignment in exported model coordinates: offset, XYZ scale, then XYZ pre-rotation.
 inline XMMATRIX GetModelAlignment(const ModelHeader& rModelHeader)
@@ -479,7 +516,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 60 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 62 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

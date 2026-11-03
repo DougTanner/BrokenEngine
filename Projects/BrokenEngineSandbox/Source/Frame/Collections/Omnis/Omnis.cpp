@@ -23,8 +23,10 @@
 
 namespace engine
 {
+
 template struct Collection<game::OmnisInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<game::OmnisPostRender>;
+
 } // namespace engine
 
 namespace game

@@ -75,7 +75,7 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 
 	XMVECTOR vecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorLerp(vecDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime)));
 
-	return {.vecArtificialIntelligenceDirection = vecArtificialIntelligenceDirection,};
+	return {.vecArtificialIntelligenceDirection = vecArtificialIntelligenceDirection, };
 }
 
 constexpr int64_t kiFrontSamples = 4;

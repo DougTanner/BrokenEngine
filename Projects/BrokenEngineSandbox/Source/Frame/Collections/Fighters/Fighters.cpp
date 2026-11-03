@@ -25,8 +25,10 @@
 
 namespace engine
 {
+
 template struct Collection<game::FightersInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<game::FightersPostRender>;
+
 } // namespace engine
 
 namespace game

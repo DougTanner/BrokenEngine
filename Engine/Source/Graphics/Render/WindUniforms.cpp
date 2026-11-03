@@ -11,7 +11,7 @@ void RenderWindGlobal(int64_t iCommandBuffer)
 {
 	// Step from the Graphics frame delta, which the skipped-render resume resets so a minimize does not land as one step.
 	static float sfWindTime = 0.0f;
-	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(gpGraphics->mRenderFrameDeltaNanoseconds);
+	float fDeltaTime = gbGameplayPaused ? 0.0f : common::NanosecondsToFloatSeconds<float>(gpGraphics->mRenderFrameDeltaNanoseconds);
 	sfWindTime += fDeltaTime * gWindTimeScale.mfCurrent;
 
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);

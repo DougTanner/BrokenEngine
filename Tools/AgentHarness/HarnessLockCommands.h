@@ -6,6 +6,8 @@
 
 namespace toolcli
 {
-	int64_t RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues);
-	bool RefreshHarnessHeartbeat(std::wstring_view owner, int64_t iMaximumWaitMilliseconds = 10'000);
-}
+
+int64_t RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues);
+bool RefreshHarnessHeartbeat(std::wstring_view owner, int64_t iMaximumWaitMilliseconds = 10'000);
+
+} // namespace toolcli

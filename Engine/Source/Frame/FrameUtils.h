@@ -30,8 +30,8 @@ template <typename... COLUMNS>
 struct FrameColumnList {};
 
 // Decoupled movement: drag decays velocity, acceleration scales down near max speed
-// kbBlendVelocityToDirection: when true, blends velocity direction toward vecDirection (airplane-like constraint)
-template<bool kbBlendVelocityToDirection = false>
+// BLEND_VELOCITY_TO_DIRECTION: when true, blends velocity direction toward vecDirection (airplane-like constraint)
+template<bool BLEND_VELOCITY_TO_DIRECTION = false>
 [[nodiscard]] inline XMVECTOR XM_CALLCONV ApplyMovement(FXMVECTOR vecVelocity, FXMVECTOR vecDirection, float fDeltaTime, float fAcceleration, float fDrag, float fMaxSpeed, float fVelocityToDirection = 0.0f)
 {
 	XMVECTOR vecResult = XMVectorMultiply(XMVectorReplicate(common::ExponentialDecay(fDrag, fDeltaTime)), vecVelocity);
@@ -40,7 +40,7 @@ template<bool kbBlendVelocityToDirection = false>
 	float fAccelerationScale = 1.0f - std::min(fSpeed / fMaxSpeed, 1.0f);
 	vecResult = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * fAcceleration * fAccelerationScale), vecDirection, vecResult);
 
-	if constexpr (kbBlendVelocityToDirection)
+	if constexpr (BLEND_VELOCITY_TO_DIRECTION)
 	{
 		float fDecay = common::ExponentialDecay(fVelocityToDirection, fDeltaTime);
 		XMVECTOR vecVelocityComponent = XMVectorMultiply(XMVectorReplicate(fDecay), XMVector3Normalize(vecResult));

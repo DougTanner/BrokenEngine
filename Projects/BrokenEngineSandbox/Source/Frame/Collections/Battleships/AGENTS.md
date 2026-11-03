@@ -26,7 +26,7 @@ model as a wreck (`## Wreck Invariants`).
   when it is not dying, its arrival grace has run out, the shared plane and
   height rule allows it (`../Ships/AGENTS.md` `## Ship Invariants`), and its
   `pNextMissileFireTimes` cooldown is at or below zero. A launch resets the
-  cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
+  cooldown to `kBattleshipMissileCooldown` (0.5 seconds), and the cooldown transfers with the
   ship, so launches come exactly `kBattleshipMissileCooldown` apart.
 - A launching row launches at most one missile per tick, at the enemy nearest
   it by 3D distance among those within `kfBattleshipMissileRange` that the
@@ -38,15 +38,16 @@ model as a wreck (`## Wreck Invariants`).
   same tick, so a later shooter sees an earlier shooter's launches. Each missile
   receives that enemy as its target at launch, with no registry acquisition
   (`../Missiles/AGENTS.md`).
-- `puiNextMissileTubes` holds the next launch slot k: tube k / 2, on the left
-  side when k is even and the right when odd, so launches alternate sides and
-  step through the `kiBattleshipMissileTubesPerSide` tubes from front to back,
-  wrapping from the last right tube to the first left one. A missile leaves its
-  tube outward from that side at the ship's exact height, so it starts on the
-  ship's plane. A launch `MissilesPostRender::Spawn` refuses takes no slot,
-  leaves the cooldown unchanged, and launches nothing that tick.
-- The tube slot transfers with the ship, and the PostRender `PostRead` rejects a
-  slot at or above `kiBattleshipMissileTubeSlots` on every Frame read.
+- Tubes come from the controller model in `kShipHitboxTypes`, fully aligned by
+  the [model exporter](../../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
+  Bound the appended records against `EagerChunk.iDataSize` before constructing
+  their span; these armed models require at least one tube and have no fallback.
+  Yaw each aligned tube by the ship's horizontal heading, translate to the ship,
+  and choose the least XY squared distance to the already selected enemy. An
+  exact tie keeps the first authored tube. Launch position Z equals the ship's
+  exact flight plane; flatten and normalize the aligned direction in XY before
+  yaw, keeping direction and velocity Z zero. A launch `MissilesPostRender::Spawn`
+  refuses leaves the ship cooldown unchanged and launches nothing that tick.
 
 ## Turning Invariants
 

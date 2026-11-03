@@ -5,5 +5,7 @@
 
 namespace toolcli
 {
-	int64_t RunLandingLockCommand(std::span<const wchar_t* const> argumentValues);
+
+int64_t RunLandingLockCommand(std::span<const wchar_t* const> argumentValues);
+
 } // namespace toolcli

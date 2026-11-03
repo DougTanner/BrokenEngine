@@ -4,5 +4,7 @@
 
 namespace toolcli
 {
-	int64_t RunBuildCommand(int64_t iArgumentCount, wchar_t* pArgumentValues[]);
+
+int64_t RunBuildCommand(int64_t iArgumentCount, wchar_t* pArgumentValues[]);
+
 } // namespace toolcli

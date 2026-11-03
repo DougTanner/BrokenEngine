@@ -4,7 +4,9 @@
 
 namespace tinygltf
 {
-	class Model;
+
+class Model;
+
 } // namespace tinygltf
 
 std::unordered_map<int64_t, int64_t> BuildNodeParentMap(const tinygltf::Model& rModel);

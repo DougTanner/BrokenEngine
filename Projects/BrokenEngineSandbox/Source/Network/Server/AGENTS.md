@@ -36,12 +36,14 @@ game state around the deterministic Frame tick.
   search is a pure function of the candidates, the origin's committed frame, and the pass's taken points, so replay
   playback reaches the recording's spawn-or-wait decision, as the fleet checksum (`../../Save/AGENTS.md`) requires.
   With none clear the member stays dead and is retried on the next tick. `ServerClientManager.cpp` owns the candidate
-  set, the clearance, and the blocked-episode logging. A Fighter launches from inside its fleet's
-  Battleship: it spawns in that row's cell with its heading, velocity, and stored plane,
-  `kfBattleshipRadius - kfFighterRadius` ahead of its position along the heading, so that Battleship's own pusher
-  pushes it out the front under the [shared ship policy](../../Frame/Collections/Ships/AGENTS.md#ship-invariants). At most
-  one Fighter launches per fleet per `kfShipSpawnInterval`, timed by `ServerClientManager::mNextFighterLaunchTicks`,
-  which every load reset clears; a skipped Fighter stays dead and is tried again on the next tick.
+  set, the clearance, and the blocked-episode logging. A Fighter launches in its fleet Battleship's cell from a packed bay of that row's controller-selected model.
+  The already aligned bay XY position and horizontal normalized direction receive the Battleship's heading yaw;
+  the Fighter inherits its height, velocity, and stored plane. `TickRespawnTimers` attempts each authored bay once
+  per fleet cooldown batch in order, assigning successful bays the next waiting Fighter in member order. A bay
+  outside the cell or blocked by terrain is skipped for the same waiting member. Any success sets the fleet's
+  `ServerClientManager::mNextFighterLaunchTicks` once to the next `kfShipSpawnInterval`; a wholly refused batch
+  leaves it unchanged and retries next tick. Each fleet pass starts at bay zero with stack-local batch state;
+  no waiting Fighters means no cooldown write. Every load reset clears the existing launch-tick map.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
   advancing updates, is empty: no queued client request becomes a

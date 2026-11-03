@@ -59,6 +59,11 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
+	if (gbGameplayPaused)
+	{
+		return;
+	}
+
 	if (rCurrent.iCount == 0)
 	{
 		return;
@@ -165,7 +170,7 @@ void SmokeTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i))->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
 	}
 }
 

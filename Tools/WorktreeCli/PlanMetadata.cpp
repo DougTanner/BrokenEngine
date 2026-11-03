@@ -10,373 +10,375 @@
 
 namespace toolcli
 {
-	bool Utf8PathLess(std::wstring_view left, std::wstring_view right)
-	{
-		return WideToUtf8(left) < WideToUtf8(right);
-	}
 
-	bool ParseCanonicalUtcTimestamp(std::string_view value, int64_t& rTicks)
-	{
-		return coordination::ParseUtcTimestamp(std::string(value), rTicks) && coordination::FormatUtcTimestamp(static_cast<uint64_t>(rTicks)) == value;
-	}
+bool Utf8PathLess(std::wstring_view left, std::wstring_view right)
+{
+	return WideToUtf8(left) < WideToUtf8(right);
+}
 
-	bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes)
-	{
-		std::ifstream input(ExtendedLengthPath(rPath), std::ios::binary);
-		if (!input)
-		{
-			return false;
-		}
-		input.seekg(0, std::ios::end);
-		int64_t iSize = static_cast<int64_t>(input.tellg());
-		if (iSize < 0 || iSize > 4 * 1'024 * 1'024)
-		{
-			return false;
-		}
-		input.seekg(0, std::ios::beg);
-		rBytes.assign(static_cast<size_t>(iSize), '\0');
-		input.read(rBytes.data(), static_cast<std::streamsize>(iSize));
-		return input.good() || input.eof();
-	}
+bool ParseCanonicalUtcTimestamp(std::string_view value, int64_t& rTicks)
+{
+	return coordination::ParseUtcTimestamp(std::string(value), rTicks) && coordination::FormatUtcTimestamp(static_cast<uint64_t>(rTicks)) == value;
+}
 
-	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath)
+bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes)
+{
+	std::ifstream input(ExtendedLengthPath(rPath), std::ios::binary);
+	if (!input)
 	{
-		std::filesystem::path path(value);
-		if (value.rfind(L"Documents/Plans/", 0) != 0)
-		{
-			return false;
-		}
-		if (!value.ends_with(L".md"))
-		{
-			return false;
-		}
-		if (std::ranges::any_of(path, [](const std::filesystem::path& rPart)
-		{
-			return rPart == L"." || rPart == L"..";
-		}))
-		{
-			return false;
-		}
-		if (path.generic_wstring() != value)
-		{
-			return false;
-		}
-		rPath = value;
-		return true;
+		return false;
 	}
-
-	static bool ParsePlanBytes(Plan& rPlan)
+	input.seekg(0, std::ios::end);
+	int64_t iSize = static_cast<int64_t>(input.tellg());
+	if (iSize < 0 || iSize > 4 * 1'024 * 1'024)
 	{
-		if (rPlan.bytes.starts_with("\xEF\xBB\xBF"))
-		{
-			rPlan.diagnostic = "manual";
-			return true;
-		}
-		if (!rPlan.bytes.starts_with(kMarkerPrefix))
-		{
-			// Classifying rather than failing keeps the stale-baseline erase and dependency blocking working; the
-			// reporting sites, not this classification, make a marker-less plan document loud.
-			rPlan.diagnostic = "manual";
-			return true;
-		}
-		int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
-		int64_t iMarkerEnd = iLineEnd == -1 ? std::ssize(rPlan.bytes) : iLineEnd;
-		if (iMarkerEnd > 0 && rPlan.bytes[static_cast<size_t>(iMarkerEnd - 1)] == '\r')
-		{
-			--iMarkerEnd;
-		}
-		std::string_view marker(rPlan.bytes.data(), static_cast<size_t>(iMarkerEnd));
-		if (!marker.ends_with(kMarkerSuffix))
-		{
-			rPlan.diagnostic = "malformed plan metadata marker";
-			return false;
-		}
-		try
-		{
-			int64_t iJsonBegin = std::ssize(kMarkerPrefix);
-			int64_t iJsonLength = std::ssize(marker) - iJsonBegin - std::ssize(kMarkerSuffix);
-			nlohmann::json metadata = nlohmann::json::parse(std::string(marker.substr(static_cast<size_t>(iJsonBegin), static_cast<size_t>(iJsonLength))));
-			if (metadata.contains("dependsOn") && metadata["dependsOn"].is_array())
-			{
-				std::vector<std::wstring> dependencies;
-				bool bComplete = true;
-				for (const nlohmann::json& rDependency : metadata["dependsOn"])
-				{
-					std::wstring path;
-					if (!rDependency.is_string() || !NormalizePlanPath(Utf8ToWide(rDependency.get<std::string>()), path))
-					{
-						bComplete = false;
-						break;
-					}
-					dependencies.push_back(std::move(path));
-				}
-				if (bComplete)
-				{
-					rPlan.dependencies = std::move(dependencies);
-					rPlan.bDependenciesKnown = true;
-				}
-			}
-			if (metadata.size() != 2 || !metadata.contains("createdUtc") || !metadata["createdUtc"].is_string() || !metadata.contains("dependsOn") || !metadata["dependsOn"].is_array())
-			{
-				rPlan.diagnostic = "metadata requires exactly createdUtc and dependsOn";
-				return false;
-			}
-			int64_t iTicks = 0;
-			if (!ParseCanonicalUtcTimestamp(metadata["createdUtc"].get<std::string>(), iTicks))
-			{
-				rPlan.diagnostic = "createdUtc is invalid";
-				return false;
-			}
-			rPlan.createdUtc = metadata["createdUtc"].get<std::string>();
-			if (!rPlan.bDependenciesKnown)
-			{
-				rPlan.diagnostic = "dependency is not a canonical Documents/Plans Markdown path";
-				return false;
-			}
-			if (!std::is_sorted(rPlan.dependencies.begin(), rPlan.dependencies.end(), Utf8PathLess) || std::adjacent_find(rPlan.dependencies.begin(), rPlan.dependencies.end()) != rPlan.dependencies.end())
-			{
-				rPlan.diagnostic = "dependencies must be unique ordinal-sorted";
-				return false;
-			}
-			rPlan.bValid = true;
-			return true;
-		}
-		catch (const nlohmann::json::exception&)
-		{
-			rPlan.diagnostic = "metadata JSON is invalid";
-			return false;
-		}
+		return false;
 	}
+	input.seekg(0, std::ios::beg);
+	rBytes.assign(static_cast<size_t>(iSize), '\0');
+	input.read(rBytes.data(), static_cast<std::streamsize>(iSize));
+	return input.good() || input.eof();
+}
 
-	static bool ParsePlan(Plan& rPlan)
+bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath)
+{
+	std::filesystem::path path(value);
+	if (value.rfind(L"Documents/Plans/", 0) != 0)
 	{
-		if (!ReadBytes(rPlan.diskPath, rPlan.bytes))
-		{
-			std::error_code error;
-			rPlan.diagnostic = !std::filesystem::exists(ExtendedLengthPath(rPlan.diskPath), error) && !error ? "missing" : "could not read plan bytes";
-			return false;
-		}
-		return ParsePlanBytes(rPlan);
+		return false;
 	}
-
-	static bool IsDirectoryGuidance(std::wstring_view path)
+	if (!value.ends_with(L".md"))
 	{
-		std::wstring filename = std::filesystem::path(path).filename().wstring();
-		return filename == L"AGENTS.md";
+		return false;
 	}
-
-	// Guidance metadata is inert in both directions: never executable, and never another Plan's dependency child, so
-	// dropping its outgoing edges keeps it out of terminal preparation's child scans.  The entry itself stays in the Plan
-	// map because inbound edges block on membership alone, which is what stops a dependent plan going stale.  A tracked
-	// file absent from the worktree keeps its "missing" classification, which the baseline comparison needs to erase it.
-	static void ClassifyDirectoryGuidance(Plan& rPlan)
+	if (std::ranges::any_of(path, [](const std::filesystem::path& rPart)
 	{
-		if (!IsDirectoryGuidance(rPlan.path))
-		{
-			return;
-		}
-		if (rPlan.diagnostic == "missing")
-		{
-			return;
-		}
-		rPlan.bValid = false;
+		return rPart == L"." || rPart == L"..";
+	}))
+	{
+		return false;
+	}
+	if (path.generic_wstring() != value)
+	{
+		return false;
+	}
+	rPath = value;
+	return true;
+}
+
+static bool ParsePlanBytes(Plan& rPlan)
+{
+	if (rPlan.bytes.starts_with("\xEF\xBB\xBF"))
+	{
 		rPlan.diagnostic = "manual";
-		rPlan.dependencies.clear();
-		rPlan.bDependenciesKnown = true;
+		return true;
 	}
-
-	// Every plan document carries byte-zero metadata, so a marker-less one is a defect rather than a reference file.
-	// Guidance is the one document that is never a plan, at any depth, so it stays silent instead of being reported.
-	static void ReportInvalidMetadata(const Plan& rPlan, nlohmann::json& rDiagnostics)
+	if (!rPlan.bytes.starts_with(kMarkerPrefix))
 	{
-		if (IsDirectoryGuidance(rPlan.path))
+		// Classifying rather than failing keeps the stale-baseline erase and dependency blocking working; the
+		// reporting sites, not this classification, make a marker-less plan document loud.
+		rPlan.diagnostic = "manual";
+		return true;
+	}
+	int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
+	int64_t iMarkerEnd = iLineEnd == -1 ? std::ssize(rPlan.bytes) : iLineEnd;
+	if (iMarkerEnd > 0 && rPlan.bytes[static_cast<size_t>(iMarkerEnd - 1)] == '\r')
+	{
+		--iMarkerEnd;
+	}
+	std::string_view marker(rPlan.bytes.data(), static_cast<size_t>(iMarkerEnd));
+	if (!marker.ends_with(kMarkerSuffix))
+	{
+		rPlan.diagnostic = "malformed plan metadata marker";
+		return false;
+	}
+	try
+	{
+		int64_t iJsonBegin = std::ssize(kMarkerPrefix);
+		int64_t iJsonLength = std::ssize(marker) - iJsonBegin - std::ssize(kMarkerSuffix);
+		nlohmann::json metadata = nlohmann::json::parse(std::string(marker.substr(static_cast<size_t>(iJsonBegin), static_cast<size_t>(iJsonLength))));
+		if (metadata.contains("dependsOn") && metadata["dependsOn"].is_array())
 		{
-			return;
+			std::vector<std::wstring> dependencies;
+			bool bComplete = true;
+			for (const nlohmann::json& rDependency : metadata["dependsOn"])
+			{
+				std::wstring path;
+				if (!rDependency.is_string() || !NormalizePlanPath(Utf8ToWide(rDependency.get<std::string>()), path))
+				{
+					bComplete = false;
+					break;
+				}
+				dependencies.push_back(std::move(path));
+			}
+			if (bComplete)
+			{
+				rPlan.dependencies = std::move(dependencies);
+				rPlan.bDependenciesKnown = true;
+			}
 		}
-		std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v1 metadata" : rPlan.diagnostic;
-		rDiagnostics.push_back({ { "plan", WideToUtf8(rPlan.path) }, { "code", "invalid-metadata" }, { "message", std::move(message) } });
+		if (metadata.size() != 2 || !metadata.contains("createdUtc") || !metadata["createdUtc"].is_string() || !metadata.contains("dependsOn") || !metadata["dependsOn"].is_array())
+		{
+			rPlan.diagnostic = "metadata requires exactly createdUtc and dependsOn";
+			return false;
+		}
+		int64_t iTicks = 0;
+		if (!ParseCanonicalUtcTimestamp(metadata["createdUtc"].get<std::string>(), iTicks))
+		{
+			rPlan.diagnostic = "createdUtc is invalid";
+			return false;
+		}
+		rPlan.createdUtc = metadata["createdUtc"].get<std::string>();
+		if (!rPlan.bDependenciesKnown)
+		{
+			rPlan.diagnostic = "dependency is not a canonical Documents/Plans Markdown path";
+			return false;
+		}
+		if (!std::is_sorted(rPlan.dependencies.begin(), rPlan.dependencies.end(), Utf8PathLess) || std::adjacent_find(rPlan.dependencies.begin(), rPlan.dependencies.end()) != rPlan.dependencies.end())
+		{
+			rPlan.diagnostic = "dependencies must be unique ordinal-sorted";
+			return false;
+		}
+		rPlan.bValid = true;
+		return true;
 	}
-
-	bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+	catch (const nlohmann::json::exception&)
 	{
-		std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans" });
-		if (!optionalListing)
+		rPlan.diagnostic = "metadata JSON is invalid";
+		return false;
+	}
+}
+
+static bool ParsePlan(Plan& rPlan)
+{
+	if (!ReadBytes(rPlan.diskPath, rPlan.bytes))
+	{
+		std::error_code error;
+		rPlan.diagnostic = !std::filesystem::exists(ExtendedLengthPath(rPlan.diskPath), error) && !error ? "missing" : "could not read plan bytes";
+		return false;
+	}
+	return ParsePlanBytes(rPlan);
+}
+
+static bool IsDirectoryGuidance(std::wstring_view path)
+{
+	std::wstring filename = std::filesystem::path(path).filename().wstring();
+	return filename == L"AGENTS.md";
+}
+
+// Guidance metadata is inert in both directions: never executable, and never another Plan's dependency child, so
+// dropping its outgoing edges keeps it out of terminal preparation's child scans.  The entry itself stays in the Plan
+// map because inbound edges block on membership alone, which is what stops a dependent plan going stale.  A tracked
+// file absent from the worktree keeps its "missing" classification, which the baseline comparison needs to erase it.
+static void ClassifyDirectoryGuidance(Plan& rPlan)
+{
+	if (!IsDirectoryGuidance(rPlan.path))
+	{
+		return;
+	}
+	if (rPlan.diagnostic == "missing")
+	{
+		return;
+	}
+	rPlan.bValid = false;
+	rPlan.diagnostic = "manual";
+	rPlan.dependencies.clear();
+	rPlan.bDependenciesKnown = true;
+}
+
+// Every plan document carries byte-zero metadata, so a marker-less one is a defect rather than a reference file.
+// Guidance is the one document that is never a plan, at any depth, so it stays silent instead of being reported.
+static void ReportInvalidMetadata(const Plan& rPlan, nlohmann::json& rDiagnostics)
+{
+	if (IsDirectoryGuidance(rPlan.path))
+	{
+		return;
+	}
+	std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v1 metadata" : rPlan.diagnostic;
+	rDiagnostics.push_back({ { "plan", WideToUtf8(rPlan.path) }, { "code", "invalid-metadata" }, { "message", std::move(message) } });
+}
+
+bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+{
+	std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans" });
+	if (!optionalListing)
+	{
+		return false;
+	}
+	int64_t iOffset = 0;
+	while (iOffset < std::ssize(*optionalListing))
+	{
+		int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
+		if (iEnd == -1)
 		{
 			return false;
 		}
-		int64_t iOffset = 0;
-		while (iOffset < std::ssize(*optionalListing))
+		std::wstring path;
+		if (!NormalizePlanPath(Utf8ToWide(std::string_view(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
 		{
-			int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
-			if (iEnd == -1)
-			{
-				return false;
-			}
-			std::wstring path;
-			if (!NormalizePlanPath(Utf8ToWide(std::string_view(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
-			{
-				iOffset = iEnd + 1;
-				continue;
-			}
 			iOffset = iEnd + 1;
-			Plan plan {};
-			plan.path = path;
-			plan.diskPath = rWorktree / path;
-			ParsePlan(plan);
-			ClassifyDirectoryGuidance(plan);
-			if (!plan.bValid && plan.diagnostic != "missing")
-			{
-				ReportInvalidMetadata(plan, rDiagnostics);
-			}
-			rPlans.emplace(std::move(path), std::move(plan));
+			continue;
 		}
-		return true;
+		iOffset = iEnd + 1;
+		Plan plan {};
+		plan.path = path;
+		plan.diskPath = rWorktree / path;
+		ParsePlan(plan);
+		ClassifyDirectoryGuidance(plan);
+		if (!plan.bValid && plan.diagnostic != "missing")
+		{
+			ReportInvalidMetadata(plan, rDiagnostics);
+		}
+		rPlans.emplace(std::move(path), std::move(plan));
 	}
+	return true;
+}
 
-	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+{
+	// -z keeps paths unambiguous.  Every path still passes the scheduler's stricter canonical check.
+	std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans" });
+	if (!optionalListing)
 	{
-		// -z keeps paths unambiguous.  Every path still passes the scheduler's stricter canonical check.
-		std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans" });
-		if (!optionalListing)
+		return false;
+	}
+	int64_t iOffset = 0;
+	while (iOffset < std::ssize(*optionalListing))
+	{
+		int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
+		if (iEnd == -1)
 		{
 			return false;
 		}
-		int64_t iOffset = 0;
-		while (iOffset < std::ssize(*optionalListing))
+		std::string_view entry(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset));
+		iOffset = iEnd + 1;
+		int64_t iTab = static_cast<int64_t>(entry.find('\t'));
+		if (iTab == -1)
 		{
-			int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
-			if (iEnd == -1)
-			{
-				return false;
-			}
-			std::string_view entry(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset));
-			iOffset = iEnd + 1;
-			int64_t iTab = static_cast<int64_t>(entry.find('\t'));
-			if (iTab == -1)
-			{
-				continue;
-			}
-
-			// Both ordinary regular-file modes hold Plan documents.  Symlinks, gitlinks, and trees stay excluded.
-			if (!entry.starts_with("100644 blob ") && !entry.starts_with("100755 blob "))
-			{
-				continue;
-			}
-			std::wstring path;
-			if (!NormalizePlanPath(Utf8ToWide(entry.substr(static_cast<size_t>(iTab + 1))), path))
-			{
-				continue;
-			}
-			std::optional<std::string> optionalBytes = RunGit({ L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path });
-			if (!optionalBytes)
-			{
-				return false;
-			}
-			Plan plan {};
-			plan.path = path;
-			plan.bytes = std::move(*optionalBytes);
-			ParsePlanBytes(plan);
-			ClassifyDirectoryGuidance(plan);
-			if (!plan.bValid)
-			{
-				ReportInvalidMetadata(plan, rDiagnostics);
-			}
-			rPlans.emplace(std::move(path), std::move(plan));
+			continue;
 		}
-		return true;
-	}
 
-	bool IsBlockedByDependencies(const Plan& rPlan, const std::unordered_map<std::wstring, Plan>& rPlans)
-	{
-		return std::ranges::any_of(rPlan.dependencies, [&rPlans](const std::wstring& rDependency)
+		// Both ordinary regular-file modes hold Plan documents.  Symlinks, gitlinks, and trees stay excluded.
+		if (!entry.starts_with("100644 blob ") && !entry.starts_with("100755 blob "))
 		{
-			return rPlans.find(rDependency) != rPlans.end();
-		});
-	}
-
-	std::vector<std::wstring> GetSortedPlanPaths(const std::unordered_map<std::wstring, Plan>& rPlans)
-	{
-		std::vector<std::wstring> paths;
-		for (const auto& [rPath, rPlan] : rPlans)
-		{
-			paths.push_back(rPath);
+			continue;
 		}
-		std::sort(paths.begin(), paths.end());
-		return paths;
-	}
-
-	void MarkCycles(std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
-	{
-		std::unordered_map<std::wstring, int64_t> colors;
-		std::vector<std::wstring> stack;
-		std::function<void(std::wstring_view)> Visit = [&](std::wstring_view path)
+		std::wstring path;
+		if (!NormalizePlanPath(Utf8ToWide(entry.substr(static_cast<size_t>(iTab + 1))), path))
 		{
-			std::wstring ownedPath(path);
-			colors.insert_or_assign(ownedPath, 1); stack.push_back(ownedPath);
-			for (const std::wstring& rDependency : rPlans.at(ownedPath).dependencies)
+			continue;
+		}
+		std::optional<std::string> optionalBytes = RunGit({ L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path });
+		if (!optionalBytes)
+		{
+			return false;
+		}
+		Plan plan {};
+		plan.path = path;
+		plan.bytes = std::move(*optionalBytes);
+		ParsePlanBytes(plan);
+		ClassifyDirectoryGuidance(plan);
+		if (!plan.bValid)
+		{
+			ReportInvalidMetadata(plan, rDiagnostics);
+		}
+		rPlans.emplace(std::move(path), std::move(plan));
+	}
+	return true;
+}
+
+bool IsBlockedByDependencies(const Plan& rPlan, const std::unordered_map<std::wstring, Plan>& rPlans)
+{
+	return std::ranges::any_of(rPlan.dependencies, [&rPlans](const std::wstring& rDependency)
+	{
+		return rPlans.find(rDependency) != rPlans.end();
+	});
+}
+
+std::vector<std::wstring> GetSortedPlanPaths(const std::unordered_map<std::wstring, Plan>& rPlans)
+{
+	std::vector<std::wstring> paths;
+	for (const auto& [rPath, rPlan] : rPlans)
+	{
+		paths.push_back(rPath);
+	}
+	std::sort(paths.begin(), paths.end());
+	return paths;
+}
+
+void MarkCycles(std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+{
+	std::unordered_map<std::wstring, int64_t> colors;
+	std::vector<std::wstring> stack;
+	std::function<void(std::wstring_view)> Visit = [&](std::wstring_view path)
+	{
+		std::wstring ownedPath(path);
+		colors.insert_or_assign(ownedPath, 1); stack.push_back(ownedPath);
+		for (const std::wstring& rDependency : rPlans.at(ownedPath).dependencies)
+		{
+			auto found = rPlans.find(rDependency);
+			if (found == rPlans.end() || !found->second.bValid)
 			{
-				auto found = rPlans.find(rDependency);
-				if (found == rPlans.end() || !found->second.bValid)
+				continue;
+			}
+			int64_t iDependencyColor = 0;
+			{
+				auto it = colors.find(rDependency);
+				if (it != colors.end())
 				{
-					continue;
-				}
-				int64_t iDependencyColor = 0;
-				{
-					auto it = colors.find(rDependency);
-					if (it != colors.end())
-					{
-						iDependencyColor = it->second;
-					}
-				}
-				if (iDependencyColor == 0)
-				{
-					Visit(rDependency);
-				}
-				else if (iDependencyColor == 1)
-				{
-					for (auto it = std::find(stack.begin(), stack.end(), rDependency); it != stack.end(); ++it)
-					{
-						rPlans.at(*it).bValid = false;
-						rPlans.at(*it).diagnostic = "dependency cycle";
-						rDiagnostics.push_back({ { "plan", WideToUtf8(*it) }, { "code", "dependency-cycle" }, { "message", "plan belongs to a dependency cycle" } });
-					}
+					iDependencyColor = it->second;
 				}
 			}
-			stack.pop_back(); colors.insert_or_assign(ownedPath, 2);
-		};
-		std::vector<std::wstring> paths = GetSortedPlanPaths(rPlans);
+			if (iDependencyColor == 0)
+			{
+				Visit(rDependency);
+			}
+			else if (iDependencyColor == 1)
+			{
+				for (auto it = std::find(stack.begin(), stack.end(), rDependency); it != stack.end(); ++it)
+				{
+					rPlans.at(*it).bValid = false;
+					rPlans.at(*it).diagnostic = "dependency cycle";
+					rDiagnostics.push_back({ { "plan", WideToUtf8(*it) }, { "code", "dependency-cycle" }, { "message", "plan belongs to a dependency cycle" } });
+				}
+			}
+		}
+		stack.pop_back(); colors.insert_or_assign(ownedPath, 2);
+	};
+	std::vector<std::wstring> paths = GetSortedPlanPaths(rPlans);
+	for (const std::wstring& rPath : paths)
+	{
+		const Plan& rPlan = rPlans.at(rPath);
+		if (rPlan.bValid && !colors.contains(rPath))
+		{
+			Visit(rPath);
+		}
+	}
+	bool bChanged = true;
+	while (bChanged)
+	{
+		bChanged = false;
 		for (const std::wstring& rPath : paths)
 		{
-			const Plan& rPlan = rPlans.at(rPath);
-			if (rPlan.bValid && !colors.contains(rPath))
+			Plan& rPlan = rPlans.at(rPath);
+			if (!rPlan.bValid)
 			{
-				Visit(rPath);
+				continue;
 			}
-		}
-		bool bChanged = true;
-		while (bChanged)
-		{
-			bChanged = false;
-			for (const std::wstring& rPath : paths)
+			for (const std::wstring& rDependency : rPlan.dependencies)
 			{
-				Plan& rPlan = rPlans.at(rPath);
-				if (!rPlan.bValid)
+				auto it = rPlans.find(rDependency);
+				if (it != rPlans.end() && !it->second.bValid)
 				{
-					continue;
-				}
-				for (const std::wstring& rDependency : rPlan.dependencies)
-				{
-					auto it = rPlans.find(rDependency);
-					if (it != rPlans.end() && !it->second.bValid)
-					{
-						rPlan.bValid = false;
-						rPlan.diagnostic = "dependency is excluded from selection";
-						rDiagnostics.push_back({ { "plan", WideToUtf8(rPath) }, { "code", "dependency-excluded" }, { "message", rPlan.diagnostic } });
-						bChanged = true;
-						break;
-					}
+					rPlan.bValid = false;
+					rPlan.diagnostic = "dependency is excluded from selection";
+					rDiagnostics.push_back({ { "plan", WideToUtf8(rPath) }, { "code", "dependency-excluded" }, { "message", rPlan.diagnostic } });
+					bChanged = true;
+					break;
 				}
 			}
 		}
 	}
+}
+
 } // namespace toolcli

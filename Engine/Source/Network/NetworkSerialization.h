@@ -6,9 +6,12 @@
 // order, and LZ4 framing. The game owns the StatusChangeType enum and each type's payload bytes, which the codec writes
 // and reads through game::WriteStatusChangePayload and game::ReadStatusChangePayload. The game type is forward-declared
 // rather than included so this engine header stays free of game dependencies; the codec .cpp includes the game headers.
+
 namespace game
 {
+
 struct StatusChange;
+
 } // namespace game
 
 namespace engine

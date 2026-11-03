@@ -668,7 +668,9 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	// queue a physical pos from them, but ImGuiManager::Prepare's sentinel is always the last mouse-pos event before
 	// NewFrame.
 	bool bInputMessage = (uiMessage >= WM_MOUSEFIRST && uiMessage <= WM_MOUSELAST) || (uiMessage >= WM_KEYFIRST && uiMessage <= WM_KEYLAST);
-	if (!(bInputSuppressed && bInputMessage))
+	bool bTabMessage = ((uiMessage == WM_KEYDOWN || uiMessage == WM_KEYUP || uiMessage == WM_SYSKEYDOWN || uiMessage == WM_SYSKEYUP) && uiWordParameter == VK_TAB)
+	                || ((uiMessage == WM_CHAR || uiMessage == WM_SYSCHAR || uiMessage == WM_UNICHAR) && uiWordParameter == '\t');
+	if (!bTabMessage && !(bInputSuppressed && bInputMessage))
 	{
 		if (ImGui_ImplWin32_WndProcHandler(hwnd, uiMessage, uiWordParameter, iLongParameter) != 0)
 		{

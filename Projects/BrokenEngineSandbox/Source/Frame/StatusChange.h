@@ -92,7 +92,7 @@ struct DestroyShipData
 	ShipType eType {};
 	int64_t iUuid = 0;
 
-	static constexpr auto Fields()
+	static constexpr engine::FrameColumnList<FRAME_COLUMN(DestroyShipData, eType), FRAME_COLUMN(DestroyShipData, iUuid)> Fields()
 	{
 		return engine::FrameColumnList<FRAME_COLUMN(DestroyShipData, eType), FRAME_COLUMN(DestroyShipData, iUuid)> {};
 	}
@@ -108,7 +108,7 @@ struct UpdateShipData
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	uint8_t uiTargetFlightPlane = kuiKeepTargetFlightPlane;
 
-	static constexpr auto Fields()
+	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> Fields()
 	{
 		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> {};
 	}
@@ -121,7 +121,7 @@ struct UpdateFleetData
 	engine::GridCoord fleetWantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 
-	static constexpr auto Fields()
+	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> Fields()
 	{
 		return engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> {};
 	}

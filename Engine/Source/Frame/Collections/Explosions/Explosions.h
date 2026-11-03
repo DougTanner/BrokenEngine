@@ -246,9 +246,9 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fTimePercent = 1.0f;
 
 		// Status-change payload members. The coordinate and start time come from the cell the spawn is applied to.
-		static constexpr auto Fields()
+		static constexpr FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, lifecycleFlags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> Fields()
 		{
-			return FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, lifecycleFlags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> {};
+			return {};
 		}
 	};
 

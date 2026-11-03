@@ -20,7 +20,7 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   such marker goes through `ExportJob::ReadMarkerFile`/`WriteMarkerFile` and is
   removed before the first output write.
 - Each job's `std::async` launch wraps `RunExport` in `common::ThreadLocal::Entry`, so the job runs with its own worker's `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other parallel exports.
-- `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline section are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
+- `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline and hardpoint sections are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
 - `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.
 
 ## Matching and Routing
@@ -190,35 +190,47 @@ without modifying the source.
 `ExportModel` owns optional adjacent `<source-filename>.model.json` metadata:
 remove only the generated final `.MODEL` extension before appending
 `.model.json`, so `scene.gltf.MODEL` uses `scene.gltf.model.json`.
-Present metadata requires integer `version: 3`, complete `rotationDegrees`,
+Present metadata requires integer `version: 4`, complete `rotationDegrees`,
 `scale`, and `offset` arrays, each with exactly three numeric components that
 fit finite floats, a `hitbox` string of `sphere`, `box`, or `outline`, and a
-`missileTubes` array, possibly empty, of objects; every scale component must
-remain strictly positive after conversion. Each tube entry requires `position`
-and `direction` arrays under the same three-component rule, both in
-pre-alignment rest model coordinates (the space of `offset`), and ignores other
-keys; `direction` must have nonzero length, which is its whole contract:
+`hardpoints` array, possibly empty, of objects; every scale component must
+remain strictly positive after conversion. Each hardpoint requires a string
+`kind`, exactly `missileTube` or `fighterLaunchBay`, and `position` and
+`direction` arrays under the same three-component rule, both in
+pre-alignment rest model coordinates (the space of `offset`). Other keys are
+ignored; `direction` must have nonzero length, which is its whole contract:
 ModelViewer writes unit vectors and the reader stores the value without
 normalizing it. Invalid present metadata fails through the export aggregate;
 absence alone supplies zero rotation and offset with unit scale, the `sphere`
-hitbox setting and no missile tubes.
+hitbox setting and no hardpoints.
 `common::ReadModelMetadata` (`Common/ModelMetadata.h`) is the one reader and
 validator, shared with ModelViewer authoring.
 
 Export converts degrees to radians once and stores rotation, scale, and offset
-separately in `ModelHeader`, leaving geometry and animation unchanged; missile
-tubes are validated but not packed. `common::GetModelAlignment` owns the complete
+separately in `ModelHeader`, leaving geometry and animation unchanged.
+`common::GetModelAlignment` owns the complete
 matrix `(offset translation * authored XYZ scale) * XYZ pre-rotation` in
 exported model coordinates, with rotation ordered X, then Y, then Z. Apply it
-once in the outline bake, ModelViewer and game rendering; metadata alone sets
-static model scale after source normalization. Dynamic render transforms and
+once in the outline and hardpoint bakes, ModelViewer and game rendering;
+metadata alone sets static model scale after source normalization. Dynamic render transforms and
 independent gameplay dimensions remain consumer-owned.
 
-Every model chunk, whatever its hitbox setting, ends in a `common::ModelOutline`
+Every model chunk, whatever its hitbox setting, appends a `common::ModelOutline`
 section: the top-down convex hull and z range of the vertices after alignment,
 plus the setting. The bake owns the outline's value checks — a hull outside 3
 to `kiModelOutlineVertexMaximum` vertices, a non-finite value, or a failed
 convexity check fails the export — so runtime readers check only memory safety.
+
+Hardpoints pack into separate missile tube then fighter launch bay sections
+after the outline, each counted by the model header. Both sections use packed
+float3 position/direction pairs without kind tags, preserving each kind's
+relative order in the authored list; missile order remains tube identity.
+Positions receive the complete alignment; directions receive its scale and
+rotation without translation or normalization. Non-finite aligned vectors or
+a zero aligned direction fail export. Retain XYZ until consumers apply their
+gameplay projection. A zero count emits no records. The outline and both
+sections stay outside the GPU payload size; their shared offsets live in
+`ModelHeader`. The server fleet launch path consumes fighter launch bays for authored spawn positions and headings.
 
 The model job fingerprints both `.MODEL` content and metadata content or explicit
 absence, so metadata addition, editing, or removal dirties model packing without

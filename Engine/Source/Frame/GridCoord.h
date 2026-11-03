@@ -90,6 +90,6 @@ struct std::hash<engine::GridCoord>
 {
 	std::size_t operator()(const engine::GridCoord& rCoordinate) const noexcept
 	{
-		return std::hash<uint64_t>{}(rCoordinate.ToKey());
+		return std::hash<uint64_t> {}(rCoordinate.ToKey());
 	}
 };

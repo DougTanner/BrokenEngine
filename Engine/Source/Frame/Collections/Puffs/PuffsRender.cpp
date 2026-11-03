@@ -58,6 +58,11 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	siTotalCount += rCurrent.iCount;
 
+	if (gbGameplayPaused)
+	{
+		return;
+	}
+
 	if (rCurrent.iCount == 0)
 	{
 		return;
@@ -121,7 +126,7 @@ void PuffsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(DynamicPipelines::FlightPlaneDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(DynamicPipelines::FlightPlaneDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
 	}
 }
 

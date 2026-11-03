@@ -189,7 +189,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    and either the rule 47 script's run has `status` `pass` or `fail` with every
    remaining violation reported as a residual, or its unavailability is
    reported.
-7. Run the session-added candidate scanner once: `pwsh -NoProfile -File
+7. Run the candidate scanner once: `pwsh -NoProfile -File
    .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <full 40-character SHA> -OutputPath
    Temp/code-style-review-candidates.json`,
@@ -199,6 +199,10 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      path;
    - with `-PathPrefix '<comma-separated prefixes>'` when the caller supplied
      `Paths`.
+   - Rule-74 namespace-spacing candidates cover each surviving changed C++
+     file in full, including a change that only deletes a blank line, and can
+     expose pre-existing spacing violations in that file. Other candidates,
+     including rule-74 indentation, retain their session-added-line scope.
    - Done when one `broken-engine-session-candidates/v1` object with `hits`
      rows of `path`, `line`, `kind`, and `text`, plus `counts`, is read from
      that file, or the run printed no summary line.

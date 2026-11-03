@@ -153,7 +153,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	int64_t iScheduledLayer = bScheduledFrame ? (gpGraphics->miFrameCounter / iLightingUpdateCadence) % shaders::kiLightingLayers : -1;
 
 	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
-	static const uint32_t suiRandomSeed = []
+	static uint32_t suiRandomSeed = []
 	{
 		common::RandomEngine randomEngine;
 		randomEngine.TimeSeed();
@@ -361,7 +361,14 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower = gPhysicallyBasedRenderingCubemapLevelOfDetailPower.mfCurrent;
 	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset = gPhysicallyBasedRenderingCubemapLevelOfDetailOffset.mfCurrent;
 
-	rMainLayout.fSmokeShadowIntensity = gSmokeShadowIntensity.mfCurrent;
+	int64_t iPlaneCount = gpFlightPlanes->Count();
+	float fIntensityBottom = gSmokeShadowIntensityBottom.mfCurrent;
+	float fIntensityTop = gSmokeShadowIntensityTop.mfCurrent;
+	for (int64_t i = 0; i < iPlaneCount; ++i)
+	{
+		float fPlaneFraction = iPlaneCount > 1 ? static_cast<float>(i) / static_cast<float>(iPlaneCount - 1) : 0.0f;
+		rMainLayout.pfSmokeShadowIntensities[i] = std::lerp(fIntensityBottom, fIntensityTop, fPlaneFraction);
+	}
 }
 
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer)

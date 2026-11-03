@@ -15,7 +15,7 @@ vec4 SmokeSpread(GlobalLayout globalLayout, sampler2D textureSampler, sampler2D 
 	float fStepCount = globalLayout.pfSmokeStepCounts[iPlane];
 	vec2 f2WindWorldPosition = f2WorldPosition + vec2(sin(0.5f * globalLayout.fElapsedTime), cos(0.5f * globalLayout.fElapsedTime));
 	float fWindNoiseSample = -1.0f + 2.0f * textureLod(noiseTextureSampler, globalLayout.fSmokeWindNoiseScale * fNoiseScale * f2WindWorldPosition, 0.0f).x;
-	float fWindNoise = max(0.0f, globalLayout.fSmokeWindNoiseQuantity * fWindNoiseSample);
+	float fWindNoise = max(0.0f, globalLayout.pfSmokeWindNoiseQuantities[iPlane] * fWindNoiseSample);
 
 	vec2 f2TimeNoise = 2.0f * vec2(-1.0f + 2.0f * sin(0.01f * globalLayout.fElapsedTime), -1.0f + 2.0f * cos(0.01f * globalLayout.fElapsedTime));
 	float fSwirlNoiseSampleX = -1.0f + 2.0f * textureLod(noiseTextureSampler, f2TimeNoise + fNoiseScale * f2WorldPosition, 0.0f).x;

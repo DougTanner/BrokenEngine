@@ -17,9 +17,8 @@ struct FlightPlane
 
 inline constexpr int64_t kiMaxFlightPlanes = 8;
 
-// The game's flight-plane table is copied at boot on both builds with its highest plane raised by the tallest island
-// peak, and stays immutable afterwards, so tick code on worker threads reads it without synchronization. Index 0 is the
-// lowest plane; heights ascend.
+// Borrows the game's immutable, static-lifetime table of absolute heights on both builds, so tick code on worker
+// threads reads it without synchronization. Index 0 is the lowest plane; heights ascend.
 class FlightPlanes : public common::Singleton<FlightPlanes>
 {
 public:
@@ -35,7 +34,7 @@ public:
 
 private:
 
-	std::vector<FlightPlane> mPlanes;
+	std::span<const FlightPlane> mPlanes;
 };
 
 inline FlightPlanes* gpFlightPlanes = nullptr;

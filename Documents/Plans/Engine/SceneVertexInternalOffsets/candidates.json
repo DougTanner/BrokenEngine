@@ -1,0 +1,17 @@
+{
+  "partition": "02-datapacker",
+  "path": "DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp",
+  "originalLine": 128,
+  "currentLine": 128,
+  "kind": "style-rule-17",
+  "text": "uint32_t uiVertexStart = static_cast<uint32_t>(rVertices.size());",
+  "presentInCurrentScan": true,
+  "status": "confirmed-semantic",
+  "tier": 2,
+  "slice": "S-vector-index",
+  "reason": "Own runtime vector start offset, not stored/API-address type: resize, pointer addition, and int64_t remap consume it at lines199-205.",
+  "action": "Use int64_t iVertexStart = std::ssize(rVertices), propagate three uses and local explanatory identifier. Preserve the prior uint32 conversion point in remap addition if exact overflow behavior is required; see plan decision.",
+  "evidence": "DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:128",
+  "candidateKey": "02-datapacker|DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp|128|style-rule-17",
+  "followUpDisposition": "pending; design in owning Plan supersedes historical action choices"
+}

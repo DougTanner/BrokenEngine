@@ -21,8 +21,10 @@
 
 namespace engine
 {
+
 template struct Collection<game::MissilesInterpolate>;
 template struct Collection<game::MissilesPostRender>;
+
 } // namespace engine
 
 namespace game
@@ -182,7 +184,7 @@ void MissilesInterpolate::Register()
 #if defined(BT_CLIENT)
 	engine::AreaLightsInterpolate::RegisterType(siFleetExhaustAreaLightTypeIndex,
 	{
-		.uiCrc = data::kTexturesMissilesBC73pngCrc,
+		.uiCrc = data::kTexturesMissilesBC72pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}},
 		.fVisibleIntensity = gMissileExhaustVisibleIntensity.mfCurrent,
@@ -195,7 +197,7 @@ void MissilesInterpolate::Register()
 
 	engine::AreaLightsInterpolate::RegisterType(siRandomExhaustAreaLightTypeIndex,
 	{
-		.uiCrc = data::kTexturesMissilesBC71pngCrc,
+		.uiCrc = data::kTexturesMissilesBC72pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}},
 		.fVisibleIntensity = gMissileExhaustVisibleIntensity.mfCurrent,
@@ -242,7 +244,7 @@ void MissilesInterpolate::Register()
 
 static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
 {
-	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f,};
+	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f, };
 	for (int64_t j = 0; float fSizeMultiplier : kpfSizeMultipliers)
 	{
 		float fScaledPercent = fPercent * fSizeMultiplier;

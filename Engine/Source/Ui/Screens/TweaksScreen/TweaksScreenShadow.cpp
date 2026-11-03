@@ -34,7 +34,8 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Object Blur Radius Noon", &gObjectShadowsBlurRadiusNoon},
 	{"Object Blur Radius Sunset", &gObjectShadowsBlurRadiusSunset},
 	{"Terrain Shadow Height Fade", &gObjectShadowsTerrainShadowFade},
-	{"Smoke Shadow Intensity", &gSmokeShadowIntensity},
+	{"Bottom Smoke Shadow Intensity", &gSmokeShadowIntensityBottom},
+	{"Top Smoke Shadow Intensity", &gSmokeShadowIntensityTop},
 };
 
 void RenderShadowSection(TweaksScreen& rScreen)
@@ -70,7 +71,8 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Object Blur Radius Noon", iSection);
 	rScreen.WrapperSlider("Object Blur Radius Sunset", iSection);
 	rScreen.WrapperSlider("Terrain Shadow Height Fade", iSection);
-	rScreen.WrapperSlider("Smoke Shadow Intensity", iSection);
+	rScreen.WrapperSlider("Bottom Smoke Shadow Intensity", iSection);
+	rScreen.WrapperSlider("Top Smoke Shadow Intensity", iSection);
 }
 
 } // namespace engine

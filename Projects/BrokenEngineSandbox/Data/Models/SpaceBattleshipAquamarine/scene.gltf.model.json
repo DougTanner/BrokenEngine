@@ -1,8 +1,16 @@
 {
-	"version": 3,
+	"version": 4,
 	"rotationDegrees": [90, 0, 90],
-	"scale": [7.7525, 7.7525, 7.7525],
-	"offset": [0, 0.0228, 0.0001],
+	"scale": [16, 16, 16],
+	"offset": [0, 0.0228, 1e-04],
 	"hitbox": "outline",
-	"missileTubes": []
+	"hardpoints": [
+		{"kind": "missileTube", "position": [0.18078084, -0.021227656, -0.31213534], "direction": [0, 0, 1]},
+		{"kind": "missileTube", "position": [0.16094449, -0.022658609, -0.2765504], "direction": [0, 0, 1]},
+		{"kind": "missileTube", "position": [0.13964812, -0.023082813, -0.23983121], "direction": [0, 0, 1]},
+		{"kind": "missileTube", "position": [-0.13778926, -0.022400253, -0.23983121], "direction": [0, 0, 1]},
+		{"kind": "missileTube", "position": [-0.15930802, -0.023275167, -0.27655053], "direction": [0, 0, 1]},
+		{"kind": "missileTube", "position": [-0.18079066, -0.024246894, -0.31213522], "direction": [0, 0, 1]},
+		{"kind": "fighterLaunchBay", "position": [-0.0015236344, 0.04832483, 0.8290173], "direction": [0, -3.636058e-05, 1]}
+	]
 }

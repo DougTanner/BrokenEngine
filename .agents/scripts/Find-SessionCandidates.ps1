@@ -1,6 +1,6 @@
 # Candidate scanner for /code-style-review: by default it reports candidate temporary
-# instrumentation and style-rule candidates on lines this session added, so a review never has to
-# separate them from pre-existing code by hand. The scan reports candidates only —
+# instrumentation and style-rule candidates on lines this session added, with namespace spacing
+# also checked throughout surviving changed C++ files. The scan reports candidates only —
 # it never decides whether a hit is temporary or a row is a violation, never edits a source file, and
 # writes only the caller's -OutputPath result and one OS temp file holding the inventory, deleted before
 # it exits (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index). Stdout carries the result
@@ -320,6 +320,24 @@ function Test-Rule74Line([string] $Path, [int] $Line, [string] $Text) {
 	return $false
 }
 
+function Test-NamespaceSpacingLine([string] $Path, [int] $Line, [string] $Text) {
+	$code = ($Text -replace '//.*$', '').Trim()
+	$opening = $code -cmatch '^(?:inline\s+)?namespace(?:\s+[A-Za-z_]\w*(?:::(?:inline\s+)?[A-Za-z_]\w*)*)?\s*\{?$'
+	$closing = $Text -cmatch '^\s*}\s*//\s*namespace(?:\s+[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)?\s*$'
+	if (-not $opening -and -not $closing) { return $false }
+	$lines = Get-NewSideLine $Path
+	$braceLine = $Line
+	if ($opening -and -not $code.EndsWith('{')) {
+		for ($braceLine++; $braceLine -le $lines.Count; $braceLine++) {
+			if (-not [string]::IsNullOrWhiteSpace($lines[$braceLine - 1])) { break }
+		}
+		if ($braceLine -gt $lines.Count -or $lines[$braceLine - 1] -cnotmatch '^\s*\{\s*(?://.*)?$') { return $false }
+	}
+	if ($Line -eq 1 -or -not [string]::IsNullOrWhiteSpace($lines[$Line - 2])) { return $true }
+	# The cached split preserves the empty element supplied by a terminal newline.
+	return $braceLine -ge $lines.Count -or -not [string]::IsNullOrWhiteSpace($lines[$braceLine])
+}
+
 function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 	# An `if` (an `else if` counts as its `if`) line is a rule 62 candidate when its condition, which may
 	# continue over later head-side lines until its parentheses close, has a `||` at depth one outside
@@ -398,7 +416,7 @@ try {
 		$inventory = Get-InventoryDocument
 		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
 		$scannedLines = Get-AddedLine $inventory
-		$scope = 'session-added C++ lines'
+		$scope = 'session-added C++ lines and namespace spacing throughout changed C++ files'
 	}
 
 	$hits = [Collections.Generic.List[object]]::new()
@@ -407,7 +425,7 @@ try {
 		if (Test-Rule61Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-61') }
 		if (Test-Rule22Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-22') }
 		if (Test-Rule59Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-59') }
-		if (Test-Rule74Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-74') }
+		if ((Test-Rule74Line $line.Path $line.Line $line.Text) -or (Test-NamespaceSpacingLine $line.Path $line.Line $line.Text)) { $kinds.Add('style-rule-74') }
 		$kinds.AddRange((Test-CandidatePattern $line.Path $line.Text))
 		if (Test-Rule62Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-62') }
 		if (Test-Rule51Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-51') }
@@ -416,7 +434,23 @@ try {
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
 		foreach ($kind in $kinds) { $hits.Add([ordered]@{ path = $line.Path; line = $line.Line; kind = $kind; text = $text }) }
 	}
-	$sorted = [Collections.Generic.List[object]]::new($hits)
+	if ($PSCmdlet.ParameterSetName -ceq 'Session') {
+		foreach ($entry in $inventory.entries) {
+			if ($entry.status -ceq 'D' -or $script:CppClasses -cnotcontains $entry.class) { continue }
+			$lines = Get-NewSideLine $entry.path
+			for ($number = 1; $number -le $lines.Count; $number++) {
+				if (-not (Test-NamespaceSpacingLine $entry.path $number $lines[$number - 1])) { continue }
+				$text = $lines[$number - 1].Trim()
+				if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
+				$hits.Add([ordered]@{ path = $entry.path; line = $number; kind = 'style-rule-74'; text = $text })
+			}
+		}
+	}
+	$seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	$sorted = [Collections.Generic.List[object]]::new()
+	foreach ($hit in $hits) {
+		if ($seen.Add("$($hit.path)`0$($hit.line)`0$($hit.kind)")) { $sorted.Add($hit) }
+	}
 	$sorted.Sort([Comparison[object]] {
 		param($left, $right)
 		$compare = [string]::CompareOrdinal($left.path, $right.path)

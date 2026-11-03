@@ -172,9 +172,9 @@ struct FrameInterpolateBase
 	}
 
 	// The frame-wide values Write, Read, and ServerRead serialize, in stream order.
-	static auto Values()
+	static FrameColumnList<FRAME_COLUMN(FrameInterpolateBase, iTick), FRAME_COLUMN(FrameInterpolateBase, fDeltaTime)> Values()
 	{
-		return FrameColumnList<FRAME_COLUMN(FrameInterpolateBase, iTick), FRAME_COLUMN(FrameInterpolateBase, fDeltaTime)> {};
+		return {};
 	}
 
 	common::crc_t Crcs() const;
@@ -269,18 +269,18 @@ struct FramePostRenderBase
 	}
 
 	// The frame-wide values Write and Read serialize, in stream order; ServerRead skips the kbClientOnlyValue ones.
-	static auto Values()
-	{
-		return FrameColumnList<
-			FRAME_COLUMN(FramePostRenderBase, randomEngine),
-			FRAME_COLUMN(FramePostRenderBase, uiNextUuid),
+	static FrameColumnList<
+		FRAME_COLUMN(FramePostRenderBase, randomEngine),
+		FRAME_COLUMN(FramePostRenderBase, uiNextUuid),
 #if defined(BT_CLIENT)
-			FRAME_COLUMN(FramePostRenderBase, uiNextSoundUuid),
-			FRAME_COLUMN(FramePostRenderBase, uiNextVisualUuid),
+		FRAME_COLUMN(FramePostRenderBase, uiNextSoundUuid),
+		FRAME_COLUMN(FramePostRenderBase, uiNextVisualUuid),
 #endif
-			FRAME_COLUMN(FramePostRenderBase, uiFrameIdentifier),
-			FRAME_COLUMN(FramePostRenderBase, uiPinned),
-			FRAME_COLUMN(FramePostRenderBase, alignments)> {};
+		FRAME_COLUMN(FramePostRenderBase, uiFrameIdentifier),
+		FRAME_COLUMN(FramePostRenderBase, uiPinned),
+		FRAME_COLUMN(FramePostRenderBase, alignments)> Values()
+	{
+		return {};
 	}
 
 	common::crc_t Crcs() const;

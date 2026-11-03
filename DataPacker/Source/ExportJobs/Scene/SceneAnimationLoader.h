@@ -2,7 +2,9 @@
 
 namespace tinygltf
 {
-	class Model;
+
+class Model;
+
 } // namespace tinygltf
 
 // Determine whether to use skeletal or node-based animation.
