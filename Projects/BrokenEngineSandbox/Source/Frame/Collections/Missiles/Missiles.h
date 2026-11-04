@@ -36,12 +36,15 @@ struct FrameInterpolate;
 
 enum class MissileFlags : uint8_t
 {
-	kDirectional = 0x04,
-	kTargetFleet  = 0x08,
-	kTargetRandom = 0x10,
-	kFalling      = 0x20,
+	kUpperFlightPlane = 0x01,
+	kDirectional      = 0x04,
+	kTargetFleet      = 0x08,
+	kTargetRandom     = 0x10,
+	kFalling          = 0x20,
 };
 using MissileFlags_t = common::Flags<MissileFlags>;
+
+[[nodiscard]] int64_t GetMissileFlightPlane(MissileFlags_t flags);
 
 struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 {
@@ -52,7 +55,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 	// Called on Game creation
 	static void Register();
 
-	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
+	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 #if defined(BT_CLIENT)
 	static void ClientInitialize(Frame& rFrame, int64_t iIndex);
@@ -114,7 +117,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 13;
+	static constexpr int64_t kiVersion = 14;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);

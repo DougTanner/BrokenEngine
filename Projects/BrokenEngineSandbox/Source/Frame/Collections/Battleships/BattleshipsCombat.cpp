@@ -235,12 +235,16 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			continue;
 		}
 
-		// Missiles launch only while the ship is exactly at its stored flight plane's height, so every flying missile
-		// starts on a plane, and only at a target whose nearest flight plane is that plane.
+		// Launch only while settled at the controller's effective height on its stored plane.
 		XMVECTOR vecShipPosition = rCurrentInterpolate.pVecPositions[i];
 		float fShipHeight = XMVectorGetZ(vecShipPosition);
 		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
-		if (FlightPlaneAtHeight(fShipHeight) != uiFlightPlane)
+		if (uiFlightPlane == kuiNoFlightPlane)
+		{
+			continue;
+		}
+
+		if (fShipHeight != EffectiveShipFlightHeight(ShipType::kBattleship, rCurrentPostRender.pController[i], uiFlightPlane))
 		{
 			continue;
 		}
@@ -323,7 +327,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		for (int64_t j = 0; j < std::ssize(tubes); ++j)
 		{
 			const XMFLOAT3& rf3Position = tubes[static_cast<size_t>(j)].f3Position;
-			XMVECTOR vecPosition = XMVectorSet((fCos * rf3Position.x - fSin * rf3Position.y) + XMVectorGetX(vecShipPosition), (fSin * rf3Position.x + fCos * rf3Position.y) + XMVectorGetY(vecShipPosition), fShipHeight, 1.0f);
+			XMVECTOR vecPosition = XMVectorSet((fCos * rf3Position.x - fSin * rf3Position.y) + XMVectorGetX(vecShipPosition), (fSin * rf3Position.x + fCos * rf3Position.y) + XMVectorGetY(vecShipPosition), fShipHeight + rf3Position.z, 1.0f);
 			float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecTargetPosition, vecPosition)));
 			if (j == 0 || fDistanceSquared < fNearestTubeDistanceSquared)
 			{
@@ -337,16 +341,17 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		float fDirectionY = XMVectorGetY(vecAlignedDirection);
 		XMVECTOR vecTubeDirection = XMVectorSet(fCos * fDirectionX - fSin * fDirectionY, fSin * fDirectionX + fCos * fDirectionY, 0.0f, 0.0f);
 
-		// Missiles Update zeroes a flying missile's velocity Z, so it holds the ship's plane height.
+		MissileFlags_t missileFlags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
+		missileFlags.Set(MissileFlags::kUpperFlightPlane, uiFlightPlane == 1);
 		bool bSpawned = MissilesPostRender::Spawn(rFrame,
 		{
 			.vecPosition = vecTubePosition,
 			.vecDirection = vecTubeDirection,
 			.vecVelocity = XMVectorScale(vecTubeDirection, kfBattleshipMissileInitialVelocity),
-			.vecStoredDirection = common::DirectionTo(vecTubePosition, XMVectorSetZ(vecTargetPosition, fShipHeight)),
+			.vecStoredDirection = common::DirectionTo(vecTubePosition, XMVectorSetZ(vecTargetPosition, XMVectorGetZ(vecTubePosition))),
 			.uiTarget = *optionalTarget,
 			.fAcceleration = kfBattleshipMissileAcceleration,
-			.flags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet,
+			.flags = missileFlags,
 			.alignment = alignment,
 		});
 		// A refused launch leaves the cooldown unchanged.

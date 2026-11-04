@@ -279,6 +279,7 @@ struct ModelLayout
 	vec4 f4ColorAdd INIT;
 	uint32_t uiMeshDataBase INIT;     // Base index into meshData[] for this object
 	uint32_t uiMaterialCount INIT;    // Number of materials (slots in meshData)
+	vec2 f2ShadowWorldXRange INIT; // Transformed aligned model-box world-X minimum/maximum relative to the model centre, independent of light.
 };
 
 CONSTEXPR int32_t kiHexShieldDirections = 4 * 4;

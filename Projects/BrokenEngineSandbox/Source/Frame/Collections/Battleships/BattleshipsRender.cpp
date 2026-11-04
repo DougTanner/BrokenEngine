@@ -231,7 +231,7 @@ void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 }
 
 // Writes one model instance; vecPosition is local to rBasis's cell, and vecTilt applies after the yaw.
-static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, FXMMATRIX matAlignment, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecTilt, const engine::AnimationData* pAnimationData, const engine::SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
+static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, const engine::ModelShadowBounds& rShadowBounds, FXMMATRIX matAlignment, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecTilt, const engine::AnimationData* pAnimationData, const engine::SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
 {
 	XMVECTOR vecRenderPosition = engine::Rebase(rBasis, vecPosition);
 	XMFLOAT4A f4Position {};
@@ -240,9 +240,11 @@ static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, FXMM
 	XMMATRIX matYaw = common::RotationMatrixFromDirection(vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 	XMMATRIX matTilt = XMMatrixRotationQuaternion(vecTilt);
 	XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecRenderPosition);
-	XMMATRIX matTransform = matAlignment * matYaw * matTilt * matTranslation;
+	XMMATRIX matInstanceTransform = matYaw * matTilt * matTranslation;
+	XMMATRIX matTransform = matAlignment * matInstanceTransform;
 
 	rModelLayout.f4PositionLayer = f4Position;
+	rModelLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(rShadowBounds, matInstanceTransform, vecRenderPosition)};
 	rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
 	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
@@ -270,6 +272,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	}
 
 	// Visibility culling and the controller partition run on the main thread before worker dispatch.
+	float fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][iPipeline].fRadius;
 	int64_t iVisibleCount = 0;
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -288,7 +291,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius))
 		{
 			continue;
 		}
@@ -312,7 +315,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			continue;
 		}
 
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::Rebase(rBasis, rWreck.vecPosition)))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::Rebase(rBasis, rWreck.vecPosition), fRadius, fRadius, fRadius, fRadius))
 		{
 			continue;
 		}
@@ -331,7 +334,9 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[iPipeline]);
-	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -339,7 +344,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
 			int64_t i = piVisibleIndices[j];
-			WriteModelLayout(rBasis, matAlignment, rCurrent.pVecPositions[i], rCurrent.pVecDirections[i], XMQuaternionIdentity(), pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[iRenderedOffset + j]);
+			WriteModelLayout(rBasis, shadowBounds, matAlignment, rCurrent.pVecPositions[i], rCurrent.pVecDirections[i], XMQuaternionIdentity(), pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[iRenderedOffset + j]);
 		}
 	};
 
@@ -364,7 +369,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		}
 
 		int64_t iInstance = iVisibleCount + k;
-		WriteModelLayout(rBasis, matAlignment, rWreck.vecPosition, rWreck.vecDirection, vecTilt, pAnimationData, skinningReservation, iInstance, rWreck.animationTime, pLayouts[iRenderedOffset + iInstance]);
+		WriteModelLayout(rBasis, shadowBounds, matAlignment, rWreck.vecPosition, rWreck.vecDirection, vecTilt, pAnimationData, skinningReservation, iInstance, rWreck.animationTime, pLayouts[iRenderedOffset + iInstance]);
 	}
 
 	siRendered[iPipeline] += iVisibleCount + iWreckCount;

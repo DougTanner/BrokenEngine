@@ -267,7 +267,8 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kOmni, rInfo.eController, rInfo.uiFlightPlane));
+	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentInterpolate.pAnimationTimes[iIndex] = rInfo.animationTime;
@@ -331,7 +332,7 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 }
 
 
-void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
+void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData)
 {
 	OmnisInterpolate& rCurrent = *rFrameInterpolate.pOmnis;
 	const OmnisInterpolate& rPrevious = *rPreviousFrame.interpolate.pOmnis;
@@ -350,7 +351,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime, uiFlightPlane);
+		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kOmni, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kOmni), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 

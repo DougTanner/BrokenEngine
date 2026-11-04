@@ -44,6 +44,12 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 	{"Hit Flash Lighting Area Two", &gHitFlashLightingAreaTwo},
 	{"Hit Flash Lighting Intensity One", &gHitFlashLightingIntensityOne},
 	{"Hit Flash Lighting Intensity Two", &gHitFlashLightingIntensityTwo},
+	{"Fighter Beam Impact Lighting Area One", &gFighterBeamImpactLightingAreaOne},
+	{"Fighter Beam Impact Lighting Area Two", &gFighterBeamImpactLightingAreaTwo},
+	{"Fighter Beam Impact Lighting Intensity One", &gFighterBeamImpactLightingIntensityOne},
+	{"Fighter Beam Impact Lighting Intensity Two", &gFighterBeamImpactLightingIntensityTwo},
+	{"Fighter Beam Lighting Area", &gFighterBeamLightingArea},
+	{"Fighter Beam Lighting Intensity", &gFighterBeamLightingIntensity},
 };
 
 void RenderLightingEffectsLightingTab(engine::TweaksScreen& rScreen)
@@ -104,6 +110,16 @@ void RenderLightingEffectsLightingTab(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Hit Flash Lighting Area Two");
 		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Hit Flash Lighting Intensity One");
 		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Hit Flash Lighting Intensity Two");
+
+		rScreen.WrapperSeparatorText("Fighters - Beam Impact");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Fighter Beam Impact Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Fighter Beam Impact Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Fighter Beam Impact Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Fighter Beam Impact Lighting Intensity Two");
+
+		rScreen.WrapperSeparatorText("Fighters - Beam");
+		rScreen.WrapperSlider("Lighting Area", iSection, 1.0f, "Fighter Beam Lighting Area");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Fighter Beam Lighting Intensity");
 
 		ImGui::EndTable();
 	}

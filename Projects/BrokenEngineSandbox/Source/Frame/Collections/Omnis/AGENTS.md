@@ -38,11 +38,12 @@ derives from the shared omni radius.
 
 ## Fleet Health Invariants
 
-- A fleet-controlled Omni never dies, a harness-injected one included: when
+- A fleet-controlled Omni survives combat damage, a harness-injected one included: when
   collision, area, or beam damage takes its armor to 0 or below, it holds its
   armor at 0, sets `ShipFlags::kHealing`, and starts no explosion; it still
   marks itself for transfer when it leaves the cell. A random-spawn Omni
-  explodes, and the random-spawn waves replace it.
+  explodes, and the random-spawn waves replace it. Explicit destruction follows
+  the shared destroy-status contract (`../Ships/AGENTS.md` `## Ship Invariants`).
 - While `kHealing` is set an Omni fires nothing and patrols whatever its
   fleet's stance. On a tick outside transfer lock on which its flagship is in
   the cell and it is within `kfOmniPatrolRadius` of that flagship in x/y, its

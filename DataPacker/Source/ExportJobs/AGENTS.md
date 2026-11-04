@@ -73,10 +73,13 @@ Dependencies include transitive linked Blender data and unpacked images used
 by exported content, excluding unrelated datablocks, plus each existing file an
 OBJ's `mtllib` statements name, the `.mtl` file sharing the OBJ's stem (`X.mtl`
 for `X.obj`) when it exists whether or not a statement names it, and every
-candidate image in the source file's folder tree (extensions
+candidate image in the resolved source file's folder tree and its exact sibling
+`textures` tree when present, searching a shared root only once (extensions
 `CANDIDATE_EXTENSIONS` in the script, mirrored by `kpCandidateImageExtensions`
 in `BlenderExport.cpp`), from which conversion relinks missing images and fills
-empty material inputs. In-root dependencies use input-root-relative
+empty material inputs. The `BaseColorAlpha` suffix supplies base color through
+the existing color input; it does not supply the alpha input. In-root
+dependencies use input-root-relative
 identities; external dependencies use source-relative identities where
 possible. Missing or unreadable dependencies, tool or marker,
 changed inputs or output, and a candidate image with no recorded dependency
@@ -95,6 +98,9 @@ also forces normal pre-export from the newly published GLB.
 which owns the consumed image, texture-slot, mesh, material, skeleton and
 animation values without references into the source model. `ExportScene` owns
 optimization, intermediate/chunk writes, and cache/publication behavior.
+Scene images contain byte channels; the glTF decoder normalizes unsigned-short
+samples to bytes before transfer. Blender channel packing preserves sRGB color
+encoding, source images, and scalar/alpha values.
 Material decoding preserves RGB emissive factors and glTF occlusion strength;
 formats without an occlusion strength keep the neutral default.
 A glTF primitive with no material gets the glTF 2.0 default material.

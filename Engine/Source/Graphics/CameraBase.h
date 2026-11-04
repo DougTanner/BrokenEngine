@@ -88,8 +88,8 @@ public:
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
 	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing times
 	// mfTexelCoverageRatio, this margin keeps the raw live-frustum footprints inside their textures throughout zoom
-	// transitions. At settled framing and tilt, the raw live-frustum window matches the wanted pixel size along the axis
-	// that sets mfTexelCoverageRatio, up to the look-at plane's height above Z = 0, regardless of this value.
+	// transitions. Once the footprint settles, the raw live-frustum window matches the wanted pixel size along the axis
+	// that sets mfTexelCoverageRatio, regardless of this value.
 	static constexpr float kfShadowHeadroomMultiplier = 1.5f;
 	static constexpr float kfLightingHeadroomMultiplier = 1.5f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
@@ -180,8 +180,8 @@ public:
 	// mfTexelCoverageRatio on first frame).
 	float mfLightingTexelFraming = 0.0f;
 
-	// The tilted footprint's larger width or height ratio to the untilted one, scaling the framing both texel references
-	// track; exactly 1 at tilt 0.
+	// The raw footprint's larger width or height ratio to the reference-angle framing dimensions, scaling the framing
+	// both texel references track.
 	float mfTexelCoverageRatio = 1.0f;
 	// North shift of the tilted footprint's center from the look-at, added to the position the shadow and lighting
 	// areas center on; exactly 0 at tilt 0.

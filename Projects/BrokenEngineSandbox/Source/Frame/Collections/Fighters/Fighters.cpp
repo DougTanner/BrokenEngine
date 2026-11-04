@@ -49,9 +49,12 @@ int64_t giFighterExplosionTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
 static int64_t siFighterHitFlashTypeIndex = 0xFF;
 int64_t giFighterHitFlashControllerTypeIndex = 0xFF;
+static int64_t siFighterBeamImpactTypeIndex = 0xFF;
+int64_t giFighterBeamImpactControllerTypeIndex = 0xFF;
 int64_t giFighterBeamAreaLightTypeIndex = 0xFF;
 
 static void RegisterFighterHitFlashEffect();
+static void RegisterFighterBeamImpactEffect();
 #endif
 
 constexpr int64_t kiFighterExplosionBaseParticleCount = 16;
@@ -102,6 +105,7 @@ void FightersInterpolate::Register()
 
 #if defined(BT_CLIENT)
 	RegisterFighterHitFlashEffect();
+	RegisterFighterBeamImpactEffect();
 
 	// Every corner samples the texture's middle column, so the line is equally bright from end to end instead of
 	// fading out toward the shooter and the target.
@@ -110,6 +114,8 @@ void FightersInterpolate::Register()
 		.uiCrc = data::kTexturesBlasterBC72pngCrc,
 		.pf2TextureCoordinates = {{0.5f, 0.0f}, {0.5f, 1.0f}, {0.5f, 0.0f}, {0.5f, 1.0f}},
 		.fLightingIntensity = 200.0f,
+		.pLightingSizeWrapper = &gFighterBeamLightingArea,
+		.pLightingIntensityWrapper = &gFighterBeamLightingIntensity,
 	});
 #endif
 }
@@ -132,14 +138,46 @@ void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::ar
 {
 	XMVECTOR vecStartToEnd = XMVectorSubtract(vecEnd, vecStart);
 	XMVECTOR vecDirection = XMVector3Normalize(vecStartToEnd);
-	XMVECTOR vecOffsetStart = XMVectorMultiplyAdd(XMVectorReplicate(kfFighterBeamStartOffset), vecDirection, vecStart);
-	float fLength = std::max(XMVectorGetX(XMVector3Length(vecStartToEnd)) - kfFighterBeamStartOffset, 0.0f);
-	auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecOffsetStart, vecDirection, fLength, 0.0f, kfFighterBeamHalfWidth);
+	float fDistance = XMVectorGetX(XMVector3Length(vecStartToEnd));
+	float fStartOffset = std::min(kfFighterBeamStartOffset, fDistance);
+	XMVECTOR vecOffsetStart = XMVectorMultiplyAdd(XMVectorReplicate(fStartOffset), vecDirection, vecStart);
+	float fLength = fDistance - fStartOffset;
+	float fHalfWidth = iTypeIndex == giFighterBeamAreaLightTypeIndex ? 0.5f * gFighterBeamWidth.mfCurrent : kfFighterBeamHalfWidth;
+	auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecOffsetStart, vecDirection, fLength, 0.0f, fHalfWidth);
 	engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 	{
 		.iTypeIndex = iTypeIndex,
 		.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		.fIntensityMultiplier = fIntensityMultiplier,
+	});
+}
+
+static void RegisterFighterBeamImpactEffect()
+{
+	engine::PointLightsInterpolate::RegisterType(siFighterBeamImpactTypeIndex,
+	{
+		.uiCrc = data::kTexturesParticlesBC4Square46pngCrc,
+		.uiColor = 0xFF6C47FF,
+		.bCameraAligned = false,
+	});
+
+	engine::PointLightsInterpolate::RegisterControllerType(giFighterBeamImpactControllerTypeIndex,
+	{
+		.iBaseTypeIndex = siFighterBeamImpactTypeIndex,
+		.iKeyframeCount = 2,
+		.bDestroysSelf = true,
+		.pTimes = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
+		{
+			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
+			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = XM_PI},
+			{},
+			{},
+		},
+		.ppVisibleAreaScales = {&gFighterBeamImpactVisibleAreaOne, &gFighterBeamImpactVisibleAreaTwo, nullptr, nullptr},
+		.ppVisibleIntensityScales = {&gFighterBeamImpactVisibleIntensityOne, &gFighterBeamImpactVisibleIntensityTwo, nullptr, nullptr},
+		.ppLightingAreaScales = {&gFighterBeamImpactLightingAreaOne, &gFighterBeamImpactLightingAreaTwo, nullptr, nullptr},
+		.ppLightingIntensityScales = {&gFighterBeamImpactLightingIntensityOne, &gFighterBeamImpactLightingIntensityTwo, nullptr, nullptr},
 	});
 }
 
@@ -214,7 +252,7 @@ static const engine::AnimationData* LoopingAnimationData(common::crc_t uiModel)
 }
 #endif
 
-void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
+void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerInterpolateUpdateFighters);
 
@@ -246,7 +284,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		float fHeightBeforeClimb = XMVectorGetZ(vecPosition);
 #endif
 		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime, uiFlightPlane);
+		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kFighter, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kFighter), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 #if defined(BT_CLIENT)
@@ -440,7 +478,8 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kFighter, rInfo.eController, rInfo.uiFlightPlane));
+	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
@@ -494,7 +533,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 #endif // BT_CLIENT
 
 	// Sync owned objects after Add()
-	SyncFighter(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition, rInfo.eController);
+	SyncFighter(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], vecPosition, rInfo.eController);
 
 	return true;
 }

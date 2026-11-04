@@ -286,7 +286,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 #endif
 
 	game::FrameInterpolate::AllocateAndCopy(rNext.interpolate, rCurrent.interpolate);
-	game::FrameInterpolate::Update(rNext.interpolate, rCurrent, kfDeltaTime);
+	game::FrameInterpolate::Update(rNext.interpolate, rCurrent, kfDeltaTime, rStaticData);
 	rNext.interpolate.iTick = iTickCounter;
 
 	game::FramePostRender::AllocateAndCopy(rNext.postRender, rCurrent.postRender);

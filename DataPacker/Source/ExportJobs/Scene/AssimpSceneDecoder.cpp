@@ -139,7 +139,7 @@ static void LoadAssimpTexture(const aiScene& rScene, const aiMaterial& rMaterial
 	unsigned int uiUv = 0;
 	ai_real fBlend = 1.0f;
 	aiTextureOp eOperation = aiTextureOp_Multiply;
-	aiTextureMapMode peModes[2] {aiTextureMapMode_Wrap, aiTextureMapMode_Wrap, };
+	aiTextureMapMode peModes[2] {aiTextureMapMode_Wrap, aiTextureMapMode_Wrap};
 	ASSERT(rMaterial.GetTexture(eType, 0, &name, &eMapping, &uiUv, &fBlend, &eOperation, peModes) == AI_SUCCESS);
 	ASSERT(eMapping == aiTextureMapping_UV && uiUv < 5 && fBlend == 1.0f && eOperation == aiTextureOp_Multiply);
 	ASSERT(peModes[0] == aiTextureMapMode_Wrap && peModes[1] == aiTextureMapMode_Wrap);
@@ -171,7 +171,7 @@ static void LoadAssimpTexture(const aiScene& rScene, const aiMaterial& rMaterial
 	if (iTexture == std::ssize(rData.textures))
 	{
 		ASSERT(iTexture < common::SceneHeader::kiMaxTextures);
-		rData.textures.push_back({.iSource = iSource, .vkFormat = vkFormat, });
+		rData.textures.push_back({.iSource = iSource, .vkFormat = vkFormat});
 	}
 	ruiIndex = static_cast<uint8_t>(iTexture);
 	riSet = static_cast<int32_t>(uiUv);
@@ -234,7 +234,7 @@ static common::MaterialShaderData LoadAssimpMaterial(const aiScene& rScene, cons
 	aiColor3D sheen(0.0f, 0.0f, 0.0f);
 	std::ignore = rMaterial.Get(AI_MATKEY_SHEEN_COLOR_FACTOR, sheen);
 	ASSERT(sheen == aiColor3D(0.0f, 0.0f, 0.0f));
-	for (const char* pcFeature : {"$mat.clearcoat.factor", "$mat.transmission.factor", "$mat.anisotropyFactor", "$mat.volume.thicknessFactor", "$mat.reflectivity", })
+	for (const char* pcFeature : {"$mat.clearcoat.factor", "$mat.transmission.factor", "$mat.anisotropyFactor", "$mat.volume.thicknessFactor", "$mat.reflectivity"})
 	{
 		ai_real fValue = 0.0f;
 		std::ignore = rMaterial.Get(pcFeature, 0, 0, fValue);
@@ -248,7 +248,7 @@ static common::MaterialShaderData LoadAssimpMaterial(const aiScene& rScene, cons
 	LoadAssimpTexture(rScene, rMaterial, aiTextureType_NORMALS, VK_FORMAT_BC5_UNORM_BLOCK, data.uiNormalTextureIndex, data.iNormalTextureSet, rPath, rData, rDependencies);
 	LoadAssimpTexture(rScene, rMaterial, rMaterial.GetTextureCount(aiTextureType_AMBIENT_OCCLUSION) != 0 ? aiTextureType_AMBIENT_OCCLUSION : aiTextureType_LIGHTMAP, VK_FORMAT_BC4_UNORM_BLOCK, data.uiOcclusionTextureIndex, data.iOcclusionTextureSet, rPath, rData, rDependencies);
 	LoadAssimpTexture(rScene, rMaterial, rMaterial.GetTextureCount(aiTextureType_EMISSION_COLOR) != 0 ? aiTextureType_EMISSION_COLOR : aiTextureType_EMISSIVE, VK_FORMAT_BC7_UNORM_BLOCK, data.uiEmissiveTextureIndex, data.iEmissiveTextureSet, rPath, rData, rDependencies);
-	for (float fValue : {color.r, color.g, color.b, color.a, emissive.r, emissive.g, emissive.b, fOpacity, data.fMetallicFactor, data.fRoughnessFactor, })
+	for (float fValue : {color.r, color.g, color.b, color.a, emissive.r, emissive.g, emissive.b, fOpacity, data.fMetallicFactor, data.fRoughnessFactor})
 	{
 		ASSERT(std::isfinite(fValue));
 	}
@@ -540,7 +540,7 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 		}
 		int64_t iOriginal = rMesh.mMaterialIndex;
 		const common::MaterialShaderData& rShaderData = rSourceMaterials.at(iOriginal);
-		for (int64_t iSet : {rShaderData.iColorTextureSet, rShaderData.iPhysicalDescriptorTextureSet, rShaderData.iNormalTextureSet, rShaderData.iOcclusionTextureSet, rShaderData.iEmissiveTextureSet, })
+		for (int64_t iSet : {rShaderData.iColorTextureSet, rShaderData.iPhysicalDescriptorTextureSet, rShaderData.iNormalTextureSet, rShaderData.iOcclusionTextureSet, rShaderData.iEmissiveTextureSet})
 		{
 			ASSERT(iSet < 0 || rMesh.HasTextureCoords(static_cast<unsigned int>(iSet)));
 		}
@@ -565,7 +565,7 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 			ASSERT(IsFiniteVector(vecPosition) && IsFiniteVector(vecNormal) && XMVectorGetX(XMVector3LengthSq(vecNormal)) > 0.0f);
 			XMStoreFloat3(&vertex.f3Pos, vecPosition);
 			XMStoreFloat3(&vertex.f3Normal, XMVector3Normalize(vecNormal));
-			XMFLOAT2* pf2Uvs[] {&vertex.f2Uv, &vertex.f2Uv1, &vertex.f2Uv2, &vertex.f2Uv3, &vertex.f2Uv4, };
+			XMFLOAT2* pf2Uvs[] {&vertex.f2Uv, &vertex.f2Uv1, &vertex.f2Uv2, &vertex.f2Uv3, &vertex.f2Uv4};
 			for (int64_t k = 0; k < 5; ++k)
 			{
 				if (rMesh.HasTextureCoords(static_cast<unsigned int>(k)))
@@ -634,7 +634,7 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 		{
 			const aiFace& rFace = rMesh.mFaces[j];
 			ASSERT(rFace.mNumIndices == 3);
-			for (int64_t k : {0, fDeterminant < 0.0f ? 2 : 1, fDeterminant < 0.0f ? 1 : 2, })
+			for (int64_t k : {0, fDeterminant < 0.0f ? 2 : 1, fDeterminant < 0.0f ? 1 : 2})
 			{
 				ASSERT(rFace.mIndices[k] < rMesh.mNumVertices);
 				rMaterial.indexBuffer.push_back(static_cast<uint32_t>(static_cast<uint32_t>(iStart) + rFace.mIndices[k]));

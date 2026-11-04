@@ -36,7 +36,7 @@ static EligibleRowReference FindEligibleRow(std::span<const RegistrySourceLayer>
 		{
 			if (rLayer.pIds[iRow] == id)
 			{
-				return {.pLayer = &rLayer, .iRow = iRow, .iEligibleIndex = iEligibleIndex, };
+				return {.pLayer = &rLayer, .iRow = iRow, .iEligibleIndex = iEligibleIndex};
 			}
 			++iEligibleIndex;
 		}

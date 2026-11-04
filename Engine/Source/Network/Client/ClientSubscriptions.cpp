@@ -134,7 +134,7 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(int
 			{
 				return {};
 			}
-			return { FullStateFlags::kAdoptCoordinate, FullStateFlags::kCommit };
+			return {FullStateFlags::kAdoptCoordinate, FullStateFlags::kCommit};
 		}
 		return FullStateFlags::kRejectAsGhost;
 	}
@@ -157,7 +157,7 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(int
 	// The server may reallocate a slot before its unsubscribe ACK arrives, and this per-slot lane can overtake that ACK
 	if (rSlot.eState == CoordSubscriptionState::kUnsubscribing && mSubscribeRequests.IsLive(coordinate) && !IsStaleRetainedEpoch(iSlotIndex, iEpoch, coordinate))
 	{
-		return { FullStateFlags::kAdoptCoordinate, FullStateFlags::kCommit };
+		return {FullStateFlags::kAdoptCoordinate, FullStateFlags::kCommit};
 	}
 
 	// kActive: resync full-state re-commit when coordinate+epoch match (desync recovery).
@@ -184,7 +184,7 @@ ClientSubscriptions::CoordUpdateFlags_t ClientSubscriptions::ClassifyCoordinateU
 	}
 	if (rSlot.eState == CoordSubscriptionState::kActive && iEpoch == rSlot.acknowledgementState.uiEpoch)
 	{
-		return { CoordUpdateFlags::kCommit, CoordUpdateFlags::kTrackTick };
+		return {CoordUpdateFlags::kCommit, CoordUpdateFlags::kTrackTick};
 	}
 	return {};
 }

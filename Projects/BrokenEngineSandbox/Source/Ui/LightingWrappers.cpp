@@ -53,6 +53,16 @@ engine::Wrapper gHitFlashLightingAreaTwo(0.0f, 0.0f, 4.0f);
 engine::Wrapper gHitFlashLightingIntensityOne(0.0f, 0.0f, 2.0f);
 engine::Wrapper gHitFlashLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 
+// Fighters - Beam impact
+engine::Wrapper gFighterBeamImpactLightingAreaOne(2.0f, 1.0f, 4.0f);
+engine::Wrapper gFighterBeamImpactLightingAreaTwo(0.0f, 0.0f, 4.0f);
+engine::Wrapper gFighterBeamImpactLightingIntensityOne(2.0f, 0.0f, 16.0f);
+engine::Wrapper gFighterBeamImpactLightingIntensityTwo(0.0f, 0.0f, 4.0f);
+
+// Fighters - Beam
+engine::Wrapper gFighterBeamLightingArea(8.0f, 1.0f, 10.0f);
+engine::Wrapper gFighterBeamLightingIntensity(20.0f, 0.0f, 100.0f);
+
 // Visible wrappers control visual area and intensity.
 
 engine::Wrapper gExplosionPrimaryVisibleAreaOne(4.0f, 0.1f, 5.0f);
@@ -97,6 +107,15 @@ engine::Wrapper gHitFlashVisibleAreaOne(0.375f, 0.04f, 1.9f);
 engine::Wrapper gHitFlashVisibleAreaTwo(0.0f, 0.0f, 1.9f);
 engine::Wrapper gHitFlashVisibleIntensityOne(1.0f, 0.1f, 5.0f);
 engine::Wrapper gHitFlashVisibleIntensityTwo(0.0f, 0.0f, 5.0f);
+
+// Fighters - Beam impact
+engine::Wrapper gFighterBeamImpactVisibleAreaOne(4.0f, 0.4f, 19.0f);
+engine::Wrapper gFighterBeamImpactVisibleAreaTwo(0.0f, 0.0f, 19.0f);
+engine::Wrapper gFighterBeamImpactVisibleIntensityOne(1.0f, 0.1f, 5.0f);
+engine::Wrapper gFighterBeamImpactVisibleIntensityTwo(0.0f, 0.0f, 5.0f);
+
+// Fighters - Beam
+engine::Wrapper gFighterBeamWidth(0.3f, 0.02f, 3.0f);
 
 } // namespace game
 

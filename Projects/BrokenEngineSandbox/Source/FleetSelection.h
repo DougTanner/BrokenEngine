@@ -34,6 +34,7 @@ public:
 	engine::NetworkUiControl<int64_t> mCreateFleetToggle;
 	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle;
 	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl;
+	std::unordered_map<int64_t, engine::NetworkUiControl<bool>> mDestroyMemberControls;
 
 	std::vector<Fleet> mClientFleets;
 	int64_t miFocusedFleetIndex = -1;

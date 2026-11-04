@@ -147,8 +147,11 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kOmni)].models[iPipeline]);
-	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
 
+	float fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kOmni)][iPipeline].fRadius;
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -166,16 +169,22 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		// The position is local to the rendered cell; one conversion into the camera cell's frame feeds both the
 		// model translation and the layout position.
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, vecPosition, fRadius, fRadius, fRadius, fRadius))
+		{
+			continue;
+		}
 
 		auto matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 		auto matTranslation = XMMatrixTranslationFromVector(vecPosition);
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
-		auto matTransform = matAlignment * matScaling * matRotationZ * matRotationAccelerationX * matRotationAccelerationY * matTranslation;
+		auto matInstanceTransform = matScaling * matRotationZ * matRotationAccelerationX * matRotationAccelerationY * matTranslation;
+		auto matTransform = matAlignment * matInstanceTransform;
 
 		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
 		XMStoreFloat4(&rOmniLayout.f4PositionLayer, vecPosition);
+		rOmniLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matInstanceTransform, vecPosition)};
 		rOmniLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition)));
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rOmniLayout.f3x4Transform[0]), matTransform);

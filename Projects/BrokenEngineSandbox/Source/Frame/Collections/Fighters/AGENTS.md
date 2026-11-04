@@ -87,6 +87,16 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   shared cooldown alone. PostRender Update releases that light and clears its
   handle once the fade ends, before the next shot. A transfer arrival draws no
   line until its next shot.
+- Target qualification and aim use the target center. The client captures the
+  current yawed baked hull contact before damage, using the canonical convex
+  outline and Z slab even for simpler projectile hitbox settings. An inside
+  start uses the center-directed ray's exit surface. The stored endpoint stays
+  fixed during the fade. A separate self-destroying impact point light places
+  a rotating particle-library star and local illumination at that contact;
+  incoming blaster hits use their own flash controller.
+- Attack beam width, lighting area and intensity, and impact visible and lighting
+  keyframes, are independently tuned; the shared beam helper keeps Omni healing
+  beams at their own fixed width.
 
 ## Rendering Invariants
 

@@ -108,6 +108,13 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		previousFocusedFleetGuid = rPreviousFocusedFleet.guid;
 	}
 	mClientFleets = std::move(rFleets);
+	std::erase_if(mDestroyMemberControls, [this](const auto& rEntry)
+	{
+		return std::ranges::none_of(mClientFleets, [&](const Fleet& rFleet)
+		{
+			return std::ranges::contains(rFleet.members, engine::GlobalId {.iValue = rEntry.first}, &FleetMember::globalId);
+		});
+	});
 
 	auto FindFleetIndexByGuid = [this](const FleetGuid& rGuid) -> int64_t
 	{
@@ -268,6 +275,7 @@ void FleetSelection::Clear()
 	mCreateFleetToggle.Reset();
 	mSpawnIntoFleetToggle.Reset();
 	mNavigationDelayControl.Reset();
+	mDestroyMemberControls.clear();
 }
 
 } // namespace game

@@ -27,9 +27,10 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   lines lowers that category's floor through a temporary verification edit
   ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md)
   `#### Step 5 — Run targeted pre-review checks`).
-- `cell_coordinate_probe`: `{"coord":[q,r]}` and nothing else — a params object
-  that is not exactly that one key fails with
-  `cell_coordinate_probe accepts only 'coord'`; both endpoints accept it. Any
+- `cell_coordinate_probe`: `{"coord":[q,r],"navigation"?:{"graphs":[g0,g1],"points":[[x0,y0],[x1,y1]]}}`.
+  Both endpoints accept the coord-only form. Unknown top-level keys or a
+  missing `coord` fail with
+  `cell_coordinate_probe accepts only 'coord' and optional 'navigation'`. Any
   pair of integers in the signed-int32 range is valid — the cell needs no
   subscription, no loaded frame, and no adjacency — while an integer outside
   that range fails with
@@ -38,14 +39,31 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   with `cell_coordinate_probe 'coord' must be an array of 2 integers`. Its one
   precondition is loaded island templates; without them it fails with
   `cell_coordinate_probe requires loaded island templates`. Read-only: it
-  generates a throwaway placement list and elevation grid for the requested
-  cell, reports them, and frees them, touching no live cell, tick, or
+  generates throwaway static data for the requested cell, reports it, and
+  frees it, touching no live cell, tick, or
   subscription. Returns
   `{"coord":[q,r],"area":{"width":float,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`,
   where `area` is the cell hexagon's bounding rectangle, about 1,039.23 m wide.
   Run the same coordinate on the client and on the server and require both CRCs
   to be equal; the two endpoints generate the cell independently from the same
   coordinate.
+  Optional `navigation` is server-only; the client rejects it with
+  `cell_coordinate_probe 'navigation' is server-only`. Its object requires
+  exactly `graphs` and `points`. `graphs` is a nonempty array of distinct valid
+  integer indices into the production cell navigation data; `points` is an
+  array of finite float XY pairs in centered cell-local meters and may be
+  empty for contour discovery. Malformed requests return ordinary command
+  errors. Graph indices carry no ship-type or flight-plane mapping.
+  Only navigation requests build the production navigation graphs. They append
+  `"navigation":{"graphs":[{"index":g0,"vertices":[[x,y],...],"polygonOffsets":[offset,...]},...],"samples":[{"xy":[x0,y0],"elevation":float,"blocked":[true,false]},...]}`
+  to the existing result. Graphs and samples preserve request order, and each
+  sample's `blocked` array follows the requested graph order. Geometry is the
+  actual selected `NavData` in native order: offsets are zero-based polygon
+  starts in the flat vertex array; a polygon ends at the next offset, or at
+  the vertex count for the last polygon, with an implicit closing edge. No
+  terminal offset is appended. Elevation uses the populated simulation grid
+  sampler, and membership uses `NavQueryPointBlocked`. Empty graphs return
+  empty geometry and false membership. Repeated queries retain no state.
 - `crash_report_harness_rig`: no params. Simulates a production crash on demand
   so the agent can observe the real report, upload, and exit. Debug-only: a
   non-`kbDebugInput` build fails with
@@ -307,6 +325,14 @@ repeating the sections' tab items and non-slider controls — and `window`
 narrows the match; offscreen widgets also run their full behavior and draw
 code. Mouse-only widgets (curve-editor control points, ImPlot plot
 interactions) and hover effects, such as hover-opened panels, cannot be driven.
+
+UI introspection and activation do not establish on-screen visibility. Use
+`describe_ui` and command results to verify submitted items' existence,
+enabled state, and activation effects. Activating an offscreen item does not
+guarantee that its slide panel opens; there is currently no generic command
+to reveal an item or panel. A criterion about rendered appearance still
+requires a screenshot with the target visibly rendered; `visible:false`
+items and successful offscreen clicks do not satisfy it.
 
 The agent client's ImGui mouse stays at ImGui's no-mouse sentinel, and the
 RawInput game mouse stays at a frozen boot-time snapshot (under agent

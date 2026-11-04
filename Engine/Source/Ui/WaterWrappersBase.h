@@ -44,10 +44,13 @@ extern Wrapper gLightingWaterSkyboxNormalBlendWave;
 extern Wrapper gLightingWaterSkyboxIntensity;
 extern Wrapper gLightingWaterSkyboxAdd;
 extern Wrapper gLightingWaterSkyboxOne;
+extern Wrapper gLightingWaterSkyboxOneNight;
 extern Wrapper gLightingWaterSkyboxOnePower;
 extern Wrapper gLightingWaterSkyboxTwo;
+extern Wrapper gLightingWaterSkyboxTwoNight;
 extern Wrapper gLightingWaterSkyboxTwoPower;
 extern Wrapper gLightingWaterSkyboxThree;
+extern Wrapper gLightingWaterSkyboxThreeNight;
 extern Wrapper gLightingWaterSkyboxThreePower;
 extern Wrapper gLightingWaterSkyboxLevelOfDetail;
 

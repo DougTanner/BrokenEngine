@@ -29,12 +29,12 @@ $script:MaximumOutputBytes = 131072
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
-# step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
+# step 16 removes, and style-rule-<n> kinds for forms of Documents/C++StyleGuide.txt that its step 9
 # adjudicates. A line reports every kind that matches it, each as its own row. An entry's Except clears a
 # match that is one of the rule's permitted forms or a form another kind reports. The style-rule-61,
-# style-rule-22, style-rule-59, style-rule-74, style-rule-62 and style-rule-51 kinds are not in this table:
-# each needs another head-side line too, so Test-Rule61Line, Test-Rule22Line, Test-Rule59Line,
-# Test-Rule74Line, Test-Rule62Line and Test-Rule51Line decide theirs. That worker's step 6 hand-read list,
+# style-rule-22, style-rule-22-single-line, style-rule-59, style-rule-74, style-rule-62 and style-rule-51
+# kinds are not in this table: their detectors need head-side context beyond one isolated line.
+# That worker's step 6 hand-read list,
 # its step 16 rule 70 check, and these style-rule-<n> kinds together make the review's style mandate, and a
 # rule is on two lists when each covers a different form, so update step 6 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
@@ -104,6 +104,7 @@ $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
 $script:NewSideLines = @{}
+$script:Rule22SingleLineHits = @{}
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-session-candidates/v1'
@@ -292,6 +293,49 @@ function Test-Rule22Line([string] $Path, [int] $Line, [string] $Text) {
 	return $false
 }
 
+function Test-Rule22SingleLine([string] $Path, [int] $Line) {
+	if (-not $script:Rule22SingleLineHits.ContainsKey($Path)) {
+		$text = (Get-NewSideLine $Path) -join "`n"
+		$found = [Collections.Generic.HashSet[int]]::new()
+		$braces = [Collections.Generic.Stack[object]]::new()
+		# Literals remain opaque tokens; comments are trivia. Numbers consume digit separators before
+		# the character-literal alternative can mistake an apostrophe for an opening quote.
+		$tokens = '(?<comment>//(?:[^\n]*\\\n)*[^\n]*|/\*[\s\S]*?(?:\*/|\z))|(?<literal>(?:u8|u|U|L)?R"(?<delimiter>[^\s()\\]{0,16})\([\s\S]*?\)\k<delimiter>"|\b[0-9][\w''.]*|"(?:\\[\s\S]|[^"\\])*"|''(?:\\[\s\S]|[^''\\])*'')|(?<space>\s+)|(?<code>.)'
+		$number = 1
+		$previous = ''
+		$onlyTrivia = $true
+		$skipUntil = 0
+		foreach ($token in [regex]::Matches($text, $tokens)) {
+			$tokenLine = $number
+			$newlines = [regex]::Matches($token.Value, "`n").Count
+			$number += $newlines
+			if ($newlines -gt 0) { $onlyTrivia = $true }
+			if ($token.Index -lt $skipUntil) { continue }
+			if ($token.Groups['comment'].Success -or $token.Groups['space'].Success) { continue }
+			if ($onlyTrivia -and $token.Value -ceq '#') {
+				# A directive can follow comments; its backslash-continued physical lines are excluded too.
+				$directive = [regex]::Match($text.Substring($token.Index), '^(?:[^\n]*\\\n)*[^\n]*')
+				$skipUntil = $token.Index + $directive.Length
+				continue
+			}
+			$onlyTrivia = $false
+			if ($token.Groups['literal'].Success) { $previous = 'literal'; continue }
+			if ($token.Value -ceq '{') {
+				$openingSpace = $token.Index + 1 -lt $text.Length -and ($text[$token.Index + 1] -ceq ' ' -or $text[$token.Index + 1] -ceq "`t")
+				$braces.Push(@{ Line = $tokenLine; OpeningSpace = $openingSpace })
+			}
+			elseif ($token.Value -ceq '}' -and $braces.Count -gt 0) {
+				$opening = $braces.Pop()
+				$closingSpace = $token.Index -gt 0 -and ($text[$token.Index - 1] -ceq ' ' -or $text[$token.Index - 1] -ceq "`t")
+				if ($opening.Line -eq $tokenLine -and ($opening.OpeningSpace -or $previous -ceq ',' -or $closingSpace)) { [void] $found.Add($tokenLine) }
+			}
+			$previous = $token.Value
+		}
+		$script:Rule22SingleLineHits[$Path] = $found
+	}
+	return $script:Rule22SingleLineHits[$Path].Contains($Line)
+}
+
 function Test-Rule59Line([string] $Path, [int] $Line, [string] $Text) {
 	# A case or default label breaks rule 59 when its indent is not exactly one tab deeper than the nearest
 	# preceding head-side switch line indented no deeper than the label, so a nested switch in an earlier case
@@ -424,6 +468,7 @@ try {
 		$kinds = [Collections.Generic.List[string]]::new()
 		if (Test-Rule61Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-61') }
 		if (Test-Rule22Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-22') }
+		if (Test-Rule22SingleLine $line.Path $line.Line) { $kinds.Add('style-rule-22-single-line') }
 		if (Test-Rule59Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-59') }
 		if ((Test-Rule74Line $line.Path $line.Line $line.Text) -or (Test-NamespaceSpacingLine $line.Path $line.Line $line.Text)) { $kinds.Add('style-rule-74') }
 		$kinds.AddRange((Test-CandidatePattern $line.Path $line.Text))
@@ -464,6 +509,7 @@ try {
 	foreach ($pattern in $script:CandidatePatterns) { $counts[$pattern.Kind] = @($sorted | Where-Object { $_.kind -ceq $pattern.Kind }).Count }
 	$counts['style-rule-61'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-61' }).Count
 	$counts['style-rule-22'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-22' }).Count
+	$counts['style-rule-22-single-line'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-22-single-line' }).Count
 	$counts['style-rule-59'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-59' }).Count
 	$counts['style-rule-62'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-62' }).Count
 	$counts['style-rule-51'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-51' }).Count

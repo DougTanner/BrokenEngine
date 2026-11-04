@@ -37,7 +37,8 @@ inline constexpr float kfBattleshipTurnAcceleration = 0.25f;
 // Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
 float RampBattleshipTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime);
 
-inline constexpr float kfBattleshipClimbRate = 5.0f;
+inline constexpr float kfBattleshipClimbPercentage = 0.25f;
+inline constexpr float kfBattleshipClimbRate = kfBattleshipMaxSpeed * kfBattleshipClimbPercentage;
 inline constexpr int64_t kiBattleshipHighestFlightPlane = 0;
 static_assert(kiBattleshipHighestFlightPlane < std::ssize(kFlightPlanes));
 
@@ -93,7 +94,7 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 		}
 	}
 
-	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
+	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 #if defined(BT_CLIENT)
 	static void ClientInitialize(Frame& rFrame, int64_t iIndex);

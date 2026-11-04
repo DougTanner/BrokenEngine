@@ -5,7 +5,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 ## Ship Invariants
 
 - Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range between ships on the same flight-plane
+  separation within their 3D range between ships sharing an occupied flight-plane
   layer, including an X position
   correction for near-coincident XY; blaster collision and missile explosion
   damage still apply.
@@ -15,7 +15,11 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   position after terrain resolution, preserving Y/Z/W and stored/target planes.
   Tiny terrain intrusion from this correction is accepted; separation can
   progress across ticks rather than fully resolving a stack in one tick.
-- A ship releases and clears its pusher when its natural explosion begins.
+- A ship releases and clears its pusher when its explosion begins. Fighter and
+  Omni `kDestroyShip` status changes use the same initializer as combat death,
+  ignore an already dying row, and retain the existing delayed removal; an
+  explicit Fighter destruction has zero damage direction. Battleship destroy
+  status changes retain immediate removal.
   Zero handles skip Sync and push queries; final removal and transfer retain
   ordinary owned-handle cleanup. Fleet Battleships follow their
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
@@ -29,6 +33,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
   death shrink. A row's pusher radius is its hitbox sphere radius times its
   type's `kShipHitboxTypes` pusher radius scale.
+- Shared startup caches each controller model's minimum origin height from its
+  aligned upright geometry, keeping the hull at least 1 meter above water.
+  A ship's effective flight height is the maximum of that minimum and its
+  requested flight-plane height; bank and pitch do not affect it. Genuine
+  spawns apply this height once before initializing owned objects; transfers
+  preserve their carried position. Collision, rendering, and effects use that
+  authoritative position without another lift or changes to local geometry.
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter in its flagship's cell and a fleet Omni there on a tick its tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
@@ -56,11 +67,15 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   Interpolate column `puiFlightPlanes`: the plane index while settled,
   `kuiNoFlightPlane` while climbing between planes. A genuine spawn stores its
   spawn plane and a transfer arrival carries the stored value.
-- A ship navigates on one plane, its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
+- Between the two flight planes, the lower plane carries the union of terrain restrictions because the upper plane has none. A ship navigates on its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
 - Interpolate Update owns a ship's height and stored plane:
-  `ClimbTowardsFlightPlane` lands on the plane table's own height, so client and
-  server match bit-exactly, and stores the target plane on arrival and
-  `kuiNoFlightPlane` once a climb toward another plane begins.
+  `ClimbTowardsFlightPlane` lands on the effective flight height, so client and
+  server match bit-exactly, and stores the effective plane on arrival and
+  `kuiNoFlightPlane` once a climb toward another plane begins. Before descending,
+  it tests the lower plane's clearance-tier navigation graph at the integrated XY.
+  While blocked it returns toward the upper plane, retaining the requested lower
+  order and horizontal movement; the first clear update resumes descent, even
+  during the upward return.
   PostRender Update stores velocity Z as 0 as its last velocity write in every
   type, so pushers, knockback, and terrain contact move ships only horizontally.
   Change a ship's height through its target plane, not its velocity.
@@ -68,9 +83,10 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - Target choice treats a ship as on its nearest flight plane
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
   missiles and Omni blasters target only an enemy whose nearest plane is the
-  shooter's stored plane and stay on the shooter's plane, hitting a climbing
-  target only by 3D contact: a missile aims along the horizontal offset to its
-  target, and an Omni bolt flies flat along the Omni's hull. The Fighter beam
+  shooter's stored plane, hitting a climbing target only by 3D contact: a
+  missile aims along the horizontal offset to its target and retains the
+  shooter's plane as its assigned plane (`../Missiles/AGENTS.md`), and an Omni
+  bolt flies flat along the Omni's hull. The Fighter beam
   has its own plane rule (`../Fighters/AGENTS.md`). All three weapons fire only
   at an enemy in line of sight (`HasLineOfSight`) on the shooter's stored plane.
   The test is 2D against tier 0's inflated navigation polygons for every
@@ -78,7 +94,8 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   it is unchecked on a plane without terrain collision. An Omni faces only an
   enemy in line of sight. A ship storing `kuiNoFlightPlane` fires none of them,
   and a Battleship launches missiles only while exactly at its stored plane's
-  height. No Omni targets, chases, or faces an enemy above its highest plane.
+  effective flight height. No Omni targets, chases, or faces an enemy above its
+  highest plane.
   These plane rules govern only target choice and aim; blaster and missile
   collision and explosion damage ignore planes, and pushers follow their
   height-derived layer rule above.

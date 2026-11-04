@@ -27,6 +27,7 @@ constexpr float kfFighterBeamAimAngle = 0.1f;
 extern int64_t giFighterExplosionTypeIndex;
 #if defined(BT_CLIENT)
 extern int64_t giFighterHitFlashControllerTypeIndex;
+extern int64_t giFighterBeamImpactControllerTypeIndex;
 extern int64_t giFighterBeamAreaLightTypeIndex;
 #endif
 
@@ -36,7 +37,7 @@ void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCo
 void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier);
 #endif
 
-static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
+void XM_CALLCONV FightersPostRender::BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
 {
 	FightersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pFighters;
 	FightersPostRender& rCurrentPostRender = *rFrame.postRender.pFighters;
@@ -78,7 +79,6 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	std::optional<ShipLocator> optionalTarget;
 	bool bKeptTargetChosen = false;
 	float fNearestDistanceSquared = 0.0f;
-	XMVECTOR vecEnd = XMVectorZero();
 	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
 		if (NearestFlightPlane(vecPosition) != uiFlightPlane)
@@ -111,7 +111,6 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 			optionalTarget = locator;
 			bKeptTargetChosen = bKeptTarget;
 			fNearestDistanceSquared = fDistanceSquared;
-			vecEnd = vecPosition;
 		}
 	});
 
@@ -120,6 +119,12 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 		return false;
 	}
 
+#if defined(BT_CLIENT)
+	XMVECTOR vecEnd = VisitShip(rFrame, *optionalTarget, [&](const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+	{
+		return ShipHullContact(optionalTarget->eType, rPostRender.pController[iRow], rInterpolate.pVecPositions[iRow], rInterpolate.pVecDirections[iRow], vecShooterPosition);
+	});
+#endif
 	VisitShip(rFrame, *optionalTarget, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 	{
 		std::remove_cvref_t<decltype(rPostRender)>::ApplyBeamDamage(rFrame, rStaticData.coordinate, iRow, vecShooterPosition, kfFighterBeamDamage);
@@ -130,7 +135,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	rCurrentInterpolate.pVecBeamEnds[i] = vecEnd;
 	SyncFighterBeam(rFrame.interpolate, rCurrentInterpolate.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecShooterPosition, vecEnd, 1.0f);
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecShooterPosition, gFighterBlasterVolume.mfCurrent, gFighterBlasterPitchMinimum.mfCurrent, gFighterBlasterPitchRandom.mfCurrent);
-	engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterHitFlashControllerTypeIndex, vecEnd, 0.0f);
+	engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterBeamImpactControllerTypeIndex, vecEnd, 0.0f);
 #endif
 	return true;
 }

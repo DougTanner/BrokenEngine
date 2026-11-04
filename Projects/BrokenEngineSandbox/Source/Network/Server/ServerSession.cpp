@@ -54,7 +54,7 @@ static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
 
 // The engine drain admits each packet through its contract row first. Every client-sendable game contract row has
 // min == max (GamePacketType.h), so admission settles each payload's size exactly and the cases below add no per-case
-// size check; only residual value checks a row cannot express — navigation-delay range and ship type bytes — stay, and
+// size check; only residual value checks a row cannot express — navigation-delay range, ship type bytes and global IDs — stay, and
 // they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
@@ -87,6 +87,17 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 				engine::NetworkMessages::ThrowCorruptStream("ServerSession spawn-into Battleship type");
 			}
 			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .eType = eType});
+			break;
+		}
+		case GamePacketType::kClientDestroyFleetMemberRequest:
+		{
+			GameMessages::DestroyFleetMemberRequestMessage message;
+			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
+			if (message.globalId.iValue <= 0)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession destroy-member global ID");
+			}
+			mpFleetManager->mPendingDestroyFleetMemberRequests.push_back({.iClientId = rPacket.iClientId, .globalId = message.globalId});
 			break;
 		}
 		case GamePacketType::kClientFleetNavigationDelay:
@@ -126,9 +137,9 @@ void ServerSession::FinalizeTickClients()
 	PublishServerEntityCounts();
 }
 
-// Empty: no queued client request becomes a once-per-update StatusChange.
 void ServerSession::BuildAdvancingFrameInputs()
 {
+	mpFleetManager->ProcessDestroyFleetMemberRequests();
 }
 
 void ServerSession::TickGameTimers(bool bRecording)

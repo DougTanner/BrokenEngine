@@ -84,6 +84,21 @@ extern engine::Wrapper gHitFlashLightingAreaTwo;
 extern engine::Wrapper gHitFlashLightingIntensityOne;
 extern engine::Wrapper gHitFlashLightingIntensityTwo;
 
+// Fighters - Beam visible
+extern engine::Wrapper gFighterBeamImpactVisibleAreaOne;
+extern engine::Wrapper gFighterBeamImpactVisibleAreaTwo;
+extern engine::Wrapper gFighterBeamImpactVisibleIntensityOne;
+extern engine::Wrapper gFighterBeamImpactVisibleIntensityTwo;
+extern engine::Wrapper gFighterBeamWidth;
+
+// Fighters - Beam lighting
+extern engine::Wrapper gFighterBeamImpactLightingAreaOne;
+extern engine::Wrapper gFighterBeamImpactLightingAreaTwo;
+extern engine::Wrapper gFighterBeamImpactLightingIntensityOne;
+extern engine::Wrapper gFighterBeamImpactLightingIntensityTwo;
+extern engine::Wrapper gFighterBeamLightingArea;
+extern engine::Wrapper gFighterBeamLightingIntensity;
+
 } // namespace game
 
 #endif // defined(BT_CLIENT)

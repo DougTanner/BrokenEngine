@@ -186,7 +186,7 @@ std::optional<ProcessResult> RunProcess(const std::filesystem::path* pExecutable
 
 std::optional<std::string> RunGit(const std::vector<std::wstring>& rArguments)
 {
-	std::vector<std::wstring> arguments { L"git.exe" };
+	std::vector<std::wstring> arguments {L"git.exe"};
 	arguments.append_range(rArguments);
 	RunProcessOptions options;
 	options.bMergeStdError = true;

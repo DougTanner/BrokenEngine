@@ -96,13 +96,13 @@ private:
 	static constexpr float kfTextEdge = 0.025f;
 	TextArea mpTextAreas[kTextAreasCount]
 	{
-		{ .fX = 0.45f, .fY = 1.0f - 2.0f * kfTextEdge },
-		{ .fX = 0.875f, .fY = kfTextEdge },
-		{ .fX = 0.5f * kfTextEdge, .fY = kfTextEdge },
-		{ .fX = 0.5f * kfTextEdge, .fY = kfTextEdge },
-		{ .fX = 0.5f * kfTextEdge, .fY = kfTextEdge },
-		{ .fX = 0.875f, .fY = 0.15f },
-		{ .fX = 0.725f, .fY = 0.15f },
+		{.fX = 0.45f, .fY = 1.0f - 2.0f * kfTextEdge},
+		{.fX = 0.875f, .fY = kfTextEdge},
+		{.fX = 0.5f * kfTextEdge, .fY = kfTextEdge},
+		{.fX = 0.5f * kfTextEdge, .fY = kfTextEdge},
+		{.fX = 0.5f * kfTextEdge, .fY = kfTextEdge},
+		{.fX = 0.875f, .fY = 0.15f},
+		{.fX = 0.725f, .fY = 0.15f},
 	};
 	static_assert(kTextAreasCount == 7);
 };

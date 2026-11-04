@@ -212,7 +212,7 @@ static void InsertNormalizationRootNode(tinygltf::Model& rGltfModel, std::string
 	std::vector<Material> materials(static_cast<size_t>(std::ssize(rGltfModel.materials)));
 	std::vector<MaterialNodeInfo> materialNodeInfos(static_cast<size_t>(std::ssize(rGltfModel.materials)));
 	MaterialNodeMap materialNodeMap;
-	LoadVerticesContext loadContext {.rVertices = vertices, .rMaterials = materials, .rMaterialNodeInfos = materialNodeInfos, .rMaterialNodeMap = materialNodeMap, .sourcePath = sourcePath, .bHasSkeleton = true, };
+	LoadVerticesContext loadContext {.rVertices = vertices, .rMaterials = materials, .rMaterialNodeInfos = materialNodeInfos, .rMaterialNodeMap = materialNodeMap, .sourcePath = sourcePath, .bHasSkeleton = true};
 	for (int64_t iNodeIndex : rDefaultScene.nodes)
 	{
 		Parent parent {.pParent = nullptr, .matNode = XMMatrixIdentity(), .iNodeIndex = -1};
@@ -319,6 +319,17 @@ GltfSceneDecoder::GltfSceneDecoder(const std::filesystem::path& rPath, bool bBin
 	rData.images.reserve(static_cast<size_t>(std::ssize(mpGltfModel->images)));
 	for (tinygltf::Image& rImage : mpGltfModel->images)
 	{
+		if (rImage.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+		{
+			int64_t iSampleCount = std::ssize(rImage.image) / static_cast<int64_t>(sizeof(uint16_t));
+			for (int64_t i = 0; i < iSampleCount; ++i)
+			{
+				uint16_t uiSample;
+				std::memcpy(&uiSample, rImage.image.data() + i * static_cast<int64_t>(sizeof(uiSample)), sizeof(uiSample));
+				rImage.image.at(i) = static_cast<uint8_t>((static_cast<uint32_t>(uiSample) + 128) / 257);
+			}
+			rImage.image.resize(static_cast<size_t>(iSampleCount));
+		}
 		rData.images.push_back({.pixels = std::move(rImage.image), .uri = std::move(rImage.uri), .iWidth = rImage.width, .iHeight = rImage.height, .iComponents = rImage.component});
 	}
 }
@@ -383,7 +394,7 @@ void GltfSceneDecoder::DecodeVertices(bool bHasSkeleton, SceneExportData& rData)
 	std::vector<common::ModelVertex>& rVertices = rData.vertices;
 	const tinygltf::Scene& rScene = rGltfModel.scenes.at(rGltfModel.defaultScene > -1 ? rGltfModel.defaultScene : 0);
 	MaterialNodeMap materialNodeMap;
-	LoadVerticesContext loadContext {.rVertices = rVertices, .rMaterials = rMaterials, .rMaterialNodeInfos = rMaterialNodeInfos, .rMaterialNodeMap = materialNodeMap, .sourcePath = mSourcePath, .bHasSkeleton = bHasSkeleton, };
+	LoadVerticesContext loadContext {.rVertices = rVertices, .rMaterials = rMaterials, .rMaterialNodeInfos = rMaterialNodeInfos, .rMaterialNodeMap = materialNodeMap, .sourcePath = mSourcePath, .bHasSkeleton = bHasSkeleton};
 	for (int64_t iNodeIndex : rScene.nodes)
 	{
 		const tinygltf::Node& rNode = rGltfModel.nodes.at(static_cast<size_t>(iNodeIndex));

@@ -195,12 +195,12 @@ static void ReportInvalidMetadata(const Plan& rPlan, nlohmann::json& rDiagnostic
 		return;
 	}
 	std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v1 metadata" : rPlan.diagnostic;
-	rDiagnostics.push_back({ { "plan", WideToUtf8(rPlan.path) }, { "code", "invalid-metadata" }, { "message", std::move(message) } });
+	rDiagnostics.push_back({{"plan", WideToUtf8(rPlan.path)}, {"code", "invalid-metadata"}, {"message", std::move(message)}});
 }
 
 bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 {
-	std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans" });
+	std::optional<std::string> optionalListing = RunGit({L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans"});
 	if (!optionalListing)
 	{
 		return false;
@@ -237,7 +237,7 @@ bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::
 bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 {
 	// -z keeps paths unambiguous.  Every path still passes the scheduler's stricter canonical check.
-	std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans" });
+	std::optional<std::string> optionalListing = RunGit({L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans"});
 	if (!optionalListing)
 	{
 		return false;
@@ -268,7 +268,7 @@ bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_vie
 		{
 			continue;
 		}
-		std::optional<std::string> optionalBytes = RunGit({ L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path });
+		std::optional<std::string> optionalBytes = RunGit({L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path});
 		if (!optionalBytes)
 		{
 			return false;
@@ -339,7 +339,7 @@ void MarkCycles(std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& 
 				{
 					rPlans.at(*it).bValid = false;
 					rPlans.at(*it).diagnostic = "dependency cycle";
-					rDiagnostics.push_back({ { "plan", WideToUtf8(*it) }, { "code", "dependency-cycle" }, { "message", "plan belongs to a dependency cycle" } });
+					rDiagnostics.push_back({{"plan", WideToUtf8(*it)}, {"code", "dependency-cycle"}, {"message", "plan belongs to a dependency cycle"}});
 				}
 			}
 		}
@@ -372,7 +372,7 @@ void MarkCycles(std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& 
 				{
 					rPlan.bValid = false;
 					rPlan.diagnostic = "dependency is excluded from selection";
-					rDiagnostics.push_back({ { "plan", WideToUtf8(rPath) }, { "code", "dependency-excluded" }, { "message", rPlan.diagnostic } });
+					rDiagnostics.push_back({{"plan", WideToUtf8(rPath)}, {"code", "dependency-excluded"}, {"message", rPlan.diagnostic}});
 					bChanged = true;
 					break;
 				}

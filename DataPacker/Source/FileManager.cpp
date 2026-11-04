@@ -198,7 +198,7 @@ static std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(cons
 		// The canonical output root anchors the ThirdParty and attribution paths validated below.
 		throw std::runtime_error(std::format("Linked worktree must export into its canonical output directory: supplied {}, expected {}", rOutputDirectory.string(), expected.string()));
 	}
-	return LinkedWorktreeIdentity { .primaryRoot = std::move(primaryRoot), .expectedOutput = std::move(expected), };
+	return LinkedWorktreeIdentity {.primaryRoot = std::move(primaryRoot), .expectedOutput = std::move(expected)};
 }
 
 struct MaterializationInventory
@@ -386,7 +386,7 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(InitializationMode eMode)
 {
 	mDataOutput.destination = mOutputDirectory;
-	std::array<OutputRootInfo*, 2> roots { &mDataOutput, &mAttributionOutput };
+	std::array<OutputRootInfo*, 2> roots {&mDataOutput, &mAttributionOutput};
 	std::span<OutputRootInfo*> outputRoots(roots.data(), eMode == InitializationMode::kFull ? roots.size() : 1);
 	if (eMode == InitializationMode::kFull)
 	{

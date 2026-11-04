@@ -84,10 +84,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   accumulates it, and the update decays it after `PullTarget` has read it. A
   tracked target's raw position updates the tracking velocity and last-known
   position; the offset is added only to the resolved target. The engine places
-  the initial position and every resolved target on the
-  lowest flight plane, so the look-at always lies on it and a target's height
-  never moves the eye or the visible area; `PullTarget` supplies no height
-  policy.
+  the initial position and Direct targets on the lowest flight plane. Tracked
+  and extrapolated targets retain their full height through the chase, raising
+  the look-at and eye together without changing tilt or framing.
 - Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the render clock's per-frame advance the caller passes separately, so it stops whenever on-screen game time stops, and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
 - Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with framing. Mouse-wheel input updates a persisted, clamped framing target, with framing and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary.
   A host may override the rendered framing with its own eased target and release it back to the world framing; the wheel is ignored while an override is active. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
@@ -114,16 +113,20 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   framing `mfCameraFraming`; the chase rate, audio blends, the saved zoom, and
   cell selection (`mf4WorldVisibleArea`) read the world framing. Camera tilt
   orbits the eye about the look-at around world X, tilt 0 straight down and
-  positive tilt moving the eye south so the view looks north; the water eye
+  positive tilt moving the eye south so the view looks north. Perspective uses
+  the stored Camera Tilt; orthographic uses zero tilt and disables its control
+  without changing the stored value. The water eye
   stays at framing straight above the look-at at any tilt, which water shading
-  relies on. Field of view, projection mode, and tilt join the visible-area
-  latch key because they move the ground area at a fixed framing while the zoom
-  bucket does not.
+  relies on. Field of view, projection mode, tilt, and look-at height join the
+  visible-area latch key because they move the ground area at a fixed framing
+  while the zoom bucket does not.
 - Shadow and lighting texel sizes track independent framing references that
   expand immediately with outward zoom and contract at their existing rates
   inward. The references never fall below rendered framing times
-  `mfTexelCoverageRatio`, preserving raw-frustum coverage without changing
-  settled on-screen density. With the rendered framing above the gameplay
+  `mfTexelCoverageRatio`, the maximum raw-footprint width or height divided by
+  the corresponding reference-angle framing dimension. This preserves
+  raw-frustum coverage and settled on-screen density along the limiting axis.
+  With the rendered framing above the gameplay
   ceiling both track it without contracting, so a return from a host-set far
   zoom does not leave the texel grids coarse. Lighting
   temporal history rejects newly exposed texels when their reprojected UV falls

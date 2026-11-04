@@ -74,9 +74,25 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 		if (rStatusChange.eType == StatusChangeType::kDestroyShip)
 		{
 			const DestroyShipData& rDestroy = std::get<DestroyShipData>(rStatusChange.data);
-			VisitShipByUuid(rFrame, rDestroy.eType, rDestroy.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
+			VisitShipByUuid(rFrame, rDestroy.eType, rDestroy.iUuid, [&](auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
-				engine::MarkDestroy(rPostRender.pLifecycleFlags[iIndex]);
+				if (rDestroy.eType != ShipType::kBattleship && (rPostRender.pLifecycleFlags[iIndex] & engine::LifecycleFlags::kDying))
+				{
+					return;
+				}
+				using PostRender = std::remove_cvref_t<decltype(rPostRender)>;
+				if constexpr (std::is_same_v<PostRender, FightersPostRender>)
+				{
+					FightersPostRender::BeginExplosion(rFrame, rStaticData.coordinate, iIndex, XMVectorZero());
+				}
+				else if constexpr (std::is_same_v<PostRender, OmnisPostRender>)
+				{
+					OmnisPostRender::BeginExplosion(rFrame, rInterpolate, rPostRender, iIndex);
+				}
+				else
+				{
+					engine::MarkDestroy(rPostRender.pLifecycleFlags[iIndex]);
+				}
 			});
 			continue;
 		}

@@ -105,6 +105,11 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 {
 	if (rEvent.eState == engine::OwnedEntityState::kDied)
 	{
+		// Resolve before a same-poll respawn can restore the owned-entity list.
+		if (auto it = gpGame->mFleetSelection.mDestroyMemberControls.find(rEvent.globalId.iValue); it != gpGame->mFleetSelection.mDestroyMemberControls.end())
+		{
+			it->second.Reset();
+		}
 		gpGame->RemoveClientOwnedEntity(rEvent.globalId);
 		mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kDied));
 		return;
@@ -216,6 +221,32 @@ void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipT
 	{
 		LOG(kNetwork, kDebug, "ClientSession::SendSpawnIntoFleetRequest Fleet: ({},{}) Type: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, ShipTypeName(eType));
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, std::to_underlying(eType));
+}
+
+void ClientSession::SendDestroyFleetMemberRequest(engine::GlobalId globalId)
+{
+	engine::Client* pClient = mpRuntime->mpClient.get();
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	if (!(pClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
+	{
+		return;
+	}
+
+	LOG(kNetwork, kDebug, "ClientSession::SendDestroyFleetMemberRequest Member: {}", globalId.iValue);
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+	rWorkbuffer.PushBack<uint8_t>(std::to_underlying(GamePacketType::kClientDestroyFleetMemberRequest));
+	GameMessages::DestroyFleetMemberRequestMessage message {.globalId = globalId};
+	engine::NetworkMessages::Write(rWorkbuffer, message);
+	engine::NetworkManager::SendPacket(pClient->mpServerPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+
+	// Heap: ENet may allocate while flushing this user request.
+	ScopedSuppressAllocationTracking suppress;
+	enet_host_flush(pClient->mpServerPeer->host);
 }
 
 void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay)

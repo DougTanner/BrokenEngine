@@ -9,6 +9,7 @@
 #include "Graphics/Debug/DebugRender.h"
 #endif
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/TerrainUtils.h"
 
@@ -57,6 +58,11 @@ bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane)
 	return iFlightPlane >= 0 && iFlightPlane <= HighestFlightPlane(eType);
 }
 
+float EffectiveShipFlightHeight(ShipType eType, ShipController eController, int64_t iFlightPlane)
+{
+	return std::max(engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
+}
+
 std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
 {
 	for (int64_t i = 0; i < engine::gpFlightPlanes->Count(); ++i)
@@ -91,13 +97,26 @@ bool SkipsTerrainContact(float fHeight)
 	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
 }
 
-XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
+// The empty graph stands in on a plane the tier has no graph on, kuiNoFlightPlane included, and in a client cell whose
+// static data has not arrived, which holds no graphs.
+static const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
 {
-	// Fixed operation order and the table's own height on arrival keep client and server bit-identical, which
-	// FlightPlaneAtHeight's exact equality relies on.
-	float fTargetHeight = engine::gpFlightPlanes->Plane(iTargetFlightPlane).fHeightMeters;
+	static const engine::NavData sEmptyNavData;
+	int64_t iGraph = NavigationGraphIndex(iClearanceTier, iNavigationPlane);
+	return (iGraph >= 0 && iGraph < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iGraph)) : sEmptyNavData;
+}
+
+XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, int64_t iClearanceTier, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
+{
+	// Fixed operation order and the exact effective height on arrival keep client and server bit-identical.
+	float fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
 	float fClimbStep = fClimbRate * deltaTime.count();
 	float fHeight = XMVectorGetZ(vecPosition);
+	if (fTargetHeight < fHeight && engine::NavQueryPointBlocked(vecPosition, NavigationPlaneData(rStaticData, iClearanceTier, iTargetFlightPlane)))
+	{
+		iTargetFlightPlane += 1;
+		fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
+	}
 	float fHeightGap = fTargetHeight - fHeight;
 	bool bArrived = false;
 	if (fHeightGap > fClimbStep)
@@ -283,15 +302,6 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, 
 		});
 	}
 #endif // BT_CLIENT
-}
-
-// The empty graph stands in on a plane the tier has no graph on, kuiNoFlightPlane included, and in a client cell whose
-// static data has not arrived, which holds no graphs.
-static const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
-{
-	static const engine::NavData sEmptyNavData;
-	int64_t iGraph = NavigationGraphIndex(iClearanceTier, iNavigationPlane);
-	return (iGraph >= 0 && iGraph < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iGraph)) : sEmptyNavData;
 }
 
 XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal)

@@ -17,6 +17,7 @@ public:
 	void ResetLightingPreset();
 	void ToggleFlight();
 	void TogglePause();
+	void SelectModel(int64_t iSelection);
 	bool WorldVisible() const;
 	void ResetDisplayTime();
 	bool Render();
@@ -25,6 +26,7 @@ public:
 	void RenderModel(int64_t iCommandBuffer);
 	bool mbWorldBackground = true;
 	float mfBackgroundGray = kVkHdrClearColor.float32[0];
+	int64_t miSelected = 0;
 
 private:
 	enum class ViewerFlags : uint8_t
@@ -74,7 +76,6 @@ private:
 	void ApplyLightingValues(const std::array<float, 19>& rValues);
 	void SaveLightingPreset(const std::array<float, 19>& rValues);
 	std::vector<Preview> mPreviews;
-	int64_t miSelected = 0;
 	int64_t miFittedSelection = -1;
 	int64_t miSelectedAnimation = -1;
 	std::chrono::duration<float> mAnimationTime {};

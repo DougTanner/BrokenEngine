@@ -207,7 +207,7 @@ static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons
 			continue;
 		}
 
-		std::vector<XMFLOAT2> polygon = { rEdges.at(i).f2A, rEdges.at(i).f2B };
+		std::vector<XMFLOAT2> polygon = {rEdges.at(i).f2A, rEdges.at(i).f2B};
 		used.at(i) = true;
 		uint64_t uiHeadKey = rEdges.at(i).uiKeyA;
 		uint64_t uiTailKey = rEdges.at(i).uiKeyB;

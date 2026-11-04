@@ -5,6 +5,7 @@
 #include "Ui/MenuUtils.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -139,7 +140,7 @@ float HudScreen::PanelWidth()
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
 
 	// Member-row template: content-spanning Selectable rows, with the longest ship type name.
-	float fMemberRowWidth = ImGui::CalcTextSize("Battleship 88 (-888,-888) #8888888888").x;
+	float fMemberRowWidth = ImGui::CalcTextSize("Battleship 88 (-888,-888) #8888888888[x]").x + 2.0f * rStyle.FramePadding.x + rStyle.ItemSpacing.x;
 
 	// Nav-row template: [<] 88/88 [>] [+] [-]. Padding-dominated — at low gUiFontScale text shrinks but the per-button
 	// FramePadding and per-joint ItemSpacing don't, so measure them explicitly: 4 buttons × 2 edges (8× FramePadding.x),
@@ -261,15 +262,36 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				}
 			}
 
-			ImGui::PushID(static_cast<int>(i));
+			char pcMemberId[32];
+			std::snprintf(pcMemberId, sizeof(pcMemberId), "%lld", rMember.globalId.iValue);
+			ImGui::PushID(pcMemberId);
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
 				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), i + 1, memberCoordinate.iQ, memberCoordinate.iR, rMember.globalId.iValue);
-				if (ImGui::Selectable(pcLabel, bSelected))
+				float fDestroyButtonWidth = ImGui::CalcTextSize("[x]").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+				float fSelectionWidth = ImGui::GetContentRegionAvail().x - fDestroyButtonWidth - ImGui::GetStyle().ItemSpacing.x;
+				if (ImGui::Selectable(pcLabel, bSelected, ImGuiSelectableFlags_None, ImVec2(fSelectionWidth, ImGui::GetFrameHeight())))
 				{
 					gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);
 					gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectOwnedEntity));
+				}
+				if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
+				{
+					bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rMember.globalId);
+					// Heap: one pending control per stable fleet member, pruned on fleet sync or selection reset.
+					ScopedSuppressAllocationTracking suppress;
+					engine::NetworkUiControl<bool>& rDestroyControl = gpGame->mFleetSelection.mDestroyMemberControls.try_emplace(rMember.globalId.iValue).first->second;
+					rDestroyControl.Update(bOwnedEntityPresent);
+					ImGui::SameLine();
+					ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+					if (ImGui::Button("[x]##DestroyMember", ImVec2(fDestroyButtonWidth, 0.0f)))
+					{
+						rDestroyControl.Update(bOwnedEntityPresent);
+						rDestroyControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+						gpClientSession->SendDestroyFleetMemberRequest(rMember.globalId);
+					}
+					ImGui::EndDisabled();
 				}
 			}
 			else

@@ -83,15 +83,15 @@ std::optional<LandingLease> ValidateLandingLease(const nlohmann::json& rMetadata
 
 nlohmann::json LandingStatus(const nlohmann::json& rMetadata, const Locator& rLocator)
 {
-	nlohmann::json status = { { "held", true }, { "leaseState", "unverifiable" } };
-	for (const char* pField : { "domain", "logicalKey", "owner", "session", "worktree", "claimedAt", "heartbeatAt", "expiresAt" })
+	nlohmann::json status = {{"held", true}, {"leaseState", "unverifiable"}};
+	for (const char* pField : {"domain", "logicalKey", "owner", "session", "worktree", "claimedAt", "heartbeatAt", "expiresAt"})
 	{
 		if (rMetadata.contains(pField) && rMetadata[pField].is_string())
 		{
 			status[pField] = rMetadata[pField];
 		}
 	}
-	for (const char* pField : { "schemaVersion", "leaseDurationSeconds" })
+	for (const char* pField : {"schemaVersion", "leaseDurationSeconds"})
 	{
 		if (rMetadata.contains(pField) && rMetadata[pField].is_number_integer())
 		{
@@ -109,7 +109,7 @@ nlohmann::json LandingStatus(const nlohmann::json& rMetadata, const Locator& rLo
 
 bool AllRegisteredWorktreesClear(const Locator& rLocator)
 {
-	std::optional<std::string> optionalListing = RunGit({ L"--git-dir", rLocator.logicalKey, L"worktree", L"list", L"--porcelain", L"-z" });
+	std::optional<std::string> optionalListing = RunGit({L"--git-dir", rLocator.logicalKey, L"worktree", L"list", L"--porcelain", L"-z"});
 	if (!optionalListing)
 	{
 		return false;
@@ -161,7 +161,7 @@ bool AllRegisteredWorktreesClear(const Locator& rLocator)
 	{
 		return false;
 	}
-	const std::filesystem::path pMarkers[] = { L"MERGE_HEAD", L"rebase-merge", L"rebase-apply", L"CHERRY_PICK_HEAD", L"REVERT_HEAD", L"BISECT_LOG", L"sequencer" };
+	const std::filesystem::path pMarkers[] = {L"MERGE_HEAD", L"rebase-merge", L"rebase-apply", L"CHERRY_PICK_HEAD", L"REVERT_HEAD", L"BISECT_LOG", L"sequencer"};
 	for (const std::wstring& rWorktree : worktrees)
 	{
 		std::error_code error;
@@ -169,7 +169,7 @@ bool AllRegisteredWorktreesClear(const Locator& rLocator)
 		{
 			return false;
 		}
-		std::optional<std::string> optionalGitDirectoryText = RunGit({ L"-C", rWorktree, L"rev-parse", L"--path-format=absolute", L"--git-dir" });
+		std::optional<std::string> optionalGitDirectoryText = RunGit({L"-C", rWorktree, L"rev-parse", L"--path-format=absolute", L"--git-dir"});
 		if (!optionalGitDirectoryText)
 		{
 			return false;

@@ -184,7 +184,7 @@ static const engine::AnimationData* LoopingAnimationData(common::crc_t uiModel)
 }
 #endif
 
-void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
+void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerInterpolateUpdateBattleships);
 
@@ -212,7 +212,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
+		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kBattleship, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -404,7 +404,8 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kBattleship, rInfo.eController, rInfo.uiFlightPlane));
+	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
@@ -456,7 +457,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 #endif // BT_CLIENT
 
 	// Sync owned objects after Add()
-	SyncBattleship(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], rInfo.vecPosition, rInfo.eController);
+	SyncBattleship(rFrame.interpolate, rCurrentInterpolate.pPushers[iIndex], vecPosition, rInfo.eController);
 
 	return true;
 }

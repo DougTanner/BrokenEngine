@@ -1,7 +1,7 @@
 {
 	"version": 4,
 	"rotationDegrees": [90, 0, 90],
-	"scale": [1, 1, 1],
+	"scale": [2, 2, 2],
 	"offset": [0, 0.0621412, -0.0985188],
 	"hitbox": "sphere",
 	"hardpoints": []

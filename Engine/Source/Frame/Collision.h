@@ -44,6 +44,10 @@ struct CollisionHitbox
 	int64_t iHullVertexCount = 0;
 };
 
+// Narrows [rfEnter, rfExit] of rf3Start + t * rf3Delta to the CCW polygon's Z prism, boundary included.
+// Returns false when the interval is empty.
+bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit);
+
 // Per-layer binding data (provided by collections each frame)
 struct CollisionLayer
 {

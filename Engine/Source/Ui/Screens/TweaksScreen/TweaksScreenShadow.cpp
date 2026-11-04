@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Ui/MenuUtils.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "TweaksSliderMap.h"
 
@@ -29,11 +30,13 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Shadow Noon", &gObjectShadowsNoon},
 	{"Shadow Sunset", &gObjectShadowsSunset},
 	{"Sunset Stretch", &gObjectShadowsSunsetStretch},
+	{"Stretch Power", &gObjectShadowsStretchPower},
 	{"Object Blur Sigma Low", &gObjectShadowsBlurSigmaLow},
 	{"Object Blur Sigma High", &gObjectShadowsBlurSigmaHigh},
 	{"Object Blur Radius Noon", &gObjectShadowsBlurRadiusNoon},
 	{"Object Blur Radius Sunset", &gObjectShadowsBlurRadiusSunset},
 	{"Terrain Shadow Height Fade", &gObjectShadowsTerrainShadowFade},
+	{"Underwater Fade", &gObjectShadowsUnderwaterFade},
 	{"Bottom Smoke Shadow Intensity", &gSmokeShadowIntensityBottom},
 	{"Top Smoke Shadow Intensity", &gSmokeShadowIntensityTop},
 };
@@ -66,11 +69,13 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Shadow Noon", iSection);
 	rScreen.WrapperSlider("Shadow Sunset", iSection);
 	rScreen.WrapperSlider("Sunset Stretch", iSection);
+	rScreen.WrapperSlider("Stretch Power", iSection);
 	rScreen.WrapperSlider("Object Blur Sigma Low", iSection);
 	rScreen.WrapperSlider("Object Blur Sigma High", iSection);
 	rScreen.WrapperSlider("Object Blur Radius Noon", iSection);
 	rScreen.WrapperSlider("Object Blur Radius Sunset", iSection);
 	rScreen.WrapperSlider("Terrain Shadow Height Fade", iSection);
+	rScreen.WrapperSlider("Underwater Fade", iSection);
 	rScreen.WrapperSlider("Bottom Smoke Shadow Intensity", iSection);
 	rScreen.WrapperSlider("Top Smoke Shadow Intensity", iSection);
 }

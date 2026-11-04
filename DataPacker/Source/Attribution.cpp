@@ -105,7 +105,7 @@ static std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<s
 {
 	bool bFoundLicense = false;
 	std::filesystem::path primaryLicenseFile;
-	for (std::string_view priority : { "license", "license.md", "license.txt" })
+	for (std::string_view priority : {"license", "license.md", "license.txt"})
 	{
 		for (const std::filesystem::directory_entry& rFileEntry : rFiles)
 		{
@@ -124,7 +124,7 @@ static std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<s
 
 	if (bFoundLicense)
 	{
-		return { std::move(primaryLicenseFile) };
+		return {std::move(primaryLicenseFile)};
 	}
 
 	std::vector<std::filesystem::path> licenseFiles;
@@ -182,7 +182,7 @@ static std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& 
 		}
 		if (libraryName == "assimp")
 		{
-			for (std::string_view noticePath : { "contrib/pugixml/LICENSE.md", "contrib/utf8cpp/doc/LICENSE", "contrib/earcut-hpp/LICENSE", "contrib/unzip/MiniZip64_info.txt", })
+			for (std::string_view noticePath : {"contrib/pugixml/LICENSE.md", "contrib/utf8cpp/doc/LICENSE", "contrib/earcut-hpp/LICENSE", "contrib/unzip/MiniZip64_info.txt"})
 			{
 				AddPendingCopy(rDirectoryEntry.path() / noticePath, libraryAttributionDirectory / noticePath, libraryName);
 			}

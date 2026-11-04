@@ -49,6 +49,7 @@ public:
 
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType);
+	void SendDestroyFleetMemberRequest(engine::GlobalId globalId);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
 	std::unique_ptr<ClientReconciler> mpReconciler;

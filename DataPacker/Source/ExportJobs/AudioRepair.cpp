@@ -172,7 +172,7 @@ static ClipRunAnalysis DetectClipRuns(const std::vector<float>& rSamples, int64_
 		int64_t iLength = i - iStart;
 		if (iLength >= kiClipRunMinSamples)
 		{
-			analysis.runs.push_back(ClipRun { .iStart = iStart, .iEnd = i - 1, .fRailValue = static_cast<float>(fRailSum / static_cast<double>(iLength)), });
+			analysis.runs.push_back(ClipRun {.iStart = iStart, .iEnd = i - 1, .fRailValue = static_cast<float>(fRailSum / static_cast<double>(iLength))});
 		}
 	}
 	return analysis;
@@ -201,13 +201,13 @@ static DeclipPolicyClassification ClassifyDeclipPolicy(const std::vector<ClipRun
 
 	if (std::ssize(rRuns) > kiDeclipWarnOnlyRunCount)
 	{
-		return { .ePolicy = DeclipPolicy::kPervasiveWarning, .iLongestRun = iLongestRun, };
+		return {.ePolicy = DeclipPolicy::kPervasiveWarning, .iLongestRun = iLongestRun};
 	}
 	if (!bAllowDeclip)
 	{
-		return { .ePolicy = DeclipPolicy::kDisabledWarning, .iLongestRun = iLongestRun, };
+		return {.ePolicy = DeclipPolicy::kDisabledWarning, .iLongestRun = iLongestRun};
 	}
-	return { .ePolicy = DeclipPolicy::kRepair, .iLongestRun = iLongestRun, };
+	return {.ePolicy = DeclipPolicy::kRepair, .iLongestRun = iLongestRun};
 }
 
 struct DeclipStatistics

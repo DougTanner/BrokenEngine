@@ -39,6 +39,11 @@ static float ComputeNightEnvelope(float fSunAngle, float fRiseStart, float fRise
 	return 0.0f;
 }
 
+bool IsMoonOut(float fSunAngle)
+{
+	return ComputeNightEnvelope(fSunAngle, gSunMoonMoonriseStart.mfCurrent, gSunMoonMoonriseEnd.mfCurrent, gSunMoonMoonsetStart.mfCurrent, gSunMoonMoonsetEnd.mfCurrent) > 0.0f;
+}
+
 // Sun/Moon direction + tilt: stores the normalized sky direction in f4SunMoonNormal and returns it so the
 // shadow-stretch translation (which also needs it) can be folded CPU-side without re-reading write-only memory.
 static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
@@ -239,7 +244,7 @@ static void PopulateSunAndLighting(shaders::GlobalLayout& rGlobalLayout, float f
 	// Smoke lighting multiplier folded with time-of-day (AddSmoke/BlendSmokePrecomputed): both inputs are known
 	// here (fSmokeLightingMultiplier source from RenderSmokeGlobal earlier this frame, time-of-day just above).
 	rGlobalLayout.fSmokeLightingCombinedMultiplier = fLightingTimeOfDayMultiplier * gSmokeLightingMultiplier.mfCurrent;
-	rGlobalLayout.fLightingWaterSkyboxOne = gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent;
+	rGlobalLayout.fLightingWaterSkyboxOne = IsMoonOut(fSunAngle) ? gLightingWaterSkyboxOneNight.mfCurrent : gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent;
 	// Skybox normal soften blends a sunrise/sunset (low-sun) value toward a noon value by the noon feather (1 at solar noon, 0 toward both horizons / night).
 	rGlobalLayout.fLightingWaterSkyboxNormalSoften = (1.0f - rfNoonPercent) * gLightingWaterSkyboxNormalSoftenSunrise.mfCurrent + rfNoonPercent * gLightingWaterSkyboxNormalSoftenNoon.mfCurrent;
 }
@@ -283,17 +288,15 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 	float fSunsetStretchCubed = fSunsetStretchScaled * fSunsetStretchScaled * fSunsetStretchScaled;
 	rGlobalLayout.fObjectShadowsExtension = std::max(fSunriseStretchCubed, fSunsetStretchCubed);
 	float fSunX = XMVectorGetX(vecSunMoonNormal);
-	float fSunY = XMVectorGetY(vecSunMoonNormal);
-	float fHorizontalLength = std::sqrt(fSunX * fSunX + fSunY * fSunY);
-	rGlobalLayout.f2ObjectShadowsAwayLight.x = fHorizontalLength == 0.0f ? 0.0f : -fSunX / fHorizontalLength;
-	rGlobalLayout.f2ObjectShadowsAwayLight.y = fHorizontalLength == 0.0f ? -1.0f : -fSunY / fHorizontalLength;
+	rGlobalLayout.fObjectShadowsAwayLightX = fSunX > 0.0f ? -1.0f : (fSunX < 0.0f ? 1.0f : 0.0f);
+	rGlobalLayout.fObjectShadowsStretchPower = gObjectShadowsStretchPower.mfCurrent;
 }
 
 static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
 {
 	// Shadow texels use a coverage-safe framing reference: outward zoom expands it immediately, inward zoom contracts it at the existing
-	// rate, and it never falls below live framing times the tilt coverage ratio. Derive texel size from that tilt-covering framing's analytic
-	// reference-angle frustum, not the snapped render area, so the grid is bit-stable at settled framing and tilt and integer-texel XY pan does not
+	// rate, and it never falls below live framing times the coverage ratio. Derive texel size from that coverage-safe framing's analytic
+	// reference-angle frustum, not the snapped render area, so the grid is bit-stable for a settled footprint and integer-texel XY pan does not
 	// shimmer. textureWidth / kfShadowHeadroomMultiplier pixels span that frustum; the headroom covers the live area throughout zoom transitions.
 	// Use the actual clamped extent for device-independent coverage and center the computed shadow area on the tilted footprint, snapped to the
 	// texel grid.
@@ -468,6 +471,7 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	}
 	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(iObjectShadowsBlurRadius);
 	rGlobalLayout.fObjectShadowsTerrainShadowFadeInverse = 1.0f / gObjectShadowsTerrainShadowFade.mfCurrent;
+	rGlobalLayout.fObjectShadowsUnderwaterFadeInverse = 1.0f / gObjectShadowsUnderwaterFade.mfCurrent;
 	float fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
 	rGlobalLayout.fObjectShadowsIntensity = fObjectShadowsIntensity * std::pow(fDayPercent, 0.1f);
 	// fShadowSunsetOffset contributes to fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.

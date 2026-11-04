@@ -126,7 +126,7 @@ static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, 
 }
 #endif // BT_CLIENT
 
-void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
+void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	BlastersInterpolate& rCurrent = *rCurrentFrameInterpolate.pBlasters;
 	const BlastersInterpolate& rPrevious = *rPreviousFrame.interpolate.pBlasters;

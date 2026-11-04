@@ -7,6 +7,7 @@
 #include "Frame/Collections/Collection.h"
 #include "Frame/CellStaticData.h"
 
+#include "Frame/FlightPlaneTable.h"
 #include "Frame/HealthDamage.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
@@ -31,6 +32,12 @@ namespace game
 {
 
 using enum MissileFlags;
+
+int64_t GetMissileFlightPlane(MissileFlags_t flags)
+{
+	static_assert(kFlightPlanes.size() == 2);
+	return (flags & kUpperFlightPlane) ? 1 : 0;
+}
 
 
 #if defined(BT_CLIENT)
@@ -244,7 +251,7 @@ void MissilesInterpolate::Register()
 
 static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
 {
-	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f, };
+	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f};
 	for (int64_t j = 0; float fSizeMultiplier : kpfSizeMultipliers)
 	{
 		float fScaledPercent = fPercent * fSizeMultiplier;
@@ -288,6 +295,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 		MissileFlags_t missileFlags;
 		missileFlags.Set(alignment == rFrame.postRender.fleetAlignment ? kTargetRandom : kTargetFleet);
+		missileFlags.Set(kUpperFlightPlane, GetMissileFlightPlane(rCurrentPostRender.pFlags[i]) == 1);
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo

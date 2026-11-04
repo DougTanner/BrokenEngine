@@ -34,7 +34,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `registryTargetId` for every ship type: the `registryId` of the row's kept
   attack target, 0 for none;
   missile rows:
-  `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
+  `index,local,dir,flightPlane,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
@@ -47,7 +47,9 @@ adding the fields below; the other entries are its own commands. For the engine
   live missile's nonzero `registryTargetId` matches a ship `registryId` in
   the same cell, or one that ship cleared later in the same tick (death,
   destroy, or transfer) and the missile drops at its next Update; `0` means no
-  target. A missile's `deltaRotation` is the live turn rate and its
+  target. A missile's `flightPlane` is its assigned logical layer (0 or 1),
+  retained while its launch height returns to that plane. Its
+  `deltaRotation` is the live turn rate and its
   `deltaRotationDelay` counts down through zero and stays negative after its
   launch ramp finishes.
 - `edit_frame`: `{"coord":[q,r],"edits":[...]}`; these are the only top-level
@@ -100,8 +102,8 @@ adding the fields below; the other entries are its own commands. For the engine
   but no assert. Positions are also unchecked, apart from a ship's height, which
   its `PostRead` hook rejects outside the lowest-to-highest flight-plane
   heights, and a flying (neither falling nor dying) missile's height and
-  velocity z, which the save reader requires to be exactly a flight-plane height
-  and 0. Positions must stay inside the cell: an out-of-cell omni position
+  velocity z, which the save reader requires to be finite and 0 respectively.
+  Positions must stay inside the cell: an out-of-cell omni position
   transfers to one edge neighbour, so a position more than one neighbour step out
   asserts in the source cell's `FramePostRenderBase::PrepareTransferRequest`
   before any transfer ([Frame
@@ -112,7 +114,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
   [ship pusher ownership](../../Source/Frame/Collections/Ships/AGENTS.md),
   no lifecycle bit on a Pushers row, and every flying missile
-  exactly at a flight-plane height with velocity z 0) plus one more refusal: a changed
+  at a finite height with velocity z 0) plus one more refusal: a changed
   `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
@@ -245,7 +247,10 @@ adding the fields below; the other entries are its own commands. For the engine
   `UpdateFleet` `uiPendingFleetWantedCoordinateTicks` to 32
   (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
-  plane. A spawn
+  plane. A missile's `flags` bit 0x01 assigns plane 1; clear assigns plane 0,
+  including when launch height differs from the plane height. A genuine ship spawn
+  uses its `uiFlightPlane` height raised only as needed for the model's upright
+  water clearance; `bTransfer:true` retains the carried height. A spawn
   gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
   unless the entry sets them. `bTransfer` defaults to false, so the
   collection's `Spawn` starts the row as a fresh spawn; a fighter or battleship

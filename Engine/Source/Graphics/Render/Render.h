@@ -12,6 +12,45 @@ struct FrameInterpolate;
 namespace engine
 {
 
+
+struct ModelShadowBounds
+{
+	XMFLOAT3A f3Minimum {};
+	XMFLOAT3A f3Maximum {};
+};
+
+inline ModelShadowBounds ComputeModelShadowBounds(const common::ModelOutline& rOutline)
+{
+	ModelShadowBounds bounds
+	{
+		.f3Minimum = {rOutline.pf2HullVertices[0].x, rOutline.pf2HullVertices[0].y, rOutline.fMinimumZ},
+		.f3Maximum = {rOutline.pf2HullVertices[0].x, rOutline.pf2HullVertices[0].y, rOutline.fMaximumZ},
+	};
+	for (int64_t i = 1; i < rOutline.iHullVertexCount; ++i)
+	{
+		bounds.f3Minimum.x = std::min(bounds.f3Minimum.x, rOutline.pf2HullVertices[i].x);
+		bounds.f3Minimum.y = std::min(bounds.f3Minimum.y, rOutline.pf2HullVertices[i].y);
+		bounds.f3Maximum.x = std::max(bounds.f3Maximum.x, rOutline.pf2HullVertices[i].x);
+		bounds.f3Maximum.y = std::max(bounds.f3Maximum.y, rOutline.pf2HullVertices[i].y);
+	}
+	return bounds;
+}
+
+// Outline bounds already contain authored alignment; apply only the remaining instance transform.
+inline XMFLOAT2 XM_CALLCONV ComputeModelShadowRange(const ModelShadowBounds& rBounds, FXMMATRIX matInstanceTransform, FXMVECTOR vecPosition)
+{
+	XMFLOAT2 f2Range {std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+	for (uint64_t i = 0; i < 8; ++i)
+	{
+		XMVECTOR vecCorner = XMVectorSet((i & 1ui64) != 0 ? rBounds.f3Maximum.x : rBounds.f3Minimum.x, (i & 2ui64) != 0 ? rBounds.f3Maximum.y : rBounds.f3Minimum.y, (i & 4ui64) != 0 ? rBounds.f3Maximum.z : rBounds.f3Minimum.z, 1.0f);
+		XMVECTOR vecLateral = XMVectorSubtract(XMVector3TransformCoord(vecCorner, matInstanceTransform), vecPosition);
+		float fRelativeX = XMVectorGetX(vecLateral);
+		f2Range.x = std::min(f2Range.x, fRelativeX);
+		f2Range.y = std::max(f2Range.y, fRelativeX);
+	}
+	return f2Range;
+}
+
 struct WorldSizedTexelArea
 {
 	XMFLOAT4 f4Area {};
@@ -144,6 +183,8 @@ struct PresentationContinuitySnapshot
 };
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
+
+bool IsMoonOut(float fSunAngle);
 
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime);

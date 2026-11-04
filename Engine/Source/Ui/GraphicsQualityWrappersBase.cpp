@@ -33,9 +33,9 @@ struct LightingLevelValues
 
 constexpr LightingLevelValues kpLightingLevels[kiLevelCount]
 {
-	{.fDepositTextureMultiplier = 0.3f, .fSpreadTextureMultiplierStart = 0.03f, .fSpreadTextureMultiplierEnd = 0.0075f, .fSpreadPassCount = 26.0f, .fBlurSampleCount = 132.0f, },
-	{.fDepositTextureMultiplier = 0.4f, .fSpreadTextureMultiplierStart = 0.05f, .fSpreadTextureMultiplierEnd = 0.01f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 200.0f, },
-	{.fDepositTextureMultiplier = 0.6f, .fSpreadTextureMultiplierStart = 0.075f, .fSpreadTextureMultiplierEnd = 0.015f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 300.0f, },
+	{.fDepositTextureMultiplier = 0.3f, .fSpreadTextureMultiplierStart = 0.03f, .fSpreadTextureMultiplierEnd = 0.0075f, .fSpreadPassCount = 26.0f, .fBlurSampleCount = 132.0f},
+	{.fDepositTextureMultiplier = 0.4f, .fSpreadTextureMultiplierStart = 0.05f, .fSpreadTextureMultiplierEnd = 0.01f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 200.0f},
+	{.fDepositTextureMultiplier = 0.6f, .fSpreadTextureMultiplierStart = 0.075f, .fSpreadTextureMultiplierEnd = 0.015f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 300.0f},
 };
 
 constexpr float kpfSmokeSimulationPixels[kiLevelCount] {0.75f, 1.0f, 1.5f};

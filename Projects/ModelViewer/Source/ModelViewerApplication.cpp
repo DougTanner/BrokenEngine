@@ -49,6 +49,23 @@ void ModelViewerApplication::TogglePause()
 	mFlags.Toggle(ViewerFlags::kPaused);
 }
 
+void ModelViewerApplication::SelectModel(int64_t iSelection)
+{
+	if (iSelection < 0 || iSelection >= std::ssize(mPreviews))
+	{
+		return;
+	}
+	if (iSelection == miSelected)
+	{
+		return;
+	}
+	miSelected = iSelection;
+	miSelectedAnimation = -1;
+	mAnimationTime = 0s;
+	mFlags.Set(ViewerFlags::kPlaying, false);
+	LoadModelMetadata();
+}
+
 struct LightingPreset
 {
 	static constexpr int64_t kiVersion = 4;
@@ -150,7 +167,7 @@ void ModelViewerApplication::GetAlignedPreviewBounds(FXMMATRIX matAlignment, XMF
 {
 	const Preview& rPreview = mPreviews.at(miSelected);
 	XMStoreFloat3A(&rf3Center, XMVector3TransformCoord(XMLoadFloat3A(&rPreview.f3Center), matAlignment));
-	float fMaximumScale = std::max({XMVectorGetX(XMVector3Length(matAlignment.r[0])), XMVectorGetX(XMVector3Length(matAlignment.r[1])), XMVectorGetX(XMVector3Length(matAlignment.r[2])), });
+	float fMaximumScale = std::max({XMVectorGetX(XMVector3Length(matAlignment.r[0])), XMVectorGetX(XMVector3Length(matAlignment.r[1])), XMVectorGetX(XMVector3Length(matAlignment.r[2]))});
 	rfRadius = rPreview.fRadius * fMaximumScale;
 }
 
@@ -310,25 +327,25 @@ struct LightingDescriptor
 
 constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
 {
-	LightingDescriptor { .pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment", },
-	LightingDescriptor { .pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbient, .pcLabel = "IBL Ambient", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse, .pcLabel = "IBL Diffuse", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower, .pcLabel = "IBL Diffuse Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecular, .pcLabel = "IBL Specular", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower, .pcLabel = "IBL Specular Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower, .pcLabel = "Cubemap Lod Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset, .pcLabel = "Cubemap Lod Offset", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse, .pcLabel = "BRDF Diffuse", .pcHeading = "BRDF", },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower, .pcLabel = "BRDF Diffuse Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular, .pcLabel = "BRDF Specular", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower, .pcLabel = "BRDF Specular Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = "Emissive", },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingExposure, .pcLabel = "Exposure", .pcHeading = "HDR color grading", },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingGamma, .pcLabel = "Gamma", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Saturation", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gColorGradingContrast, .pcLabel = "Contrast", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr, },
+	LightingDescriptor {.pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment"},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbient, .pcLabel = "IBL Ambient", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse, .pcLabel = "IBL Diffuse", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower, .pcLabel = "IBL Diffuse Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecular, .pcLabel = "IBL Specular", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower, .pcLabel = "IBL Specular Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower, .pcLabel = "Cubemap Lod Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset, .pcLabel = "Cubemap Lod Offset", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse, .pcLabel = "BRDF Diffuse", .pcHeading = "BRDF"},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower, .pcLabel = "BRDF Diffuse Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular, .pcLabel = "BRDF Specular", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower, .pcLabel = "BRDF Specular Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = "Emissive"},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingExposure, .pcLabel = "Exposure", .pcHeading = "HDR color grading"},
+	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingGamma, .pcLabel = "Gamma", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Saturation", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingContrast, .pcLabel = "Contrast", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr},
 };
 
 static std::array<float, 19> GetLightingDefaults()
@@ -743,14 +760,24 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		}
 		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
 		rLayout = {};
-		XMMATRIX matTransform = mMatModelAlignment;
+		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+		const common::SceneHeader& rSceneHeader = rChunkMap.at(rPreview.crc).pHeader->sceneHeader;
+		const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+		engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
+		XMMATRIX matPackedAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+		XMMATRIX matAlignmentDelta = XMMatrixInverse(nullptr, matPackedAlignment) * mMatModelAlignment;
+		XMMATRIX matInstanceTransform = XMMatrixIdentity();
+		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		if (mFlags & ViewerFlags::kFlying)
 		{
 			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
-			matTransform = mMatModelAlignment * matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
+			matInstanceTransform = matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
+			vecPosition = mFlightBody.vecPosition;
 			XMStoreFloat4(&rLayout.f4PositionLayer, mFlightBody.vecPosition);
 			rLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(mFlightBody.vecPosition)));
 		}
+		XMMATRIX matTransform = mMatModelAlignment * matInstanceTransform;
+		rLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matAlignmentDelta * matInstanceTransform, vecPosition)};
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
 		if (!rPreview.meshData.empty())
@@ -1034,14 +1061,9 @@ void ModelViewerApplication::RenderUi()
 			}
 			for (int64_t i = 0; i < std::ssize(mPreviews); ++i)
 			{
-				if (ImGui::Selectable(mPreviews.at(i).pcPath, i == miSelected) && i != miSelected)
+				if (ImGui::Selectable(mPreviews.at(i).pcPath, i == miSelected))
 				{
-					miSelected = i;
-					miSelectedAnimation = -1;
-					mAnimationTime = 0s;
-					mFlags.Set(ViewerFlags::kPlaying, false);
-					LoadModelMetadata();
-					ResetFlight();
+					SelectModel(i);
 				}
 			}
 			ImGui::Spacing();

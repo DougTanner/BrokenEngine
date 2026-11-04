@@ -5,6 +5,20 @@
 namespace game::GameMessages
 {
 
+struct DestroyFleetMemberRequestMessage
+{
+	static constexpr int64_t kiSize = sizeof(int64_t);
+	static_assert(kiSize == 8);
+
+	engine::GlobalId globalId {};
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, DestroyFleetMemberRequestMessage& rMessage)
+	{
+		rVisitor.Field(rMessage.globalId.iValue);
+	}
+};
+
 struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);

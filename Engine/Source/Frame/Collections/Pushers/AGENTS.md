@@ -12,26 +12,28 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   runs that parent call before its own collection Updates, so zones are valid
   from the rest of that same Update phase onward, on the same thread only (a
   game collection's `Update` is a same-phase consumer). Stored `thread_local` so
-  each Dispatch worker and reconcile thread owns its copy. Each tick every row
-  belongs to one layer, the flight
-  plane nearest its registered height (`FlightPlanes::NearestPlaneIndex`,
-  `../../AGENTS.md`), and each layer has its own fixed zone grid (dimensions in
+  each Dispatch worker and reconcile thread owns its copy. Each tick a row at
+  an exact flight-plane height occupies that layer; a height strictly between
+  planes occupies both adjacent layers. Heights outside the table occupy the
+  nearest endpoint layer. Each layer has its own fixed zone grid (dimensions in
   `PushersUpdate.cpp`, layer count from the game's flight-plane table) that
   always covers that whole rectangle, with a cap of 512 per zone per layer
   (overflow `DEBUG_BREAK`s and logs one `kWarning` summary of the dropped
   registrations across all layers per `SetupZones` call); pushers wholly
   outside the rectangle are silently skipped. A pusher spanning multiple zones
-  is registered in every overlapping zone of its own layer; a query reads only
-  the single zone of its own layer containing its position (queries outside
-  the rectangle clamp to the border zone), so only same-layer rows push each
-  other.
+  is registered in every overlapping zone of each occupied layer; a query reads
+  the single zone containing its position in each occupied layer (queries
+  outside the rectangle clamp to the border zone). Layers are queried in
+  ascending order, and each peer contributes only on the first queried layer
+  whose zone contains its successful registration, preserving row order within
+  each layer without duplicate force or correction.
 - A query requires a registered self handle and uses its registered position,
   excluding that row. Keep registered positions and zones unchanged throughout
   the game collection Updates; the next ordinary Interpolate Sync refreshes
   positions, rather than each consumer changing the shared query snapshot.
 - Push falloff: `(1 - d²/r²)^power * intensity`, using full 3D distance
   within the source pusher's sphere, directed horizontally pusher-to-query and
-  summed across the query's zone.
+  summed across the query's zones.
   Include/exclude masks on `PusherFlags_t` default to `kTypeDefault` and
   `kTypeMines`; new pusher types opt in/out through those flags.
 - An included peer within the source sphere whose XY distance is at

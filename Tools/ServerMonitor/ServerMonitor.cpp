@@ -33,7 +33,7 @@ struct TextSection
 	std::string text;
 };
 
-enum class ConnectionState { kDisconnected, kConnecting, kAwaitingChallenge, kResponsePending, kConnected };
+enum class ConnectionState {kDisconnected, kConnecting, kAwaitingChallenge, kResponsePending, kConnected};
 static ConnectionState seConnectionState = ConnectionState::kDisconnected;
 static SOCKET sSocket = INVALID_SOCKET;
 static sockaddr_in sServerAddress {};
@@ -228,7 +228,7 @@ static void NetworkTimer(HWND hwnd)
 	}
 }
 
-enum class ServerTab : uint8_t { kMap, kProfile };
+enum class ServerTab : uint8_t {kMap, kProfile};
 static ServerTab seActiveTab = ServerTab::kMap;
 
 constexpr int64_t kiTabBarLeft = 250;

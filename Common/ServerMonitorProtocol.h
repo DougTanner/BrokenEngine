@@ -14,7 +14,7 @@ inline constexpr uint32_t kuiServerMonitorMaximumFrameSize = 4 * 1'024 * 1'024;
 inline constexpr uint32_t kuiServerMonitorCellActive = 1;
 inline constexpr uint32_t kuiServerMonitorCellSubscribed = 2;
 
-enum class ServerMonitorMessageType : uint32_t { kChallenge = 1, kSnapshot = 2 };
+enum class ServerMonitorMessageType : uint32_t {kChallenge = 1, kSnapshot = 2};
 
 struct ServerMonitorFrameHeader
 {

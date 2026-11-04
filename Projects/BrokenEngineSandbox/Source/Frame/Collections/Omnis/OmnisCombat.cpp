@@ -95,7 +95,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 	}
 }
 
-static void BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
+void OmnisPostRender::BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
 {
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
@@ -106,7 +106,7 @@ static void BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate,
 	rCurrentInterpolate.pRegistryIds[i] = {};
 }
 
-// At zero armor a random-spawn omni begins its explosion. A fleet omni never dies: its armor holds at 0 and it heals.
+// At zero armor a random-spawn omni begins its explosion; a fleet omni holds its armor at 0 and heals.
 static void HandleArmorDepleted(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
 {
 	if (rCurrentPostRender.pController[i] == ShipController::kFleet)
@@ -115,7 +115,7 @@ static void HandleArmorDepleted(Frame& rFrame, OmnisInterpolate& rCurrentInterpo
 		rCurrentPostRender.pFlags[i].Set(ShipFlags::kHealing);
 		return;
 	}
-	BeginExplosion(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
+	OmnisPostRender::BeginExplosion(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 }
 
 void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)

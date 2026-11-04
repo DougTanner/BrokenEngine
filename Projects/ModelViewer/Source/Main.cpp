@@ -48,6 +48,14 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		}
 		return 0;
 	}
+	if (uiMessage == WM_KEYDOWN && (uiWordParameter == VK_LEFT || uiWordParameter == VK_RIGHT) && (ImGui::GetCurrentContext() == nullptr || !ImGui::GetIO().WantTextInput))
+	{
+		if ((iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr)
+		{
+			gpModelViewerApplication->SelectModel(gpModelViewerApplication->miSelected + (uiWordParameter == VK_LEFT ? -1 : 1));
+		}
+		return 0;
+	}
 	if (ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(hwnd, uiMessage, uiWordParameter, iLongParameter) != 0)
 	{
 		return TRUE;

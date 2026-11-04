@@ -118,6 +118,11 @@ void PrepareReplayPlaybackTick()
 	rFleetManager.mRandomEngine = rRecord.randomEngine;
 	gpServerSession->mpClientManager->mNextFighterLaunchTicks = std::move(rRecord.nextFighterLaunchTicks);
 	++rReplayLog.iNextPlaybackRecord;
+
+	for ([[maybe_unused]] const auto& [rClientGuid, iClientId] : rFleetManager.mGuidToClientId)
+	{
+		rFleetManager.SendFleetSyncToClient(rClientGuid);
+	}
 }
 
 // The fleet checksum is replay-only: it never enters Frame::Crc or the wire.

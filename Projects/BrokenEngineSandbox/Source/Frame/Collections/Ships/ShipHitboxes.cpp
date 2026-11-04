@@ -27,6 +27,7 @@ void InitializeShipHitboxes()
 			ASSERT(rOutline.iHullVertexCount >= 3 && rOutline.iHullVertexCount <= common::kiModelOutlineVertexMaximum);
 
 			ShipHitboxShape& rShape = gShipHitboxShapes[i][j];
+			rShape.fMinimumOriginZ = 1.0f - rOutline.fMinimumZ;
 			engine::CollisionHitbox& rHitbox = rShape.hitbox;
 			rHitbox.eHitboxLevel = rOutline.eHitboxLevel;
 			rHitbox.fMinimumZ = rOutline.fMinimumZ;
@@ -99,6 +100,26 @@ void XM_CALLCONV BuildShipHitbox(ShipType eType, ShipController eController, FXM
 }
 
 #if defined(BT_CLIENT)
+XMVECTOR XM_CALLCONV ShipHullContact(ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecShooterPosition)
+{
+	const engine::CollisionHitbox& rHitbox = gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].hitbox;
+	XMVECTOR vecOffset = XMVectorSubtract(vecShooterPosition, vecPosition);
+	float fX = XMVectorGetX(vecOffset);
+	float fY = XMVectorGetY(vecOffset);
+	float fCosine = XMVectorGetX(vecDirection);
+	float fSine = XMVectorGetY(vecDirection);
+	XMFLOAT3A f3Start {fCosine * fX + fSine * fY, -fSine * fX + fCosine * fY, XMVectorGetZ(vecOffset)};
+	XMFLOAT3A f3Delta {-f3Start.x, -f3Start.y, -f3Start.z};
+	float fEnter = 0.0f;
+	float fExit = std::numeric_limits<float>::max();
+	bool bHit = engine::ClipSegmentToPrism(f3Start, f3Delta, std::span<const XMFLOAT2>(rHitbox.pf2HullVertices, static_cast<size_t>(rHitbox.iHullVertexCount)), rHitbox.fMinimumZ, rHitbox.fMaximumZ, fEnter, fExit);
+	ASSERT(bHit);
+	// Extending through the center reaches the far surface when overlapping ships put the shooter inside the hull.
+	float fContact = fEnter > 0.0f ? fEnter : fExit;
+	ASSERT(std::isfinite(fContact));
+	return XMVectorSetW(XMVectorMultiplyAdd(XMVectorReplicate(fContact), XMVectorSubtract(vecPosition, vecShooterPosition), vecShooterPosition), 1.0f);
+}
+
 static void DebugRenderPrism(const engine::RenderBasis& rBasis, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, const XMFLOAT4A& rf4Color)
 {
 	auto Corner = [&](int64_t i, float fZ)

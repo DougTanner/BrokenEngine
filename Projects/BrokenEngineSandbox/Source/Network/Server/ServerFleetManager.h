@@ -21,6 +21,12 @@ struct PendingSpawnIntoFleetRequest
 	ShipType eType {};
 };
 
+struct PendingDestroyFleetMemberRequest
+{
+	int64_t iClientId = 0;
+	engine::GlobalId globalId {};
+};
+
 class ServerFleetManager
 {
 public:
@@ -29,6 +35,7 @@ public:
 
 	void ProcessCreateFleetRequests();
 	void ProcessSpawnIntoFleetRequests();
+	void ProcessDestroyFleetMemberRequests();
 	void TickFleetTimers();
 	void TickRespawnTimers();
 
@@ -76,6 +83,7 @@ public:
 
 	std::vector<PendingCreateFleetRequest> mPendingCreateFleetRequests;
 	std::vector<PendingSpawnIntoFleetRequest> mPendingSpawnIntoFleetRequests;
+	std::vector<PendingDestroyFleetMemberRequest> mPendingDestroyFleetMemberRequests;
 };
 
 } // namespace game

@@ -32,12 +32,18 @@ vec2 VisibleAreaToWorld(vec2 f2Uv, vec4 f4VisibleArea)
 	            f4VisibleArea.w + (1.0f - f2Uv.y) * (f4VisibleArea.y - f4VisibleArea.w));
 }
 
-vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, vec3 f3ObjectPosition)
+vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, vec3 f3ObjectPosition, vec2 f2WorldXRange)
 {
-	vec2 f2Lateral = f3WorldPosition.xy - f3ObjectPosition.xy;
-	float fAwayExtent = max(dot(f2Lateral, globalLayout.f2ObjectShadowsAwayLight), 0.0f);
 	vec3 f3ShadowPosition = f3WorldPosition;
-	f3ShadowPosition.xy += globalLayout.f2ObjectShadowsAwayLight * globalLayout.fObjectShadowsExtension * fAwayExtent;
+	float fWidth = f2WorldXRange.y - f2WorldXRange.x;
+	if (fWidth > 0.0f)
+	{
+		float fDirection = globalLayout.fObjectShadowsAwayLightX;
+		float fNearX = fDirection > 0.0f ? f2WorldXRange.x : f2WorldXRange.y;
+		float fRelativeX = f3WorldPosition.x - f3ObjectPosition.x;
+		float fDistance = clamp(fDirection * (fRelativeX - fNearX) / fWidth, 0.0f, 1.0f);
+		f3ShadowPosition.x += fDirection * globalLayout.fObjectShadowsExtension * fWidth * pow(fDistance, globalLayout.fObjectShadowsStretchPower);
+	}
 	vec2 f2VisibleAreaUV = WorldToVisibleArea(f3ShadowPosition, globalLayout.f4VisibleArea);
 	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 }

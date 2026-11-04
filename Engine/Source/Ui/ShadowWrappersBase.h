@@ -26,11 +26,13 @@ extern Wrapper gObjectShadowsBlurMultiplier;
 extern Wrapper gObjectShadowsNoon;
 extern Wrapper gObjectShadowsSunset;
 extern Wrapper gObjectShadowsSunsetStretch;
+inline Wrapper gObjectShadowsStretchPower(2.0f, 0.25f, 4.0f);
 extern Wrapper gObjectShadowsBlurSigmaLow;
 extern Wrapper gObjectShadowsBlurSigmaHigh;
 extern Wrapper gObjectShadowsBlurRadiusNoon;
 extern Wrapper gObjectShadowsBlurRadiusSunset;
 extern Wrapper gObjectShadowsTerrainShadowFade;
+inline Wrapper gObjectShadowsUnderwaterFade(0.01f, 0.005f, 1.0f); // Positive minimum keeps fObjectShadowsUnderwaterFadeInverse finite.
 inline Wrapper gSmokeShadowIntensityBottom(1.0f, 0.0f, 1.0f);
 inline Wrapper gSmokeShadowIntensityTop(0.7f, 0.0f, 1.0f);
 

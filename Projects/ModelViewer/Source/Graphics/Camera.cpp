@@ -34,7 +34,6 @@ void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 {
 	mVecModelCenter = XMVectorSetW(XMLoadFloat3A(&rf3Center), 1.0f);
 	mfRadius = fRadius;
-	mArcBall = arc_ball::ArcBall(glm::vec3(0.0f), 0.75f, glm::mat4(1.0f));
 	mfZoom = 1.0f;
 	mModelSunRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }

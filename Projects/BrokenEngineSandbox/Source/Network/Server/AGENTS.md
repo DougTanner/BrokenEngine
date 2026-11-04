@@ -18,7 +18,7 @@ game state around the deterministic Frame tick.
 - Fleets are permanent: no request deletes one, so a fleet's position within its client's list never shifts. Requests and queued work still carry the generated fleet identifier and resolve it at consumption.
 - A fleet member is identified by the global ID minted when the member is added, unique across every owner's fleets, which every spawn of it keeps; stored member references — the flagship, a queued spawn, and client focus — carry that ID, never a list position.
 - Each client's owned-entity records are in global-ID order; because each member's ID is minted when it is added, that order is the members' add order.
-- Every member, the fleet's Battleship included, is added dead with an expired countdown, so its first spawn and every respawn take the same path. A dead member respawns automatically when its type's countdown ends — 0 s for a Fighter, 1 s (`kRespawnDelay`) for an Omni or Battleship — and the countdown drains whether or not its owner is connected.
+- Every member, the fleet's Battleship included, is added dead with an expired countdown, so its first spawn and every respawn take the same path. A member retained after ordinary death respawns automatically when its type's countdown ends — 0 s for a Fighter, 1 s (`kRespawnDelay`) for an Omni or Battleship — and the countdown drains whether or not its owner is connected.
 - The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound harness rig slot and its clearing semantics; teardown detaches it before destroying the runtime.
 
 ## Timing and Paused Availability
@@ -46,8 +46,13 @@ game state around the deterministic Frame tick.
   no waiting Fighters means no cooldown write. Every load reset clears the existing launch-tick map.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
-  advancing updates, is empty: no queued client request becomes a
-  once-per-update `StatusChange`.
+  advancing updates, drains destroy-member requests into the first advancing
+  tick's input once. Each request retires its sender-owned non-Battleship member
+  from the fleet and sends the reduced full fleet sync, even if death races the
+  request. A present, live, non-dying row also queues staged destruction using
+  its current cell, ship type and UUID. Battleships remain members. Paused
+  updates retain the queue; consumption,
+  disconnect, reset and load clear it through the fleet request lifecycle.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the
   spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
   walk owners in GUID order, because each fleet's direction draw consumes the

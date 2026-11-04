@@ -9,6 +9,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 ## Invariants
 
 - The tick phases implemented here are called by engine-owned `RunFrameTick` (`../../../../Engine/Source/Frame/AGENTS.md`). CRC-affecting fixed-tick decisions use `Frame`, `FrameInput`, `CellStaticData`, or explicit phase parameters, not `game::gpGame`, wall-clock time, or client render state; if required input is unavailable, stop and resolve ownership.
+- Game Interpolate Update receives its own cell's `CellStaticData` explicitly from both the fixed-tick and render callers and forwards it through the game collection tuple; engine base interpolation keeps its existing inputs.
 - Every game collection pair registers in the tuples in `FrameCollections.h`;
   no collection has explicit per-collection dispatch. Register new collections
   in the correct tuple and preserve deterministic ordering: the three ship types
@@ -26,8 +27,10 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   ships must have zero handles. Reject missing, duplicate, or orphan ownership,
   and any Pushers row with nonzero `pLifecycleFlags`, after rebuilding ID maps.
   The [shared ship policy](Collections/Ships/AGENTS.md#ship-invariants) owns the
-  death transition. Also reject a flying missile — neither falling nor dying —
-  whose height is no flight plane's or whose velocity Z is nonzero.
+  death transition. Build-local reads also reject a flying missile — neither
+  falling nor dying — whose height is non-finite or whose velocity Z is nonzero;
+  finite off-plane heights are valid during its return to its assigned plane
+  (`Collections/Missiles/AGENTS.md` `## Invariants`).
 - Navigation and elevation are deterministic derived data excluded from both the
   CRC and persisted frame payload. The game derives the clearance tiers, the
   planes each tier has graphs on, and each graph's clearance and elevation
@@ -62,7 +65,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   controller or ship type, or a target or stored flight plane the ship type
   disallows (`IsAdoptableStatusChange`), or a fleet-controlled ship spawn
   payload with global ID 0.
-- Delayed behavior updates use countdowns that transfer with the entity; transfer, spawn, and destroy status changes apply immediately.
+- Delayed behavior updates use countdowns that transfer with the entity; transfer and spawn status changes apply immediately. Destroy status changes follow the shared ship lifecycle contract (`Collections/Ships/AGENTS.md` `## Ship Invariants`).
 - Battleship missile targeting is owned by `Collections/Battleships/AGENTS.md`
   and Missiles Update targeting, through the engine frame registry
   (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`), by

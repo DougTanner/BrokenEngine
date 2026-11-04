@@ -50,7 +50,8 @@ inline constexpr float kfOmniMaximumSpeed = 33.33f;
 inline constexpr float kfOmniCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfOmniJitterRange = 0.60f;
 
-inline constexpr float kfOmniClimbRate = 12.0f;
+inline constexpr float kfOmniClimbPercentage = 0.25f;
+inline constexpr float kfOmniClimbRate = kfOmniMaximumSpeed * kfOmniClimbPercentage;
 inline constexpr int64_t kiOmniHighestFlightPlane = 1;
 static_assert(kiOmniHighestFlightPlane < std::ssize(kFlightPlanes));
 
@@ -120,7 +121,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 		}
 	}
 
-	static void Update(FrameInterpolate& __restrict rFrameInterpolate, const Frame& __restrict rPreviousFrame);
+	static void Update(FrameInterpolate& __restrict rFrameInterpolate, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
@@ -249,6 +250,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+
+	static void BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i);
 
 	// A beam hit of fDamage from vecShooterPosition, applied during PostCollision. Defined in OmnisCombat.cpp.
 	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage);

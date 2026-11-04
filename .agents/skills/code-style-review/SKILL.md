@@ -39,6 +39,14 @@ candidates on every line of named tracked `*.h`/`*.cpp` files, each a path
 relative to the repository root with no `./` prefix:
 `pwsh -NoProfile -Command "& '.agents/scripts/Find-SessionCandidates.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>'"`.
 A review never runs it; a caller passes one directory's files per run.
+For a focused single-line brace-list cleanup, add `-OutputPath
+Temp/single-line-comma-candidates.json` to preserve the complete result, then
+consume only hits whose `kind` is `style-rule-22-single-line`. Do not consume
+`style-rule-22` or other kinds for that cleanup. The new kind reports candidates
+on lines with a matching inline brace pair and a final code comma or horizontal
+whitespace immediately after the opening or before the closing brace; source
+adjudication, including rejecting actual code blocks, belongs to the worker's
+step 9.
 
 ## Handoff
 

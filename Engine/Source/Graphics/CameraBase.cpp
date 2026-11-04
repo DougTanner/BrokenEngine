@@ -114,7 +114,7 @@ CameraTarget CameraTarget::Extrapolate()
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 : common::Singleton<CameraBase>(gpCamera, this)
 {
-	// Gameplay starts on the lowest flight plane; CameraBase::Update keeps the look-at there, so the opening pose needs no chase-blend ease.
+	// Match the Direct menu target's lowest-plane height so the opening pose needs no chase-blend ease.
 	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, gpFlightPlanes->Lowest().fHeightMeters);
 }
 
@@ -216,9 +216,7 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 
 	if (!bFreeCameraActive)
 	{
-		// The look-at sits on the lowest flight plane whatever the target's height, so a climb neither raises the eye nor
-		// widens the Z = 0 visible area.
-		XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(rPulledTarget), gpFlightPlanes->Lowest().fHeightMeters);
+		XMVECTOR vecTargetPosition = ResolveTarget(rPulledTarget);
 		UpdatePosition(vecTargetPosition, fDeltaTime);
 	}
 	UpdateFraming();
@@ -226,10 +224,9 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 
 	CalculateMatricesAndVisibleArea();
 
-	// Keep each world-texel reference at or above the rendered framing times the tilt coverage ratio: zero
-	// initialization, outward zoom, and a tilt increase snap immediately for full viewport coverage, while inward zoom and
-	// a tilt decrease contract at the existing independent rates so the density change remains gradual. At a settled
-	// framing and tilt both references converge to that product.
+	// Keep each world-texel reference at or above the rendered framing times the coverage ratio. Increases snap
+	// immediately for full viewport coverage; decreases contract at the existing independent rates so the density change
+	// remains gradual. Both references converge to that product once the footprint settles.
 	float fRenderFraming = RenderFraming();
 	float fCoveredFraming = fRenderFraming * mfTexelCoverageRatio;
 	// Above the gameplay ceiling (the map zoom) both references track rendered framing, so a return from the map does not
@@ -256,7 +253,7 @@ XMVECTOR CameraBase::ResolveTarget(const CameraTarget& rCameraTarget)
 {
 	if (rCameraTarget.meKind == CameraTarget::Kind::kDirect)
 	{
-		return rCameraTarget.mVecPosition;
+		return XMVectorSetZ(rCameraTarget.mVecPosition, gpFlightPlanes->Lowest().fHeightMeters);
 	}
 
 	if (rCameraTarget.meKind == CameraTarget::Kind::kExtrapolate)
@@ -477,7 +474,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// half-height at any distance, so it places a virtual eye at the default field of view.
 	mbOrthographicProjection = gOrthographicProjection.Get<bool>();
 	float fRenderFraming = RenderFraming();
-	float fTiltDegrees = gCameraTilt.mfCurrent;
+	float fTiltDegrees = mbOrthographicProjection ? 0.0f : gCameraTilt.mfCurrent;
 	float fTilt = XMConvertToRadians(fTiltDegrees);
 	float fFramingHalfHeight = fRenderFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
 	float fEyeFieldOfView = mbOrthographicProjection ? gFieldOfView.mfDefault : gFieldOfView.mfCurrent;
@@ -502,13 +499,11 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
 	mMatProjection = mbOrthographicProjection ? XMMatrixOrthographicRH(2.0f * fFramingHalfHeight * fAspectRatio, 2.0f * fFramingHalfHeight, fNearClip, fFarClip) : XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent), fAspectRatio, fNearClip, fFarClip);
 
-	// One footprint feeds the visible area and the texel coverage. The tilt-0 call runs the same operations on the same
-	// arguments when the tilt is 0, so the ratio is then exactly 1 and the symmetric footprint's center offset exactly 0.
+	// Normalize the raw footprint by the reference-angle framing dimensions used to size both texel grids.
 	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(gFieldOfView.mfCurrent));
 	float fLookAtHeight = XMVectorGetZ(mVecPosition);
 	XMFLOAT4 f4Footprint = TiltedFootprint(fTilt, mbOrthographicProjection, fEyeDistance, fFramingHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
-	XMFLOAT4 f4UntiltedFootprint = TiltedFootprint(0.0f, mbOrthographicProjection, fEyeDistance, fFramingHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
-	mfTexelCoverageRatio = std::max((f4Footprint.z - f4Footprint.x) / (f4UntiltedFootprint.z - f4UntiltedFootprint.x), (f4Footprint.y - f4Footprint.w) / (f4UntiltedFootprint.y - f4UntiltedFootprint.w));
+	mfTexelCoverageRatio = std::max((f4Footprint.z - f4Footprint.x) / (2.0f * fFramingHalfHeight * fAspectRatio), (f4Footprint.y - f4Footprint.w) / (2.0f * fFramingHalfHeight));
 	mfTexelCenterOffsetNorth = 0.5f * (f4Footprint.w + f4Footprint.y);
 
 	float fLookAtX = XMVectorGetX(mVecPosition);
@@ -586,9 +581,9 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
 
-	// Field of view, projection, and tilt move the ground area at a fixed framing without moving the bucket, so they
-	// re-latch the quad size through the key; otherwise the snapped span could fall short of the raw area.
-	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(gFieldOfView.mfCurrent) ^ std::bit_cast<uint32_t>(fTiltDegrees) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
+	// Field of view, projection, tilt, and look-at height move the ground area at a fixed framing without moving the
+	// bucket, so they re-latch the quad size through the key; otherwise the snapped span could fall short of the raw area.
+	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX) ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16) ^ gpGraphics->mFramebufferVkExtent2D.width ^ (gpGraphics->mFramebufferVkExtent2D.height << 16) ^ std::bit_cast<uint32_t>(gFieldOfView.mfCurrent) ^ std::bit_cast<uint32_t>(fTiltDegrees) ^ std::bit_cast<uint32_t>(fLookAtHeight) ^ (static_cast<uint32_t>(mbOrthographicProjection) << 31);
 
 	if (iZoomBucket != miVisibleAreaZoomBucket || uiLatchKey != muiVisibleAreaLatchKey || iLevelOfDetail != miVisibleAreaLevelOfDetail)
 	{

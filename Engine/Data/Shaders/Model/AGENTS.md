@@ -17,11 +17,29 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   `mat3(skinMatrix)` and therefore assumes near-rigid joint transforms rather
   than arbitrary non-uniform joint scaling.
 - Object shadow footprints use model world XY, independent of camera position.
-  Horizon stretch extends only the half away from the active light;
-  vertical light uses south as the extension direction. The shadow-mode vertex
+  Horizon stretch changes world X only, preserving Y/Z. It fixes the sun-facing
+  endpoint of the transformed model bounding box and fully extends the opposite
+  endpoint; the box is the rest bound, not an animated silhouette. Every
+  model-layout producer supplies its ordinary world-X minimum and maximum
+  relative to the model centre, independent of light and including all instance
+  scale and pose rotations. Alignment ownership is in
+  [Model Alignment](../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment);
+  editable previews transform bounds by inverse packed alignment followed by
+  editable alignment.
+  Global publishes the opposite active sun/moon X sign directly to the shader;
+  model-bound publication needs no light state. The positive Stretch Power
+  shapes the clamped normalized distance from the fixed endpoint: the default is 2;
+  power 1 is linear, higher values concentrate extension toward the far endpoint, and
+  lower values increase interior extension without changing either endpoint.
+  Zero extension, zero light X, or zero box width leaves the position unchanged.
+  The shadow-mode vertex
   samples the terrain elevation render target at the model centre for the
   blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is
   shared, so every model pipeline binds that texture.
+- Object shadow coverage uses each surface point's original interpolated world Z:
+  full at and above sea level, fading linearly to zero at the configured depth
+  below Z=0. Scale all RGBA coverage channels before MAX blending; model-centre
+  height and displaced water waves do not determine this fade.
 - A model's height above the lowest flight plane fades the terrain shadow it
   receives and moves its lighting sample: each lighting layer is sampled along
   the eye line by the model centre's height above that layer's plane. The

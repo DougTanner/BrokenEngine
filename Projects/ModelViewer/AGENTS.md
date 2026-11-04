@@ -36,9 +36,9 @@ accepts only finite values and is reached at a fixed rate, with no terrain
 collision, island avoidance or descent hold. Flight planes are not a viewer
 control; the table stays supplied for engine files
 ([Engine integration](#engine-integration)).
-Model selection resets the body to its water anchor and the Height (m) entry to
-its default height in either mode, retaining the active mode. Reroll rebuilds elevation before the
-same reset, also retaining the mode.
+Model selection retains the body, destination, Height (m) entry, pause and active
+mode. Reroll rebuilds elevation before resetting the body to its water anchor and
+the Height (m) entry to its default height, also retaining the mode.
 
 Startup shares the Sandbox client's native instance mutex under
 [Engine single-instance policy](../../Engine/Source/AGENTS.md#crash-reporting).
@@ -105,15 +105,17 @@ between load request and adoption and every referenced island template is GPU
 resident with its mesh resident.
 
 The catalog includes every packed scene with materials, sorted by packed path.
+Left/Right selects the adjacent model once per tap outside text editing and stops
+at the catalog endpoints. These keys are withheld from ImGui outside text editing;
+mouse selection uses the same transition.
 The viewer owns clip selection, playback time and play/pause state; selected
 clips use the engine's indexed pose evaluation. Rest pose uses cached authored
 node matrices and skinning; an animation's first key is not a rest-pose
 substitute. Camera fitting transforms the rest-bounds center through accepted
 alignment and scales its radius by the largest 3D linear-row length, enclosing
 positive anisotropic scales. Model changes reset to Rest pose, refit the camera,
-and reset the orbit camera rotation. Accepted alignment edits also refit;
-clip changes restart playback without
-refitting. UI mouse capture takes precedence over camera, sun and picking
+retaining orbit camera rotation. Accepted alignment edits also refit with the
+same retained rotation; clip changes restart playback without refitting. UI mouse capture takes precedence over camera, sun and picking
 gestures.
 
 In orbit, left drags rotate the camera, except that while picking mode is on,
@@ -232,8 +234,9 @@ sections, adding no Tweaks content. The viewer `Pch.h` sets
 `kbDrawModelsOverWorld` to `true`. Keep ordinary
 engine profiling collection, Graphics lifecycle and local crash reporting
 without network upload.
-In orbit, the viewer's world camera follows Camera Tilt at the default engine
-framing under the shared projection settings over the water anchor, with a
+In orbit, the viewer's world camera follows the
+[shared camera contract](../../Engine/Source/Graphics/AGENTS.md#world-and-camera-contracts)
+at the default engine framing over the water anchor, with a
 separate model orbit pose used only for model draws. Flight uses the engine's
 tracked camera and world model matrices and eye position; retain orbit fitting
 and rotation across toggles. The seed

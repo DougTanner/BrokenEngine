@@ -45,10 +45,6 @@ static const float* AccessorFloats(const tinygltf::Model& rModel, int64_t iAcces
 	{
 		throw std::runtime_error(std::format("{} accessor {} buffer view {} references buffer {} out of range (buffer count {}).", context, iAccessor, rAccessor.bufferView, rBufferView.buffer, std::ssize(rModel.buffers)));
 	}
-	if (rBufferView.byteStride != 0)
-	{
-		throw std::runtime_error(std::format("{} accessor {} buffer view {} has unsupported animation byte stride {}.", context, iAccessor, rAccessor.bufferView, rBufferView.byteStride));
-	}
 
 	int64_t iComponentSize = tinygltf::GetComponentSizeInBytes(static_cast<uint32_t>(rAccessor.componentType));
 	int64_t iComponentCount = tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type));
@@ -61,6 +57,10 @@ static const float* AccessorFloats(const tinygltf::Model& rModel, int64_t iAcces
 	}
 
 	size_t uiElementSize = CheckedAnimationSize(static_cast<size_t>(iComponentSize), static_cast<size_t>(iComponentCount), context);
+	if (rBufferView.byteStride != 0 && rBufferView.byteStride != uiElementSize)
+	{
+		throw std::runtime_error(std::format("{} accessor {} buffer view {} has unsupported animation byte stride {}.", context, iAccessor, rAccessor.bufferView, rBufferView.byteStride));
+	}
 	size_t uiAccessorBytes = CheckedAnimationSize(rAccessor.count, uiElementSize, context);
 	if (rAccessor.byteOffset > rBufferView.byteLength || uiAccessorBytes > rBufferView.byteLength - rAccessor.byteOffset)
 	{

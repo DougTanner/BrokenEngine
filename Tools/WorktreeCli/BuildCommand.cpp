@@ -251,8 +251,8 @@ private:
 		mDiagnostics.push_back(std::move(diagnostic));
 	}
 
-	std::regex mOriginDiagnostic { R"(^\s*(.+?)(?:\((\d+)(?:,(\d+))?\))?\s*:\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*?)\s*(?:\[([^\][]*)\])?\s*$)" };
-	std::regex mBareDiagnostic { R"(^\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*)$)" };
+	std::regex mOriginDiagnostic {R"(^\s*(.+?)(?:\((\d+)(?:,(\d+))?\))?\s*:\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*?)\s*(?:\[([^\][]*)\])?\s*$)"};
+	std::regex mBareDiagnostic {R"(^\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*)$)"};
 	std::string mCarry;
 	std::unordered_set<std::string> mSeenDiagnostics;
 
@@ -324,7 +324,7 @@ static std::optional<std::filesystem::path> FindMsBuild()
 		return std::nullopt;
 	}
 
-	std::vector<std::wstring> arguments = { vswherePath.native(), L"-latest", L"-products", L"*", L"-requires", L"Microsoft.Component.MSBuild", L"-find", LR"(MSBuild\**\Bin\MSBuild.exe)" };
+	std::vector<std::wstring> arguments = {vswherePath.native(), L"-latest", L"-products", L"*", L"-requires", L"Microsoft.Component.MSBuild", L"-find", LR"(MSBuild\**\Bin\MSBuild.exe)"};
 	std::optional<ProcessResult> optionalResult = RunBuildProcess(vswherePath, arguments);
 	if (!optionalResult || optionalResult->uiExitCode != 0)
 	{
@@ -457,7 +457,7 @@ struct EvaluatedCompileItems
 
 static std::optional<EvaluatedCompileItems> EvaluateProjectCompileItems(const std::filesystem::path& rMsBuild, const std::filesystem::path& rProject, const std::vector<std::wstring>& rBuildArguments, RetainedLog& rLog)
 {
-	std::vector<std::wstring> queryArguments = { rMsBuild.native(), rProject.native() };
+	std::vector<std::wstring> queryArguments = {rMsBuild.native(), rProject.native()};
 	queryArguments.reserve(static_cast<size_t>(std::ssize(queryArguments) + std::ssize(rBuildArguments) + 3));
 	queryArguments.append_range(rBuildArguments);
 	queryArguments.emplace_back(L"/getProperty:IntDir");
@@ -606,8 +606,8 @@ static nlohmann::json NewBuildResult()
 	result["arguments"] = nlohmann::json::array();
 	result["selectedFiles"] = nlohmann::json::array();
 	result["invalidatedObjects"] = nlohmann::json::array();
-	result["lock"] = { { "disposition", "not-attempted" }, { "path", nullptr }, { "waitedSeconds", 0 } };
-	result["msbuild"] = { { "discovered", false }, { "path", nullptr }, { "launched", false }, { "exitCode", nullptr } };
+	result["lock"] = {{"disposition", "not-attempted"}, {"path", nullptr}, {"waitedSeconds", 0}};
+	result["msbuild"] = {{"discovered", false}, {"path", nullptr}, {"launched", false}, {"exitCode", nullptr}};
 	result["retainedLog"] = nullptr;
 	result["diagnostics"] = nlohmann::json::array();
 	result["diagnosticsTruncated"] = false;
@@ -649,7 +649,7 @@ static int64_t RunBuildExecution(BuildExecutionState& rState)
 	{
 		return kiExitFailure;
 	}
-	rState.rResult["retainedLog"] = { { "path", WideToUtf8(rState.retainedLog.mPath.native()) }, { "bytes", 0 }, { "complete", false } };
+	rState.rResult["retainedLog"] = {{"path", WideToUtf8(rState.retainedLog.mPath.native())}, {"bytes", 0}, {"complete", false}};
 
 	std::filesystem::path lockPath;
 	int64_t iWaitedSeconds = 0;
@@ -669,7 +669,7 @@ static int64_t RunBuildExecution(BuildExecutionState& rState)
 		return kiExitFailure;
 	}
 
-	std::vector<std::wstring> arguments = { rState.rMsBuild.native(), rState.rTarget.native() };
+	std::vector<std::wstring> arguments = {rState.rMsBuild.native(), rState.rTarget.native()};
 	arguments.append_range(rState.rBuildArguments);
 	// Persistent MSBuild worker nodes inherit the pipe write handle and would stall the
 	// drain long after the build completes.
@@ -735,7 +735,7 @@ static int64_t RunBuildCommandUnguarded(int64_t iArgumentCount, wchar_t* pArgume
 		buildArguments.emplace_back(pArgumentValues[iIndex]);
 	}
 
-	result["target"] = { { "requested", WideToUtf8(target.native()) }, { "normalized", WideToUtf8(ComparablePath(target)) } };
+	result["target"] = {{"requested", WideToUtf8(target.native())}, {"normalized", WideToUtf8(ComparablePath(target))}};
 	for (const std::wstring& rArgument : buildArguments)
 	{
 		result["arguments"].push_back(WideToUtf8(rArgument));
@@ -760,7 +760,7 @@ static int64_t RunBuildCommandUnguarded(int64_t iArgumentCount, wchar_t* pArgume
 	std::optional<std::filesystem::path> optionalMsbuildPath = FindMsBuild();
 	if (optionalWorktreeRoot)
 	{
-		result["worktreeRoot"] = { { "path", WideToUtf8(optionalWorktreeRoot->native()) }, { "normalized", WideToUtf8(ComparablePath(*optionalWorktreeRoot)) } };
+		result["worktreeRoot"] = {{"path", WideToUtf8(optionalWorktreeRoot->native())}, {"normalized", WideToUtf8(ComparablePath(*optionalWorktreeRoot))}};
 	}
 	if (optionalMsbuildPath)
 	{

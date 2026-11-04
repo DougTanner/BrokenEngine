@@ -334,7 +334,7 @@ void ExportScene::CaptureSceneDependencies(const std::vector<std::filesystem::pa
 			std::filesystem::path relativePath = std::filesystem::relative(rDependency, gpFileManager->mpInputDirectories[i]);
 			if (!relativePath.empty() && *relativePath.begin() != "..")
 			{
-				metadata["dependencies"].push_back({{"root", i, }, {"path", relativePath.generic_string(), }, {"hash", gpFileManager->mpInputFingerprintCache->Get(rDependency), }, });
+				metadata["dependencies"].push_back({{"root", i}, {"path", relativePath.generic_string()}, {"hash", gpFileManager->mpInputFingerprintCache->Get(rDependency)}});
 				bFound = true;
 				break;
 			}

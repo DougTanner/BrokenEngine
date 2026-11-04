@@ -7,7 +7,7 @@ namespace game
 
 struct FrameInput
 {
-	static constexpr int64_t kiVersion = 33;
+	static constexpr int64_t kiVersion = 34;
 
 	std::vector<StatusChange> statusChanges;
 

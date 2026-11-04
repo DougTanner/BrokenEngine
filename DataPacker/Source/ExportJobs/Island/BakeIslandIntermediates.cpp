@@ -47,16 +47,16 @@ static std::filesystem::path IslandRelativePath(const std::filesystem::path& rSo
 // only the split.
 constexpr RouteSubdivision kpRouteSubdivisions[] =
 {
-	{ .pcLabel = "1x1", .iGaeaChoice = 0, .iColumns = 1, .iRows = 1, },
-	{ .pcLabel = "2x1", .iGaeaChoice = 1, .iColumns = 1, .iRows = 2, },
-	{ .pcLabel = "2x2", .iGaeaChoice = 2, .iColumns = 2, .iRows = 2, },
-	{ .pcLabel = "3x1", .iGaeaChoice = 3, .iColumns = 1, .iRows = 3, },
-	{ .pcLabel = "3x2", .iGaeaChoice = 4, .iColumns = 2, .iRows = 3, },
-	{ .pcLabel = "3x3", .iGaeaChoice = 5, .iColumns = 3, .iRows = 3, },
-	{ .pcLabel = "3x4", .iGaeaChoice = 6, .iColumns = 4, .iRows = 3, },
-	{ .pcLabel = "8x4", .iGaeaChoice = 7, .iColumns = 4, .iRows = 8, },
-	{ .pcLabel = "4x2", .iGaeaChoice = 8, .iColumns = 2, .iRows = 4, },
-	{ .pcLabel = "4x4", .iGaeaChoice = 9, .iColumns = 4, .iRows = 4, },
+	{.pcLabel = "1x1", .iGaeaChoice = 0, .iColumns = 1, .iRows = 1},
+	{.pcLabel = "2x1", .iGaeaChoice = 1, .iColumns = 1, .iRows = 2},
+	{.pcLabel = "2x2", .iGaeaChoice = 2, .iColumns = 2, .iRows = 2},
+	{.pcLabel = "3x1", .iGaeaChoice = 3, .iColumns = 1, .iRows = 3},
+	{.pcLabel = "3x2", .iGaeaChoice = 4, .iColumns = 2, .iRows = 3},
+	{.pcLabel = "3x3", .iGaeaChoice = 5, .iColumns = 3, .iRows = 3},
+	{.pcLabel = "3x4", .iGaeaChoice = 6, .iColumns = 4, .iRows = 3},
+	{.pcLabel = "8x4", .iGaeaChoice = 7, .iColumns = 4, .iRows = 8},
+	{.pcLabel = "4x2", .iGaeaChoice = 8, .iColumns = 2, .iRows = 4},
+	{.pcLabel = "4x4", .iGaeaChoice = 9, .iColumns = 4, .iRows = 4},
 };
 
 static const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std::filesystem::path& rIslandJsonFile)

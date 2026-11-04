@@ -16,7 +16,7 @@ import numpy
 dependencies = set()
 CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tga"}
 CHANNEL_WORDS = {
-    "base color": ("basecolor", "albedo", "diffuse", "diff", "colour", "color"),
+    "base color": ("basecoloralpha", "basecolor", "albedo", "diffuse", "diff", "colour", "color"),
     "normal": ("normalopengl", "normaldirectx", "normal", "normals", "nor"),
     "metallic": ("metallic", "metalness"),
     "roughness": ("roughness",),
@@ -127,9 +127,14 @@ def find_candidates(source):
     def fail(error):
         raise error
 
+    roots = [source.resolve().parent]
+    textures = (roots[0].parent / "textures").resolve()
+    if textures.is_dir() and textures != roots[0]:
+        roots.append(textures)
     candidates = []
-    for directory, _, names in os.walk(source.resolve().parent, onerror=fail):
-        candidates += [Path(directory, name) for name in names if Path(name).suffix.lower() in CANDIDATE_EXTENSIONS]
+    for root in roots:
+        for directory, _, names in os.walk(root, onerror=fail):
+            candidates += [Path(directory, name) for name in names if Path(name).suffix.lower() in CANDIDATE_EXTENSIONS]
     return sorted(path for path in candidates if path.is_file())
 
 
@@ -423,10 +428,40 @@ def main():
         return original_descend(nav)
 
     def encode(image, mime_type, settings):
-        result = original_encode(image, mime_type, settings)
-        if not result[0]:
-            raise RuntimeError("Failed to encode consumed Blender image")
-        return result
+        from io_scene_gltf2.blender.exp.material.encode_image import FillImage
+
+        saved_fills = image.fills
+        temporary = None
+        try:
+            rgb = [image.fills.get(channel) for channel in range(3)]
+            if (image.numpy_calc is None
+                    and all(isinstance(fill, FillImage) and fill.src_chan == channel for channel, fill in enumerate(rgb))
+                    and all(fill.image == rgb[0].image for fill in rgb)
+                    and rgb[0].image.is_float
+                    and rgb[0].image.colorspace_settings.name == "sRGB"
+                    and image.blender_image(settings) is None):
+                source = rgb[0].image
+                settings["exported_images"][source.name] = 2
+                pixels = numpy.empty(len(source.pixels), numpy.float32)
+                source.pixels.foreach_get(pixels)
+                colors = pixels.reshape(-1, 4)[:, :3]
+                # Blender's float-to-byte channel merge copies linear RGB without sRGB encoding.
+                colors[:] = numpy.where(colors <= 0.0031308, 12.92 * colors,
+                                        1.055 * numpy.maximum(colors, 0) ** (1 / 2.4) - 0.055)
+                temporary = bpy.data.images.new("##broken-engine-encoded-rgb##",
+                                                width=source.size[0], height=source.size[1], alpha=True)
+                temporary.pixels.foreach_set(pixels)
+                image.fills = dict(saved_fills)
+                for channel, fill in enumerate(rgb):
+                    image.fill_image(temporary, channel, fill.src_chan)
+            result = original_encode(image, mime_type, settings)
+            if not result[0]:
+                raise RuntimeError("Failed to encode consumed Blender image")
+            return result
+        finally:
+            image.fills = saved_fills
+            if temporary is not None:
+                bpy.data.images.remove(temporary)
 
     def lookup(socket, settings):
         result = original_lookup(socket, settings)

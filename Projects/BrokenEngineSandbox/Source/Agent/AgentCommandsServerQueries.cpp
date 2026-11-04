@@ -103,6 +103,7 @@ static nlohmann::json ExtractMissiles(const Frame& rFrame, int64_t iOffset, int6
 			{"index", i},
 			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
 			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
+			{"flightPlane", GetMissileFlightPlane(rPost.pFlags[i])},
 			{"deltaRotation", rPost.pfDeltaRotations[i]},
 			{"deltaRotationDelay", rPost.pDeltaRotationDelays[i].count()},
 			{"alignment", rPost.pAlignments[i].uiValue},

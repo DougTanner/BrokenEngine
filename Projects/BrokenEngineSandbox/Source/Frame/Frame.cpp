@@ -73,8 +73,7 @@ static void ValidatePusherOwners(const Frame& rFrame)
 	});
 }
 
-// Missiles Update asserts that a flying missile, neither falling nor dying, is at a flight plane's height; it holds
-// that height only while its velocity has no Z.
+// Flying missile height returns by position stepping; propulsion remains horizontal.
 static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 {
 	const MissilesInterpolate& rInterpolate = *rFrame.interpolate.pMissiles;
@@ -89,7 +88,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 		{
 			continue;
 		}
-		if (!FlightPlaneAtHeight(XMVectorGetZ(rInterpolate.pVecPositions[i])))
+		if (!std::isfinite(XMVectorGetZ(rInterpolate.pVecPositions[i])))
 		{
 			throw std::ios_base::failure("Frame flying missile plane");
 		}
@@ -103,7 +102,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 158i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 161i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -158,7 +157,7 @@ void FrameInterpolate::AllocateAndCopy(FrameInterpolate& __restrict rCurrent, co
 	engine::AllocateAndCopyCollections(GameInterpolateCollections(rCurrent), GameInterpolateCollections(rPrevious), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameInterpolateCollections(rCurrent))>)> {});
 }
 
-void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime)
+void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime, const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerInterpolateUpdate);
 
@@ -168,7 +167,7 @@ void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame
 
 	rCurrent.fSpawnTimer = rPrevious.fSpawnTimer + fDeltaTime;
 
-	engine::ForEachInterpolateUpdate(GameInterpolateTypes {}, rCurrent, rPreviousFrame);
+	engine::ForEachInterpolateUpdate(GameInterpolateTypes {}, rCurrent, rPreviousFrame, rStaticData);
 }
 
 void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious)

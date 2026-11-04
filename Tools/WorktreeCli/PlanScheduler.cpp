@@ -69,7 +69,7 @@ static void PrintResult(nlohmann::json value, int64_t iSchemaVersion)
 
 static int64_t Failure(std::string_view code, int64_t iExitCode = kiExitFailure)
 {
-	PrintResult({ { "status", "error" }, { "code", code } }, 2);
+	PrintResult({{"status", "error"}, {"code", code}}, 2);
 	return iExitCode;
 }
 
@@ -176,7 +176,7 @@ static bool ValidateClaim(const nlohmann::json& rClaim, std::wstring_view reposi
 		return false;
 	}
 	std::unordered_map<std::string, std::string> fields;
-	for (const char* pcField : { "repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt" })
+	for (const char* pcField : {"repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt"})
 	{
 		if (!ReadRequiredString(rClaim, pcField, fields.try_emplace(pcField).first->second))
 		{
@@ -272,7 +272,7 @@ static bool HealClaims(const std::filesystem::path& rRoot, std::wstring_view rep
 
 static std::optional<std::wstring> ResolveGitCommonDirectory(const std::filesystem::path& rWorktree)
 {
-	std::optional<std::string> optionalCommonDirectory = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--path-format=absolute", L"--git-common-dir" });
+	std::optional<std::string> optionalCommonDirectory = RunGit({L"-C", rWorktree.wstring(), L"rev-parse", L"--path-format=absolute", L"--git-common-dir"});
 	if (!optionalCommonDirectory)
 	{
 		return std::nullopt;
@@ -283,7 +283,7 @@ static std::optional<std::wstring> ResolveGitCommonDirectory(const std::filesyst
 
 static std::optional<std::string> ResolveGitBranch(const std::filesystem::path& rWorktree)
 {
-	std::optional<std::string> optionalBranch = RunGit({ L"-C", rWorktree.wstring(), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
+	std::optional<std::string> optionalBranch = RunGit({L"-C", rWorktree.wstring(), L"symbolic-ref", L"--quiet", L"--short", L"HEAD"});
 	if (!optionalBranch)
 	{
 		return std::nullopt;
@@ -298,7 +298,7 @@ static std::optional<std::string> ResolveGitBranch(const std::filesystem::path& 
 
 static std::optional<std::string> ResolvePrimaryBranch(std::wstring_view repository)
 {
-	std::optional<std::string> optionalBranch = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
+	std::optional<std::string> optionalBranch = RunGit({L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"--short", L"HEAD"});
 	if (!optionalBranch)
 	{
 		return std::nullopt;
@@ -313,7 +313,7 @@ static std::optional<std::string> ResolvePrimaryBranch(std::wstring_view reposit
 
 static std::optional<std::string> ResolvePrimaryReference(std::wstring_view repository)
 {
-	std::optional<std::string> optionalReference = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"HEAD" });
+	std::optional<std::string> optionalReference = RunGit({L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"HEAD"});
 	if (!optionalReference)
 	{
 		return std::nullopt;
@@ -328,7 +328,7 @@ static std::optional<std::string> ResolvePrimaryReference(std::wstring_view repo
 
 static std::optional<std::string> ResolveCommit(const std::filesystem::path& rWorktree, std::wstring_view revision)
 {
-	std::optional<std::string> optionalCommit = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
+	std::optional<std::string> optionalCommit = RunGit({L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}"});
 	if (!optionalCommit)
 	{
 		return std::nullopt;
@@ -339,7 +339,7 @@ static std::optional<std::string> ResolveCommit(const std::filesystem::path& rWo
 
 static std::optional<std::string> ResolveRepositoryCommit(std::wstring_view repository, std::wstring_view revision)
 {
-	std::optional<std::string> optionalCommit = RunGit({ L"--git-dir", std::wstring(repository), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
+	std::optional<std::string> optionalCommit = RunGit({L"--git-dir", std::wstring(repository), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}"});
 	if (!optionalCommit)
 	{
 		return std::nullopt;
@@ -433,7 +433,7 @@ static bool FindSessionClaim(const std::filesystem::path& rRoot, std::wstring_vi
 
 static void PrintClaim(std::string_view code, std::wstring_view planPath, const nlohmann::json& rClaim)
 {
-	PrintResult({ { "status", "ok" }, { "code", code }, { "plan", WideToUtf8(planPath) }, { "owner", rClaim["owner"] }, { "session", rClaim["session"] }, { "worktree", rClaim["worktree"] }, { "branch", rClaim["branch"] }, { "claimedAt", rClaim["claimedAt"] }, { "expiresAt", rClaim["expiresAt"] } }, 2);
+	PrintResult({{"status", "ok"}, {"code", code}, {"plan", WideToUtf8(planPath)}, {"owner", rClaim["owner"]}, {"session", rClaim["session"]}, {"worktree", rClaim["worktree"]}, {"branch", rClaim["branch"]}, {"claimedAt", rClaim["claimedAt"]}, {"expiresAt", rClaim["expiresAt"]}}, 2);
 }
 
 static int64_t RunValidate(const Arguments& rArguments)
@@ -495,7 +495,7 @@ static int64_t RunValidate(const Arguments& rArguments)
 			}
 		}
 	}
-	nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", std::move(diagnostics) }, { "notices", nlohmann::json::array() }, { "healedClaims", std::move(healed) }, { "plans", nlohmann::json::array() } };
+	nlohmann::json output = {{"operation", "validate"}, {"status", diagnostics.empty() ? "valid" : "invalid"}, {"code", diagnostics.empty() ? "ok" : "invalid-plans"}, {"message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection"}, {"diagnostics", std::move(diagnostics)}, {"notices", nlohmann::json::array()}, {"healedClaims", std::move(healed)}, {"plans", nlohmann::json::array()}};
 	for (const std::wstring& rPath : GetSortedPlanPaths(plans))
 	{
 		const Plan& rPlan = plans.at(rPath);
@@ -511,7 +511,7 @@ static int64_t RunValidate(const Arguments& rArguments)
 		{
 			if (plans.find(rDependency) == plans.end())
 			{
-				output["notices"].push_back({ { "plan", WideToUtf8(rPath) }, { "code", "stale-dependency" }, { "dependency", WideToUtf8(rDependency) } });
+				output["notices"].push_back({{"plan", WideToUtf8(rPath)}, {"code", "stale-dependency"}, {"dependency", WideToUtf8(rDependency)}});
 			}
 		}
 	}
@@ -534,7 +534,7 @@ static int64_t RunValidate(const Arguments& rArguments)
 		{
 			dependencies.push_back(WideToUtf8(rDependency));
 		}
-		output["plans"].push_back({ { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", std::move(dependencies) } });
+		output["plans"].push_back({{"path", WideToUtf8(pPlan->path)}, {"createdUtc", pPlan->createdUtc}, {"dependsOn", std::move(dependencies)}});
 	}
 	PrintResult(std::move(output), 1);
 	return kiExitOk;
@@ -558,7 +558,7 @@ static int64_t RunList(const Arguments& rArguments)
 	// Listing reads only committed trees, so any session on the primary line is a legitimate view: behind the
 	// primary tip, or ahead of it after landing preparation rebased the session onto the current tip.
 	std::optional<std::string> optionalSessionCommit = ResolveCommit(worktree, L"HEAD");
-	if (!optionalSessionCommit || (!RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit) }) && !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalPrimaryCommit), Utf8ToWide(*optionalSessionCommit) })))
+	if (!optionalSessionCommit || (!RunGit({L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit)}) && !RunGit({L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalPrimaryCommit), Utf8ToWide(*optionalSessionCommit)})))
 	{
 		return Failure("git-identity-mismatch");
 	}
@@ -589,7 +589,7 @@ static int64_t RunList(const Arguments& rArguments)
 		return Failure("local-app-data-unavailable");
 	}
 	const std::filesystem::path& root = *optionalSchedulerRoot;
-	nlohmann::json output = { { "operation", "list" }, { "status", "ok" }, { "code", "ok" }, { "diagnostics", std::move(diagnostics) }, { "plans", nlohmann::json::array() } };
+	nlohmann::json output = {{"operation", "list"}, {"status", "ok"}, {"code", "ok"}, {"diagnostics", std::move(diagnostics)}, {"plans", nlohmann::json::array()}};
 	for (const Plan* pPlan : rows)
 	{
 		nlohmann::json dependencies = nlohmann::json::array();
@@ -597,7 +597,7 @@ static int64_t RunList(const Arguments& rArguments)
 		{
 			dependencies.push_back(WideToUtf8(rDependency));
 		}
-		nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", std::move(dependencies) } };
+		nlohmann::json row = {{"path", WideToUtf8(pPlan->path)}, {"createdUtc", pPlan->createdUtc}, {"dependsOn", std::move(dependencies)}};
 		Claim claim;
 		std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(root, pPlan->path);
 		if (!optionalClaimPath)
@@ -607,7 +607,7 @@ static int64_t RunList(const Arguments& rArguments)
 		bool bClaimed = ReadClaim(*optionalClaimPath, claim) && ValidateClaim(claim.json, repository, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
 		if (bClaimed)
 		{
-			row["claim"] = { { "session", claim.json["session"] }, { "worktree", claim.json["worktree"] }, { "expiresAt", claim.json["expiresAt"] } };
+			row["claim"] = {{"session", claim.json["session"]}, {"worktree", claim.json["worktree"]}, {"expiresAt", claim.json["expiresAt"]}};
 		}
 		auto primary = primaryPlans.find(pPlan->path);
 		if (primary == primaryPlans.end() || !primary->second.bValid)
@@ -704,7 +704,7 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		return Failure("primary-revision-failed");
 	}
 	std::optional<std::string> optionalSessionCommit = ResolveCommit(worktree, L"HEAD");
-	if (!optionalSessionCommit || !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit) }))
+	if (!optionalSessionCommit || !RunGit({L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit)}))
 	{
 		return Failure("git-identity-mismatch");
 	}
@@ -736,7 +736,7 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 	{
 		if (!requestedPlan.empty() && requestedPlan != existingPlanPath)
 		{
-			PrintResult({ { "status", "error" }, { "code", "claim-plan-mismatch" }, { "requestedPlan", WideToUtf8(requestedPlan) }, { "heldPlan", WideToUtf8(existingPlanPath) } }, 2);
+			PrintResult({{"status", "error"}, {"code", "claim-plan-mismatch"}, {"requestedPlan", WideToUtf8(requestedPlan)}, {"heldPlan", WideToUtf8(existingPlanPath)}}, 2);
 			return kiExitStateConflict;
 		}
 		PrintClaim("existing", existingPlanPath, existing.json);
@@ -785,7 +785,7 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 			continue; // claimed by another session, or an unhealable record
 		}
 		int64_t iClaimedAt = static_cast<int64_t>(coordination::CurrentUtcTicks());
-		nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repository) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt)) }, { "expiresAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt + kiClaimLifetimeTicks)) } };
+		nlohmann::json claim = {{"schemaVersion", 2}, {"repository", WideToUtf8(repository)}, {"plan", WideToUtf8(pPlan->path)}, {"owner", WideToUtf8(rArguments.owner)}, {"session", WideToUtf8(rArguments.session)}, {"worktree", WideToUtf8(worktree.wstring())}, {"branch", WideToUtf8(rArguments.branch)}, {"claimedAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt))}, {"expiresAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt + kiClaimLifetimeTicks))}};
 		if (!coordination::EnsureParentDirectory(*optionalClaimPath))
 		{
 			return Failure("claim-write-failed");
@@ -797,7 +797,7 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		PrintClaim("claimed", pPlan->path, claim);
 		return kiExitOk;
 	}
-	PrintResult({ { "status", "ok" }, { "code", "none" } }, 2);
+	PrintResult({{"status", "ok"}, {"code", "none"}}, 2);
 	return kiExitOk;
 }
 
@@ -839,12 +839,12 @@ static int64_t RunClaimStatus(const Arguments& rArguments)
 	}
 	if (!bFound)
 	{
-		PrintResult({ { "status", "ok" }, { "code", "none" } }, 2);
+		PrintResult({{"status", "ok"}, {"code", "none"}}, 2);
 		return kiExitOk;
 	}
 	if (!requestedPlan.empty() && requestedPlan != plan)
 	{
-		PrintResult({ { "status", "error" }, { "code", "claim-plan-mismatch" }, { "requestedPlan", WideToUtf8(requestedPlan) }, { "heldPlan", WideToUtf8(plan) } }, 2);
+		PrintResult({{"status", "error"}, {"code", "claim-plan-mismatch"}, {"requestedPlan", WideToUtf8(requestedPlan)}, {"heldPlan", WideToUtf8(plan)}}, 2);
 		return kiExitStateConflict;
 	}
 	PrintClaim("claimed", plan, claim.json);
@@ -884,14 +884,14 @@ static int64_t RunUnclaim(const Arguments& rArguments)
 	}
 	if (!bFound)
 	{
-		PrintResult({ { "status", "ok" }, { "code", "already-absent" } }, 2);
+		PrintResult({{"status", "ok"}, {"code", "already-absent"}}, 2);
 		return kiExitOk;
 	}
 	if (::DeleteFileW(ExtendedLengthPath(claim.path).c_str()) == FALSE)
 	{
 		return Failure("delete-failed");
 	}
-	PrintResult({ { "status", "ok" }, { "code", "released" } }, 2);
+	PrintResult({{"status", "ok"}, {"code", "released"}}, 2);
 	return kiExitOk;
 }
 
@@ -901,7 +901,7 @@ static void RenderDependencies(const Plan& rPlan, std::wstring_view removed, std
 	dependencies.erase(std::find(dependencies.begin(), dependencies.end(), removed));
 	int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
 	int64_t iSuffixStart = iLineEnd == -1 ? std::ssize(rPlan.bytes) : (iLineEnd > 0 && rPlan.bytes[static_cast<size_t>(iLineEnd - 1)] == '\r' ? iLineEnd - 1 : iLineEnd);
-	nlohmann::json metadata = { { "createdUtc", rPlan.createdUtc }, { "dependsOn", nlohmann::json::array() } };
+	nlohmann::json metadata = {{"createdUtc", rPlan.createdUtc}, {"dependsOn", nlohmann::json::array()}};
 	for (const std::wstring& rDependency : dependencies)
 	{
 		metadata["dependsOn"].push_back(WideToUtf8(rDependency));
@@ -1005,7 +1005,7 @@ static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArgume
 		{
 			return Failure("child-invalid", kiExitStateConflict);
 		}
-		ChildRewrite rewrite { .path = rPath, .after = {} };
+		ChildRewrite rewrite {.path = rPath, .after = {}};
 		RenderDependencies(rPlan, target, rewrite.after);
 		rewrites.push_back(std::move(rewrite));
 	}
@@ -1041,7 +1041,7 @@ static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArgume
 	{
 		changed.push_back(WideToUtf8(rRewrite.path));
 	}
-	PrintResult({ { "status", "ok" }, { "code", bReject ? "rejected" : "completed" }, { "plan", WideToUtf8(target) }, { "changedPaths", std::move(changed) } }, 2);
+	PrintResult({{"status", "ok"}, {"code", bReject ? "rejected" : "completed"}, {"plan", WideToUtf8(target)}, {"changedPaths", std::move(changed)}}, 2);
 	return kiExitOk;
 }
 

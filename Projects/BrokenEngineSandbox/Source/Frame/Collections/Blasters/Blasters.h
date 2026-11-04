@@ -37,7 +37,7 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 
 	static void Register();
 
-	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
+	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 #if defined(BT_CLIENT)
 	static void ClientInitialize(Frame& rFrame, int64_t iIndex);

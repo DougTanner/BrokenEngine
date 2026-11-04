@@ -123,6 +123,14 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
+		WrapperToggle("Orthographic Projection", &gOrthographicProjection);
+		ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
+		ColumnSlider("Vertical Field of View", &gFieldOfView);
+		ColumnSlider("Camera Tilt", &gCameraTilt);
+		ImGui::EndDisabled();
+
+		ImGui::Separator();
+
 		WrapperToggle("Fullscreen", &gFullscreen);
 
 		RadioRow("Presentation Mode", &gPresentMode, gPresentMode.mfCurrent, {{"Immediate", static_cast<float>(VK_PRESENT_MODE_IMMEDIATE_KHR)}, {"Mailbox", static_cast<float>(VK_PRESENT_MODE_MAILBOX_KHR)}, {"FIFO", static_cast<float>(VK_PRESENT_MODE_FIFO_KHR)}});

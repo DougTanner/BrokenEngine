@@ -226,7 +226,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      macro argument, a function type, or a functional-notation cast in code of
      a dual-language header that GLSL compiles, since GLSL has no
      `static_cast`; rule 17, a container that is not a
-     `std::vector`; rule 22, an enum body
+     `std::vector`; the old `style-rule-22` kind, an enum body
      or a function body, which is not an initializer list; rule 25, a
      namespace-scope `constexpr` variable in a `.cpp` file, since rule 25
      governs only function scope and header global scope; rule 26, an enum
@@ -254,6 +254,22 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - The rows carry their own rule number, so this step covers whatever kinds
      the run emits; step 6's hand read supplies the other hand-read rules'
      findings.
+   - `style-rule-22-single-line` supplies candidates for rules 22 and 73 in brace
+     pairs whose opening and closing braces share a physical source line,
+     including enum lists and inline inner lists within multiline outer lists.
+     Classify each pair from source context before editing: reject actual code
+     blocks (functions, lambdas, control-flow, namespaces, class/struct
+     definitions, scopes and requirements bodies). Inspect each pair
+     independently when several share a line, including lines containing both
+     lists and blocks; one row can cover several occurrences. Never apply a
+     whole-line regex replacement. Remove space/tab runs immediately after an
+     accepted list's opening brace; preserve multiline indentation, literals,
+     comments and whitespace separating comment tokens. Return ambiguous or
+     macro-sensitive cases to the caller. The old `style-rule-22` kind covers
+     missing multiline initializer commas only. Before editing a list inside a
+     macro invocation, prove that the edit preserves expansion, including
+     preprocessor argument count; otherwise return the concrete occurrence to the caller. Do not
+     rewrite macro arguments to make the removal possible.
    - Done when every style row is accepted as a finding or rejected.
 10. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
     Examples include whitespace, argument layout, an exact deduced type

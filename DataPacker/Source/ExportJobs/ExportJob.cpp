@@ -278,7 +278,7 @@ std::vector<std::byte>& ExportJob::RunExport()
 	std::filesystem::remove(mCacheMetadataFile);
 
 	std::fstream fileStream(mChunkFile, std::ios::out | std::ios::binary);
-	int64_t piMagicAndVersion[2] = { kiMagic, miVersion };
+	int64_t piMagicAndVersion[2] = {kiMagic, miVersion};
 	fileStream.write(reinterpret_cast<char*>(piMagicAndVersion), sizeof(piMagicAndVersion));
 	fileStream.write(reinterpret_cast<char*>(mHeaderAndData.data()), static_cast<std::streamsize>(std::ssize(mHeaderAndData)));
 	fileStream.close();

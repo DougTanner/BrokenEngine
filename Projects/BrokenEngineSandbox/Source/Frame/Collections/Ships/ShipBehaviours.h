@@ -57,7 +57,9 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 // The plane a ship of the type flies while not engaging: the lowest for Omnis, the type's highest otherwise.
 [[nodiscard]] int64_t DefaultFlightPlane(ShipType eType);
 [[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
-// The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height.
+// The upright model's minimum origin or the authored plane height, whichever is higher.
+[[nodiscard]] float EffectiveShipFlightHeight(ShipType eType, ShipController eController, int64_t iFlightPlane);
+// The plane whose authored height equals fHeight exactly, or none.
 [[nodiscard]] std::optional<int64_t> FlightPlaneAtHeight(float fHeight);
 // The plane nearest the position's height, which target choice treats the position as on.
 [[nodiscard]] int64_t XM_CALLCONV NearestFlightPlane(FXMVECTOR vecPosition);
@@ -65,10 +67,10 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 [[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
 // True on a plane without kTerrainCollision.
 [[nodiscard]] bool SkipsTerrainContact(float fHeight);
-// Moves Z toward the target plane's height by at most fClimbRate times the delta, landing exactly on it; W is untouched.
-// A stored plane equal to the target plane stays; any other becomes the target plane on arrival and kuiNoFlightPlane
-// while the climb is under way.
-[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
+// Moves Z toward the ordered plane, or the upper plane while the lower clearance graph blocks descent at vecPosition.
+// Moves at most fClimbRate times the delta and lands on the effective ship height; W is untouched. Stores the plane on
+// arrival and kuiNoFlightPlane in transit.
+[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, int64_t iClearanceTier, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 

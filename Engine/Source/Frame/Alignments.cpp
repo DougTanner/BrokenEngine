@@ -30,7 +30,7 @@ void Alignments::AddAlignment(AlignmentIdentifier alignmentA, AlignmentIdentifie
 	}
 	else
 	{
-		alignmentPairs.insert(it, AlignmentPair {.uiKey = uiKey, .uiFlags = uiFlags, });
+		alignmentPairs.insert(it, AlignmentPair {.uiKey = uiKey, .uiFlags = uiFlags});
 	}
 }
 

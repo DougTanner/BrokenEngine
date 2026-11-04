@@ -37,5 +37,6 @@ void main()
 	// with height. B and A hold ships on flight planes 1 and 2 only, for shadows on ships and smoke below them; nothing
 	// reads plane 0's.
 	float fHeightFraction = clamp(fInHeightAboveBase * globalLayout.fObjectShadowsBlurHeightRangeInverse, 0.0f, 1.0f);
-	f4OutColor = vec4(1.0f - fHeightFraction, fHeightFraction, equal(ivec2(1, 2), ivec2(iInLayer)));
+	float fUnderwaterFade = clamp(1.0f + f3InWorldPosition.z * globalLayout.fObjectShadowsUnderwaterFadeInverse, 0.0f, 1.0f);
+	f4OutColor = fUnderwaterFade * vec4(1.0f - fHeightFraction, fHeightFraction, equal(ivec2(1, 2), ivec2(iInLayer)));
 }

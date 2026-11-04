@@ -182,7 +182,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		DeleteProcThreadAttributeList(pAttributeList);
 	});
-	HANDLE pHandleToInherit[] = { handleStandardInputPipeRead, handleStandardOutputPipeWrite };
+	HANDLE pHandleToInherit[] = {handleStandardInputPipeRead, handleStandardOutputPipeWrite};
 	if (UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, pHandleToInherit, sizeof(pHandleToInherit), nullptr, nullptr) == FALSE)
 	{
 		return std::nullopt;

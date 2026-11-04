@@ -22,12 +22,12 @@ Wrapper gShadowHeightFadeBottom(-2.0f, -30.0f, 0.0f);
 Wrapper gObjectShadowsRenderMultiplier(0.8f, 0.25f, 4.0f);
 Wrapper gObjectShadowsBlurMultiplier(0.6f, 0.125f, 1.0f);
 Wrapper gObjectShadowsNoon(0.9f, 0.1f, 1.0f);
-Wrapper gObjectShadowsSunset(0.7f, 0.0f, 1.0f);
-Wrapper gObjectShadowsSunsetStretch(3.0f, 0.0f, 10.0f);
+Wrapper gObjectShadowsSunset(0.45f, 0.0f, 1.0f);
+Wrapper gObjectShadowsSunsetStretch(2.0f, 0.0f, 10.0f);
 Wrapper gObjectShadowsBlurSigmaLow(10.0f, 1.0f, 20.0f);
 Wrapper gObjectShadowsBlurSigmaHigh(5.0f, 0.1f, 10.0f);
 Wrapper gObjectShadowsBlurRadiusNoon(5.0f, 1.0f, static_cast<float>(shaders::kiMaxObjectShadowsBlurRadius), 1.0f); // Max load-bearing: sizes GlobalLayout pf4ObjectShadowsBlurWeights.
-Wrapper gObjectShadowsBlurRadiusSunset(25.0f, 1.0f, static_cast<float>(shaders::kiMaxObjectShadowsBlurRadius), 1.0f); // Max load-bearing: sizes GlobalLayout pf4ObjectShadowsBlurWeights.
+Wrapper gObjectShadowsBlurRadiusSunset(70.0f, 1.0f, static_cast<float>(shaders::kiMaxObjectShadowsBlurRadius), 1.0f); // Max load-bearing: sizes GlobalLayout pf4ObjectShadowsBlurWeights.
 Wrapper gObjectShadowsTerrainShadowFade(30.0f, 1.0f, 200.0f); // min >= 1.0f load-bearing: keeps the folded fObjectShadowsTerrainShadowFadeInverse finite.
 
 } // namespace engine

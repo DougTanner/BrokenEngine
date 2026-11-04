@@ -192,10 +192,12 @@ struct GlobalLayout
 	float fShadowAngleOffsetSum INIT; // Shadow sun angle + noon + sunset feather offsets, summed CPU-side (Shadow.comp feather term).
 	vec4 pf4ObjectShadowsBlurWeights[kiMaxObjectShadowsBlurRadius + 1] INIT; // Per object-shadow channel, pre-normalized Gaussian half-kernel: ObjectShadowsBlurH/V index by abs(offset); entries past iObjectShadowsBlurRadius are unused
 	float fObjectShadowsIntensity INIT;
-	float fObjectShadowsExtension INIT; // max(sunrise stretch cube, sunset stretch cube); the vertex supplies the away-light extent.
+	float fObjectShadowsExtension INIT; // max(sunrise stretch cube, sunset stretch cube); the vertex supplies the world-X box width and power profile.
+	float fObjectShadowsStretchPower INIT; // Positive exponent of normalized world-X distance from the sun-facing box edge.
 	int32_t iObjectShadowsBlurRadius INIT;
-	vec2 f2ObjectShadowsAwayLight INIT; // Unit horizontal direction opposite the active sun/moon, or south for vertical light.
+	float fObjectShadowsAwayLightX INIT; // Opposite active sun/moon X sign; zero leaves world X unchanged.
 	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
+	float fObjectShadowsUnderwaterFadeInverse INIT; // 1 / gObjectShadowsUnderwaterFade (1/meters); surface height remains per-fragment.
 	float fObjectShadowsBlurHeightRangeInverse INIT; // 1 / (highest - lowest flight-plane height) (ModelShadow.frag ground-coverage height split)
 	float fShadowAffectAmbient INIT;
 	float fWaterReducedNoiseOriginX INIT;

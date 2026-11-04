@@ -159,7 +159,7 @@ StaticVoices::AcquiredVoice StaticVoices::AcquireOrLoadVoice(common::crc_t uiAud
 	{
 		return {};
 	}
-	return { .pVoice = pVoice, .bFromPool = bFromPool, };
+	return {.pVoice = pVoice, .bFromPool = bFromPool};
 }
 
 void StaticVoices::BeginFadeOut(StaticVoice& rVoice)
@@ -572,7 +572,7 @@ void StaticVoices::UpdateListenerPosition()
 
 	// mVecListenerPosition sits above the camera look-at at a fixed height just over the highest flight plane, so
 	// emitter altitude contributes to manual fade distance while field of view and projection do not move the listener.
-	// mX3dAudioListener.Position is the camera look-at, which the camera keeps on the lowest flight plane, for pan/Doppler.
+	// mX3dAudioListener.Position is the camera look-at for pan/Doppler.
 	// ApplyThreeDimensionalVolume flattens every emitter to its Z, so the XY-only vector keeps screen-left audible on the
 	// left rather than collapsed toward center by altitude or emitter height. Listener velocity is zero because RTS
 	// camera-motion Doppler is negligible and snap/jump easing must not add artifacts.

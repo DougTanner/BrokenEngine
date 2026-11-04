@@ -34,7 +34,8 @@ inline constexpr float kfFighterDrag = 0.25f;
 inline constexpr float kfFighterMaxSpeed = 45.0f;
 inline constexpr float kfFighterMaxTurnRate = 8.0f;
 
-inline constexpr float kfFighterClimbRate = 25.0f;
+inline constexpr float kfFighterClimbPercentage = 0.25f;
+inline constexpr float kfFighterClimbRate = kfFighterMaxSpeed * kfFighterClimbPercentage;
 inline constexpr int64_t kiFighterHighestFlightPlane = 1;
 static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
@@ -59,7 +60,7 @@ inline constexpr float kfFighterPusherPower = 3.0f;
 inline constexpr float kfFighterMaxPusherPushVelocity = kfFighterMaxSpeed * 0.5f;
 
 inline constexpr std::chrono::duration<float> kFighterBeamCooldown = std::chrono::duration<float>(1.0f);
-inline constexpr float kfFighterBeamRange = 100.0f;
+inline constexpr float kfFighterBeamRange = 50.0f;
 
 struct FightersInterpolate : public engine::Collection<FightersInterpolate, engine::CollectionFlags::kIdToIndex>
 {
@@ -94,7 +95,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 		}
 	}
 
-	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
+	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 #if defined(BT_CLIENT)
 	static void ClientInitialize(Frame& rFrame, int64_t iIndex);
@@ -205,6 +206,8 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+
+	static void XM_CALLCONV BeginExplosion(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection);
 
 	// A beam hit of fDamage from vecShooterPosition, applied during PostCollision.
 	static void XM_CALLCONV ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage);

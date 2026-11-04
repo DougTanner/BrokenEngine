@@ -94,6 +94,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	}
 
 	// Visibility culling and the controller partition run on the main thread before worker dispatch.
+	float fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kFighter)][iPipeline].fRadius;
 	int64_t iVisibleCount = 0;
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -111,7 +112,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius))
 		{
 			continue;
 		}
@@ -130,7 +131,9 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kFighter)].models[iPipeline]);
-	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -155,10 +158,12 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matAlignment * matScaling * matRoll * matClimbTilt * matYaw * matTranslation;
+			XMMATRIX matInstanceTransform = matScaling * matRoll * matClimbTilt * matYaw * matTranslation;
+			XMMATRIX matTransform = matAlignment * matInstanceTransform;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4PositionLayer = f4Position;
+			rModelLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matInstanceTransform, vecPosition)};
 			rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));

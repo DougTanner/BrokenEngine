@@ -3,9 +3,11 @@
 #include "Agent/Commands/CellCoordinateProbe.h"
 
 #include "Agent/AgentCommandsShared.h"
+#include "Frame/CellStaticData.h"
 #include "Frame/FrameUtils.h"
 #include "Frame/IslandChainPlacement.h"
 #include "Frame/IslandTerrain.h"
+#include "Frame/NavQuery.h"
 
 namespace engine
 {
@@ -25,13 +27,19 @@ static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacemen
 }
 
 // cell_coordinate_probe: report the cell geometry a requested coordinate produces, on either endpoint, without
-// subscribing to it or touching live cells. Schema: {"coord":[q,r]}.
+// subscribing to it or touching live cells.
 void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (rParameters.size() != 1 || !rParameters.contains("coord"))
+	if (!rParameters.contains("coord") || rParameters.size() != (rParameters.contains("navigation") ? 2 : 1))
 	{
-		throw std::runtime_error("cell_coordinate_probe accepts only 'coord'");
+		throw std::runtime_error("cell_coordinate_probe accepts only 'coord' and optional 'navigation'");
 	}
+#if defined(BT_CLIENT)
+	if (rParameters.contains("navigation"))
+	{
+		throw std::runtime_error("cell_coordinate_probe 'navigation' is server-only");
+	}
+#endif
 	const nlohmann::json& rCoordinate = rParameters.at("coord");
 	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
 	{
@@ -44,18 +52,60 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 		throw std::runtime_error("cell_coordinate_probe requires loaded island templates");
 	}
 
-	// Placement generation and elevation building share their implementations and allocation tracking suppression
-	// with cell creation and the frame tick. One coordinate at a time limits peak elevation storage to one
-	// 1024x1024 grid (~4 MB).
+	// Heap: Production builders generate temporary cell geometry; the probe writes JSON without retaining live state.
 	ScopedSuppressAllocationTracking suppress;
 
-	std::vector<IslandPlacement> placements;
-	GenerateIslandChain(coordinate, placements);
+	CellStaticData staticData {.coordinate = coordinate};
+#if defined(BT_SERVER)
+	std::vector<int64_t> graphs;
+	std::vector<XMFLOAT2> points;
+	if (rParameters.contains("navigation"))
+	{
+		const nlohmann::json& rNavigation = rParameters.at("navigation");
+		if (!rNavigation.is_object() || rNavigation.size() != 2 || !rNavigation.contains("graphs") || !rNavigation.contains("points"))
+		{
+			throw std::runtime_error("cell_coordinate_probe 'navigation' requires only 'graphs' and 'points'");
+		}
+		const nlohmann::json& rGraphs = rNavigation.at("graphs");
+		if (!rGraphs.is_array() || rGraphs.empty())
+		{
+			throw std::runtime_error("cell_coordinate_probe 'graphs' must be a nonempty array of distinct valid graph indices");
+		}
+		graphs.reserve(rGraphs.size());
+		for (const nlohmann::json& rGraph : rGraphs)
+		{
+			if (!rGraph.is_number_integer() || (rGraph.is_number_unsigned() && !std::in_range<int64_t>(rGraph.get<uint64_t>())))
+			{
+				throw std::runtime_error("cell_coordinate_probe 'graphs' must contain valid integer graph indices");
+			}
+			int64_t iGraph = rGraph.get<int64_t>();
+			if (iGraph < 0 || iGraph >= gpIslandTerrain->miNavigationGraphCount || std::ranges::contains(graphs, iGraph))
+			{
+				throw std::runtime_error("cell_coordinate_probe 'graphs' must contain distinct valid graph indices");
+			}
+			graphs.push_back(iGraph);
+		}
+		const nlohmann::json& rPoints = rNavigation.at("points");
+		if (!rPoints.is_array())
+		{
+			throw std::runtime_error("cell_coordinate_probe 'points' must be an array of XY pairs");
+		}
+		points.reserve(rPoints.size());
+		for (const nlohmann::json& rPoint : rPoints)
+		{
+			if (!rPoint.is_array() || rPoint.size() != 2)
+			{
+				throw std::runtime_error("cell_coordinate_probe 'points' must be an array of XY pairs");
+			}
+			points.push_back({AgentFloatValue(rPoint.at(0), "cell_coordinate_probe point X"), AgentFloatValue(rPoint.at(1), "cell_coordinate_probe point Y")});
+		}
+	}
+#endif
+	GenerateIslandChain(coordinate, staticData.islands);
 
-	std::vector<float> elevationGrid;
-	gpIslandTerrain->BuildElevationGrid(placements, elevationGrid);
+	gpIslandTerrain->BuildElevationGrid(staticData.islands, staticData.elevationGrid);
 
-	bool bSamplesFinite = std::ranges::all_of(elevationGrid, [](const float& fSample)
+	bool bSamplesFinite = std::ranges::all_of(staticData.elevationGrid, [](const float& fSample)
 	{
 		return std::isfinite(fSample);
 	});
@@ -63,8 +113,38 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	rResult["coord"] = AgentCoordinateJson(coordinate);
 	rResult["area"] = {{"width", 2.0f * kfCellHalfWidth}, {"height", 2.0f * kfCellHalfHeight}};
 	rResult["terrain"] = {{"samplesFinite", bSamplesFinite}};
-	rResult["placements"] = {{"count", std::ssize(placements)}, {"crc", PlacementsCrc(placements)}};
-	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), static_cast<size_t>(std::ssize(elevationGrid))))}};
+	rResult["placements"] = {{"count", std::ssize(staticData.islands)}, {"crc", PlacementsCrc(staticData.islands)}};
+	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(staticData.elevationGrid.data(), static_cast<size_t>(std::ssize(staticData.elevationGrid))))}};
+#if defined(BT_SERVER)
+	if (rParameters.contains("navigation"))
+	{
+		BuildCellNavigationData(staticData.navigationData, staticData.islands);
+		nlohmann::json& rNavigation = rResult["navigation"];
+		rNavigation["graphs"] = nlohmann::json::array();
+		for (int64_t iGraph : graphs)
+		{
+			const NavData& rGraph = staticData.navigationData.at(iGraph);
+			nlohmann::json vertices = nlohmann::json::array();
+			for (const XMFLOAT2& rVertex : rGraph.vertices)
+			{
+				vertices.push_back({rVertex.x, rVertex.y});
+			}
+			rNavigation["graphs"].push_back({{"index", iGraph}, {"vertices", std::move(vertices)}, {"polygonOffsets", rGraph.polygonOffsets}});
+		}
+		rNavigation["samples"] = nlohmann::json::array();
+		CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(staticData);
+		for (const XMFLOAT2& rPoint : points)
+		{
+			XMVECTOR vecPosition = XMVectorSet(rPoint.x, rPoint.y, 0.0f, 1.0f);
+			nlohmann::json blocked = nlohmann::json::array();
+			for (int64_t iGraph : graphs)
+			{
+				blocked.push_back(NavQueryPointBlocked(vecPosition, staticData.navigationData.at(iGraph)));
+			}
+			rNavigation["samples"].push_back({{"xy", {rPoint.x, rPoint.y}}, {"elevation", sampler.Sample(vecPosition)}, {"blocked", std::move(blocked)}});
+		}
+	}
+#endif
 }
 
 } // namespace engine

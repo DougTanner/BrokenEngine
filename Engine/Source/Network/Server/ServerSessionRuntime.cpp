@@ -95,7 +95,7 @@ void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 	std::chrono::nanoseconds sleepNanoseconds = remainingNanoseconds - kSpinMarginNanoseconds;
 	if (sleepNanoseconds > 0ns)
 	{
-		LARGE_INTEGER dueTime {.QuadPart = -(sleepNanoseconds.count() / 100), };
+		LARGE_INTEGER dueTime {.QuadPart = -(sleepNanoseconds.count() / 100)};
 		SetWaitableTimerEx(mHandleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0);
 		WaitForSingleObject(mHandleTimer, INFINITE);
 	}

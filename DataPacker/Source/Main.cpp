@@ -854,7 +854,7 @@ bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSumma
 
 bool MaterializeData(char* ppcArguments[])
 {
-	std::array<char*, 4> fileManagerArguments { ppcArguments[0], ppcArguments[2], ppcArguments[3], ppcArguments[4] };
+	std::array<char*, 4> fileManagerArguments {ppcArguments[0], ppcArguments[2], ppcArguments[3], ppcArguments[4]};
 	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
 	auto pFileManager = std::make_unique<FileManager>(fileManagerArguments, eInitializationResult, FileManager::InitializationMode::kDataOnly);
 	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
@@ -980,7 +980,7 @@ static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
 		std::filesystem::path projectDirectory = repositoryRoot / "Projects" / rProjectName;
 		std::string projectDataDirectory = (projectDirectory / "Data").string();
 		std::string outputDirectory = (projectDirectory / "Platforms" / "VisualStudio2026" / "Output" / "Data").string();
-		std::array<char*, 4> projectArguments { ppcArguments[0], engineDataDirectory.data(), projectDataDirectory.data(), outputDirectory.data() };
+		std::array<char*, 4> projectArguments {ppcArguments[0], engineDataDirectory.data(), projectDataDirectory.data(), outputDirectory.data()};
 		bSuccess &= RunProject(std::ssize(projectArguments), projectArguments.data());
 	}
 	return bSuccess;

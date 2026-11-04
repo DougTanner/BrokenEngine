@@ -9,6 +9,8 @@
 #include "Ui/WaterWrappersBase.h"
 #include "Render.h"
 
+#include "Graphics/Camera.h"
+
 namespace engine
 {
 
@@ -29,7 +31,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	// Lighting mirrors the shadow area's raw-frustum-safe framing reference. RenderTargetTextures sizes deposit/spread/combine through
 	// LightingDetailTextureSize with kfLightingHeadroomMultiplier; textureWidth / that multiplier pixels span the framing's reference-angle
 	// frustum at mfLightingTexelFraming. The reference expands immediately outward, contracts at the existing rate inward, and never falls below
-	// live framing times the tilt coverage ratio. Actual clamped extents preserve device-independent coverage. At settled framing and tilt the grid
+	// live framing times the coverage ratio. Actual clamped extents preserve device-independent coverage. For a settled footprint the grid
 	// stays fixed; snap f4LightingArea, centered on the tilted footprint, to integer deposit texels because deposit rasterizes lights.
 	// Spread/combine/temporal resample that world rectangle at their own resolutions.
 	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.width);
@@ -284,13 +286,14 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.mfCurrent;
+	bool bMoonOut = IsMoonOut(static_cast<game::Camera*>(engine::gpCamera)->SunAngle());
 	float fSkyboxPowerOne = gLightingWaterSkyboxOnePower.mfCurrent;
 	float fSkyboxPowerTwo = gLightingWaterSkyboxTwoPower.mfCurrent;
 	float fSkyboxPowerThree = gLightingWaterSkyboxThreePower.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxOnePower = fSkyboxPowerOne;
-	rMainLayout.fLightingWaterSkyboxTwo = gLightingWaterSkyboxTwo.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxTwo = bMoonOut ? gLightingWaterSkyboxTwoNight.mfCurrent : gLightingWaterSkyboxTwo.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxTwoPower = fSkyboxPowerTwo;
-	rMainLayout.fLightingWaterSkyboxThree = gLightingWaterSkyboxThree.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxThree = bMoonOut ? gLightingWaterSkyboxThreeNight.mfCurrent : gLightingWaterSkyboxThree.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxThreePower = fSkyboxPowerThree;
 	rMainLayout.fLightingWaterSkyboxOneBeachReduction = gLightingWaterSkyboxOneBeachReduction.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxTwoBeachReduction = gLightingWaterSkyboxTwoBeachReduction.mfCurrent;

@@ -301,7 +301,7 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 
 	for (int64_t iChild : rNode.children)
 	{
-		Parent parent { .pParent = pParent, .matNode = matNode, .iNodeIndex = iCurrentNodeIndex };
+		Parent parent {.pParent = pParent, .matNode = matNode, .iNodeIndex = iCurrentNodeIndex};
 		LoadVertices(&parent, iChild, rModel.nodes.at(static_cast<size_t>(iChild)), rModel, rContext);
 	}
 

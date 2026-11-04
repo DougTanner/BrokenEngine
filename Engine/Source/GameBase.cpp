@@ -820,7 +820,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 			}
 			float fCoordinateDeltaTime = (rCell.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
 			game::FrameInterpolate::AllocateAndCopy(mRenderInterpolates.try_emplace(rCoordinate).first->second, rFrame.interpolate);
-			game::FrameInterpolate::Update(mRenderInterpolates.at(rCoordinate), rFrame, fCoordinateDeltaTime);
+			game::FrameInterpolate::Update(mRenderInterpolates.at(rCoordinate), rFrame, fCoordinateDeltaTime, rCell.staticData);
 			// Label the copy with the cell its positions are local to and that cell's offset from the camera cell
 			// this same render entry point just resolved. Every renderer converts with this value at its one
 			// position-to-GPU point; the position columns are never rewritten.
@@ -916,7 +916,7 @@ bool GameBase::HandleDeferredSwapchain()
 			std::chrono::nanoseconds remainingNanoseconds = budgetNanoseconds - elapsedNanoseconds;
 			if (remainingNanoseconds > 0ns)
 			{
-				LARGE_INTEGER dueTime {.QuadPart = -(remainingNanoseconds.count() / 100), }; // Negative = relative, 100ns units.
+				LARGE_INTEGER dueTime {.QuadPart = -(remainingNanoseconds.count() / 100)}; // Negative = relative, 100ns units.
 				if (mHandleMinimizedThrottleTimer != nullptr && SetWaitableTimerEx(mHandleMinimizedThrottleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0) != 0)
 				{
 					WaitForSingleObject(mHandleMinimizedThrottleTimer, INFINITE);

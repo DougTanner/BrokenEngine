@@ -354,7 +354,7 @@ std::optional<int64_t> JsonInt64(const nlohmann::json& rValue)
 
 bool ValidateMetadataEnvelope(const nlohmann::json& rMetadata, const Locator& rLocator, int64_t iExpectedSchemaVersion)
 {
-	const char* const pFields[] = { "owner", "session", "worktree", "claimedAt", "heartbeatAt" };
+	const char* const pFields[] = {"owner", "session", "worktree", "claimedAt", "heartbeatAt"};
 	if (!std::ranges::all_of(pFields, [&rMetadata](const char* const& rpField)
 	{
 		return rMetadata.contains(rpField) && rMetadata[rpField].is_string() && !rMetadata[rpField].get<std::string>().empty();
@@ -380,15 +380,15 @@ nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std
 	std::string timestamp = CurrentUtcTimestamp();
 	return
 	{
-		{ "schemaVersion", kiSchemaVersion },
-		{ "domain", WideToUtf8(rLocator.domain) },
-		{ "logicalKey", WideToUtf8(rLocator.logicalKey) },
-		{ "owner", WideToUtf8(owner) },
-		{ "session", WideToUtf8(session) },
-		{ "worktree", WideToUtf8(worktree) },
-		{ "claimantPid", ::GetCurrentProcessId() },
-		{ "claimedAt", timestamp },
-		{ "heartbeatAt", std::move(timestamp) },
+		{"schemaVersion", kiSchemaVersion},
+		{"domain", WideToUtf8(rLocator.domain)},
+		{"logicalKey", WideToUtf8(rLocator.logicalKey)},
+		{"owner", WideToUtf8(owner)},
+		{"session", WideToUtf8(session)},
+		{"worktree", WideToUtf8(worktree)},
+		{"claimantPid", ::GetCurrentProcessId()},
+		{"claimedAt", timestamp},
+		{"heartbeatAt", std::move(timestamp)},
 	};
 }
 

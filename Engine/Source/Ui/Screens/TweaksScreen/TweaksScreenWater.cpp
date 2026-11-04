@@ -46,10 +46,13 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Intensity", &gLightingWaterSkyboxIntensity},
 	{"Add", &gLightingWaterSkyboxAdd},
 	{"Skybox 1", &gLightingWaterSkyboxOne},
+	{"Skybox 1 Night", &gLightingWaterSkyboxOneNight},
 	{"Skybox 1 Power", &gLightingWaterSkyboxOnePower},
 	{"Skybox 2", &gLightingWaterSkyboxTwo},
+	{"Skybox 2 Night", &gLightingWaterSkyboxTwoNight},
 	{"Skybox 2 Power", &gLightingWaterSkyboxTwoPower},
 	{"Skybox 3", &gLightingWaterSkyboxThree},
+	{"Skybox 3 Night", &gLightingWaterSkyboxThreeNight},
 	{"Skybox 3 Power", &gLightingWaterSkyboxThreePower},
 	{"Skybox Lod", &gLightingWaterSkyboxLevelOfDetail},
 	// Specular - Height Darken
@@ -178,10 +181,13 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Intensity", iSection, 1.0f);
 				rScreen.WrapperSlider("Add", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 1", iSection, 1.0f);
+				rScreen.WrapperSlider("Skybox 1 Night", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 1 Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 2", iSection, 1.0f);
+				rScreen.WrapperSlider("Skybox 2 Night", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 2 Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 3", iSection, 1.0f);
+				rScreen.WrapperSlider("Skybox 3 Night", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox 3 Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Skybox Lod", iSection, 1.0f);
 

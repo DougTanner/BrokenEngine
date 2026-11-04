@@ -44,8 +44,9 @@ model as a wreck (`## Wreck Invariants`).
   their span; these armed models require at least one tube and have no fallback.
   Yaw each aligned tube by the ship's horizontal heading, translate to the ship,
   and choose the least XY squared distance to the already selected enemy. An
-  exact tie keeps the first authored tube. Launch position Z equals the ship's
-  exact flight plane; flatten and normalize the aligned direction in XY before
+  exact tie keeps the first authored tube. Preserve the tube's full aligned Z
+  offset in the launch position; apply alignment, yaw, and translation once.
+  Flatten and normalize the aligned direction in XY before
   yaw, keeping direction and velocity Z zero. A launch `MissilesPostRender::Spawn`
   refuses leaves the ship cooldown unchanged and launches nothing that tick.
 

@@ -178,14 +178,22 @@ bool BlenderExportDirty(const std::filesystem::path& rSource, const std::filesys
 				return true;
 			}
 		}
-		// ExportBlenderScene.py records every candidate texture image under the source folder, with the same extensions
-		// compared ignoring case, so a candidate with no recorded dependency was added after conversion.
-		static constexpr std::string_view kpCandidateImageExtensions[] = {".png", ".jpg", ".jpeg", ".tga"};
-		for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rSource.parent_path()))
+		// Mirror ExportBlenderScene.py's source and sibling textures roots to detect added candidates.
+		std::vector<std::filesystem::path> roots {std::filesystem::canonical(rSource).parent_path()};
+		std::filesystem::path textures = roots.at(0).parent_path() / "textures";
+		if (std::filesystem::is_directory(textures) && !std::filesystem::equivalent(textures, roots.at(0)))
 		{
-			if (rEntry.is_regular_file() && std::ranges::contains(kpCandidateImageExtensions, common::ToLower(BlenderPathText(rEntry.path().extension()))) && !std::ranges::contains(marker.at("dependencies"), BlenderDependency(rSource, rEntry.path())))
+			roots.push_back(std::filesystem::canonical(textures));
+		}
+		static constexpr std::string_view kpCandidateImageExtensions[] = {".png", ".jpg", ".jpeg", ".tga"};
+		for (const std::filesystem::path& rRoot : roots)
+		{
+			for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rRoot))
 			{
-				return true;
+				if (rEntry.is_regular_file() && std::ranges::contains(kpCandidateImageExtensions, common::ToLower(BlenderPathText(rEntry.path().extension()))) && !std::ranges::contains(marker.at("dependencies"), BlenderDependency(rSource, rEntry.path())))
+				{
+					return true;
+				}
 			}
 		}
 		return false;

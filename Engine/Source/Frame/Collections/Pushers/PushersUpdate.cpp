@@ -15,7 +15,7 @@ constexpr int64_t kiPusherZoneSlots = kiPusherLayers * kiPusherZones * kiPusherZ
 // slots, indexed layer, X zone, Y zone, slot, are sized on the thread's first SetupZones call, so only simulation
 // threads commit them; the StableVector constructor makes no OS call, so it is safe before the allocator is ready.
 alignas(64) static thread_local int64_t spppiPushersPerZone[kiPusherLayers][kiPusherZones][kiPusherZones] {};
-static thread_local common::StableVector<int16_t> sPusherZones(kiPusherZoneSlots);
+static thread_local common::StableVector<int64_t> sPusherZones(kiPusherZoneSlots);
 
 // The zone grid spans the cell's bounding rectangle.
 constexpr float kfPusherAreaMinimumX = -kfCellHalfWidth;
@@ -28,9 +28,23 @@ constexpr float kfPusherZoneHeight = 2.0f * kfCellHalfHeight / static_cast<float
 constexpr float kfPusherCoincidentDistance = 0.0001f;
 constexpr float kfPusherCoincidentCorrection = 0.001f;
 
-static int16_t* PusherZone(int64_t iLayer, int64_t iZoneX, int64_t iZoneY)
+static int64_t* PusherZone(int64_t iLayer, int64_t iZoneX, int64_t iZoneY)
 {
 	return sPusherZones.Data() + ((iLayer * kiPusherZones + iZoneX) * kiPusherZones + iZoneY) * kiMaxPushersPerZone;
+}
+
+static std::pair<int64_t, int64_t> OccupiedPusherLayers(float fHeight)
+{
+	for (int64_t i = 0; i < kiPusherLayers; ++i)
+	{
+		float fPlaneHeight = gpFlightPlanes->Plane(i).fHeightMeters;
+		if (fHeight <= fPlaneHeight)
+		{
+			return {i == 0 || fHeight == fPlaneHeight ? i : i - 1, i};
+		}
+	}
+
+	return {kiPusherLayers - 1, kiPusherLayers - 1};
 }
 
 void PushersInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
@@ -90,22 +104,23 @@ void PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restri
 		iZoneStartY = std::clamp(iZoneStartY, 0i64, kiPusherZones - 1);
 		iZoneEndY = std::clamp(iZoneEndY, 0i64, kiPusherZones - 1);
 
-		// A row's layer is the flight plane nearest its registered height. SetupZones and ApplyPush must both derive it
-		// from the registered position, so a query's zone holds only rows of the querying row's layer.
-		int64_t iLayer = gpFlightPlanes->NearestPlaneIndex(f4Position.z);
-		for (int64_t j = iZoneStartY; j <= iZoneEndY; ++j)
+		auto [iLayerStart, iLayerEnd] = OccupiedPusherLayers(f4Position.z);
+		for (int64_t iLayer = iLayerStart; iLayer <= iLayerEnd; ++iLayer)
 		{
-			for (int64_t k = iZoneStartX; k <= iZoneEndX; ++k)
+			for (int64_t j = iZoneStartY; j <= iZoneEndY; ++j)
 			{
-				int64_t iPushersPerZone = spppiPushersPerZone[iLayer][k][j];
-				if (iPushersPerZone >= kiMaxPushersPerZone) [[unlikely]]
+				for (int64_t k = iZoneStartX; k <= iZoneEndX; ++k)
 				{
-					++iDroppedRegistrations;
-					continue;
-				}
+					int64_t iPushersPerZone = spppiPushersPerZone[iLayer][k][j];
+					if (iPushersPerZone >= kiMaxPushersPerZone) [[unlikely]]
+					{
+						++iDroppedRegistrations;
+						continue;
+					}
 
-				PusherZone(iLayer, k, j)[iPushersPerZone] = static_cast<int16_t>(i);
-				++spppiPushersPerZone[iLayer][k][j];
+					PusherZone(iLayer, k, j)[iPushersPerZone] = i;
+					++spppiPushersPerZone[iLayer][k][j];
+				}
 			}
 		}
 	}
@@ -128,53 +143,68 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 
 	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - kfPusherAreaMinimumX) / kfPusherZoneWidth), 0i64, kiPusherZones - 1);
 	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - kfPusherAreaMinimumY) / kfPusherZoneHeight), 0i64, kiPusherZones - 1);
-	int64_t iLayer = gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
-	const int16_t* piZone = PusherZone(iLayer, iZoneX, iZoneY);
-	int64_t iPushersInZone = spppiPushersPerZone[iLayer][iZoneX][iZoneY];
+	auto [iLayerStart, iLayerEnd] = OccupiedPusherLayers(XMVectorGetZ(vecPosition));
 
 	auto vecPush = XMVectorZero();
-	for (int64_t j = 0; j < iPushersInZone; ++j)
+	for (int64_t iLayer = iLayerStart; iLayer <= iLayerEnd; ++iLayer)
 	{
-		int64_t i = piZone[j];
-
-		if (i == iSelfIndex) [[unlikely]]
+		const int64_t* piZone = PusherZone(iLayer, iZoneX, iZoneY);
+		int64_t iPushersInZone = spppiPushersPerZone[iLayer][iZoneX][iZoneY];
+		for (int64_t j = 0; j < iPushersInZone; ++j)
 		{
-			continue;
+			int64_t i = piZone[j];
+
+			if (i == iSelfIndex) [[unlikely]]
+			{
+				continue;
+			}
+
+			PusherFlags_t flags = rCurrent.pFlags[i];
+
+			if (flags.Mask(excludeFlags) != 0ui32) [[unlikely]]
+			{
+				continue;
+			}
+
+			if (flags.Mask(includeFlags) == 0ui32) [[unlikely]]
+			{
+				continue;
+			}
+
+			// SetupZones appends rows in ascending order; only successful registrations suppress a duplicate.
+			bool bAlreadyQueried = std::ranges::any_of(std::views::iota(iLayerStart, iLayer), [&](int64_t iEarlierLayer)
+			{
+				const int64_t* piEarlierZone = PusherZone(iEarlierLayer, iZoneX, iZoneY);
+				int64_t iEarlierPushersInZone = spppiPushersPerZone[iEarlierLayer][iZoneX][iZoneY];
+				return std::binary_search(piEarlierZone, piEarlierZone + iEarlierPushersInZone, i);
+			});
+			if (bAlreadyQueried)
+			{
+				continue;
+			}
+
+			auto vecPusherPosition = rCurrent.pVecPositions[i];
+			auto vecFromPusher = XMVectorSubtract(vecPosition, vecPusherPosition);
+			auto vecDistanceSquared = XMVector3LengthSq(vecFromPusher);
+			float fRadius = rCurrent.pfRadii[i];
+			if (XMVectorGetX(vecDistanceSquared) > fRadius * fRadius) [[likely]]
+			{
+				continue;
+			}
+
+			if (XMVectorGetX(XMVector2LengthSq(vecFromPusher)) <= kfPusherCoincidentDistance * kfPusherCoincidentDistance) [[unlikely]]
+			{
+				rfPositionCorrectionX += iSelfIndex < i ? -kfPusherCoincidentCorrection : kfPusherCoincidentCorrection;
+				continue;
+			}
+
+			auto vecIntensity = XMVectorSubtract(XMVectorReplicate(1.0f), XMVectorDivide(vecDistanceSquared, XMVectorReplicate(fRadius * fRadius)));
+			vecIntensity = XMVectorPow(vecIntensity, XMVectorReplicate(rCurrent.pfPowers[i]));
+			vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
+
+			auto vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));
+			vecPush = XMVectorMultiplyAdd(vecIntensity, vecFromPusherNormal, vecPush);
 		}
-
-		PusherFlags_t flags = rCurrent.pFlags[i];
-
-		if (flags.Mask(excludeFlags) != 0ui32) [[unlikely]]
-		{
-			continue;
-		}
-
-		if (flags.Mask(includeFlags) == 0ui32) [[unlikely]]
-		{
-			continue;
-		}
-
-		auto vecPusherPosition = rCurrent.pVecPositions[i];
-		auto vecFromPusher = XMVectorSubtract(vecPosition, vecPusherPosition);
-		auto vecDistanceSquared = XMVector3LengthSq(vecFromPusher);
-		float fRadius = rCurrent.pfRadii[i];
-		if (XMVectorGetX(vecDistanceSquared) > fRadius * fRadius) [[likely]]
-		{
-			continue;
-		}
-
-		if (XMVectorGetX(XMVector2LengthSq(vecFromPusher)) <= kfPusherCoincidentDistance * kfPusherCoincidentDistance) [[unlikely]]
-		{
-			rfPositionCorrectionX += iSelfIndex < i ? -kfPusherCoincidentCorrection : kfPusherCoincidentCorrection;
-			continue;
-		}
-
-		auto vecIntensity = XMVectorSubtract(XMVectorReplicate(1.0f), XMVectorDivide(vecDistanceSquared, XMVectorReplicate(fRadius * fRadius)));
-		vecIntensity = XMVectorPow(vecIntensity, XMVectorReplicate(rCurrent.pfPowers[i]));
-		vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
-
-		auto vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));
-		vecPush = XMVectorMultiplyAdd(vecIntensity, vecFromPusherNormal, vecPush);
 	}
 
 	return vecPush;

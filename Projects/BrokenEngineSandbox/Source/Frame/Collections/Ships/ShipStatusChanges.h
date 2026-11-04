@@ -13,8 +13,7 @@ namespace game
 struct Frame;
 struct FrameInput;
 
-// kUpdateShip, kUpdateFleet, and kDestroyShip, applied once after every ship Update; kDestroyShip marks the row for the
-// Destroy-phase compaction fold.
+// Applied after every ship Update; kDestroyShip begins Fighter/Omni explosions and marks Battleships for removal.
 void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, const engine::CellStaticData& rStaticData);
 
 } // namespace game

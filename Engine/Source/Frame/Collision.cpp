@@ -554,7 +554,7 @@ void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 
 // Cyrus-Beck clip: narrows [rfEnter, rfExit] of the point path rf3Start + t * rf3Delta to the part inside the CCW
 // convex polygon extruded over [fMinimumZ, fMaximumZ], boundary included. Returns false once the interval is empty.
-static bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit)
+bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit)
 {
 	// The path is inside the half-space where fOutside + t * fRate <= 0.
 	auto ClipToHalfSpace = [&rfEnter, &rfExit](float fOutside, float fRate)

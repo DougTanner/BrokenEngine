@@ -507,7 +507,7 @@ void PackChunks::LoadPackFiles()
 				}
 				int64_t iDataOffset = static_cast<int64_t>(rChunkLocation.uiOffset + common::kiChunkDataOffset);
 
-				mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + iDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
+				mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk {.pHeader = pChunkHeader, .pData = rPackBytes.data() + iDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset)});
 
 				LOG(kLoading, kDebug, "Eager chunk {} \"{}\" size {}", rChunkLocation.crc, std::string_view(pChunkHeader->pcPath), rChunkLocation.uiSize);
 			}

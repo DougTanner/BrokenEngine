@@ -120,6 +120,57 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 	mPendingSpawnIntoFleetRequests.clear();
 }
 
+void ServerFleetManager::ProcessDestroyFleetMemberRequests()
+{
+	// Heap: cell FrameInput statusChanges grow for accepted requests.
+	ScopedSuppressAllocationTracking suppress;
+
+	for (const PendingDestroyFleetMemberRequest& rRequest : mPendingDestroyFleetMemberRequests)
+	{
+		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
+		auto it = mFleets.find(pClient->clientGuid);
+		if (it == mFleets.end())
+		{
+			continue;
+		}
+		for (Fleet& rFleet : it->second)
+		{
+			auto memberIt = std::ranges::find(rFleet.members, rRequest.globalId, &FleetMember::globalId);
+			if (memberIt == rFleet.members.end())
+			{
+				continue;
+			}
+			if (memberIt->eType == ShipType::kBattleship)
+			{
+				break;
+			}
+			if (!(memberIt->flags & FleetMemberFlags::kIsDead))
+			{
+				auto frameInputIt = gpGame->mFrameInputs.find(memberIt->coordinate);
+				if (frameInputIt != gpGame->mFrameInputs.end())
+				{
+					const Frame& rFrame = *gpGame->mCells.at(memberIt->coordinate).pCurrent;
+					std::optional<ShipLocator> optionalShip = FindShipByGlobalId(rFrame, rRequest.globalId);
+					if (optionalShip)
+					{
+						VisitShip(rFrame, *optionalShip, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+						{
+							if (!(rPostRender.pLifecycleFlags[iRow] & engine::LifecycleFlags::kDying))
+							{
+								frameInputIt->second.statusChanges.push_back({.eType = StatusChangeType::kDestroyShip, .data = DestroyShipData {.eType = optionalShip->eType, .iUuid = rPostRender.pIds[iRow].uuid.iValue}});
+							}
+						});
+					}
+				}
+			}
+			rFleet.members.erase(memberIt);
+			SendFleetSyncToClient(pClient->clientGuid);
+			break;
+		}
+	}
+	mPendingDestroyFleetMemberRequests.clear();
+}
+
 void ServerFleetManager::TickFleetTimers()
 {
 	// Heap: FrameInput statusChanges vectors of the cells holding the fleet's live members grow when a flagship picks a new direction
@@ -205,6 +256,7 @@ void ServerFleetManager::ClearPendingRequests()
 {
 	mPendingCreateFleetRequests.clear();
 	mPendingSpawnIntoFleetRequests.clear();
+	mPendingDestroyFleetMemberRequests.clear();
 }
 
 void ServerFleetManager::OnOwnedEntityTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalId, engine::GridCoord destination)
@@ -260,6 +312,7 @@ void ServerFleetManager::OnClientDisconnected(int64_t iClientId, const engine::C
 	};
 	std::erase_if(mPendingCreateFleetRequests, IsFromClient);
 	std::erase_if(mPendingSpawnIntoFleetRequests, IsFromClient);
+	std::erase_if(mPendingDestroyFleetMemberRequests, IsFromClient);
 }
 
 void ServerFleetManager::OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid)
@@ -375,6 +428,7 @@ void ServerFleetManager::ResetState()
 	// mRandomEngine intentionally not re-seeded: constructor TimeSeeds once; ReadFleetData restores from save for replay determinism.
 	mPendingCreateFleetRequests.clear();
 	mPendingSpawnIntoFleetRequests.clear();
+	mPendingDestroyFleetMemberRequests.clear();
 	mFleets.clear();
 	mGuidToClientId.clear();
 }

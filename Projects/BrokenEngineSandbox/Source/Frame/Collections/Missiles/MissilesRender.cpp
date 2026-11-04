@@ -76,7 +76,9 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kMissileModelCrc).pHeader->sceneHeader;
-	XMMATRIX matAlignment = common::GetModelAlignment(rChunkMap.at(rSceneHeader.modelCrc).pHeader->modelHeader);
+	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
@@ -108,10 +110,12 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMMATRIX matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 		XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 		XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-		XMMATRIX matTransform = matAlignment * matScaling * matYaw * matTranslation;
+		XMMATRIX matInstanceTransform = matScaling * matYaw * matTranslation;
+		XMMATRIX matTransform = matAlignment * matInstanceTransform;
 
 		shaders::ModelLayout& rModelLayout = pLayouts[siRendered++];
 		rModelLayout.f4PositionLayer = f4Position;
+		rModelLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matInstanceTransform, vecPosition)};
 		rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));

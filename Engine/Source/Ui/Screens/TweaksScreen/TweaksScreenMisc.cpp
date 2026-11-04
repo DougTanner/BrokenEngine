@@ -27,8 +27,8 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 	WrapperToggle("Orthographic Projection", &gOrthographicProjection);
 	ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
 	rScreen.WrapperSlider("Vertical Field of View", iSection);
-	ImGui::EndDisabled();
 	rScreen.WrapperSlider("Camera Tilt", iSection);
+	ImGui::EndDisabled();
 }
 
 } // namespace engine
