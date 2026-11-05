@@ -29,23 +29,23 @@ void RenderWindDepositsTab(engine::TweaksScreen& rScreen)
 	int64_t iSection = engine::giTweakSectionWind;
 
 	rScreen.WrapperSeparatorText("Omni");
-	rScreen.WrapperSlider("Omni Deposit Width", iSection);
-	rScreen.WrapperSlider("Omni Deposit Intensity", iSection);
-	rScreen.WrapperSlider("Omni Deposit Length Multiplier", iSection);
+	rScreen.WrapperSlider("Wind Deposit Omni Width", iSection, 2.0f, "Omni Deposit Width");
+	rScreen.WrapperSlider("Wind Deposit Omni Intensity", iSection, 2.0f, "Omni Deposit Intensity");
+	rScreen.WrapperSlider("Wind Deposit Omni Length Multiplier", iSection, 2.0f, "Omni Deposit Length Multiplier");
 
 	rScreen.WrapperSeparatorText("Fighters");
-	rScreen.WrapperSlider("Fighters Deposit Width", iSection);
-	rScreen.WrapperSlider("Fighters Deposit Intensity", iSection);
-	rScreen.WrapperSlider("Fighters Deposit Length Multiplier", iSection);
+	rScreen.WrapperSlider("Wind Deposit Fighters Width", iSection, 2.0f, "Fighters Deposit Width");
+	rScreen.WrapperSlider("Wind Deposit Fighters Intensity", iSection, 2.0f, "Fighters Deposit Intensity");
+	rScreen.WrapperSlider("Wind Deposit Fighters Length Multiplier", iSection, 2.0f, "Fighters Deposit Length Multiplier");
 
 	rScreen.WrapperSeparatorText("Omni Blasters");
-	rScreen.WrapperSlider("Omni Blasters Deposit Width", iSection);
-	rScreen.WrapperSlider("Omni Blasters Deposit Intensity", iSection);
-	rScreen.WrapperSlider("Blasters Deposit Length Multiplier", iSection);
+	rScreen.WrapperSlider("Wind Deposit Omni Blasters Width", iSection, 2.0f, "Omni Blasters Deposit Width");
+	rScreen.WrapperSlider("Wind Deposit Omni Blasters Intensity", iSection, 2.0f, "Omni Blasters Deposit Intensity");
+	rScreen.WrapperSlider("Wind Deposit Omni Blasters Length Multiplier", iSection, 2.0f, "Blasters Deposit Length Multiplier");
 
 	rScreen.WrapperSeparatorText("Explosions");
-	rScreen.WrapperSlider("Explosions Deposit Width", iSection);
-	rScreen.WrapperSlider("Explosions Deposit Intensity", iSection);
+	rScreen.WrapperSlider("Wind Deposit Explosions Width", iSection, 2.0f, "Explosions Deposit Width");
+	rScreen.WrapperSlider("Wind Deposit Explosions Intensity", iSection, 2.0f, "Explosions Deposit Intensity");
 }
 
 } // namespace game

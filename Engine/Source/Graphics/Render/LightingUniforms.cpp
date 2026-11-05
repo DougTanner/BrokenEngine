@@ -286,14 +286,37 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.mfCurrent;
-	bool bMoonOut = IsMoonOut(static_cast<game::Camera*>(engine::gpCamera)->SunAngle());
+	float fMoonAmount = MoonAmount(static_cast<game::Camera*>(engine::gpCamera)->SunAngle());
 	float fSkyboxPowerOne = gLightingWaterSkyboxOnePower.mfCurrent;
 	float fSkyboxPowerTwo = gLightingWaterSkyboxTwoPower.mfCurrent;
 	float fSkyboxPowerThree = gLightingWaterSkyboxThreePower.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxOnePower = fSkyboxPowerOne;
-	rMainLayout.fLightingWaterSkyboxTwo = bMoonOut ? gLightingWaterSkyboxTwoNight.mfCurrent : gLightingWaterSkyboxTwo.mfCurrent;
+	float fSampleRadius = gWaterSkyboxOneSampleRadius.mfCurrent;
+	int32_t iSampleCount = fSampleRadius > 0.0f ? gWaterSkyboxOneSampleCount.Get<int32_t>() : 1;
+	shaders::vec2 pf2SampleOffsets[8] {};
+	if (iSampleCount > 1)
+	{
+		int64_t iRingCount = iSampleCount - 1i64;
+		float fAngleStep = XM_2PI / static_cast<float>(iRingCount);
+		for (int64_t i = 0; i < iRingCount; ++i)
+		{
+			float fAngle = fAngleStep * static_cast<float>(i);
+			pf2SampleOffsets[i].x = fSampleRadius * std::sin(fAngle);
+			pf2SampleOffsets[i].y = -fSampleRadius * std::cos(fAngle);
+		}
+	}
+	float fSampleCountInverse = 1.0f / static_cast<float>(iSampleCount);
+	float fSampleBlend = gWaterSkyboxOneSampleBlend.mfCurrent;
+	rMainLayout.iLightingWaterSkyboxOneSampleCount = iSampleCount;
+	for (int64_t i = 0; i < 8; ++i)
+	{
+		rMainLayout.pf2LightingWaterSkyboxOneSampleOffsets[i] = pf2SampleOffsets[i];
+	}
+	rMainLayout.fLightingWaterSkyboxOneSampleCountInverse = fSampleCountInverse;
+	rMainLayout.fLightingWaterSkyboxOneSampleBlend = fSampleBlend;
+	rMainLayout.fLightingWaterSkyboxTwo = std::lerp(gLightingWaterSkyboxTwo.mfCurrent, gLightingWaterSkyboxTwoNight.mfCurrent, fMoonAmount);
 	rMainLayout.fLightingWaterSkyboxTwoPower = fSkyboxPowerTwo;
-	rMainLayout.fLightingWaterSkyboxThree = bMoonOut ? gLightingWaterSkyboxThreeNight.mfCurrent : gLightingWaterSkyboxThree.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxThree = std::lerp(gLightingWaterSkyboxThree.mfCurrent, gLightingWaterSkyboxThreeNight.mfCurrent, fMoonAmount);
 	rMainLayout.fLightingWaterSkyboxThreePower = fSkyboxPowerThree;
 	rMainLayout.fLightingWaterSkyboxOneBeachReduction = gLightingWaterSkyboxOneBeachReduction.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxTwoBeachReduction = gLightingWaterSkyboxTwoBeachReduction.mfCurrent;
@@ -334,35 +357,35 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fLightingTerrainBelowBaseMultiplier = gLightingTerrainBelowBaseMultiplier.mfCurrent;
 	rMainLayout.fLightingTerrainBelowBasePower = gLightingTerrainBelowBasePower.mfCurrent;
 
-	rMainLayout.fPhysicallyBasedRenderingExposure = gPhysicallyBasedRenderingExposure.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingGammaInverse = 1.0f / gPhysicallyBasedRenderingGamma.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingExposure = gPbrExposure.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingGammaInverse = 1.0f / gPbrGamma.mfCurrent;
 	rMainLayout.fColorGradingSaturation = gColorGradingSaturation.mfCurrent;
 	rMainLayout.fColorGradingContrast = gColorGradingContrast.mfCurrent;
 	rMainLayout.fColorGradingTemperature = gColorGradingTemperature.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingDayBrightness = gPhysicallyBasedRenderingDayBrightness.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingAmbient = gPhysicallyBasedRenderingImageBasedLightingAmbient.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingDayBrightness = gPbrDayBrightness.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingAmbient = gPbrIblAmbient.mfCurrent;
 
 	rMainLayout.fPhysicallyBasedRenderingMipmapCount = static_cast<float>(gpTextureManager->mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount);
-	rMainLayout.fPhysicallyBasedRenderingSmoke = gPhysicallyBasedRenderingSmoke.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingSmoke = gPbrSmoke.mfCurrent;
 
-	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse = gPhysicallyBasedRenderingImageBasedLightingDiffuse.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower = gPhysicallyBasedRenderingImageBasedLightingDiffusePower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecular = gPhysicallyBasedRenderingImageBasedLightingSpecular.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecularPower = gPhysicallyBasedRenderingImageBasedLightingSpecularPower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingSun = gPhysicallyBasedRenderingSun.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingLighting = gPhysicallyBasedRenderingLighting.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingLightingPower = gPhysicallyBasedRenderingLightingPower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingLightingSpecular = gPhysicallyBasedRenderingLightingSpecular.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingLightingSpecularPower = gPhysicallyBasedRenderingLightingSpecularPower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingEmissive = gPhysicallyBasedRenderingEmissive.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend = gPhysicallyBasedRenderingImageBasedLightingShadowBlend.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingShadowFloor = gPhysicallyBasedRenderingShadowFloor.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower = gPhysicallyBasedRenderingCubemapLevelOfDetailPower.mfCurrent;
-	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset = gPhysicallyBasedRenderingCubemapLevelOfDetailOffset.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse = gPbrBrdfDiffuse.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower = gPbrBrdfDiffusePower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular = gPbrBrdfSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower = gPbrBrdfSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse = gPbrIblDiffuse.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower = gPbrIblDiffusePower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecular = gPbrIblSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecularPower = gPbrIblSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingSun = gPbrSun.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLighting = gPbrLighting.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingPower = gPbrLightingPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingSpecular = gPbrLightingSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingSpecularPower = gPbrLightingSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingEmissive = gPbrEmissive.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend = gPbrIblShadowBlend.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingShadowFloor = gPbrShadowFloor.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower = gPbrCubemapLodPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset = gPbrCubemapLodOffset.mfCurrent;
 
 	int64_t iPlaneCount = gpFlightPlanes->Count();
 	float fIntensityBottom = gSmokeShadowIntensityBottom.mfCurrent;

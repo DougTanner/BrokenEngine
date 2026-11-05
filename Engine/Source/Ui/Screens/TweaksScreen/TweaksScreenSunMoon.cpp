@@ -44,44 +44,44 @@ void RenderSunMoonSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionSunMoon;
 
 	rScreen.WrapperSeparatorText("Color Phase Boundaries (radians)");
-	rScreen.WrapperSlider("Morning Start", iSection);
-	rScreen.WrapperSlider("Noon Start", iSection);
-	rScreen.WrapperSlider("Noon End", iSection);
-	rScreen.WrapperSlider("Evening Start", iSection);
-	rScreen.WrapperSlider("Night Start", iSection);
+	rScreen.WrapperSlider("Sun Moon Morning", iSection, 2.0f, "Morning Start");
+	rScreen.WrapperSlider("Sun Moon Noon Start", iSection, 2.0f, "Noon Start");
+	rScreen.WrapperSlider("Sun Moon Noon End", iSection, 2.0f, "Noon End");
+	rScreen.WrapperSlider("Sun Moon Evening", iSection, 2.0f, "Evening Start");
+	rScreen.WrapperSlider("Sun Moon Night Start", iSection, 2.0f, "Night Start");
 
 	rScreen.WrapperSeparatorText("Sun Intensity");
-	rScreen.WrapperSlider("Sun Terrain", iSection);
-	rScreen.WrapperSlider("Sun Water", iSection);
-	rScreen.WrapperSlider("Sun Objects", iSection);
-	rScreen.WrapperSlider("Sun Smoke", iSection);
+	rScreen.WrapperSlider("Sun Moon Sun Intensity Terrain", iSection, 2.0f, "Sun Terrain");
+	rScreen.WrapperSlider("Sun Moon Sun Intensity Water", iSection, 2.0f, "Sun Water");
+	rScreen.WrapperSlider("Sun Moon Sun Intensity Objects", iSection, 2.0f, "Sun Objects");
+	rScreen.WrapperSlider("Sun Moon Sun Intensity Smoke", iSection, 2.0f, "Sun Smoke");
 
 	rScreen.WrapperSeparatorText("Moon Intensity");
-	rScreen.WrapperSlider("Moon Terrain", iSection);
-	rScreen.WrapperSlider("Moon Water", iSection);
-	rScreen.WrapperSlider("Moon Objects", iSection);
-	rScreen.WrapperSlider("Moon Smoke", iSection);
-	rScreen.WrapperSlider("Moon Blue Tint", iSection);
+	rScreen.WrapperSlider("Sun Moon Moon Intensity Terrain", iSection, 2.0f, "Moon Terrain");
+	rScreen.WrapperSlider("Sun Moon Moon Intensity Water", iSection, 2.0f, "Moon Water");
+	rScreen.WrapperSlider("Sun Moon Moon Intensity Objects", iSection, 2.0f, "Moon Objects");
+	rScreen.WrapperSlider("Sun Moon Moon Intensity Smoke", iSection, 2.0f, "Moon Smoke");
+	rScreen.WrapperSlider("Sun Moon Moon Blue Tint", iSection, 2.0f, "Moon Blue Tint");
 
 	rScreen.WrapperSeparatorText("Moon Timing (radians)");
-	rScreen.WrapperSlider("Moonrise Start", iSection);
-	rScreen.WrapperSlider("Moonrise End", iSection);
-	rScreen.WrapperSlider("Moonset Start", iSection);
-	rScreen.WrapperSlider("Moonset End", iSection);
+	rScreen.WrapperSlider("Sun Moon Moonrise Start", iSection, 2.0f, "Moonrise Start");
+	rScreen.WrapperSlider("Sun Moon Moonrise End", iSection, 2.0f, "Moonrise End");
+	rScreen.WrapperSlider("Sun Moon Moonset Start", iSection, 2.0f, "Moonset Start");
+	rScreen.WrapperSlider("Sun Moon Moonset End", iSection, 2.0f, "Moonset End");
 
 	rScreen.WrapperSeparatorText("Ambient");
-	rScreen.WrapperSlider("Minimum Ambient", iSection);
-	rScreen.WrapperSlider("Ambient Multiplier", iSection);
+	rScreen.WrapperSlider("Sun Moon Minimum Ambient", iSection, 2.0f, "Minimum Ambient");
+	rScreen.WrapperSlider("Sun Moon Ambient Multiplier", iSection, 2.0f, "Ambient Multiplier");
 
 	rScreen.WrapperSeparatorText("Normal Tilt (radians)");
-	rScreen.WrapperSlider("Normal Tilt", iSection);
+	rScreen.WrapperSlider("Sun Moon Normal Tilt", iSection, 2.0f, "Normal Tilt");
 
 	rScreen.WrapperSeparatorText("Shadow Night-Gate (radians)");
-	rScreen.WrapperSlider("Shadow Night Multiplier", iSection);
-	rScreen.WrapperSlider("Shadow Sunset Start", iSection);
-	rScreen.WrapperSlider("Shadow Sunset End", iSection);
-	rScreen.WrapperSlider("Shadow Sunrise Start", iSection);
-	rScreen.WrapperSlider("Shadow Sunrise End", iSection);
+	rScreen.WrapperSlider("Sun Moon Shadow Night Multiplier", iSection, 2.0f, "Shadow Night Multiplier");
+	rScreen.WrapperSlider("Sun Moon Shadow Sunset Start", iSection, 2.0f, "Shadow Sunset Start");
+	rScreen.WrapperSlider("Sun Moon Shadow Sunset End", iSection, 2.0f, "Shadow Sunset End");
+	rScreen.WrapperSlider("Sun Moon Shadow Sunrise Start", iSection, 2.0f, "Shadow Sunrise Start");
+	rScreen.WrapperSlider("Sun Moon Shadow Sunrise End", iSection, 2.0f, "Shadow Sunrise End");
 }
 
 } // namespace engine

@@ -139,6 +139,29 @@ XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStat
 	return XMVectorSetZ(vecPosition, fHeight);
 }
 
+XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane)
+{
+	if (!IsFlightPlaneAllowed(eType, 1))
+	{
+		return vecPosition;
+	}
+	float fMinimumHeight = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) + engine::gpFlightPlanes->Lowest().fHeightMeters;
+	if (XMVectorGetZ(vecPosition) >= fMinimumHeight)
+	{
+		return vecPosition;
+	}
+	ruiFlightPlane = kuiNoFlightPlane;
+	for (int64_t i = 0; i <= HighestFlightPlane(eType); ++i)
+	{
+		if (fMinimumHeight == EffectiveShipFlightHeight(eType, eController, i))
+		{
+			ruiFlightPlane = static_cast<uint8_t>(i);
+			break;
+		}
+	}
+	return XMVectorSetZ(vecPosition, fMinimumHeight);
+}
+
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks)
 {
 	if (riPendingFleetWantedCoordinateTicks > 0)

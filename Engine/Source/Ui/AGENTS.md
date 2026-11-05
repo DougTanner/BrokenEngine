@@ -15,6 +15,7 @@ is engine-owned here.
 - Mutate through `Set` or `Reset`, or restore defaults with `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
 - A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it, so every returned index is in range. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
 - One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
+- A wrapper control's visible label (including a slider's label) must use the wrapper identifier's words in the same order, with the naming prefix removed and spaces between words: `gPbrBrdfDiffuse` becomes `Pbr Brdf Diffuse`. This makes the wrapper searchable from its on-screen label. For localized controls, apply this rule to the English/source label; translated labels retain their normal localization behavior.
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
 - Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
 

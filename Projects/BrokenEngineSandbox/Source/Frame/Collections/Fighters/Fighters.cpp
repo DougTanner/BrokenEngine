@@ -283,7 +283,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 #if defined(BT_CLIENT)
 		float fHeightBeforeClimb = XMVectorGetZ(vecPosition);
 #endif
-		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
+		// PostRender Update stores velocity Z as 0; ordinary plane travel steps the position directly.
 		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kFighter, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kFighter), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
@@ -291,6 +291,10 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		// Full tilt at the full climb rate, none on a plane; a zero-length render step keeps the last tilt.
 		float fClimbTilt = fClimbStep > 0.0f ? kfFighterClimbTilt * ((XMVectorGetZ(vecPosition) - fHeightBeforeClimb) / fClimbStep) : rPrevious.pfClimbTilts[i];
 #endif
+		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
+		{
+			vecPosition = RaiseAboveTerrain(rStaticData, ShipType::kFighter, rPreviousPostRender.pController[i], vecPosition, uiFlightPlane);
+		}
 
 		vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * fDeltaRotation)));
 
@@ -663,7 +667,10 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		}
 
 		float fNavigationDeltaRotation = fDeltaRotation;
-		if (!SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
+		float fHeight = XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]);
+		if (((lifecycleFlags & engine::LifecycleFlags::kDying) || !IsFlightPlaneAllowed(ShipType::kFighter, 1))
+		 && !SkipsTerrainContact(fHeight)
+		 && (engine::gpFlightPlanes->Plane(NavigationFlightPlane(fHeight, GetTargetFlightPlane(rPrevious.pOrders[i]))).flags & engine::FlightPlaneFlags::kTerrainCollision))
 		{
 			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
 		}
@@ -672,6 +679,10 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			fDeltaRotation = fNavigationDeltaRotation;
 		}
 		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
+		if (!(lifecycleFlags & engine::LifecycleFlags::kDying))
+		{
+			rCurrentInterpolate.pVecPositions[i] = RaiseAboveTerrain(rStaticData, ShipType::kFighter, rPrevious.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.puiFlightPlanes[i]);
+		}
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);

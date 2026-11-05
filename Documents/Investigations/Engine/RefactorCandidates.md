@@ -10,6 +10,8 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-04 codex/fb777af5-e663-4f71-9163-a208625e4c4d — size observation — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp:46 — 10105 tokens; height and plane policy through RaiseAboveTerrain forms a cohesive possible future split; no reduction required by this review.
+
 - 2026-11-01 claude/c5401001-5b07-4667-9379-a63c2a27c40a — Engine/Source/Graphics/Render/LightingUniforms.cpp:48 —
   remove the per-layer held flag and let the per-layer reset flag alone mean "no held area". The held flag is
   cleared at only one site (line 70), and that same branch sets gbLightingTemporalReset, which sets every layer's

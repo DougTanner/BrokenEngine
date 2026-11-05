@@ -46,43 +46,43 @@ void RenderSmokeDepositsTab(engine::TweaksScreen& rScreen)
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Explosions - Primary Puff");
-		rScreen.WrapperSlider("Area One", iSection, 1.0f, "Explosion Primary Puff Area One");
-		rScreen.WrapperSlider("Area Two", iSection, 1.0f, "Explosion Primary Puff Area Two");
-		rScreen.WrapperSlider("Intensity One", iSection, 1.0f, "Explosion Primary Puff Intensity One");
-		rScreen.WrapperSlider("Intensity Two", iSection, 1.0f, "Explosion Primary Puff Intensity Two");
+		rScreen.WrapperSlider("Explosion Primary Puff Area One", iSection, 1.0f, "Explosion Primary Puff Area One");
+		rScreen.WrapperSlider("Explosion Primary Puff Area Two", iSection, 1.0f, "Explosion Primary Puff Area Two");
+		rScreen.WrapperSlider("Explosion Primary Puff Intensity One", iSection, 1.0f, "Explosion Primary Puff Intensity One");
+		rScreen.WrapperSlider("Explosion Primary Puff Intensity Two", iSection, 1.0f, "Explosion Primary Puff Intensity Two");
 
 		rScreen.WrapperSeparatorText("Explosions - Secondary Puff");
-		rScreen.WrapperSlider("Area One", iSection, 1.0f, "Explosion Secondary Puff Area One");
-		rScreen.WrapperSlider("Area Two", iSection, 1.0f, "Explosion Secondary Puff Area Two");
-		rScreen.WrapperSlider("Intensity One", iSection, 1.0f, "Explosion Secondary Puff Intensity One");
-		rScreen.WrapperSlider("Intensity Two", iSection, 1.0f, "Explosion Secondary Puff Intensity Two");
+		rScreen.WrapperSlider("Explosion Secondary Puff Area One", iSection, 1.0f, "Explosion Secondary Puff Area One");
+		rScreen.WrapperSlider("Explosion Secondary Puff Area Two", iSection, 1.0f, "Explosion Secondary Puff Area Two");
+		rScreen.WrapperSlider("Explosion Secondary Puff Intensity One", iSection, 1.0f, "Explosion Secondary Puff Intensity One");
+		rScreen.WrapperSlider("Explosion Secondary Puff Intensity Two", iSection, 1.0f, "Explosion Secondary Puff Intensity Two");
 
 		rScreen.WrapperSeparatorText("Explosions - Primary Trail");
-		rScreen.WrapperSlider("Intensity", iSection, 1.0f, "Explosion Primary Trail Intensity");
-		rScreen.WrapperSlider("Length", iSection, 1.0f, "Explosion Primary Trail Length");
-		rScreen.WrapperSlider("Duration", iSection, 1.0f, "Explosion Primary Trail Duration");
+		rScreen.WrapperSlider("Explosion Primary Trail Intensity", iSection, 1.0f, "Explosion Primary Trail Intensity");
+		rScreen.WrapperSlider("Explosion Primary Trail Length", iSection, 1.0f, "Explosion Primary Trail Length");
+		rScreen.WrapperSlider("Explosion Primary Trail Duration", iSection, 1.0f, "Explosion Primary Trail Duration");
 
 		rScreen.WrapperSeparatorText("Explosions - Secondary Trail");
-		rScreen.WrapperSlider("Intensity", iSection, 1.0f, "Explosion Secondary Trail Intensity");
-		rScreen.WrapperSlider("Length", iSection, 1.0f, "Explosion Secondary Trail Length");
-		rScreen.WrapperSlider("Duration", iSection, 1.0f, "Explosion Secondary Trail Duration");
+		rScreen.WrapperSlider("Explosion Secondary Trail Intensity", iSection, 1.0f, "Explosion Secondary Trail Intensity");
+		rScreen.WrapperSlider("Explosion Secondary Trail Length", iSection, 1.0f, "Explosion Secondary Trail Length");
+		rScreen.WrapperSlider("Explosion Secondary Trail Duration", iSection, 1.0f, "Explosion Secondary Trail Duration");
 
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Blasters - Terrain Puff");
-		rScreen.WrapperSlider("Area Start", iSection, 1.0f, "Blaster Puff Area Start");
-		rScreen.WrapperSlider("Area End", iSection, 1.0f, "Blaster Puff Area End");
-		rScreen.WrapperSlider("Intensity Start", iSection, 1.0f, "Blaster Puff Intensity Start");
-		rScreen.WrapperSlider("Intensity End", iSection, 1.0f, "Blaster Puff Intensity End");
+		rScreen.WrapperSlider("Blaster Puff Area Start", iSection, 1.0f, "Blaster Puff Area Start");
+		rScreen.WrapperSlider("Blaster Puff Area End", iSection, 1.0f, "Blaster Puff Area End");
+		rScreen.WrapperSlider("Blaster Puff Intensity Start", iSection, 1.0f, "Blaster Puff Intensity Start");
+		rScreen.WrapperSlider("Blaster Puff Intensity End", iSection, 1.0f, "Blaster Puff Intensity End");
 
 		rScreen.WrapperSeparatorText("Omnis - Impact Puff");
-		rScreen.WrapperSlider("Area One", iSection, 1.0f, "Omni Impact Puff Area One");
-		rScreen.WrapperSlider("Area Two", iSection, 1.0f, "Omni Impact Puff Area Two");
-		rScreen.WrapperSlider("Intensity One", iSection, 1.0f, "Omni Impact Puff Intensity One");
-		rScreen.WrapperSlider("Intensity Two", iSection, 1.0f, "Omni Impact Puff Intensity Two");
+		rScreen.WrapperSlider("Omni Impact Puff Area One", iSection, 1.0f, "Omni Impact Puff Area One");
+		rScreen.WrapperSlider("Omni Impact Puff Area Two", iSection, 1.0f, "Omni Impact Puff Area Two");
+		rScreen.WrapperSlider("Omni Impact Puff Intensity One", iSection, 1.0f, "Omni Impact Puff Intensity One");
+		rScreen.WrapperSlider("Omni Impact Puff Intensity Two", iSection, 1.0f, "Omni Impact Puff Intensity Two");
 
 		rScreen.WrapperSeparatorText("Missiles - Trail");
-		rScreen.WrapperSlider("Intensity", iSection, 1.0f, "Missile Trail Intensity");
+		rScreen.WrapperSlider("Missile Trail Intensity", iSection, 1.0f, "Missile Trail Intensity");
 
 		// Column 3: Engine smoke trail rendering params
 		ImGui::TableNextColumn();

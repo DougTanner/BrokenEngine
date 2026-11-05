@@ -58,8 +58,8 @@ derives from the shared omni radius.
   the heal step, adds the `pHealBeamAreaLights` area light on a row that healed
   this tick and still heals, and releases it on every other row and tick. That
   write of the client-only Interpolate handle is an exception, like the
-  Fighter beam handle (`../Fighters/AGENTS.md`), to the rule that the
-  position is the only Interpolate field PostRender Update writes. Interpolate
+  Fighter beam handle (`../Fighters/AGENTS.md`), to the PostRender writes of
+  Interpolate position and stored plane under the shared ship policy. Interpolate
   Update draws the line from the flagship's previous-frame position, about one
   tick behind, to the Omni, its brightness pulsing as a pure function of the
   interpolated time; with no flagship in the previous frame the light keeps its

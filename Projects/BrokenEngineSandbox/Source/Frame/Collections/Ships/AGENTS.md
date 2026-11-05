@@ -12,9 +12,10 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
   owns the layer, distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate
-  position after terrain resolution, preserving Y/Z/W and stored/target planes.
-  Tiny terrain intrusion from this correction is accepted; separation can
-  progress across ticks rather than fully resolving a stack in one tick.
+  position after terrain resolution, preserving Y/Z/W and target orders, then
+  enforce the live terrain-rise rule below. For ships without that rule, tiny
+  terrain intrusion from the correction is accepted. Separation can progress
+  across ticks rather than fully resolving a stack in one tick.
 - A ship releases and clears its pusher when its explosion begins. Fighter and
   Omni `kDestroyShip` status changes use the same initializer as combat death,
   ignore an already dying row, and retain the existing delayed removal; an
@@ -56,19 +57,21 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
   navigation delay, an unknown controller, and a target flight plane the type
-  disallows, and each Interpolate `PostRead` rejects a height outside the
-  lowest-to-highest flight plane range and a stored flight plane that is neither
-  `kuiNoFlightPlane` nor allowed for the type, on every Frame read.
+  disallows. On every Frame read, Interpolate `PostRead` requires a finite
+  Fighter or Omni height at or above the lowest plane, allowing terrain-raised
+  heights above the highest plane; Battleships retain the lowest-to-highest
+  plane range. Every type rejects a stored plane that is neither
+  `kuiNoFlightPlane` nor allowed for the type.
 - A ship's target flight plane lives in its orders, set at spawn and changed by
   `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
   by the random-spawn Omni chase (`../Fighters/AGENTS.md`,
-  `../Omnis/AGENTS.md`); each type flies only up to its own highest plane
+  `../Omnis/AGENTS.md`); target planes must be allowed for the type
   (`IsFlightPlaneAllowed`). Its current plane is stored in the shared
-  Interpolate column `puiFlightPlanes`: the plane index while settled,
-  `kuiNoFlightPlane` while climbing between planes. A genuine spawn stores its
+  Interpolate column `puiFlightPlanes`: the plane index at its exact effective
+  height, `kuiNoFlightPlane` between or above planes. A genuine spawn stores its
   spawn plane and a transfer arrival carries the stored value.
 - Between the two flight planes, the lower plane carries the union of terrain restrictions because the upper plane has none. A ship navigates on its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
-- Interpolate Update owns a ship's height and stored plane:
+- Interpolate Update owns rate-limited ordinary plane travel and its stored-plane changes:
   `ClimbTowardsFlightPlane` lands on the effective flight height, so client and
   server match bit-exactly, and stores the effective plane on arrival and
   `kuiNoFlightPlane` once a climb toward another plane begins. Before descending,
@@ -76,9 +79,17 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   While blocked it returns toward the upper plane, retaining the requested lower
   order and horizontal movement; the first clear update resumes descent, even
   during the upward return.
+- A live ship whose type allows plane 1 immediately rises to at least the
+  terrain elevation sampled at its center XY plus the lowest plane's height.
+  Apply this floor after ordinary Interpolate plane travel and after the final
+  PostRender pusher correction, without a rise-rate or highest-plane ceiling.
+  Preserve XY/W, target orders, and the ordinary effective model-origin floor;
+  a rise recomputes the stored plane under the exact-height rule above. These
+  ships bypass horizontal terrain push/contact. Dying ships receive no terrain
+  floor; Fighter and Omni death contact retains the exact-height skip and also
+  requires the actual navigation plane to enable terrain collision.
   PostRender Update stores velocity Z as 0 as its last velocity write in every
-  type, so pushers, knockback, and terrain contact move ships only horizontally.
-  Change a ship's height through its target plane, not its velocity.
+  type. Height changes step position directly, never through velocity.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
 - Target choice treats a ship as on its nearest flight plane
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
@@ -144,9 +155,9 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - After arrival grace expires, a living fleet Fighter or Battleship accelerates
   only when its horizontal AI bearing is within the inclusive +/-45-degree
   forward cone; a zero AI bearing is outside. Outside the cone it retains drag
-  and skips terrain avoidance; terrain contact and pusher response still
+  and skips terrain avoidance; the shared terrain response and pusher response still
   apply. A fleet Fighter outside the cone uses its signed maximum turn rate,
-  preserving that navigation turn through terrain bounce, and inside the cone
+  preserving that navigation turn through terrain response, and inside the cone
   uses ordinary steering smoothing. A fleet Battleship turns as
   `../Battleships/AGENTS.md` `## Turning Invariants` states. This rule does not
   apply to Omnis or random-spawn ships.

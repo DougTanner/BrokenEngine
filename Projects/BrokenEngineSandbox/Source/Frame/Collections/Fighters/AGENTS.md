@@ -35,15 +35,17 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   PostCollision hook (`## Weapon Invariants`). Destruction applies horizontal knockback and a
   staged explosion sequence. Separation and pusher death ownership follow the
   [shared ship policy](../Ships/AGENTS.md#ship-invariants).
-- The nose climb tilt is client-only render state: Interpolate Update derives it from the tick's height change and Render pitches the model by it, while the simulated heading stays yaw-only.
+- The nose climb tilt is client-only render state: Interpolate Update derives
+  it from ordinary plane travel before terrain rise, and Render pitches the
+  model by it, while the simulated heading stays yaw-only. Terrain displacement
+  contributes no tilt.
 - Body and effect sizing derive from `kfFighterRadius`; collision dimensions
   follow the [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn sentinel or in [0, `kFighterDestroyTime`]. The Interpolate `PostRead` rejects any other row on every Frame read.
-- Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules),
-  arrival grace and the beam cooldown count down unconditionally before
+- Arrival grace and the beam cooldown count down unconditionally before
   behavior gating. While the decremented grace remains positive, a non-exploding
-  fighter retains carried motion, pusher response, and terrain bounce while
-  skipping navigation and AI steering, acceleration, drag,
+  fighter retains carried motion, pusher response, and the shared terrain
+  response while skipping navigation and AI steering, acceleration, drag,
   terrain avoidance, and firing. Ordinary behavior resumes in the same tick that
   grace reaches zero; exploding fighters continue through the existing death
   path.
@@ -52,9 +54,9 @@ Fighters combine heading-based steering, health and damage, a hit-scan beam, and
   amount) lives in the Interpolate struct and is read by Interpolate Update and
   by Render, but it is decayed and written from PostRender Update. That crossing
   is deliberate — do not "fix" it by moving the field to PostRender, which would
-  change the CRC member set and the render read path. The position, resolved
-  against terrain and then corrected under the shared ship policy, and the
-  client-only beam light handle `pBeamAreaLights`, which it releases and clears
+  change the CRC member set and the render read path. The position and stored
+  plane, corrected under the shared ship policy, and the client-only beam light
+  handle `pBeamAreaLights`, which it releases and clears
   (`## Weapon Invariants`), are the only other Interpolate fields PostRender
   Update writes; do not treat any other Interpolate field as writable from
   PostRender Update.

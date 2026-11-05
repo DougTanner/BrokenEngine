@@ -327,25 +327,25 @@ struct LightingDescriptor
 
 constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
 {
-	LightingDescriptor {.pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment"},
-	LightingDescriptor {.pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbient, .pcLabel = "IBL Ambient", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse, .pcLabel = "IBL Diffuse", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower, .pcLabel = "IBL Diffuse Power", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecular, .pcLabel = "IBL Specular", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower, .pcLabel = "IBL Specular Power", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower, .pcLabel = "Cubemap Lod Power", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset, .pcLabel = "Cubemap Lod Offset", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse, .pcLabel = "BRDF Diffuse", .pcHeading = "BRDF"},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower, .pcLabel = "BRDF Diffuse Power", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular, .pcLabel = "BRDF Specular", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower, .pcLabel = "BRDF Specular Power", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = "Emissive"},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingExposure, .pcLabel = "Exposure", .pcHeading = "HDR color grading"},
-	LightingDescriptor {.pWrapper = &engine::gPhysicallyBasedRenderingGamma, .pcLabel = "Gamma", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Saturation", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gColorGradingContrast, .pcLabel = "Contrast", .pcHeading = nullptr},
-	LightingDescriptor {.pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Sun Moon Minimum Ambient", .pcHeading = "Ambient and environment"},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Sun Moon Ambient Multiplier", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrIblAmbient, .pcLabel = "Pbr Ibl Ambient", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrIblDiffuse, .pcLabel = "Pbr Ibl Diffuse", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrIblDiffusePower, .pcLabel = "Pbr Ibl Diffuse Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrIblSpecular, .pcLabel = "Pbr Ibl Specular", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrIblSpecularPower, .pcLabel = "Pbr Ibl Specular Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrCubemapLodPower, .pcLabel = "Pbr Cubemap Lod Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrCubemapLodOffset, .pcLabel = "Pbr Cubemap Lod Offset", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrBrdfDiffuse, .pcLabel = "Pbr Brdf Diffuse", .pcHeading = "BRDF"},
+	LightingDescriptor {.pWrapper = &engine::gPbrBrdfDiffusePower, .pcLabel = "Pbr Brdf Diffuse Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrBrdfSpecular, .pcLabel = "Pbr Brdf Specular", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrBrdfSpecularPower, .pcLabel = "Pbr Brdf Specular Power", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gPbrEmissive, .pcLabel = "Pbr Emissive", .pcHeading = "Emissive"},
+	LightingDescriptor {.pWrapper = &engine::gPbrExposure, .pcLabel = "Pbr Exposure", .pcHeading = "HDR color grading"},
+	LightingDescriptor {.pWrapper = &engine::gPbrGamma, .pcLabel = "Pbr Gamma", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Color Grading Saturation", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingContrast, .pcLabel = "Color Grading Contrast", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Color Grading Temperature", .pcHeading = nullptr},
 };
 
 static std::array<float, 19> GetLightingDefaults()
@@ -1035,12 +1035,12 @@ void ModelViewerApplication::RenderUi()
 			}
 			engine::WrapperToggle("Sample Shading", &engine::gSampleShading);
 			ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
-			QualitySlider("Min Sample Shading", engine::gMinimumSampleShading);
+			QualitySlider("Minimum Sample Shading", engine::gMinimumSampleShading);
 			ImGui::EndDisabled();
 			ImGui::EndDisabled();
 			engine::WrapperToggle("Anisotropy", &engine::gAnisotropy);
 			ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
-			QualitySlider("Max Anisotropy", engine::gMaximumAnisotropy);
+			QualitySlider("Maximum Anisotropy", engine::gMaximumAnisotropy);
 			ImGui::EndDisabled();
 			ImGui::PopStyleVar();
 			ImGui::Separator();

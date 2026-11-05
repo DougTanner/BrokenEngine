@@ -27,20 +27,20 @@ void RenderHexShieldSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionHexShield;
 
 	rScreen.WrapperSeparatorText("Edge");
-	rScreen.WrapperSlider("Grow", iSection);
-	rScreen.WrapperSlider("Edge Distance", iSection);
-	rScreen.WrapperSlider("Edge Multiplier", iSection);
+	rScreen.WrapperSlider("Hex Shield Grow", iSection, 2.0f, "Grow");
+	rScreen.WrapperSlider("Hex Shield Edge Distance", iSection, 2.0f, "Edge Distance");
+	rScreen.WrapperSlider("Hex Shield Edge Multiplier", iSection, 2.0f, "Edge Multiplier");
 
 	rScreen.WrapperSeparatorText("Wave");
-	rScreen.WrapperSlider("Wave Multiplier", iSection);
-	rScreen.WrapperSlider("Wave Dot", iSection);
-	rScreen.WrapperSlider("Wave Intensity", iSection);
-	rScreen.WrapperSlider("Wave Intensity Power", iSection);
-	rScreen.WrapperSlider("Wave Falloff Power", iSection);
+	rScreen.WrapperSlider("Hex Shield Wave Multiplier", iSection, 2.0f, "Wave Multiplier");
+	rScreen.WrapperSlider("Hex Shield Wave Dot Multiplier", iSection, 2.0f, "Wave Dot");
+	rScreen.WrapperSlider("Hex Shield Wave Intensity Multiplier", iSection, 2.0f, "Wave Intensity");
+	rScreen.WrapperSlider("Hex Shield Wave Intensity Power", iSection, 2.0f, "Wave Intensity Power");
+	rScreen.WrapperSlider("Hex Shield Wave Falloff Power", iSection, 2.0f, "Wave Falloff Power");
 
 	rScreen.WrapperSeparatorText("Direction");
-	rScreen.WrapperSlider("Direction Falloff Power", iSection);
-	rScreen.WrapperSlider("Direction Multiplier", iSection);
+	rScreen.WrapperSlider("Hex Shield Direction Falloff Power", iSection, 2.0f, "Direction Falloff Power");
+	rScreen.WrapperSlider("Hex Shield Direction Multiplier", iSection, 2.0f, "Direction Multiplier");
 }
 
 } // namespace engine

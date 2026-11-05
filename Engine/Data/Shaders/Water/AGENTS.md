@@ -63,6 +63,17 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 
 ## Lighting Contracts
 
+- Skybox One selects every integer count 1..9 (default 2), reusing the original
+  center highlight plus count-minus-one evenly spaced clock-ring points starting
+  at 12 o'clock clockwise. Sample Radius ranges from 0 to 1 screen pixel
+  (default 0.5); zero collapses the effective count to one. Count one or Sample
+  Blend zero skips extra sampling. Blend mixes the center with the mean of
+  independently reconstructed highlights after positive-domain authored power;
+  nonpositive factors contribute zero and remain in the total denominator.
+  Capture position and geometry-normal derivatives before terrain rejection and
+  sample branches; every normal sample uses the original full-pixel unwrapped
+  gradients, independently of Radius. Two, Three, cubemap color, and other water
+  shading retain center inputs.
 - Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height lighting and smoke projections keep the true eye line (`ToEyeLine`).

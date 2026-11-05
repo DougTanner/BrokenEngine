@@ -6,7 +6,7 @@ struct WaterSpecularResult
 	float fReflection;
 };
 
-WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult, vec3 f3ToEyeNormal, vec3 f3InNormal, vec3 f3SunOrMoon, float fTerrainElevation)
+WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult, vec3 f3ToEyeNormal, vec3 f3InNormal, vec3 f3SunOrMoon, float fTerrainElevation, vec2 f2InitialPosition, vec2 f2InitialDx, vec2 f2InitialDy, vec3 f3NormalDx, vec3 f3NormalDy)
 {
 	WaterSpecularResult result = WaterSpecularResult(vec3(0.0f), vec3(0.0f), 0.0f, 0.0f);
 
@@ -29,17 +29,43 @@ WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult,
 	float fIntensityThree = mainLayout.fLightingWaterSkyboxThree * (1.0f - fBeachBlend * mainLayout.fLightingWaterSkyboxThreeBeachReduction);
 	float fPowerThree = mainLayout.fLightingWaterSkyboxThreePower;
 	float fSpecularSum = 0.0f;
+	float fSpecularOne = 0.0f;
 	vec3 f3LightReflectionNormal = reflect(f3BiasedSunNormal, reflect(f3ToEyeNormal, f3SkyboxWaveNormal));
 	float fSpecularFactor = dot(vec3(-1.0f, 1.0f, -1.0f) * f3ToEyeNormal, f3LightReflectionNormal);
 
 	if (fSpecularFactor > 0.0f)
 	{
 		float fSpecularLog2 = log2(fSpecularFactor);
+		fSpecularOne = exp2(fPowerOne * fSpecularLog2);
 		fSpecularSum =
-			fIntensityOne   * exp2(fPowerOne   * fSpecularLog2) +
 			fIntensityTwo   * exp2(fPowerTwo   * fSpecularLog2) +
 			fIntensityThree * exp2(fPowerThree * fSpecularLog2);
 	}
+
+	int iSampleCount = mainLayout.iLightingWaterSkyboxOneSampleCount;
+	if (iSampleCount > 1 && mainLayout.fLightingWaterSkyboxOneSampleBlend > 0.0f)
+	{
+		float fSampleSum = fSpecularOne;
+		for (int i = 0; i < iSampleCount - 1; ++i)
+		{
+			vec2 f2SampleOffset = mainLayout.pf2LightingWaterSkyboxOneSampleOffsets[i];
+			vec2 f2SamplePosition = f2InitialPosition + f2SampleOffset.x * f2InitialDx + f2SampleOffset.y * f2InitialDy;
+			WaterNormalSamplingResult sampleNormalResult = SampleWaterNormals(f2SamplePosition, f2InitialDx, f2InitialDy);
+			vec3 f3SampleToEyeNormal = normalize(vec3(-f2SamplePosition, mainLayout.f4WaterEyePosition.z));
+			f3SampleToEyeNormal = normalize(mix(f3SampleToEyeNormal, vec3(0.0f, 0.0f, 1.0f), globalLayout.fLightingWaterSkyboxNormalSoften));
+			vec3 f3SampleGeometryNormal = normalize(f3InNormal + f2SampleOffset.x * f3NormalDx + f2SampleOffset.y * f3NormalDy);
+			vec3 f3SampleSkyboxWaveNormal = normalize((1.0f - fSkyboxNormalBlendWave) * sampleNormalResult.f3SampledNormal + fSkyboxNormalBlendWave * f3SampleGeometryNormal);
+			vec3 f3SampleLightReflectionNormal = reflect(f3BiasedSunNormal, reflect(f3SampleToEyeNormal, f3SampleSkyboxWaveNormal));
+			float fSampleFactor = dot(vec3(-1.0f, 1.0f, -1.0f) * f3SampleToEyeNormal, f3SampleLightReflectionNormal);
+			if (fSampleFactor > 0.0f)
+			{
+				fSampleSum += exp2(fPowerOne * log2(fSampleFactor));
+			}
+		}
+		float fSampleMean = fSampleSum * mainLayout.fLightingWaterSkyboxOneSampleCountInverse;
+		fSpecularOne = mix(fSpecularOne, fSampleMean, mainLayout.fLightingWaterSkyboxOneSampleBlend);
+	}
+	fSpecularSum += fIntensityOne * fSpecularOne;
 	result.fReflection = mainLayout.fLightingWaterSkyboxIntensity * result.fReflectionTerrainMultiplier * fSpecularSum;
 	return result;
 }

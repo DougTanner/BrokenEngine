@@ -54,6 +54,11 @@ extern Wrapper gLightingWaterSkyboxThreeNight;
 extern Wrapper gLightingWaterSkyboxThreePower;
 extern Wrapper gLightingWaterSkyboxLevelOfDetail;
 
+// Specular - Skybox One Sampling
+extern Wrapper gWaterSkyboxOneSampleCount;
+extern Wrapper gWaterSkyboxOneSampleRadius;
+extern Wrapper gWaterSkyboxOneSampleBlend;
+
 // Specular - Height Darken
 extern Wrapper gWaterHeightDarkenTop;
 extern Wrapper gWaterHeightDarkenBottom;

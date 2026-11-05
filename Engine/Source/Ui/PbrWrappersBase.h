@@ -5,31 +5,31 @@
 namespace engine
 {
 
-extern Wrapper gPhysicallyBasedRenderingSun;
-extern Wrapper gPhysicallyBasedRenderingDayBrightness;
-extern Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse;
-extern Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower;
-extern Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular;
-extern Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower;
-extern Wrapper gPhysicallyBasedRenderingExposure;
-extern Wrapper gPhysicallyBasedRenderingGamma;
+extern Wrapper gPbrSun;
+extern Wrapper gPbrDayBrightness;
+extern Wrapper gPbrBrdfDiffuse;
+extern Wrapper gPbrBrdfDiffusePower;
+extern Wrapper gPbrBrdfSpecular;
+extern Wrapper gPbrBrdfSpecularPower;
+extern Wrapper gPbrExposure;
+extern Wrapper gPbrGamma;
 extern Wrapper gColorGradingSaturation;
 extern Wrapper gColorGradingContrast;
 extern Wrapper gColorGradingTemperature;
-extern Wrapper gPhysicallyBasedRenderingLightingSpecular;
-extern Wrapper gPhysicallyBasedRenderingLightingSpecularPower;
-extern Wrapper gPhysicallyBasedRenderingLighting;
-extern Wrapper gPhysicallyBasedRenderingLightingPower;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingAmbient;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingDiffuse;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingDiffusePower;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingSpecular;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingSpecularPower;
-extern Wrapper gPhysicallyBasedRenderingImageBasedLightingShadowBlend;
-extern Wrapper gPhysicallyBasedRenderingCubemapLevelOfDetailPower;
-extern Wrapper gPhysicallyBasedRenderingCubemapLevelOfDetailOffset;
-extern Wrapper gPhysicallyBasedRenderingShadowFloor;
-extern Wrapper gPhysicallyBasedRenderingSmoke;
-extern Wrapper gPhysicallyBasedRenderingEmissive;
+extern Wrapper gPbrLightingSpecular;
+extern Wrapper gPbrLightingSpecularPower;
+extern Wrapper gPbrLighting;
+extern Wrapper gPbrLightingPower;
+extern Wrapper gPbrIblAmbient;
+extern Wrapper gPbrIblDiffuse;
+extern Wrapper gPbrIblDiffusePower;
+extern Wrapper gPbrIblSpecular;
+extern Wrapper gPbrIblSpecularPower;
+extern Wrapper gPbrIblShadowBlend;
+extern Wrapper gPbrCubemapLodPower;
+extern Wrapper gPbrCubemapLodOffset;
+extern Wrapper gPbrShadowFloor;
+extern Wrapper gPbrSmoke;
+extern Wrapper gPbrEmissive;
 
 } // namespace engine

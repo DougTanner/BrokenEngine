@@ -99,9 +99,9 @@ adding the fields below; the other entries are its own commands. For the engine
 
   `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a
   value that duplicates another frame's or ship's identity gives odd behavior
-  but no assert. Positions are also unchecked, apart from a ship's height, which
-  its `PostRead` hook rejects outside the lowest-to-highest flight-plane
-  heights, and a flying (neither falling nor dying) missile's height and
+  but no assert. Positions are also unchecked, apart from a ship's height under
+  the [shared ship read admission](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants),
+  and a flying (neither falling nor dying) missile's height and
   velocity z, which the save reader requires to be finite and 0 respectively.
   Positions must stay inside the cell: an out-of-cell omni position
   transfers to one edge neighbour, so a position more than one neighbour step out

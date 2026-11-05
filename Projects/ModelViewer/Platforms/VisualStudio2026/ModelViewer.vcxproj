@@ -23,7 +23,7 @@
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <Import Project="$(ProjectDir)Build\ResolvedData.props" Condition="exists('$(ProjectDir)Build\ResolvedData.props')" />
+  <Import Project="$(ProjectDir)Build\ResolvedData.props" Condition="$([System.IO.File]::Exists('$(ProjectDir)..\..\..\..\.git')) and exists('$(ProjectDir)Build\ResolvedData.props')" />
   <PropertyGroup>
     <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
     <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>

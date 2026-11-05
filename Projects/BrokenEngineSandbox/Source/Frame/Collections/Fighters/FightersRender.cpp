@@ -13,7 +13,7 @@ namespace game
 {
 
 // One model per ShipController, also used for animation lookup.
-extern const common::crc_t kFighterFleetModel = data::kModelsLightFighterSpaceshipscenegltfCrc;
+extern const common::crc_t kFighterFleetModel = data::kModelsRavenStarConflictV2scenegltfCrc;
 extern const common::crc_t kFighterRandomModel = data::kModelsSpaceshipscenegltfCrc;
 
 constexpr float kfRoll = 0.2f;

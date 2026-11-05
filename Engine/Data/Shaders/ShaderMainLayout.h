@@ -54,6 +54,12 @@ struct MainLayout
 	float fLightingWaterSkyboxIntensity INIT;
 	float fLightingWaterSkyboxAdd INIT;
 	float fLightingWaterSkyboxOnePower INIT;
+	int32_t iLightingWaterSkyboxOneSampleCount INIT;
+	// CPU folds clock angles and pixel radius into offsets and the effective total into its reciprocal;
+	// position and geometry-normal derivatives remain raw per fragment, with full-pixel texture gradients.
+	vec2 pf2LightingWaterSkyboxOneSampleOffsets[8] INIT;
+	float fLightingWaterSkyboxOneSampleCountInverse INIT;
+	float fLightingWaterSkyboxOneSampleBlend INIT;
 	float fLightingWaterSkyboxTwo INIT;
 	float fLightingWaterSkyboxTwoPower INIT;
 	float fLightingWaterSkyboxThree INIT;

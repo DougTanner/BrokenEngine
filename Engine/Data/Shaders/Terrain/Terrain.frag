@@ -167,9 +167,8 @@ void main()
 
 	// Sample each flight plane's smoke at that plane's eye-ray projected position, lowest first so the plane nearest the
 	// eye blends last; plane k is lit by lighting layer k's ambient at that same position, which is where the blend above
-	// read it, so a layer the blend skipped is read here only where its plane's smoke shows. Every plane is shadowed by the
-	// object shadow above it at the base-height projected position, read once because that position does not vary with
-	// the plane.
+	// read it, so a layer the blend skipped is read here only where its plane's smoke shows. Only plane 0 receives the
+	// combined object shadow at the base-height projected position.
 	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
@@ -185,6 +184,6 @@ void main()
 		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? f4SmokeObjectShadows.x : 1.0f);
 	}
 }

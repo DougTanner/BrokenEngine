@@ -104,3 +104,10 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
   `Engine/Source/Server/AGENTS.md` `## Monitor Channel`,
   `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`,
   `Engine/Source/Agent/AGENTS.md` `## Architecture`.
+
+## Accronyms
+
+DP - DataPacker
+MV - ModelViewer
+BES - BrokenEngineSandbox
+CT - Coretide

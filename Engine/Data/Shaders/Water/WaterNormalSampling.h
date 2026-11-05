@@ -10,7 +10,7 @@ struct WaterNormalSamplingResult
 	vec3 f3SampledNormal;
 };
 
-WaterNormalSamplingResult SampleWaterNormals()
+WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2LocalDx, vec2 f2LocalDy)
 {
 	WaterNormalSamplingResult result;
 
@@ -23,8 +23,6 @@ WaterNormalSamplingResult SampleWaterNormals()
 	vec2 f2ReducedTime = vec2(globalLayout.fWaterReducedNormalTimeX, globalLayout.fWaterReducedNormalTimeY);
 	vec2 f2ReducedTimeTwo = vec2(globalLayout.fWaterReducedNormalTimeTwoX, globalLayout.fWaterReducedNormalTimeTwoY);
 	vec2 f2ReducedTimeThree = vec2(globalLayout.fWaterReducedNormalTimeThreeX, globalLayout.fWaterReducedNormalTimeThreeY);
-	vec2 f2LocalDx = dFdx(f2InInitialPosition);
-	vec2 f2LocalDy = dFdy(f2InInitialPosition);
 
 	// Per-sample weights resolved CPU-side by camera framing (LightingUniforms.cpp), then weighted-sum-then-normalize.
 	// normalize() is scale-invariant so absolute weight magnitudes don't matter; only ratios do. Weight 0 disables a
@@ -42,7 +40,7 @@ WaterNormalSamplingResult SampleWaterNormals()
 	{ \
 		float fCallSize = sizeMult * size; \
 		vec2 f2UV = offset \
-			+ fCallSize * (m2UvRot * f2InInitialPosition) \
+			+ fCallSize * (m2UvRot * f2InitialPosition) \
 			+ sizeMult * reducedOrigin \
 			+ speedMult * reducedTime; \
 		vec2 f2Dx = fCallSize * (m2UvRot * f2LocalDx); \

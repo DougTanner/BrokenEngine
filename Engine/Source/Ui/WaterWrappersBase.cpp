@@ -56,6 +56,11 @@ Wrapper gLightingWaterSkyboxThreeNight(475.0f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
 Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
 
+// Specular - Skybox One Sampling
+Wrapper gWaterSkyboxOneSampleCount(2, std::vector<int32_t> {1, 2, 3, 4, 5, 6, 7, 8, 9});
+Wrapper gWaterSkyboxOneSampleRadius(0.5f, 0.0f, 1.0f);
+Wrapper gWaterSkyboxOneSampleBlend(1.0f, 0.0f, 1.0f);
+
 // Specular - Height Darken
 Wrapper gWaterHeightDarkenTop(0.05f, -0.1f, 0.05f);
 Wrapper gWaterHeightDarkenBottom(-0.1f, -0.5f, 0.0f);

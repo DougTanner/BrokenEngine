@@ -46,38 +46,38 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionShadow;
 
 	rScreen.WrapperSeparatorText("Quality / Perf");
-	rScreen.WrapperSlider("Resolution", iSection);
-	rScreen.WrapperSlider("Texel Contraction Speed", iSection, 2.0f, "Shadow Texel Ramp Speed");
-	rScreen.WrapperSlider("Temporal Blend", iSection, 2.0f, "Shadow Temporal Blend");
-	rScreen.WrapperSlider("Update Cadence", iSection, 2.0f, "Shadow Update Cadence");
+	rScreen.WrapperSlider("Shadow Render Multiplier", iSection, 2.0f, "Resolution");
+	rScreen.WrapperSlider("Shadow Texel Ramp Meters Per Second", iSection, 2.0f, "Shadow Texel Ramp Speed");
+	rScreen.WrapperSlider("Shadow Temporal Blend", iSection, 2.0f, "Shadow Temporal Blend");
+	rScreen.WrapperSlider("Shadow Update Cadence", iSection, 2.0f, "Shadow Update Cadence");
 
 	rScreen.WrapperSeparatorText("Feather");
-	rScreen.WrapperSlider("Feather Noon", iSection);
-	rScreen.WrapperSlider("Feather Noon Offset", iSection);
-	rScreen.WrapperSlider("Feather Sunset", iSection);
-	rScreen.WrapperSlider("Feather Sunset Offset", iSection);
-	rScreen.WrapperSlider("Feather Power", iSection);
-	rScreen.WrapperSlider("Distance Falloff", iSection);
-	rScreen.WrapperSlider("Blur Sigma", iSection);
-	rScreen.WrapperSlider("Affect Ambient", iSection);
-	rScreen.WrapperSlider("Height Fade Top", iSection);
-	rScreen.WrapperSlider("Height Fade Bottom", iSection);
+	rScreen.WrapperSlider("Shadow Feather Noon", iSection, 2.0f, "Feather Noon");
+	rScreen.WrapperSlider("Shadow Feather Noon Offset", iSection, 2.0f, "Feather Noon Offset");
+	rScreen.WrapperSlider("Shadow Feather Sunset", iSection, 2.0f, "Feather Sunset");
+	rScreen.WrapperSlider("Shadow Feather Sunset Offset", iSection, 2.0f, "Feather Sunset Offset");
+	rScreen.WrapperSlider("Shadow Feather Power", iSection, 2.0f, "Feather Power");
+	rScreen.WrapperSlider("Shadow Distance Falloff", iSection, 2.0f, "Distance Falloff");
+	rScreen.WrapperSlider("Shadow Blur Sigma", iSection, 2.0f, "Blur Sigma");
+	rScreen.WrapperSlider("Shadow Affect Ambient", iSection, 2.0f, "Affect Ambient");
+	rScreen.WrapperSlider("Shadow Height Fade Top", iSection, 2.0f, "Height Fade Top");
+	rScreen.WrapperSlider("Shadow Height Fade Bottom", iSection, 2.0f, "Height Fade Bottom");
 
 	rScreen.WrapperSeparatorText("Object Shadows");
-	rScreen.WrapperSlider("Render Multiplier", iSection);
-	rScreen.WrapperSlider("Blur Multiplier", iSection);
-	rScreen.WrapperSlider("Shadow Noon", iSection);
-	rScreen.WrapperSlider("Shadow Sunset", iSection);
-	rScreen.WrapperSlider("Sunset Stretch", iSection);
-	rScreen.WrapperSlider("Stretch Power", iSection);
-	rScreen.WrapperSlider("Object Blur Sigma Low", iSection);
-	rScreen.WrapperSlider("Object Blur Sigma High", iSection);
-	rScreen.WrapperSlider("Object Blur Radius Noon", iSection);
-	rScreen.WrapperSlider("Object Blur Radius Sunset", iSection);
-	rScreen.WrapperSlider("Terrain Shadow Height Fade", iSection);
-	rScreen.WrapperSlider("Underwater Fade", iSection);
-	rScreen.WrapperSlider("Bottom Smoke Shadow Intensity", iSection);
-	rScreen.WrapperSlider("Top Smoke Shadow Intensity", iSection);
+	rScreen.WrapperSlider("Object Shadows Render Multiplier", iSection, 2.0f, "Render Multiplier");
+	rScreen.WrapperSlider("Object Shadows Blur Multiplier", iSection, 2.0f, "Blur Multiplier");
+	rScreen.WrapperSlider("Object Shadows Noon", iSection, 2.0f, "Shadow Noon");
+	rScreen.WrapperSlider("Object Shadows Sunset", iSection, 2.0f, "Shadow Sunset");
+	rScreen.WrapperSlider("Object Shadows Sunset Stretch", iSection, 2.0f, "Sunset Stretch");
+	rScreen.WrapperSlider("Object Shadows Stretch Power", iSection, 2.0f, "Stretch Power");
+	rScreen.WrapperSlider("Object Shadows Blur Sigma Low", iSection, 2.0f, "Object Blur Sigma Low");
+	rScreen.WrapperSlider("Object Shadows Blur Sigma High", iSection, 2.0f, "Object Blur Sigma High");
+	rScreen.WrapperSlider("Object Shadows Blur Radius Noon", iSection, 2.0f, "Object Blur Radius Noon");
+	rScreen.WrapperSlider("Object Shadows Blur Radius Sunset", iSection, 2.0f, "Object Blur Radius Sunset");
+	rScreen.WrapperSlider("Object Shadows Terrain Shadow Fade", iSection, 2.0f, "Terrain Shadow Height Fade");
+	rScreen.WrapperSlider("Object Shadows Underwater Fade", iSection, 2.0f, "Underwater Fade");
+	rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", iSection, 2.0f, "Bottom Smoke Shadow Intensity");
+	rScreen.WrapperSlider("Smoke Shadow Intensity Top", iSection, 2.0f, "Top Smoke Shadow Intensity");
 }
 
 } // namespace engine

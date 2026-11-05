@@ -34,15 +34,12 @@ void InitializeShipHitboxes()
 			rHitbox.fMaximumZ = rOutline.fMaximumZ;
 			rHitbox.iHullVertexCount = rOutline.iHullVertexCount;
 
-			// The exact quarter turn (x, y) -> (-y, x) takes a -Y-facing model into the +X-forward frame and keeps the hull CCW.
 			XMFLOAT2 f2BoxMinimum {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
 			XMFLOAT2 f2BoxMaximum {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
 			float fHullLengthSquared = 0.0f;
 			for (int64_t k = 0; k < rHitbox.iHullVertexCount; ++k)
 			{
-				float fX = rOutline.pf2HullVertices[k].x;
-				float fY = rOutline.pf2HullVertices[k].y;
-				XMFLOAT2 f2Vertex = rType.bFacesNegativeY ? XMFLOAT2 {-fY, fX} : XMFLOAT2 {fX, fY};
+				XMFLOAT2 f2Vertex = rOutline.pf2HullVertices[k];
 				rHitbox.pf2HullVertices[k] = f2Vertex;
 				f2BoxMinimum.x = std::min(f2BoxMinimum.x, f2Vertex.x);
 				f2BoxMinimum.y = std::min(f2BoxMinimum.y, f2Vertex.y);

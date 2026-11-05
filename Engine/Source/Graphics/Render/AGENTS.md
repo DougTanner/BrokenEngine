@@ -51,9 +51,9 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - Every latch assumes its entry point runs exactly once per frame. Hosts invoke `RenderWaterMain` in `WaterUniforms.cpp` once per frame from their water-rendering path to publish Main water data. Main wave phases use the supplied elapsed time; water's reduced-time accumulation remains on the Global publication path.
 - The whole day cycle resolves on the CPU in `GlobalUniforms.cpp`: sun and moon angle and direction, the piecewise color and ambient ramps, the separate night-gate and moon envelopes, and every product of those that more than one shader reads. Shaders only read the finished uniform values, so a new day-cycle term belongs here rather than recomputed per pixel.
 
-- Water skybox component night inputs replace their daytime inputs whenever the
-  moon envelope is nonzero. Component 1 retains its daytime boost only while
-  the daytime input is selected.
+- Water skybox components blend continuously from their daytime inputs to their
+  night inputs using the moon envelope. Component 1's daytime endpoint includes
+  its daytime boost.
 
 ## Precision and History
 

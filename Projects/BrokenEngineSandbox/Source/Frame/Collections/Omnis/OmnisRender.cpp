@@ -15,7 +15,7 @@ namespace game
 {
 
 // One model per ShipController, also used for animation lookup.
-extern const common::crc_t kOmniFleetModel = data::kModelsspaceship2scenegltfCrc;
+extern const common::crc_t kOmniFleetModel = data::kModelsSpaceGliderGltfscenegltfCrc;
 extern const common::crc_t kOmniRandomModel = data::kModelsSpaceFighterscenegltfCrc;
 
 constexpr float kfDeathShrinkPower = 2.0f;
@@ -176,7 +176,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 
 		auto matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 		auto matTranslation = XMMatrixTranslationFromVector(vecPosition);
-		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
+		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
 		auto matInstanceTransform = matScaling * matRotationZ * matRotationAccelerationX * matRotationAccelerationY * matTranslation;

@@ -19,16 +19,14 @@ struct ShipHitboxType
 	std::array<common::crc_t, kiShipControllerCount> models {};
 	float fGameplayRadius = 0.0f;
 	float fPusherRadiusScale = 0.0f;
-	// The model's forward axis before yaw: -Y for Omnis, +X for Fighters and Battleships.
-	bool bFacesNegativeY = false;
 };
 
 // Indexed by ShipType; models by ShipController, matching each type's Render model table.
 inline constexpr std::array<ShipHitboxType, kiShipTypeCount> kShipHitboxTypes
 {
-	ShipHitboxType {.models = {data::kModelsLightFighterSpaceshipscenegltfMODELCrc, data::kModelsSpaceshipscenegltfMODELCrc}, .fGameplayRadius = kfFighterRadius, .fPusherRadiusScale = 1.5f, .bFacesNegativeY = false},
-	ShipHitboxType {.models = {data::kModelsspaceship2scenegltfMODELCrc, data::kModelsSpaceFighterscenegltfMODELCrc}, .fGameplayRadius = kfOmniRadius, .fPusherRadiusScale = 1.5f, .bFacesNegativeY = true},
-	ShipHitboxType {.models = {data::kModelsBattleshipJesterz86scenegltfMODELCrc, data::kModelsSpaceBattleshipAquamarinescenegltfMODELCrc}, .fGameplayRadius = kfBattleshipRadius, .fPusherRadiusScale = 1.5f, .bFacesNegativeY = false},
+	ShipHitboxType {.models = {data::kModelsRavenStarConflictV2scenegltfMODELCrc, data::kModelsSpaceshipscenegltfMODELCrc}, .fGameplayRadius = kfFighterRadius, .fPusherRadiusScale = 1.5f},
+	ShipHitboxType {.models = {data::kModelsSpaceGliderGltfscenegltfMODELCrc, data::kModelsSpaceFighterscenegltfMODELCrc}, .fGameplayRadius = kfOmniRadius, .fPusherRadiusScale = 1.5f},
+	ShipHitboxType {.models = {data::kModelsBattleshipJesterz86scenegltfMODELCrc, data::kModelsSpaceBattleshipAquamarinescenegltfMODELCrc}, .fGameplayRadius = kfBattleshipRadius, .fPusherRadiusScale = 1.5f},
 };
 
 // One controller's shape at gameplay size, facing +X, centered on the ship, with z relative to its height.

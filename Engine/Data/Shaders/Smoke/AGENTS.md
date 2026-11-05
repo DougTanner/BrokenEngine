@@ -5,10 +5,11 @@ follows the camera on its own held world rectangle and refreshes on its own
 frames. Objects deposit into the fields, two compute passes advect and diffuse
 each plane's field, and world shaders sample the planes, lowest first, through
 shared smoke helpers, lighting plane k's smoke with lighting layer k; Model
-(`../Model/AGENTS.md`) owns which planes a model samples. Each plane's smoke
-has its sun/moon and ambient base lighting multiplied by the object shadow of
-ships on the planes above it (channel layout: `../Shadow/AGENTS.md`
-`## Overview`); point-light and explosion lighting on smoke stays unshadowed.
+(`../Model/AGENTS.md`) owns which planes a model samples. Only plane 0's smoke
+has its sun/moon and ambient base lighting multiplied by combined object-shadow
+R, covering both ground blur layers (channel layout: `../Shadow/AGENTS.md`
+`## Overview`); higher smoke planes receive no object shadow. Point-light and
+explosion lighting on smoke stays unshadowed.
 Terrain and water read that shadow at the base-height (plane-0) projection, and
 models at the fragment.
 

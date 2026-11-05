@@ -284,7 +284,8 @@ BrokenEngineSandbox owns the viewer's generated data and packed identity.
 Sandbox data headers are permitted; sandbox Source headers are not viewer host
 contracts. Viewer Source has include precedence over engine headers.
 
-The project imports ignored resolved data properties written by `/compile` and
+In linked worktrees, the project imports ignored resolved data properties written by `/compile`.
+Ordinary primary-checkout builds automatically pack Sandbox data. The project
 generates its default-root header from the effective build properties. The host
 must assign that root to LaunchOptions before FileManager construction. Direct
 launch and configured Visual Studio builds use the same root. Output, intermediate

@@ -60,28 +60,28 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Decay");
-				rScreen.WrapperSlider("Smoke Max", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Maximum", iSection, 1.0f, "Smoke Max");
 				rScreen.WrapperSlider("Smoke Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Decay", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Edge Decay Distance", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Update Cadence", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Color");
-				rScreen.WrapperSlider("Smoke Color Min", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Color Minimum", iSection, 1.0f, "Smoke Color Min");
 				rScreen.WrapperSlider("Smoke Color Multiplier", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Lighting Multiplier", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Shadow");
-				rScreen.WrapperSlider("Bottom Smoke Shadow Intensity", iSection, 1.0f);
-				rScreen.WrapperSlider("Top Smoke Shadow Intensity", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", iSection, 1.0f, "Bottom Smoke Shadow Intensity");
+				rScreen.WrapperSlider("Smoke Shadow Intensity Top", iSection, 1.0f, "Top Smoke Shadow Intensity");
 
 				rScreen.WrapperSeparatorText("Noise");
 				rScreen.WrapperSlider("Smoke Noise Scale One", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Scale Two", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Wind Noise Scale", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Quantity", iSection, 1.0f);
-				rScreen.WrapperSlider("Bottom Smoke Wind Noise Quantity", iSection, 1.0f);
-				rScreen.WrapperSlider("Top Smoke Wind Noise Quantity", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Wind Noise Quantity Bottom", iSection, 1.0f, "Bottom Smoke Wind Noise Quantity");
+				rScreen.WrapperSlider("Smoke Wind Noise Quantity Top", iSection, 1.0f, "Top Smoke Wind Noise Quantity");
 				rScreen.WrapperSlider("Smoke Curl Strength Low", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Strength High", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Curl Scale", iSection, 1.0f);

@@ -72,9 +72,10 @@ The build invocation derives the mode, both directories, and the four `DataBuild
 ModelViewer uses this same resolution and generation flow with BrokenEngineSandbox
 as data owner, including selective builds. Its project generates an ignored
 `Build/ModelViewerDataRoot.h` from the resolved directory. The invocation also
-writes `Projects/ModelViewer/Platforms/VisualStudio2026/Build/ResolvedData.props`, which the
-viewer project imports so configured Visual Studio builds retain the same data
-mode, generated-header root and default launch root. The viewer's identity never
+writes `Projects/ModelViewer/Platforms/VisualStudio2026/Build/ResolvedData.props`.
+Project import and packing behavior is documented in
+[ModelViewer build and data ownership](../../../../Projects/ModelViewer/AGENTS.md#build-and-data-ownership).
+The viewer's identity never
 changes pack names or export inputs. Viewer builds do not write sandbox harness
 Shared-data records.
 

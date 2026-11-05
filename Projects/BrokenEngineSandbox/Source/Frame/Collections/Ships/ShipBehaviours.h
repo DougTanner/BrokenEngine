@@ -72,6 +72,10 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 // arrival and kuiNoFlightPlane in transit.
 [[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, int64_t iClearanceTier, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
 
+// Raises a type that allows the next plane to terrain plus the lowest plane's clearance, without changing XY/W.
+// A raised position stores its exact effective plane, or kuiNoFlightPlane between or above planes.
+[[nodiscard]] XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane);
+
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 
 // The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.

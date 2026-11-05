@@ -352,6 +352,10 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
 		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kOmni, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kOmni), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime, uiFlightPlane);
+		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
+		{
+			vecPosition = RaiseAboveTerrain(rStaticData, ShipType::kOmni, rPreviousPostRender.pController[i], vecPosition, uiFlightPlane);
+		}
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -732,7 +736,9 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 		// Shield regeneration and pushes also run while transfer-locked. Terrain contact uses the sweep end's height.
 		float fHeight = XMVectorGetZ(rFrame.interpolate.pOmnis->pVecPositions[i]);
-		bool bTerrainContact = !SkipsTerrainContact(fHeight);
+		bool bTerrainContact = ((rPrevious.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) || !IsFlightPlaneAllowed(ShipType::kOmni, 1))
+		                    && !SkipsTerrainContact(fHeight)
+		                    && (engine::gpFlightPlanes->Plane(NavigationFlightPlane(fHeight, GetTargetFlightPlane(orders))).flags & engine::FlightPlaneFlags::kTerrainCollision);
 		RegenerateShield(deltaTime, shieldCooldown, kfOmniShield, kfOmniShieldRegeneration, fShield);
 		if (bTerrainContact)
 		{
@@ -745,7 +751,11 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity, GetTargetFlightPlane(orders));
 		}
 		rFrame.interpolate.pOmnis->pVecPositions[i] = XMVectorSetX(rFrame.interpolate.pOmnis->pVecPositions[i], XMVectorGetX(rFrame.interpolate.pOmnis->pVecPositions[i]) + fPositionCorrectionX);
-		// Only the climb moves height.
+		if (!(rPrevious.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
+		{
+			rFrame.interpolate.pOmnis->pVecPositions[i] = RaiseAboveTerrain(rStaticData, ShipType::kOmni, rPrevious.pController[i], rFrame.interpolate.pOmnis->pVecPositions[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i]);
+		}
+		// Height changes step the position directly.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 
 		SetNavigationDirection(flags, iNavigationDirection);

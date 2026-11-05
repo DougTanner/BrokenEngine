@@ -98,7 +98,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
-	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
+	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
 	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
 	static void PostRead(const OmnisInterpolate& rCurrent)
 	{
@@ -110,7 +110,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 				throw std::ios_base::failure("OmnisInterpolate pDestroyedTimes");
 			}
 			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
-			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
+			if (!(std::isfinite(fHeight) && fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters))
 			{
 				throw std::ios_base::failure("OmnisInterpolate position height");
 			}

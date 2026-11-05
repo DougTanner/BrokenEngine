@@ -34,7 +34,7 @@ void main()
 {
 	// Coverage merged by MAX blending. R and G split ground coverage by ship height above the ground below it, between
 	// the lowest and highest flight-plane heights, and blur with Sigma Low and High, so the ground blur varies smoothly
-	// with height. B and A hold ships on flight planes 1 and 2 only, for shadows on ships and smoke below them; nothing
+	// with height. B and A hold ships on flight planes 1 and 2 only, for shadows on ships below them; nothing
 	// reads plane 0's.
 	float fHeightFraction = clamp(fInHeightAboveBase * globalLayout.fObjectShadowsBlurHeightRangeInverse, 0.0f, 1.0f);
 	float fUnderwaterFade = clamp(1.0f + f3InWorldPosition.z * globalLayout.fObjectShadowsUnderwaterFadeInverse, 0.0f, 1.0f);

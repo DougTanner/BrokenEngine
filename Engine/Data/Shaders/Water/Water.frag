@@ -43,15 +43,13 @@ layout (location = 0) out vec4 f4OutColor;
 
 void main()
 {
+	vec2 f2InitialDx = dFdx(f2InInitialPosition);
+	vec2 f2InitialDy = dFdy(f2InInitialPosition);
+	vec3 f3NormalDx = dFdx(f3InNormal);
+	vec3 f3NormalDy = dFdy(f3InNormal);
 	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f3InPosition, globalLayout.f4VisibleArea);
 
 	float fTerrainElevation = texture(elevationTextureSampler, f2VisibleAreaTexcoord).x;
-	if (fTerrainElevation > 0.0f)
-	{
-		f4OutColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		discard;
-		return;
-	}
 
 	// Camera-relative to world-space reconstruction
 	vec2 f2WaterOrigin = vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
@@ -66,7 +64,14 @@ void main()
 	vec3 f3ToEyeNormal = normalize(vec3(-f2InInitialPosition, mainLayout.f4WaterEyePosition.z));
 	f3ToEyeNormal = normalize(mix(f3ToEyeNormal, vec3(0.0, 0.0, 1.0), globalLayout.fLightingWaterSkyboxNormalSoften));
 
-	WaterNormalSamplingResult normalResult = SampleWaterNormals();
+	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy);
+	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy);
+	if (fTerrainElevation > 0.0f)
+	{
+		f4OutColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+		discard;
+		return;
+	}
 
 	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).
 	// CPU stores fmod(freq*camera, 10.0) so mult * 10 must be integer for fract() to absorb the wrap.
@@ -113,13 +118,11 @@ void main()
 	vec3 f3DirectionalLighting = f3PreLightingColor * fDirectionalLighting;
 	vec3 f3LightingColor = mix(f3PreLightingColor, f3DirectionalLighting, 0.75f);
 	// GlobalUniforms.cpp folds max-combined water sun/moon color plus /3 sun and ambient scalars from uniform inputs;
-	// at noon f4MoonColor is near zero. Separate scalars keep fShadowAffectAmbient on ambient while f3SunOrMoon
-	// modulates skybox color.
-	vec3 f3SunOrMoon = globalLayout.f4WaterSunOrMoon.xyz;
+	// at noon f4MoonColor is near zero. Separate scalars keep fShadowAffectAmbient on ambient while the combined
+	// sun/moon color modulates skybox color.
 	float fSunScalar     = globalLayout.fWaterSunScalar;
 	float fAmbientScalar = globalLayout.fWaterAmbientScalar;
 
-	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, f3SunOrMoon, fTerrainElevation);
 	vec3 f3SkyboxColor = specularResult.f3SkyboxColor;
 	vec3 f3SkyboxColorSun = specularResult.f3SkyboxColorSun;
 	float fReflectionTerrainMultiplier = specularResult.fReflectionTerrainMultiplier;
@@ -229,9 +232,8 @@ void main()
 
 	// Blend smoke per flight plane, lowest first (precomputed direction-averaged ambient — matches Terrain.frag,
 	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
-	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Every plane
-	// is shadowed by the object shadow above it at the base-height projected position, read once because that position
-	// does not vary with the plane.
+	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Only plane 0
+	// receives the combined object shadow at the base-height projected position.
 	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
@@ -246,6 +248,6 @@ void main()
 		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, ObjectShadowAbove(f4SmokeObjectShadows, iPlane));
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? f4SmokeObjectShadows.x : 1.0f);
 	}
 }

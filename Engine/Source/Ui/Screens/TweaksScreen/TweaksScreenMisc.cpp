@@ -22,11 +22,11 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionMiscellaneous;
 
 	rScreen.WrapperSeparatorText("Misc");
-	rScreen.WrapperSlider("Debug Texture Range", iSection);
+	rScreen.WrapperSlider("Misc Debug Texture Linear Range", iSection, 2.0f, "Debug Texture Range");
 
 	WrapperToggle("Orthographic Projection", &gOrthographicProjection);
 	ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
-	rScreen.WrapperSlider("Vertical Field of View", iSection);
+	rScreen.WrapperSlider("Field of View", iSection, 2.0f, "Vertical Field of View");
 	rScreen.WrapperSlider("Camera Tilt", iSection);
 	ImGui::EndDisabled();
 }

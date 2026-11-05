@@ -39,9 +39,9 @@ static float ComputeNightEnvelope(float fSunAngle, float fRiseStart, float fRise
 	return 0.0f;
 }
 
-bool IsMoonOut(float fSunAngle)
+float MoonAmount(float fSunAngle)
 {
-	return ComputeNightEnvelope(fSunAngle, gSunMoonMoonriseStart.mfCurrent, gSunMoonMoonriseEnd.mfCurrent, gSunMoonMoonsetStart.mfCurrent, gSunMoonMoonsetEnd.mfCurrent) > 0.0f;
+	return ComputeNightEnvelope(fSunAngle, gSunMoonMoonriseStart.mfCurrent, gSunMoonMoonriseEnd.mfCurrent, gSunMoonMoonsetStart.mfCurrent, gSunMoonMoonsetEnd.mfCurrent);
 }
 
 // Sun/Moon direction + tilt: stores the normalized sky direction in f4SunMoonNormal and returns it so the
@@ -141,7 +141,7 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	// Moon: floor color modulated by the moonrise/moonset envelope. Per-target moon intensity
 	// sliders scale at shader read sites, not here.
 	// Moon color follows its own rise/set schedule, independent of the shadow night gate.
-	float fMoonAmount = ComputeNightEnvelope(fSunAngle, gSunMoonMoonriseStart.mfCurrent, gSunMoonMoonriseEnd.mfCurrent, gSunMoonMoonsetStart.mfCurrent, gSunMoonMoonsetEnd.mfCurrent);
+	float fMoonAmount = MoonAmount(fSunAngle);
 	XMVECTOR vecMoon = XMVectorScale(vecMoonFloor, fMoonAmount);
 	XMStoreFloat4(&rGlobalLayout.f4MoonColor, vecMoon);
 
@@ -197,8 +197,8 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	// products include Object intensity and fPhysicallyBasedRenderingSun. IBL uses separate unscaled Rec.709 luminance / fPhysicallyBasedRenderingDayBrightness so it stays linear in
 	// fPhysicallyBasedRenderingSun; scaling that luminance compounds to fPhysicallyBasedRenderingSun^3. The brightness reciprocal is intentionally unguarded.
 	XMVECTOR vecRecommendation709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
-	float fPhysicallyBasedRenderingSun = gPhysicallyBasedRenderingSun.mfCurrent;
-	float fPhysicallyBasedRenderingDayBrightnessInverse = 1.0f / gPhysicallyBasedRenderingDayBrightness.mfCurrent;
+	float fPhysicallyBasedRenderingSun = gPbrSun.mfCurrent;
+	float fPhysicallyBasedRenderingDayBrightnessInverse = 1.0f / gPbrDayBrightness.mfCurrent;
 	XMVECTOR vecPhysicallyBasedRenderingSunColorObjects = XMVectorScale(vecSunMoon, fSunIntensityObjects * fPhysicallyBasedRenderingSun);
 	XMVECTOR vecPhysicallyBasedRenderingMoonColorObjects = XMVectorScale(vecMoon, fMoonIntensityObjects * fPhysicallyBasedRenderingSun);
 	XMStoreFloat4(&rGlobalLayout.f4PhysicallyBasedRenderingSunColorObjects, vecPhysicallyBasedRenderingSunColorObjects);
@@ -244,7 +244,7 @@ static void PopulateSunAndLighting(shaders::GlobalLayout& rGlobalLayout, float f
 	// Smoke lighting multiplier folded with time-of-day (AddSmoke/BlendSmokePrecomputed): both inputs are known
 	// here (fSmokeLightingMultiplier source from RenderSmokeGlobal earlier this frame, time-of-day just above).
 	rGlobalLayout.fSmokeLightingCombinedMultiplier = fLightingTimeOfDayMultiplier * gSmokeLightingMultiplier.mfCurrent;
-	rGlobalLayout.fLightingWaterSkyboxOne = IsMoonOut(fSunAngle) ? gLightingWaterSkyboxOneNight.mfCurrent : gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent;
+	rGlobalLayout.fLightingWaterSkyboxOne = std::lerp(gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent, gLightingWaterSkyboxOneNight.mfCurrent, MoonAmount(fSunAngle));
 	// Skybox normal soften blends a sunrise/sunset (low-sun) value toward a noon value by the noon feather (1 at solar noon, 0 toward both horizons / night).
 	rGlobalLayout.fLightingWaterSkyboxNormalSoften = (1.0f - rfNoonPercent) * gLightingWaterSkyboxNormalSoftenSunrise.mfCurrent + rfNoonPercent * gLightingWaterSkyboxNormalSoftenNoon.mfCurrent;
 }

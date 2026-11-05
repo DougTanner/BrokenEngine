@@ -118,14 +118,14 @@ void GraphicsMenuScreen::Render()
 		// Left column: Display
 		ImGui::TableNextColumn();
 
-		ColumnSlider("Time of Day", &gSunAngleOverride);
-		ColumnSlider("Minimum Ambient", &gSunMoonMinimumAmbient, "%.4f");
+		ColumnSlider("Sun Angle Override", &gSunAngleOverride);
+		ColumnSlider("Sun Moon Minimum Ambient", &gSunMoonMinimumAmbient, "%.4f");
 
 		ImGui::Separator();
 
 		WrapperToggle("Orthographic Projection", &gOrthographicProjection);
 		ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());
-		ColumnSlider("Vertical Field of View", &gFieldOfView);
+		ColumnSlider("Field of View", &gFieldOfView);
 		ColumnSlider("Camera Tilt", &gCameraTilt);
 		ImGui::EndDisabled();
 
@@ -148,7 +148,7 @@ void GraphicsMenuScreen::Render()
 
 		WrapperToggle("Sample Shading", &gSampleShading);
 		ImGui::BeginDisabled(!gSampleShading.Get<bool>());
-		ColumnSlider("Min Sample Shading", &gMinimumSampleShading);
+		ColumnSlider("Minimum Sample Shading", &gMinimumSampleShading);
 		ImGui::EndDisabled();
 		ImGui::EndDisabled();
 
@@ -156,7 +156,7 @@ void GraphicsMenuScreen::Render()
 
 		WrapperToggle("Anisotropy", &gAnisotropy);
 		ImGui::BeginDisabled(!gAnisotropy.Get<bool>());
-		ColumnSlider("Max Anisotropy", &gMaximumAnisotropy);
+		ColumnSlider("Maximum Anisotropy", &gMaximumAnisotropy);
 		ImGui::EndDisabled();
 
 		ImGui::TableNextColumn();
@@ -170,7 +170,7 @@ void GraphicsMenuScreen::Render()
 		{
 			ApplyTerrainShadowsLevel();
 		}
-		ColumnSlider("Terrain Shadow Update Cadence", &gShadowUpdateCadence, "%.0f");
+		ColumnSlider("Shadow Update Cadence", &gShadowUpdateCadence, "%.0f");
 
 		ImGui::Separator();
 
@@ -191,7 +191,7 @@ void GraphicsMenuScreen::Render()
 		{
 			ApplySmokeDetailLevel();
 		}
-		ColumnSlider("Smoke Area", &gSmokeSimulationArea);
+		ColumnSlider("Smoke Simulation Area", &gSmokeSimulationArea);
 		ColumnSlider("Smoke Update Cadence", &gSmokeUpdateCadence, "%.0f");
 		WrapperToggle("Stagger Smoke Layer Updates", &gSmokeLayerStagger);
 		ImGui::EndDisabled();

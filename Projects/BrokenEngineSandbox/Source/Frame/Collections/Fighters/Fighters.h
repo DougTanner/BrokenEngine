@@ -72,7 +72,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kFighterDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
-	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
+	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
 	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
 	static void PostRead(const FightersInterpolate& rCurrent)
 	{
@@ -84,7 +84,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 				throw std::ios_base::failure("FightersInterpolate pDestroyedTimes");
 			}
 			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
-			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
+			if (!(std::isfinite(fHeight) && fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters))
 			{
 				throw std::ios_base::failure("FightersInterpolate position height");
 			}

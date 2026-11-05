@@ -184,7 +184,7 @@ struct PresentationContinuitySnapshot
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
 
-bool IsMoonOut(float fSunAngle);
+float MoonAmount(float fSunAngle);
 
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime);

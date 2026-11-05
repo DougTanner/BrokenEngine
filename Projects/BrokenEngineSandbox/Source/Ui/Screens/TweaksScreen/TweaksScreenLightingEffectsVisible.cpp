@@ -58,62 +58,62 @@ void RenderLightingEffectsVisibleTab(engine::TweaksScreen& rScreen)
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Explosions - Primary");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Explosion Primary Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Explosion Primary Visible Area Two");
-		rScreen.WrapperSlider("Visible Area Three", iSection, 1.0f, "Explosion Primary Visible Area Three");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Explosion Primary Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Explosion Primary Visible Intensity Two");
-		rScreen.WrapperSlider("Visible Int Three", iSection, 1.0f, "Explosion Primary Visible Intensity Three");
+		rScreen.WrapperSlider("Explosion Primary Visible Area One", iSection, 1.0f, "Explosion Primary Visible Area One");
+		rScreen.WrapperSlider("Explosion Primary Visible Area Two", iSection, 1.0f, "Explosion Primary Visible Area Two");
+		rScreen.WrapperSlider("Explosion Primary Visible Area Three", iSection, 1.0f, "Explosion Primary Visible Area Three");
+		rScreen.WrapperSlider("Explosion Primary Visible Intensity One", iSection, 1.0f, "Explosion Primary Visible Intensity One");
+		rScreen.WrapperSlider("Explosion Primary Visible Intensity Two", iSection, 1.0f, "Explosion Primary Visible Intensity Two");
+		rScreen.WrapperSlider("Explosion Primary Visible Intensity Three", iSection, 1.0f, "Explosion Primary Visible Intensity Three");
 
 		rScreen.WrapperSeparatorText("Explosions - Secondary");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Explosion Secondary Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Explosion Secondary Visible Area Two");
-		rScreen.WrapperSlider("Visible Area Three", iSection, 1.0f, "Explosion Secondary Visible Area Three");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Explosion Secondary Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Explosion Secondary Visible Intensity Two");
-		rScreen.WrapperSlider("Visible Int Three", iSection, 1.0f, "Explosion Secondary Visible Intensity Three");
+		rScreen.WrapperSlider("Explosion Secondary Visible Area One", iSection, 1.0f, "Explosion Secondary Visible Area One");
+		rScreen.WrapperSlider("Explosion Secondary Visible Area Two", iSection, 1.0f, "Explosion Secondary Visible Area Two");
+		rScreen.WrapperSlider("Explosion Secondary Visible Area Three", iSection, 1.0f, "Explosion Secondary Visible Area Three");
+		rScreen.WrapperSlider("Explosion Secondary Visible Intensity One", iSection, 1.0f, "Explosion Secondary Visible Intensity One");
+		rScreen.WrapperSlider("Explosion Secondary Visible Intensity Two", iSection, 1.0f, "Explosion Secondary Visible Intensity Two");
+		rScreen.WrapperSlider("Explosion Secondary Visible Intensity Three", iSection, 1.0f, "Explosion Secondary Visible Intensity Three");
 
 		rScreen.WrapperSeparatorText("Blasters - Terrain Crater");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Crater Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Crater Visible Area Two");
-		rScreen.WrapperSlider("Visible Area Three", iSection, 1.0f, "Crater Visible Area Three");
-		rScreen.WrapperSlider("Visible Area Four", iSection, 1.0f, "Crater Visible Area Four");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Crater Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Crater Visible Intensity Two");
-		rScreen.WrapperSlider("Visible Int Three", iSection, 1.0f, "Crater Visible Intensity Three");
-		rScreen.WrapperSlider("Visible Int Four", iSection, 1.0f, "Crater Visible Intensity Four");
+		rScreen.WrapperSlider("Crater Visible Area One", iSection, 1.0f, "Crater Visible Area One");
+		rScreen.WrapperSlider("Crater Visible Area Two", iSection, 1.0f, "Crater Visible Area Two");
+		rScreen.WrapperSlider("Crater Visible Area Three", iSection, 1.0f, "Crater Visible Area Three");
+		rScreen.WrapperSlider("Crater Visible Area Four", iSection, 1.0f, "Crater Visible Area Four");
+		rScreen.WrapperSlider("Crater Visible Intensity One", iSection, 1.0f, "Crater Visible Intensity One");
+		rScreen.WrapperSlider("Crater Visible Intensity Two", iSection, 1.0f, "Crater Visible Intensity Two");
+		rScreen.WrapperSlider("Crater Visible Intensity Three", iSection, 1.0f, "Crater Visible Intensity Three");
+		rScreen.WrapperSlider("Crater Visible Intensity Four", iSection, 1.0f, "Crater Visible Intensity Four");
 
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Omnis - Area Light");
-		rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Omni Area Light Visible Intensity");
+		rScreen.WrapperSlider("Omni Area Light Visible Intensity", iSection, 1.0f, "Omni Area Light Visible Intensity");
 
 		rScreen.WrapperSeparatorText("Omnis - Impact Light");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Omni Impact Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Omni Impact Visible Area Two");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Omni Impact Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Omni Impact Visible Intensity Two");
+		rScreen.WrapperSlider("Omni Impact Visible Area One", iSection, 1.0f, "Omni Impact Visible Area One");
+		rScreen.WrapperSlider("Omni Impact Visible Area Two", iSection, 1.0f, "Omni Impact Visible Area Two");
+		rScreen.WrapperSlider("Omni Impact Visible Intensity One", iSection, 1.0f, "Omni Impact Visible Intensity One");
+		rScreen.WrapperSlider("Omni Impact Visible Intensity Two", iSection, 1.0f, "Omni Impact Visible Intensity Two");
 
 		rScreen.WrapperSeparatorText("Omnis - Hex Shield");
-		rScreen.WrapperSlider("Intensity Decay", iSection, 1.0f, "Hex Shield Intensity Decay");
+		rScreen.WrapperSlider("Hex Shield Intensity Decay", iSection, 1.0f, "Hex Shield Intensity Decay");
 
 		rScreen.WrapperSeparatorText("Missiles - Exhaust");
-		rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Missile Exhaust Visible Intensity");
+		rScreen.WrapperSlider("Missile Exhaust Visible Intensity", iSection, 1.0f, "Missile Exhaust Visible Intensity");
 
 		rScreen.WrapperSeparatorText("Fighters - Hit Flash");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Hit Flash Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Hit Flash Visible Area Two");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Hit Flash Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Hit Flash Visible Intensity Two");
+		rScreen.WrapperSlider("Hit Flash Visible Area One", iSection, 1.0f, "Hit Flash Visible Area One");
+		rScreen.WrapperSlider("Hit Flash Visible Area Two", iSection, 1.0f, "Hit Flash Visible Area Two");
+		rScreen.WrapperSlider("Hit Flash Visible Intensity One", iSection, 1.0f, "Hit Flash Visible Intensity One");
+		rScreen.WrapperSlider("Hit Flash Visible Intensity Two", iSection, 1.0f, "Hit Flash Visible Intensity Two");
 
 		rScreen.WrapperSeparatorText("Fighters - Beam Impact");
-		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Fighter Beam Impact Visible Area One");
-		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Fighter Beam Impact Visible Area Two");
-		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Fighter Beam Impact Visible Intensity One");
-		rScreen.WrapperSlider("Visible Int Two", iSection, 1.0f, "Fighter Beam Impact Visible Intensity Two");
+		rScreen.WrapperSlider("Fighter Beam Impact Visible Area One", iSection, 1.0f, "Fighter Beam Impact Visible Area One");
+		rScreen.WrapperSlider("Fighter Beam Impact Visible Area Two", iSection, 1.0f, "Fighter Beam Impact Visible Area Two");
+		rScreen.WrapperSlider("Fighter Beam Impact Visible Intensity One", iSection, 1.0f, "Fighter Beam Impact Visible Intensity One");
+		rScreen.WrapperSlider("Fighter Beam Impact Visible Intensity Two", iSection, 1.0f, "Fighter Beam Impact Visible Intensity Two");
 
 		rScreen.WrapperSeparatorText("Fighters - Beam");
-		rScreen.WrapperSlider("Width", iSection, 1.0f, "Fighter Beam Width");
+		rScreen.WrapperSlider("Fighter Beam Width", iSection, 1.0f, "Fighter Beam Width");
 
 		ImGui::EndTable();
 	}

@@ -5,7 +5,7 @@
 Two independent compute chains post-process top-down (orthographic, world-XY-mapped) shadow data for the RTS camera. The terrain chain ray-marches sun occlusion, runs horizontal and vertical Gaussian blur, temporally resolves the final result, then refreshes distinct history storage.
 The object chain blurs its top-down object-coverage raster separately, merged by MAX blending.
 R and G split each ship's ground coverage as `1 - t` and `t`, where `t` is its centre's height above the ground directly below it (terrain elevation, or sea level over water) minus the lowest flight-plane height, as a fraction of the lowest-to-highest plane span, clamped to `[0, 1]`, so a ship over high terrain trends back toward Sigma Low.
-B and A hold coverage by ships on flight planes 1 and 2 only. Vertical blur recombines R and G into R, capped at full coverage, so terrain and water read object-shadow R for their own shading; models consume both final textures as `../Model/AGENTS.md` describes, and smoke blending reads B and A as `../Smoke/AGENTS.md` describes.
+B and A hold coverage by ships on flight planes 1 and 2 only. Vertical blur recombines R and G into R, capped at full coverage, so terrain and water read object-shadow R for their own shading; models consume both final textures as `../Model/AGENTS.md` describes, and smoke blending uses R as `../Smoke/AGENTS.md` describes.
 
 ## Terrain Shadow Contract
 

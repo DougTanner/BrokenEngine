@@ -382,7 +382,15 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 		kPipelineCount
 	};
 
-56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`). Exception: loop counters `i`/`j`/`k` and iterators `it` (per rule 8), and Windows handle prefixes such as `hwnd`/`hdc` (per rule 3).
+56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`), except:
+	- Loop counters `i`/`j`/`k` and iterators `it` (per rule 8).
+	- Windows handle prefixes such as `hwnd`/`hdc` (per rule 3).
+	- Approved standard terms (keep the existing naming casing, e.g., `gPbrBrdfDiffuse`):
+		- `Pbr` (physically based rendering), `Ibl` (image-based lighting), `Brdf` (bidirectional reflectance distribution function).
+		- `Cpu` (central processing unit), `Gpu` (graphics processing unit), `Hdr` (high dynamic range), `Lod` (level of detail).
+		- `Uv` (texture coordinates), `Fov` (field of view), `Aabb` (axis-aligned bounding box).
+		- `Json` (JavaScript Object Notation), `Guid` (globally unique identifier), `Utf8` (8-bit Unicode Transformation Format), `Fps` (frames per second), `Rtt` (round-trip time).
+	Before adding or using an unlisted standard abbreviation, ask the user for approval with the term, its meaning, and its intended use or an example. Keep the authoritative exception list here.
 
 57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (a private member, or a `static` file-local function) to distinguish internal from public versions.
 

@@ -202,7 +202,19 @@ void TweaksScreen::WrapperSlider(std::string_view label, int64_t iSection, float
 		std::snprintf(pcImGuiLabel, sizeof(pcImGuiLabel), "%.*s", static_cast<int>(label.size()), label.data());
 	}
 
-	if (ImGui::SliderFloat(pcImGuiLabel, &fValue, pWrapper->mfMin, pWrapper->mfMax, "%.6f"))
+	if (!pWrapper->mAllowed.empty())
+	{
+		int64_t iIndex = pWrapper->GetIndex();
+		int64_t iMaxIndex = std::ssize(pWrapper->mAllowed) - 1i64;
+		int iSliderIndex = static_cast<int>(iIndex);
+		char pcValue[32] {};
+		std::snprintf(pcValue, sizeof(pcValue), "%.6g", static_cast<double>(pWrapper->mAllowed.at(iIndex)));
+		if (ImGui::SliderInt(pcImGuiLabel, &iSliderIndex, 0, static_cast<int>(iMaxIndex), pcValue, ImGuiSliderFlags_NoInput))
+		{
+			pWrapper->SetIndex(std::clamp<int64_t>(iSliderIndex, 0i64, iMaxIndex));
+		}
+	}
+	else if (ImGui::SliderFloat(pcImGuiLabel, &fValue, pWrapper->mfMin, pWrapper->mfMax, "%.6f"))
 	{
 		pWrapper->Set(fValue);
 	}

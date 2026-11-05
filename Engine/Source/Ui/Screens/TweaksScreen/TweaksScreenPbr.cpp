@@ -10,32 +10,32 @@ namespace engine
 
 const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 {
-	{"Sun", &gPhysicallyBasedRenderingSun},
-	{"Day Brightness", &gPhysicallyBasedRenderingDayBrightness},
-	{"BRDF Diffuse", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse},
-	{"BRDF Diffuse Power", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower},
-	{"BRDF Specular", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular},
-	{"BRDF Specular Power", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower},
-	{"Exposure", &gPhysicallyBasedRenderingExposure},
-	{"Gamma", &gPhysicallyBasedRenderingGamma},
+	{"Sun", &gPbrSun},
+	{"Day Brightness", &gPbrDayBrightness},
+	{"BRDF Diffuse", &gPbrBrdfDiffuse},
+	{"BRDF Diffuse Power", &gPbrBrdfDiffusePower},
+	{"BRDF Specular", &gPbrBrdfSpecular},
+	{"BRDF Specular Power", &gPbrBrdfSpecularPower},
+	{"Exposure", &gPbrExposure},
+	{"Gamma", &gPbrGamma},
 	{"Saturation", &gColorGradingSaturation},
 	{"Contrast", &gColorGradingContrast},
 	{"Temperature", &gColorGradingTemperature},
-	{"Lighting Specular", &gPhysicallyBasedRenderingLightingSpecular},
-	{"Lighting Specular Power", &gPhysicallyBasedRenderingLightingSpecularPower},
-	{"Lighting", &gPhysicallyBasedRenderingLighting},
-	{"Lighting Power", &gPhysicallyBasedRenderingLightingPower},
-	{"IBL Ambient", &gPhysicallyBasedRenderingImageBasedLightingAmbient},
-	{"IBL Diffuse", &gPhysicallyBasedRenderingImageBasedLightingDiffuse},
-	{"IBL Diffuse Power", &gPhysicallyBasedRenderingImageBasedLightingDiffusePower},
-	{"IBL Specular", &gPhysicallyBasedRenderingImageBasedLightingSpecular},
-	{"IBL Specular Power", &gPhysicallyBasedRenderingImageBasedLightingSpecularPower},
-	{"IBL Shadow Blend", &gPhysicallyBasedRenderingImageBasedLightingShadowBlend},
-	{"Cubemap Lod Power", &gPhysicallyBasedRenderingCubemapLevelOfDetailPower},
-	{"Cubemap Lod Offset", &gPhysicallyBasedRenderingCubemapLevelOfDetailOffset},
-	{"Shadow Floor", &gPhysicallyBasedRenderingShadowFloor},
-	{"Smoke", &gPhysicallyBasedRenderingSmoke},
-	{"Emissive", &gPhysicallyBasedRenderingEmissive},
+	{"Lighting Specular", &gPbrLightingSpecular},
+	{"Lighting Specular Power", &gPbrLightingSpecularPower},
+	{"Lighting", &gPbrLighting},
+	{"Lighting Power", &gPbrLightingPower},
+	{"IBL Ambient", &gPbrIblAmbient},
+	{"IBL Diffuse", &gPbrIblDiffuse},
+	{"IBL Diffuse Power", &gPbrIblDiffusePower},
+	{"IBL Specular", &gPbrIblSpecular},
+	{"IBL Specular Power", &gPbrIblSpecularPower},
+	{"IBL Shadow Blend", &gPbrIblShadowBlend},
+	{"Cubemap Lod Power", &gPbrCubemapLodPower},
+	{"Cubemap Lod Offset", &gPbrCubemapLodOffset},
+	{"Shadow Floor", &gPbrShadowFloor},
+	{"Smoke", &gPbrSmoke},
+	{"Emissive", &gPbrEmissive},
 };
 
 void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
@@ -51,39 +51,39 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Engine Variables");
-				rScreen.WrapperSlider("Sun", iSection, 1.0f);
-				rScreen.WrapperSlider("Day Brightness", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Sun", iSection, 1.0f, "Sun");
+				rScreen.WrapperSlider("Pbr Day Brightness", iSection, 1.0f, "Day Brightness");
 
 				rScreen.WrapperSeparatorText("BRDF");
-				rScreen.WrapperSlider("BRDF Diffuse", iSection, 1.0f);
-				rScreen.WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
-				rScreen.WrapperSlider("BRDF Specular", iSection, 1.0f);
-				rScreen.WrapperSlider("BRDF Specular Power", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Brdf Diffuse", iSection, 1.0f, "BRDF Diffuse");
+				rScreen.WrapperSlider("Pbr Brdf Diffuse Power", iSection, 1.0f, "BRDF Diffuse Power");
+				rScreen.WrapperSlider("Pbr Brdf Specular", iSection, 1.0f, "BRDF Specular");
+				rScreen.WrapperSlider("Pbr Brdf Specular Power", iSection, 1.0f, "BRDF Specular Power");
 
 				rScreen.WrapperSeparatorText("Post Lighting");
-				rScreen.WrapperSlider("Lighting Specular", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting Specular Power", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting", iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Lighting Specular", iSection, 1.0f, "Lighting Specular");
+				rScreen.WrapperSlider("Pbr Lighting Specular Power", iSection, 1.0f, "Lighting Specular Power");
+				rScreen.WrapperSlider("Pbr Lighting", iSection, 1.0f, "Lighting");
+				rScreen.WrapperSlider("Pbr Lighting Power", iSection, 1.0f, "Lighting Power");
 
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("IBL");
-				rScreen.WrapperSlider("IBL Ambient", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Diffuse", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Diffuse Power", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Specular", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Specular Power", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
-				rScreen.WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
-				rScreen.WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
-				rScreen.WrapperSlider("Shadow Floor", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Ibl Ambient", iSection, 1.0f, "IBL Ambient");
+				rScreen.WrapperSlider("Pbr Ibl Diffuse", iSection, 1.0f, "IBL Diffuse");
+				rScreen.WrapperSlider("Pbr Ibl Diffuse Power", iSection, 1.0f, "IBL Diffuse Power");
+				rScreen.WrapperSlider("Pbr Ibl Specular", iSection, 1.0f, "IBL Specular");
+				rScreen.WrapperSlider("Pbr Ibl Specular Power", iSection, 1.0f, "IBL Specular Power");
+				rScreen.WrapperSlider("Pbr Ibl Shadow Blend", iSection, 1.0f, "IBL Shadow Blend");
+				rScreen.WrapperSlider("Pbr Cubemap Lod Power", iSection, 1.0f, "Cubemap Lod Power");
+				rScreen.WrapperSlider("Pbr Cubemap Lod Offset", iSection, 1.0f, "Cubemap Lod Offset");
+				rScreen.WrapperSlider("Pbr Shadow Floor", iSection, 1.0f, "Shadow Floor");
 
 				rScreen.WrapperSeparatorText("Smoke");
-				rScreen.WrapperSlider("Smoke", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Smoke", iSection, 1.0f, "Smoke");
 
 				rScreen.WrapperSeparatorText("Emissive");
-				rScreen.WrapperSlider("Emissive", iSection, 1.0f);
+				rScreen.WrapperSlider("Pbr Emissive", iSection, 1.0f, "Emissive");
 
 				ImGui::EndTable();
 			}
@@ -93,13 +93,13 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 		if (rScreen.BeginSubtab("Post Processing", iSection, 1))
 		{
 			rScreen.WrapperSeparatorText("Tone Mapping");
-			rScreen.WrapperSlider("Exposure", iSection);
-			rScreen.WrapperSlider("Gamma", iSection);
+			rScreen.WrapperSlider("Pbr Exposure", iSection, 2.0f, "Exposure");
+			rScreen.WrapperSlider("Pbr Gamma", iSection, 2.0f, "Gamma");
 
 			rScreen.WrapperSeparatorText("Color Grading");
-			rScreen.WrapperSlider("Saturation", iSection);
-			rScreen.WrapperSlider("Contrast", iSection);
-			rScreen.WrapperSlider("Temperature", iSection);
+			rScreen.WrapperSlider("Color Grading Saturation", iSection, 2.0f, "Saturation");
+			rScreen.WrapperSlider("Color Grading Contrast", iSection, 2.0f, "Contrast");
+			rScreen.WrapperSlider("Color Grading Temperature", iSection, 2.0f, "Temperature");
 
 			ImGui::EndTabItem();
 		}

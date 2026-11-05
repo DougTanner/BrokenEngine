@@ -416,7 +416,7 @@ void main()
 				{
 					ReadLighting(pf4LightingLow, pLightingSamplers, 0, f2LightingTexcoordLow);
 				}
-				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingLow, ObjectShadowAbove(f4ObjectShadows, iPlane));
+				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingLow, iPlane == 0 ? f4ObjectShadows.x : 1.0f);
 			}
 			else
 			{
@@ -424,7 +424,7 @@ void main()
 				{
 					ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2LightingTexcoordHigh);
 				}
-				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingHigh, ObjectShadowAbove(f4ObjectShadows, iPlane));
+				color = AddSmoke(globalLayout, color, fSmoke, fSmokeMax, pf4LightingHigh, iPlane == 0 ? f4ObjectShadows.x : 1.0f);
 			}
 		}
 	}

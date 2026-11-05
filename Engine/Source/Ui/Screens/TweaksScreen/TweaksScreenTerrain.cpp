@@ -36,31 +36,31 @@ void RenderTerrainSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionTerrain;
 
 	rScreen.WrapperSeparatorText("Ambient Occlusion");
-	rScreen.WrapperSlider("Ambient Occlusion", iSection);
+	rScreen.WrapperSlider("Island Ambient Occlusion", iSection, 2.0f, "Ambient Occlusion");
 
 	rScreen.WrapperSeparatorText("Terrain Detail");
-	rScreen.WrapperSlider("Detail Normals Multiplier Start Height", iSection);
-	rScreen.WrapperSlider("Detail Normals Multiplier End Height", iSection);
-	rScreen.WrapperSlider("Detail Normals Multiplier Low", iSection);
-	rScreen.WrapperSlider("Detail Normals Multiplier High", iSection);
+	rScreen.WrapperSlider("Terrain Detail Normals Multiplier Start Height", iSection, 2.0f, "Detail Normals Multiplier Start Height");
+	rScreen.WrapperSlider("Terrain Detail Normals Multiplier End Height", iSection, 2.0f, "Detail Normals Multiplier End Height");
+	rScreen.WrapperSlider("Terrain Detail Normals Multiplier Low", iSection, 2.0f, "Detail Normals Multiplier Low");
+	rScreen.WrapperSlider("Terrain Detail Normals Multiplier High", iSection, 2.0f, "Detail Normals Multiplier High");
 
 	rScreen.WrapperSeparatorText("Beach");
-	rScreen.WrapperSlider("Snow Blend", iSection);
-	rScreen.WrapperSlider("Snow AO Exclusion", iSection);
-	rScreen.WrapperSlider("Beach Sand Size", iSection);
-	rScreen.WrapperSlider("Beach Sand Blend", iSection);
-	rScreen.WrapperSlider("Beach Normals Size 1", iSection);
-	rScreen.WrapperSlider("Beach Normals Size 2", iSection);
-	rScreen.WrapperSlider("Beach Normals Size 3", iSection);
-	rScreen.WrapperSlider("Beach Normals Blend", iSection);
+	rScreen.WrapperSlider("Terrain Snow Blend", iSection, 2.0f, "Snow Blend");
+	rScreen.WrapperSlider("Terrain Snow Ambient Occlusion Exclusion", iSection, 2.0f, "Snow AO Exclusion");
+	rScreen.WrapperSlider("Terrain Beach Sand Size", iSection, 2.0f, "Beach Sand Size");
+	rScreen.WrapperSlider("Terrain Beach Sand Blend", iSection, 2.0f, "Beach Sand Blend");
+	rScreen.WrapperSlider("Terrain Beach Normals Size One", iSection, 2.0f, "Beach Normals Size 1");
+	rScreen.WrapperSlider("Terrain Beach Normals Size Two", iSection, 2.0f, "Beach Normals Size 2");
+	rScreen.WrapperSlider("Terrain Beach Normals Size Three", iSection, 2.0f, "Beach Normals Size 3");
+	rScreen.WrapperSlider("Terrain Beach Normals Blend", iSection, 2.0f, "Beach Normals Blend");
 
 	rScreen.WrapperSeparatorText("Rock");
-	rScreen.WrapperSlider("Rock Size", iSection);
-	rScreen.WrapperSlider("Rock Blend", iSection);
-	rScreen.WrapperSlider("Rock Normals Size 1", iSection);
-	rScreen.WrapperSlider("Rock Normals Size 2", iSection);
-	rScreen.WrapperSlider("Rock Normals Size 3", iSection);
-	rScreen.WrapperSlider("Rock Normals Blend", iSection);
+	rScreen.WrapperSlider("Terrain Rock Size", iSection, 2.0f, "Rock Size");
+	rScreen.WrapperSlider("Terrain Rock Blend", iSection, 2.0f, "Rock Blend");
+	rScreen.WrapperSlider("Terrain Rock Normals Size One", iSection, 2.0f, "Rock Normals Size 1");
+	rScreen.WrapperSlider("Terrain Rock Normals Size Two", iSection, 2.0f, "Rock Normals Size 2");
+	rScreen.WrapperSlider("Terrain Rock Normals Size Three", iSection, 2.0f, "Rock Normals Size 3");
+	rScreen.WrapperSlider("Terrain Rock Normals Blend", iSection, 2.0f, "Rock Normals Blend");
 }
 
 } // namespace engine
