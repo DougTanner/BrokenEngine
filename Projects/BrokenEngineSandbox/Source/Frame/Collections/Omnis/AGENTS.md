@@ -16,7 +16,10 @@ derives from the shared omni radius.
   `kfOmniPatrolRadius` of the flagship's previous-frame position in x/y,
   snapped clear of terrain, keeps it only when it lies `kfOmniPatrolCellInset`
   inside the cell, else draws again next tick, flies to it, and picks another on
-  arrival. A stored point stays until arrival even when the flagship moves.
+  arrival. A stored point stays until arrival even when the flagship moves, or
+  when it lies inside the flagship's navigation rectangle, which that query then
+  leaves out (`../Ships/AGENTS.md` `## Ship Invariants`). A route around a
+  rectangle can still pass the inset and transfer the Omni out.
   Weapons free it attacks its kept attack target (`../Ships/AGENTS.md`
   `## Ship Invariants`) on that enemy's nearest plane, ignoring enemies above
   the highest Omni plane, routes to it while it is hidden, and while it is in line of sight within

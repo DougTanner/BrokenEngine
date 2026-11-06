@@ -23,11 +23,11 @@ struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
 	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float);
-	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t) + sizeof(uint8_t);
+	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t);
 
 	static_assert(kiFleetCountSize == 8);
 	static_assert(kiFleetHeaderSize == 36);
-	static_assert(kiFleetMemberSize == 10);
+	static_assert(kiFleetMemberSize == 11);
 
 	template <typename TVISITOR, typename TFLEET>
 	static void VisitFleetHeader(TVISITOR& rVisitor, TFLEET& rFleet, int64_t& riMemberCount)
@@ -50,6 +50,7 @@ struct FleetSyncMessage
 		rVisitor.Field(rMember.globalId.iValue);
 		rVisitor.Field(ruiType);
 		rVisitor.Field(ruiFlags);
+		rVisitor.Field(rMember.uiSquadron);
 	}
 
 	static void WritePayload(common::Workbuffer& rWorkbuffer, const std::vector<Fleet>& rFleets)

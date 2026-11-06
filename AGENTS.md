@@ -50,8 +50,9 @@ are not, and stay out of the CRC.
   AGENTS.md carries the constraints, invariants, and routing every session
   needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and
   skill `references/` carry mechanics, schemas, and long detail; code comments
-  carry local non-obvious rationale. Comment content:
-  `Documents/C++StyleGuide.txt` rule 64.
+  carry local non-obvious rationale. A doc names the owning identifier and never
+  copies a number, default, range, or tuning value that code owns. Comment
+  content: `Documents/C++StyleGuide.txt` rule 64.
 - Bounded reading: a citation that names a `##` section is the reading scope — locate that heading and read only that section, never the whole file.
 - One term per concept: use the established repository term or the code's own name, never a coined nickname; prefer plain words over formal ones.
 - Do not add unit tests
@@ -105,7 +106,7 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
   `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`,
   `Engine/Source/Agent/AGENTS.md` `## Architecture`.
 
-## Accronyms
+## Acronyms
 
 DP - DataPacker
 MV - ModelViewer

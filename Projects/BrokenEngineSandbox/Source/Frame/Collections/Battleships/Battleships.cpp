@@ -492,7 +492,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Island centers and base height are fixed for this cell's tick; the per-thread workbuffer shares candidates across ships.
-	int64_t iIslandCount = std::ssize(rStaticData.islands);
+	int64_t iIslandCount = std::ssize(engine::CentredIslands(rStaticData.islands));
 	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
 	for (int64_t i = 0; i < iIslandCount; ++i)
 	{
@@ -500,6 +500,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
 	}
 	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
+	NavRectangleBoard navRectangleBoard(rPreviousFrame, ShipType::kBattleship);
 
 	// Cell center: every cell's local frame is centered on the origin; W=1.0 keeps it a proper position.
 	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
@@ -547,7 +548,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			}
 			else if (rPrevious.pController[i] == ShipController::kFleet)
 			{
-				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
 				fDeltaRotation = SteerBattleshipHeading(vecDirection, vecAiDirection);
 				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kBattleshipMovement, vecVelocity);
@@ -579,7 +580,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				if (bRouteToTarget)
 				{
 					bool bFinalWaypoint = false;
-					vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				// The stored wanted heading feeds only the heading capture: random-spawn rows run no fleet navigation or cone test.
 				vecAiDirection = XMVectorZero();

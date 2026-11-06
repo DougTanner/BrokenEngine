@@ -10,34 +10,11 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
-- 2026-11-04 codex/fb777af5-e663-4f71-9163-a208625e4c4d — size observation — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp:46 — 10105 tokens; height and plane policy through RaiseAboveTerrain forms a cohesive possible future split; no reduction required by this review.
+- 2026-11-05 claude/02d81b1e-9526-44c9-b600-56fc582cd210 — Engine/Source/Profile/ProfileManager.cpp:378 — `GpuRead` treats a query still in flight and a query this recording never writes the same way, so an inactive row keeps its old sample; clearing the `mpGpuTimers` rows when command buffers are re-recorded would fix that at the base, since a row only changes between active and inactive at re-recording
+  — makes unnecessary: the paired empty timestamps the inactive water foam recording keeps (`Engine/Source/Graphics/Managers/AGENTS.md` `### CommandBufferManager`)
+- 2026-11-05 claude/4a3377b2-9193-4035-830d-1b0d217e7190 — refactor observation Engine/Source/Frame/NavQuery.cpp:544 —
+  TryVisibleNeighbors walks the grid before TryNeighbor's length prune — test tentative length against pGCost first in
+  sealed queries.
 
-- 2026-11-01 claude/c5401001-5b07-4667-9379-a63c2a27c40a — Engine/Source/Graphics/Render/LightingUniforms.cpp:48 —
-  remove the per-layer held flag and let the per-layer reset flag alone mean "no held area". The held flag is
-  cleared at only one site (line 70), and that same branch sets gbLightingTemporalReset, which sets every layer's
-  spbTemporalResets. CreateLightingTextures also sets gbLightingTemporalReset before the first frame. The two
-  flags are cleared and set together (TemporalAreaLatch::Update clears the reset at line 101 and line 104 sets
-  held), so "!held" never holds without "reset" also holding. The old single-layer code had the same redundancy.
-  Plan item 5 names a "held flag" per layer, so removing it needs the user to change the plan. — makes
-  unnecessary: LightingUniforms.cpp:48, :70, :83 (the !spbHeldVisibleAreas[i] term), :104
+- 2026-11-05 claude/f8358cc9-467b-430e-9258-b1818603694a — Projects/ModelViewer/Source/ModelViewerApplication.cpp:1306 — add `ImGuiSliderFlags_NoInput` to the "Inset (m)" slider so no typed text reaches it; drag values stay within 0 to 2 m and the loaded value is already validated finite, at the cost of Ctrl+click exact entry — makes unnecessary: ModelViewerApplication.cpp:1306 `std::isfinite(fOutlineInset)` and its comment at :1304
 
-- 2026-11-01 claude/2c5731e6-262d-48d2-b0f4-773cd3d679ee — refactor observation —
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:463 — RampBattleshipTurnRate
-  and SteerBattleshipHeading are Battleship-local, while Fighters keep the signed-max cone branch plus
-  SteerHeadingTowards pair that gave Battleships two alternating turn rates (Fighters.cpp:587) — one shared
-  ramped soft-clamp turn in ShipBehaviours, parameterized by type constants, would let Fighters use it and keep
-  the two collections parallel
-- 2026-11-01 claude/8bce67c8-8b83-4559-a8bd-9856a639aa8b —
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.cpp:28 — InitializeShipHitboxes could
-  read each controller's model CRC from the scene chunk named in that type's Render model table
-  (SceneHeader::modelCrc), instead of keeping its own parallel model CRC table; the hitbox model and the drawn
-  model would then share one source and could not disagree — makes unnecessary:
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsRender.cpp:132,
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/FightersRender.cpp:132,
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisRender.cpp:149
-- 2026-10-31 claude/4651544d-53aa-4a04-b074-f08eb3cea56e — refactor observation — Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp:678 — a random-spawn Omni scans its enemies with line-of-sight tests twice per tick, once in FindAttackTarget for steering and once in AcquireTarget (:698) for fire and look — one per-row targeting pass whose result feeds both steering and the blaster and look picks would remove the repeated scan and sight tests
-- 2026-10-31 claude/6474a6e5-0b43-47ad-81ad-b041b5850efe — Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/FleetCoordination.cpp:249 — let `ChooseFleetTactic` return only the plain Attack tactic for both types
-  and move the veer-off start and continuation into the Fighter script (`Fighters.cpp`, which already owns
-  `pVecVeerOffPoints`); the shared function would then need no type test and no veer-off output parameter.
-  This goes beyond the user-chosen Option 3 (plan line 25) and touches Fighter code outside this change,
-  so it is for the user to decide only. — makes unnecessary: FleetCoordination.cpp:249, FleetCoordination.cpp:259, Omnis.cpp:625

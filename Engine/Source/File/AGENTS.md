@@ -23,7 +23,7 @@ snapshot carries the game's payload half by value, uninspected; the game side
 owns it (game Network Server: the game project's own
 `Source/Network/Server/AGENTS.md`), and the two stage sets change together.
 
-- A placement whose island CRC is absent from this build's island pack, whose centre fails `IsInsideCell` (a bounding-rectangle corner, NaN, and both infinities fail it), or whose rotation is non-finite aborts the load.
+- A save stores no placements: `ReadGridSave` regenerates each cell's list from its saved coordinate, as a fresh cell does, so no placement value crosses this trust boundary and no list-order check runs on load. The version rule this creates is in [Frame](../Frame/AGENTS.md) `## Terrain and Navigation`.
 - `ServerSaveLoad` (`GameBase::mServerSaveLoad`) owns when a save, load, reset,
   or autosave runs and what happens around it, and returns the actual commit
   result to callers. A successful load keeps the saved simulation clock and
@@ -41,7 +41,7 @@ Eager types load whole at startup; lazy chunks load on demand on loader threads 
 - `WaitForChunks` blocks until a chunk is ready, but an already queued request is not reprioritized.
 - Chunk reset locks nothing; the caller owns exclusion. Device loss drains accepted whole-chunk and streaming-audio range work before resetting texture state; island eviction drains the renderer's Vulkan descriptor window. Keep the two in step, and settle exclusion before adding a third.
 - Sorting, filtering, or re-emitting the ordered Islands or Model chunk table changes the client's handshake pack integrity token ([Network](../../../Documents/Architecture/Network.md)): every client fails to connect, with an error misleadingly blaming the data build.
-- `EagerChunk.iDataSize` is the chunk table's raw on-disk extent, not the chunk header size, which excludes a scene chunk's appended animation section and a model chunk's outline and missile-tube sections. Bound eager reads by `iDataSize`, or that data silently truncates.
+- `EagerChunk.iDataSize` is the chunk table's raw on-disk extent, not the chunk header size, which excludes a scene chunk's appended animation section and a model chunk's outline and hardpoint sections. Bound eager reads by `iDataSize`, or that data silently truncates.
 - Corrupt runtime `.pack` chunks and pack-backed textures halt both processes, even at call sites outside this subsystem: validate and `ASSERT`; never soft-fail, skip, or substitute a placeholder.
 - A new publish path validates first (as `ValidateChunkLocation` and `ValidateChunkHeader` do): once a pointer, slice, pool slot, or map entry exists, a corrupt value already addresses memory outside the pack.
 - Cross-pack references are unvalidated at open and the lazy-chunk map is fixed at construction, so packs from different DataPacker runs can name a chunk absent for the whole process lifetime.

@@ -42,7 +42,7 @@ frame alternation. It runs in full on every frame:
   leave the texture mapped to the wrong place as the camera moves.
 
 The terrain shadow chain, by contrast, has a cadence through
-`gShadowUpdateCadence` (graphics-menu "Terrain Shadow Update Cadence",
+`gShadowUpdateCadence` (graphics-menu "Shadow Update Cadence",
 `Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp:164`). It refreshes on
 `(miFrameCounter + 1) % cadence == 0`, against lighting's phase 0, on reset or
 first use, or when the visible area leaves the held area. A skipped frame

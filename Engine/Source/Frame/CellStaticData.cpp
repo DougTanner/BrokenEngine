@@ -5,7 +5,7 @@
 namespace engine
 {
 
-void CellStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) const
+void CellStaticData::Write(std::ostream& rStream) const
 {
 	common::Write(rStream, static_cast<int32_t>(std::ssize(islands)));
 	for (const IslandPlacement& rPlacement : islands)
@@ -14,23 +14,17 @@ void CellStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) c
 		common::Write(rStream, rPlacement.f2WorldPosition);
 		common::Write(rStream, rPlacement.fRotation);
 	}
-	if (bIncludeNavigationData)
+	common::Write(rStream, static_cast<int32_t>(std::ssize(navigationData)));
+	for (const NavData& rNavData : navigationData)
 	{
-		common::Write(rStream, static_cast<int32_t>(std::ssize(navigationData)));
-		for (const NavData& rNavData : navigationData)
-		{
-			rNavData.Write(rStream);
-		}
+		rNavData.Write(rStream);
 	}
 }
 
-void CellStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
+void CellStaticData::Read(std::istream& rStream)
 {
 	int32_t iCount = 0;
 	common::Read(rStream, iCount);
-	// Trust boundary (save / network full-state): enforce the generated per-cell contract and bound the count
-	// against the stream before resize.
-	common::ValidateDeserializedCountCapacity(iCount, kiMaximumIslandsPerCell, sizeof(IslandPlacement::islandCrc) + sizeof(IslandPlacement::f2WorldPosition) + sizeof(IslandPlacement::fRotation), rStream, "CellStaticData::Read");
 	islands.resize(iCount);
 	for (IslandPlacement& rPlacement : islands)
 	{
@@ -38,30 +32,16 @@ void CellStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 		common::Read(rStream, rPlacement.f2WorldPosition);
 		common::Read(rStream, rPlacement.fRotation);
 	}
-	if (bIncludeNavigationData)
+	int32_t iGraphCount = 0;
+	common::Read(rStream, iGraphCount);
+	navigationData.resize(iGraphCount);
+	for (NavData& rNavData : navigationData)
 	{
-		int32_t iGraphCount = 0;
-		common::Read(rStream, iGraphCount);
-		navigationData.resize(iGraphCount);
-		for (NavData& rNavData : navigationData)
-		{
-			rNavData.Read(rStream);
-		}
-		// Wire-received navigationData is authoritative (client never rebuilds — server-only NavContour), so mark it
-		// built regardless of vertex count.
-		bNavigationDataBuilt = true;
+		rNavData.Read(rStream);
 	}
-	else
-	{
-		navigationData = {};
-		// Save-load only (the network-receive path takes the if-branch above with bIncludeNavigationData true): clear so
-		// RunFrameTick (server) rebuilds navigationData via BuildCellNavigationData from the freshly-read placements.
-		bNavigationDataBuilt = false;
-	}
-	// Never serialized — purely local derived data. Clear so a network resend / save-load
-	// forces RunFrameTick to rebuild from the freshly-read placements.
-	elevationGrid = {};
-	islandRenderQueries = {};
+	// Wire-received navigationData is authoritative (client never rebuilds — server-only NavContour), so mark it
+	// built regardless of vertex count.
+	bNavigationDataBuilt = true;
 }
 
 void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const

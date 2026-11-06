@@ -42,7 +42,7 @@ payload changes follow the owning detail documentation.
 
 The Gaea bake is separate from `ExportJob`: version-specific archetype handling stays in `ExportJobs/Island/GaeaArchetype.{h,cpp}`, while route orchestration, region processing, and shoreline subdivision remain version-agnostic. Each route patches a temporary archetype inside the shared cache; source `.terrain` files are never changed. `ExportJobs/Island/AGENTS.md` owns the cache location, and `ExportJobs/AGENTS.md` owns chunk rules and island chunk consumption.
 
-Island elevation is meters-absolute: archetype Sea level and `Island.json` elevation scale place the beach at engine Z 0, and DataPacker validates the resulting sea floor against `common::kfSeaBottomMeters`. Auto-crop removes only deepest-water pixels, retaining the landmass plus shallow-water coastline halo. The runtime applies no per-island height or water-depth multiplier.
+Island elevation is meters-absolute: archetype Sea level and `Island.json` elevation scale place the beach at engine Z 0, and DataPacker validates the resulting sea floor against `common::kfSeaBottomMeters`. Auto-crop removes only deepest-water pixels, retaining the landmass plus shallow-water coastline halo. The runtime applies no per-island height or water-depth multiplier, and export applies the one island scale (`ExportJobs/Island/AGENTS.md` `## Island Outputs`).
 
 The named Win32 single-instance mutex makes a second process wait for the first.
 Under a debugger, top-level exceptions remain unwrapped so they break at the

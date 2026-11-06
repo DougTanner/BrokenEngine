@@ -277,7 +277,7 @@ function Test-InstructionDocPath([string] $Path) {
 	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
 	if ($leaf -ceq 'AGENTS.md') { return $true }
 	if (-not $leaf.ToLowerInvariant().EndsWith('.md')) { return $false }
-	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/')
+	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/') -or $Path.StartsWith('Documents/Architecture/')
 }
 
 function Test-InventoryHeadPath([string] $Path) {

@@ -3,7 +3,7 @@
 
 ## Context
 
-The all-rule lint review confirmed 541 remaining obligations in
+The all-rule lint review confirmed 540 remaining obligations in
 the saved ledger. The source forms remain present and fail the named style
 rules; the declarations, missing defaults, parameter forms or ordered guard
 groups in candidates.json establish the local cause. These were pre-existing
@@ -14,7 +14,7 @@ or permission to expand a hand audit.
 
 ## Design
 
-Implement only `inline-wrappers`, using every ledger.definition as the exact initializer. Preserve header
+Implement only `inline-wrappers`, moving each current initializer unchanged. Preserve header
 declaration order, guards, all types/constructor arguments/defaults/ranges/steps/allowed order, quartet
 groups, both CurveData objects, guarded bool, curve points and invariant comments. Remove old definitions,
 retain .cpp files and membership. Constructors remain untouched. Existing inline SoundSettings quartets are
@@ -22,7 +22,7 @@ the pattern. Normal dynamic initialization remains below library-phase logging (
 allocation tracking starts false.
 
 Projects wrapper globals (162 rows).** Own six Ui header/.cpp pairs: Lighting, Map, Particle, Smoke, Sound,
-WindDeposits. Apply the ledger's exact three-float initializer tokens once per object, preserving header order
+WindDeposits. Move each object's current three-float initializer unchanged, once per object, preserving header order
 and comments. Lighting/Map/Smoke/Sound remain BT_CLIENT; Particle/WindDeposits remain shared. Keep files,
 includes, namespace skeletons and project membership. No Wrapper, registrar, consumer, reset/load/save or
 default/range change.
@@ -81,9 +81,9 @@ default/range change.
 
 ## In scope
 
-Implement exactly 541 saved candidate rows in `InlineUiWrapperInitialization/candidates.json` and their
-correctness-dependent declarations/consumers. The ledger preserves original identity, source text and exact
-wrapper definitions; this Design overrides historical alternatives or stale action labels. Do not repeat
+Implement exactly 540 saved candidate rows in `InlineUiWrapperInitialization/candidates.json` and their
+correctness-dependent declarations/consumers. The ledger preserves original identity, source text and each
+wrapper definition's location; this Design overrides historical alternatives or stale action labels. Do not repeat
 completed formatter return-type, namespace or SAL edits.
 
 ## Out of scope
@@ -99,7 +99,7 @@ An unexpected behavior change returns for re-planning instead of widening scope.
 ## Acceptance criteria
 
 - Every saved row is implemented once, using the exact symbol/type/initializer,
-  order, guard and lifetime contracts in Design; no rejected row is changed.
+  order, guard and lifetime contracts in Design; no row outside the ledger is changed.
 - Before the first edit retain current-tree build identity and a /agent-harness baseline with isolated
   settings: connected rendering and advancing server tick; get_wrapper for Water Scale, Lighting Blur Sigma,
   four Detail Normals Multiplier keys and one setting from each of Lighting, Map, Particle, Smoke, Sound and
@@ -107,17 +107,13 @@ An unexpected behavior change returns for re-planning instead of widening scope.
   text-value capture; exercise Tweaks reset on representative settings. Repeat matching setup after the
   change, require identical values/labels/IDs/reset results and clean shutdown without duplicate registration,
   constructor or lifetime diagnostics. The supplied evidence records no executed runtime setup; capture this
-  prospective baseline before editing. Compare all 541 exact definition tokens and guards with candidates.json
+  prospective baseline before editing. Compare all 540 exact definition tokens and guards with the pre-edit tree
   and preserve header order, curve points/comments, quartets and allowed order. Build sandbox client/server
   and ModelViewer Debug|x64 and Release|x64 via /compile.
 - Required reviews and checks pass; no format/layout/CRC or compatibility
   behavior changes beyond the expressly recorded internal-offset choice.
 
-Complete original-row reconciliation is retained in
-`InlineUiWrapperInitialization/coverage.json`: it records every one of the
-2,056 non74 original candidates, including false positives, completed rows,
-SAL contract rejections and the twelve earlier deferred rows. Only this Plan's
-541 rows in candidates.json are implementation scope. The additional 736
+Only this Plan's 540 rows in candidates.json are implementation scope. The additional 736
 rule74 rows were already completed and are excluded from every follow-up.
 
 ## Notes
@@ -135,7 +131,7 @@ propagation, owner-document synchronization, style, correctness, comments,
 over-engineering and independent acceptance verification; finalize verified
 work through /finalize-changes. No unit tests or new harness commands.
 
-Baseline evidence is static source at ad5d456751c76bf43c86b7cc5bd038946c81b1c0
+Baseline evidence is static source at 5c2e6a8d3c22cc8815256342cd63ec7fe8f4d8b3
 plus the saved current candidate forms. Original coordinates may drift: match
 path, symbol and text. A recorded runtime baseline must identify its actual
 current-tree build; it is not an unedited-session baseline. All live operations

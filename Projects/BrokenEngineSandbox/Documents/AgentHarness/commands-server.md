@@ -113,8 +113,7 @@ adding the fields below; the other entries are its own commands. For the engine
   save reader's checks (pair count/capacity parity and ID maps, the
   `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
   [ship pusher ownership](../../Source/Frame/Collections/Ships/AGENTS.md),
-  no lifecycle bit on a Pushers row, and every flying missile
-  at a finite height with velocity z 0) plus one more refusal: a changed
+  with no lifecycle bit on a Pushers row) plus one more refusal: a changed
   `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
@@ -248,10 +247,9 @@ adding the fields below; the other entries are its own commands. For the engine
   (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
   plane. A missile's `flags` bit 0x01 assigns plane 1; clear assigns plane 0,
-  including when launch height differs from the plane height. A genuine ship spawn
-  uses its `uiFlightPlane` height raised only as needed for the model's upright
-  water clearance; `bTransfer:true` retains the carried height. A spawn
-  gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
+  including when launch height differs from the plane height. Ship spawn height
+  follows [shared ship policy](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants).
+  A spawn gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
   unless the entry sets them. `bTransfer` defaults to false, so the
   collection's `Spawn` starts the row as a fresh spawn; a fighter or battleship
   then takes full health (`kfFighterHealth`, `kfBattleshipHealth`) whatever

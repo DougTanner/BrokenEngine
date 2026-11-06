@@ -221,6 +221,9 @@ def wire_material(material, channels):
         if channel == "emissive" and principled.inputs["Emission Strength"].default_value == 0:
             # The exporter drops an emissive factor scaled by zero strength.
             principled.inputs["Emission Strength"].default_value = 1.0
+        if channel == "normal" and normal_map.inputs["Strength"].default_value == 0:
+            # A Strength set with Color unlinked, such as the FBX importer's BumpFactor, scaled no texture.
+            normal_map.inputs["Strength"].default_value = 1.0
 
 
 def wire_texture_sets(candidates):

@@ -276,44 +276,6 @@ bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B
 	return fT > kfSegmentEpsilon && fT < (1.0f - kfSegmentEpsilon) && fU > kfSegmentEpsilon && fU < (1.0f - kfSegmentEpsilon);
 }
 
-// The builder and NavQuery's PointInAnyPolygon share this winding-number core so boundary rules cannot
-// drift.
-bool PointInPolygon(XMFLOAT2 f2Point, std::span<const XMFLOAT2> vertices)
-{
-	int64_t iVertexCount = std::ssize(vertices);
-	int64_t iWinding = 0;
-	for (int64_t i = 0; i < iVertexCount; ++i)
-	{
-		int64_t iNext = (i + 1) % iVertexCount;
-		XMFLOAT2 f2A = vertices[i];
-		XMFLOAT2 f2B = vertices[iNext];
-
-		if (f2A.y <= f2Point.y)
-		{
-			if (f2B.y > f2Point.y)
-			{
-				float fCross = (f2B.x - f2A.x) * (f2Point.y - f2A.y) - (f2Point.x - f2A.x) * (f2B.y - f2A.y);
-				if (fCross > 0.0f)
-				{
-					++iWinding;
-				}
-			}
-		}
-		else
-		{
-			if (f2B.y <= f2Point.y)
-			{
-				float fCross = (f2B.x - f2A.x) * (f2Point.y - f2A.y) - (f2Point.x - f2A.x) * (f2B.y - f2A.y);
-				if (fCross < 0.0f)
-				{
-					--iWinding;
-				}
-			}
-		}
-	}
-	return iWinding != 0;
-}
-
 void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
 {
 	LOG(kNavData, kDebug, "NavBuild: heightmap {}x{} worldThreshold={}", iHeightmapWidth, iHeightmapHeight, common::Wb(fWorldThreshold, 4));

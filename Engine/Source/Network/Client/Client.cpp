@@ -522,7 +522,7 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 
 	ReceivedStaticData received {};
 	received.coordinate = coord;
-	received.staticData.Read(staticStream, /*bIncludeNavigationData=*/true);
+	received.staticData.Read(staticStream);
 
 	// Heap: received static data vector grows on new subscription
 	mReceivedStaticData.push_back(std::move(received));

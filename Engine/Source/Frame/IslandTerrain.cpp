@@ -10,16 +10,17 @@ namespace engine
 // Footprint-AREA thresholds (engine m^2) for the IslandChainPlacement size buckets. The multi-island
 // export tiles a ~400 m master into 1x1 (400x400 Huge), 2x1/3x1 strips (Large), mid tiles (Medium), and
 // 4x4 (100x100 Small). Area separates them where the larger dimension cannot — a 2x1 strip (200x400) and
-// the 1x1 master (400x400) share the same long edge.
-constexpr float kfHugeIslandAreaMeters = 120'000.0f;   // 1x1     = 400x400 = 160k
-constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53k-80k
-constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
+// the 1x1 master (400x400) share the same long edge. Those sizes are baked meters; the footprints these
+// thresholds read carry common::kfIslandScale on both axes, so each threshold carries it squared.
+constexpr float kfHugeIslandAreaMeters = 120'000.0f * common::kfIslandScale * common::kfIslandScale;   // 1x1     = 400x400 = 160k
+constexpr float kfLargeIslandAreaMeters = 48'000.0f * common::kfIslandScale * common::kfIslandScale;   // 2x1/3x1 strips    = 53k-80k
+constexpr float kfMediumIslandAreaMeters = 16'000.0f * common::kfIslandScale * common::kfIslandScale;  // mid tiles; 4x4 (10k) falls below -> Small
 
-// The elevation grid spans the cell's bounding rectangle.
-constexpr float kfGridPitchX = 2.0f * kfCellHalfWidth / static_cast<float>(kiElevationGridDimension);
-constexpr float kfGridPitchY = 2.0f * kfCellHalfHeight / static_cast<float>(kiElevationGridDimension);
-constexpr float kfCellOriginX = -kfCellHalfWidth;
-constexpr float kfCellOriginY = -kfCellHalfHeight;
+// The elevation grid spans the bounding rectangle grown by kfCellLandMarginMeters.
+constexpr float kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
+constexpr float kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
+constexpr float kfCellOriginX = -kfElevationGridHalfWidth;
+constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
 
 IslandTerrain::IslandTerrain()
 : common::Singleton<IslandTerrain>(gpIslandTerrain, this)
@@ -373,9 +374,10 @@ float IslandTerrain::CellElevation(const CellStaticData& rStaticData, const XMFL
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds CellElevationSampler::Sample, which steers CRC'd sim
 // positions, so client and server must build a bit-identical grid. Every position is centered cell-local
-// meters, so grid texel 0,0 sits at the bounding rectangle's south-west corner, (kfCellOriginX, kfCellOriginY). A
-// texel whose center lies outside the cell's hexagon belongs to a neighbouring cell and keeps the sea floor, because a
-// footprint rectangle can extend past its placement's hull.
+// meters, so grid texel 0,0 sits at the grid rectangle's south-west corner, (kfCellOriginX, kfCellOriginY). A texel
+// whose center lies past the hexagon grown by kfCellLandMarginMeters keeps the sea floor: hulls beyond that margin are
+// not listed here, and a footprint rectangle can extend past its placement's hull, so land there would depend on which
+// neighbours list the island.
 static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
 {
 	float fFootprintX = rTemplate.fQuadFootprintX;
@@ -426,7 +428,7 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 			{
 				continue;
 			}
-			if (!IsInsideCell(XMVectorSet(fTexelX, fTexelY, 0.0f, 1.0f)))
+			if (!common::IsInsideHex(XMVectorSet(fTexelX, fTexelY, 0.0f, 1.0f), kCellDirections, -kfCellLandMarginMeters))
 			{
 				continue;
 			}

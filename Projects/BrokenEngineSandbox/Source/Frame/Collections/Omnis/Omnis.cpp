@@ -569,7 +569,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 	// Random-spawn destinations: island centers are fixed for this cell's tick; the per-thread workbuffer shares them across ships.
-	int64_t iIslandCount = std::ssize(rStaticData.islands);
+	int64_t iIslandCount = std::ssize(engine::CentredIslands(rStaticData.islands));
 	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
 	for (int64_t i = 0; i < iIslandCount; ++i)
 	{
@@ -579,6 +579,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
 
 	FleetBoard fleetBoard(rPreviousFrame);
+	NavRectangleBoard navRectangleBoard(rPreviousFrame, ShipType::kOmni);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -637,7 +638,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				// Omnis never veer off, so the fleet tactic's veer-off point is discarded.
 				XMVECTOR vecVeerOffPoint = XMVectorZero();
-				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
 				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{
@@ -653,7 +654,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				else
 				{
-					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
 				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
 			}
@@ -663,7 +664,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 				bool bFinalWaypoint = false;
-				XMVECTOR vecDestination = HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, NearestFlightPlane(vecFlagship), bFinalWaypoint);
+				XMVECTOR vecDestination = HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
 				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
 			}
 			else
@@ -686,7 +687,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.
 					static_assert(ShipTypeClearanceTier(ShipType::kOmni) == kiFiringClearanceTier);
 					bool bFinalWaypoint = false;
-					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecTarget, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
 				if (bHasDestination)
 				{

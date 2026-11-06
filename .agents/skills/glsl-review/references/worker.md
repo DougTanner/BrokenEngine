@@ -75,7 +75,7 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 ### Performance Review
 
 - Require evidence before asserting device-, driver-, or compiler-specific cost. Accept a capture, target-device limit/property, compiler output, SPIR-V/disassembly, or a documented repository production constraint. Otherwise request measurement or emit external verification; do not report folklore as a defect.
-- Inspect hot-path `pow`, transcendental functions, normalization, dependent reads, loop bounds, SSBO/image access, workgroup dimensions, bank layout, divergence, `discard`, and depth writes only where the changed path is demonstrably hot or contract-significant.
+- Inspect hot-path `pow`, transcendental functions, normalization, dependent reads, loop bounds, SSBO/image access, workgroup dimensions, bank layout, divergence, `discard`, work placed ahead of a `discard`, and depth writes only where the changed path is demonstrably hot or contract-significant.
 - Flag an expression with at least one uniform or push-constant operand whose
   operands are all uniforms, push constants, spec/compile-time constants, or
   values derived only from those: every invocation computes the identical

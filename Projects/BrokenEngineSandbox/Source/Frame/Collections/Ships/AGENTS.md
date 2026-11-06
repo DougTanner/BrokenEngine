@@ -26,7 +26,9 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   [fleet health rule](../Battleships/AGENTS.md#fleet-health-invariants) and
   fleet Omnis theirs (`../Omnis/AGENTS.md`).
 - A ship's collision and missile-damage shape uses its model's already aligned
-  baked outline directly, at the depth its sidecar hitbox setting names. Ship
+  baked `common::ModelOutline` directly, at the depth its sidecar hitbox setting
+  names: the box and radius come from its convex hull and the outline level from
+  its outline polygon, so an outline inset moves neither radius nor pusher. Ship
   models require uniform authored scale. `kShipHitboxTypes` must name each
   controller's Render model. Each ship
   PreCollision writes every row's radius and posed hitbox from its current pose
@@ -39,8 +41,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   A ship's effective flight height is the maximum of that minimum and its
   requested flight-plane height; bank and pitch do not affect it. Genuine
   spawns apply this height once before initializing owned objects; transfers
-  preserve their carried position. Collision, rendering, and effects use that
-  authoritative position without another lift or changes to local geometry.
+  preserve their carried position.
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter in its flagship's cell and a fleet Omni there on a tick its tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
@@ -71,14 +72,30 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   height, `kuiNoFlightPlane` between or above planes. A genuine spawn stores its
   spawn plane and a transfer arrival carries the stored value.
 - Between the two flight planes, the lower plane carries the union of terrain restrictions because the upper plane has none. A ship navigates on its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
-- Interpolate Update owns rate-limited ordinary plane travel and its stored-plane changes:
-  `ClimbTowardsFlightPlane` lands on the effective flight height, so client and
-  server match bit-exactly, and stores the effective plane on arrival and
-  `kuiNoFlightPlane` once a climb toward another plane begins. Before descending,
-  it tests the lower plane's clearance-tier navigation graph at the integrated XY.
-  While blocked it returns toward the upper plane, retaining the requested lower
-  order and horizontal movement; the first clear update resumes descent, even
-  during the upward return.
+- Path queries route around large ships. `NavRectangleBoard`, built once per
+  ship type's PostRender Update, holds one rectangle per previous-frame row
+  `IsNavRectangleRow` accepts, so a navigation-obstacle ship's rectangle exists
+  exactly while its pusher does. A rectangle is the row's box inflated by the
+  asking ship's clearance, posed at the row's previous-frame position, under the
+  engine's navigation rectangle contract
+  (`../../../../../../Engine/Source/Frame/AGENTS.md`
+  `## Terrain and Navigation`). A way round cheaper than the crossing penalty
+  wins; otherwise the ship crosses and pushers separate them.
+- A query sees only the rectangles `NavRectangleBoard::Select` picks, so no
+  exception code exists for a ship's own rectangle, a flagship, or an attack
+  target. Plane sharing reads each ship's `CappedOccupiedPlanes`, and the terrain
+  graph stays on `NavigationFlightPlane`. Pushers move a ship out of a box it
+  starts in. A stored destination is never snapped out of a box, because a point
+  left beside a ship that moves on might never be reached.
+- Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles.
+  In-sight attack, chase, and Omni circling steering, flee, return to an island,
+  veer-off, roaming, escort, terrain snaps, and line of sight all ignore them,
+  and a ship in a neighbouring cell makes none.
+- Interpolate Update owns ordinary plane travel: `ClimbTowardsFlightPlane` lands
+  exactly on the effective flight height, so client and server match bit-exactly.
+  A descent blocked by the lower plane's clearance graph at the integrated XY
+  returns toward the upper plane, keeping order and horizontal motion, until the
+  first clear update.
 - A live ship whose type allows plane 1 immediately rises to at least the
   terrain elevation sampled at its center XY plus the lowest plane's height.
   Apply this floor after ordinary Interpolate plane travel and after the final
@@ -90,6 +107,14 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   requires the actual navigation plane to enable terrain collision.
   PostRender Update stores velocity Z as 0 as its last velocity write in every
   type. Height changes step position directly, never through velocity.
+- Ships taking horizontal terrain contact in PostRender Update sweep their disc
+  from the previous to the current Interpolate position against the cell's
+  elevation grid, blocked at the current position's height, and write the
+  resolved position back to the current Interpolate row. A ship on a plane
+  without terrain collision skips contact, as does a dying Battleship. On contact
+  Omnis slide along the terrain once and Fighters and Battleships bounce off it.
+  A start already inside terrain logs a warning; spawn sites test at most the
+  body's center against terrain, so a warning right after a spawn is expected.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
 - Target choice treats a ship as on its nearest flight plane
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
@@ -167,24 +192,36 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
   a follower stalls until that row is in its cell again or a fleet wanted cell
   other than its own sends it cross-cell.
-- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes. A tick a fleet Omni's patrol pick is dropped (`../Omnis/AGENTS.md`) keeps the cached steering with no recompute.
+- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes. A tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island destination is dropped keeps the cached steering with no recompute.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current
   position. Both tests are needed: containment ahead does not imply containment
   at the position, and a ship already driven inside sits there as its steady
   state. Key this on nav-polygon containment, not a terrain-elevation probe —
   the polygon is that elevation contour inflated outward, so a ship stranded in
-  the band between them measures clear terrain and never re-paths.
+  the band between them measures clear terrain and never re-paths. A navigation
+  rectangle (`## Ship Invariants`) never breaks the cadence, so its reach must
+  stay above what the two ships can close between recomputes.
 - Random draws, arrival checks, and mode transitions remain outside the
   pathfinding throttle. Modes 6 and 7 must consume the same number of random
   draws on any tick they can flip between, so mode 7 mirrors mode 6's three
   entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
-  a cell with no islands neither mode draws: mode 7 skips the mirror and mode 6
-  navigates to the cell center instead of an island. A fleet Omni's patrol pick
+  a cell with no centred islands neither mode draws: mode 7 skips the mirror and
+  mode 6 navigates to the cell center instead of an island. A fleet Omni's patrol pick
   instead draws two values per attempt in any cell; a fleet Omni never enters
   mode 7, so none of its ticks can flip between the modes. Only the draw count
   matters — each `common::Random` advances the shared random stream once no matter what
   bound it is given — so mode 7's mirror draws are load-bearing, not dead code,
   even though it throws their results away.
+- Every ship's island decisions, destination picks and returns alike, read the
+  cell's `CentredIslands`, never its full list
+  (`../../../../../../Engine/Source/Frame/AGENTS.md`
+  `## Terrain and Navigation`), so no ship heads for an island centred in
+  another cell. A centred island's footprint can still pass the cell edge and a
+  navigation snap can push a point past it, so a fresh island destination, or a
+  stored one snapped when its plane's polygons cover it, that fails
+  `IsInsideCell` after the snap is dropped: the destination clears, and the next
+  tick draws again. A dropped largest or smallest pick still advances to the
+  next waypoint.
 - Spawning always consumes its cell-change random draw.
 - Preserve cached steering and client debug waypoints across ticks where pathfinding is skipped.

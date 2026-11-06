@@ -5,10 +5,9 @@
 namespace engine
 {
 
-// 3D distance from rf3Point to the CCW convex polygon extruded over [fMinimumZ, fMaximumZ]; 0 inside.
+// 3D distance from rf3Point to the simple polygon extruded over [fMinimumZ, fMaximumZ]; 0 inside.
 static float DistanceToPrism(const XMFLOAT3A& rf3Point, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ)
 {
-	bool bInside = true;
 	float fEdgeDistanceSquared = std::numeric_limits<float>::max();
 	for (int64_t i = 0; i < std::ssize(vertices); ++i)
 	{
@@ -18,17 +17,12 @@ static float DistanceToPrism(const XMFLOAT3A& rf3Point, std::span<const XMFLOAT2
 		float fEdgeY = rEndVertex.y - rStartVertex.y;
 		float fOffsetX = rf3Point.x - rStartVertex.x;
 		float fOffsetY = rf3Point.y - rStartVertex.y;
-		// The interior of a CCW polygon lies left of every edge.
-		if (fEdgeX * fOffsetY - fEdgeY * fOffsetX < 0.0f)
-		{
-			bInside = false;
-		}
 		float fEdgeTime = std::clamp((fOffsetX * fEdgeX + fOffsetY * fEdgeY) / (fEdgeX * fEdgeX + fEdgeY * fEdgeY), 0.0f, 1.0f);
 		float fClosestX = fOffsetX - fEdgeTime * fEdgeX;
 		float fClosestY = fOffsetY - fEdgeTime * fEdgeY;
 		fEdgeDistanceSquared = std::min(fEdgeDistanceSquared, fClosestX * fClosestX + fClosestY * fClosestY);
 	}
-	float fHorizontalDistanceSquared = bInside ? 0.0f : fEdgeDistanceSquared;
+	float fHorizontalDistanceSquared = common::PointInPolygon({rf3Point.x, rf3Point.y}, vertices) ? 0.0f : fEdgeDistanceSquared;
 	float fVerticalDistance = std::max({fMinimumZ - rf3Point.z, rf3Point.z - fMaximumZ, 0.0f});
 	return std::sqrt(fHorizontalDistanceSquared + fVerticalDistance * fVerticalDistance);
 }
@@ -56,7 +50,7 @@ float AreaDamage::Get(FXMVECTOR vecPosition, const CollisionHitbox& rHitbox, uin
 	float fTotalDamage = 0.0f;
 	float fClosestDistance = std::numeric_limits<float>::max();
 	rvecClosestSource = vecPosition;
-	std::span<const XMFLOAT2> shapeVertices = rHitbox.eHitboxLevel == common::ModelHitboxLevel::kOutline ? std::span<const XMFLOAT2>(rHitbox.pf2HullVertices, static_cast<size_t>(rHitbox.iHullVertexCount)) : std::span<const XMFLOAT2>(rHitbox.pf2BoxVertices);
+	std::span<const XMFLOAT2> shapeVertices = rHitbox.eHitboxLevel == common::ModelHitboxLevel::kOutline ? std::span<const XMFLOAT2>(rHitbox.pf2OutlineVertices, static_cast<size_t>(rHitbox.iOutlineVertexCount)) : std::span<const XMFLOAT2>(rHitbox.pf2BoxVertices);
 
 	for (int64_t i = 0; i < siAreaDamageSourceCount; ++i)
 	{

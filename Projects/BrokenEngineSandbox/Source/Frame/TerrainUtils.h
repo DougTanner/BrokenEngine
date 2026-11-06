@@ -51,6 +51,9 @@ constexpr float NavigationClearanceMeters(int64_t iTier)
 	return ClearanceTierRadius(iTier) + kfPushMargin;
 }
 
+// An obstacle polygon inflated into a cell must come from an island that cell lists.
+static_assert(NavigationClearanceMeters(kiNavigationClearanceTierCount - 1) < engine::kfCellLandMarginMeters);
+
 // Indexed by ShipType: the smallest tier whose clearance covers the type's gameplay radius plus kfPushMargin.
 inline constexpr std::array<int64_t, kiShipTypeCount> kShipTypeClearanceTiers = []
 {
@@ -132,12 +135,15 @@ static_assert(std::ranges::all_of(kNavigationGraphs, [](const NavigationGraph& r
 // The index of tier iTier's graph on plane iPlane, or -1 when the tier has none there.
 constexpr int64_t NavigationGraphIndex(int64_t iTier, int64_t iPlane)
 {
-	for (const auto& [i, rGraph] : std::views::enumerate(kNavigationGraphs))
+	// std::views::enumerate cannot be used here: MSVC then reports C2872 on iter_move inside std::ranges::sort, between the
+	// enumerate iterator's friend and the customization point, in any translation unit that includes this header and sorts.
+	for (int64_t i = 0; const NavigationGraph& rGraph : kNavigationGraphs)
 	{
 		if (rGraph.iClearanceTier == iTier && rGraph.iFlightPlane == iPlane)
 		{
 			return i;
 		}
+		++i;
 	}
 	return -1;
 }

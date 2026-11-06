@@ -44,10 +44,10 @@ is engine-owned here.
 - `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
-- `GraphicsSettings.bin` version 22 persists Water quality, Water Foam, the
-  Stagger Smoke Layer Updates flag, Smoke Update Cadence, Terrain Shadow Update
-  Cadence, Vertical Field of View, and Orthographic Projection. Lighting and
-  Water Foam default on, and Defaults restores them. Older versions fail the current-format gate
+- `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
+  Water quality, Water Foam, the Stagger Smoke Layer Updates flag, Smoke Update
+  Cadence, Shadow Update Cadence, Field of View, and Orthographic Projection.
+  Lighting and Water Foam default on, and Defaults restores them. Older versions fail the current-format gate
   and use defaults. Water Foam and Orthographic Projection are validated Boolean
   bytes; any value other than zero or one rejects the whole file before
   application.

@@ -225,6 +225,10 @@ void ModelViewerApplication::LoadModelMetadata()
 	mf3ModelRotation = {};
 	mf3ModelOffset = {};
 	meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+	mfOutlineInset = common::ModelMetadata {}.fOutlineInsetMeters;
+	mFlags.Set(ViewerFlags::kNavigationObstacle, false);
+	mOutlineVertices.clear();
+	mModelOutlineError.clear();
 	mHardpoints.clear();
 	meSelectedHardpointKind = common::ModelHardpointKind::kMissileTube;
 	mFlags.Set(ViewerFlags::kResetHardpointTab);
@@ -261,6 +265,8 @@ void ModelViewerApplication::LoadModelMetadata()
 			mf3ModelRotation = metadata.f3RotationDegrees;
 			mf3ModelOffset = metadata.f3Offset;
 			meModelHitboxLevel = metadata.eHitboxLevel;
+			mfOutlineInset = metadata.fOutlineInsetMeters;
+			mFlags.Set(ViewerFlags::kNavigationObstacle, metadata.bNavigationObstacle);
 			mHardpoints = std::move(metadata.hardpoints);
 			ValidateModelAlignment();
 			if (!(mFlags & ViewerFlags::kMetadataValid))
@@ -281,10 +287,45 @@ void ModelViewerApplication::LoadModelMetadata()
 		mf3ModelRotation = {};
 		mf3ModelOffset = {};
 		meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+		mfOutlineInset = common::ModelMetadata {}.fOutlineInsetMeters;
+		mFlags.Set(ViewerFlags::kNavigationObstacle, false);
 		mHardpoints.clear();
 		ValidateModelAlignment();
 		mModelMetadataStatus = std::format("Load failed: {}", rException.what());
 	}
+	UpdateModelOutline();
+}
+
+const common::ModelOutline& ModelViewerApplication::GetSelectedModelOutline() const
+{
+	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+	const common::SceneHeader& rSceneHeader = rChunkMap.at(mPreviews.at(miSelected).crc).pHeader->sceneHeader;
+	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+	return *reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize));
+}
+
+void ModelViewerApplication::UpdateModelOutline()
+{
+	const common::ModelOutline& rOutline = GetSelectedModelOutline();
+	// A pack that is not kOutline holds the convex hull in its outline array, so a preview from it would look real.
+	if (rOutline.eHitboxLevel != common::ModelHitboxLevel::kOutline)
+	{
+		return;
+	}
+	ASSERT(rOutline.iOutlineVertexCount >= 3 && rOutline.iOutlineVertexCount <= common::kiModelOutlineVertexMaximum);
+	std::vector<XMFLOAT2> vertices = common::OffsetPolygon(std::span<const XMFLOAT2>(rOutline.pf2OutlineVertices, static_cast<size_t>(rOutline.iOutlineVertexCount)), rOutline.fOutlineInsetMeters - mfOutlineInset, common::kfModelOutlineSimplifyEpsilonMeters);
+	if (std::ssize(vertices) < 3 || std::ssize(vertices) > common::kiModelOutlineVertexMaximum)
+	{
+		mModelOutlineError = std::format("Outline has {} vertices; it needs 3 to {}", std::ssize(vertices), common::kiModelOutlineVertexMaximum);
+		return;
+	}
+	if (!common::PointInPolygon({0.0f, 0.0f}, vertices))
+	{
+		mModelOutlineError = "Outline does not contain the model origin";
+		return;
+	}
+	mOutlineVertices = std::move(vertices);
+	mModelOutlineError.clear();
 }
 
 void ModelViewerApplication::SaveModelMetadata()
@@ -292,7 +333,7 @@ void ModelViewerApplication::SaveModelMetadata()
 	// Heap: explicit source Save formats and writes the sidecar.
 	ScopedSuppressAllocationTracking suppress;
 	// The tracked sidecars' layout: fixed key order, tab indentation and shortest round-trip floats.
-	std::string content = std::format("{{\n\t\"version\": 4,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\",\n\t\"hardpoints\": [", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)]);
+	std::string content = std::format("{{\n\t\"version\": 6,\n\t\"rotationDegrees\": [{}, {}, {}],\n\t\"scale\": [{}, {}, {}],\n\t\"offset\": [{}, {}, {}],\n\t\"hitbox\": \"{}\",\n\t\"outlineInset\": {},\n\t\"navigationObstacle\": {},\n\t\"hardpoints\": [", mf3ModelRotation.x, mf3ModelRotation.y, mf3ModelRotation.z, mf3ModelScale.x, mf3ModelScale.y, mf3ModelScale.z, mf3ModelOffset.x, mf3ModelOffset.y, mf3ModelOffset.z, common::kpcModelHitboxLevelNames[static_cast<size_t>(meModelHitboxLevel)], mfOutlineInset, mFlags & ViewerFlags::kNavigationObstacle);
 	for (const auto& [i, rHardpoint] : std::views::enumerate(std::as_const(mHardpoints)))
 	{
 		std::format_to(std::back_inserter(content), "{}\n\t\t{{\"kind\": \"{}\", \"position\": [{}, {}, {}], \"direction\": [{}, {}, {}]}}", i == 0 ? "" : ",", common::kpcModelHardpointKindNames[static_cast<size_t>(rHardpoint.eKind)], rHardpoint.f3Position.x, rHardpoint.f3Position.y, rHardpoint.f3Position.z, rHardpoint.f3Direction.x, rHardpoint.f3Direction.y, rHardpoint.f3Direction.z);
@@ -615,15 +656,22 @@ void ModelViewerApplication::GenerateIslands()
 {
 	// Heap: island generation builds placement and hull vectors on seed changes.
 	ScopedSuppressAllocationTracking suppress;
-	// Steps the seed forward until the layout holds the tallest template and another placement to alternate with. It
-	// ends by probability, not guarantee: the generator may draw the tallest template for a link that does not fit.
+	// Steps the seed forward until the cell's centred placements hold the tallest template and another placement to
+	// alternate with, and each one's peak lies inside the flight sweep's inset, where the body can arrive. It ends by
+	// probability, not guarantee: no seed is certain to centre the tallest template in the cell.
 	while (true)
 	{
 		engine::GenerateIslandChain(mIslandSeed, mIslandCell.islands);
-		auto it = std::ranges::find(mIslandCell.islands, mTallestIslandCrc, &engine::IslandPlacement::islandCrc);
-		if (std::ssize(mIslandCell.islands) > 1 && it != mIslandCell.islands.end())
+		std::span<const engine::IslandPlacement> centredIslands = engine::CentredIslands(mIslandCell.islands);
+		auto it = std::ranges::find(centredIslands, mTallestIslandCrc, &engine::IslandPlacement::islandCrc);
+		bool bPeaksReachable = std::ranges::all_of(centredIslands, [](const engine::IslandPlacement& rPlacement)
 		{
-			miTallestPlacement = it - mIslandCell.islands.begin();
+			XMFLOAT2 f2Peak = engine::gpIslandTerrain->PlacementPeakPosition(rPlacement);
+			return common::IsInsideHex(XMLoadFloat2(&f2Peak), engine::kCellDirections, kfFlightRadius + 0.01f);
+		});
+		if (std::ssize(centredIslands) > 1 && it != centredIslands.end() && bPeaksReachable)
+		{
+			miTallestPlacement = it - centredIslands.begin();
 			break;
 		}
 		mIslandSeed = engine::GridCoord::FromKey(mIslandSeed.ToKey() + 1);
@@ -682,7 +730,7 @@ void ModelViewerApplication::SelectDestination()
 	if (miDestinationPlacement == miTallestPlacement)
 	{
 		// Random is inclusive, so size - 2 draws one of the other placements, skipping past the tallest.
-		miDestinationPlacement = common::Random(std::ssize(mIslandCell.islands) - 2, mSeedRandomEngine);
+		miDestinationPlacement = common::Random(std::ssize(engine::CentredIslands(mIslandCell.islands)) - 2, mSeedRandomEngine);
 		if (miDestinationPlacement >= miTallestPlacement)
 		{
 			++miDestinationPlacement;
@@ -902,13 +950,18 @@ bool ModelViewerApplication::Render()
 
 void ModelViewerApplication::RenderUi()
 {
-	// Heap: ImGui retains window and draw storage between frames and rebuilds it after recreation.
+	// Heap: ImGui retains window and draw storage between frames and rebuilds it after recreation, and an outline inset
+	// edit rebuilds the previewed outline.
 	ScopedSuppressAllocationTracking suppress;
 	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
 	// True only on a frame whose drawn right window selects the Edit Hardpoints tab in orbit with Rest pose: the one
 	// gate for picking and hardpoint markers, whose entries are rest-pose coordinates drawn through the accepted alignment.
 	bool bHardpointsActive = false;
+	// True only on a frame whose drawn right window selects the Collision tab in orbit with Rest pose on a model with a
+	// packed outline: the one gate for the inset slider and the outline overlay, whose lines are in the rest model's
+	// aligned space.
+	bool bOutlineActive = false;
 	if (!engine::gbShowImGui)
 	{
 		float fScale = engine::UiScale();
@@ -1085,7 +1138,7 @@ void ModelViewerApplication::RenderUi()
 			auto SourceMetadataControls = [this]()
 			{
 				ImGui::TextWrapped("Source: %ls", mModelMetadataPath.c_str());
-				ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid));
+				ImGui::BeginDisabled(!(mFlags & ViewerFlags::kMetadataLoaded) || !(mFlags & ViewerFlags::kMetadataValid) || !mModelOutlineError.empty());
 				if (ImGui::Button("Save"))
 				{
 					SaveModelMetadata();
@@ -1096,6 +1149,10 @@ void ModelViewerApplication::RenderUi()
 				if (!mModelAlignmentError.empty())
 				{
 					ImGui::TextWrapped("%s", mModelAlignmentError.c_str());
+				}
+				if (!mModelOutlineError.empty())
+				{
+					ImGui::TextWrapped("%s", mModelOutlineError.c_str());
 				}
 				ImGui::TextWrapped("Save changes this checkout's source. Games use it after their next data build.");
 			};
@@ -1249,6 +1306,34 @@ void ModelViewerApplication::RenderUi()
 					SourceMetadataControls();
 					ImGui::EndTabItem();
 				}
+				if (ImGui::BeginTabItem("Collision"))
+				{
+					bool bPackedOutline = !mPreviews.empty() && GetSelectedModelOutline().eHitboxLevel == common::ModelHitboxLevel::kOutline;
+					bOutlineActive = bPackedOutline && !(mFlags & ViewerFlags::kFlying) && miSelectedAnimation < 0;
+					ImGui::BeginDisabled(!bOutlineActive);
+					// ImGui parses inf and nan; keep the last value, as Height (m) does.
+					float fOutlineInset = mfOutlineInset;
+					if (ImGui::SliderFloat("Inset (m)", &fOutlineInset, 0.0f, 2.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp) && std::isfinite(fOutlineInset))
+					{
+						mfOutlineInset = fOutlineInset;
+						if (mFlags & ViewerFlags::kMetadataLoaded)
+						{
+							mModelMetadataStatus = "Unsaved source edits";
+						}
+						UpdateModelOutline();
+					}
+					ImGui::EndDisabled();
+					if (bPackedOutline)
+					{
+						ImGui::Text("Outline vertices: %lld", static_cast<long long>(std::ssize(mOutlineVertices)));
+					}
+					else
+					{
+						ImGui::TextWrapped("This model has no packed outline. A data build applies a hitbox change.");
+					}
+					SourceMetadataControls();
+					ImGui::EndTabItem();
+				}
 				ImGui::EndTabBar();
 			}
 			engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
@@ -1272,6 +1357,27 @@ void ModelViewerApplication::RenderUi()
 				pDrawList->AddLine(screenPosition, ImVec2(XMVectorGetX(vecScreenEnd), XMVectorGetY(vecScreenEnd)), uiMarkerColor, 2.0f * fScale);
 				pDrawList->AddCircleFilled(screenPosition, 4.0f * fScale, uiMarkerColor);
 			}
+		}
+		if (bOutlineActive)
+		{
+			// These points need no near-plane clipping for the reason the hardpoint markers do: they lie within one fitted
+			// radius of the aligned center. Outline vertices are already aligned, so their world matrix is identity.
+			const common::ModelOutline& rOutline = GetSelectedModelOutline();
+			float fOutlineZ = 0.5f * (rOutline.fMinimumZ + rOutline.fMaximumZ);
+			ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
+			auto DrawOutline = [&](std::span<const XMFLOAT2> vertices, ImU32 uiColor, float fThickness)
+			{
+				ImVec2 pScreenPoints[common::kiModelOutlineVertexMaximum] {};
+				for (const auto& [i, rVertex] : std::views::enumerate(vertices))
+				{
+					XMVECTOR vecScreen = XMVector3Project(XMVectorSet(rVertex.x, rVertex.y, fOutlineZ, 1.0f), pViewport->Pos.x, pViewport->Pos.y, pViewport->Size.x, pViewport->Size.y, 0.0f, 1.0f, pCamera->mMatModelPerspective, pCamera->mMatModelView, XMMatrixIdentity());
+					pScreenPoints[i] = ImVec2(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen));
+				}
+				pDrawList->AddPolyline(pScreenPoints, static_cast<int>(std::ssize(vertices)), uiColor, fThickness, ImDrawFlags_Closed);
+			};
+			// Magenta is what the game holds; green is the slider's approximation of the next bake, drawn on top.
+			DrawOutline(std::span<const XMFLOAT2>(rOutline.pf2OutlineVertices, static_cast<size_t>(rOutline.iOutlineVertexCount)), IM_COL32(255, 0, 255, 255), 4.0f * fScale);
+			DrawOutline(mOutlineVertices, IM_COL32(0, 255, 0, 255), 1.5f * fScale);
 		}
 	}
 	// Rewritten every frame because a surface-tier recreation replaces the manager and its text areas.

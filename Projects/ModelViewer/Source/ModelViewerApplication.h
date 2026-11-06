@@ -29,7 +29,7 @@ public:
 	int64_t miSelected = 0;
 
 private:
-	enum class ViewerFlags : uint8_t
+	enum class ViewerFlags : uint16_t
 	{
 		kComparingDefaults = 0x01,
 		kPlaying = 0x02,
@@ -39,6 +39,8 @@ private:
 		kPaused = 0x20,
 		kPicking = 0x40,
 		kResetHardpointTab = 0x80,
+		// Not editable; Save writes back the loaded tag.
+		kNavigationObstacle = 0x100,
 	};
 	struct FlightBody
 	{
@@ -66,6 +68,8 @@ private:
 	void PickHardpoint();
 	void LoadModelMetadata();
 	void SaveModelMetadata();
+	const common::ModelOutline& GetSelectedModelOutline() const;
+	void UpdateModelOutline();
 	void GetAlignedPreviewBounds(FXMMATRIX matAlignment, XMFLOAT3A& rf3Center, float& rfRadius) const;
 	void ValidateModelAlignment();
 	void GenerateIslands();
@@ -101,6 +105,11 @@ private:
 	XMFLOAT3A mf3ModelOffset {};
 	// Not editable; Save writes back the loaded setting.
 	common::ModelHitboxLevel meModelHitboxLevel = common::ModelHitboxLevel::kSphere;
+	float mfOutlineInset = 0.0f;
+	// The packed outline adjusted to mfOutlineInset, an approximation of the next bake. Invalid edits retain the last
+	// valid line and leave their reason in mModelOutlineError.
+	std::vector<XMFLOAT2> mOutlineVertices;
+	std::string mModelOutlineError;
 	std::vector<common::ModelHardpoint> mHardpoints;
 	common::ModelHardpointKind meSelectedHardpointKind = common::ModelHardpointKind::kMissileTube;
 	// Invalid edits retain the last complete renderable authored alignment.

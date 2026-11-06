@@ -18,7 +18,15 @@ game state around the deterministic Frame tick.
 - Fleets are permanent: no request deletes one, so a fleet's position within its client's list never shifts. Requests and queued work still carry the generated fleet identifier and resolve it at consumption.
 - A fleet member is identified by the global ID minted when the member is added, unique across every owner's fleets, which every spawn of it keeps; stored member references — the flagship, a queued spawn, and client focus — carry that ID, never a list position.
 - Each client's owned-entity records are in global-ID order; because each member's ID is minted when it is added, that order is the members' add order.
-- Every member, the fleet's Battleship included, is added dead with an expired countdown, so its first spawn and every respawn take the same path. A member retained after ordinary death respawns automatically when its type's countdown ends — 0 s for a Fighter, 1 s (`kRespawnDelay`) for an Omni or Battleship — and the countdown drains whether or not its owner is connected.
+- A fleet member keeps one squadron for life, named by `FleetMember::uiSquadron`
+  (`../../Fleet.h`). A squadron has no create or delete step: only the destroy
+  request removes a member, ordinary death keeps the member's squadron, and a
+  remaining squadron keeps its number when a lower one empties. The member list
+  stays in add order, because focus and the respawn timer pass read that order,
+  and the squadron number travels through fleet sync, the grid save, and replay
+  fleet records. Squadron choice and the fleet size limit: `FindOpenFleetSquadron`
+  in `../../Fleet.h`.
+- Every member, the fleet's Battleship included, is added dead with an expired countdown, so its first spawn and every respawn take the same path. A member retained after ordinary death respawns automatically when its type's countdown ends — zero for a Fighter, `kRespawnDelay` for an Omni or Battleship — and the countdown drains whether or not its owner is connected.
 - The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound harness rig slot and its clearing semantics; teardown detaches it before destroying the runtime.
 
 ## Timing and Paused Availability
@@ -36,14 +44,9 @@ game state around the deterministic Frame tick.
   search is a pure function of the candidates, the origin's committed frame, and the pass's taken points, so replay
   playback reaches the recording's spawn-or-wait decision, as the fleet checksum (`../../Save/AGENTS.md`) requires.
   With none clear the member stays dead and is retried on the next tick. `ServerClientManager.cpp` owns the candidate
-  set, the clearance, and the blocked-episode logging. A Fighter launches in its fleet Battleship's cell from a packed bay of that row's controller-selected model.
-  The already aligned bay XY position and horizontal normalized direction receive the Battleship's heading yaw;
-  the Fighter inherits its height, velocity, and stored plane. `TickRespawnTimers` attempts each authored bay once
-  per fleet cooldown batch in order, assigning successful bays the next waiting Fighter in member order. A bay
-  outside the cell or blocked by terrain is skipped for the same waiting member. Any success sets the fleet's
-  `ServerClientManager::mNextFighterLaunchTicks` once to the next `kfShipSpawnInterval`; a wholly refused batch
-  leaves it unchanged and retries next tick. Each fleet pass starts at bay zero with stack-local batch state;
-  no waiting Fighters means no cooldown write. Every load reset clears the existing launch-tick map.
+  set, the clearance, and the blocked-episode logging. A Fighter launches in its fleet Battleship's cell from a packed bay
+  of that row's model, yawed by its heading, inheriting velocity and stored plane. A wholly refused batch leaves
+  `mNextFighterLaunchTicks` unchanged and retries next tick; every load reset clears it.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
   advancing updates, drains destroy-member requests into the first advancing
@@ -71,6 +74,17 @@ game state around the deterministic Frame tick.
   Replay playback reruns the step on every dispatching tick with every
   bookkeeping effect but no frame change and no queued spawn, because playback
   takes every frame change from the recording.
+- A flagship's pick of a new cell makes its one direction draw, then asks
+  `NavQueryEdgeReachable` whether the flagship reaches an open stretch of that
+  shared edge, on its own navigation graph from its committed position. A
+  refusal takes the same branch as a missing neighbour: the timer resets with
+  no move and no second draw, so a flagship sealed on all six edges waits and
+  redraws each delay. The step builds an unbuilt cell's navigation data there
+  and never skips or assumes the edge open, since the answer reaches the fleet
+  checksum (`../../Save/AGENTS.md`). No tick runs during the step, so that build
+  cannot race `RunFrameTick`. Only this pick checks an edge: a harness
+  `UpdateFleet` order across a sealed edge routes around it by A*, because a
+  navigation graph has no cell boundary.
 - Agent-injected `StatusChange`s remain queued until the first normal tick at or after the entry's target tick whose coordinate is active and has a committed current Frame: a destroy or update entry then enters that tick's input at `PrepareTick`, and a spawn entry joins that tick's post-tick batch at its harvest. Consumed changes then follow the engine-owned status-change ordering.
 - Transfer validation, deterministic ordering, destination materialization and
   CRC recompute, and publication assembly are engine-owned

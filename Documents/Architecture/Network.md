@@ -313,17 +313,15 @@ sizes are the full packet including the type byte.
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
 | `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
-| `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; per-fleet member cap 16 |
-| `kClientDestroyFleetMemberRequest` | 9 | 9 | 8 | yes | violation | global ID ≤ 0 → corrupt; at advancing-tick consumption, reject unowned/stale IDs and Battleships; erase accepted sender-owned Fighter/Omni membership and send full fleet sync even if dead, absent or already dying; those states skip only the new explosion |
+| `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; no open squadron of that type (`FindOpenFleetSquadron`) → refused with a warning |
+| `kClientDestroyFleetMemberRequest` | 9 | 9 | 8 | yes | violation | global ID ≤ 0 → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
 | `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 46, which appended the
-`kClientDestroyFleetMemberRequest` packet; version 45 added the assigned flight-plane flag to missile spawn state; version 44 removed the
-missile tube slot `uiNextMissileTube` from the Battleship `SpawnInfo` `Fields()`;
-version 43 made the
+client-sendable). The current wire-protocol version is `kiProtocolVersion`.
+Version 47 added a squadron byte to each FleetSync member; version 43 made the
 `kServerCoordinateStaticData` count one navigation graph per game `kNavigationGraphs` entry
 (clearance tier and flight plane) instead of one per flight plane; version 42
 added the missile cooldown `nextMissileFireTime` to the Battleship `SpawnInfo`

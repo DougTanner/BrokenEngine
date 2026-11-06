@@ -45,6 +45,7 @@ static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 		common::Write(rStream, rMember.globalId.iValue);
 		common::Write(rStream, std::to_underlying(rMember.eType));
 		rMember.flags.Write(rStream);
+		common::Write(rStream, rMember.uiSquadron);
 		common::Write(rStream, rMember.coordinate.iQ);
 		common::Write(rStream, rMember.coordinate.iR);
 	}
@@ -88,7 +89,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		throw std::ios_base::failure("Fleet cell change timer");
 	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
-	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + 2 * sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
+	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + 3 * sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
 	for (FleetMember& rMember : rFleet.members)
 	{
@@ -110,17 +111,32 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		{
 			throw std::ios_base::failure("Fleet member flags");
 		}
+		// Trust boundary (save / replay file): FindOpenFleetSquadron counts and the HUD draws only numbers below the maximum.
+		uint8_t uiSquadron = 0;
+		common::Read(rFileStream, uiSquadron);
+		if (uiSquadron >= kiMaximumFleetSquadronsPerType)
+		{
+			throw std::ios_base::failure("Fleet member squadron");
+		}
 		int32_t iCoordQ = 0;
 		int32_t iCoordR = 0;
 		common::Read(rFileStream, iCoordQ);
 		common::Read(rFileStream, iCoordR);
-		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .coordinate = engine::GridCoord {.iQ = iCoordQ, .iR = iCoordR}};
+		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .uiSquadron = uiSquadron, .coordinate = engine::GridCoord {.iQ = iCoordQ, .iR = iCoordR}};
 	}
 	// Trust boundary (save / replay file): the fleet must hold exactly one Battleship, named by the flagship.
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
 	if (std::ranges::count(rFleet.members, ShipType::kBattleship, &FleetMember::eType) != 1 || flagshipIt == rFleet.members.end() || flagshipIt->eType != ShipType::kBattleship)
 	{
 		throw std::ios_base::failure("Fleet flagship Battleship");
+	}
+	// Trust boundary (save / replay file): no squadron exceeds its type's capacity.
+	if (std::ranges::any_of(rFleet.members, [&rFleet](const FleetMember& rMember)
+	{
+		return CountFleetSquadronMembers(rFleet, rMember.eType, rMember.uiSquadron) > kpiFleetSquadronCapacities[std::to_underlying(rMember.eType)];
+	}))
+	{
+		throw std::ios_base::failure("Fleet squadron capacity");
 	}
 }
 

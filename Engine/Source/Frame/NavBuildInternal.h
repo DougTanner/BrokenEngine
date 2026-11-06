@@ -22,15 +22,12 @@ inline std::pair<int64_t, int64_t> PolygonRange(const std::vector<T>& rPolygonOf
 // endpoint touching). Defined in NavBuild.cpp.
 bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B2);
 
-// Winding-number test over a polygon subrange of the larger vertex buffer; defined in NavBuild.cpp.
-bool PointInPolygon(XMFLOAT2 f2Point, std::span<const XMFLOAT2> vertices);
-
 // Grid-DDA broad phase over the NavData edge CSR, defined in NavQuery.cpp.
 // NavCellData.cpp shares this predicate so visibility building and runtime queries agree on edge crossings.
 bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVertices, const NavData& rNavData);
 
-// Is the point inside any obstacle polygon? Per-polygon AABB broad phase over PointInPolygon. Defined
-// in NavQuery.cpp; shared with the same visibility build.
+// Is the point inside any obstacle polygon? Per-polygon AABB broad phase over common::PointInPolygon.
+// Defined in NavQuery.cpp; shared with the same visibility build.
 bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavData& rNavData);
 
 } // namespace engine

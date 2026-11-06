@@ -31,7 +31,7 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 
 struct ReplayMeta
 {
-	static constexpr int64_t kiVersion = 5;
+	static constexpr int64_t kiVersion = 6;
 	engine::GridCoord clientGridCoordinate {};
 	int64_t iClientOwnedEntityIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;

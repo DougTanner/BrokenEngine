@@ -1,9 +1,11 @@
 {
-	"version": 4,
+	"version": 6,
 	"rotationDegrees": [90, 0, 90],
 	"scale": [16, 16, 16],
 	"offset": [0, 0.0228, 1e-04],
 	"hitbox": "outline",
+	"outlineInset": 0.1,
+	"navigationObstacle": true,
 	"hardpoints": [
 		{"kind": "missileTube", "position": [0.18078084, -0.021227656, -0.31213534], "direction": [0, 0, 1]},
 		{"kind": "missileTube", "position": [0.16094449, -0.022658609, -0.2765504], "direction": [0, 0, 1]},

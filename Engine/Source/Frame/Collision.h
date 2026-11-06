@@ -32,21 +32,22 @@ using CollisionLayerFlags_t = common::Flags<CollisionLayerFlags>;
 struct CellStaticData;
 struct SegmentHit;
 
-// One hitbox layer row's posed shape in its cell's local frame: the box and hull are CCW top-down polygons, each
-// extruded over [fMinimumZ, fMaximumZ]. A kSphere row's box and hull are unread.
+// One hitbox layer row's posed shape in its cell's local frame: top-down polygons extruded over [fMinimumZ, fMaximumZ],
+// the box CCW and the outline a simple polygon of either winding that lies inside the box. A kSphere row's box and
+// outline are unread.
 struct CollisionHitbox
 {
 	common::ModelHitboxLevel eHitboxLevel = common::ModelHitboxLevel::kSphere;
 	XMFLOAT2 pf2BoxVertices[4] {};
-	XMFLOAT2 pf2HullVertices[common::kiModelOutlineVertexMaximum] {};
+	XMFLOAT2 pf2OutlineVertices[common::kiModelOutlineVertexMaximum] {};
 	float fMinimumZ = 0.0f;
 	float fMaximumZ = 0.0f;
-	int64_t iHullVertexCount = 0;
+	int64_t iOutlineVertexCount = 0;
 };
 
-// Narrows [rfEnter, rfExit] of rf3Start + t * rf3Delta to the CCW polygon's Z prism, boundary included.
-// Returns false when the interval is empty.
-bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit);
+// The earliest time in [fFrom, fTo] that rf3Start + t * rf3Delta crosses an edge of the polygon, or infinity when it
+// crosses none. Horizontal only: the caller's prism clip supplies the Z range.
+float FirstOutlineCrossing(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fFrom, float fTo);
 
 // Per-layer binding data (provided by collections each frame)
 struct CollisionLayer

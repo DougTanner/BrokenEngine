@@ -45,12 +45,20 @@ inline constexpr GridCoord kOriginCoordinate {.iQ = 0, .iR = 0};
 inline constexpr float kfCellApothem = 450.0f;
 inline constexpr common::HexDirections kCellDirections = common::MakeHexDirections(kfCellApothem);
 
-// Half extents of the cell's bounding rectangle, which the elevation, collision, and pusher grids span.
+// Half extents of the cell's bounding rectangle, which the collision and pusher grids span.
 inline constexpr float kfCellHalfWidth = kCellDirections.f2HalfExtents.x;
 inline constexpr float kfCellHalfHeight = kCellDirections.f2HalfExtents.y;
 
-// Per-cell elevation grids use 4 MiB for 1,024 × 1,024 floats spanning the bounding rectangle, at ~1.01-unit spacing in
-// x and ~0.88-unit spacing in y. CellElevationSampler::Sample quantizes queries to these sample centers;
+// How far past its hexagon a cell lists island hulls and keeps their elevation, so a query at the edge sees the land
+// across it. Every navigation clearance fits under it, so a polygon inflated into the cell comes from a listed island.
+inline constexpr float kfCellLandMarginMeters = 10.0f;
+
+// Half extents of the elevation grid: the bounding rectangle grown by the margin.
+inline constexpr float kfElevationGridHalfWidth = kfCellHalfWidth + kfCellLandMarginMeters;
+inline constexpr float kfElevationGridHalfHeight = kfCellHalfHeight + kfCellLandMarginMeters;
+
+// Per-cell elevation grids use 4 MiB for 1,024 × 1,024 floats spanning that rectangle, at ~1.03-unit spacing in x and
+// ~0.90-unit spacing in y. CellElevationSampler::Sample quantizes queries to these sample centers;
 // IslandTerrain::BuildElevationGrid fills the grid.
 inline constexpr int64_t kiElevationGridDimension = 1'024;
 

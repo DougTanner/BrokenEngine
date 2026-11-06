@@ -78,6 +78,13 @@ hull has fewer than three vertices fails its export.
 `IslandHeader` also carries the leaf's peak height and texel, defined in its
 `Common/DataFile.h` field comment.
 
+Export multiplies the footprint, mesh XY, and elevation samples above 0 by
+`common::kfIslandScale`, so the runtime and shaders only ever see scaled
+values. The hull and peak are derived after that and carry the scale with no
+other step; `fWorldElevationMeters` stays baked because only a debug range reads
+it. Samples at or below 0 stay, so the sea floor, the underwater threshold, the
+masks, and the tracked BC textures do not change with the scale.
+
 Large shared route inputs use persistent fingerprints rather than repeated content reads. JPEG diagnostics belong only in the parallel `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/.../Gaea/Diagnostics/` tree, never the source checkout.
 
 ## Versioning
@@ -88,7 +95,10 @@ raw Gaea output; the split version covers post-bake crop, split, leaf-output, or
 covers the BC texture encode alone, and `ExportIsland::kiVersion` covers the chunk payload —
 quantized elevation, mesh, indices, map thumbnail, hull, and `IslandHeader` layout — which may also
 require the shared data-format version. The chunk fingerprint also covers a published leaf's Color
-and AO, which the map thumbnail derives from.
+and AO, which the map thumbnail derives from. `common::kiIslandScalePermille` joins `ExportIsland::kiVersion`
+and `engine::kiFrameBaseVersion` directly, so changing it takes no manual bump. A change to the island set
+placement picks from also takes the version bump `../../../../Engine/Source/Frame/AGENTS.md`
+`## Terrain and Navigation` owns, which no version here reaches.
 
 The BC outputs are tracked in the checkout, which shapes the texture stage: its version stays a plain `int64_t` outside `ExportJob::Version(...)`, so a chunk-header layout change cannot rewrite hundreds of megabytes of tracked textures for byte-identical output. Its marker fingerprints only the encode's own inputs; the processed mesh is deliberately excluded so a mesh-only rebake re-packs the chunk without touching the textures.
 

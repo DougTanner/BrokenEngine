@@ -5,38 +5,33 @@
 namespace engine
 {
 
-// One placed island instance inside a cell, emitted by GenerateIslandChain. A cell holds
-// 0..kiMaximumIslandsPerCell placements; when the list is non-empty, index 0 is the dominant anchor
-// island (consumers index islands.at(0) / islands.at(i % size)).
+// One island listed in a cell, emitted by GenerateIslandChain. A cell holds 0..kiMaximumIslandsPerCell
+// placements, those centred in the cell first (CentredIslands). An island that reaches several cells is
+// listed in each of them; its copies hold equal islandCrc and fRotation bits and equal positions to rounding.
 struct IslandPlacement
 {
 	common::crc_t islandCrc = 0;
-	// Centered cell-local meters inside the cell's hexagon; the owning cell's GridCoord supplies the identity.
+	// Centered cell-local meters, possibly outside the cell's hexagon; the owning cell's GridCoord supplies the identity.
 	XMFLOAT2 f2WorldPosition {};
 	float fRotation = 0.0f;
 };
 
-// Chain links after the Huge anchor (a fixed sequence, truncated by the cell's hexagon edge).
-inline constexpr int64_t kiChainLargeCount = 2;
-inline constexpr int64_t kiChainMediumCount = 3;
+// The world divides into rhombus regions this many cells a side, each generated as a whole.
+inline constexpr int64_t kiRegionSideCells = 4;
 
-inline constexpr int64_t kiMaximumSurroundSlots = 16;
+// A ceiling on one cell's list that GenerateIslandChain asserts; the render arena sizes from it.
+inline constexpr int64_t kiMaximumIslandsPerCell = 108;
 
-// A few extra smalls trailing off the end of the curve (attached to the chain tip, biased forward).
-inline constexpr int64_t kiTailSmallCount = 5;
-
-// Worst-case placements per cell (every big island + a full surround ring on each + the tail). The
-// placement generator reserves this capacity so its ConvexHull2D views remain pointer-stable.
-inline constexpr int64_t kiMaximumBigIslands = 1 + kiChainLargeCount + kiChainMediumCount;
-inline constexpr int64_t kiMaximumIslandsPerCell = kiMaximumBigIslands + kiMaximumBigIslands * kiMaximumSurroundSlots + kiTailSmallCount;
-
-// Deterministic per-cell archipelago generator. Builds a chain by contact growth — a Huge anchor
-// targeted at the SW third of the cell's bounding rectangle, then a fixed sequence of Large/Medium links each
-// placed just-touching the chain tip along a hard-turning curve (truncated where the next link would leave the
-// margin-inset hexagon), then Small islets ringing each big island — packing every island by its rotated true
-// valid-area hull so no two hulls overlap (bounding rectangles may overlap, hidden underwater). The grid coordinate is used only
-// to seed the RNG streams, so client and server produce identical layouts and the emitted positions are
-// centered cell-local meters at every coordinate.
+// Deterministic archipelago generator. A region grows routes and island groups in its anchor cell's frame, packing
+// every island by its rotated true valid-area hull (bounding rectangles may overlap, hidden underwater) inside the
+// region's padded rhombus, so two regions never overlap. The region coordinate only seeds the RNG streams and no
+// coordinate-derived term enters the geometry, so a layout depends only on that coordinate and the templates, and
+// client and server agree in any generation order. A cell lists every placement whose hull comes within
+// kfCellLandMarginMeters of its hexagon, in its own frame, regions ascending, and adds its own filler when none is
+// centred in it. Main thread only: regions memoize in IslandTerrain::mRegionPlacements.
 void GenerateIslandChain(GridCoord coordinate, std::vector<IslandPlacement>& rOut);
+
+// The prefix of a cell's list whose positions pass IsInsideCell; indices into it are indices into the list.
+std::span<const IslandPlacement> CentredIslands(std::span<const IslandPlacement> islands);
 
 } // namespace engine

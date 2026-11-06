@@ -9,10 +9,10 @@ namespace engine
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
 {
-	static constexpr float kfGridPitchX = 2.0f * kfCellHalfWidth / static_cast<float>(kiElevationGridDimension);
-	static constexpr float kfGridPitchY = 2.0f * kfCellHalfHeight / static_cast<float>(kiElevationGridDimension);
-	static constexpr float kfCellOriginX = -kfCellHalfWidth;
-	static constexpr float kfCellOriginY = -kfCellHalfHeight;
+	static constexpr float kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
+	static constexpr float kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
+	static constexpr float kfCellOriginX = -kfElevationGridHalfWidth;
+	static constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
 
 	CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};
@@ -155,10 +155,10 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 // an overlap.
 constexpr float kfDiscOverlapTolerance = 0.001f;
 
-constexpr double kfGridPitchX = 2.0f * kfCellHalfWidth / static_cast<float>(kiElevationGridDimension);
-constexpr double kfGridPitchY = 2.0f * kfCellHalfHeight / static_cast<float>(kiElevationGridDimension);
-constexpr double kfCellOriginX = -kfCellHalfWidth;
-constexpr double kfCellOriginY = -kfCellHalfHeight;
+constexpr double kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
+constexpr double kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
+constexpr double kfCellOriginX = -kfElevationGridHalfWidth;
+constexpr double kfCellOriginY = -kfElevationGridHalfHeight;
 
 // One elevation grid cell's square in cell-local meters. The disc query computes in double, where float positions,
 // the grid pitch, and every cell edge are exact.

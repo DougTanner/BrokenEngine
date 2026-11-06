@@ -31,6 +31,9 @@ public:
 	[[nodiscard]] const FlightPlane& Highest() const;
 	// The index of the plane nearest fHeight; a height equally near two planes takes the lower one.
 	[[nodiscard]] int64_t NearestPlaneIndex(float fHeight) const;
+	// The first and last plane indices fHeight occupies: that plane at an exact plane height, both adjacent planes strictly
+	// between two, and the nearest endpoint plane outside the table.
+	[[nodiscard]] std::pair<int64_t, int64_t> OccupiedPlanes(float fHeight) const;
 
 private:
 

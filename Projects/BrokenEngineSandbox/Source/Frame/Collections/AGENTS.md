@@ -7,17 +7,7 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 ## Game-Specific Rules
 
 - Transferable entity collections resolve collision/terrain outcomes before marking surviving out-of-bounds rows for Transfer.
-- The [shared ship policy](Ships/AGENTS.md#ship-invariants) governs terrain-rise
-  eligibility, contact gating, and final separation. Ships taking horizontal
-  terrain contact in PostRender Update sweep their disc from the previous to
-  the current Interpolate position against the cell's elevation grid, blocked
-  at the current position's height, and write the resolved position back to
-  the current Interpolate row. A ship on a plane without terrain collision
-  skips contact, as does a dying Battleship. On contact
-  Omnis slide along the terrain once and Fighters and Battleships bounce off
-  it. A start already inside terrain logs a warning; spawn sites test at most
-  the body's center against terrain, so a warning right after a spawn is
-  expected.
+- Ship terrain contact: [shared ship policy](Ships/AGENTS.md#ship-invariants).
 - Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals in PostRender Spawn, except the heal beam, which PostRender Update recreates. Hydration is filling a newly allocated collection slot from transferred or loaded data.
 - Every ship type receives a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival

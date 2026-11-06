@@ -105,14 +105,15 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 		}
 
 		Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
-		if (std::ssize(rFleet.members) >= kiMaximumFleetMembers)
+		uint8_t uiSquadron = FindOpenFleetSquadron(rFleet, rRequest.eType);
+		if (uiSquadron == kuiNoOpenFleetSquadron)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, kiMaximumFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) Type: {} no open squadron, ignoring spawn", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, ShipTypeName(rRequest.eType));
 			continue;
 		}
 
 		engine::GlobalId memberGlobalId {.iValue = gpGame->miNextGlobalId++};
-		rFleet.members.push_back(FleetMember {.globalId = memberGlobalId, .eType = rRequest.eType, .flags = FleetMemberFlags_t {FleetMemberFlags::kIsDead}, .coordinate = engine::kOriginCoordinate});
+		rFleet.members.push_back(FleetMember {.globalId = memberGlobalId, .eType = rRequest.eType, .flags = FleetMemberFlags_t {FleetMemberFlags::kIsDead}, .uiSquadron = uiSquadron, .coordinate = engine::kOriginCoordinate});
 		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) Type: {} Member: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, ShipTypeName(rRequest.eType), memberGlobalId.iValue);
 		SendFleetSyncToClient(guid);
 	}

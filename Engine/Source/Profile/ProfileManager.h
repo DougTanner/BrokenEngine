@@ -191,6 +191,7 @@ enum GpuTimers : int64_t
 		kGpuTimerSquareParticlesRender,
 		kGpuTimerVisibleLights,
 		kGpuTimerBillboards,
+		kGpuTimerSceneResolve,
 		kGpuTimerHdrResolve,
 	kGpuTimerUiRender,
 
@@ -236,6 +237,7 @@ inline constexpr std::string_view kpGpuTimerNames[]
 	"    Square Particles Render",
 	"    VisibleLights",
 	"    Billboards",
+	"    Scene Resolve",
 	"    HDR Resolve",
 	"Ui Render",
 };

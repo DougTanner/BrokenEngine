@@ -39,8 +39,6 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 		{
 			engine::GridCoord coordinate = engine::GridCoord::FromKey(uiKey);
 			coordinate.Write(fileStream);
-			// NavData is rebuilt lazily on first RunFrameTick — don't persist it.
-			game::gpGame->mCells.at(coordinate).staticData.Write(fileStream, /*bIncludeNavigationData=*/false);
 			fileStream << *game::gpGame->mCells.at(coordinate).pCurrent;
 		}
 	});
@@ -114,26 +112,8 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			}
 
 			engine::Cell& rCell = itCell->second;
-			rCell.staticData.Read(fileStream, /*bIncludeNavigationData=*/false);
 			rCell.staticData.coordinate = coordinate;
-			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's
-			// margin-inset hexagon. IsInsideCell rejects a center in a bounding-rectangle corner, NaN, and both
-			// infinities.
-			for (const IslandPlacement& rPlacement : rCell.staticData.islands)
-			{
-				if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
-				{
-					throw std::ios_base::failure("island placement template");
-				}
-				if (!IsInsideCell(XMLoadFloat2(&rPlacement.f2WorldPosition)))
-				{
-					throw std::ios_base::failure("island placement center");
-				}
-				if (!std::isfinite(rPlacement.fRotation))
-				{
-					throw std::ios_base::failure("island placement rotation");
-				}
-			}
+			GenerateIslandChain(coordinate, rCell.staticData.islands);
 			auto pFrame = std::make_unique<game::Frame>();
 			fileStream >> *pFrame;
 			rCell.pCurrent = std::move(pFrame);

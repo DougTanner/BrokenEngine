@@ -57,4 +57,18 @@ int64_t FlightPlanes::NearestPlaneIndex(float fHeight) const
 	return iNearest;
 }
 
+std::pair<int64_t, int64_t> FlightPlanes::OccupiedPlanes(float fHeight) const
+{
+	for (int64_t i = 0; i < Count(); ++i)
+	{
+		float fPlaneHeight = Plane(i).fHeightMeters;
+		if (fHeight <= fPlaneHeight)
+		{
+			return {i == 0 || fHeight == fPlaneHeight ? i : i - 1, i};
+		}
+	}
+
+	return {Count() - 1, Count() - 1};
+}
+
 } // namespace engine

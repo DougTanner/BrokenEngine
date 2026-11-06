@@ -17,11 +17,15 @@ runtime contracts of the screens that remain here.
 - Screens gate themselves from authoritative game/UI state (`../../../../../Engine/Source/Ui/Screens/AGENTS.md` `## Standard Menu Contract`).
 - Networked controls remain disabled through `NetworkUiControl` until authoritative
   state resolves the request. Fleet Fighter/Omni [x] controls are keyed by stable
-  member ID and use the owned-entity list independently of render subscriptions.
-  The owned-entity death event clears pending before a same-poll respawn can
-  restore that list; authoritative fleet sync prunes controls for IDs absent
-  from every fleet, and fleet-selection reset clears all controls.
+  member ID. The owned-entity death event clears pending; authoritative fleet
+  sync prunes controls for IDs absent from every fleet, and fleet-selection reset
+  clears all controls.
 - While the server plays a replay, the HUD disables every control that sends a simulation-affecting request; fleet and member focus change only subscriptions and stay enabled. The server refuses those requests during playback regardless, so this gating keeps players from sending requests that do nothing.
+- The left panel draws one box per squadron (`../../Network/Server/AGENTS.md`
+  `## State Ownership`). It filters the unchanged `Fleet::members` per box,
+  never sorting or copying it, so a box's rows stay in add order. A box has no
+  child window or scroll flag, because the mouse-wheel gate assumes none
+  (`../../../../../Engine/Source/Input/AGENTS.md`).
 - The HUD is the only game UI that changes network subscription state: its fleet
   and owned-entity focus controls tell the client session which cells it wants, tagged
   with an explicit reason. A rebuilt focus button that drops that call leaves
@@ -36,7 +40,11 @@ runtime contracts of the screens that remain here.
   cell's islands as their templates' baked top-down pictures, and the world's
   cell hexagons, projected at ground level through the live camera, all at the
   map opacity. The placements come from the client's own island-chain
-  generation per shown cell, never from the client's cells. The map is open
+  generation per shown cell, never from the client's cells. Each cell draws only
+  its `CentredIslands`, so an island listed in several cells draws once with no
+  double blend, and because that picture can overhang its cell, the cell cull
+  and ring bound reach past the hexagon by the largest template's half
+  footprint diagonal. The map is open
   exactly while the camera's framing override is set and not releasing, so no
   separate open flag exists; TAB eases the override out to the map framing, or
   releases it back to the world framing, which the map never changes, so cells

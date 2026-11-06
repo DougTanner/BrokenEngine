@@ -47,7 +47,8 @@ A plan spanning areas goes to the area owning most of its named files; a tie sta
 Every Plan sits exactly at `Documents/Plans/<Area>/<Name>.md` and may own a
 support folder named after its file without `.md`
 (`Documents/Plans/<Area>/<Name>/`), holding the files the Plan needs, every
-one committed with the Plan. Each file keeps its real format and extension,
+one committed with the Plan. A ledger support file holds only rows the Plan acts on,
+never excluded false positives. Each file keeps its real format and extension,
 except that a Markdown file is saved as `.txt`: the scheduler reads every
 `.md` under this tree as a plan document, so no `.md` file lives in a support
 folder. No support file's name contains a comma: the landing splits its owned

@@ -2,7 +2,8 @@
 name: progressive-disclosure-review
 description: >-
   Review session-changed instruction prose — AGENTS.md,
-  `.agents/skills/**/*.md`, `.agents/references/**/*.md` — against the root
+  `.agents/skills/**/*.md`, `.agents/references/**/*.md`,
+  `Documents/Architecture/**/*.md` — against the root
   AGENTS.md progressive-disclosure directive. Use during the Change Workflow
   Apply the triggered cleanup step after `/update-claude-docs` whenever the
   session changed such a file, and when a reviewer suspects a skill body
@@ -23,8 +24,8 @@ directive is the sole statement of the layering; this skill only enforces it.
 
 - The Change Workflow Apply the triggered cleanup step, after
   `/update-claude-docs`, whenever the session
-  changed `AGENTS.md`, `.agents/skills/**/*.md`, or
-  `.agents/references/**/*.md`.
+  changed `AGENTS.md`, `.agents/skills/**/*.md`,
+  `.agents/references/**/*.md`, or `Documents/Architecture/**/*.md`.
 - When a reviewer suspects a skill body restates a reference, a script, or a
   parent `AGENTS.md`, or exceeds the skill size thresholds.
 

@@ -563,7 +563,9 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		}
 	}
 
+	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSceneResolve);
 	vkCmdEndRenderPass(vkCommandBuffer);
+	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSceneResolve);
 }
 
 void CommandBufferRecordMain::RecordHighDynamicRangeResolve(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iFramebuffer)

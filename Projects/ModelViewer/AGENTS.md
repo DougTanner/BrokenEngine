@@ -14,8 +14,11 @@ World background, Background gray and Reroll are viewer-owned, unsaved controls 
 presets and Q comparison. Reroll remains usable with the world hidden; enabling
 World background restores that layout. At load the viewer picks the template with the tallest
 stored peak (`IslandHeader`). Startup steps the seed forward from the origin,
-and Reroll from a random seed, until the generated layout holds that template
-and another placement. Startup enables World background.
+and Reroll from a random seed, until the cell's `CentredIslands` hold that
+template and another placement and every one of their peaks passes the flight
+sweep's inset, because the body could never arrive at a peak past it. The
+elevation grid keeps the full list, so the viewer's cell shows the land the game
+does. Startup enables World background.
 
 TAB toggles orbit preview and autonomous flight once per tap outside text
 editing and is then withheld from ImGui, whose tabbing would start a slider's
@@ -28,7 +31,7 @@ that preference and pauses the body. In flight the wheel drives the engine
 camera's framing zoom between its minimum and maximum, starting at the engine's
 initial framing on every flight entry. Resuming flight preserves its position
 without a catch-up interval. One viewer-owned body loops between peaks: the
-tallest template's peak, then a random other placement's peak, then the tallest
+tallest template's peak, then a random other centred placement's peak, then the tallest
 again. The body stays inside the original cell, never transfers cells, and never
 enters deterministic game state. Peaks are horizontal destinations only: the
 body flies at the exact, unbounded Height (m) entry, which has a 0-100 m slider,
@@ -120,7 +123,7 @@ gestures.
 
 In orbit, left drags rotate the camera, except that while picking mode is on,
 the Edit Hardpoints tab is selected and Rest pose is shown a left click picks a
-hardpoint of the selected category and never orbits
+hardpoint of the selected kind and never orbits
 ([Source metadata authoring](#source-metadata-authoring)); right
 drags rotate only the model sun about the active camera's screen axes in either
 mode with the same continuous feel. Both gestures allow edge roll and cross poles
@@ -150,34 +153,43 @@ and foreground.
 ## Source metadata authoring
 
 The right window's Flight tab edits XYZ scale, rotation in degrees and offset,
-and the Edit Hardpoints tab edits hardpoints; both tabs offer the same
+the Edit Hardpoints tab edits hardpoints, and the Collision tab edits the
+outline inset; all three tabs offer the same
 explicit Save to the selected source's adjacent `.model.json`. No control edits
-the hitbox setting, so Save writes back the loaded one. The
+the hitbox setting or the navigation obstacle tag, so Save writes back the
+loaded values. The
 [exporter owns the metadata format](../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
-Geometry and animation still come from packs; alignment and hardpoints always come
+Geometry and animation still come from packs; alignment, outline inset and hardpoints always come
 from this checkout's source metadata on startup and actual model selection,
-with no packed fallback. Selection discards unsaved alignment and hardpoint edits;
+with no packed fallback. Selection discards unsaved alignment, inset and hardpoint edits;
 reselecting or restarting reloads saved values without packing. Mode changes,
 Reroll and Graphics recreation retain active edits. There is no source watcher.
 
-The Edit Hardpoints tab, present in both modes, has separate Missile tubes and
-Fighter launch bays category tabs sharing one ordered hardpoint list and the
-same editing and picking logic. Each lists only its category, with an X that
-deletes the original list entry while preserving all surviving order. Each
-category shows a Pick checkbox for one retained picking mode; switching category
-retargets it, and model load selects Missile tubes. Picking is active only while
-Edit Hardpoints is selected in the shown right window, in orbit with Rest pose;
-there a left click outside the panels always picks and never orbits. A pick
-appends the selected kind at the nearest
-front-facing (counter-clockwise) rest-geometry triangle hit under the pointer:
-its hit position and its unflipped unit winding normal as the direction; a miss
-adds nothing. In flight or with a clip selected the Pick setting is kept but
-inactive and its checkbox disabled, and picking resumes on return to orbit with
-Rest pose. Only while Edit Hardpoints is selected in orbit with Rest pose, both
-categories draw together as dots at their positions with short lines along
-their directions: missile tubes orange and fighter launch bays cyan. One shared
-projection applies the accepted alignment, over the scene and under the panels
-with no depth test. Save preserves the shared list's order.
+One ordered hardpoint list is edited through per-kind tabs; X deletes the
+original entry and Save preserves list order. Pick appends the selected kind at
+the nearest front-facing (counter-clockwise) rest-geometry triangle hit under
+the pointer: its hit position and its unflipped unit winding normal as the
+direction; a miss adds nothing. Picking is active only while Edit Hardpoints is
+selected in the shown right window, in orbit with Rest pose; there a left click
+outside the panels always picks and never orbits. In flight or with a clip
+selected the Pick setting is kept but inactive and its checkbox disabled, and
+picking resumes on return to orbit with Rest pose. Only while Edit Hardpoints is
+selected in orbit with Rest pose, both kinds draw together as dots at their
+positions with short lines along their directions. One shared projection applies
+the accepted alignment, over the scene and under the panels with no depth test.
+
+The Collision tab, present in both modes, previews the inset on a model whose
+pack holds the `outline` hitbox setting; on any other model it says a data build
+applies a hitbox change, its Inset (m) slider stays disabled and nothing draws.
+The slider and overlay are active only while Collision is selected in the shown
+right window, in orbit with Rest pose. Two closed lines draw at the outline's
+mid height, over the scene and under the panels with no depth test: magenta, the
+packed outline the game holds, and on top of it green, that outline moved by
+the difference between its baked inset and the slider. The viewer reads no mesh
+and builds no silhouette, so green only approximates the next bake, and magenta
+changes only after a data build and viewer restart. An edit that fails the
+bake's vertex-count or origin check keeps the last valid green line, shows the
+reason and disables Save.
 
 The executable's containing checkout owns source reads and Save, in both main
 checkouts and linked worktrees, independently of working directory and packed

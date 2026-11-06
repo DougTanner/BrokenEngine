@@ -26,7 +26,7 @@ model as a wreck (`## Wreck Invariants`).
   when it is not dying, its arrival grace has run out, the shared plane and
   height rule allows it (`../Ships/AGENTS.md` `## Ship Invariants`), and its
   `pNextMissileFireTimes` cooldown is at or below zero. A launch resets the
-  cooldown to `kBattleshipMissileCooldown` (0.5 seconds), and the cooldown transfers with the
+  cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
   ship, so launches come exactly `kBattleshipMissileCooldown` apart.
 - A launching row launches at most one missile per tick, at the enemy nearest
   it by 3D distance among those within `kfBattleshipMissileRange` that the
@@ -38,17 +38,12 @@ model as a wreck (`## Wreck Invariants`).
   same tick, so a later shooter sees an earlier shooter's launches. Each missile
   receives that enemy as its target at launch, with no registry acquisition
   (`../Missiles/AGENTS.md`).
-- Tubes come from the controller model in `kShipHitboxTypes`, fully aligned by
-  the [model exporter](../../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment).
-  Bound the appended records against `EagerChunk.iDataSize` before constructing
-  their span; these armed models require at least one tube and have no fallback.
-  Yaw each aligned tube by the ship's horizontal heading, translate to the ship,
-  and choose the least XY squared distance to the already selected enemy. An
-  exact tie keeps the first authored tube. Preserve the tube's full aligned Z
-  offset in the launch position; apply alignment, yaw, and translation once.
-  Flatten and normalize the aligned direction in XY before
-  yaw, keeping direction and velocity Z zero. A launch `MissilesPostRender::Spawn`
-  refuses leaves the ship cooldown unchanged and launches nothing that tick.
+- Tubes are the controller model's packed missile tubes
+  ([exporter](../../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment));
+  these armed models require at least one. A launch uses the yawed tube nearest
+  the selected enemy in XY (exact tie: first authored), its full aligned Z, and a
+  flattened direction with zero Z. A launch `MissilesPostRender::Spawn` refuses
+  leaves the cooldown unchanged.
 
 ## Turning Invariants
 

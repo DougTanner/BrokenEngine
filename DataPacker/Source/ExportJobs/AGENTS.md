@@ -78,8 +78,9 @@ candidate image in the resolved source file's folder tree and its exact sibling
 `CANDIDATE_EXTENSIONS` in the script, mirrored by `kpCandidateImageExtensions`
 in `BlenderExport.cpp`), from which conversion relinks missing images and fills
 empty material inputs. The `BaseColorAlpha` suffix supplies base color through
-the existing color input; it does not supply the alpha input. In-root
-dependencies use input-root-relative
+the existing color input; it does not supply the alpha input. A normal image
+wired into a Normal Map node raises a Strength of 0 to 1.
+In-root dependencies use input-root-relative
 identities; external dependencies use source-relative identities where
 possible. Missing or unreadable dependencies, tool or marker,
 changed inputs or output, and a candidate image with no recorded dependency
@@ -101,8 +102,9 @@ optimization, intermediate/chunk writes, and cache/publication behavior.
 Scene images contain byte channels; the glTF decoder normalizes unsigned-short
 samples to bytes before transfer. Blender channel packing preserves sRGB color
 encoding, source images, and scalar/alpha values.
-Material decoding preserves RGB emissive factors and glTF occlusion strength;
-formats without an occlusion strength keep the neutral default.
+Material decoding preserves RGB emissive factors, glTF occlusion strength and
+glTF normal texture scale; formats without those values keep the neutral
+defaults.
 A glTF primitive with no material gets the glTF 2.0 default material.
 glTF decoding stays phased: source loading, canonical skin selection and normalization
 precede pre-export marker removal; texture publication and orphan sweeping
@@ -196,9 +198,12 @@ without modifying the source.
 `ExportModel` owns optional adjacent `<source-filename>.model.json` metadata:
 remove only the generated final `.MODEL` extension before appending
 `.model.json`, so `scene.gltf.MODEL` uses `scene.gltf.model.json`.
-Present metadata requires integer `version: 4`, complete `rotationDegrees`,
+Present metadata requires the integer `version` `common::ReadModelMetadata`
+accepts, complete `rotationDegrees`,
 `scale`, and `offset` arrays, each with exactly three numeric components that
-fit finite floats, a `hitbox` string of `sphere`, `box`, or `outline`, and a
+fit finite floats, a `hitbox` string of `sphere`, `box`, or `outline`, a numeric
+`outlineInset` that fits a finite float and is at or above 0, a boolean
+`navigationObstacle`, and a
 `hardpoints` array, possibly empty, of objects; every scale component must
 remain strictly positive after conversion. Each hardpoint requires a string
 `kind`, exactly `missileTube` or `fighterLaunchBay`, and `position` and
@@ -208,7 +213,7 @@ ignored; `direction` must have nonzero length, which is its whole contract:
 ModelViewer writes unit vectors and the reader stores the value without
 normalizing it. Invalid present metadata fails through the export aggregate;
 absence alone supplies zero rotation and offset with unit scale, the `sphere`
-hitbox setting and no hardpoints.
+hitbox setting, a false navigation obstacle tag and no hardpoints.
 `common::ReadModelMetadata` (`Common/ModelMetadata.h`) is the one reader and
 validator, shared with ModelViewer authoring.
 
@@ -223,20 +228,32 @@ independent gameplay dimensions remain consumer-owned.
 
 Every model chunk, whatever its hitbox setting, appends a `common::ModelOutline`
 section: the top-down convex hull and z range of the vertices after alignment,
-plus the setting. The bake owns the outline's value checks — a hull outside 3
-to `kiModelOutlineVertexMaximum` vertices, a non-finite value, or a failed
-convexity check fails the export — so runtime readers check only memory safety.
+the setting, the navigation obstacle tag, the outline weapons test, and the
+inset it was baked with. An
+`outline` model's outline is the outer contour of its top-down triangles moved
+in by `outlineInset` and simplified; every other model's outline is its hull.
+The outline is a simple polygon of either winding. It must stay inside the hull
+because the game's `ShipHitboxes.cpp` builds a ship's row radius and box from
+the hull, and those must enclose the outline
+(`../../../Engine/Source/Frame/AGENTS.md` `## Architecture`); the bake meets that
+by construction, with no hull check:
+its contour comes from the same vertices and only moves in, so `outlineInset`
+cannot be negative. It holds the model origin because the Fighter beam
+contact's center-directed ray relies on that. The bake owns the outline's value
+checks — a hull or outline outside 3 to `kiModelOutlineVertexMaximum` vertices,
+a non-finite value, a failed hull convexity check, or an outline without the
+origin fails the export — so runtime readers check only memory safety.
 
 Hardpoints pack into separate missile tube then fighter launch bay sections
 after the outline, each counted by the model header. Both sections use packed
 float3 position/direction pairs without kind tags, preserving each kind's
-relative order in the authored list; missile order remains tube identity.
+relative order in the authored list; authored order breaks nearest-tube ties.
 Positions receive the complete alignment; directions receive its scale and
 rotation without translation or normalization. Non-finite aligned vectors or
 a zero aligned direction fail export. Retain XYZ until consumers apply their
 gameplay projection. A zero count emits no records. The outline and both
 sections stay outside the GPU payload size; their shared offsets live in
-`ModelHeader`. The server fleet launch path consumes fighter launch bays for authored spawn positions and headings.
+`ModelHeader`.
 
 The model job fingerprints both `.MODEL` content and metadata content or explicit
 absence, so metadata addition, editing, or removal dirties model packing without

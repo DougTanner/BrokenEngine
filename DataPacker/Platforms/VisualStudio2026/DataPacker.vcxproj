@@ -186,7 +186,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
@@ -223,7 +223,7 @@ if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include\Volk;$(VK_SDK_PATH)\Include;$(VK_SDK_PATH)\Include\vulkan;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\..\Common;$(ProjectDir)\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\ThirdParty\DirectXTK\Src;$(ProjectDir)\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\ThirdParty\zlib;$(ProjectDir)\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\ThirdParty\cmft\include;$(ProjectDir)\..\..\..\ThirdParty\cmft\dependency;$(ProjectDir)\..\..\..\ThirdParty\meshoptimizer\src;$(ProjectDir)..\..\..\ThirdParty\assimp\include;$(ProjectDir)..\..\..\ThirdParty\Prebuilts\Source\DataPacker\assimp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
@@ -245,7 +245,8 @@ if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnablePREfast>true</EnablePREfast>
       <ExceptionHandling>Async</ExceptionHandling>
-      <DisableSpecificWarnings>28278;6385;6326;6340;6297;26115;26135;26408;26445</DisableSpecificWarnings>
+      <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
+      <DisableSpecificWarnings>28278;6385;6326;6340;6297;26115;26135;26408;26445;4702</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

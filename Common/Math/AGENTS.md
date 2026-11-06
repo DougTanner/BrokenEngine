@@ -35,7 +35,17 @@ Adding or removing a draw changes every later result. Keep random draws and mode
 
 ## Convex Hulls
 
-`ConvexHull2D`, `BuildWorldHull`, and `ConvexHullsOverlap` provide deterministic island-placement and posed ship-hitbox geometry; offline bakes build hulls with `BuildConvexHull` and validate them with `IsPolygonStrictlyConvexCcw`. Runtime SAT and hitbox prism tests assume convex, counter-clockwise hulls; producers must preserve those properties and validate them before serialization. Placement math that feeds CRC state uses deterministic trig.
+`ConvexHull2D`, `BuildWorldHull`, and `ConvexHullsOverlap` provide deterministic
+island-placement and posed ship-hitbox geometry; offline bakes build hulls with
+`BuildConvexHull` and validate them with `IsPolygonStrictlyConvexCcw`. Runtime
+SAT and `ClipSegmentToPrism` assume convex, counter-clockwise polygons;
+producers must preserve those properties and validate them before serialization.
+`ClipSegmentToPrism` is the one segment clip for weapon hitboxes and navigation
+rectangles. `BuildWorldHull` keeps its input's winding, so it also poses ship
+outlines, which are simple polygons of either winding and need neither property.
+`PointInPolygon` tests such a polygon and is the one rule for navigation
+obstacles and outline hit tests. Placement math that feeds CRC state uses
+deterministic trig.
 
 ## See Also
 

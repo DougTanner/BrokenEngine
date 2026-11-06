@@ -98,7 +98,7 @@ static nlohmann::json BuildFleets()
 			nlohmann::json members = nlohmann::json::array();
 			for (const FleetMember& rMember : pFocused->members)
 			{
-				members.push_back({{"globalId", rMember.globalId.iValue}, {"alive", !(rMember.flags & FleetMemberFlags::kIsDead)}});
+				members.push_back({{"globalId", rMember.globalId.iValue}, {"type", kShipUnitTypes[std::to_underlying(rMember.eType)]}, {"squadron", rMember.uiSquadron}, {"alive", !(rMember.flags & FleetMemberFlags::kIsDead)}});
 			}
 			fleetJson["members"] = std::move(members);
 		}

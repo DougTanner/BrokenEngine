@@ -12,8 +12,11 @@
 2. Search both the old and new side of every contract. Account for all old-name
    hits after a rename and all users of the new symbol or representation. Use
    repository-tracked searches that work on the current host (prefer `git grep`
-   with explicit pathspecs), limited to relevant C++, headers, and GLSL. Exclude
-   `ThirdParty/`, generated data, and build/output directories; inspect owned
+   with explicit pathspecs), limited to relevant C++, headers, and GLSL. As an
+   exception to that limit and to step 6, a rename also runs `git grep` of the
+   old name under `Documents/Plans` and updates quoted text in unclaimed Plans
+   and their support files. Exclude `ThirdParty/`, generated data, and
+   build/output directories; inspect owned
    untracked source additions directly. Do not use a moving merge base or
    `git status` alone to attribute changes. Done when both the old-side and
    new-side searches have been run and every hit is classified as needing an

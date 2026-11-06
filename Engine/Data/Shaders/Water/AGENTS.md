@@ -7,7 +7,7 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 - Active LOD grid dimensions must match both displacement textures. Water-mesh recreation recreates the grid and textures together.
 - Water quality selects wave bands without changing their tuned counts: Low runs no displacement, Medium runs the low-frequency band, and High runs both low- and medium-frequency bands.
 - Low-frequency Gerstner amplitudes come directly from the base values in `MainLayout.pf4LowWavesTwo[i].y`; displacement applies no depth-based Green's-law shoaling multiplier.
-- The low-frequency Gerstner band's breaker boundary weight transitions from `Break Start Depth` (`S`) to `Break End Depth` (`E`). When `S < E`, normalized depth `t` is shaped as `pow(t, exponent)` by `Break Blend Curve` (range `0.125`–`8`, default `1` is linear; values below `1` introduce low earlier and values above `1` retain medium longer); the clamped endpoints remain exact. When `S >= E`, the boundary is a hard step at `E`.
+- The low-frequency Gerstner band's breaker boundary weight transitions from `Break Start Depth` (`S`) to `Break End Depth` (`E`). When `S < E`, normalized depth `t` is shaped as `pow(t, exponent)` by `Break Blend Curve` (`gWaterBreakBlendCurve`; `1` is linear, values below `1` introduce low earlier and values above `1` retain medium longer); the clamped endpoints remain exact. When `S >= E`, the boundary is a hard step at `E`.
 - The medium-frequency band starts with the complementary boundary weight
   `1 - low`. After both boundaries are calculated, one smooth shore envelope
   over physical depth `[0, Medium Shore Softness]` multiplies the medium weight
@@ -63,17 +63,10 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 
 ## Lighting Contracts
 
-- Skybox One selects every integer count 1..9 (default 2), reusing the original
-  center highlight plus count-minus-one evenly spaced clock-ring points starting
-  at 12 o'clock clockwise. Sample Radius ranges from 0 to 1 screen pixel
-  (default 0.5); zero collapses the effective count to one. Count one or Sample
-  Blend zero skips extra sampling. Blend mixes the center with the mean of
-  independently reconstructed highlights after positive-domain authored power;
-  nonpositive factors contribute zero and remain in the total denominator.
-  Capture position and geometry-normal derivatives before terrain rejection and
-  sample branches; every normal sample uses the original full-pixel unwrapped
-  gradients, independently of Radius. Two, Three, cubemap color, and other water
-  shading retain center inputs.
+- Skybox One extra sampling: capture position and geometry-normal derivatives
+  before terrain rejection and sample branches; every normal sample uses the
+  original full-pixel unwrapped gradients. Nonpositive factors contribute zero
+  and stay in the denominator. Only Skybox One samples extra.
 - Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height lighting and smoke projections keep the true eye line (`ToEyeLine`).

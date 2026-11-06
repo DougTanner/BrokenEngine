@@ -64,14 +64,14 @@ void main()
 	vec3 f3ToEyeNormal = normalize(vec3(-f2InInitialPosition, mainLayout.f4WaterEyePosition.z));
 	f3ToEyeNormal = normalize(mix(f3ToEyeNormal, vec3(0.0, 0.0, 1.0), globalLayout.fLightingWaterSkyboxNormalSoften));
 
-	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy);
-	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy);
 	if (fTerrainElevation > 0.0f)
 	{
 		f4OutColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		discard;
 		return;
 	}
+	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy);
+	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy);
 
 	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).
 	// CPU stores fmod(freq*camera, 10.0) so mult * 10 must be integer for fract() to absorb the wrap.

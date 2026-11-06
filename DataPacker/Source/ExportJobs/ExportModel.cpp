@@ -14,6 +14,58 @@ static std::filesystem::path GetModelMetadataPath(const std::filesystem::path& r
 	return metadataPath;
 }
 
+// The outer contour of the model's top-down triangles: the largest path of their union, so holes and specks drop out.
+// Reads whichever index vector the export decoded; the other is empty. Empty when no triangle has area.
+static std::vector<XMFLOAT2> BuildModelSilhouette(std::span<const XMFLOAT2> points, std::span<const uint16_t> indices16, std::span<const uint32_t> indices32)
+{
+	static constexpr int64_t kiClipperPrecision = 4;
+
+	auto IndexedPoint = [&](int64_t i) -> XMFLOAT2
+	{
+		return points[indices16.empty() ? indices32[i] : indices16[i]];
+	};
+
+	int64_t iIndexCount = std::ssize(indices16) + std::ssize(indices32);
+	Clipper2Lib::PathsD triangles;
+	triangles.reserve(static_cast<size_t>(iIndexCount / 3));
+	for (int64_t i = 0; i + 2 < iIndexCount; i += 3)
+	{
+		XMFLOAT2 f2A = IndexedPoint(i);
+		XMFLOAT2 f2B = IndexedPoint(i + 1);
+		XMFLOAT2 f2C = IndexedPoint(i + 2);
+		double fCross = (static_cast<double>(f2B.x) - f2A.x) * (static_cast<double>(f2C.y) - f2A.y) - (static_cast<double>(f2B.y) - f2A.y) * (static_cast<double>(f2C.x) - f2A.x);
+		if (fCross == 0.0)
+		{
+			continue;
+		}
+		// Mixed directions would cancel under the nonzero fill where triangles overlap.
+		if (fCross < 0.0)
+		{
+			std::swap(f2B, f2C);
+		}
+		triangles.push_back({Clipper2Lib::PointD(f2A.x, f2A.y), Clipper2Lib::PointD(f2B.x, f2B.y), Clipper2Lib::PointD(f2C.x, f2C.y)});
+	}
+
+	Clipper2Lib::PathsD unioned = Clipper2Lib::Union(triangles, Clipper2Lib::FillRule::NonZero, static_cast<int>(kiClipperPrecision));
+	// Holes have negative area, so the largest area is always an outer contour.
+	auto it = std::ranges::max_element(unioned, {}, [](const Clipper2Lib::PathD& rPath)
+	{
+		return Clipper2Lib::Area(rPath);
+	});
+	if (it == unioned.end())
+	{
+		return {};
+	}
+
+	std::vector<XMFLOAT2> silhouette;
+	silhouette.reserve(it->size());
+	for (const Clipper2Lib::PointD& rPoint : *it)
+	{
+		silhouette.emplace_back(static_cast<float>(rPoint.x), static_cast<float>(rPoint.y));
+	}
+	return silhouette;
+}
+
 
 std::optional<common::ChunkFlags_t> ExportModel::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
@@ -33,6 +85,8 @@ void ExportModel::Export()
 		modelHeader.f3Scale = metadata.f3Scale;
 		modelHeader.f3Offset = metadata.f3Offset;
 		outline.eHitboxLevel = metadata.eHitboxLevel;
+		outline.fOutlineInsetMeters = metadata.fOutlineInsetMeters;
+		outline.uiNavigationObstacle = metadata.bNavigationObstacle ? 1ui32 : 0ui32;
 		int64_t iMissileTubeCount = std::ranges::count(metadata.hardpoints, common::ModelHardpointKind::kMissileTube, &common::ModelHardpoint::eKind);
 		int64_t iFighterLaunchBayCount = std::ssize(metadata.hardpoints) - iMissileTubeCount;
 		if (!std::in_range<uint32_t>(iMissileTubeCount) || !std::in_range<uint32_t>(iFighterLaunchBayCount))
@@ -174,6 +228,12 @@ void ExportModel::Export()
 		outline.fMinimumZ = std::min(outline.fMinimumZ, f3Position.z);
 		outline.fMaximumZ = std::max(outline.fMaximumZ, f3Position.z);
 	}
+	// Runs before BuildConvexHull, whose sort leaves hullPoints out of step with the indices.
+	std::vector<XMFLOAT2> silhouette;
+	if (outline.eHitboxLevel == common::ModelHitboxLevel::kOutline)
+	{
+		silhouette = BuildModelSilhouette(hullPoints, indices16, indices32);
+	}
 	std::vector<XMFLOAT2> hull = common::BuildConvexHull(hullPoints);
 	if (std::ssize(hull) < 3 || std::ssize(hull) > common::kiModelOutlineVertexMaximum)
 	{
@@ -185,6 +245,18 @@ void ExportModel::Export()
 	}
 	std::copy(hull.begin(), hull.end(), outline.pf2HullVertices);
 	outline.iHullVertexCount = static_cast<int32_t>(std::ssize(hull));
+	std::vector<XMFLOAT2> outlineVertices = outline.eHitboxLevel == common::ModelHitboxLevel::kOutline ? common::OffsetPolygon(silhouette, -outline.fOutlineInsetMeters, common::kfModelOutlineSimplifyEpsilonMeters) : hull;
+	if (std::ssize(outlineVertices) < 3 || std::ssize(outlineVertices) > common::kiModelOutlineVertexMaximum)
+	{
+		throw std::runtime_error(std::format("ExportModel::Export outline has {} vertices; it needs 3 to {}", std::ssize(outlineVertices), common::kiModelOutlineVertexMaximum));
+	}
+	// ShipHullContact's center-directed ray relies on the origin lying inside.
+	if (!common::PointInPolygon({0.0f, 0.0f}, outlineVertices))
+	{
+		throw std::runtime_error("ExportModel::Export outline does not contain the model origin");
+	}
+	std::copy(outlineVertices.begin(), outlineVertices.end(), outline.pf2OutlineVertices);
+	outline.iOutlineVertexCount = static_cast<int32_t>(std::ssize(outlineVertices));
 
 	int64_t iIndexCount = static_cast<int64_t>(uiIndexCount);
 	int64_t iIndicesSize = std::ssize(indices16) > 0

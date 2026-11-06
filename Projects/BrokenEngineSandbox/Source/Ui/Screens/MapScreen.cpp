@@ -72,14 +72,23 @@ void MapScreen::Render()
 	static constexpr float kfHalfHeight = engine::kfCellHalfHeight;
 	static constexpr XMFLOAT2 kpf2Corners[6] {{kfHalfWidth, 0.0f}, {0.5f * kfHalfWidth, kfHalfHeight}, {-0.5f * kfHalfWidth, kfHalfHeight}, {-kfHalfWidth, 0.0f}, {-0.5f * kfHalfWidth, -kfHalfHeight}, {0.5f * kfHalfWidth, -kfHalfHeight}};
 
+	// A centred island draws only from its own cell, and its quad can overhang that cell's hexagon by up to the largest
+	// template's half footprint diagonal.
+	float fLargestHalfDiagonal = 0.0f;
+	for ([[maybe_unused]] const auto& [rCrc, rIsland] : rIslandTerrain.mIslands)
+	{
+		fLargestHalfDiagonal = std::max(fLargestHalfDiagonal, 0.5f * std::hypot(rIsland.fQuadFootprintX, rIsland.fQuadFootprintY));
+	}
+	float fCellReach = kfHalfWidth + fLargestHalfDiagonal;
+
 	// The camera works in its own cell's frame, centred on that cell. A cell at grid distance k has its centre at least
-	// k * sqrt(3) * apothem from there, and a cell overlapping the visible area has its centre within a half width of an
-	// area point, so the farthest area corner bounds the rings to visit.
+	// k * sqrt(3) * apothem from there, and a cell whose hexagon or islands overlap the visible area has its centre within
+	// fCellReach of an area point, so the farthest area corner bounds the rings to visit.
 	XMFLOAT4 f4VisibleArea = engine::gpCamera->mf4LargeVisibleArea;
 	float fFarthestX = std::max(std::abs(f4VisibleArea.x), std::abs(f4VisibleArea.z));
 	float fFarthestY = std::max(std::abs(f4VisibleArea.y), std::abs(f4VisibleArea.w));
 	float fFarthestDistance = std::sqrt(fFarthestX * fFarthestX + fFarthestY * fFarthestY);
-	int64_t iRadius = static_cast<int64_t>(std::ceil((fFarthestDistance + kfHalfWidth) / (std::numbers::sqrt3_v<float> * engine::kfCellApothem)));
+	int64_t iRadius = static_cast<int64_t>(std::ceil((fFarthestDistance + fCellReach) / (std::numbers::sqrt3_v<float> * engine::kfCellApothem)));
 
 	ImU32 uiLineColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapCellLineColor.x, kMapCellLineColor.y, kMapCellLineColor.z, fOpacity));
 	ImU32 uiPictureColor = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, fOpacity));
@@ -89,7 +98,7 @@ void MapScreen::Render()
 		for (int64_t j = std::max(-iRadius, -i - iRadius); j <= std::min(iRadius, -i + iRadius); ++j)
 		{
 			XMVECTOR vecCenter = common::HexCenterOffset(i, j, engine::kCellDirections);
-			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecCenter, kfHalfWidth, kfHalfWidth, kfHalfWidth, kfHalfWidth))
+			if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecCenter, fCellReach, fCellReach, fCellReach, fCellReach))
 			{
 				continue;
 			}
@@ -105,7 +114,7 @@ void MapScreen::Render()
 					engine::GenerateIslandChain(coordinate, itCell->second);
 				}
 
-				for (const engine::IslandPlacement& rPlacement : itCell->second)
+				for (const engine::IslandPlacement& rPlacement : engine::CentredIslands(itCell->second))
 				{
 					const engine::IslandTemplate& rTemplate = rIslandTerrain.mIslands.at(rPlacement.islandCrc);
 					ImFontAtlasRect rect;

@@ -552,48 +552,30 @@ void Collision::CommitCandidate(const CollisionCandidate& rCandidate)
 	}
 }
 
-// Cyrus-Beck clip: narrows [rfEnter, rfExit] of the point path rf3Start + t * rf3Delta to the part inside the CCW
-// convex polygon extruded over [fMinimumZ, fMaximumZ], boundary included. Returns false once the interval is empty.
-bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit)
+float FirstOutlineCrossing(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fFrom, float fTo)
 {
-	// The path is inside the half-space where fOutside + t * fRate <= 0.
-	auto ClipToHalfSpace = [&rfEnter, &rfExit](float fOutside, float fRate)
-	{
-		if (fRate == 0.0f)
-		{
-			return fOutside <= 0.0f;
-		}
-		float fTime = -fOutside / fRate;
-		if (fRate < 0.0f)
-		{
-			rfEnter = std::max(rfEnter, fTime);
-		}
-		else
-		{
-			rfExit = std::min(rfExit, fTime);
-		}
-		return rfEnter <= rfExit;
-	};
-
-	if (!ClipToHalfSpace(fMinimumZ - rf3Start.z, -rf3Delta.z) || !ClipToHalfSpace(rf3Start.z - fMaximumZ, rf3Delta.z))
-	{
-		return false;
-	}
+	float fFirst = std::numeric_limits<float>::infinity();
 	for (int64_t i = 0; i < std::ssize(vertices); ++i)
 	{
 		const XMFLOAT2& rStartVertex = vertices[i];
 		const XMFLOAT2& rEndVertex = vertices[(i + 1) % std::ssize(vertices)];
-		// Outward normal of the CCW edge (v1 - v0) is (edge.y, -edge.x).
-		float fNormalX = rEndVertex.y - rStartVertex.y;
-		float fNormalY = rStartVertex.x - rEndVertex.x;
-		float fOutside = fNormalX * (rf3Start.x - rStartVertex.x) + fNormalY * (rf3Start.y - rStartVertex.y);
-		float fRate = fNormalX * rf3Delta.x + fNormalY * rf3Delta.y;
-		if (!ClipToHalfSpace(fOutside, fRate))
+		float fEdgeX = rEndVertex.x - rStartVertex.x;
+		float fEdgeY = rEndVertex.y - rStartVertex.y;
+		float fDenominator = rf3Delta.x * fEdgeY - rf3Delta.y * fEdgeX;
+		if (fDenominator == 0.0f)
 		{
-			return false;
+			continue;
+		}
+		float fOffsetX = rStartVertex.x - rf3Start.x;
+		float fOffsetY = rStartVertex.y - rf3Start.y;
+		float fTime = (fOffsetX * fEdgeY - fOffsetY * fEdgeX) / fDenominator;
+		float fEdgeTime = (fOffsetX * rf3Delta.y - fOffsetY * rf3Delta.x) / fDenominator;
+		if (fTime >= fFrom && fTime <= fTo && fEdgeTime >= 0.0f && fEdgeTime <= 1.0f)
+		{
+			fFirst = std::min(fFirst, fTime);
 		}
 	}
-	return true;
+	return fFirst;
 }
 
 // The caller deduplicates each B object for the current A object.
@@ -666,8 +648,9 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 
 	}
 
-	// A box or outline row narrows the sphere hit to its box prism, then for an outline its hull prism. The hitbox
-	// holds the ship's end pose, so the projectile point's path is taken relative to the ship's motion.
+	// A box or outline row narrows the sphere hit to its box prism, then an outline row moves the contact to where the
+	// path is first inside the outline. The box clip supplies the Z range. The hitbox holds the ship's end pose, so the
+	// projectile point's path is taken relative to the ship's motion.
 	const CollisionHitbox* pHitbox = rLayerA.pHitboxes != nullptr ? &rLayerA.pHitboxes[i] : (rLayerB.pHitboxes != nullptr ? &rLayerB.pHitboxes[j] : nullptr);
 	bool bHitboxContact = pHitbox != nullptr && pHitbox->eHitboxLevel != common::ModelHitboxLevel::kSphere;
 	XMVECTOR vecContactPoint = vecImpactA;
@@ -685,14 +668,22 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 
 		float fEnter = 0.0f;
 		float fExit = 1.0f;
-		if (!ClipSegmentToPrism(f3PathStart, f3PathDelta, pHitbox->pf2BoxVertices, pHitbox->fMinimumZ, pHitbox->fMaximumZ, fEnter, fExit))
+		if (!common::ClipSegmentToPrism(f3PathStart, f3PathDelta, pHitbox->pf2BoxVertices, pHitbox->fMinimumZ, pHitbox->fMaximumZ, fEnter, fExit))
 		{
 			return;
 		}
-		if (pHitbox->eHitboxLevel == common::ModelHitboxLevel::kOutline
-		 && !ClipSegmentToPrism(f3PathStart, f3PathDelta, std::span(pHitbox->pf2HullVertices, static_cast<size_t>(pHitbox->iHullVertexCount)), pHitbox->fMinimumZ, pHitbox->fMaximumZ, fEnter, fExit))
+		if (pHitbox->eHitboxLevel == common::ModelHitboxLevel::kOutline)
 		{
-			return;
+			std::span<const XMFLOAT2> outlineVertices(pHitbox->pf2OutlineVertices, static_cast<size_t>(pHitbox->iOutlineVertexCount));
+			if (!common::PointInPolygon({f3PathStart.x + fEnter * f3PathDelta.x, f3PathStart.y + fEnter * f3PathDelta.y}, outlineVertices))
+			{
+				// A crossing lost to rounding at a vertex is caught next tick, when the path starts inside.
+				fEnter = FirstOutlineCrossing(f3PathStart, f3PathDelta, outlineVertices, fEnter, fExit);
+				if (!std::isfinite(fEnter))
+				{
+					return;
+				}
+			}
 		}
 
 		fTimeOfImpact = fEnter;

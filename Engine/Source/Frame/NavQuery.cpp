@@ -8,6 +8,8 @@
 namespace engine
 {
 
+constexpr int64_t kiRectangleCornerCount = 4;
+
 // Conservative edge-CSR AABB buckets and DDA traversal of every clipped-segment cell test all real
 // crossings; the boolean OR is order-independent. Callers require f2GridMinimum/f2GridMaximum and edge CSR from
 // BuildNavigationAcceleration on nonempty vertices. NavQueryDirection checks empty vertices; NavCellData runs
@@ -152,8 +154,6 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	return false;
 }
 
-// PointInAnyPolygon uses a per-polygon AABB broad phase and shares PointInPolygon's winding core with
-// the builder through NavBuildInternal.h.
 bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavData& rNavData)
 {
 	for (int64_t i = 0; i < std::ssize(rNavData.polygonOffsets); ++i)
@@ -169,7 +169,7 @@ bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavDat
 		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rNavData.polygonOffsets, i, std::ssize(rNavData.vertices)));
 		int64_t iCount = iEnd - iStart;
 
-		if (iCount > 0 && PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
+		if (iCount > 0 && common::PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
 		{
 			return true;
 		}
@@ -182,6 +182,27 @@ static float Distance(XMFLOAT2 f2A, XMFLOAT2 f2B)
 	float fDeltaX = f2B.x - f2A.x;
 	float fDeltaY = f2B.y - f2A.y;
 	return std::sqrt(fDeltaX * fDeltaX + fDeltaY * fDeltaY);
+}
+
+// The sum of the penalties of the rectangles the segment touches, boundary included, in span order. A clip decides,
+// because SegmentsIntersect misses a diagonal between two box corners and a segment wholly inside. A zero Z range at Z 0
+// makes the prism clip 2D.
+static float RectangleCrossingPenalty(XMFLOAT2 f2A, XMFLOAT2 f2B, std::span<const NavRectangle> rectangles)
+{
+	XMFLOAT3A f3Start {f2A.x, f2A.y, 0.0f};
+	XMFLOAT3A f3Delta {f2B.x - f2A.x, f2B.y - f2A.y, 0.0f};
+
+	float fPenalty = 0.0f;
+	for (const NavRectangle& rRectangle : rectangles)
+	{
+		float fEnter = 0.0f;
+		float fExit = 1.0f;
+		if (common::ClipSegmentToPrism(f3Start, f3Delta, rRectangle.pf2Box, 0.0f, 0.0f, fEnter, fExit))
+		{
+			fPenalty += rRectangle.fCrossingPenalty;
+		}
+	}
+	return fPenalty;
 }
 
 static XMFLOAT2 NearestPolygonEdgePoint(XMFLOAT2 f2Position, const XMFLOAT2* pVertices, const NavData& rNavData)
@@ -397,14 +418,17 @@ struct AStarHeap
 	}
 };
 
-// A* pathfinding on the visibility graph with temporary start/end nodes
+// A* pathfinding on the visibility graph with temporary rectangle corner, start, and end nodes, indexed static vertices,
+// then corners in span order, then start, then end, so the heap's tie-break follows the span order.
+// An edge costs its length plus its rectangle penalties. A penalty only raises a cost, so the Euclidean heuristic stays
+// consistent, which the closed set and the first pop of the end node both need.
 // Returns the direction toward the first waypoint, or zero vector if no path found
-static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fHeight, XMVECTOR& rVecNextWaypoint)
+static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, std::span<const NavRectangle> rectangles, bool bStaticBlocked, const AStarMemory& rMemory, float fHeight, XMVECTOR& rVecNextWaypoint)
 {
 	int64_t iVertexCount = std::ssize(rNavData.vertices);
-	int64_t iStartNode = iVertexCount;
-	int64_t iEndNode = iVertexCount + 1;
-	int64_t iTotalNodes = iVertexCount + 2;
+	int64_t iStartNode = iVertexCount + kiRectangleCornerCount * std::ssize(rectangles);
+	int64_t iEndNode = iStartNode + 1;
+	int64_t iTotalNodes = iStartNode + 2;
 
 	for (int64_t i = 0; i < iTotalNodes; ++i)
 	{
@@ -433,8 +457,19 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 		{
 			return f2End;
 		}
+		if (iNode >= iVertexCount)
+		{
+			int64_t iCorner = iNode - iVertexCount;
+			return rectangles[iCorner / kiRectangleCornerCount].pf2Corners[iCorner % kiRectangleCornerCount];
+		}
 		return pVertices[iNode];
 	};
+
+	// A corner inside a polygon is no waypoint; every static node stays open.
+	for (int64_t i = iVertexCount; i < iStartNode; ++i)
+	{
+		rMemory.pClosed[i] = PointInAnyPolygon(GetPosition(i), pVertices, rNavData);
+	}
 
 	AStarHeap heap {.pOpenSet = rMemory.pOpenSet, .pHeapPosition = rMemory.pHeapPosition, .pFCost = rMemory.pFCost, .iHeapCount = 0};
 
@@ -474,6 +509,14 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			XMFLOAT2 f2Neighbor = GetPosition(iNeighbor);
 			float fTentativeG = rMemory.pGCost[iCurrent] + Distance(f2Current, f2Neighbor);
 
+			if (fTentativeG >= rMemory.pGCost[iNeighbor])
+			{
+				return;
+			}
+
+			// The length alone prunes first, because the penalty costs a clip per rectangle.
+			fTentativeG += RectangleCrossingPenalty(f2Current, f2Neighbor, rectangles);
+
 			if (fTentativeG < rMemory.pGCost[iNeighbor])
 			{
 				rMemory.pGCost[iNeighbor] = fTentativeG;
@@ -491,15 +534,37 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			}
 		};
 
+		// Corners have no adjacency, so their edges test the polygons here, closed nodes first to skip the grid walk. An
+		// empty graph has no grid and blocks nothing.
+		auto TryVisibleNeighbors = [&](int64_t iBegin, int64_t iStop)
+		{
+			XMFLOAT2 f2Current = GetPosition(iCurrent);
+			for (int64_t i = iBegin; i < iStop; ++i)
+			{
+				if (!rMemory.pClosed[i] && (iVertexCount == 0 || !SegmentBlockedByObstacle(f2Current, GetPosition(i), pVertices, rNavData)))
+				{
+					TryNeighbor(i);
+				}
+			}
+		};
+
 		if (iCurrent == iStartNode)
 		{
-			// The sole caller enters A* only after this post-snap start-to-end segment tested blocked.
 			for (int64_t i = 0; i < iVertexCount; ++i)
 			{
 				if (rMemory.pStartVisible[i])
 				{
 					TryNeighbor(i);
 				}
+			}
+
+			TryVisibleNeighbors(iVertexCount, iStartNode);
+
+			// Both callers enter A* with this post-snap start-to-end segment blocked by a polygon or crossing a rectangle. Only
+			// the crossing case offers the edge, at its penalty, so a sealed ship can still choose to cross.
+			if (!bStaticBlocked)
+			{
+				TryNeighbor(iEndNode);
 			}
 		}
 		else if (iCurrent < iVertexCount)
@@ -522,6 +587,13 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			{
 				TryNeighbor(iStartNode);
 			}
+
+			TryVisibleNeighbors(iVertexCount, iStartNode);
+		}
+		else
+		{
+			// A corner reaches every node; the start node is already closed.
+			TryVisibleNeighbors(0, iTotalNodes);
 		}
 	}
 
@@ -602,7 +674,7 @@ XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavDat
 	return XMVectorSet(f2BestPoint.x, f2BestPoint.y, f4Position.z, 1.0f);
 }
 
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR& rVecNextWaypoint)
+XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, std::span<const NavRectangle> rectangles, XMVECTOR& rVecNextWaypoint)
 {
 	ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
 
@@ -615,13 +687,13 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 		return XMVectorZero();
 	}
 
-	if (rNavData.vertices.empty())
+	if (rNavData.vertices.empty() && rectangles.empty())
 	{
 		return XMVector3Normalize(vecDelta);
 	}
 
 	int64_t iVertexCount = std::ssize(rNavData.vertices);
-	int64_t iTotalNodes = iVertexCount + 2;
+	int64_t iTotalNodes = iVertexCount + kiRectangleCornerCount * std::ssize(rectangles) + 2;
 
 	// Workbuffer allocation for A* scratch memory only (vertices already in NavData's cell-local frame)
 	AStarMemoryLayout aStarMemoryLayout = ComputeAStarMemoryLayout(iTotalNodes, iVertexCount);
@@ -660,7 +732,8 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 		f2Destination = SnapOutsidePolygon(f2Destination, pVertices, rNavData);
 	}
 
-	if (!SegmentBlockedByObstacle(f2Position, f2Destination, pVertices, rNavData))
+	bool bStaticBlocked = iVertexCount > 0 && SegmentBlockedByObstacle(f2Position, f2Destination, pVertices, rNavData);
+	if (!bStaticBlocked && RectangleCrossingPenalty(f2Position, f2Destination, rectangles) == 0.0f)
 	{
 		rVecNextWaypoint = XMVectorSet(f2Destination.x, f2Destination.y, f4Position.z, 1.0f);
 		vecResult = XMVector3Normalize(XMVectorSet(f2Destination.x - f2Position.x, f2Destination.y - f2Position.y, 0.0f, 0.0f));
@@ -673,7 +746,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 			gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, 1);
 		}
 #endif // BT_SERVER
-		vecResult = AStarPath(f2Position, f2Destination, pVertices, rNavData, aStarMemory, f4Position.z, rVecNextWaypoint);
+		vecResult = AStarPath(f2Position, f2Destination, pVertices, rNavData, rectangles, bStaticBlocked, aStarMemory, f4Position.z, rVecNextWaypoint);
 
 		// Fallback: if A* found no path, slide along the nearest obstacle boundary. The visibility graph
 		// spans the whole cell, so a miss means it is disconnected — an invariant violation worth a warning.
@@ -686,5 +759,79 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 
 	return vecResult;
 }
+
+#if defined(BT_SERVER)
+
+bool XM_CALLCONV NavQueryEdgeReachable(FXMVECTOR vecPosition, int64_t iDirection, const NavData& rNavData)
+{
+	static constexpr float kfEdgeStepMeters = 5.0f;
+	static constexpr float kfOpenStretchMeters = 20.0f;
+
+	if (rNavData.vertices.empty())
+	{
+		return true;
+	}
+
+	int64_t iVertexCount = std::ssize(rNavData.vertices);
+	AStarMemoryLayout aStarMemoryLayout = ComputeAStarMemoryLayout(iVertexCount + 2, iVertexCount);
+
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	auto pMemory = rWorkbuffer.PushBuffer<std::byte*>(aStarMemoryLayout.iByteCount);
+	AStarMemory aStarMemory = BindAStarMemory(pMemory.mpData, aStarMemoryLayout);
+
+	const XMFLOAT2* pVertices = rNavData.vertices.data();
+
+	XMFLOAT4A f4Position {};
+	XMStoreFloat4A(&f4Position, vecPosition);
+	XMFLOAT2 f2Start {f4Position.x, f4Position.y};
+	if (PointInAnyPolygon(f2Start, pVertices, rNavData))
+	{
+		f2Start = SnapOutsidePolygon(f2Start, pVertices, rNavData);
+	}
+
+	// The shared edge is centred halfway to the neighbour's centre and runs perpendicular to that offset, whose length is
+	// twice the apothem; a side of a regular hexagon is as long as kfCellHalfWidth, its circumradius.
+	const XMFLOAT2& rf2CenterOffset = kCellDirections.pEntries[iDirection].f2CenterOffset;
+	float fAlongX = -rf2CenterOffset.y / (2.0f * kfCellApothem);
+	float fAlongY = rf2CenterOffset.x / (2.0f * kfCellApothem);
+	float fEdgeHalfLength = 0.5f * kfCellHalfWidth;
+	int64_t iSampleCount = static_cast<int64_t>(kfCellHalfWidth / kfEdgeStepMeters) + 1;
+	auto EdgeSample = [&](int64_t iSample) -> XMFLOAT2
+	{
+		float fAlong = static_cast<float>(iSample) * kfEdgeStepMeters - fEdgeHalfLength;
+		return XMFLOAT2 {0.5f * rf2CenterOffset.x + fAlong * fAlongX, 0.5f * rf2CenterOffset.y + fAlong * fAlongY};
+	};
+
+	// A blocked sample, or the end of the edge, closes the run of unblocked samples before it.
+	int64_t iRunStart = 0;
+	for (int64_t i = 0; i <= iSampleCount; ++i)
+	{
+		if (i < iSampleCount && !PointInAnyPolygon(EdgeSample(i), pVertices, rNavData))
+		{
+			continue;
+		}
+
+		int64_t iRunLast = i - 1;
+		if (static_cast<float>(iRunLast - iRunStart) * kfEdgeStepMeters >= kfOpenStretchMeters)
+		{
+			XMFLOAT2 f2Midpoint = EdgeSample((iRunStart + iRunLast) / 2);
+			if (!SegmentBlockedByObstacle(f2Start, f2Midpoint, pVertices, rNavData))
+			{
+				return true;
+			}
+
+			XMVECTOR vecWaypoint = XMVectorZero();
+			if (XMVectorGetX(XMVector3LengthSq(AStarPath(f2Start, f2Midpoint, pVertices, rNavData, {}, true, aStarMemory, f4Position.z, vecWaypoint))) >= 1.0e-8f)
+			{
+				return true;
+			}
+		}
+		iRunStart = i + 1;
+	}
+
+	return false;
+}
+
+#endif // BT_SERVER
 
 } // namespace engine

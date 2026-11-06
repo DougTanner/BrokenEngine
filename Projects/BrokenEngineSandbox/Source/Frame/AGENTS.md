@@ -9,7 +9,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 ## Invariants
 
 - The tick phases implemented here are called by engine-owned `RunFrameTick` (`../../../../Engine/Source/Frame/AGENTS.md`). CRC-affecting fixed-tick decisions use `Frame`, `FrameInput`, `CellStaticData`, or explicit phase parameters, not `game::gpGame`, wall-clock time, or client render state; if required input is unavailable, stop and resolve ownership.
-- Game Interpolate Update receives its own cell's `CellStaticData` explicitly from both the fixed-tick and render callers and forwards it through the game collection tuple; engine base interpolation keeps its existing inputs.
+- Game Interpolate Update receives its own cell's `CellStaticData` explicitly from both the fixed-tick and render callers and forwards it through the game collection tuple.
 - Every game collection pair registers in the tuples in `FrameCollections.h`;
   no collection has explicit per-collection dispatch. Register new collections
   in the correct tuple and preserve deterministic ordering: the three ship types
@@ -19,7 +19,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   `Values()` rule (`../../../../Engine/Source/Frame/AGENTS.md`
   `## Collection and Serialization Invariants`).
 - `SharedCrcMembers()` is a subset of `SharedMembers()`. Full `Write()`/`Read()` is build-local; `ServerRead()` consumes the shared cross-build format. Both `Read()` and `ServerRead()` require exact Interpolate/PostRender count and capacity parity across every registered collection pair and rebuild ID maps (`../../../../Engine/Source/Frame/Collections/AGENTS.md`); build-local reads replace the destination only after the full frame passes that check.
-- `Frame::kiVersion` composes navigation and collection versions. Bump its base when CRC semantics change without a contributing version bump.
+- `Frame::kiVersion` composes the navigation version, the island scale (`common::kiIslandScalePermille`), and collection versions. Bump its base when CRC semantics change without a contributing version bump.
 - At save/replay read boundaries, reject a non-finite ship-spawn timer or one at or above the shared 0.5-second spawn interval as a corrupt stream, and leave smaller finite values unchanged before the loop that repeatedly subtracts the interval.
 - Random-spawn waves cap enemy population per cell and per ship type: a wave adds at most twice the cell's non-dying fleet ships of its type minus its non-dying random-spawn ships of that type. The cap only limits new spawns; random-spawn ships are never removed when the fleet shrinks or leaves the cell. Each ship a wave places draws one coin toss right before its `Spawn` call, and a skipped chevron slot draws none; a win sets its `ShipOrders::kTargetFlagship` (`Collections/Ships/AGENTS.md`).
 - At the same read boundaries, non-dying Fighters, Omnis, and Battleships must

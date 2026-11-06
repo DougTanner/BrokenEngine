@@ -256,6 +256,7 @@ struct PbrMaterialLayout
 	float fRoughnessFactor INIT;
 	float fAlphaMask INIT;
 	float fAlphaMaskCutoff INIT;
+	float fNormalScale INIT;
 
 	// Bindless texture array indices (populated by CrcToIndex() on CPU)
 	float fColorTextureIndex INIT;
@@ -265,10 +266,10 @@ struct PbrMaterialLayout
 	float fEmissiveTextureIndex INIT;
 };
 #if defined(BT_ENGINE)
-static_assert(sizeof(PbrMaterialLayout) == 88, "PbrMaterialLayout stride no longer matches the scalar-layout shader buffer");
+static_assert(sizeof(PbrMaterialLayout) == 92, "PbrMaterialLayout stride no longer matches the scalar-layout shader buffer");
 static_assert(BT_OFFSETOF(PbrMaterialLayout, f3EmissiveFactor) == 16, "PbrMaterialLayout emissive offset no longer matches MaterialShaderData");
 static_assert(BT_OFFSETOF(PbrMaterialLayout, fOcclusionStrength) == 28, "PbrMaterialLayout occlusion strength offset no longer matches MaterialShaderData");
-static_assert(BT_OFFSETOF(PbrMaterialLayout, fColorTextureIndex) == 68, "PbrMaterialLayout prefix no longer matches the MaterialShaderData upload");
+static_assert(BT_OFFSETOF(PbrMaterialLayout, fColorTextureIndex) == 72, "PbrMaterialLayout prefix no longer matches the MaterialShaderData upload");
 #endif
 
 struct ModelLayout

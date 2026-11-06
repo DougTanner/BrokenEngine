@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frame/GridCoord.h"
+#include "Frame/IslandChainPlacement.h"
 #include "Frame/NavBuild.h"
 #if defined(BT_CLIENT)
 #include "Graphics/Objects/Buffer.h"
@@ -153,7 +154,7 @@ public:
 
 	// Sim path (Frame-tick callers). Cell-local surface normal from four nearest-texel samples of the cell's
 	// precomputed CellStaticData::elevationGrid, taking the position in that cell's own centered local
-	// meters. A tap outside the cell samples mfSeaFloorElevation. Honors the Frame Purity Constraint: the
+	// meters. A tap past the hexagon grown by kfCellLandMarginMeters samples mfSeaFloorElevation. Honors the Frame Purity Constraint: the
 	// caller hands its own static data in, so this never touches gpGame->mCells and never reads a
 	// neighbor cell. Builds happen at the top of RunFrameTick (see FrameBase.cpp), before any sim phase
 	// that would query.
@@ -165,8 +166,8 @@ public:
 
 	[[nodiscard]] CellElevationSampler XM_CALLCONV MakeCellElevationSampler(const CellStaticData& rStaticData) const;
 
-	// Centered cell-local grids cover the cell's bounding rectangle, with sea floor outside its hexagon; overlapping island
-	// footprints max-blend, matching GlobalElevation.
+	// Centered cell-local grids cover the bounding rectangle grown by kfCellLandMarginMeters, with sea floor past the
+	// hexagon grown by that margin; overlapping island footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
 #if defined(BT_CLIENT)
@@ -186,10 +187,14 @@ public:
 	std::vector<common::crc_t> mIslandCrcsByArea;
 
 	// IslandChainPlacement selects roles from size buckets in the same CRC order on client and server.
-	std::vector<common::crc_t> mHugeCrcs;      // area >= kfHugeIslandAreaMeters   (1x1 full tiles, ~400x400)
+	std::vector<common::crc_t> mHugeCrcs;      // area >= kfHugeIslandAreaMeters   (1x1 full tiles)
 	std::vector<common::crc_t> mLargeCrcs;     // area >= kfLargeIslandAreaMeters  (2x1 / 3x1 strips)
 	std::vector<common::crc_t> mMediumCrcs;    // area >= kfMediumIslandAreaMeters (mid tiles)
-	std::vector<common::crc_t> mSmallCrcs;     // smaller                          (4x4 tiles, ~100x100)
+	std::vector<common::crc_t> mSmallCrcs;     // smaller                          (4x4 tiles)
+
+	// Each generated region's placements in its anchor cell's frame, keyed by region coordinate. GenerateIslandChain fills
+	// it on the main thread; a region's entry is a pure function of its key and the templates, so it never goes stale.
+	std::unordered_map<GridCoord, std::vector<IslandPlacement>> mRegionPlacements;
 
 	// Open-ocean samples share the elevation render target's sea-floor depth to avoid blends at island edges.
 	// Island heightmaps already store negative depths in engine meters.

@@ -514,6 +514,7 @@ void GltfSceneDecoder::DecodeMaterialShaderDatas(SceneExportData& rData) const
 			materialShaderData.uiNormalTextureIndex = static_cast<uint8_t>(rMaterial.additionalValues.at("normalTexture").TextureIndex());
 			LOG(kDefault, kVerbose, "  normalTexture: {}", materialShaderData.uiNormalTextureIndex);
 			materialShaderData.iNormalTextureSet = rMaterial.additionalValues.at("normalTexture").TextureTexCoord();
+			materialShaderData.fNormalScale = static_cast<float>(rMaterial.normalTexture.scale);
 		}
 
 		if (rMaterial.additionalValues.contains("occlusionTexture"))

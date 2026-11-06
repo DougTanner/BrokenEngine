@@ -19,7 +19,9 @@ whose purpose is to execute a scripted pass/fail scenario itself.
 - `ExecuteSharedAgentCommand` owns build-agnostic process lifecycle and log
   commands; the game dispatcher tries it before side-specific handlers. It stays
   engine-generic: game state such as the current tick (-1 before game creation)
-  arrives as a plain `int64_t`, never through game globals. Focused Commands
+  arrives as a plain `int64_t`, never through game globals, except that
+  `cell_coordinate_probe` reads the live cell for its `placements.liveCrc`
+  through `game::gpGame`. Focused Commands
   modules own the `crash_report_harness_rig` and the read-only
   `cell_coordinate_probe`, and `AgentCommandsShared.h` defines the one agent
   position shape and the checked grid-coordinate and float readers that engine

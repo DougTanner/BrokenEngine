@@ -40,13 +40,24 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   precondition is loaded island templates; without them it fails with
   `cell_coordinate_probe requires loaded island templates`. Read-only: it
   generates throwaway static data for the requested cell, reports it, and
-  frees it, touching no live cell, tick, or
+  frees it, changing no live cell, tick, or
   subscription. Returns
-  `{"coord":[q,r],"area":{"width":float,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`,
-  where `area` is the cell hexagon's bounding rectangle, about 1,039.23 m wide.
-  Run the same coordinate on the client and on the server and require both CRCs
-  to be equal; the two endpoints generate the cell independently from the same
-  coordinate.
+  `{"coord":[q,r],"area":{"width":float,"height":float},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64,"liveCrc"?:uint64},"islands":[{"crc":uint64,"x":float,"y":float,"rotation":float,"footprint":[x,y],"peak":float},...],"elevation":{"crc":uint64}}`,
+  where `area` is the cell hexagon's bounding rectangle, twice `kfCellHalfWidth`
+  by twice `kfCellHalfHeight`.
+  Run the same coordinate on the client and on the server and require
+  `placements.crc` and `elevation.crc` to match between them; the two endpoints
+  generate the cell independently from the same coordinate. `islands` holds one
+  row per generated placement in list order, placements centred in the cell
+  first: `crc` is the island's, `x` and `y` are centered cell-local meters that
+  may lie outside the cell for an island that crosses into it, `rotation` is
+  radians with no normalized range, and `footprint` and `peak` are its
+  template's scaled meters.
+  `placements.liveCrc` is present only when that endpoint's `mCells` holds the
+  coordinate: it folds the live cell's list the way `crc` folds the generated
+  one, so it witnesses what a load or a static-data transfer left in the cell.
+  In a `kbDebugInput` build the main-menu origin cell instead holds the single
+  island `BuildMenuIslandPlacement` picks, so there it need not match `crc`.
   Optional `navigation` is server-only; the client rejects it with
   `cell_coordinate_probe 'navigation' is server-only`. Its object requires
   exactly `graphs` and `points`. `graphs` is a nonempty array of distinct valid
@@ -55,15 +66,15 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   empty for contour discovery. Malformed requests return ordinary command
   errors. Graph indices carry no ship-type or flight-plane mapping.
   Only navigation requests build the production navigation graphs. They append
-  `"navigation":{"graphs":[{"index":g0,"vertices":[[x,y],...],"polygonOffsets":[offset,...]},...],"samples":[{"xy":[x0,y0],"elevation":float,"blocked":[true,false]},...]}`
+  `"navigation":{"graphs":[{"index":g0,"vertices":[[x,y],...],"polygonOffsets":[offset,...],"reachableEdges":[bool,...]},...],"samples":[{"xy":[x0,y0],"elevation":float,"blocked":[true,false]},...]}`
   to the existing result. Graphs and samples preserve request order, and each
-  sample's `blocked` array follows the requested graph order. Geometry is the
-  actual selected `NavData` in native order: offsets are zero-based polygon
-  starts in the flat vertex array; a polygon ends at the next offset, or at
-  the vertex count for the last polygon, with an implicit closing edge. No
-  terminal offset is appended. Elevation uses the populated simulation grid
-  sampler, and membership uses `NavQueryPointBlocked`. Empty graphs return
-  empty geometry and false membership. Repeated queries retain no state.
+  sample's `blocked` array follows the requested graph order. Offsets are
+  zero-based polygon starts in the flat vertex array; a polygon ends at the next
+  offset, or at the vertex count for the last polygon, with an implicit closing
+  edge. No terminal offset is appended. `reachableEdges` holds one
+  `NavQueryEdgeReachable` answer per `kCellDirections` entry, in that order, for
+  that graph from the cell origin. Empty graphs return empty geometry, false
+  membership, and every edge reachable.
 - `crash_report_harness_rig`: no params. Simulates a production crash on demand
   so the agent can observe the real report, upload, and exit. Debug-only: a
   non-`kbDebugInput` build fails with
@@ -326,13 +337,9 @@ narrows the match; offscreen widgets also run their full behavior and draw
 code. Mouse-only widgets (curve-editor control points, ImPlot plot
 interactions) and hover effects, such as hover-opened panels, cannot be driven.
 
-UI introspection and activation do not establish on-screen visibility. Use
-`describe_ui` and command results to verify submitted items' existence,
-enabled state, and activation effects. Activating an offscreen item does not
-guarantee that its slide panel opens; there is currently no generic command
-to reveal an item or panel. A criterion about rendered appearance still
-requires a screenshot with the target visibly rendered; `visible:false`
-items and successful offscreen clicks do not satisfy it.
+Command results never prove on-screen visibility: a rendered-appearance
+criterion needs a screenshot showing the target, and no generic command reveals
+an offscreen item or panel.
 
 The agent client's ImGui mouse stays at ImGui's no-mouse sentinel, and the
 RawInput game mouse stays at a frozen boot-time snapshot (under agent

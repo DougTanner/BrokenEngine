@@ -317,7 +317,7 @@ inline constexpr bool XmIsInf(float fValue)
 #endif
 
 // Clipper2 - polygon clipping & offsetting (Boost Software License 1.0)
-#if defined(BT_ENGINE)
+#if defined(BT_ENGINE) || defined(BT_DATA_PACKER)
 	#include "clipper2/clipper.h"
 	#include "clipper2/clipper.offset.h"
 #endif

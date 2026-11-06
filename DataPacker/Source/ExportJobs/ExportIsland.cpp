@@ -278,8 +278,8 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	rOut.cpuMeshIndices = std::move(meshIndices);
 	for (int64_t i = 0; i < iMeshVertexCount; ++i)
 	{
-		rOut.cpuMeshPositions.at(i * 2)     = meshPositionsXYZ.at(i * 3);
-		rOut.cpuMeshPositions.at(i * 2 + 1) = meshPositionsXYZ.at(i * 3 + 1);
+		rOut.cpuMeshPositions.at(i * 2)     = meshPositionsXYZ.at(i * 3) * common::kfIslandScale;
+		rOut.cpuMeshPositions.at(i * 2 + 1) = meshPositionsXYZ.at(i * 3 + 1) * common::kfIslandScale;
 	}
 }
 
@@ -407,8 +407,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	std::filesystem::path intermediatesDirectory = GetIslandCachePath(rInputPath);
 	std::filesystem::path textureSourceDirectory = intermediatesDirectory.parent_path();
 	std::filesystem::path diagnosticsDirectory = GetIslandDiagnosticsPath(rInputPath);
-	rOut.fWorldFootprintXMeters = baked.fWidthMeters;
-	rOut.fWorldFootprintYMeters = baked.fHeightMeters;
+	rOut.fWorldFootprintXMeters = baked.fWidthMeters * common::kfIslandScale;
+	rOut.fWorldFootprintYMeters = baked.fHeightMeters * common::kfIslandScale;
 	rOut.fWorldElevationMeters = baked.fElevationMeters;
 	int64_t iElevationWidth = baked.iCropWidth / kiElevationDivisor;
 	int64_t iElevationHeight = baked.iCropHeight / kiElevationDivisor;
@@ -436,6 +436,16 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	}
 	rOut.iHeightmapWidth = iElevationWidth;
 	rOut.iHeightmapHeight = iElevationHeight;
+
+	// Only land scales: the sea floor and underwater mask threshold are constants at or below 0, so
+	// the masks, and with them the tracked BC textures, stay byte-identical.
+	for (float& rfSample : rOut.cpuHeightmapData)
+	{
+		if (rfSample > 0.0f)
+		{
+			rfSample *= common::kfIslandScale;
+		}
+	}
 
 	// max_element compares with '<', so a NaN first sample is never replaced and an infinite sample wins; both fail here.
 	auto peakIterator = std::ranges::max_element(rOut.cpuHeightmapData);

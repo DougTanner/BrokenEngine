@@ -309,8 +309,8 @@ static_assert(std::is_same_v<decltype(std::declval<FramePostRenderBase>().Collec
 using InterpolateTypes = TupleToTypeList_t<decltype(std::declval<FrameInterpolateBase>().Collections())>;
 using PostRenderBaseTypes = TupleToTypeList_t<decltype(std::declval<FramePostRenderBase>().Collections())>;
 
-// The engine's share of game::Frame::kiVersion: navigation plus every shared engine collection.
-inline constexpr int64_t kiFrameBaseVersion = kiNavDataVersion + SumVersions(TupleToTypeList_t<decltype(std::declval<FrameInterpolateBase&>().ServerCollections())> {}) + SumVersions(TupleToTypeList_t<decltype(std::declval<FramePostRenderBase&>().ServerCollections())> {});
+// The engine's share of game::Frame::kiVersion: navigation, the island scale, and every shared engine collection.
+inline constexpr int64_t kiFrameBaseVersion = kiNavDataVersion + common::kiIslandScalePermille + SumVersions(TupleToTypeList_t<decltype(std::declval<FrameInterpolateBase&>().ServerCollections())> {}) + SumVersions(TupleToTypeList_t<decltype(std::declval<FramePostRenderBase&>().ServerCollections())> {});
 
 // Base collection pair checks for the build-local read (Collections()) and the shared read (ServerCollections()).
 void ValidateBaseCollectionPairs(FrameInterpolateBase& rInterpolate, const FramePostRenderBase& rPostRender);

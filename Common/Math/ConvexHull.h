@@ -15,9 +15,10 @@ struct ConvexHull2D
 	XMFLOAT2 f2AabbMax {};
 };
 
-// Input vertices are CCW and centered at the origin; (fCos, fSin) follows GlobalElevation's CCW
-// convention. The output storage holds at least the input vertex count. Derive (fCos, fSin) with
-// common::DeterministicSinCos because this math feeds CRC-verified placement.
+// Input vertices are centered at the origin and the output keeps their winding, so a hull that must
+// be CCW starts CCW. (fCos, fSin) follows GlobalElevation's CCW convention and must be deterministic:
+// island placement derives it with common::DeterministicSinCos, ship hitboxes take it from the unit
+// heading. The output storage holds at least the input vertex count.
 inline ConvexHull2D BuildWorldHull(std::span<const XMFLOAT2> localVertices, XMFLOAT2 f2WorldPosition, float fCos, float fSin, std::span<XMFLOAT2> outputVertices)
 {
 	XMFLOAT2 f2Min {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
@@ -185,6 +186,125 @@ inline std::vector<XMFLOAT2> BuildConvexHull(std::span<XMFLOAT2> points)
 	// Last point repeats the first; drop it.
 	hull.resize(static_cast<size_t>(iHullVertexCount) - 1);
 	return hull;
+}
+
+// Winding-number test for a simple polygon of either direction. The shared core of navigation's obstacle tests and the
+// outline hit tests, so boundary rules cannot drift between callers.
+inline bool PointInPolygon(XMFLOAT2 f2Point, std::span<const XMFLOAT2> vertices)
+{
+	int64_t iVertexCount = std::ssize(vertices);
+	int64_t iWinding = 0;
+	for (int64_t i = 0; i < iVertexCount; ++i)
+	{
+		int64_t iNext = (i + 1) % iVertexCount;
+		XMFLOAT2 f2A = vertices[i];
+		XMFLOAT2 f2B = vertices[iNext];
+
+		if (f2A.y <= f2Point.y)
+		{
+			if (f2B.y > f2Point.y)
+			{
+				float fCross = (f2B.x - f2A.x) * (f2Point.y - f2A.y) - (f2Point.x - f2A.x) * (f2B.y - f2A.y);
+				if (fCross > 0.0f)
+				{
+					++iWinding;
+				}
+			}
+		}
+		else
+		{
+			if (f2B.y <= f2Point.y)
+			{
+				float fCross = (f2B.x - f2A.x) * (f2Point.y - f2A.y) - (f2Point.x - f2A.x) * (f2B.y - f2A.y);
+				if (fCross < 0.0f)
+				{
+					--iWinding;
+				}
+			}
+		}
+	}
+	return iWinding != 0;
+}
+
+// Cyrus-Beck clip: narrows [rfEnter, rfExit] of the point path rf3Start + t * rf3Delta to the part inside the CCW
+// convex polygon extruded over [fMinimumZ, fMaximumZ], boundary included. Returns false once the interval is empty.
+// It lives here because ModelViewer compiles the navigation query but not Collision.cpp.
+inline bool ClipSegmentToPrism(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3Delta, std::span<const XMFLOAT2> vertices, float fMinimumZ, float fMaximumZ, float& rfEnter, float& rfExit)
+{
+	// The path is inside the half-space where fOutside + t * fRate <= 0.
+	auto ClipToHalfSpace = [&rfEnter, &rfExit](float fOutside, float fRate)
+	{
+		if (fRate == 0.0f)
+		{
+			return fOutside <= 0.0f;
+		}
+		float fTime = -fOutside / fRate;
+		if (fRate < 0.0f)
+		{
+			rfEnter = std::max(rfEnter, fTime);
+		}
+		else
+		{
+			rfExit = std::min(rfExit, fTime);
+		}
+		return rfEnter <= rfExit;
+	};
+
+	if (!ClipToHalfSpace(fMinimumZ - rf3Start.z, -rf3Delta.z) || !ClipToHalfSpace(rf3Start.z - fMaximumZ, rf3Delta.z))
+	{
+		return false;
+	}
+	for (int64_t i = 0; i < std::ssize(vertices); ++i)
+	{
+		const XMFLOAT2& rStartVertex = vertices[i];
+		const XMFLOAT2& rEndVertex = vertices[(i + 1) % std::ssize(vertices)];
+		// Outward normal of the CCW edge (v1 - v0) is (edge.y, -edge.x).
+		float fNormalX = rEndVertex.y - rStartVertex.y;
+		float fNormalY = rStartVertex.x - rEndVertex.x;
+		float fOutside = fNormalX * (rf3Start.x - rStartVertex.x) + fNormalY * (rf3Start.y - rStartVertex.y);
+		float fRate = fNormalX * rf3Delta.x + fNormalY * rf3Delta.y;
+		if (!ClipToHalfSpace(fOutside, fRate))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+// Moves a polygon's edges outward by fOffsetMeters, inward when negative, then simplifies the result within
+// fSimplifyEpsilonMeters. Returns the largest resulting path, or nothing when none survives. For offline bakes and
+// explicit UI edits: it allocates.
+inline std::vector<XMFLOAT2> OffsetPolygon(std::span<const XMFLOAT2> vertices, float fOffsetMeters, float fSimplifyEpsilonMeters)
+{
+	static constexpr double kfMiterLimit = 2.0;
+	static constexpr int64_t kiClipperPrecision = 4;
+
+	Clipper2Lib::PathsD polygon(1);
+	polygon.at(0).reserve(vertices.size());
+	for (const XMFLOAT2& rVertex : vertices)
+	{
+		polygon.at(0).emplace_back(rVertex.x, rVertex.y);
+	}
+
+	Clipper2Lib::PathsD offset = Clipper2Lib::InflatePaths(polygon, static_cast<double>(fOffsetMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, static_cast<int>(kiClipperPrecision));
+	// The offset keeps the input's direction, so the largest path is the one of greatest absolute area.
+	auto it = std::ranges::max_element(offset, {}, [](const Clipper2Lib::PathD& rPath)
+	{
+		return std::abs(Clipper2Lib::Area(rPath));
+	});
+	if (it == offset.end())
+	{
+		return {};
+	}
+
+	Clipper2Lib::PathD simplified = Clipper2Lib::SimplifyPath(*it, static_cast<double>(fSimplifyEpsilonMeters));
+	std::vector<XMFLOAT2> result;
+	result.reserve(simplified.size());
+	for (const Clipper2Lib::PointD& rPoint : simplified)
+	{
+		result.emplace_back(static_cast<float>(rPoint.x), static_cast<float>(rPoint.y));
+	}
+	return result;
 }
 
 } // namespace common

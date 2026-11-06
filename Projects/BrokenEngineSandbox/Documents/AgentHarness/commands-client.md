@@ -17,7 +17,7 @@ below.
   empty array emits no unit rows, and any other value or unknown string is a
   parameter error. It applies only when `includeUnits` is true. A negative
   `maxUnits` is a parameter error. Beside the engine fields it returns
-  `fleets[{index,focused,members?}]`,
+  `fleets[{index,focused,members?[{globalId,type,squadron,alive}]}]`,
   `units[{type,globalId?,coord,local,screen,armor?,shield?,health?,alignment,flags?,windTrailIntensity?,windTrailWidth?,windTrailLengthMultiplier?}]`,
   ring-wide `counts{fighters,omnis,battleships,missiles,blasters}` summed over every
   subscribed cell that has a snapshot, and `truncated`. Each unit's `local` is
@@ -27,6 +27,8 @@ below.
   trail rendered pixels. `units` are visible-area-filtered while counts span
   subscribed cells that have a snapshot; edge projection may lie slightly
   outside the framebuffer. Every ship row carries `globalId` (0 for a ship that
-  has none), and only the focused fleet lists members. Each cell emits its
+  has none), and only the focused fleet lists members, in add order: a member's
+  `type` is a `unitTypes` string and its `squadron` is the stored per-type
+  number, one less than the number in the HUD's squadron header. Each cell emits its
   fighter, omni, and battleship rows, then its blaster rows, while the
   `maxUnits` cap is shared across all subscribed cells.

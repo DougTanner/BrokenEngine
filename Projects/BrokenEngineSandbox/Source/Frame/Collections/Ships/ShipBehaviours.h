@@ -11,6 +11,8 @@ namespace engine
 {
 
 struct CellStaticData;
+struct NavData;
+struct NavRectangle;
 
 } // namespace engine
 
@@ -67,6 +69,9 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 [[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
 // True on a plane without kTerrainCollision.
 [[nodiscard]] bool SkipsTerrainContact(float fHeight);
+// Tier iClearanceTier's graph on the plane. The empty graph stands in on a plane the tier has no graph on,
+// kuiNoFlightPlane included, and in a client cell whose static data has not arrived, which holds no graphs.
+[[nodiscard]] const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane);
 // Moves Z toward the ordered plane, or the upper plane while the lower clearance graph blocks descent at vecPosition.
 // Moves at most fClimbRate times the delta and lands on the effective ship height; W is untouched. Stores the plane on
 // arrival and kuiNoFlightPlane in transit.
@@ -78,12 +83,33 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 
-// The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph; rbFinal: it is the destination snapped clear of terrain.
-[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal);
+// One rectangle per row of the cell's previous frame with a pusher and a navigation-obstacle model, in ForEachShipType
+// order, sized for one asking ship type and held in the thread's workbuffer for one Update.
+class NavRectangleBoard
+{
+public:
+
+	struct BoardRectangle;
+
+	NavRectangleBoard(const Frame& rPreviousFrame, ShipType eSelfType);
+
+	// In board order, the rectangles sharing a flight plane with a meSelfType ship at vecPosition, within their reach of it,
+	// and holding neither point, which also leaves out the asker's own. The span is valid until the next Select.
+	[[nodiscard]] std::span<const engine::NavRectangle> XM_CALLCONV Select(FXMVECTOR vecPosition, FXMVECTOR vecDestination);
+
+	ShipType meSelfType = ShipType::kFighter;
+	int64_t miRectangleCount = 0;
+	common::ScopedWorkbufferAllocation<BoardRectangle*> mRectangles;
+	common::ScopedWorkbufferAllocation<engine::NavRectangle*> mPicked;
+};
+
+// The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph, around
+// the rectangles rNavRectangleBoard selects; rbFinal: it is the destination snapped clear of terrain.
+[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, bool& rbFinal);
 
 // Fleet navigation: roaming, cross-cell movement, island destinations, following the row's own flagship, and a fleet
 // Omni's patrol around its flagship while that flagship is in the cell.
-void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
+void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
 
 // Random-spawn steering destination: return to the nearest island, else the nearest enemy. Updates the kFlee and
 // kReturnToIslandCenter hysteresis; rbHasDestination is false in an island-free cell with no enemy.

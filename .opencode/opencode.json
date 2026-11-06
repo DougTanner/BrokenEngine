@@ -23,6 +23,7 @@
 			"gaea2-save": "ask",
 			"next-plan": "ask",
 			"optimize-build-time": "ask",
+			"refactor-candidates": "ask",
 			"save-plan": "ask",
 			"session-audit": "ask",
 			"what": "ask"

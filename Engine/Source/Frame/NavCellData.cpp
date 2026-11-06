@@ -303,16 +303,7 @@ static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector
 	// coordinate enters it. Topology offsets are rebased per island.
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
-		auto it = gpIslandTerrain->mIslands.find(rPlacement.islandCrc);
-		if (it == gpIslandTerrain->mIslands.end())
-		{
-			// ReadGridSave rejects a save or replay placement CRC with no loaded template and generation only
-			// emits loaded ones, so reaching this is an internal invariant break.
-			LOG(kNavData, kError, "BuildCellNavData: placement islandCrc={} has no loaded island template", rPlacement.islandCrc);
-			throw std::out_of_range("placement islandCrc has no loaded island template");
-		}
-
-		const IslandTemplate& rTemplate = it->second;
+		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 		const NavContour& rContour = rTemplate.navContours.at(iGraph);
 		int64_t iVertexCount = std::ssize(rContour.vertices);
 		if (iVertexCount == 0)

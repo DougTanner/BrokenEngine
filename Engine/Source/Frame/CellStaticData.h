@@ -34,8 +34,8 @@ struct CellStaticData
 	mutable std::vector<NavData> navigationData;
 
 	// A completed navigation build can have no vertices (degenerate or underwater contours), so emptiness cannot
-	// signal an unbuilt cell. BuildCellNavigationData on the server and Read(true) on the client set this flag; Read(false)
-	// clears it and navigationData for a save reload. This flag is outside the CRC and save format.
+	// signal an unbuilt cell. BuildCellNavigationData on the server and Read on the client set this flag; a cell a save
+	// reload creates starts with it clear. This flag is outside the CRC and save format.
 	mutable bool bNavigationDataBuilt = false;
 
 	// Derived from islands + per-template heightmaps. Built lazily on the per-coord
@@ -52,8 +52,8 @@ struct CellStaticData
 	// the next tick rebuilds an empty cache. It is derived from placements and shared templates and never serialized.
 	mutable std::vector<IslandRenderQuery> islandRenderQueries;
 
-	void Write(std::ostream& rStream, bool bIncludeNavigationData) const;
-	void Read(std::istream& rStream, bool bIncludeNavigationData);
+	void Write(std::ostream& rStream) const;
+	void Read(std::istream& rStream);
 
 	void BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const;
 };

@@ -33,20 +33,6 @@ static int64_t* PusherZone(int64_t iLayer, int64_t iZoneX, int64_t iZoneY)
 	return sPusherZones.Data() + ((iLayer * kiPusherZones + iZoneX) * kiPusherZones + iZoneY) * kiMaxPushersPerZone;
 }
 
-static std::pair<int64_t, int64_t> OccupiedPusherLayers(float fHeight)
-{
-	for (int64_t i = 0; i < kiPusherLayers; ++i)
-	{
-		float fPlaneHeight = gpFlightPlanes->Plane(i).fHeightMeters;
-		if (fHeight <= fPlaneHeight)
-		{
-			return {i == 0 || fHeight == fPlaneHeight ? i : i - 1, i};
-		}
-	}
-
-	return {kiPusherLayers - 1, kiPusherLayers - 1};
-}
-
 void PushersInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
 {
 	PushersInterpolate& __restrict rCurrent = rFrameInterpolate.pushers;
@@ -104,7 +90,7 @@ void PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restri
 		iZoneStartY = std::clamp(iZoneStartY, 0i64, kiPusherZones - 1);
 		iZoneEndY = std::clamp(iZoneEndY, 0i64, kiPusherZones - 1);
 
-		auto [iLayerStart, iLayerEnd] = OccupiedPusherLayers(f4Position.z);
+		auto [iLayerStart, iLayerEnd] = gpFlightPlanes->OccupiedPlanes(f4Position.z);
 		for (int64_t iLayer = iLayerStart; iLayer <= iLayerEnd; ++iLayer)
 		{
 			for (int64_t j = iZoneStartY; j <= iZoneEndY; ++j)
@@ -143,7 +129,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 
 	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - kfPusherAreaMinimumX) / kfPusherZoneWidth), 0i64, kiPusherZones - 1);
 	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - kfPusherAreaMinimumY) / kfPusherZoneHeight), 0i64, kiPusherZones - 1);
-	auto [iLayerStart, iLayerEnd] = OccupiedPusherLayers(XMVectorGetZ(vecPosition));
+	auto [iLayerStart, iLayerEnd] = gpFlightPlanes->OccupiedPlanes(XMVectorGetZ(vecPosition));
 
 	auto vecPush = XMVectorZero();
 	for (int64_t iLayer = iLayerStart; iLayer <= iLayerEnd; ++iLayer)

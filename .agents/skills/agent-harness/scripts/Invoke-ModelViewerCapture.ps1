@@ -1,14 +1,15 @@
 # Capture one ModelViewer PNG without showing or activating the viewer: start the Debug viewer hidden in its
-# agent mode on a fresh app-data directory, wait for its initial streaming done line in its log, post F9 to
-# its own window, read the completion line from its log, and close it by exact PID on every exit path after
-# the start.
+# agent mode on a fresh app-data directory, wait for its initial streaming done line in its log, with -Flight
+# post TAB to its own window and let it fly, post F9 to its own window, read the completion line from its log,
+# and close it by exact PID on every exit path after the start.
 # The viewer binds no port, so the capture takes no harness lock and runs no process check.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	# Absolute and must not exist; the script creates it, so the viewer starts from compiled defaults.
 	[Parameter(Mandatory)][string] $AppDataDirectory,
-	[ValidateNotNullOrEmpty()][string] $ModelPath
+	[ValidateNotNullOrEmpty()][string] $ModelPath,
+	[switch] $Flight
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +18,10 @@ Set-StrictMode -Version Latest
 $MaximumMessageLength = 256
 # Launch through the capture, sized for a Debug cold start on a fresh app-data directory.
 $CaptureTimeoutSeconds = 180
+# Covers the longest leg across one cell at the body's cruise speed, so the body reaches at least one peak; a
+# second arrival depends on how far apart the seed places the peaks.
+$FlightSeconds = 60
+if ($Flight) { $CaptureTimeoutSeconds += $FlightSeconds }
 $CloseTimeoutSeconds = 60
 $PollMilliseconds = 250
 # The viewer never binds it; the value only selects its agent mode and stays clear of the harness ports.
@@ -24,6 +29,7 @@ $AgentPort = 27103
 $WindowClass = 'Broken Engine Model Viewer'
 $WmClose = 0x0010
 $WmKeyDown = 0x0100
+$VkTab = 0x09
 $VkF9 = 0x78
 $CodeExits = @{
 	'ok' = 0
@@ -117,7 +123,20 @@ function Invoke-ViewerCapture($Process, [string] $LogPath, [Diagnostics.Stopwatc
 		Start-Sleep -Milliseconds $PollMilliseconds
 	}
 
-	# lParam 1: repeat count 1 with the previous-key-state bit clear, so the viewer does not treat it as a repeat.
+	# lParam 1 on both posts: repeat count 1 with the previous-key-state bit clear, so the viewer does not treat it
+	# as a repeat.
+	if ($Flight) {
+		if (-not [BrokenEngineHarness.ModelViewerWindow]::PostMessage($script:Window, $WmKeyDown, [IntPtr]$VkTab, [IntPtr]1)) {
+			throw "PostMessage TAB to the viewer window failed with Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())."
+		}
+		$flightEnd = $Clock.Elapsed + [TimeSpan]::FromSeconds($FlightSeconds)
+		while ($Clock.Elapsed -lt $flightEnd) {
+			if ($Process.HasExited) { return Get-ExitOutcome $Process }
+			if ($Clock.Elapsed -ge $deadline) { return Get-DeadlineOutcome }
+			Start-Sleep -Milliseconds $PollMilliseconds
+		}
+		if ($Process.HasExited) { return Get-ExitOutcome $Process }
+	}
 	if (-not [BrokenEngineHarness.ModelViewerWindow]::PostMessage($script:Window, $WmKeyDown, [IntPtr]$VkF9, [IntPtr]1)) {
 		throw "PostMessage F9 to the viewer window failed with Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())."
 	}

@@ -9,6 +9,8 @@
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 
+#include "Game.h"
+
 namespace engine
 {
 
@@ -27,7 +29,7 @@ static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacemen
 }
 
 // cell_coordinate_probe: report the cell geometry a requested coordinate produces, on either endpoint, without
-// subscribing to it or touching live cells.
+// subscribing to it. A live cell is only read, for liveCrc.
 void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	if (!rParameters.contains("coord") || rParameters.size() != (rParameters.contains("navigation") ? 2 : 1))
@@ -114,6 +116,18 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	rResult["area"] = {{"width", 2.0f * kfCellHalfWidth}, {"height", 2.0f * kfCellHalfHeight}};
 	rResult["terrain"] = {{"samplesFinite", bSamplesFinite}};
 	rResult["placements"] = {{"count", std::ssize(staticData.islands)}, {"crc", PlacementsCrc(staticData.islands)}};
+	auto it = game::gpGame->mCells.find(coordinate);
+	if (it != game::gpGame->mCells.end())
+	{
+		rResult["placements"]["liveCrc"] = PlacementsCrc(it->second.staticData.islands);
+	}
+	nlohmann::json islands = nlohmann::json::array();
+	for (const IslandPlacement& rPlacement : staticData.islands)
+	{
+		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
+		islands.push_back({{"crc", rPlacement.islandCrc}, {"x", rPlacement.f2WorldPosition.x}, {"y", rPlacement.f2WorldPosition.y}, {"rotation", rPlacement.fRotation}, {"footprint", {rTemplate.fWorldFootprintXMeters, rTemplate.fWorldFootprintYMeters}}, {"peak", rTemplate.fPeakHeightMeters}});
+	}
+	rResult["islands"] = std::move(islands);
 	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(staticData.elevationGrid.data(), static_cast<size_t>(std::ssize(staticData.elevationGrid))))}};
 #if defined(BT_SERVER)
 	if (rParameters.contains("navigation"))
@@ -129,7 +143,12 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 			{
 				vertices.push_back({rVertex.x, rVertex.y});
 			}
-			rNavigation["graphs"].push_back({{"index", iGraph}, {"vertices", std::move(vertices)}, {"polygonOffsets", rGraph.polygonOffsets}});
+			nlohmann::json reachableEdges = nlohmann::json::array();
+			for (int64_t i = 0; i < common::kiHexDirectionCount; ++i)
+			{
+				reachableEdges.push_back(NavQueryEdgeReachable(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), i, rGraph));
+			}
+			rNavigation["graphs"].push_back({{"index", iGraph}, {"vertices", std::move(vertices)}, {"polygonOffsets", rGraph.polygonOffsets}, {"reachableEdges", std::move(reachableEdges)}});
 		}
 		rNavigation["samples"] = nlohmann::json::array();
 		CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(staticData);

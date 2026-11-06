@@ -5,7 +5,6 @@
 #include "Ui/MenuUtils.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
-
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -139,8 +138,9 @@ float HudScreen::PanelWidth()
 	// gUiFontScale/UiScale() with no magnifying multiplier.
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
 
-	// Member-row template: content-spanning Selectable rows, with the longest ship type name.
-	float fMemberRowWidth = ImGui::CalcTextSize("Battleship 88 (-888,-888) #8888888888[x]").x + 2.0f * rStyle.FramePadding.x + rStyle.ItemSpacing.x;
+	// Member-row template: content-spanning Selectable rows, with the longest ship type name, inside a squadron table's
+	// cell padding. The table's two border pixels fit in the template's spare row-number digit.
+	float fMemberRowWidth = ImGui::CalcTextSize("Battleship 88 (-888,-888) #8888888888[x]").x + 2.0f * rStyle.FramePadding.x + rStyle.ItemSpacing.x + 2.0f * rStyle.CellPadding.x;
 
 	// Nav-row template: [<] 88/88 [>] [+] [-]. Padding-dominated — at low gUiFontScale text shrinks but the per-button
 	// FramePadding and per-joint ItemSpacing don't, so measure them explicitly: 4 buttons × 2 edges (8× FramePadding.x),
@@ -151,6 +151,61 @@ float HudScreen::PanelWidth()
 	// ScrollbarSize added unconditionally (not gated on list length) so the width stays frame-to-frame stable when a
 	// vertical scrollbar appears on long fleet lists — otherwise it would clip the exact-fit member rows.
 	return std::max(fMemberRowWidth, fNavigationRowWidth) + rStyle.WindowPadding.x * 2.0f + rStyle.ScrollbarSize;
+}
+
+// iRowNumber counts within the member's squadron box.
+static void RenderFleetMemberRow(const FleetMember& rMember, int64_t iRowNumber)
+{
+	bool bSelected = rMember.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
+
+	engine::GridCoord memberCoordinate {};
+	for (int64_t j = 0; j < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++j)
+	{
+		if (gpGame->mClientOwnedEntityIdentifiers.at(j) == rMember.globalId)
+		{
+			memberCoordinate = gpGame->mClientOwnedEntityCoordinates.at(j);
+			break;
+		}
+	}
+
+	char pcMemberId[32];
+	std::snprintf(pcMemberId, sizeof(pcMemberId), "%lld", rMember.globalId.iValue);
+	ImGui::PushID(pcMemberId);
+	if (!(rMember.flags & FleetMemberFlags::kIsDead))
+	{
+		char pcLabel[64];
+		std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), iRowNumber, memberCoordinate.iQ, memberCoordinate.iR, rMember.globalId.iValue);
+		float fDestroyButtonWidth = ImGui::CalcTextSize("[x]").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+		float fSelectionWidth = ImGui::GetContentRegionAvail().x - fDestroyButtonWidth - ImGui::GetStyle().ItemSpacing.x;
+		if (ImGui::Selectable(pcLabel, bSelected, ImGuiSelectableFlags_None, ImVec2(fSelectionWidth, ImGui::GetFrameHeight())))
+		{
+			gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);
+			gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectOwnedEntity));
+		}
+		if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
+		{
+			bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rMember.globalId);
+			// Heap: one pending control per stable fleet member, pruned on fleet sync or selection reset.
+			ScopedSuppressAllocationTracking suppress;
+			engine::NetworkUiControl<bool>& rDestroyControl = gpGame->mFleetSelection.mDestroyMemberControls.try_emplace(rMember.globalId.iValue).first->second;
+			rDestroyControl.Update(bOwnedEntityPresent);
+			ImGui::SameLine();
+			ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+			if (ImGui::Button("[x]##DestroyMember", ImVec2(fDestroyButtonWidth, 0.0f)))
+			{
+				rDestroyControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				gpClientSession->SendDestroyFleetMemberRequest(rMember.globalId);
+			}
+			ImGui::EndDisabled();
+		}
+	}
+	else
+	{
+		char pcLabel[64];
+		std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld [DEAD] #%lld", ShipTypeName(rMember.eType), iRowNumber, rMember.globalId.iValue);
+		ImGui::TextDisabled("%s", pcLabel);
+	}
+	ImGui::PopID();
 }
 
 void HudScreen::RenderFleetPanel(float fTarget)
@@ -232,75 +287,62 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			ShipType eType {};
 		};
 		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}};
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers || IsServerReplaying());
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		for (const auto& [i, rButton] : std::views::enumerate(kpSpawnButtons))
 		{
 			if (i > 0)
 			{
 				ImGui::SameLine();
 			}
+			ImGui::BeginDisabled(FindOpenFleetSquadron(*pFleet, rButton.eType) == kuiNoOpenFleetSquadron);
 			if (ImGui::Button(rButton.pcLabel))
 			{
 				gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid, rButton.eType);
 				LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{}) Type: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, ShipTypeName(rButton.eType));
 			}
+			ImGui::EndDisabled();
 		}
 		ImGui::EndDisabled();
 
-		for (const auto& [i, rMember] : std::views::enumerate(pFleet->members))
+		// The Battleship leads, as it leads the member list; ShipType order puts it last.
+		static constexpr ShipType kpeSquadronDisplayOrder[] {ShipType::kBattleship, ShipType::kFighter, ShipType::kOmni};
+		for (ShipType eType : kpeSquadronDisplayOrder)
 		{
-			bool bSelected = (rMember.globalId.iValue != 0) && rMember.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
-
-			engine::GridCoord memberCoordinate {};
-			for (int64_t j = 0; j < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++j)
+			for (uint8_t i = 0; i < kiMaximumFleetSquadronsPerType; ++i)
 			{
-				if (gpGame->mClientOwnedEntityIdentifiers.at(j) == rMember.globalId)
+				if (CountFleetSquadronMembers(*pFleet, eType, i) == 0)
 				{
-					memberCoordinate = gpGame->mClientOwnedEntityCoordinates.at(j);
-					break;
+					continue;
 				}
-			}
 
-			char pcMemberId[32];
-			std::snprintf(pcMemberId, sizeof(pcMemberId), "%lld", rMember.globalId.iValue);
-			ImGui::PushID(pcMemberId);
-			if (!(rMember.flags & FleetMemberFlags::kIsDead))
-			{
-				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), i + 1, memberCoordinate.iQ, memberCoordinate.iR, rMember.globalId.iValue);
-				float fDestroyButtonWidth = ImGui::CalcTextSize("[x]").x + 2.0f * ImGui::GetStyle().FramePadding.x;
-				float fSelectionWidth = ImGui::GetContentRegionAvail().x - fDestroyButtonWidth - ImGui::GetStyle().ItemSpacing.x;
-				if (ImGui::Selectable(pcLabel, bSelected, ImGuiSelectableFlags_None, ImVec2(fSelectionWidth, ImGui::GetFrameHeight())))
+				// The header text is the table ID, which differs for every squadron of the panel.
+				char pcHeader[32];
+				std::snprintf(pcHeader, sizeof(pcHeader), "%s Squadron %d", ShipTypeName(eType), i + 1);
+				// A vertical padding of half ItemSpacing.y spaces rows by ItemSpacing.y and holds a selected row's fill inside
+				// the box.
+				const ImGuiStyle& rStyle = ImGui::GetStyle();
+				ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(rStyle.CellPadding.x, rStyle.ItemSpacing.y * 0.5f));
+				if (ImGui::BeginTable(pcHeader, 1, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_NoSavedSettings))
 				{
-					gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);
-					gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectOwnedEntity));
-				}
-				if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
-				{
-					bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rMember.globalId);
-					// Heap: one pending control per stable fleet member, pruned on fleet sync or selection reset.
-					ScopedSuppressAllocationTracking suppress;
-					engine::NetworkUiControl<bool>& rDestroyControl = gpGame->mFleetSelection.mDestroyMemberControls.try_emplace(rMember.globalId.iValue).first->second;
-					rDestroyControl.Update(bOwnedEntityPresent);
-					ImGui::SameLine();
-					ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
-					if (ImGui::Button("[x]##DestroyMember", ImVec2(fDestroyButtonWidth, 0.0f)))
+					ImGui::TableSetupColumn(pcHeader);
+					ImGui::TableHeadersRow();
+					int64_t iRowNumber = 0;
+					for (const FleetMember& rMember : pFleet->members)
 					{
-						rDestroyControl.Update(bOwnedEntityPresent);
-						rDestroyControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-						gpClientSession->SendDestroyFleetMemberRequest(rMember.globalId);
+						if (rMember.eType != eType || rMember.uiSquadron != i)
+						{
+							continue;
+						}
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						++iRowNumber;
+						RenderFleetMemberRow(rMember, iRowNumber);
 					}
-					ImGui::EndDisabled();
+					ImGui::EndTable();
 				}
+				ImGui::PopStyleVar();
 			}
-			else
-			{
-				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld [DEAD] #%lld", ShipTypeName(rMember.eType), i + 1, rMember.globalId.iValue);
-				ImGui::TextDisabled("%s", pcLabel);
-			}
-			ImGui::PopID();
 		}
 	}
 

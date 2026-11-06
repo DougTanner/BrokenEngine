@@ -20,6 +20,13 @@ inline constexpr int64_t kiAnimationSectionAlignment = 4;
 // floor matches this constant so divergence is caught at bake time.
 inline constexpr float kfSeaBottomMeters = -10.0f;
 
+// Island scale DataPacker applies at export to the footprint, mesh XY, and heightmap samples above sea level,
+// so island geometry reaches the runtime and shaders already scaled. An integer so it can join the version sums:
+// changing it alone rejects stale chunks through ExportIsland::kiVersion and saves, replays, and connections
+// through engine::kiFrameBaseVersion.
+inline constexpr int64_t kiIslandScalePermille = 1'158;
+inline constexpr float kfIslandScale = static_cast<float>(kiIslandScalePermille) / 1'000.0f;
+
 // Heightmap depth (engine-meters) below which island textures are zeroed out at bake time and
 // above which a pixel counts toward the island's valid-area convex polygon. Beach = 0, deeper =
 // negative. Shared by DataPacker (texture masking + valid-area hull + map thumbnail alpha) and the engine debug render.
@@ -269,8 +276,9 @@ struct MaterialShaderData
 	float fRoughnessFactor = 1.0f;
 	float fAlphaMask = 0.0f;
 	float fAlphaMaskCutoff = 1.0f;
+	float fNormalScale = 1.0f;
 };
-static_assert(sizeof(MaterialShaderData) == 76, "MaterialShaderData layout changed — bump DataHeader::kiVersion and re-check PbrMaterialLayout; same-size layout or semantic changes also bump ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
+static_assert(sizeof(MaterialShaderData) == 80, "MaterialShaderData layout changed — bump DataHeader::kiVersion and re-check PbrMaterialLayout; same-size layout or semantic changes also bump ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 static_assert(BT_OFFSETOF(MaterialShaderData, f4BaseColorFactor) == 8, "MaterialShaderData padding changed — PBR factor block no longer at offset 8");
 static_assert(BT_OFFSETOF(MaterialShaderData, f3EmissiveFactor) == 24, "MaterialShaderData emissive offset no longer matches PbrMaterialLayout");
 static_assert(BT_OFFSETOF(MaterialShaderData, fOcclusionStrength) == 36, "MaterialShaderData occlusion strength offset no longer matches PbrMaterialLayout");
@@ -367,9 +375,13 @@ enum class ModelHitboxLevel : uint32_t
 };
 
 inline constexpr int64_t kiModelOutlineVertexMaximum = 96;
+inline constexpr float kfModelOutlineSimplifyEpsilonMeters = 0.1f;
 
 // The top-down CCW convex hull of a model's vertices after its alignment (offset, scale, pre-rotation), their z range,
-// and the sidecar's hitbox setting, in aligned model units. DataPacker bakes one for every model.
+// the sidecar's hitbox setting and navigation obstacle tag (0 or 1), and the outline weapons test, in aligned model
+// units. DataPacker bakes one for every model. The hull encloses the mesh. The outline is a simple polygon of either
+// winding that holds the origin and lies inside the hull: a kOutline model's silhouette moved in by
+// fOutlineInsetMeters, any other model's hull.
 struct ModelOutline
 {
 	XMFLOAT2 pf2HullVertices[kiModelOutlineVertexMaximum] {};
@@ -377,8 +389,12 @@ struct ModelOutline
 	float fMaximumZ = 0.0f;
 	int32_t iHullVertexCount = 0;
 	ModelHitboxLevel eHitboxLevel = ModelHitboxLevel::kSphere;
+	XMFLOAT2 pf2OutlineVertices[kiModelOutlineVertexMaximum] {};
+	int32_t iOutlineVertexCount = 0;
+	float fOutlineInsetMeters = 0.0f;
+	uint32_t uiNavigationObstacle = 0;
 };
-static_assert(sizeof(ModelOutline) == 784, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
+static_assert(sizeof(ModelOutline) == 1'564, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
 
 // Full authored alignment is baked into both vectors; directions exclude offset translation and remain unnormalized.
 struct PackedModelMissileTube
@@ -516,7 +532,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 62 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 65 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

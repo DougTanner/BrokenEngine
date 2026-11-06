@@ -1,8 +1,10 @@
 {
-	"version": 4,
+	"version": 6,
 	"rotationDegrees": [90, 0, 90],
 	"scale": [3, 3, 3],
 	"offset": [0, 0, 0],
 	"hitbox": "box",
+	"outlineInset": 0.1,
+	"navigationObstacle": false,
 	"hardpoints": []
 }

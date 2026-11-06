@@ -21,9 +21,12 @@ Steps and rules for the dispatched reviewer. The public
 2. Flag changed prose that restates or paraphrases content another location
    already owns — a reference doc, a script's own documented usage, a parent
    `AGENTS.md`, another skill, elsewhere in the same file, or code and comments
-   reached through pointers in the changed prose. Done when each such finding
-   cites the changed location and the owning location and gives the reference
-   that replaces it.
+   reached through pointers in the changed prose. Changed prose copying a value
+   the root `Progressive disclosure` directive forbids, with or without a unit
+   (`default 2`), is a `duplication` finding when the owning symbol can be
+   named, and that symbol is the replacing reference. Done when each such
+   finding cites the changed location and the owning location and gives the
+   reference that replaces it.
 
 3. Flag detail sitting above its owning layer — a schema, mechanics, or a long
    example in a `SKILL.md` body instead of `references/` or a script; a

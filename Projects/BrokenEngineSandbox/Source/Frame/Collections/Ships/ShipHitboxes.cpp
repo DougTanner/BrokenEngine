@@ -25,22 +25,25 @@ void InitializeShipHitboxes()
 			ASSERT(iOutlineOffset + static_cast<int64_t>(sizeof(common::ModelOutline)) <= rChunk.iDataSize);
 			const common::ModelOutline& rOutline = *reinterpret_cast<const common::ModelOutline*>(rChunk.pData + iOutlineOffset);
 			ASSERT(rOutline.iHullVertexCount >= 3 && rOutline.iHullVertexCount <= common::kiModelOutlineVertexMaximum);
+			ASSERT(rOutline.iOutlineVertexCount >= 3 && rOutline.iOutlineVertexCount <= common::kiModelOutlineVertexMaximum);
 
 			ShipHitboxShape& rShape = gShipHitboxShapes[i][j];
 			rShape.fMinimumOriginZ = 1.0f - rOutline.fMinimumZ;
+			rShape.bNavigationObstacle = rOutline.uiNavigationObstacle != 0;
 			engine::CollisionHitbox& rHitbox = rShape.hitbox;
 			rHitbox.eHitboxLevel = rOutline.eHitboxLevel;
 			rHitbox.fMinimumZ = rOutline.fMinimumZ;
 			rHitbox.fMaximumZ = rOutline.fMaximumZ;
-			rHitbox.iHullVertexCount = rOutline.iHullVertexCount;
+			rHitbox.iOutlineVertexCount = rOutline.iOutlineVertexCount;
+			std::copy_n(rOutline.pf2OutlineVertices, rOutline.iOutlineVertexCount, rHitbox.pf2OutlineVertices);
 
+			// The box and radius come from the hull, which encloses the mesh and the outline inside it.
 			XMFLOAT2 f2BoxMinimum {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
 			XMFLOAT2 f2BoxMaximum {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
 			float fHullLengthSquared = 0.0f;
-			for (int64_t k = 0; k < rHitbox.iHullVertexCount; ++k)
+			for (int64_t k = 0; k < rOutline.iHullVertexCount; ++k)
 			{
 				XMFLOAT2 f2Vertex = rOutline.pf2HullVertices[k];
-				rHitbox.pf2HullVertices[k] = f2Vertex;
 				f2BoxMinimum.x = std::min(f2BoxMinimum.x, f2Vertex.x);
 				f2BoxMinimum.y = std::min(f2BoxMinimum.y, f2Vertex.y);
 				f2BoxMaximum.x = std::max(f2BoxMaximum.x, f2Vertex.x);
@@ -91,8 +94,8 @@ void XM_CALLCONV BuildShipHitbox(ShipType eType, ShipController eController, FXM
 
 	if (rShapeHitbox.eHitboxLevel == common::ModelHitboxLevel::kOutline)
 	{
-		rHitbox.iHullVertexCount = rShapeHitbox.iHullVertexCount;
-		common::BuildWorldHull(std::span<const XMFLOAT2>(rShapeHitbox.pf2HullVertices, static_cast<size_t>(rShapeHitbox.iHullVertexCount)), f2Position, fCos, fSin, rHitbox.pf2HullVertices);
+		rHitbox.iOutlineVertexCount = rShapeHitbox.iOutlineVertexCount;
+		common::BuildWorldHull(std::span<const XMFLOAT2>(rShapeHitbox.pf2OutlineVertices, static_cast<size_t>(rShapeHitbox.iOutlineVertexCount)), f2Position, fCos, fSin, rHitbox.pf2OutlineVertices);
 	}
 }
 
@@ -109,10 +112,20 @@ XMVECTOR XM_CALLCONV ShipHullContact(ShipType eType, ShipController eController,
 	XMFLOAT3A f3Delta {-f3Start.x, -f3Start.y, -f3Start.z};
 	float fEnter = 0.0f;
 	float fExit = std::numeric_limits<float>::max();
-	bool bHit = engine::ClipSegmentToPrism(f3Start, f3Delta, std::span<const XMFLOAT2>(rHitbox.pf2HullVertices, static_cast<size_t>(rHitbox.iHullVertexCount)), rHitbox.fMinimumZ, rHitbox.fMaximumZ, fEnter, fExit);
+	bool bHit = common::ClipSegmentToPrism(f3Start, f3Delta, rHitbox.pf2BoxVertices, rHitbox.fMinimumZ, rHitbox.fMaximumZ, fEnter, fExit);
 	ASSERT(bHit);
-	// Extending through the center reaches the far surface when overlapping ships put the shooter inside the hull.
-	float fContact = fEnter > 0.0f ? fEnter : fExit;
+	std::span<const XMFLOAT2> outlineVertices(rHitbox.pf2OutlineVertices, static_cast<size_t>(rHitbox.iOutlineVertexCount));
+	float fContact = fEnter;
+	if (fEnter <= 0.0f || !common::PointInPolygon({f3Start.x + fEnter * f3Delta.x, f3Start.y + fEnter * f3Delta.y}, outlineVertices))
+	{
+		// The first crossing ahead is the entry from outside, or the exit surface when overlapping ships put the shooter
+		// inside. A path that leaves the prism through its top or bottom first ends there, at fExit.
+		// An outline edge lying on a box face can round to a crossing just below fEnter, so a search from that face starts
+		// slightly earlier. A search from the shooter itself takes no tolerance, because a crossing behind it is no contact.
+		static constexpr float kfEnterTolerance = 1.0e-5f;
+		float fSearchStart = fEnter > 0.0f ? fEnter - kfEnterTolerance : 0.0f;
+		fContact = std::min(engine::FirstOutlineCrossing(f3Start, f3Delta, outlineVertices, fSearchStart, fExit), fExit);
+	}
 	ASSERT(std::isfinite(fContact));
 	return XMVectorSetW(XMVectorMultiplyAdd(XMVectorReplicate(fContact), XMVectorSubtract(vecPosition, vecShooterPosition), vecShooterPosition), 1.0f);
 }
@@ -152,7 +165,7 @@ void XM_CALLCONV DebugRenderShipHitbox(const engine::RenderBasis& rBasis, ShipTy
 	}
 	if (hitbox.eHitboxLevel == common::ModelHitboxLevel::kOutline)
 	{
-		DebugRenderPrism(rBasis, std::span<const XMFLOAT2>(hitbox.pf2HullVertices, static_cast<size_t>(hitbox.iHullVertexCount)), hitbox.fMinimumZ, hitbox.fMaximumZ, {0.0f, 1.0f, 1.0f, 1.0f});
+		DebugRenderPrism(rBasis, std::span<const XMFLOAT2>(hitbox.pf2OutlineVertices, static_cast<size_t>(hitbox.iOutlineVertexCount)), hitbox.fMinimumZ, hitbox.fMaximumZ, {0.0f, 1.0f, 1.0f, 1.0f});
 	}
 }
 #endif // BT_CLIENT

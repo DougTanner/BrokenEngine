@@ -3,9 +3,10 @@
 Read this reference only for a scenario that targets the ModelViewer. It owns
 the one-call use of `../scripts/Invoke-ModelViewerCapture.ps1`, which starts the
 ModelViewer Debug executable hidden in its agent mode, waits for the viewer's
-initial streaming done line, captures one PNG through the viewer's own F9 path
-by message to its window, and closes it by exact PID; the
-script owns that sequence, its result codes, and its fixed capture timeout.
+initial streaming done line, optionally enters autonomous flight, captures one
+PNG through the viewer's own F9 path by message to its window, and closes it by
+exact PID; the script owns that sequence, its result codes, and its capture
+timeout.
 
 ## Capture
 
@@ -30,6 +31,10 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCap
   before rendering. Case and separators are significant; this is not a source
   filesystem path. See [ModelViewer application contracts](../../../../Projects/ModelViewer/AGENTS.md#application-contracts)
   for the shared scene-selection contract.
+- Optionally pass `-Flight` to enter autonomous flight before the capture: the
+  script posts TAB to the viewer's window after the initial streaming wait, lets
+  it fly for `$FlightSeconds`, and lengthens that run's timeout by the same
+  amount. The result schema does not change.
 - Pass no log or configuration argument: the script always runs the Debug
   executable and writes the viewer log to `ModelViewer.log` inside the app-data
   directory it creates.

@@ -38,6 +38,7 @@ struct ShipHitboxShape
 	float fPusherRadius = 0.0f;
 	// Cached upright water clearance floor for spawn and per-tick height targets.
 	float fMinimumOriginZ = 0.0f;
+	bool bNavigationObstacle = false;
 };
 
 // Indexed by ShipType, then ShipController. Written once by InitializeShipHitboxes before the first frame; read-only
@@ -50,14 +51,14 @@ inline float gfLargestShipPusherRadius = 0.0f;
 void InitializeShipHitboxes();
 
 // Poses the (type, controller) shape at vecPosition, yawed by the horizontal unit vecDirection, writing the setting and,
-// as far as it reaches, the box and hull.
+// as far as it reaches, the box and outline.
 void XM_CALLCONV BuildShipHitbox(ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection, engine::CollisionHitbox& rHitbox);
 
 #if defined(BT_CLIENT)
-// Returns the center-directed ray's hull contact in the cell-local frame; an inside start uses the exit surface.
+// Returns the center-directed ray's outline contact in the cell-local frame; an inside start uses the exit surface.
 XMVECTOR XM_CALLCONV ShipHullContact(ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecShooterPosition);
 
-// Draws the row's sphere and, as far as its setting reaches, the box and hull prisms; vecPosition and vecDirection are
+// Draws the row's sphere and, as far as its setting reaches, the box and outline prisms; vecPosition and vecDirection are
 // the interpolated pose, local to rBasis's cell.
 void XM_CALLCONV DebugRenderShipHitbox(const engine::RenderBasis& rBasis, ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection);
 #endif

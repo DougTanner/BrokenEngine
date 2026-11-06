@@ -12,10 +12,9 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   runs that parent call before its own collection Updates, so zones are valid
   from the rest of that same Update phase onward, on the same thread only (a
   game collection's `Update` is a same-phase consumer). Stored `thread_local` so
-  each Dispatch worker and reconcile thread owns its copy. Each tick a row at
-  an exact flight-plane height occupies that layer; a height strictly between
-  planes occupies both adjacent layers. Heights outside the table occupy the
-  nearest endpoint layer. Each layer has its own fixed zone grid (dimensions in
+  each Dispatch worker and reconcile thread owns its copy. Each tick a row
+  occupies one layer per plane `FlightPlanes::OccupiedPlanes` gives for its
+  height. Each layer has its own fixed zone grid (dimensions in
   `PushersUpdate.cpp`, layer count from the game's flight-plane table) that
   always covers that whole rectangle, with a cap of 512 per zone per layer
   (overflow `DEBUG_BREAK`s and logs one `kWarning` summary of the dropped

@@ -2,7 +2,11 @@
 
 #include "Network/Server/FleetNavigationController.h"
 
+#include "Frame/NavQuery.h"
+
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
+#include "Frame/TerrainUtils.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Game.h"
 
@@ -10,6 +14,29 @@ namespace game
 {
 
 #if defined(BT_SERVER)
+
+// The fleet step runs ahead of this tick's dispatch, so a cell just loaded or activated has not built its navigation data.
+// It builds here, on the main thread with no tick running: the answer reaches the fleet checksum, and playback can hold an
+// unbuilt cell where the recording had a built one.
+static bool FlagshipReachesEdge(const Frame& rFlagshipFrame, ShipLocator flagship, const engine::CellStaticData& rStaticData, int64_t iDirection)
+{
+	if (!rStaticData.bNavigationDataBuilt)
+	{
+		// Heap: BuildCellNavigationData grows the per-graph navigationData vector and each graph's vertex, polygon, and visibility-edge vectors, and
+		// this path runs on the main thread inside the armed main loop
+		ScopedSuppressAllocationTracking suppress;
+		engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
+		rStaticData.bNavigationDataBuilt = true;
+	}
+
+	XMVECTOR vecPosition = ShipPosition(rFlagshipFrame.interpolate, flagship);
+	int64_t iTargetFlightPlane = VisitShip(rFlagshipFrame, flagship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+	{
+		return GetTargetFlightPlane(rPostRender.pOrders[iRow]);
+	});
+	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), iTargetFlightPlane);
+	return engine::NavQueryEdgeReachable(vecPosition, iDirection, NavigationPlaneData(rStaticData, ShipTypeClearanceTier(flagship.eType), iNavigationPlane));
+}
 
 // Owners walk in GUID order because each fleet's direction draw consumes the one fleet RNG, and replay playback must
 // draw in the recording's order.
@@ -68,13 +95,15 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			int64_t iDirection = common::Random(common::kiHexDirectionCount - 1, rRandom);
 			const common::HexDirection& rDirection = engine::kCellDirections.pEntries[iDirection];
 			engine::GridCoord destination {};
-			if (!engine::TryAddGridCoordinate(rFlagship.coordinate, rDirection.iDeltaQ, rDirection.iDeltaR, destination)) [[unlikely]]
+			if (!engine::TryAddGridCoordinate(rFlagship.coordinate, rDirection.iDeltaQ, rDirection.iDeltaR, destination)
+			 || !FlagshipReachesEdge(rFlagshipFrame, *optionalFlagship, gpGame->mCells.at(rFlagship.coordinate).staticData, iDirection)) [[unlikely]]
 			{
-				// A flagship at a numeric coordinate edge has no neighbour that way, so this move never happens
-				// rather than wrapping to the far side of the grid. wantedCoordinate already equals the flagship coord,
-				// so resetting the timer alone spends a full navigationDelaySeconds before the next draw instead of
-				// redrawing a direction every tick.
+				// A flagship at a numeric coordinate edge has no neighbour that way, rather than wrapping to the far side of
+				// the grid, and one with no reachable open stretch of that edge is sealed from it, so this move never happens.
+				// wantedCoordinate already equals the flagship coord, so resetting the timer alone spends a full
+				// navigationDelaySeconds before the next draw instead of redrawing a direction every tick.
 				rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
+				LOG(kNetwork, kDebug, "FleetNavigationController::TickFleetTimers refused move FleetGuid: ({},{}) Coord: ({},{}) Direction: {}", rFleet.guid.uiHigh, rFleet.guid.uiLow, rFlagship.coordinate.iQ, rFlagship.coordinate.iR, iDirection);
 				continue;
 			}
 			int64_t iPendingTicks = engine::kiTickRate;
@@ -122,7 +151,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				});
 				++iMembersUpdated;
 			}
-			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{}) MembersUpdated: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iQ, destination.iR, iMembersUpdated);
+			LOG(kNetwork, kDebug, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{}) MembersUpdated: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iQ, destination.iR, iMembersUpdated);
 		}
 	}
 }

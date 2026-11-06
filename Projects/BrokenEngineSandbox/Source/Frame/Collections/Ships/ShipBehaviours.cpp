@@ -12,6 +12,7 @@
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/TerrainUtils.h"
+#include "Profile/ProfileRows.h"
 
 namespace game
 {
@@ -28,6 +29,11 @@ constexpr float kfFlagshipCloseDistanceSquared = 12.5f * 12.5f;
 constexpr int64_t kiNavigationRecomputeInterval = 16;
 
 constexpr float kfNavigationLookahead = 8.0f;
+
+// A rectangle's A* corners stand this far outside its tested box, so a leg round the box never touches it.
+constexpr float kfNavRectangleCornerMargin = 0.5f;
+// A rectangle counts for a query within this multiple of both ships' summed radii; a farther one moves before arrival.
+constexpr float kfNavRectangleReachScale = 4.0f;
 
 // A stored patrol point lies this far inside the cell, so an Omni overshooting it stays in the cell: the 10 m arrival
 // radius plus kfOmniMaximumSpeed over kfOmniDrag times the lowest decay multiplier is 57.6 m. Assumes the next tick's
@@ -97,9 +103,7 @@ bool SkipsTerrainContact(float fHeight)
 	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
 }
 
-// The empty graph stands in on a plane the tier has no graph on, kuiNoFlightPlane included, and in a client cell whose
-// static data has not arrived, which holds no graphs.
-static const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
+const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
 {
 	static const engine::NavData sEmptyNavData;
 	int64_t iGraph = NavigationGraphIndex(iClearanceTier, iNavigationPlane);
@@ -170,11 +174,11 @@ void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks)
 	}
 }
 
-// Returns the index into rStaticData.islands for the next navigation waypoint:
-// 0 -> largest-area island in this frame, 1 -> smallest-area, 2+ -> the supplied random pick.
-// Largest/smallest scan the frame's placements deterministically (no RNG, first-found tie-break);
+// Returns the index into centredIslands, the same index in the cell's full list, for the next navigation waypoint:
+// 0 -> largest-area centred island, 1 -> smallest-area, 2+ -> the supplied random pick.
+// Largest/smallest scan centredIslands deterministically (no RNG, first-found tie-break);
 // area uses the same anisotropic quad footprint the destination point is generated from.
-static int64_t SelectIslandPlacement(const engine::CellStaticData& rStaticData, int64_t iWaypointIndex, int64_t iRandomPick)
+static int64_t SelectIslandPlacement(std::span<const engine::IslandPlacement> centredIslands, int64_t iWaypointIndex, int64_t iRandomPick)
 {
 	if (iWaypointIndex >= 2)
 	{
@@ -184,9 +188,9 @@ static int64_t SelectIslandPlacement(const engine::CellStaticData& rStaticData, 
 	bool bWantLargest = (iWaypointIndex == 0);
 	int64_t iSelected = 0;
 	float fSelectedArea = -1.0f;
-	for (int64_t j = 0; j < std::ssize(rStaticData.islands); ++j)
+	for (const auto& [j, rPlacement] : std::views::enumerate(centredIslands))
 	{
-		const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rStaticData.islands.at(static_cast<size_t>(j)).islandCrc);
+		const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 		float fArea = rTemplate.fQuadFootprintX * rTemplate.fQuadFootprintY;
 		if (fSelectedArea < 0.0f || (bWantLargest ? (fArea > fSelectedArea) : (fArea < fSelectedArea)))
 		{
@@ -302,12 +306,157 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 	return bRecompute;
 }
 
-static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, [[maybe_unused]] ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::NavData& rNavData, XMVECTOR& rVecArtificialIntelligenceDirection)
+// Select tests reach per rectangle per query, so the center and half diagonal are cached.
+struct NavRectangleBoard::BoardRectangle
+{
+	engine::NavRectangle rectangle {};
+	XMFLOAT2 f2Center {};
+	float fHalfDiagonal = 0.0f;
+	float fReach = 0.0f;
+	int64_t iLowestPlane = 0;
+	int64_t iHighestPlane = 0;
+};
+
+// OccupiedPlanes reads raw plane heights, so a Battleship at its effective height reads as between planes; the cap at the
+// type's highest plane keeps it on its own.
+static std::pair<int64_t, int64_t> CappedOccupiedPlanes(float fHeight, ShipType eType)
+{
+	auto [iLowestPlane, iHighestPlane] = engine::gpFlightPlanes->OccupiedPlanes(fHeight);
+	return {iLowestPlane, std::min(iHighestPlane, HighestFlightPlane(eType))};
+}
+
+// The handle test is ApplyPusherPush's, so a rectangle exists exactly while its ship's pusher does.
+template <typename SHIP_INTERPOLATE, typename SHIP_POST_RENDER>
+static bool IsNavRectangleRow(ShipType eType, const SHIP_INTERPOLATE& rInterpolate, const SHIP_POST_RENDER& rPostRender, int64_t iRow)
+{
+	return rInterpolate.pPushers[iRow].uuid.iValue != 0 && gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(rPostRender.pController[iRow])].bNavigationObstacle;
+}
+
+static int64_t CountNavRectangles(const Frame& rPreviousFrame)
+{
+	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerPostRenderUpdateNavigationRectangles);
+
+	int64_t iCount = 0;
+	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
+	{
+		for (int64_t i = 0; i < rPostRender.iCount; ++i)
+		{
+			if (IsNavRectangleRow(eType, rInterpolate, rPostRender, i))
+			{
+				++iCount;
+			}
+		}
+	});
+	return iCount;
+}
+
+// The shape's box runs CCW from its minimum corner, so each corner moves out along both axes before posing.
+static void PoseInflatedBox(const engine::CollisionHitbox& rShapeHitbox, float fClearance, XMFLOAT2 f2Position, float fCos, float fSin, std::span<XMFLOAT2> outputVertices)
+{
+	const XMFLOAT2* pf2Box = rShapeHitbox.pf2BoxVertices;
+	XMFLOAT2 pf2InflatedBox[4]
+	{
+		{pf2Box[0].x - fClearance, pf2Box[0].y - fClearance},
+		{pf2Box[1].x + fClearance, pf2Box[1].y - fClearance},
+		{pf2Box[2].x + fClearance, pf2Box[2].y + fClearance},
+		{pf2Box[3].x - fClearance, pf2Box[3].y + fClearance},
+	};
+	common::BuildWorldHull(pf2InflatedBox, f2Position, fCos, fSin, outputVertices);
+}
+
+NavRectangleBoard::NavRectangleBoard(const Frame& rPreviousFrame, ShipType eSelfType)
+: meSelfType(eSelfType)
+, miRectangleCount(CountNavRectangles(rPreviousFrame))
+, mRectangles(common::gpThreadLocal->mWorkbuffer.PushBuffer<BoardRectangle*>(miRectangleCount * static_cast<int64_t>(sizeof(BoardRectangle))))
+, mPicked(common::gpThreadLocal->mWorkbuffer.PushBuffer<engine::NavRectangle*>(miRectangleCount * static_cast<int64_t>(sizeof(engine::NavRectangle))))
+{
+	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerPostRenderUpdateNavigationRectangles);
+
+	float fClearance = NavigationClearanceMeters(ShipTypeClearanceTier(eSelfType));
+	float fCornerClearance = fClearance + kfNavRectangleCornerMargin;
+	// One board serves both of the type's controllers, and Select takes no controller.
+	const std::array<ShipHitboxShape, kiShipControllerCount>& rSelfShapes = gShipHitboxShapes[std::to_underlying(eSelfType)];
+	float fSelfRadius = std::max(rSelfShapes[0].fRadius, rSelfShapes[1].fRadius);
+
+	int64_t iRectangle = 0;
+	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
+	{
+		for (int64_t i = 0; i < rPostRender.iCount; ++i)
+		{
+			if (!IsNavRectangleRow(eType, rInterpolate, rPostRender, i))
+			{
+				continue;
+			}
+
+			const ShipHitboxShape& rShape = gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(rPostRender.pController[i])];
+			XMVECTOR vecPosition = rInterpolate.pVecPositions[i];
+			XMVECTOR vecDirection = rInterpolate.pVecDirections[i];
+			XMFLOAT2 f2Position {XMVectorGetX(vecPosition), XMVectorGetY(vecPosition)};
+			float fCos = XMVectorGetX(vecDirection);
+			float fSin = XMVectorGetY(vecDirection);
+
+			BoardRectangle& rRectangle = mRectangles.mpData[iRectangle++];
+			PoseInflatedBox(rShape.hitbox, fClearance, f2Position, fCos, fSin, rRectangle.rectangle.pf2Box);
+			PoseInflatedBox(rShape.hitbox, fCornerClearance, f2Position, fCos, fSin, rRectangle.rectangle.pf2Corners);
+			// The inflated box's half extents are each at most the ship's radius plus the corner clearance, so the penalty is
+			// at least the half perimeter a way round costs and a clear way round always wins.
+			rRectangle.rectangle.fCrossingPenalty = 4.0f * (rShape.fRadius + fCornerClearance);
+
+			XMFLOAT2 f2Corner = rRectangle.rectangle.pf2Box[0];
+			XMFLOAT2 f2OppositeCorner = rRectangle.rectangle.pf2Box[2];
+			float fDiagonalX = f2OppositeCorner.x - f2Corner.x;
+			float fDiagonalY = f2OppositeCorner.y - f2Corner.y;
+			rRectangle.f2Center = {f2Corner.x + 0.5f * fDiagonalX, f2Corner.y + 0.5f * fDiagonalY};
+			rRectangle.fHalfDiagonal = 0.5f * std::sqrt(fDiagonalX * fDiagonalX + fDiagonalY * fDiagonalY);
+			rRectangle.fReach = kfNavRectangleReachScale * (fSelfRadius + rShape.fRadius);
+
+			auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), eType);
+			rRectangle.iLowestPlane = iLowestPlane;
+			rRectangle.iHighestPlane = iHighestPlane;
+		}
+	});
+}
+
+std::span<const engine::NavRectangle> XM_CALLCONV NavRectangleBoard::Select(FXMVECTOR vecPosition, FXMVECTOR vecDestination)
+{
+	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerPostRenderUpdateNavigationRectangles);
+
+	auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), meSelfType);
+	XMFLOAT2 f2Position {XMVectorGetX(vecPosition), XMVectorGetY(vecPosition)};
+	XMFLOAT2 f2Destination {XMVectorGetX(vecDestination), XMVectorGetY(vecDestination)};
+
+	int64_t iPickedCount = 0;
+	for (int64_t i = 0; i < miRectangleCount; ++i)
+	{
+		const BoardRectangle& rRectangle = mRectangles.mpData[i];
+		if (rRectangle.iLowestPlane > iHighestPlane || rRectangle.iHighestPlane < iLowestPlane)
+		{
+			continue;
+		}
+
+		float fOffsetX = rRectangle.f2Center.x - f2Position.x;
+		float fOffsetY = rRectangle.f2Center.y - f2Position.y;
+		if (std::sqrt(fOffsetX * fOffsetX + fOffsetY * fOffsetY) - rRectangle.fHalfDiagonal > rRectangle.fReach)
+		{
+			continue;
+		}
+
+		if (common::PointInPolygon(f2Position, rRectangle.rectangle.pf2Box) || common::PointInPolygon(f2Destination, rRectangle.rectangle.pf2Box))
+		{
+			continue;
+		}
+
+		mPicked.mpData[iPickedCount++] = rRectangle.rectangle;
+	}
+	return {mPicked.mpData, static_cast<size_t>(iPickedCount)};
+}
+
+static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, [[maybe_unused]] ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::NavData& rNavData, NavRectangleBoard& rNavRectangleBoard, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
 	// Destinations can sit on another plane's height; at the ship's own Z the query delta, and so the direction, stays
 	// horizontal.
-	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition)), rNavData, vecDebugWaypoint);
+	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition)), rNavData, rNavRectangleBoard.Select(vecPosition, vecDestination), vecDebugWaypoint);
 	if (XMVectorGetX(XMVector3LengthSq(vecNavigationDirection)) > 0.001f)
 	{
 		rVecArtificialIntelligenceDirection = vecNavigationDirection;
@@ -327,18 +476,18 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, 
 #endif // BT_CLIENT
 }
 
-XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, int64_t iTargetFlightPlane, bool& rbFinal)
+XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, bool& rbFinal)
 {
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iClearanceTier, NavigationFlightPlane(XMVectorGetZ(vecPosition), iTargetFlightPlane));
 	XMVECTOR vecLevelDestination = XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition));
 	XMVECTOR vecWaypoint = XMVectorZero();
-	engine::NavQueryDirection(vecPosition, vecLevelDestination, rNavData, vecWaypoint);
+	engine::NavQueryDirection(vecPosition, vecLevelDestination, rNavData, rNavRectangleBoard.Select(vecPosition, vecLevelDestination), vecWaypoint);
 	// NavQueryDirection snaps its destination with the same polygon snap, so a final waypoint matches it exactly.
 	rbFinal = XMVector2Equal(vecWaypoint, engine::NavQuerySnapToNavigable(vecLevelDestination, rNavData));
 	return vecWaypoint;
 }
 
-void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
+void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	engine::GlobalId globalId = VisitShip(rFrame, self, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 	{
@@ -383,14 +532,14 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	{
 		// A missing flagship leaves FollowFlagship without a target; the fleet flagship is its Battleship, which never
 		// dies, so a follower stalls until that row is back in this cell or the fleet override moves it on.
-		// Agent-injected ships have no Fleet updates. Mode 7 follows without arrival or missing-flagship fallback.
-		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 6 draws only when
-		// selecting a destination. Both skip draws without islands, except mode 6's fleet Omni patrol pick, which draws
-		// two per attempt in any cell; a fleet Omni never enters mode 7. Every Random call advances once regardless of bound.
-		if (!rStaticData.islands.empty())
+		// Agent-injected ships have no Fleet updates. Mode 7 follows without arrival or missing-flagship fallback and
+		// mirrors mode 6's three entry draws (island pick, footprint X/Y) each tick with centred islands; a fleet Omni
+		// never enters mode 7. Every Random call advances once regardless of bound.
+		std::span<const engine::IslandPlacement> centredIslands = engine::CentredIslands(rStaticData.islands);
+		if (!centredIslands.empty())
 		{
-			common::Random(std::ssize(rStaticData.islands) - 1, rFrame.postRender.randomEngine);
-			const engine::IslandPlacement& rRandomPlacement = rStaticData.islands.at(static_cast<size_t>(self.iRow % std::ssize(rStaticData.islands)));
+			common::Random(std::ssize(centredIslands) - 1, rFrame.postRender.randomEngine);
+			const engine::IslandPlacement& rRandomPlacement = rStaticData.islands.at(static_cast<size_t>(self.iRow % std::ssize(centredIslands)));
 			const engine::IslandTemplate& rRandomTemplate = engine::gpIslandTerrain->mIslands.at(rRandomPlacement.islandCrc);
 			common::Random(rRandomTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
 			common::Random(rRandomTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
@@ -398,7 +547,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rNavRectangleBoard, rVecArtificialIntelligenceDirection);
 		}
 	}
 	else if (riNavigationDirection == 6)
@@ -407,12 +556,13 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		if (XMVectorGetW(rVecIslandDestination) == 0.0f)
 		{
 			// A patrolling fleet Omni samples a point uniformly in the kfOmniPatrolRadius disc around its flagship, two
-			// draws per attempt in any cell. A snapped point outside the cell inset is dropped and the tick keeps its
-			// cached steering, since a recompute would aim at the zero destination; the next tick draws again.
-			// Otherwise waypoints select the largest, smallest, then random island by quad-footprint area.
-			// All waypoint indices consume the island-pick draw before the two footprint draws, keeping each
-			// destination selection at three draws. The sampled point lies in the selected island's quad-footprint
-			// AABB; island-free cells skip draws and target the cell center.
+			// draws per attempt in any cell. Otherwise waypoints select the largest, smallest, then random centred
+			// island by quad-footprint area, always drawing the island pick before the two footprint draws; a cell with
+			// no centred island skips them and targets the cell center. A patrol point outside the cell inset, or an
+			// island point or snap past the cell edge (the island's quad-footprint AABB can pass it), is dropped and
+			// the next tick draws again; a dropped largest or smallest pick still advances to the next, and the tick
+			// keeps its cached steering because a recompute would aim at the zero destination.
+			std::span<const engine::IslandPlacement> centredIslands = engine::CentredIslands(rStaticData.islands);
 			if (optionalPatrolFlagship)
 			{
 				XMVECTOR vecFlagshipPosition = ShipPosition(rPreviousFrame.interpolate, *optionalPatrolFlagship);
@@ -431,15 +581,15 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 					bRecompute = false;
 				}
 			}
-			else if (rStaticData.islands.empty())
+			else if (centredIslands.empty())
 			{
 				rVecIslandDestination = vecCellCenter;
 				bRecompute = true;
 			}
 			else
 			{
-				int64_t iRandomPick = common::Random(std::ssize(rStaticData.islands) - 1, rFrame.postRender.randomEngine);
-				int64_t iPlacement = SelectIslandPlacement(rStaticData, riNavigationWaypointIndex, iRandomPick);
+				int64_t iRandomPick = common::Random(std::ssize(centredIslands) - 1, rFrame.postRender.randomEngine);
+				int64_t iPlacement = SelectIslandPlacement(centredIslands, riNavigationWaypointIndex, iRandomPick);
 				if (riNavigationWaypointIndex < 2)
 				{
 					++riNavigationWaypointIndex;
@@ -455,8 +605,16 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 				// Snap to navigable area if inside an obstacle
 				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);
-				LOG(kNavData, kVerbose, "{} {} NavSwitch: island dest generated pos={} dest={}", ShipTypeName(self.eType), self.iRow, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
-				bRecompute = true; // new destination -> path immediately
+				if (engine::IsInsideCell(rVecIslandDestination))
+				{
+					LOG(kNavData, kVerbose, "{} {} NavSwitch: island dest generated pos={} dest={}", ShipTypeName(self.eType), self.iRow, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
+					bRecompute = true; // new destination -> path immediately
+				}
+				else
+				{
+					rVecIslandDestination = XMVectorZero();
+					bRecompute = false;
+				}
 			}
 		}
 		else if (engine::NavQueryPointBlocked(rVecIslandDestination, rNavData))
@@ -465,12 +623,18 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 			// plane drops; left there, the path stops at the polygon edge, so the arrival test passes only when that edge lies
 			// within its radius of the destination.
 			// NavQueryDirection already snaps its destination to this same point, so the snap needs no immediate recompute.
+			// A polygon can pass the cell edge; a snap past it is dropped as a fresh pick's is, and the next tick draws again.
 			rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);
+			if (!engine::IsInsideCell(rVecIslandDestination))
+			{
+				rVecIslandDestination = XMVectorZero();
+				bRecompute = false;
+			}
 		}
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rNavRectangleBoard, rVecArtificialIntelligenceDirection);
 		}
 
 		// Arrival check (unconditional — independent of the pathfind throttle). Zeroing the destination
@@ -497,7 +661,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, vecDestination, rNavData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, vecDestination, rNavData, rNavRectangleBoard, rVecArtificialIntelligenceDirection);
 		}
 	}
 	else

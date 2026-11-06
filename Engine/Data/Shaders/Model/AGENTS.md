@@ -6,7 +6,7 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
 
 - The material push-constant index also selects the mesh-data slot relative to the instance base. CPU draw generation must keep one material/primitive draw aligned with that mesh slot.
 - The generated BRDF lookup stores inverted roughness on its V axis. Generator and runtime lookup must remain paired.
-- Tangent space is derived from screen-space position and UV derivatives. Degenerate UV gradients or a collapsed orthogonalized tangent fall back to the geometric normal to avoid NaNs.
+- Tangent space is derived from screen-space position and UV derivatives. Degenerate UV gradients, a collapsed orthogonalized tangent, or a normal texture scale of 0 fall back to the geometric normal to avoid NaNs.
 - Authored occlusion strength blends the linear red sample from neutral 1 and attenuates only the diffuse/specular image-based lighting sum. Direct sun/moon, engine directional lighting, and emissive remain independent of ambient occlusion.
 - Skinning uses compact three-row joint matrices in a buffer separate from mesh
   data. That split is a layout choice — each mesh indexes the shared buffer
@@ -17,21 +17,12 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   `mat3(skinMatrix)` and therefore assumes near-rigid joint transforms rather
   than arbitrary non-uniform joint scaling.
 - Object shadow footprints use model world XY, independent of camera position.
-  Horizon stretch changes world X only, preserving Y/Z. It fixes the sun-facing
-  endpoint of the transformed model bounding box and fully extends the opposite
-  endpoint; the box is the rest bound, not an animated silhouette. Every
-  model-layout producer supplies its ordinary world-X minimum and maximum
-  relative to the model centre, independent of light and including all instance
-  scale and pose rotations. Alignment ownership is in
-  [Model Alignment](../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment);
-  editable previews transform bounds by inverse packed alignment followed by
-  editable alignment.
-  Global publishes the opposite active sun/moon X sign directly to the shader;
-  model-bound publication needs no light state. The positive Stretch Power
-  shapes the clamped normalized distance from the fixed endpoint: the default is 2;
-  power 1 is linear, higher values concentrate extension toward the far endpoint, and
-  lower values increase interior extension without changing either endpoint.
-  Zero extension, zero light X, or zero box width leaves the position unchanged.
+  Horizon stretch changes world X only: it fixes the sun-facing endpoint of the
+  transformed rest bounding box and extends the opposite one, shaped by Stretch
+  Power. Every model-layout producer supplies world-X minimum and maximum
+  relative to the model centre, independent of light;
+  [Model Alignment](../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment)
+  owns alignment.
   The shadow-mode vertex
   samples the terrain elevation render target at the model centre for the
   blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is

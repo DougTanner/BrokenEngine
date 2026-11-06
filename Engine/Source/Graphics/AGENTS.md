@@ -137,8 +137,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   unless crop safety requires an earlier refresh.
 - Terrain rendering uses boot-fixed island templates, a stable 128 MiB mesh
   arena, and a per-framebuffer placement arena derived from the active-cell
-  subscription slots plus one local unconfirmed cell and the 107-placement cell
-  contract. The record-once terrain command buffer binds the mesh arena once;
+  subscription slots plus one local unconfirmed cell and the
+  `kiMaximumIslandsPerCell` cell contract. The record-once terrain command
+  buffer binds the mesh arena once;
   each acquired framebuffer's indirect records, rewritten every frame from
   residency state, provide each template's mesh subrange (zero unless
   resident) plus the current per-template run offset and mesh-visible count,
@@ -150,6 +151,12 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   reused range. Residency never replaces the mesh-buffer handle or re-records.
   Arena teardown invalidates every suballocation, while File-owned
   asynchronous range state survives.
+- The renderer draws every listed copy of an island that crosses cells, with no
+  deduplication: copies share a template, texture slot, and rotation, the
+  elevation prepasses' MAX blend leaves the height unchanged, and the depth test
+  rejects a later copy at equal depth. Each cell's render offset can part copies
+  by millimetres, so a fragment may shade twice, writing the same color to
+  rounding.
 - The island least-recently-used grace period counts rendered frames, not sim ticks or wall time. Both the frame counter and each template's last-used stamp advance only inside the render path, so a frame that skips rendering ages nothing and cannot evict an island early.
 - Render-target sizes derive from a fixed 3840-pixel reference width, not the
   live window. Smoke simulation resolution scales against that reference, and

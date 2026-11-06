@@ -211,7 +211,7 @@ ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnectio
 	// Heap: scratch grows until steady state
 	mSendScratch.clear();
 	mFrameStreamBuffer.mpTarget = &mSendScratch;
-	rStaticData.Write(mFrameStream, /*bIncludeNavigationData=*/true);
+	rStaticData.Write(mFrameStream);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

@@ -5,7 +5,7 @@
 
 Ship hits use per-row, model-derived hitboxes: each ship row carries its own
 enclosing sphere and, as far as its model's `.model.json` `hitbox` setting
-reaches, a box prism and a hull (outline) prism
+reaches, a box prism and an outline prism
 (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.h`,
 `gShipHitboxShapes`, `BuildShipHitbox`). Blasters and missiles hit as swept
 points. The change that introduced them accepted, by user decision, that a
@@ -17,32 +17,44 @@ Observed gap (from code; no live run has reproduced it yet):
 - Cells have a 450 m apothem (`kfCellApothem`,
   `Engine/Source/Frame/GridCoord.h:45`). A ship belongs to the cell holding its
   center and transfers only when its center leaves the hexagon
-  (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsCombat.cpp:169-173`).
-- A random-controller Battleship's aligned outline reaches up to about 89 m
-  from its center (largest aligned XY outline radius 19.78 model units x
-  `kfBattleshipRadius` 4.5); a fleet Battleship about 29 m; Fighters and Omnis
-  under 2 m. Whenever such a ship's center is closer to an edge than that
-  reach, part of its hull lies in the neighbour cell.
+  (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsCombat.cpp:168-172`).
+- Cells are flat-top hexagons (`common::HexDirections`,
+  `Common/Math/MathUtils.h:239`). With apothem a, neighbour centers sit at
+  (+-sqrt(3)a, +-a) and (0, +-2a), so +X points at a vertex and no edge faces
+  east. The north edge is local y = +450, shared with the neighbour at
+  (q, r + 1).
+- Horizontal mesh reach from a ship's center, measured from each `.MODEL`'s
+  vertices at its `.model.json` alignment: a random-controller Battleship
+  (SpaceBattleshipAquamarine) 16.03 m at the nose; a fleet Battleship
+  (BattleshipJesterz86) 17.25 m at the stern quarter, its length spanning
+  +-16.00 m; Fighters 3.05 m (RavenStarConflictV2, fleet) and 2.28 m
+  (Spaceship, random); Omnis 3.01 m (SpaceGliderGltf, fleet) and 3.10 m
+  (SpaceFighter, random). Weapons test the outline only on the `outline`
+  models, the two Battleships, where it lies inside that reach by the model's
+  `outlineInset` (0.1 m today); SpaceFighter's `box` row is tested to its box
+  corners, and a `sphere` row to its row radius (2.37 to 3.14 m) by a projectile
+  and at its center by a blast. Whenever such a ship's center is closer to an
+  edge than its mesh reach, part of its hull can lie in the neighbour cell.
 - Each cell's tick runs `Collision::Collide` and the AreaDamage phase over that
   cell's own rows only (`Engine/Source/Frame/FrameBase.cpp:299-305`); the
   collision and area-damage state is `thread_local`
-  (`Engine/Source/Frame/Collision.h:112`, `Engine/Source/Frame/AreaDamage.h:29`)
+  (`Engine/Source/Frame/Collision.h:121`, `Engine/Source/Frame/AreaDamage.h:29`)
   and the zone grids hold only the cell's own rows
   (`Engine/Source/Frame/Collision.cpp:9-13`, `Engine/Source/Frame/AGENTS.md`
   entity-containment invariant).
 - A Blaster or Missile stops testing the cell's ships at its cell exit and
   transfers (`CollisionOutcomeType::kCellExit`,
-  `Engine/Source/Frame/Collision.cpp:837`,
+  `Engine/Source/Frame/Collision.cpp:872`,
   `Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/BlastersUpdate.cpp:242`,
-  `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesUpdate.cpp:305`).
+  `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesUpdate.cpp:323`).
   In the neighbour cell it never tests the ship whose hull reaches across.
 - Missile area damage (`kfMissileDamageRadius` 7 m,
   `Projects/BrokenEngineSandbox/Source/Frame/HealthDamage.h:19`) is added to
   the exploding cell's own queue and queried only by that cell's ships
   (`AreaDamage::Get`, `Engine/Source/Frame/AreaDamage.h:27`), so a blast in the
   neighbour cell never damages the hull across the edge. Before per-row
-  hitboxes this affected only ship centers within 7 m of an edge; hull prisms
-  widen it to the full hull reach.
+  hitboxes this affected only ship centers within 7 m of an edge; box and
+  outline prisms widen it to the full hull reach.
 
 Constraints any mechanism meets:
 
@@ -133,16 +145,27 @@ collections.
 
 ## Acceptance criteria
 
-- Reproduction then fix: with the server paused, `inject_payload` spawns a
-  random-controller Battleship facing +X with its center about 40 m inside
-  its cell's east edge, and an enemy Blaster in the east neighbour cell whose
-  path crosses the hull part beyond that edge at the ship's height; after
-  ticks, `read_frame` on the unedited tree shows no health change, and after
-  the fix shows the Battleship's health reduced by `kfBlasterDamage` and the
-  Blaster gone.
+- Reproduction then fix: with the server paused and the north neighbour cell
+  active (`create_cell`), `inject_payload` spawns a `"RandomSpawn"` Battleship
+  of `"random"` alignment facing +Y with its center at about local (0, 440),
+  10 m inside its cell's north edge, and a `"fleet"` Blaster in the north
+  neighbour cell flying along X at local y about -447, 3 m past that edge,
+  through the hull part beyond the edge at the ship's height; after ticks,
+  `read_frame` on the unedited tree shows no health change, and after the fix
+  shows the Battleship's health reduced by `kfBlasterDamage` and the Blaster
+  gone. The author recommends this placement because about 5.9 m of the nose
+  then crosses the edge, about 2 m wide where the path meets it, and a path
+  parallel to the edge never transfers into the Battleship's cell, where it
+  would hit the hull and hide the gap. Both spawns default to plane 0's height.
+  The placement comes from the measured mesh; no harness run has exercised it.
 - Blast: the same setup with an enemy Missile exploding in the neighbour cell
   within `kfMissileDamageRadius` of the crossing hull part reduces the
-  Battleship's health after the fix, and does not on the unedited tree.
+  Battleship's health after the fix, and does not on the unedited tree. A
+  spawned Missile has no homing target and explodes only on entity or terrain
+  contact (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesUpdate.cpp:304`,
+  `:320`), so the author recommends flying it into a `"random"` Fighter spawned
+  in the neighbour cell about 5 m from the nose. No harness run has exercised
+  this setup either.
 - Determinism: `replay_record` then `replay_play` over both scenarios reports
   no CRC mismatch, and a connected client's `get_logs` with a `[Dd]esync`
   pattern returns no lines.

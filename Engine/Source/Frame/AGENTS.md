@@ -61,11 +61,13 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   (`../../../Common/Math/MathUtils.h`) owns; a position outside the hexagon
   belongs to the neighbour `CellExitDirection` names, so an
   out-of-cell entity transfers instead of being simulated locally. The
-  elevation, collision, and pusher grids span the hexagon's bounding rectangle
+  collision and pusher grids span the hexagon's bounding rectangle
   (`kfCellHalfWidth`, `kfCellHalfHeight`), whose corners outside the hexagon
-  belong to the neighbours: they hold no island placement, no elevation sample
-  but the sea floor, and no entity this cell spawns, and the zone grids there
-  hold only this cell's own rows. Each collection's `Spawn(SpawnInfo)` tests the
+  belong to the neighbours: they hold no entity this cell spawns, and the zone
+  grids there hold only this cell's own rows. The elevation grid spans that
+  rectangle grown by `kfCellLandMarginMeters` (`GridCoord.h`), and its samples
+  past the hexagon grown by that margin keep the sea floor, so land there never
+  depends on which neighbours list an island. Each collection's `Spawn(SpawnInfo)` tests the
   position before appending anything. An overload either refuses an outside
   position silently, never clamping, requeuing, or leaving the row to the
   transfer path, and returns whether it appended, or, where an outside position
@@ -85,17 +87,21 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   `Collision::GetOutcome` in `Collision.h`). Per-pair collision masks must be
   bi-directional and same-layer collision is unsupported; both are asserted.
 - In a `CollisionLayerFlags::kHitboxes` layer, the row radius is the first
-  level, so it must enclose the row's box or hull prism; for a box or outline
-  row, a pair it accepts is narrowed by clipping the other row's path, as a
-  point, against those prisms. That pair must be swept with only one hitbox
-  side, and the other layer's radius should be 0. `AreaDamage::Get` also reads
-  the hitbox.
+  level, so it must enclose the row's box or outline prism, and the box must
+  enclose the outline; for a box or outline row, a pair it accepts is narrowed
+  by clipping the other row's path, as a point, against the box prism, which
+  also supplies an outline row's Z range. An outline can be concave, so an
+  outline row then moves the contact to where the path is first inside the
+  outline rather than clipping against it. That pair must be swept with only one
+  hitbox side, and the other layer's radius should be 0. `AreaDamage::Get` also
+  reads the hitbox.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
 - `FlightPlanes` borrows the game's immutable, static-lifetime flight-plane
   table on both builds through a const span. Heights are absolute and independent
   of terrain. Its lowest plane is the base height every simulation and
   render consumer reads, and `NearestPlaneIndex` is the one rule for which
   plane a height is nearest (an exact midpoint takes the lower plane).
+  `OccupiedPlanes` is the one rule for which planes a height occupies.
   Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes
   with positive, strictly ascending heights; the client additionally requires
   exactly two, one per world-lighting layer (`CreateLightingTextures`).
@@ -127,19 +133,40 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
 
 ## Terrain and Navigation
 
-- An island-free cell is a supported state whose elevation samples all return the sea floor (no grid is built) and whose navigation data is built empty.
-- World cells place and rotate islands deterministically from independent RNG
-  streams seeded from the grid coordinate with distinct multipliers. Preserve
-  each stream's purpose and load-bearing draw order: separate streams keep one
+- An island-free cell is a supported state whose elevation samples all return the sea floor (no grid is built) and whose navigation data is built empty. A cell whose list holds only islands centred elsewhere is island-free to inside-cell decisions alone: its `CentredIslands` prefix is empty, and its terrain still reads the full list.
+- `GenerateIslandChain` owns region growth (its declaration comment in
+  `IslandChainPlacement.h`); two regions never overlap. Preserve each of its RNG
+  streams' purpose and load-bearing draw order: separate streams keep one
   category from directly consuming another's RNG state, but placement control
-  flow can still change later draws. The generator caps each cell at 107
-  placements; static-data deserialization rejects a larger count before
-  resize/publication, and client rendering derives its aggregate placement arena
-  from that cap and the active-cell subscription slots plus one local
-  unconfirmed cell. Every placement's hull lies inside the cell's hexagon inset
-  by the generator's edge margin. Keep world/local transforms, the placement
-  bound, and the west/east/north/south convention consistent across CPU
-  sampling and shaders.
+  flow can still change later draws. The math is float, with sine and cosine
+  only through `common::DeterministicSinCos` and a route tangent's angle only
+  through `DeterministicAngle`, and the output depends only on the coordinate
+  and the templates, so client and server agree in any generation order. Every
+  caller stays on the main thread, because `IslandTerrain` memoizes each region.
+- A cell's `islands` list holds every placement whose hull comes within
+  `kfCellLandMarginMeters` of its hexagon, in that cell's local frame. An island
+  that reaches several cells is an ordinary entry in each, so a position in the
+  list can lie outside the hexagon; its copies hold equal CRC and rotation bits
+  and equal positions to rounding, and its centre passes `IsInsideCell` in
+  exactly one cell, to rounding. A cell with no centred island adds filler of
+  its own, inset past the margin so no neighbour lists it; filler can fail,
+  which leaves the island-free state above. A stable partition then puts
+  placements centred in the cell first, and `CentredIslands` returns that
+  prefix, whose indices are indices into the list. Gameplay and map decisions
+  read the prefix; elevation, navigation, rendering, and spawn read the full
+  list. Tick code still reads only its own `CellStaticData`: no per-site filter,
+  owner flag, or neighbour lookup belongs on this path.
+- `kiMaximumIslandsPerCell` is a ceiling the generator asserts at the end of
+  cell listing, not a limit it enforces: region growth counts no cells.
+  Static-data deserialization trusts the count under the corrupt-input policy
+  (`../Network/AGENTS.md`), and the client's placement arena,
+  `kiMaxActivePlacements`, derives from that ceiling. Keep world/local
+  transforms, the placement bound, and the west/east/north/south convention
+  consistent across CPU sampling and shaders.
+- Saves regenerate placements instead of storing them, so a change to
+  `GenerateIslandChain`'s output, or to the island set it picks from, bumps the
+  game's `Frame::kiVersion` base literal. Nothing detects a missed bump: a
+  re-pack that changes the island set moves regenerated land under saved ships.
 - Two terrain-sampling paths exist and must not be mixed. Simulation code calls
   `CellElevationSampler::Sample`/`CellNormal`, which read only the cell's own
   `CellStaticData` elevation grid, never `mCells` or a neighbouring cell, so
@@ -178,8 +205,26 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   teardown invalidates its mesh allocations without cancelling File-owned
   range-reload state.
 - Each `NavigationGraphBake` entry the server receives at startup gets one template contour and one cell graph, index-parallel with the entries (`IslandTemplate::navContours`, `CellStaticData::navigationData`); an entry on a plane without `kTerrainCollision` builds an empty one. A caller picks a graph by passing it, and queries take waypoint Z from the query position.
-- The obstacle visibility graph is built once per cell, in that cell's local meters, over every obstacle polygon the cell contains; island templates contribute contour geometry only, because per-template building would yield disjoint per-island graphs with inter-island routes unreachable. Because the graph spans the cell, an A* miss is unexpected: disconnection is the usual cause, and a found path whose first waypoint coincides with the start also reports as a miss.
-- The build path and the runtime query share one segment-blocked and one point-in-polygon predicate through `NavBuildInternal.h`. Keep them shared: a divergent epsilon or boundary rule lets the graph claim a segment the query rejects, threading paths through obstacles.
+- The obstacle visibility graph is built once per cell, in that cell's local
+  meters, over the obstacle polygons of every island the cell lists; island
+  templates contribute contour geometry only, because per-template building
+  would yield disjoint per-island graphs with inter-island routes unreachable.
+  The graph has no cell boundary, so a path may leave through any edge. Because
+  the graph spans the cell, an A* miss is unexpected: disconnection is the usual
+  cause, and a found path whose first waypoint coincides with the start also
+  reports as a miss. `NavQueryEdgeReachable` excepts this: it asks whether a
+  position reaches an open stretch of a shared cell edge, so a miss there is an
+  expected answer and logs nothing.
+- The build path and the runtime query share one segment-blocked and one point-in-polygon predicate through `NavBuildInternal.h`, the latter over `common::PointInPolygon`. Keep them shared: a divergent epsilon or boundary rule lets the graph claim a segment the query rejects, threading paths through obstacles.
+- A path query also takes a span of per-query rectangles (`NavRectangle`,
+  `NavQuery.h`), for obstacles that move: `NavData` stays immutable because its
+  visibility edges are baked against every polygon and its polygons double as
+  terrain. The `NavQueryDirection` declaration owns what a rectangle costs and
+  what the caller leaves out of the span. Rectangles close no static node and
+  remove no edge, so a rectangle never causes an A* miss. The span's order feeds
+  the heap's tie-break, so it must derive from deterministic state. Snap, point,
+  and segment-blocked queries ignore rectangles, and an empty span gives the
+  same result as no rectangles, bit for bit.
 - Navigation data arrives only from the server, which built it, so its deserialization trusts it under the corrupt-input policy (`../Network/AGENTS.md`); the acceleration build, runtime queries, and debug nav rendering must not validate it either.
 - The contour bake takes each entry's flight plane, clearance distance, and elevation threshold from the caller (the game derives them and the server passes them in at startup) and forwards them unchanged; engine navigation code must not reach back into game constants for them.
 - Frame and gameplay geometry uses meters (one meter per engine unit); UV is only the normalized template representation. For navigation contours, union in UV, convert to centered local meters with the template's anisotropic footprint, apply clearance and simplification there, then map back to UV for storage; a scalar offset in UV makes the margin in meters depend on the footprint.
