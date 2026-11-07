@@ -191,8 +191,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 
 9. Run each build invocation synchronously in the foreground and remain in-turn
    until its process exit code and single JSON result are captured. Done when
-   every requested target has returned that pair and each build's block is in
-   this dispatch's envelope file.
+   every requested target has returned that pair, each build's block is in
+   this dispatch's envelope file, and the `-Compare` run below has returned its
+   exit code and output.
 
    - In a call of its own before the first build call, create
      `Temp/AgentBuildEnvelopes/` if absent and this dispatch's envelope file in
@@ -201,6 +202,12 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      from that call's own UTC time and process id, create the file holding the
      dispatch's single `##` heading, and print the path. `Temp/` is gitignored,
      so the directory is absent in a fresh worktree.
+   - In that envelope-creating call, run
+     `pwsh -NoProfile -File .agents/skills/compile/scripts/Get-CompileRewrittenPaths.ps1 -SnapshotPath '<snapshot>'`,
+     where `<snapshot>` is the envelope path with `.md` replaced by
+     `.tracked.txt`; after the last build returns, run the same command with
+     `-Compare` added. Its printed lines are the handoff's `Changed files`;
+     `../SKILL.md` `## Handoff` owns the result of a non-zero exit.
    - Every build call has the same shape, with that path written as a literal;
      never find the file by name pattern, process id, or modification time,
      because other dispatches' files share the directory. The build script is

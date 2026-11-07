@@ -100,8 +100,13 @@ the execution and result discipline in
 - `Residuals` — one row per failed or skipped required build, counting
   `complete: false` as a failure; `none` when absent.
 
-A `builder`'s `Changed files` and `Build required` are `none` because this skill
-changes no tracked file; the envelope file is ignored `Temp/` output.
+A `builder`'s `Changed files` lists the tracked paths the builds newly
+modified, as `scripts/Get-CompileRewrittenPaths.ps1 -Compare` prints them
+(`references/worker.md` step 9), or `none`; its `Build required` is `none`.
+When either run of that script exits non-zero, the `builder` returns
+`Status: BLOCKED` with a `Residuals` row naming that run's failure and stderr,
+because its `Changed files` is then unknown. The envelope and snapshot
+files are ignored `Temp/` output.
 
 When an execution-card acceptance check has its assigned dispatch run this
 skill inside that dispatch's own task, as `## Purpose` routes, the decisive
@@ -118,7 +123,7 @@ running skill whose own `## Handoff` declares a field for the run's result puts
 that run's row there instead of under `Decisive checks`; one that also places
 each run's complete handoff follows its own placement instead of those
 per-build `Decisive checks` rows and this `Temp/` file. The dispatch reports
-its own `Changed files` and `Build required` instead of the `none` values
+its own `Changed files` and `Build required` instead of the `builder` values
 above; an `/implement-plan` slice keeps returning `Build required`.
 
 ## References

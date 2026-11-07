@@ -195,25 +195,34 @@ function Get-AgentGameProjects([string] $Root) {
 	return $names
 }
 
-# The data inputs under Root that differ from commit Base, committed, staged, unstaged, or untracked: paths under
-# DataPacker, Engine/Data, and Projects/<Project>/Data, plus Common/DataFile.h, '/'-separated, unique, in ordinal order.
+# True when the '/'-separated repository-relative Path is a data input of game Project: a path under DataPacker,
+# Engine/Data, or Projects/<Project>/Data, or Common/DataFile.h, matched case-sensitively as a Git pathspec matches.
 # Repository agent documentation is never a data-pipeline input, so an AGENTS.md leaf is dropped. The Raw carve-out
 # mirrors ExportRaw, which packs any file under a directory segment named Raw whatever its extension.
+function Test-AgentDataInputPath([string] $Path, [string] $Project) {
+	$isInput = $Path -ceq 'Common/DataFile.h'
+	foreach ($root in @('DataPacker', 'Engine/Data', "Projects/$Project/Data")) {
+		if ($Path -ceq $root -or $Path.StartsWith("$root/", [StringComparison]::Ordinal)) { $isInput = $true }
+	}
+	if (-not $isInput) { return $false }
+	$segments = $Path.Split('/')
+	return -not ($segments[-1].Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) -and
+		@($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0)
+}
+
+# The paths under Root that differ from commit Base, committed, staged, unstaged, or untracked, and that
+# Test-AgentDataInputPath accepts for Project, '/'-separated, unique, in ordinal order.
 function Get-AgentDataInputChanges([string] $Root, [string] $Base, [string] $Project) {
-	[string[]] $inputs = @('DataPacker', 'Engine/Data', "Projects/$Project/Data", 'Common/DataFile.h')
 	$paths = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
 	foreach ($arguments in @(
-		[string[]](@('-c', 'core.quotepath=false', '-C', $Root, 'diff', '--name-only', $Base, '--') + $inputs),
-		[string[]](@('-c', 'core.quotepath=false', '-C', $Root, 'ls-files', '--others', '--exclude-standard', '--') + $inputs))) {
+		[string[]]@('-c', 'core.quotepath=false', '-C', $Root, 'diff', '--name-only', '--no-renames', $Base, '--'),
+		[string[]]@('-c', 'core.quotepath=false', '-C', $Root, 'ls-files', '--others', '--exclude-standard'))) {
 		# Stdout only: a git warning on stderr, such as a line-ending notice, must never read as a path.
 		$run = Invoke-AgentProcess 'git' $arguments $Root
 		if ($run.ExitCode -ne 0) { throw "git $($arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 		foreach ($line in ($run.Stdout -split "`n")) {
 			$path = $line.Trim().Replace('\', '/')
-			if ($path.Length -eq 0) { continue }
-			$segments = $path.Split('/')
-			if ($segments[-1].Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) -and
-				@($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0) { continue }
+			if ($path.Length -eq 0 -or -not (Test-AgentDataInputPath $path $Project)) { continue }
 			[void] $paths.Add($path)
 		}
 	}
@@ -402,4 +411,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation

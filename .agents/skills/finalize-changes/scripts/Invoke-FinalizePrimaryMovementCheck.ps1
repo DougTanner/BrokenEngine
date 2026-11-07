@@ -18,26 +18,20 @@ if (-not (Test-Path -LiteralPath $commonModule -PathType Leaf)) {
 	$commonModule = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts\FinalizeWorkflowCommon.psm1'
 }
 Import-Module $commonModule -Force -DisableNameChecking
-
-$script:EvidenceLimit = 500
+Import-Module (Join-Path (Split-Path -Parent $commonModule) 'AgentScriptCommon.psm1') -Force
 
 function New-Evidence([object[]] $Items) {
 	$values = @()
 	if ($null -ne $Items) { $values = @($Items) }
-	$count = $values.Count
-	$shown = @()
-	if ($count -gt $script:EvidenceLimit) { $shown = @($values[0..($script:EvidenceLimit - 1)]) }
-	else { $shown = @($values) }
 	return [ordered]@{
-		totalCount = $count
-		items = $shown
-		truncated = ($count -gt $script:EvidenceLimit)
+		totalCount = $values.Count
+		items = $values
 	}
 }
 
 function New-Result {
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-primary-movement/v2'
+		schemaVersion = 'broken-engine-finalize-primary-movement/v3'
 		status = 'error'
 		code = 'assessment.failed'
 		message = 'Primary movement assessment did not complete.'
@@ -48,9 +42,10 @@ function New-Result {
 		changes = [ordered]@{
 			totalCount = 0
 			items = @()
-			truncated = $false
 			overlapPaths = New-Evidence @()
+			exportOutputPaths = New-Evidence @()
 		}
+		rebuildProjects = @()
 	}
 }
 
@@ -231,7 +226,66 @@ function Get-RawChanges([string] $Root, [string] $Parent, [string] $Target) {
 	return $rows.ToArray()
 }
 
-function Set-Evidence([object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) {
+# The paths whose export-output attribute the session worktree's .gitattributes sets. The paths go on stdin because an
+# overlap can hold more paths than one command line fits.
+function Get-ExportOutputPaths([string] $Root, [string[]] $Paths) {
+	if ($Paths.Count -eq 0) { return @() }
+	$start = [Diagnostics.ProcessStartInfo]::new()
+	$start.FileName = 'git.exe'
+	$start.WorkingDirectory = $Root
+	$start.UseShellExecute = $false
+	$start.CreateNoWindow = $true
+	$start.RedirectStandardInput = $true
+	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
+	$start.StandardInputEncoding = [Text.UTF8Encoding]::new($false)
+	$start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+	foreach ($argument in @('-C', $Root, 'check-attr', '--stdin', '-z', 'export-output')) { [void] $start.ArgumentList.Add($argument) }
+	$process = [Diagnostics.Process]::new()
+	$process.StartInfo = $start
+	try {
+		if (-not $process.Start()) { Throw-Assessment 'export-output attribute read could not start.' }
+		# Reading starts before writing so a full stdout pipe can never stall the stdin write.
+		$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+		$stderrTask = $process.StandardError.ReadToEndAsync()
+		$process.StandardInput.Write(($Paths -join [char] 0) + [char] 0)
+		$process.StandardInput.Close()
+		$process.WaitForExit()
+		$stdout = $stdoutTask.GetAwaiter().GetResult()
+		$stderr = $stderrTask.GetAwaiter().GetResult()
+		if ($process.ExitCode -ne 0) { Throw-Assessment "export-output attribute read failed: $($stderr.Trim())" }
+	}
+	finally { $process.Dispose() }
+	$tokens = $stdout.Split([char] 0)
+	if ($tokens.Count -ne $Paths.Count * 3 + 1 -or $tokens[$tokens.Count - 1] -cne '') {
+		Throw-Assessment 'export-output attribute read returned malformed NUL-delimited output.'
+	}
+	$set = [Collections.Generic.List[string]]::new()
+	for ($index = 0; $index -lt $tokens.Count - 1; $index += 3) {
+		if ($tokens[$index + 1] -cne 'export-output') { Throw-Assessment 'export-output attribute read returned a malformed record.' }
+		if ($tokens[$index + 2] -ceq 'set') { $set.Add($tokens[$index]) }
+	}
+	return @(Get-OrdinalUnique $set.ToArray())
+}
+
+function Test-SourcePath([string] $Path) {
+	return ($Path.StartsWith('Common/', [StringComparison]::Ordinal) -or $Path.StartsWith('Engine/', [StringComparison]::Ordinal) -or
+		$Path.StartsWith('Projects/', [StringComparison]::Ordinal)) -and
+		($Path.EndsWith('.cpp', [StringComparison]::Ordinal) -or $Path.EndsWith('.h', [StringComparison]::Ordinal))
+}
+
+# The game projects to rebuild with the foreign changes before landing: every game when both sides hold a C++ source
+# path, plus each game for which both sides hold a data input.
+function Get-RebuildProjects([string] $Root, [string[]] $Foreign, [string[]] $Owned) {
+	$source = @($Foreign | Where-Object { Test-SourcePath $_ }).Count -gt 0 -and @($Owned | Where-Object { Test-SourcePath $_ }).Count -gt 0
+	return @(Get-AgentGameProjects $Root | Where-Object {
+		$project = $_
+		$source -or (@($Foreign | Where-Object { Test-AgentDataInputPath $_ $project }).Count -gt 0 -and
+			@($Owned | Where-Object { Test-AgentDataInputPath $_ $project }).Count -gt 0)
+	})
+}
+
+function Set-Evidence([string] $Root, [object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) {
 	$rowValues = @()
 	if ($null -ne $Rows) { $rowValues = @($Rows) }
 	$ownedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -244,15 +298,12 @@ function Set-Evidence([object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) 
 	$script:Result.foreignCommits = New-Evidence @($Foreign)
 	$script:Result.changes = [ordered]@{
 		totalCount = $rowValues.Count
-		items = (New-Evidence $rowValues).items
-		truncated = ($rowValues.Count -gt $script:EvidenceLimit)
+		items = $rowValues
 		overlapPaths = New-Evidence $overlapPaths
+		exportOutputPaths = New-Evidence @(Get-ExportOutputPaths $Root $overlapPaths)
 	}
-	return [pscustomobject]@{
-		OverlapPaths = $overlapPaths
-		Truncated = ($script:Result.foreignCommits.truncated -or $script:Result.changes.truncated -or
-			$script:Result.changes.overlapPaths.truncated)
-	}
+	$script:Result.rebuildProjects = @(Get-RebuildProjects $Root @($rowValues | ForEach-Object { $_.path }) $Owned)
+	return [pscustomobject]@{ OverlapPaths = $overlapPaths }
 }
 
 try {
@@ -291,7 +342,7 @@ try {
 
 	$owned = @(Get-OrdinalUnique @(Get-RawChanges $session.Worktree $CandidateParent $CandidateCommit | ForEach-Object { $_.path }))
 	if ($owned.Count -eq 0) { Throw-Input 'Candidate commit changes no paths against its parent.' }
-	$script:Result.ownedPaths = [ordered]@{ totalCount = $owned.Count; items = $owned; truncated = $false }
+	$script:Result.ownedPaths = [ordered]@{ totalCount = $owned.Count; items = $owned }
 	if ($livePrimary -ceq $CandidateParent) {
 		$script:Result.tips.relation = 'equal'
 		Complete-Result 0 'pass' 'ok' 'Primary remains at the candidate parent.'
@@ -308,10 +359,7 @@ try {
 
 	$foreign = Get-ForeignCommits $primary.Worktree $CandidateParent $livePrimary
 	$rows = Get-RawChanges $primary.Worktree $CandidateParent $livePrimary
-	$partition = Set-Evidence $foreign $rows $owned
-	if ($partition.Truncated) {
-		Throw-Blocked 'primary.evidence-truncated' 'Primary movement evidence exceeds the 500-item cap.'
-	}
+	$partition = Set-Evidence $session.Worktree $foreign $rows $owned
 	if ($partition.OverlapPaths.Count -gt 0) {
 		Throw-Blocked 'primary.path-overlap' 'Foreign primary movement overlaps an owned path.'
 	}

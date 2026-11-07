@@ -71,6 +71,11 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      the brief's `Attribution trailer` field carries; this worker's own session
      configuration never overrides it. A brief without that field returns
      `BLOCKED` naming the missing field before the candidate commit is created.
+   - Only when the brief carries the `-RequireExportOutputsRewritten` switch
+     (`SKILL.md` `### Landing confirmation`), add it to the candidate-commit
+     invocation. Its `candidate.export-output-not-regenerated` block returns a
+     blocker for the user carrying the script's message verbatim, never a
+     blocked result for the recovery dispatch the `## Steps` preamble names.
    - Done when one prepared commit whose parent is the session's merge-base with
      primary exists.
 3. Fill the acceptance table on the resulting diff.
@@ -107,15 +112,17 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      which owns every status and code.
    - A blocker returns no launch line and no landing summary, and names the
      candidate parent and live primary whenever either is available.
-   - When a `needs-review` or `primary.path-overlap` result's `changes.items`
-     and `ownedPaths.items` each hold a `.cpp` or `.h` path under `Common/`,
-     `Engine/`, or `Projects/`, the session's source builds with that foreign
-     source before the summary: a `needs-review` result runs the overlap
-     recovery in `## Recovery` in this same dispatch, returning the original
+   - When a `needs-review` or `primary.path-overlap` result's `rebuildProjects`
+     is non-empty
+     ([`scripts.md#primary-movement-check`](scripts.md#primary-movement-check)),
+     the session's source builds with that foreign source before the summary:
+     a `needs-review` result runs the overlap recovery in `## Recovery` in this
+     same dispatch, returning the original
      `needs-review` result wherever that recovery returns the original
      `primary.path-overlap` result, and on either route the recovery's clean
      path returns the meaning-change handoff with `Build required` naming the
-     client and the server even when its inspection finds no meaning change.
+     client and server builds of each game `rebuildProjects` lists, even when
+     its inspection finds no meaning change.
    - Any other `needs-review` result follows the documented lossless
      checker-result handoff in
      [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is consumed as
@@ -247,6 +254,16 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
   Plan before choosing, and preserve both intents where they are compatible.
   Keep the resolution to behavior one side already had; never invent new
   behavior in a resolution.
+  A conflict on a path that the primary-movement result triggering this
+  reconciliation lists in `changes.exportOutputPaths`
+  ([`scripts.md#primary-movement-check`](scripts.md#primary-movement-check))
+  resolves to the primary tip's bytes, except that a modify/delete conflict
+  where the session deleted the path keeps the session's deletion; that
+  resolution counts as a meaning change, and the returned meaning-change handoff's `Build required` names the
+  client and server builds of each game that result's `rebuildProjects` lists.
+  Any other binary conflict, island textures included, aborts the rebase to
+  return a blocker, as does every binary conflict of a reconciliation with no
+  triggering result, such as the restart after `rebase.conflicted`.
   Abort the rebase only to return a blocker when the approved decisions do not
   determine a valid resolution; otherwise resolve rather than abort.
 - Process died after primary advanced: re-invoke

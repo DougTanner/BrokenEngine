@@ -35,7 +35,8 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   through `ExportJob::ReadMarkerFile`/`WriteMarkerFile` and is removed before
   the first output write. The scene `.pre-export` sidecar uses the same two
   functions and is exempt from the removal rule
-  (`ExportScene::UpdateCacheMetadata` holds the reason).
+  (`ExportScene::UpdateCacheMetadata` holds the reason). Root `.gitattributes`
+  marks which of these tracked outputs carry `export-output`.
 - Each job's `std::async` launch wraps `RunExport` in `common::ThreadLocal::Entry`, so the job runs with its own worker's `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other parallel exports.
 - `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline and hardpoint sections are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
 - `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.

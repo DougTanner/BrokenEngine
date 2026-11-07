@@ -10,7 +10,7 @@ repository-relative `Temp/finalize-primary-movement-result.json` artifact.
 The caller parses that artifact for every result. For the exact result with
 `status` `needs-review` and `code` `primary.disjoint-needs-review`, the finalizer
 handoff returns the artifact path and selector `$`; main reads the complete typed
-`broken-engine-finalize-primary-movement/v2` result, including the
+`broken-engine-finalize-primary-movement/v3` result, including the
 foreign-commit manifest, losslessly from that artifact. Never inline-copy,
 summarize, or reconstruct it; the artifact remains byte-identical and available
 through the SmartGit/summary handoff. Other results surface only short status,
@@ -55,7 +55,9 @@ pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1
 ```
 
 Add `-ReleasePlanClaim` to the landing command when a claimed Plan reached final
-preparation, `-CommitMessageFile '<message-file>'` to the approval-preparation
+preparation, `-RequireExportOutputsRewritten` to the candidate-commit command
+when the rules below call for the regeneration check,
+`-CommitMessageFile '<message-file>'` to the approval-preparation
 command when the rules below call for the message override,
 `-VerifiedCandidateCommit '<reviewed-commit>' -VerifiedCandidateTree
 '<reviewed-tree>'` to that same approval-preparation command to prove the
@@ -74,30 +76,36 @@ original approved arguments.
 `Invoke-FinalizePrimaryMovementCheck.ps1` is read-only: it takes no lease and
 does not change a ref, checkout, index, or worktree. It emits one fixed-shape
 JSON result. The schema version is
-`broken-engine-finalize-primary-movement/v2`. Its top-level fields are
+`broken-engine-finalize-primary-movement/v3`. Its top-level fields are
 `schemaVersion`, `status`, `code`, `message`, `candidate`, `tips`,
-`ownedPaths`, `foreignCommits`, and `changes`:
+`ownedPaths`, `foreignCommits`, `changes`, and `rebuildProjects`:
 
 - `status` is exactly `pass`, `needs-review`, `blocked`, or `error`.
 - `candidate` is `{commit,tree,parent}`, with each member individually nullable.
   `tips` is `{session,livePrimary,relation}`.
-- `ownedPaths` and `foreignCommits` are evidence objects
-  `{totalCount,items,truncated}`. `ownedPaths.items` contains the normalized
-  relative POSIX paths the candidate commit changes against
+- `ownedPaths` and `foreignCommits` are evidence objects `{totalCount,items}`,
+  and every evidence object holds every item. `ownedPaths.items` contains the
+  normalized relative POSIX paths the candidate commit changes against
   `candidate.parent`. `foreignCommits.items` contains foreign commit
   identities ordered oldest-to-newest; the aggregate changed-path manifest is
   in `changes`.
-- `changes` is `{totalCount,items,truncated,overlapPaths}`. Each evidence
-  collection has `{totalCount,items,truncated}`. Each `items` row has exactly
-  the tuple fields `(path,status,oldMode,newMode)`, and `overlapPaths` contains
-  the overlap paths, computed over every changed path.
+- `changes` is `{totalCount,items,overlapPaths,exportOutputPaths}`. Each
+  `items` row has exactly the tuple fields `(path,status,oldMode,newMode)`.
+  `overlapPaths` is the evidence object of the overlap paths, computed over
+  every changed path. `exportOutputPaths` is the evidence object of the
+  overlap paths whose `export-output` attribute, read by Git's attribute
+  lookup in the session worktree, is `set`: tracked export outputs.
+- `rebuildProjects` is the ordinal-sorted array of game project names
+  (`Get-AgentGameProjects`) the session must rebuild with the foreign changes:
+  every game when `changes.items` and `ownedPaths.items` each hold a `.cpp` or
+  `.h` path under `Common/`, `Engine/`, or `Projects/`, plus each game for
+  which both hold a path `Test-AgentDataInputPath`
+  (`.agents/scripts/AgentScriptCommon.psm1`) accepts for that game. It is
+  empty when no game qualifies and on every result that exits before the
+  foreign changes are read.
 - Path collections are ordinal-sorted and deduplicated. Foreign commit items
   retain oldest-to-newest order, and change rows sort by the tuple
-  `(path,status,oldMode,newMode)`. `ownedPaths` is never capped, so its
-  `truncated` is always false. Every other bounded collection has a cap of
-  500; truncation sets its `truncated` field and blocks the result with
-  `primary.evidence-truncated` rather than allowing partial evidence to
-  proceed.
+  `(path,status,oldMode,newMode)`.
 
 The fixed terminal mapping is:
 
@@ -106,7 +114,7 @@ The fixed terminal mapping is:
 | 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit review and the landing summary. |
 | 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `primary.path-overlap` | Run the overlap recovery in the [finalizer worker workflow](worker.md#recovery). |
-| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant`, `primary.evidence-truncated` | Stop before SmartGit or the landing summary and return a blocker. |
+| 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
 Malformed JSON, a schema mismatch, or an exit/status mismatch is itself a
@@ -124,7 +132,12 @@ reconstructs the assessment from Git output.
   entry already committed as a deletion is a satisfied no-op, so a
   re-preparation dispatch passes the same set unchanged. A path found in neither
   the baseline tree nor the expected-tip tree nor the worktree still blocks with
-  `input.path-not-single-entry`.
+  `input.path-not-single-entry`. With `-RequireExportOutputsRewritten`, a
+  landing-set path whose `export-output` attribute, read by Git's attribute
+  lookup in the session worktree, is `set` but which is unchanged between
+  `<baseline>` and the candidate tree blocks with
+  `candidate.export-output-not-regenerated`, naming every such path, before
+  any ref, index, or worktree change; without the switch no such check runs.
 - `Invoke-FinalizeCandidateCommit.ps1` never advances primary. Its result is
   `broken-engine-finalize-candidate/v5`, carrying only the candidate.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact

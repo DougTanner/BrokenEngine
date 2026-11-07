@@ -16,13 +16,18 @@
 *.otf       binary
 *.bin       binary
 *.docx      binary
-*.MODEL     binary
-*.PreExport binary
+*.MODEL     binary export-output
+*.PreExport binary export-output
 # Data-packer intermediate texture/model assets (uppercase, underscored).
-*.BC4_UNORM_BLOCK     binary
-*.BC5_UNORM_BLOCK     binary
-*.BC7_UNORM_BLOCK     binary
+*.BC4_UNORM_BLOCK     binary export-output
+*.BC5_UNORM_BLOCK     binary export-output
+*.BC7_UNORM_BLOCK     binary export-output
 *.R16G16B16A16_SFLOAT binary
+*.blend.glb export-output
+*.fbx.glb   export-output
+*.obj.glb   export-output
+# export-output marks tracked DataPacker export outputs for the finalize primary-movement and candidate-commit checks; island textures are unset, as no ordinary build regenerates them.
+**/Islands/** -export-output
 
 # Whitespace errors `git diff --check` reports, which Invoke-StaticChecks.ps1's file-hygiene row runs.
 * whitespace=blank-at-eol,-space-before-tab,-blank-at-eof

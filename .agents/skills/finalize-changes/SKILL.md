@@ -157,7 +157,21 @@ confirmation row.
 Confirmation binds the reviewed diff, not commit hashes. Landing's clean
 identical rebase onto an advanced primary after confirmation lands without
 re-asking, and needs no re-review or rebuild; a rebuild before the summary is
-owned by `references/worker.md` step 5. An actual rebase conflict
+owned by `references/worker.md` step 5. A `builder` handoff since that step's
+meaning-change handoff whose `Residuals` names a failed
+`Get-CompileRewrittenPaths.ps1` run ([`/compile`](../compile/SKILL.md)
+`## Handoff`) is a stop for the user. After that build,
+main dispatches a fresh preparation whose path set is the session's full landing set plus every
+path that any `builder` handoff since that step's meaning-change handoff lists
+under `Changed files` ([`/compile`](../compile/SKILL.md) `## Handoff`), and
+whose brief carries the
+`-RequireExportOutputsRewritten` switch (`references/scripts.md`
+`## Invocation`); every later preparation brief of that landing keeps it, the
+restart after `rebase.conflicted` included. A returned
+`candidate.export-output-not-regenerated` blocker is a stop for the user: main
+reports it and dispatches no recovery. Only a direct user instruction under
+`## Inputs`' user-override paragraph clears the switch for that landing.
+An actual rebase conflict
 requiring manual resolution, a change to the session bytes, or a meaningful
 semantic change re-runs review of the affected regions and requires a refreshed
 summary, a fresh `SmartGit launch:` line for the new commit that main runs the
