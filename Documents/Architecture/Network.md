@@ -7,7 +7,7 @@
 - Multi-threaded Frame Tick update, spread over cores via `common::gpMultithreading->Dispatch` (`GameBase::BuildAndDispatchFrameTicks`)
 - Each Tick is simulated exactly once: previous Frame Tick(`sharedCrc`) + StatusChanges → new Frame Tick(`sharedCrc`)
 - When a Tick is ready, send its StatusChanges + `sharedCrc` to the client (one unreliable packet per active subscription slot)
-  - Client confirms ASAP via an ACK stream carrying, per-slot, `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single trailing 8-byte client timestamp the server echoes back to drive pipeline RTT. The bitfield covers 128 ticks (= `kiNetworkBufferSize`) above the floor
+  - Client confirms ASAP via an ACK stream carrying, per-slot, `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single trailing 8-byte client timestamp the server echoes back to drive pipeline RTT. The bitfield covers `kiNetworkBufferSize` ticks above the floor
   - **Epoch**: `AckState.uiEpoch` guards against ghost ACKs reactivating a slot that has been reassigned to a different coord. An ACK whose epoch doesn't match the current slot epoch is dropped
 - After per-cell dispatch, the live post-tick transfer tail harvests requests,
   validates destination formation and liveness, adds the spawns decided outside
@@ -108,9 +108,10 @@
   where the divisor is the wall duration one sim tick occupies at the current
   time scale (`TimeStep::SimulationToWall(kTickNanoseconds)`, equal to the fixed
   tick period at the 1:1 default; the division is done in nanoseconds), and
-  where `kiJitterSafetyMicroseconds = 109'375` (109.375 ms wall-clock, = 3.5
-  ticks at 32 Hz, deliberately off the tick boundary so the zero-jitter floor is
-  a true 4 ticks at the 1:1 default). The measured jitter counts 3× because it
+  where `kiJitterSafetyMicroseconds` is a wall-clock margin midway between two
+  whole tick periods at `kiTickRate`, deliberately off the tick boundary so the
+  zero-jitter floor at the 1:1 default is the next whole tick count rather than
+  one more. The measured jitter counts 3× because it
   is the *mean* |interarrival deviation|, which understates the one-way arrival
   tail the buffer must cover. RTT is deliberately NOT in the formula — it is
   already built into `latestServerTick` lagging server wall clock by one-way
@@ -119,8 +120,9 @@
   adopted instantly; afterwards a higher computed value raises
   `miCurrentTargetBehind` by exactly +1 per call (so the sim ceiling never drops
   more than a tick at a time), and a lower computed value is adopted only after
-  it has held continuously across a 128 sim tick streak (`common::Smoothed`
-  capacity, ≈ 4 s at 32 Hz) — jitter samples arrive one per coord update, so at
+  it has held continuously across a streak of `common::Smoothed::kiCapacity`
+  sim ticks (in seconds, that count divided by `kiTickRate`) — jitter samples
+  arrive one per coord update, so at
   tick cadence that spans roughly one full jitter window (packet loss delivers
   fewer samples, so it is an approximation, not a guarantee that every
   higher-jitter sample has aged out of the average). The streak is measured in
@@ -227,9 +229,10 @@ sizes are the full packet including the type byte.
   4 drops them uncounted) → one violation recorded at the first crossing per
   update window (packet and byte budgets counted independently), with all
   further over-budget packets that update dropped silently; after a server stall
-  (more than 1 s plus the scheduled update interval between the end of one
-  `Server::Poll` and the start of the next) a budget crossing records no
-  violation for 1 s plus that interval while over-budget packets still drop, so
+  (more than `kBudgetStallGrace` plus the scheduled update interval between the
+  end of one `Server::Poll` and the start of the next) a budget crossing records
+  no violation for `kBudgetStallGrace` plus that interval while over-budget
+  packets still drop, so
   a stall-recovery burst costs a legitimate client nothing while a sustained
   flood still escalates to disconnect. Slow motion lengthens only the scheduled
   interval, so it never opens that window; slow motion stops at 1/32
@@ -250,10 +253,11 @@ sizes are the full packet including the type byte.
   reaches this count, because ENet's datagram checksum drops it before
   dispatch. **Too fast** — a gate-2 packet or byte budget crossing, a
   violation-counted per-type cap, or a repeat crash report on one connection —
-  increments a count that loses one strike per `kRateViolationDecayInterval` (60
-  s), applied when the next too-fast strike is recorded, and disconnects at
-  `kiRateViolationDisconnectCount = 8`, so a sustained flood outside a stall
-  window reaches it within about 8 updates (0.25 s at 1:1). Each kind logs
+  increments a count that loses one strike per `kRateViolationDecayInterval`,
+  applied when the next too-fast strike is recorded, and disconnects at
+  `kiRateViolationDisconnectCount`, so a sustained flood outside a stall window
+  reaches it within about that many updates (at 1:1, in seconds, that count
+  divided by `kiTickRate`). Each kind logs
   `kWarning` lines naming it (`Kind: corrupt` or `Kind: rate`), with no
   per-packet spam: one `First` line each time its count reaches 1 (for the
   too-fast count, again after it decays to zero) and one `Disconnecting` line at
@@ -269,7 +273,8 @@ sizes are the full packet including the type byte.
   sources of too-fast strikes: a person sending more chat messages than the
   `kClientChat` per-type cap, or on a Debug server pressing one debug key more
   times than its per-type cap, with the sends reaching the server within one
-  update window (about 1 s at 1/32, or bunched by a server stall). Each dispatch
+  update window (`TimeStep::SimulationToWall(kTickNanoseconds)`, longest in slow
+  motion, or bunched by a server stall). Each dispatch
   `try/catch` records a corrupt-data violation (engine `Server::Receive` as
   `"corrupt payload"`, the deferred drain
   `ServerSessionBase::DispatchDeferredClientPackets` as
@@ -314,7 +319,7 @@ sizes are the full packet including the type byte.
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
 | `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
 | `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; no open squadron of that type (`FindOpenFleetSquadron`) → refused with a warning |
-| `kClientDestroyFleetMemberRequest` | 9 | 9 | 8 | yes | violation | global ID ≤ 0 → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
+| `kClientDestroyFleetMemberRequest` | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
 | `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |

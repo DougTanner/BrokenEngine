@@ -67,12 +67,12 @@ re-enabled recurrence does not replay missed runs (same page,
 
 ## Budget
 
-`<instance>-server-budget` is Cost, Monthly, $200, scoped to the instance's
-resource group. Its one notification fires at 100% of actual cost: it emails the
-signed-in account and calls the action group, which runs the budget-stop
-workflow (`SKILL.md` `## Schedule and budget stop`). Budgets are evaluated about
-every 24 hours on cost data that can lag 8-24 hours, so spend can pass $200
-before the stop
+`<instance>-server-budget` is Cost, Monthly, for the `amount` of resource
+`budget` in `assets/server.bicep`, scoped to the instance's resource group. Its
+one notification fires at 100% of actual cost: it emails the signed-in account
+and calls the action group, which runs the budget-stop workflow (`SKILL.md`
+`## Schedule and budget stop`). Budgets are evaluated about every 24 hours on
+cost data that can lag 8-24 hours, so spend can pass that amount before the stop
 (https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets).
 
 The template omits `endDate`; Azure then defaults it to 10 years from the start

@@ -230,18 +230,19 @@ and overwrites the artifact; the stale receipt is never reused, because its
   Its guarded primary checkout — the advance to the
   candidate and the rollback restore alike — waits out a foreign
   `.git/index.lock` on the primary repository, re-running the same checkout every
-  500 milliseconds while git reports that lock. That waiting is bounded by a
-  default budget of 500 seconds across the whole invocation, and every sleep pays
-  for one more attempt, so a lock clearing right at the bound still lands; only
-  when that last attempt still reports the lock does the run return the truthful
-  terminal `git.rollback-failed` result, and it never reports a landed commit or
-  tree it did not verify. A run that waited reports one `git.index-lock-wait`
-  diagnostic naming the seconds spent, on a landed result as well as a failed
-  one. Allow a landing invocation on the default budget a command timeout of up
-  to 20 minutes; its worst case is about 15 minutes — the omitted-token route's
-  300-second lock-claim wait, this 500-second index-lock budget, and the
-  landing's own Git work, plus about 2 minutes (unvalidated) for its at most
-  one history commit Snapshot (when one is taken is in
+  500 milliseconds while git reports that lock. That waiting is bounded by the
+  `-IndexLockWaitSeconds` budget across the whole invocation, and every sleep
+  pays for one more attempt, so a lock clearing right at the bound still lands;
+  only when that last attempt still reports the lock does the run return the
+  truthful terminal `git.rollback-failed` result, and it never reports a landed
+  commit or tree it did not verify. A run that waited reports one
+  `git.index-lock-wait` diagnostic naming the seconds spent, on a landed result
+  as well as a failed one. Allow a landing invocation on the default budget a
+  command timeout of up to 20 minutes; its worst case is about 15 minutes — the
+  omitted-token route's 300-second lock-claim wait, this index-lock budget at
+  its `-IndexLockWaitSeconds` default, and the landing's own Git work, plus
+  about 2 minutes (unvalidated) for its at most one history commit Snapshot
+  (when one is taken is in
   [`HistoryContract.md`](../../code-quality-metrics/references/HistoryContract.md)
   `## Source table and decision`) — so a caller raising that budget must raise
   its host timeout by the same amount. Pass the post-confirmation claim's owner

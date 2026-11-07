@@ -69,8 +69,9 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   nor the idle-loader lookup can retain it across destruction.
 - `ReplayHarnessRigs` owns one server slot bound to live `Replay` for controls and replay observations. The slot keeps a per-event list of the recording's captured transfer events and never drops a captured event. It carries replay-timed transfer counts opaquely and invokes the classifier the game provides (`## Game contract`). The [File Replay contract](../File/AGENTS.md#replay-streams) owns production replay state and storage.
 - Construction binds on the startup thread with `SO_REUSEADDR` and retries a
-  `WSAEADDRINUSE` bind (port still in TIME_WAIT after a rapid relaunch) for up
-  to ~2.5 s before throwing `std::runtime_error`. Only the constructor call has
+  `WSAEADDRINUSE` bind (port still in TIME_WAIT after a rapid relaunch) across
+  up to `kiMaximumBindAttempts` attempts, `kBindRetryInterval` apart, before
+  throwing `std::runtime_error`. Only the constructor call has
   the fatal agent-startup handler, and it rethrows `std::system_error`; after a
   handled listener failure, startup drains the eager asset future while its
   managers are still alive and returns nonzero. The same socket setting also
@@ -78,16 +79,18 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   fast; the harness's quit-and-wait-for-exact-PID relaunch rule is the guard
   against that misuse, not a bind-time check.
 - Keep listener accept nonblocking: the listener thread retries accept between
-  50 ms condition-variable waits, so it observes a stop request without another
-  thread closing its socket. The listener thread owns both sockets: it closes
+  `kListenerRetryInterval` condition-variable waits, so it observes a stop
+  request without another thread closing its socket. The listener thread owns
+  both sockets: it closes
   the accepted socket after I/O exits and the listen socket when its loop ends;
   teardown never touches either socket; it requests stop under the transport
   lock and wakes the condition variable. Keep active-connection readiness,
   receive, and send outside the transport lock. The accepted socket remains
-  nonblocking, and receive waits check stop before and after each 50 ms
-  readiness wait. The response wait also peeks the socket every 50 ms, so a peer
-  that closes mid-wait releases the connection. The listener flushes a published
-  response despite stop under a single 3 s deadline.
+  nonblocking, and receive waits check stop before and after each
+  `kListenerRetryInterval` readiness wait. The response wait also peeks the
+  socket every `kListenerRetryInterval`, so a peer that closes mid-wait releases
+  the connection. The listener flushes a published response despite stop under
+  a single `kResponseFlushTimeout` deadline.
 - Only one request is in flight. Deferred handlers return a poll function; later drains publish its first result under the original request ID. Each request carries its connection generation (the reuse counter); a reply, synchronous or deferred, whose connection has since torn down is discarded rather than sent to a later client, and the drain-count timeout prevents a lost async result from blocking the channel indefinitely.
 - The command channel is an exempt developer tool, so handlers need not range-check arguments; a check that exists throws into the failure envelope, which `Drain()` produces from the exception.
 - `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It queues ImGui item activation, typed text, and keys, adds wheel notches to the published `RawInput` scroll value, and overlays that snapshot's keys for engine key bindings. Physical input suppression is owned by the startup/input path.

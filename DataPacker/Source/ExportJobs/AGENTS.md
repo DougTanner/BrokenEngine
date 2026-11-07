@@ -319,9 +319,10 @@ Shader export records every dependency from `glslc -MD` as an input-root index, 
 
 Audio export accepts only 16-bit PCM and 32-bit float `.wav` sources; anything
 else asserts, so a 24-bit WAV cannot simply be dropped into the asset tree.
-Output is interleaved 48 kHz PCM matching the runtime mastering rate —
-`AudioRepair.h` owns that rate constant, kept in lockstep with the engine's
-mastering voice, plus every repair policy toggle. The 16-bit decode divisor and
+Output is interleaved PCM at `audiorepair::kiAudioExportSampleRate`, matching
+the runtime mastering rate — `AudioRepair.h` owns that rate constant, kept in
+lockstep with the engine's mastering voice, plus every repair policy toggle. The
+16-bit decode divisor and
 the rounded output conversion are a matched pair that makes a defect-free 16-bit
 file round-trip bit-exactly; change them together or not at all. Repairs operate
 only on packed output and run before resampling; source files are never

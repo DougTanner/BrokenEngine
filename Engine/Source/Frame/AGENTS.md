@@ -33,7 +33,7 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   serialization, and difference logging.
 - Static cell data derives from the grid coordinate and packed island assets;
   elevation is shared, while navigation is server-built. Every cell is the same
-  flat-top regular hexagon, 900 m tall (`kfCellApothem` 450 m), centred on its
+  flat-top regular hexagon, twice `kfCellApothem` tall, centred on its
   local origin, and `GridCoord` holds its axial coordinates (`iQ`, `iR`). The
   cell shape is one constant stored nowhere, the `kCellDirections` table
   (`GridCoord.h`): its six edge neighbours in the fixed order

@@ -98,7 +98,7 @@ commit before landing.
 
    When the user asks for more or less parallelism, append `'-Throttle','<n>'`
    to a `-Batch` launch to set how many of the batch's units run at once
-   (default 8).
+   (`Invoke-Sweep.ps1` owns the default).
    Done when the process has started.
 4. Wait with a Monitor until-loop until `Temp/Sweep/Status.txt` exists and no
    longer reads `RUNNING`; the delete in step 3 keeps the previous run's final

@@ -220,12 +220,12 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
      single-quoted and `"$buildOutput"` double-quoted, so an empty stdout
      still writes one line between the fences. Never write a block from a new
      script or a retyped envelope.
-   - Give the call the maximum available execution timeout so the 500-second
-     target-lock wait is not preempted. Never use `Start-Job`, a trailing `&`, a
-     fire-and-forget watcher, or a host background-execution parameter such as
-     `run_in_background`, and never end a delegated turn while a build is
-     running — a background task's completion notification cannot resume a
-     worker whose turn has ended.
+   - Give the call the maximum available execution timeout so the target-lock
+     wait (`kiBuildLockWaitSeconds`) is not preempted. Never use `Start-Job`, a
+     trailing `&`, a fire-and-forget watcher, or a host background-execution
+     parameter such as `run_in_background`, and never end a delegated turn while
+     a build is running — a background task's completion notification cannot
+     resume a worker whose turn has ended.
    - If the host call times out while a build that is not a Local game build
      continues, re-invoke the identical command; target serialization and
      incremental tlogs carry it to completion.
@@ -288,8 +288,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
 ## Rules
 
 - `WorktreeCli build` serializes writers per target basename inside the current
-  worktree, waits up to 500 seconds, preserves native Windows argument
-  boundaries, and owns MSBuild through a kill-on-close Job Object.
+  worktree, waits up to `kiBuildLockWaitSeconds`, preserves native Windows
+  argument boundaries, and owns MSBuild through a kill-on-close Job Object.
 - A `C1090` or `LNK1318` PDB-service failure is reported like any other
   build failure, with no process check and no retry: the build entry point
   gives each build its own PDB server (`_MSPDBSRV_ENDPOINT_`), so another

@@ -29,7 +29,7 @@ a present-but-invalid Plan still exits 0 with an empty `plans` array, an absent
 or untracked one exits 2 with `plan-not-found`, and `status`, `code`, and
 `diagnostics` describe the whole tree.
 
-`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, and fixed at 48 hours; a claim whose owning session or worktree no longer exists is orphaned, and self-healing releases an expired or orphaned claim automatically. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
+`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, and last a fixed lifetime (`kiClaimLifetimeTicks`, in 100 ns ticks); a claim whose owning session or worktree no longer exists is orphaned, and self-healing releases an expired or orphaned claim automatically. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
 
 Completion uses `plan complete`; explicit rejection uses `plan reject --user-authorized-rejection`. Preparation removes direct child metadata edges and deletes the target in the Git worktree. After landing succeeds, the claim is deleted.
 

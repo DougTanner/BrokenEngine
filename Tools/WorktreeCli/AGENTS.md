@@ -73,8 +73,8 @@ Enumeration skips unreadable, schema-invalid, and expired claim records instead
 of failing on them; for claim-record read/validation, only a directory-scan
 error aborts the operation. Recovery removes only the diagnosed `.lock` file.
 Every scheduler change runs under the scheduler guard — a lock only one
-scheduler change holds at a time — and waits up to 500 seconds for it:
-contention alone reports `busy` as a state conflict, while an unusable lock file
+scheduler change holds at a time — and waits up to `kiSchedulerGuardWaitSeconds`
+for it: contention alone reports `busy` as a state conflict, while an unusable lock file
 or its storage reports `guard-unavailable` as an OS failure. Before rewriting
 Plan files or deleting the target Plan, scheduler changes stop with a state
 conflict when an existing non-guidance child's dependency relation is unknown,

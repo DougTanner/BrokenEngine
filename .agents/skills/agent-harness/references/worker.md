@@ -568,9 +568,9 @@ and the handoff this run returns.
     Done when that recipe has been read, or the scenario needs no server-monitor
     verification.
 
-32. Use `--timeout-ms N` for a deferred client command; default is 15000 and
-    maximum is 600000. Done when each deferred command carries a timeout matched
-    to it.
+32. Use `--timeout-ms N` for a deferred client command; default is
+    `kiDefaultResponseTimeoutMilliseconds` and maximum is 600000. Done when each
+    deferred command carries a timeout matched to it.
 
     - The CLI retries the loopback connect until this same deadline rather than
       making a single short attempt, so a probe against a dead port consumes the
@@ -841,7 +841,8 @@ case.
 - The same holds for a large driver result file: query it targeted first, and
   read the whole record only after a targeted read provably misses.
 - Request only the resolution the check needs. `screenshot` downscales through
-  `maxWidth` (default 1568) and `quality` (default 80), and those defaults are
+  `maxWidth` (default `ScreenshotRequest::iMaxWidth`) and `quality` (default
+  `ScreenshotRequest::iQuality`), and those defaults are
   sized for UI readability. A "did terrain render at all" check does not need
   them; pass a `maxWidth` and `quality` matched to the assertion as part of
   designing the check.

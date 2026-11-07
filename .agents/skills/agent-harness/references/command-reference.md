@@ -122,7 +122,8 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   authority — a cell other than origin whose `GridDistance` from every
   authorized cell exceeds 1 is accepted locally and rejected on the wire.
 - `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[q,r]}`. The viewer stays in that cell until the next game writer, such as an owned-entity event, moves it.
-- `screenshot`: `{"path"?,"maxWidth"?:1568,"format"?:"jpg"|"png","quality"?:80}`. A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
+- `screenshot`: `{"path"?,"maxWidth"?,"format"?:"jpg"|"png","quality"?}`; `maxWidth` defaults to `ScreenshotRequest::iMaxWidth` and `quality` to `ScreenshotRequest::iQuality`.
+  A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
   `{"paths":[absolute .rdc paths]}`. Requires a client launched with
@@ -361,9 +362,9 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   request at the start of each update, before that update's tick wait: the
   unpause lets the tick ending that update run, and the pause stops the next
   tick only if it arrives before the next update starts. That window is one
-  update interval, about 1 s at 1/32 but 31 ms at 1/1, shorter than one
-  AgentHarness call, so a wait between the two commands, or a faster timescale,
-  lets extra ticks run.
+  update interval (`TimeStep::SimulationToWall(kTickNanoseconds)`), which at 1/1
+  is shorter than one AgentHarness call, so a wait between the two commands, or
+  a faster timescale, lets extra ticks run.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
 - `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Every loaded cell is saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns `{"file"}`.
 - `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`

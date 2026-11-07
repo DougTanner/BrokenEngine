@@ -105,17 +105,18 @@ headings) counts in the count row but is not a touch and gets no per-path row.
 ## Reading the queue listing
 
 `Get-NextPlanList.ps1` reports a bounded projection: per-state counts, then the
-first Plans in selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
-blocked row and `diagnostic` on an excluded one, and `claim` (`session`,
-`worktree`, `expiresAt`) on any row with a live claim. It never emits the whole
-tree, so a large Plan queue cannot flood the session. It deliberately reads the
-session worktree's own tree and never moves it, so a Plan landed on primary
-after this session started shows up only after the claim script fast-forwards
-the session. Its eligible and claimed states are likewise an unguarded
-point-in-time snapshot of the machine-local claim store, so a bare claim run
-moments later can skip Plans the listing showed as eligible because concurrent
-sessions claimed them in between. That is normal scheduler behavior rather than
-a selection defect, and the claim result does not name the passed-over Plans.
+first Plans in selection order (`-Top` default) as `path`/`state` rows, with
+`blockedBy` on a blocked row and `diagnostic` on an excluded one, and `claim`
+(`session`, `worktree`, `expiresAt`) on any row with a live claim. It never
+emits the whole tree, so a large Plan queue cannot flood the session. It
+deliberately reads the session worktree's own tree and never moves it, so a Plan
+landed on primary after this session started shows up only after the claim
+script fast-forwards the session. Its eligible and claimed states are likewise
+an unguarded point-in-time snapshot of the machine-local claim store, so a bare
+claim run moments later can skip Plans the listing showed as eligible because
+concurrent sessions claimed them in between. That is normal scheduler behavior
+rather than a selection defect, and the claim result does not name the
+passed-over Plans.
 
 For a tier-constrained request, read the `Risk tier` prose of the top eligible
 candidates in that order until one matches, then claim that path.

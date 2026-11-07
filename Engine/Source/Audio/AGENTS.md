@@ -4,7 +4,7 @@ Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManage
 
 ## Runtime Contracts
 
-- The mastering graph is pinned to 48 kHz to match DataPacker audio. Preserve that rate through device resets; Windows may convert only at the final shared-mode output.
+- The mastering graph is pinned to `kiMasteringSampleRate` to match DataPacker audio. Preserve that rate through device resets; Windows may convert only at the final shared-mode output.
 - Construct one stable `AudioEngine` and attach voice subsystems to it once. Static and streaming voices retain its raw pointer, so recover a silent or lost device by resetting the existing engine rather than replacing it.
 - Treat the default-endpoint query, graph reset, and XAudio2 results as trust boundaries. A missing device leaves a usable silent engine; recovery must clear stale source voices before normal playback resumes.
 - Packed audio metadata is a trust boundary: every path that hands a wave format and byte range to XAudio2 calls `AssertValidPackedAudio` (`AudioUtility.h`) first, including any new voice-creation path.
@@ -25,7 +25,7 @@ Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManage
 ## Asset and Thread Ownership
 
 - Static sounds use resident chunks; music streams random-access ranges from lazy chunks without loading the full track.
-- Source data and the mastering graph share the 48 kHz contract with DataPacker audio repair (`../../../DataPacker/Source/ExportJobs/AGENTS.md`).
+- Source data and the mastering graph share the `kiMasteringSampleRate` contract with DataPacker audio repair (`../../../DataPacker/Source/ExportJobs/AGENTS.md`).
 - Audio calls follow the parent main-loop allocation and affinity rules.
 
 ## See Also

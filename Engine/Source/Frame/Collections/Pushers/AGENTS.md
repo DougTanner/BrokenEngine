@@ -36,8 +36,9 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   Include/exclude masks on `PusherFlags_t` default to `kTypeDefault` and
   `kTypeMines`; new pusher types opt in/out through those flags.
 - An included peer within the source sphere whose XY distance is at
-  most 0.0001 m contributes no force, only a signed 0.001 m X position
-  correction: negative when the self row index is lower, positive otherwise.
+  most `kfPusherCoincidentDistance` contributes no force, only a signed
+  `kfPusherCoincidentCorrection` X position correction: negative when the self
+  row index is lower, positive otherwise.
   Every other peer's XY offset is
   safe to normalize. Force has zero Z/W; the correction is added to the
   caller's value as transient output, never a snapshot-position write.

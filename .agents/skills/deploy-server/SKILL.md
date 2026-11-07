@@ -65,10 +65,11 @@ Provisioning needs these from the user:
 - The VM runs 08:00-23:00 US Eastern time every day, following daylight
   saving: the schedule workflow starts it at 08:00 and deallocates it at 23:00,
   from the first 08:00 after creation.
-- The $200 budget and its stop are per instance: the budget belongs to
-  `<instance>-server-rg` and stops only that instance's VM. At $200 of actual
-  monthly spend the budget emails the signed-in account and calls the
-  budget-stop workflow, which disables the schedule workflow and then
+- The budget and its stop are per instance: the budget belongs to
+  `<instance>-server-rg` and stops only that instance's VM. When actual monthly
+  spend reaches the `amount` of resource `budget` in `assets/server.bicep`, the
+  budget emails the signed-in account and calls the budget-stop workflow, which
+  disables the schedule workflow and then
   deallocates the VM. The VM stays off, while the disk and IP keep billing about
   $13.25/month, until the user runs the turn-back-on step in `## Operations`.
   Nothing re-enables it automatically, including at the start of a new month.
@@ -218,7 +219,8 @@ az deployment sub <what-if|create> --name <instance>-server --location eastus --
    - `az monitor action-group show -g <instance>-server-rg -n <instance>-server-budget-ag --query "{enabled: enabled, receivers: logicAppReceivers[].{name: name, resourceId: resourceId}}"`:
      enabled, one receiver on the budget-stop workflow.
    - `az consumption budget list -g <instance>-server-rg`, and the budget
-     read below: amount 200, Monthly, and the one notification.
+     read below: the `amount` of resource `budget` in `assets/server.bicep`,
+     Monthly, and the one notification.
    - `az role assignment list -g <instance>-server-rg -o json`: exactly the
      three assignments.
    - `Test-NetConnection <publicIp> -Port 3389` reports
