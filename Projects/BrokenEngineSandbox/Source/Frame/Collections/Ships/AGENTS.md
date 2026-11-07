@@ -1,6 +1,8 @@
 # Ships - Shared Ship Code
 
 What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and Omnis steer by (`FleetCoordination`), the ship status changes (`ShipStatusChanges`), and the collision hitboxes (`ShipHitboxes`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
+The ramped heading turn in `ShipBehaviours` follows the
+[turning rule](../Battleships/AGENTS.md#turning-invariants).
 
 ## Ship Invariants
 

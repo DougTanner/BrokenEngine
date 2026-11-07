@@ -32,7 +32,8 @@ struct AcceleratedMovementConstants
 	float fCatchUpMaximumSpeed = 0.0f;
 };
 
-// Tuning for ApplyHeadingMovement, instantiated in Fighters.h and Battleships.h.
+// Tuning for ApplyHeadingMovement, instantiated in Fighters.h and Battleships.h, and for the ramped turn
+// (RampHeadingTurnRate, SteerHeading, CaptureHeading), instantiated in Battleships.h.
 struct HeadingMovementConstants
 {
 	float fChaseAcceleration = 0.0f;
@@ -42,6 +43,11 @@ struct HeadingMovementConstants
 	float fMaximumSpeed = 0.0f;
 	// Velocity-to-direction blend (airplane constraint)
 	float fVelocityToDirection = 0.0f;
+	float fMaxTurnRate = 0.0f;
+	float fTurnAcceleration = 0.0f;
+	// Within this angle of its wanted heading a ship stops turning and Interpolate Update rotates it the rest of the way.
+	float fCaptureAngle = 0.0f;
+	float fCaptureRate = 0.0f;
 };
 
 // A ship's stored flight plane while it climbs between planes.
@@ -124,6 +130,11 @@ void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection);
 
 // A negative fTurnRate turns away from the destination; without a destination the turn only decays.
 void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation);
+
+// Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
+[[nodiscard]] float RampHeadingTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants);
+[[nodiscard]] float XM_CALLCONV SteerHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, const HeadingMovementConstants& rConstants);
+[[nodiscard]] XMVECTOR XM_CALLCONV CaptureHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants);
 
 void XM_CALLCONV ApplyAcceleratedMovement(int64_t iNavigationDirection, FXMVECTOR vecAiDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, const AcceleratedMovementConstants& rConstants, XMVECTOR& rVecVelocity);
 void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags, bool bAllowAcceleration, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants, XMVECTOR& rVecVelocity);

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-05T13:04:44.757Z","dependsOn":["Documents/Plans/Game/MoveRampedTurnToShipBehaviours.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-05T13:04:44.757Z","dependsOn":[]} -->
 # Convert Fighters to the Ramped Turn
 
 ## Context
@@ -11,9 +11,9 @@ Collection paths below are relative to `Projects/BrokenEngineSandbox/Source/Fram
 The user chose this session to convert Fighters to the Battleship ramped turn, accepting Fighter
 retuning and the simulation version change (the authoring agent's record of that choice), and
 reported this symptom: "I often see fighters twist rapidly suddenly when turning sharply". Fighter
-steering changes here and is not bit-identical. The prerequisite stage,
-`Documents/Plans/Game/MoveRampedTurnToShipBehaviours.md`, supplies `HeadingTurnConstants`,
-`RampHeadingTurnRate`, `SteerHeading`, and `CaptureHeading`.
+steering changes here and is not bit-identical. `Ships/ShipBehaviours.h` declares
+`RampHeadingTurnRate`, `SteerHeading`, and `CaptureHeading`, tuned by the four turn fields of
+`HeadingMovementConstants`.
 
 Originating gap: a refactor log row in `Documents/Investigations/Engine/RefactorCandidates.md`,
 since removed but readable in `5c2e6a8d`, says Fighters keep the signed-max cone branch plus
@@ -69,14 +69,16 @@ surface that with the captured ticks instead of claiming a cause.
 
 ### 2. Convert
 
-Mirror the Battleship code from `488c27e6`, as it stands after the prerequisite stage:
+Mirror the Battleship code from `488c27e6`, as it stands with the shared ramped turn in
+`Ships/ShipBehaviours`:
 
-- `Fighters.h`: `kFighterTurn` beside `kFighterMovement`. Remove `kfFighterMaxTurnRate`,
-  `kfFighterSteeringSmoothing`, `kfFighterSteeringDecay`, and `kfFighterChaseTurnRate`.
+- `Fighters.h`: the four turn fields of `HeadingMovementConstants` set in `kFighterMovement`.
+  Remove `kfFighterMaxTurnRate`, `kfFighterSteeringSmoothing`, `kfFighterSteeringDecay`, and
+  `kfFighterChaseTurnRate`.
 - Fleet branch (`Fighters.cpp:634-643`): `bool bAligning = !IsWithinHeadingCone(...)`, then
-  `fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterTurn)`. `bAligning` stays
+  `fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement)`. `bAligning` stays
   the acceleration gate and becomes local to this branch.
-- Random-spawn branch (`Fighters.cpp:659`): mirror `Battleships.cpp:584-595` without its flee
+- Random-spawn branch (`Fighters.cpp:659`): mirror `Battleships.cpp:558-565` without its flee
   negation. Zero `vecAiDirection` and `fDeltaRotation`; with a destination, store the normalized
   horizontal direction to it and call `SteerHeading`. Random-spawn rows then store a wanted heading,
   which is a new CRC-visible value in the existing `pVecAiDirections` column, needed by the capture.
@@ -93,9 +95,9 @@ The shared `kfTerrainBounceRotation` stays 8.0; the ramp limits what a bounce ca
 
 ### 3. Retune
 
-The per-type parameters are the four `HeadingTurnConstants` fields. Final Fighter values are chosen
-by live check against the behavior criteria in `## Acceptance criteria`. The recommended starting
-values for `kFighterTurn` are:
+The per-type parameters are the four turn fields of `HeadingMovementConstants`. Final Fighter values
+are chosen by live check against the behavior criteria in `## Acceptance criteria`. The recommended
+starting values in `kFighterMovement` are:
 
 | Field | Start | Rationale |
 | --- | --- | --- |
@@ -135,8 +137,8 @@ old replays, and a mismatched client at the Hello (`Engine/Source/Network/Server
 - The root-cause investigation in `## Design` step 1.
 - The fix region, which bounds any fix: the steering in `FightersPostRender::Update` (the two
   branches, the restore, and the final turn-rate write), the rate write in
-  `FightersPostRender::AvoidTerrain`, the capture in `FightersInterpolate::Update`, and the
-  `kFighterTurn` values.
+  `FightersPostRender::AvoidTerrain`, the capture in `FightersInterpolate::Update`, and the four
+  turn field values in `kFighterMovement`.
 - Removal of the four Fighter constants and of `SteerHeadingTowards`.
 - The `Frame::kiVersion` base.
 - `/update-claude-docs` sync: move `Battleships/AGENTS.md` `## Turning Invariants` to `Ships/AGENTS.md`
@@ -158,11 +160,12 @@ old replays, and a mismatched client at the Hello (`Engine/Source/Network/Server
 
 - Tier 3. Trigger: determinism/CRC, because this changes CRC-visible Fighter steering and
   `Frame::kiVersion`, which also breaks save and replay compatibility.
-- Battleship results: `RampHeadingTurnRate`, `SteerHeading`, `CaptureHeading`, and `kBattleshipTurn`
-  are untouched, so a Battleship's own turn computation is bit-identical for the same inputs. Whole-frame
-  CRCs change whenever Fighters exist, and a Battleship's trajectory can still diverge through
-  Fighter-dependent inputs such as pushers and target choice. The bit-identity proof is the
-  prerequisite stage's replay; the bump makes it unrepeatable here, so the diff settles this.
+- Battleship results: `RampHeadingTurnRate`, `SteerHeading`, `CaptureHeading`, and the turn fields
+  of `kBattleshipMovement` are untouched, so a Battleship's own turn computation is bit-identical for
+  the same inputs. Whole-frame CRCs change whenever Fighters exist, and a Battleship's trajectory can
+  still diverge through Fighter-dependent inputs such as pushers and target choice. The bit-identity
+  proof is the replay that verified the Battleship turn's move into `Ships/ShipBehaviours`; the bump
+  makes it unrepeatable here, so the diff settles this.
 - No random draw is added, no read moves to another frame, and client and server run the same code.
 - Cross-phase: `FightersInterpolate::Update` newly reads `rPreviousPostRender.pVecAiDirections`, as
   `BattleshipsInterpolate::Update` does. A transfer arrival stores a zero heading, which skips the
@@ -205,7 +208,7 @@ old replays, and a mismatched client at the Hello (`Engine/Source/Network/Server
 
 ## Coordination
 
-`dependsOn` carries the prerequisite stage. Reciprocal coordination with
+Reciprocal coordination with
 `Documents/Plans/Game/RouteShipFleeReturnAndVeerOffGoals.md`: that Plan edits the
 `ComputeFleeOrReturnDestination` call directly above `Fighters.cpp:659` and also bumps the
 `Frame::kiVersion` base, so whichever lands second refreshes that block and takes its own bump from

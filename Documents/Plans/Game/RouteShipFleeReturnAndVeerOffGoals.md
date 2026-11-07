@@ -165,12 +165,10 @@ Reciprocal coordination with
 inside `FleetCoordination.cpp`, so whichever lands second refreshes those call sites. Each Plan
 keeps its own acceptance.
 
-Reciprocal coordination with `Documents/Plans/Game/MoveRampedTurnToShipBehaviours.md`: that Plan
-changes the Battleship steering call directly below this Plan's flee lines, so whichever lands second
-refreshes that block. Reciprocal coordination with
-`Documents/Plans/Game/ConvertFightersToRampedTurn.md`: that Plan rewrites the Fighter steering call
-directly below the `ComputeFleeOrReturnDestination` call and also bumps the `Frame::kiVersion` base,
-so whichever lands second refreshes that block and takes its own bump from the value it finds.
+Reciprocal coordination with `Documents/Plans/Game/ConvertFightersToRampedTurn.md`: that Plan
+rewrites the Fighter steering call directly below the `ComputeFleeOrReturnDestination` call and
+also bumps the `Frame::kiVersion` base, so whichever lands second refreshes that block and takes
+its own bump from the value it finds.
 
 ## Notes
 

@@ -31,11 +31,6 @@ inline constexpr float kfBattleshipRadius = 4.5f;
 inline constexpr float kfBattleshipAcceleration = 4.0f;
 inline constexpr float kfBattleshipDrag = 0.25f;
 inline constexpr float kfBattleshipMaxSpeed = 15.0f;
-inline constexpr float kfBattleshipMaxTurnRate = 0.25f;
-inline constexpr float kfBattleshipTurnAcceleration = 0.25f;
-
-// Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
-float RampBattleshipTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime);
 
 inline constexpr float kfBattleshipClimbPercentage = 0.25f;
 inline constexpr float kfBattleshipClimbRate = kfBattleshipMaxSpeed * kfBattleshipClimbPercentage;
@@ -50,6 +45,10 @@ inline constexpr HeadingMovementConstants kBattleshipMovement
 	.fDrag = kfBattleshipDrag,
 	.fMaximumSpeed = kfBattleshipMaxSpeed,
 	.fVelocityToDirection = 4.0f,
+	.fMaxTurnRate = 0.25f,
+	.fTurnAcceleration = 0.25f,
+	.fCaptureAngle = XM_PI / 180.0f,
+	.fCaptureRate = 4.0f,
 };
 
 inline constexpr float kfBattleshipPusherIntensity = 36.0f;

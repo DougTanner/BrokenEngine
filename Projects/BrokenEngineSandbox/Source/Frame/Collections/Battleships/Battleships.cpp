@@ -31,10 +31,6 @@ template struct Collection<game::BattleshipsPostRender>;
 namespace game
 {
 
-// Within this angle of its wanted heading a Battleship stops turning and Interpolate Update rotates it the rest of the way.
-constexpr float kfBattleshipHeadingCaptureAngle = XM_PI / 180.0f;
-constexpr float kfBattleshipHeadingCaptureRate = 4.0f;
-
 constexpr float kfBattleshipExplosionParticleCount = 8.0f;
 constexpr float kfBattleshipExplosionSizeStart = kfBattleshipRadius * 0.625f;
 constexpr float kfBattleshipExplosionSizeEnd = kfBattleshipRadius * 0.25f;
@@ -221,11 +217,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		// previous tick's wanted heading, one tick behind PostRender's angle test.
 		if (fDeltaRotation == 0.0f && !(rPreviousPostRender.pFlags[i] & ShipFlags::kNoAiDirection))
 		{
-			XMVECTOR vecWantedNormal = rPreviousPostRender.pVecAiDirections[i];
-			if (XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal)) <= kfBattleshipHeadingCaptureAngle)
-			{
-				vecDirection = common::RotateTowardsPercent(vecDirection, vecWantedNormal, common::ExponentialInterpolant(kfBattleshipHeadingCaptureRate, deltaTime.count()));
-			}
+			vecDirection = CaptureHeading(vecDirection, rPreviousPostRender.pVecAiDirections[i], deltaTime, kBattleshipMovement);
 		}
 
 		// The -1.0f sentinel means not exploding and must remain unchanged.
@@ -458,24 +450,6 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	return true;
 }
 
-float RampBattleshipTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime)
-{
-	return common::ClampMagnitude(fPreviousDeltaRotation + common::ClampMagnitude(fWantedDeltaRotation - fPreviousDeltaRotation, kfBattleshipTurnAcceleration * deltaTime.count()), kfBattleshipMaxTurnRate);
-}
-
-// The wanted turn rate toward vecWantedNormal: 0 within the capture angle, otherwise the rate the turn acceleration can still stop
-// from by the capture angle, so the ramp starts slowing early, up to the max turn rate.
-static float XM_CALLCONV SteerBattleshipHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal)
-{
-	float fAngle = XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal));
-	if (fAngle <= kfBattleshipHeadingCaptureAngle)
-	{
-		return 0.0f;
-	}
-	float fTurnRate = std::min(kfBattleshipMaxTurnRate, std::sqrt(2.0f * kfBattleshipTurnAcceleration * (fAngle - kfBattleshipHeadingCaptureAngle)));
-	return XMVectorGetZ(XMVector3Cross(vecDirection, vecWantedNormal)) > 0.0f ? fTurnRate : -fTurnRate;
-}
-
 void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateBattleships);
@@ -545,7 +519,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			{
 				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
-				fDeltaRotation = SteerBattleshipHeading(vecDirection, vecAiDirection);
+				fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
 				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kBattleshipMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
@@ -585,7 +559,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				{
 					bool bFleeing = (flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter);
 					AimAiDirection(bFleeing ? XMVectorSubtract(vecPosition, vecDestination) : XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
-					fDeltaRotation = SteerBattleshipHeading(vecDirection, vecAiDirection);
+					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
 				}
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
@@ -603,7 +577,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 
 		// Navigation and terrain bounce share one acceleration-limited step per tick.
-		fDeltaRotation = RampBattleshipTurnRate(rPreviousInterpolate.pfDeltaRotations[i], fDeltaRotation, deltaTime);
+		fDeltaRotation = RampHeadingTurnRate(rPreviousInterpolate.pfDeltaRotations[i], fDeltaRotation, deltaTime, kBattleshipMovement);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);

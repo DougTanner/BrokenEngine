@@ -47,10 +47,10 @@ model as a wreck (`## Wreck Invariants`).
 
 ## Turning Invariants
 
-- Every Battleship turns at one maximum rate, `kfBattleshipMaxTurnRate`.
-  Each tick PostRender Update moves the turn rate toward a wanted rate by at
-  most `kfBattleshipTurnAcceleration` times the tick time
-  (`RampBattleshipTurnRate`), and terrain bounce and terrain avoidance pass
+- Every Battleship turns at one maximum rate, `kBattleshipMovement`'s
+  `fMaxTurnRate`. Each tick PostRender Update moves the turn rate toward a
+  wanted rate by at most its `fTurnAcceleration` times the tick time
+  (`RampHeadingTurnRate`), and terrain bounce and terrain avoidance pass
   through that same ramp instead of setting the rate directly. The wanted rate
   is zero within the heading capture angle of the wanted heading.
 - Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet

@@ -752,6 +752,33 @@ void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirecti
 	rfDeltaRotation = common::ExponentialDecay(fDecay, deltaTime.count()) * rfDeltaRotation;
 }
 
+float RampHeadingTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants)
+{
+	return common::ClampMagnitude(fPreviousDeltaRotation + common::ClampMagnitude(fWantedDeltaRotation - fPreviousDeltaRotation, rConstants.fTurnAcceleration * deltaTime.count()), rConstants.fMaxTurnRate);
+}
+
+// The wanted turn rate toward vecWantedNormal: 0 within the capture angle, otherwise the rate the turn acceleration can still stop
+// from by the capture angle, so the ramp starts slowing early, up to the max turn rate.
+float XM_CALLCONV SteerHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, const HeadingMovementConstants& rConstants)
+{
+	float fAngle = XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal));
+	if (fAngle <= rConstants.fCaptureAngle)
+	{
+		return 0.0f;
+	}
+	float fTurnRate = std::min(rConstants.fMaxTurnRate, std::sqrt(2.0f * rConstants.fTurnAcceleration * (fAngle - rConstants.fCaptureAngle)));
+	return XMVectorGetZ(XMVector3Cross(vecDirection, vecWantedNormal)) > 0.0f ? fTurnRate : -fTurnRate;
+}
+
+XMVECTOR XM_CALLCONV CaptureHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants)
+{
+	if (XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal)) <= rConstants.fCaptureAngle)
+	{
+		return common::RotateTowardsPercent(vecDirection, vecWantedNormal, common::ExponentialInterpolant(rConstants.fCaptureRate, deltaTime.count()));
+	}
+	return vecDirection;
+}
+
 void XM_CALLCONV ApplyAcceleratedMovement(int64_t iNavigationDirection, FXMVECTOR vecAiDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, const AcceleratedMovementConstants& rConstants, XMVECTOR& rVecVelocity)
 {
 	float fAcceleration = (iNavigationDirection == 7 ? rConstants.fCatchUpAcceleration : rConstants.fAcceleration) * fAccelerationMultiplier;
