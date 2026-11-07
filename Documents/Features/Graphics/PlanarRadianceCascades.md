@@ -6,8 +6,8 @@ Revisit When: local emissive weapons and effects need visible occlusion by ships
 
 Option 1: investigate a camera-centered planar lighting field using 2D radiance
 cascades (RC), including Holographic Radiance Cascades (HRC) as a candidate.
-This is an alternative to [Option 2: screen-space RC](ScreenSpaceRadianceCascades.md).
-Both are manual feature proposals; saving either document approves no implementation.
+This is an alternative to the [screen-space RC prototype Plan](../../Plans/Engine/ScreenSpaceRadianceCascades.md).
+This remains a manual feature proposal; saving either document approves no implementation.
 
 Target the selected local-light contribution on terrain, ships, and water at
 the engine's distant RTS camera scale. Neither a full 3D world volume nor ray
