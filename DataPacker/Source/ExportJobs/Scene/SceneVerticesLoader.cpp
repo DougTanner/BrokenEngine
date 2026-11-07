@@ -130,7 +130,7 @@ static void RequireFiniteComponents(std::span<const float> components, std::stri
 	}
 }
 
-static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<int64_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, int64_t iPrimitive, int64_t iSkinJointCount)
+static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<int64_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, bool bMirrored, int64_t iPrimitive, int64_t iSkinJointCount)
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
 	const tinygltf::Accessor& rPositionAccessor = rModel.accessors.at(rPrimitive.attributes.find("POSITION")->second);
@@ -150,6 +150,10 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 
 	uint32_t uiVertexStart = static_cast<uint32_t>(rVertices.size());
 
+	// The inverse transpose keeps a normal perpendicular to its surface under non-uniform scale or shear. A singular
+	// matrix inverts to non-finite elements, so the packed NORMAL check below rejects a primitive under a flattening node
+	XMMATRIX matNormal = bHasSkeleton ? XMMatrixIdentity() : XMMatrixTranspose(XMMatrixInverse(nullptr, rMatMeshWorld));
+
 	// Build raw per-primitive vertices into a temp buffer, then dedup via meshoptimizer's byte-identity remap.
 	// ModelVertex's size assertion keeps the raw-byte comparison free of uninitialized padding.
 	std::vector<common::ModelVertex> rawVertices(rPositionAccessor.count);
@@ -165,7 +169,7 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 			// Without a skeleton nothing poses these vertices at runtime - the static shader applies no matrix -
 			// so every primitive bakes here, JOINTS_0 or not, or one model would ship two vertex-space conventions
 			vecPosition = XMVector4Transform(vecPosition, rMatMeshWorld);
-			vecNormal = XMVector3TransformNormal(vecNormal, rMatMeshWorld);
+			vecNormal = XMVector3TransformNormal(vecNormal, matNormal);
 		}
 		// With a skeleton the vertices stay mesh-local: runtime skinning or node matrices place them
 
@@ -181,7 +185,9 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 				// XMVector3TransformNormal applies the matrix itself, the forward transform a surface direction takes
 				vecTangent = XMVector3TransformNormal(vecTangent, rMatMeshWorld);
 			}
-			XMStoreFloat4(&rVertex.f4Tangent, XMVectorSetW(XMVector3Normalize(vecTangent), pfTangents[j * iTangentStride + 3]));
+			// A mirroring matrix flips the baked normal's side of the tangent-bitangent plane, so the bitangent sign flips with it
+			float fBitangentSign = bMirrored ? -pfTangents[j * iTangentStride + 3] : pfTangents[j * iTangentStride + 3];
+			XMStoreFloat4(&rVertex.f4Tangent, XMVectorSetW(XMVector3Normalize(vecTangent), fBitangentSign));
 			RequireFiniteComponents(std::array {rVertex.f4Tangent.x, rVertex.f4Tangent.y, rVertex.f4Tangent.z, rVertex.f4Tangent.w}, "TANGENT", iPrimitive, j);
 		}
 
@@ -269,13 +275,14 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 	LOG(kDefault, kVerbose, "  Vertices: {} -> {} (deduplicated {})", rPositionAccessor.count, iUniqueCount, static_cast<int64_t>(rPositionAccessor.count) - iUniqueCount);
 }
 
-static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const std::vector<int64_t>& rIndexRemap)
+static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const std::vector<int64_t>& rIndexRemap, bool bMirrored)
 {
 	if (rPrimitive.indices <= -1)
 	{
 		return;
 	}
 
+	int64_t iIndexStart = std::ssize(rIndexBuffer);
 	const tinygltf::Accessor& rIndicesAccessor = rModel.accessors.at(rPrimitive.indices);
 	const tinygltf::BufferView& rIndiciesBufferView = rModel.bufferViews.at(rIndicesAccessor.bufferView);
 	const tinygltf::Buffer& rIndiciesBuffer = rModel.buffers.at(rIndiciesBufferView.buffer);
@@ -323,6 +330,15 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 
 		default:
 			ASSERT(false);
+	}
+
+	// A mirroring matrix reverses each baked triangle's corner order relative to its normal, so restore counter-clockwise fronts
+	if (bMirrored)
+	{
+		for (int64_t j = iIndexStart; j < std::ssize(rIndexBuffer); j += 3)
+		{
+			std::swap(rIndexBuffer.at(j + 1), rIndexBuffer.at(j + 2));
+		}
 	}
 }
 
@@ -380,6 +396,8 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 	}
 
 	XMMATRIX matMeshWorld = matNode * matLocal;
+	// Only a static export bakes the matrix, so only it flips winding for a negative determinant
+	bool bMirrored = !rContext.bHasSkeleton && XMVectorGetX(XMMatrixDeterminant(matMeshWorld)) < 0.0f;
 
 	const tinygltf::Mesh& rMesh = rModel.meshes.at(rNode.mesh);
 	for (int64_t i = 0; i < std::ssize(rMesh.primitives); ++i)
@@ -434,9 +452,9 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 		int64_t iSkinJointCount = bHasSkinning ? std::ssize(rModel.skins[rNode.skin].joints) : 0;
 
 		std::vector<int64_t> indexRemap;
-		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld, i, iSkinJointCount);
+		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld, bMirrored, i, iSkinJointCount);
 
-		AppendIndices(rMaterial.indexBuffer, rPrimitive, rModel, indexRemap);
+		AppendIndices(rMaterial.indexBuffer, rPrimitive, rModel, indexRemap, bMirrored);
 	}
 }
 
