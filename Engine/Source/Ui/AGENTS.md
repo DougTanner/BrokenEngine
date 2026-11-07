@@ -46,7 +46,8 @@ is engine-owned here.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
 - `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
   Water quality, Water Foam, the Stagger Smoke Layer Updates flag, Smoke Update
-  Cadence, Shadow Update Cadence, Field of View, and Orthographic Projection.
+  Cadence, Shadow Update Cadence, Field of View, Camera Tilt, and Orthographic
+  Projection.
   Lighting and Water Foam default on, and Defaults restores them. Older versions fail the current-format gate
   and use defaults. Water Foam and Orthographic Projection are validated Boolean
   bytes; any value other than zero or one rejects the whole file before

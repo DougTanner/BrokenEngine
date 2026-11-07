@@ -26,7 +26,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 25;
+	static constexpr int64_t kiVersion = 26;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -50,6 +50,7 @@ struct GraphicsSettings
 	uint8_t puiProjectionPadding[1] {};
 	float fFieldOfView = 15.0f;
 	float fSmokeUpdateCadence = 2.0f;
+	float fCameraTilt = 20.0f;
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -73,7 +74,8 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiOrthographicProjection) == 42, "Gr
 static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 43, "GraphicsSettings padding changed — fFieldOfView must stay four-byte aligned");
 static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 44, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeUpdateCadence) == 48, "GraphicsSettings::fSmokeUpdateCadence offset changed — existing setting bytes move");
-static_assert(sizeof(GraphicsSettings) == 52, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, fCameraTilt) == 52, "GraphicsSettings::fCameraTilt offset changed — existing setting bytes move");
+static_assert(sizeof(GraphicsSettings) == 56, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -100,6 +102,7 @@ void SaveGraphicsSettings()
 		.uiOrthographicProjection = static_cast<uint8_t>(gOrthographicProjection.Get<bool>()),
 		.fFieldOfView = gFieldOfView.mfCurrent,
 		.fSmokeUpdateCadence = gSmokeUpdateCadence.mfCurrent,
+		.fCameraTilt = gCameraTilt.mfCurrent,
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -202,6 +205,11 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "fFieldOfView";
 	}
 
+	if (!gCameraTilt.IsInRange(rGraphicsSettings.fCameraTilt))
+	{
+		return "fCameraTilt";
+	}
+
 	return nullptr;
 }
 
@@ -239,6 +247,7 @@ bool LoadGraphicsSettings()
 		gMinimumSampleShading.Set(graphicsSettings.fMinimumSampleShading);
 		gOrthographicProjection.Set(graphicsSettings.uiOrthographicProjection != 0);
 		gFieldOfView.Set(graphicsSettings.fFieldOfView);
+		gCameraTilt.Set(graphicsSettings.fCameraTilt);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
 		gSmokeLayerStagger.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmokeLayerStagger);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
@@ -275,6 +284,7 @@ void ResetGraphicsSettings()
 	gMinimumSampleShading.mfCurrent = gMinimumSampleShading.mfDefault;
 	gOrthographicProjection.mfCurrent = gOrthographicProjection.mfDefault;
 	gFieldOfView.mfCurrent = gFieldOfView.mfDefault;
+	gCameraTilt.mfCurrent = gCameraTilt.mfDefault;
 	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
 	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;
