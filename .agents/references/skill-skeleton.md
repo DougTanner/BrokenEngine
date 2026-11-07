@@ -40,8 +40,8 @@ Choose a shape by who consumes the workflow. The presence of
    and no more text than that action needs, however short the excess is;
    `subagent-handoff.md`'s `## Handoffs` field rules still govern the return. An
    extension field's own line counts when main acts on it as it acts on the
-   field it extends, text main must present or ask verbatim stays inline per
-   `## Section placement`, and everything else is cited as path plus selector.
+   field it extends; text main must present or ask verbatim also counts;
+   everything else is cited as path plus selector.
    A field that judges each item of a supplied list carries a `<n>/<total>`
    count line, `<n>` named for what it counts, closed by the field's own
    passing word (`passed`, `traced`, `settled`), followed only by the items

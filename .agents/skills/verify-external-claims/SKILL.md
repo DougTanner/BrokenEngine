@@ -30,11 +30,7 @@ Dispatch one `locator` with the authoritative shared task-brief fields from
 ## Handoff
 
 The `locator` returns one row per claim under each of `Sources`,
-`Decisive checks`, and `Per-proposition verdicts`. Only the
-`Per-proposition verdicts` rows are required inline; the `Sources` and
-`Decisive checks` rows are not, and when they would push the handoff past
-the shared cap they follow the over-cap file rule
-(`../../references/subagent-handoff.md`, `## Handoffs`).
+`Decisive checks`, and `Per-proposition verdicts`.
 
 Each `Sources` row is one line on this form:
 

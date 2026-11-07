@@ -263,8 +263,8 @@ per-statement enumeration of unaffected results.
 - `Candidate zero` — the drafted mechanism as the `Mechanism` through
   `Pays off when` rows exactly as
   [`../plan-alternatives/SKILL.md`](../plan-alternatives/SKILL.md)
-  `## Handoff` declares them, required inline in the handoff; `Mechanism` is
-  written to satisfy the brief exclusions of the `/plan-alternatives` bullet in
+  `## Handoff` declares them; `Mechanism` is written to satisfy the brief
+  exclusions of the `/plan-alternatives` bullet in
   [`../../references/change-workflow.md`](../../references/change-workflow.md)
   `#### Step 2 — Prepare and explore alternatives` and names neither the plan
   file nor its `Temp/` snapshot;

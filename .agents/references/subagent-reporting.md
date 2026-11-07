@@ -113,7 +113,7 @@ What main does with each field:
 | `Changed files` | Bounds what is re-reviewed. |
 | `Decisive checks` | Feed the acceptance table. |
 | `Build required` | Goes to a `builder`. |
-| `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it, and then only at the cited selector, not the file whole. |
+| `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it or when it must act on moved material, such as dispatching or presenting its rows, and then only at the cited selector, not the file whole. |
 | `Residuals` | Go to the message footer or to `/create-follow-up-plans`. |
 
 ## Whether a worker is still running, and interruption

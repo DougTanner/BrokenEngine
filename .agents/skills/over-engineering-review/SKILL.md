@@ -63,8 +63,7 @@ validator, no candidate rows, no inventory output file, or no authorization
 source.
 
 Each `Design suggestions` row describes, in plain language, a root-cause change
-that would make a check unnecessary. Every row stays inline even past the shared
-character cap, because main puts each one to the user.
+that would make a check unnecessary.
 
 ### Finder
 

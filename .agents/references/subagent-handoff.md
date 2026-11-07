@@ -24,25 +24,23 @@ That fenced form is the whole return — nothing precedes or follows it except t
 extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
 declares — and `Status` carries exactly one of the three tokens alone on its
 line. Every row is one line. Do not quote code and do not repeat a row from
-another field. The whole returned handoff stays under 4,000 characters, or
-under the character cap a skill's `## Handoff` declares in its place. When it
-would exceed the cap, the full material of the fields that push it over moves to
-an existing file or log, or to a `Temp/` file when no existing file holds it,
-with one `##` heading per section of that material, and `Evidence` carries one
-table-of-contents row per section:
+another field. The whole returned handoff stays under 4,000 characters; no
+skill sets its own cap. Before returning, the worker estimates the drafted
+handoff's character count; when it may reach the cap, the full material of the
+fields that push it over moves to an existing file or log, or to a `Temp/` file
+when no existing file holds it, with one `##` heading per section of that
+material, and `Evidence` carries one table-of-contents row per section:
 `<path> ## <heading> — <one-line description of what the section holds>`. A
-selector into a Markdown file is a `##` heading in it. Text a skill's
-`## Handoff` requires inline never moves to a file, even past the cap. The
-handoff itself still carries the decision-relevant summary of each moved field,
-such as the count in `Changed files`, so main decides without opening the file;
-the file is for the workers main dispatches next, cited to them as path plus
-selector, and for main when a decision needs the detail. The report-file
-exemption for that file is in root `AGENTS.md` `## Environment`. The Claude Code
-host still refuses a Claude Code subagent's `Write` of a `.md` file whose name
-begins with `analysis`, `report`, `findings`, or `summary` in any case (a
-host-internal list that can change), so the brief or worker naming a `Temp/`
-file a handoff cites under `Evidence` prefixes such a name, for example
-`temp-analysis.md`.
+selector into a Markdown file is a `##` heading in it. The handoff itself still
+carries the decision-relevant summary of each moved field, such as the count in
+`Changed files`, so main decides without opening the file; the file is for the
+workers main dispatches next, cited to them as path plus selector, and for main
+when a decision needs the detail. The report-file exemption for that file is in
+root `AGENTS.md` `## Environment`. The Claude Code host still refuses a Claude
+Code subagent's `Write` of a `.md` file whose name begins with `analysis`,
+`report`, `findings`, or `summary` in any case (a host-internal list that can
+change), so the brief or worker naming a `Temp/` file a handoff cites under
+`Evidence` prefixes such a name, for example `temp-analysis.md`.
 
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row

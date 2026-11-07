@@ -49,14 +49,14 @@ Require all of the following before starting:
 
 Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
-extended with the fields below, inline. Interview questions carry their full
-wording in the `Interview questions` rows, because the manager runs the
-interview from that text and must not read a file mid-question. The decision-and-refinement rows, the
-execution-card rows, the execution card itself, the refined implementation plan,
-reproduction recipes, and any other bulk evidence go to one file under `Temp/`,
-returned as that path plus a per-section selector, never as inline text.
-`Plan delta` is relative to the frozen plan text; any behavior, scope,
-architecture, acceptance, or verification change is meaningful.
+extended with the fields below. Interview questions carry their full wording in
+the `Interview questions` rows, because the manager runs the interview from that
+text. The decision-and-refinement rows, the execution-card rows, the execution
+card itself, the refined implementation plan, reproduction recipes, and any
+other bulk evidence go to one file under `Temp/`, returned as that path plus a
+per-section selector, never as inline text. `Plan delta` is relative to the
+frozen plan text; any behavior, scope, architecture, acceptance, or verification
+change is meaningful.
 
 - `Plan` — the exact path, or the inline plan title.
 - `Plan-audit evidence` — the audited plan revision and its result.

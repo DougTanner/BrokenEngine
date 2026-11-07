@@ -44,9 +44,6 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
 
 ## Handoff
 
-The handoff enters the main session's context whole, so it stays under 16,000
-characters, which leaves room for the host's result wrapper under the
-20,000-character per-result budget the `/next-plan` checkpoint measures.
 Require the shared handoff form in
 `../../references/subagent-handoff.md`, extended with:
 

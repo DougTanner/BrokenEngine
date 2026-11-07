@@ -151,7 +151,8 @@ Order: `/prepare-change` first at Tier 2+, because the alternative investigation
   exclusions. Main writes the candidate-zero line from the
   `Mechanism` row of the preparation handoff's `Candidate zero` field whenever
   a preparation handoff returned that field with a value other than `none`,
-  reading neither the plan snapshot nor the plan file for it.
+  reading that row inline or in the file section the handoff's `Evidence`
+  cites for it, and no other part of the plan snapshot or the plan file.
   Main compares the handoffs per that skill's `## Handoff`
   and presents per that skill's `### User presentation`.
 
