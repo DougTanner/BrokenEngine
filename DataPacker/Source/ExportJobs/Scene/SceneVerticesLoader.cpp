@@ -4,8 +4,9 @@
 
 
 // Fetches a primitive vertex attribute as a typed pointer + element stride (in units of T).
-// Returns {nullptr, 0} when the attribute is absent. Throws when reading iComponentCount values of T
-// for each of uiVertexCount vertices would leave the accessor's buffer view or buffer.
+// Returns {nullptr, 0} when the attribute is absent. Throws when the accessor's component count or element
+// count differs from iComponentCount or uiVertexCount, or when reading iComponentCount values of T for each
+// of uiVertexCount vertices would leave the accessor's buffer view or buffer.
 template <typename T>
 static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName, size_t uiVertexCount, int64_t iComponentCount)
 {
@@ -17,6 +18,14 @@ static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPr
 	}
 
 	const tinygltf::Accessor& rAccessor = rModel.accessors.at(it->second);
+	if (tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type)) != iComponentCount)
+	{
+		throw std::runtime_error(std::format("{} accessor type {} does not have {} components", pcAttributeName, rAccessor.type, iComponentCount));
+	}
+	if (rAccessor.count != uiVertexCount)
+	{
+		throw std::runtime_error(std::format("{} accessor count {} differs from the vertex count {}", pcAttributeName, rAccessor.count, uiVertexCount));
+	}
 	if constexpr (std::is_same_v<T, float>)
 	{
 		ASSERT(rAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
@@ -108,7 +117,8 @@ int64_t ResolveEffectiveMaterial(std::vector<Material>& rMaterials, std::vector<
 	return iEffectiveMaterial;
 }
 
-// Takes the packed value, not the source: a finite source whose squared length overflows also normalizes to NaN, and NaN reaches the shaders.
+// NORMAL and TANGENT pass the packed value, not the source: a finite source whose squared length overflows also
+// normalizes to NaN, and NaN reaches the shaders. TEXCOORD_n and WEIGHTS_0 are packed unchanged, so they pass the source.
 static void RequireFiniteComponents(std::span<const float> components, std::string_view attributeName, int64_t iPrimitive, int64_t iVertex)
 {
 	for (const auto& [k, rfComponent] : std::views::enumerate(components))
@@ -175,6 +185,26 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 			RequireFiniteComponents(std::array {rVertex.f4Tangent.x, rVertex.f4Tangent.y, rVertex.f4Tangent.z, rVertex.f4Tangent.w}, "TANGENT", iPrimitive, j);
 		}
 
+		if (pfTexcoords0 != nullptr)
+		{
+			RequireFiniteComponents(std::span(&pfTexcoords0[j * iTexcoordStride0], 2), "TEXCOORD_0", iPrimitive, j);
+		}
+		if (pfTexcoords1 != nullptr)
+		{
+			RequireFiniteComponents(std::span(&pfTexcoords1[j * iTexcoordStride1], 2), "TEXCOORD_1", iPrimitive, j);
+		}
+		if (pfTexcoords2 != nullptr)
+		{
+			RequireFiniteComponents(std::span(&pfTexcoords2[j * iTexcoordStride2], 2), "TEXCOORD_2", iPrimitive, j);
+		}
+		if (pfTexcoords3 != nullptr)
+		{
+			RequireFiniteComponents(std::span(&pfTexcoords3[j * iTexcoordStride3], 2), "TEXCOORD_3", iPrimitive, j);
+		}
+		if (pfTexcoords4 != nullptr)
+		{
+			RequireFiniteComponents(std::span(&pfTexcoords4[j * iTexcoordStride4], 2), "TEXCOORD_4", iPrimitive, j);
+		}
 		rVertex.f2Uv = pfTexcoords0 != nullptr ? XMFLOAT2(&pfTexcoords0[j * iTexcoordStride0]) : XMFLOAT2(0.0f, 0.0f);
 		rVertex.f2Uv1 = pfTexcoords1 != nullptr ? XMFLOAT2(&pfTexcoords1[j * iTexcoordStride1]) : rVertex.f2Uv;
 		rVertex.f2Uv2 = pfTexcoords2 != nullptr ? XMFLOAT2(&pfTexcoords2[j * iTexcoordStride2]) : rVertex.f2Uv;
@@ -183,6 +213,11 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 
 		if (puiJoints != nullptr)
 		{
+			if (pfWeights != nullptr)
+			{
+				RequireFiniteComponents(std::span(&pfWeights[j * iWeightsStride], 4), "WEIGHTS_0", iPrimitive, j);
+			}
+
 			// An index at or above the skin's joint count reads the next material's or instance's joint-matrix stride at runtime.
 			// A zero-weight slot influences nothing and routinely holds an arbitrary index, so it goes unchecked; without
 			// WEIGHTS_0 nothing marks a slot unused, so all four count as used

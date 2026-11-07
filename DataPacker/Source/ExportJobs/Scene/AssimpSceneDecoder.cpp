@@ -562,9 +562,10 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 				vecPosition = XMVector3TransformCoord(vecPosition, matWorld);
 				vecNormal = XMVector3TransformNormal(vecNormal, matNormal);
 			}
-			ASSERT(IsFiniteVector(vecPosition) && IsFiniteVector(vecNormal) && XMVectorGetX(XMVector3LengthSq(vecNormal)) > 0.0f);
+			XMVECTOR vecUnitNormal = XMVector3Normalize(vecNormal);
+			ASSERT(IsFiniteVector(vecPosition) && IsFiniteVector(vecUnitNormal) && XMVectorGetX(XMVector3LengthSq(vecNormal)) > 0.0f);
 			XMStoreFloat3(&vertex.f3Pos, vecPosition);
-			XMStoreFloat3(&vertex.f3Normal, XMVector3Normalize(vecNormal));
+			XMStoreFloat3(&vertex.f3Normal, vecUnitNormal);
 			XMFLOAT2* pf2Uvs[] {&vertex.f2Uv, &vertex.f2Uv1, &vertex.f2Uv2, &vertex.f2Uv3, &vertex.f2Uv4};
 			for (int64_t k = 0; k < 5; ++k)
 			{

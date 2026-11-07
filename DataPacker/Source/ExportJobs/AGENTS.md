@@ -220,9 +220,13 @@ without modifying the source.
 `BuildVertices` packs a glTF primitive's `TANGENT` into
 `ModelVertex::f4Tangent`, whose comment owns the encoding. A static export bakes
 the direction with the mesh-world matrix, and `f3Normal` is packed normalized.
-A non-finite `NORMAL` or `TANGENT` component fails the export. A primitive with
-no `TANGENT` packs none, as does every Assimp scene, and `ExportBlenderScene.py`
-exports no tangents, so an authored scene has none. The
+A non-finite `NORMAL`, `TANGENT`, or packed `TEXCOORD_n` component, or a
+non-finite `WEIGHTS_0` component on a primitive with `JOINTS_0`, fails the
+export, as does an attribute `BuildVertices` reads whose accessor component
+count differs from the attribute's or whose element count differs from
+`POSITION`'s. A primitive with no `TANGENT` packs none, as does every Assimp
+scene, and `ExportBlenderScene.py` exports no tangents, so an authored scene
+has none. The
 [model shaders](../../../Engine/Data/Shaders/Model/AGENTS.md#architecture-notes)
 own what the frame does with a tangent and with none.
 
