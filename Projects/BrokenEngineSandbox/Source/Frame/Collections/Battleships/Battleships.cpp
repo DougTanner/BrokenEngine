@@ -216,19 +216,15 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * fDeltaRotation)));
+		vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * fDeltaRotation);
 		// PostRender Update ramps the rate to exactly 0 inside the capture angle, so the last of the turn is a percent rotation toward the
 		// previous tick's wanted heading, one tick behind PostRender's angle test.
-		if (fDeltaRotation == 0.0f)
+		if (fDeltaRotation == 0.0f && !(rPreviousPostRender.pFlags[i] & ShipFlags::kNoAiDirection))
 		{
-			XMVECTOR vecWantedHorizontal = XMVectorSetZ(rPreviousPostRender.pVecAiDirections[i], 0.0f);
-			if (XMVectorGetX(XMVector3LengthSq(vecWantedHorizontal)) > 0.0f)
+			XMVECTOR vecWantedNormal = rPreviousPostRender.pVecAiDirections[i];
+			if (XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal)) <= kfBattleshipHeadingCaptureAngle)
 			{
-				XMVECTOR vecWantedNormal = XMVector3Normalize(vecWantedHorizontal);
-				if (XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal)) <= kfBattleshipHeadingCaptureAngle)
-				{
-					vecDirection = common::RotateTowardsPercent(vecDirection, vecWantedNormal, common::ExponentialInterpolant(kfBattleshipHeadingCaptureRate, deltaTime.count()));
-				}
+				vecDirection = common::RotateTowardsPercent(vecDirection, vecWantedNormal, common::ExponentialInterpolant(kfBattleshipHeadingCaptureRate, deltaTime.count()));
 			}
 		}
 
@@ -448,7 +444,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
-	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
 	rCurrentPostRender.pRegistryTargets[iIndex] = {};
@@ -467,11 +463,10 @@ float RampBattleshipTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRot
 	return common::ClampMagnitude(fPreviousDeltaRotation + common::ClampMagnitude(fWantedDeltaRotation - fPreviousDeltaRotation, kfBattleshipTurnAcceleration * deltaTime.count()), kfBattleshipMaxTurnRate);
 }
 
-// The wanted turn rate toward vecWantedHeading: 0 within the capture angle, otherwise the rate the turn acceleration can still stop
+// The wanted turn rate toward vecWantedNormal: 0 within the capture angle, otherwise the rate the turn acceleration can still stop
 // from by the capture angle, so the ramp starts slowing early, up to the max turn rate.
-static float XM_CALLCONV SteerBattleshipHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedHeading)
+static float XM_CALLCONV SteerBattleshipHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal)
 {
-	XMVECTOR vecWantedNormal = XMVector3Normalize(XMVectorSetZ(vecWantedHeading, 0.0f));
 	float fAngle = XMVectorGetX(XMVector2AngleBetweenNormals(vecDirection, vecWantedNormal));
 	if (fAngle <= kfBattleshipHeadingCaptureAngle)
 	{
@@ -582,16 +577,14 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 					bool bFinalWaypoint = false;
 					vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
 				}
-				// The stored wanted heading feeds only the heading capture: random-spawn rows run no fleet navigation or cone test.
-				vecAiDirection = XMVectorZero();
+				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination:
+				// random-spawn rows run no fleet navigation or cone test.
+				flags.Set(ShipFlags::kNoAiDirection, !bHasDestination);
 				fDeltaRotation = 0.0f;
 				if (bHasDestination)
 				{
-					vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
-					if ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter))
-					{
-						vecAiDirection = XMVectorNegate(vecAiDirection);
-					}
+					bool bFleeing = (flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter);
+					AimAiDirection(bFleeing ? XMVectorSubtract(vecPosition, vecDestination) : XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
 					fDeltaRotation = SteerBattleshipHeading(vecDirection, vecAiDirection);
 				}
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);

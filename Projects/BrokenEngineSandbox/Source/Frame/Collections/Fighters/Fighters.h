@@ -73,7 +73,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kFighterDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
 	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
-	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
+	// The stored flight plane is kuiNoFlightPlane or a plane the type flies, and every simulation write and ship spawn stores a horizontal unit heading.
 	static void PostRead(const FightersInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -91,6 +91,10 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kFighter, rCurrent.puiFlightPlanes[i]))
 			{
 				throw std::ios_base::failure("FightersInterpolate puiFlightPlanes");
+			}
+			if (!IsShipHeadingValid(rCurrent.pVecDirections[i]))
+			{
+				throw std::ios_base::failure("FightersInterpolate pVecDirections");
 			}
 		}
 	}
@@ -174,8 +178,8 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	static constexpr int64_t kiVersion = 11;
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, and no controller writes
-	// a target flight plane the type disallows.
+	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, every simulation write and
+	// ship spawn stores a horizontal unit AI direction, and no controller writes a target flight plane the type disallows.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -191,6 +195,10 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
 				throw std::ios_base::failure("FightersPostRender pNavigationDelays");
+			}
+			if (!IsShipHeadingValid(rCurrent.pVecAiDirections[i]))
+			{
+				throw std::ios_base::failure("FightersPostRender pVecAiDirections");
 			}
 			if (!IsFlightPlaneAllowed(ShipType::kFighter, GetTargetFlightPlane(rCurrent.pOrders[i])))
 			{

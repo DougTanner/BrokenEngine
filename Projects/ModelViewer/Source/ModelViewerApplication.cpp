@@ -765,7 +765,7 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 	float fHeight = XMVectorGetZ(rBody.vecPosition);
 	float fNextHeight = fHeight + std::clamp(mfFlightHeight - fHeight, -25.0f * fDeltaTime, 25.0f * fDeltaTime);
 	rBody.fClimbTilt = fDeltaTime > 0.0f ? 0.35f * (fNextHeight - fHeight) / (25.0f * fDeltaTime) : rBody.fClimbTilt;
-	rBody.vecDirection = XMVector3Normalize(XMVector3TransformNormal(rBody.vecDirection, XMMatrixRotationZ(fDeltaTime * rBody.fDeltaRotation)));
+	rBody.vecDirection = common::RotateDirectionAboutZ(rBody.vecDirection, fDeltaTime * rBody.fDeltaRotation);
 	rBody.vecVelocity = engine::ApplyMovement<true>(rBody.vecVelocity, rBody.vecDirection, fDeltaTime, 10.0f, 0.25f, 40.0f, 4.0f);
 	XMVECTOR vecNext = XMVectorSetZ(XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rBody.vecVelocity, rBody.vecPosition), fNextHeight);
 	// Sweep the disc against the inset cell so every accepted segment stays in the original cell.
@@ -777,7 +777,7 @@ void ModelViewerApplication::UpdateFlight(float fDeltaTime)
 		float fDistance = XMVectorGetX(XMVector2Length(XMVectorSubtract(vecNext, rBody.vecPosition)));
 		vecNext = XMVectorSetZ(XMVectorLerp(rBody.vecPosition, vecNext, std::max(0.0f, *optionalExit - 0.001f / fDistance)), fNextHeight);
 		rBody.vecVelocity = XMVector3Reflect(rBody.vecVelocity, vecNormal);
-		rBody.vecDirection = XMVector3Reflect(rBody.vecDirection, vecNormal);
+		rBody.vecDirection = common::ReflectDirection(rBody.vecDirection, vecNormal);
 	}
 	rBody.vecPosition = XMVectorSetW(vecNext, 1.0f);
 }

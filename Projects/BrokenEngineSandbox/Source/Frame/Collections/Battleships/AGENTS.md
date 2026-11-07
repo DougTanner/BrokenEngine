@@ -55,11 +55,14 @@ model as a wreck (`## Wreck Invariants`).
   is zero within the heading capture angle of the wanted heading.
 - Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet
   rows their navigation bearing, random-spawn rows the normalized horizontal
-  direction to their destination, negated while fleeing and not returning, or
-  zero without a destination, in which case the wanted rate is zero.
-- Interpolate Update, while the previous turn rate is exactly 0 and the
-  previous wanted heading is nonzero and within the capture angle, rotates the
-  direction a fixed percent toward it each tick.
+  direction to their destination, away from it while fleeing and not
+  returning. Without a destination a random-spawn row keeps its previous wanted
+  heading with `ShipFlags::kNoAiDirection` set, and its wanted rate is zero;
+  the flag is clear while it has one.
+- Interpolate Update, while the previous turn rate is exactly 0, the previous
+  row does not carry `ShipFlags::kNoAiDirection`, and the previous wanted
+  heading is within the capture angle, rotates the direction a fixed percent
+  toward it each tick.
 
 ## Fleet Health Invariants
 

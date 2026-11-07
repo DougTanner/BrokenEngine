@@ -66,6 +66,10 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	{
 		names.push_back("kBlasterSpawnLeft");
 	}
+	if (flags & ShipFlags::kNoAiDirection)
+	{
+		names.push_back("kNoAiDirection");
+	}
 	if (flags & ShipFlags::kFlee)
 	{
 		names.push_back("kFlee");

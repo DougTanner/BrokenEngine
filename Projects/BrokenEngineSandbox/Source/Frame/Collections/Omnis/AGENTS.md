@@ -38,6 +38,12 @@ derives from the shared omni radius.
   below the highest Omni plane keeps that flagship as its kept attack target
   instead and chases and circles it the same way, with no flee or return to an
   island.
+- An Omni enters a cell, by spawn or transfer arrival, with its heading as its
+  AI direction and `ShipFlags::kNoAiDirection` set (`../Ships/AGENTS.md`
+  `## Ship Invariants`). The first tick outside transfer lock that gives it a
+  bearing clears the flag for good: any fleet tick, a flagship chase, or a
+  random-spawn tick with a destination. A later random-spawn tick with no
+  destination keeps the previous AI direction.
 
 ## Fleet Health Invariants
 

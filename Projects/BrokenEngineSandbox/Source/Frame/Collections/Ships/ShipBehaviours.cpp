@@ -280,11 +280,11 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(const Frame& __restrict
 	}
 }
 
-static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId globalId, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::NavData& rNavData)
+static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId globalId, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, int64_t iNavigationDirection, const engine::NavData& rNavData)
 {
-	// Cadence, mode changes, direction reseeding, and blocked position/lookahead probes request pathfinding; otherwise
-	// cached steering is reused without NavQueryDirection.
-	bool bRecompute = bReseededDirection || (iNavigationDirection != iEntryNavigationDirection)
+	// Cadence, mode changes, and blocked position/lookahead probes request pathfinding; otherwise cached steering is
+	// reused without NavQueryDirection.
+	bool bRecompute = (iNavigationDirection != iEntryNavigationDirection)
 	               || (((rFrame.interpolate.iTick + globalId.iValue) % kiNavigationRecomputeInterval) == 0);
 
 	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
@@ -294,7 +294,7 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 	// polygon inflates that contour, leaving a no-nav band with zero terrain push. rVecArtificialIntelligenceDirection, vecPosition, and server-built, wire-shipped navigationData match on
 	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeArtificialIntelligenceSteering re-steers
 	// every tick.
-	if (!bRecompute && iNavigationDirection >= 0 && XMVectorGetX(XMVector3LengthSq(vecArtificialIntelligenceDirection)) > 0.001f)
+	if (!bRecompute && iNavigationDirection >= 0)
 	{
 		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavigationLookahead), vecArtificialIntelligenceDirection, vecPosition);
 		if (engine::NavQueryPointBlocked(vecLookahead, rNavData) || engine::NavQueryPointBlocked(vecPosition, rNavData))
@@ -463,7 +463,7 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, 
 	}
 	else
 	{
-		rVecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+		AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), rVecArtificialIntelligenceDirection);
 	}
 #if defined(BT_CLIENT)
 	if constexpr (kbDebugRender)
@@ -494,18 +494,9 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		return rPostRender.pGlobalIds[iRow];
 	});
 
-	// Throttle bookkeeping: capture mode before the fleet/flagship/timer blocks can change it, and note
-	// when the direction is re-seeded. Both force an immediate pathfind below (see bRecompute).
+	// Throttle bookkeeping: capture mode before the fleet/flagship/timer blocks can change it; a mode change forces an
+	// immediate pathfind below (see bRecompute).
 	int64_t iEntryNavigationDirection = riNavigationDirection;
-	bool bReseededDirection = false;
-
-	// Initialize direction if zero (first spawn or after reset)
-	if (XMVectorGetX(XMVector3LengthSq(rVecArtificialIntelligenceDirection)) < 0.001f)
-	{
-		float fAngle = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
-		rVecArtificialIntelligenceDirection = XMVector4Transform(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngle));
-		bReseededDirection = true;
-	}
 
 	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, ShipTypeClearanceTier(self.eType), iNavigationPlane);
@@ -526,7 +517,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		UpdateFleetAndFlagshipNavigation(rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
 	}
 
-	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rNavData);
+	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, riNavigationDirection, rNavData);
 
 	if (riNavigationDirection == 7)
 	{
@@ -737,8 +728,16 @@ XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> is
 bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection)
 {
 	static constexpr float kfCosHalfAngle = std::numbers::sqrt2_v<float> * 0.5f;
-	XMVECTOR vecAiNormal = XMVector2Normalize(vecAiDirection);
-	return XMVectorGetX(XMVector2Dot(vecDirection, vecAiNormal)) >= kfCosHalfAngle;
+	return XMVectorGetX(XMVector2Dot(vecDirection, vecAiDirection)) >= kfCosHalfAngle;
+}
+
+void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection)
+{
+	XMVECTOR vecAiDirection = XMVector3Normalize(XMVectorSetZ(vecOffset, 0.0f));
+	if (XMVectorGetX(XMVector3LengthSq(vecAiDirection)) > 0.0f)
+	{
+		rVecAiDirection = vecAiDirection;
+	}
 }
 
 void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation)

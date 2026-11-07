@@ -303,17 +303,19 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pShieldCooldowns[iIndex] = rInfo.shieldCooldown;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentPostRender.pShieldDownSoundCooldowns[iIndex] = rInfo.shieldDownSoundCooldown;
-	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pTransferLockTimers[iIndex] = rInfo.transferLockTimer;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows its flagship in the same cell
-	// kHealing carries across a transfer.
+	// kHealing carries across a transfer. The AI direction starts as the heading with kNoAiDirection set until the first
+	// bearing, so the Omni does not thrust along it.
 	ShipFlags_t spawnFlags = rInfo.flags;
 	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
+	spawnFlags.Set(ShipFlags::kNoAiDirection);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
@@ -543,9 +545,7 @@ static XMVECTOR XM_CALLCONV OmniCirclingPoint(FXMVECTOR vecPosition, FXMVECTOR v
 
 	// XMVector2Normalize divides every lane by the x/y length, so Z is zeroed above; a zero offset normalizes to zero.
 	XMVECTOR vecNormal = XMVector2Normalize(vecOffset);
-	float fX = XMVectorGetX(vecNormal);
-	float fY = XMVectorGetY(vecNormal);
-	XMVECTOR vecLeadNormal = XMVectorSet(fX * kfOmniCirclingLeadCos + fY * kfOmniCirclingLeadSin, fY * kfOmniCirclingLeadCos - fX * kfOmniCirclingLeadSin, 0.0f, 0.0f);
+	XMVECTOR vecLeadNormal = common::TransformDirection(vecNormal, XMMATRIX(kfOmniCirclingLeadCos, -kfOmniCirclingLeadSin, 0.0f, 0.0f, kfOmniCirclingLeadSin, kfOmniCirclingLeadCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 	return XMVectorAdd(vecTarget, XMVectorScale(vecLeadNormal, kfOmniCirclingDistance));
 }
 
@@ -648,14 +648,14 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					}
 					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes mode
 					// and recomputes its path.
-					XMVECTOR vecToDestination = XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f);
-					vecAiDirection = XMVector2Normalize(vecToDestination);
+					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
 					iNavigationDirection = -1;
 				}
 				else
 				{
 					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
+				flags.Set(ShipFlags::kNoAiDirection, false);
 				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
 			}
 			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
@@ -665,7 +665,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 				bool bFinalWaypoint = false;
 				XMVECTOR vecDestination = HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
-				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+				AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
+				flags.Set(ShipFlags::kNoAiDirection, false);
 			}
 			else
 			{
@@ -691,7 +692,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				if (bHasDestination)
 				{
-					vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+					AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
+					flags.Set(ShipFlags::kNoAiDirection, false);
 				}
 			}
 
@@ -701,7 +703,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
-			ApplyAcceleratedMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
+			ApplyAcceleratedMovement(iNavigationDirection, (flags & ShipFlags::kNoAiDirection) ? XMVectorZero() : vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
 
 			if (bLookTargetFound)
 			{

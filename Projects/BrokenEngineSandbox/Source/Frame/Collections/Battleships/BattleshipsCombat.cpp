@@ -337,9 +337,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			}
 		}
 		XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&tubes[static_cast<size_t>(iNearestTube)].f3Direction), 0.0f));
-		float fDirectionX = XMVectorGetX(vecAlignedDirection);
-		float fDirectionY = XMVectorGetY(vecAlignedDirection);
-		XMVECTOR vecTubeDirection = XMVectorSet(fCos * fDirectionX - fSin * fDirectionY, fSin * fDirectionX + fCos * fDirectionY, 0.0f, 0.0f);
+		XMVECTOR vecTubeDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
 		MissileFlags_t missileFlags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
 		missileFlags.Set(MissileFlags::kUpperFlightPlane, uiFlightPlane == 1);

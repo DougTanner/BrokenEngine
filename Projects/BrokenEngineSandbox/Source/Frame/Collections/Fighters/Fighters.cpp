@@ -296,7 +296,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 			vecPosition = RaiseAboveTerrain(rStaticData, ShipType::kFighter, rPreviousPostRender.pController[i], vecPosition, uiFlightPlane);
 		}
 
-		vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * fDeltaRotation)));
+		vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * fDeltaRotation);
 
 		// The -1.0f sentinel means not exploding and must remain unchanged.
 		if (destroyedTime > std::chrono::duration<float>::zero())
@@ -527,7 +527,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
-	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
+	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	rCurrentPostRender.pVecVeerOffPoints[iIndex] = XMVectorZero();
 	// Registry ids are per cell, so a transfer arrival starts without a kept target too.
@@ -625,7 +625,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				{
 					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes
 					// mode and recomputes its path; no cached path direction survives.
-					vecAiDirection = XMVector2Normalize(XMVectorSetZ(XMVectorSubtract(tactic.vecDestination, vecPosition), 0.0f));
+					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
 					iNavigationDirection = -1;
 				}
 				else

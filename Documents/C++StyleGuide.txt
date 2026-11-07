@@ -386,6 +386,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 	- Loop counters `i`/`j`/`k` and iterators `it` (per rule 8).
 	- Windows handle prefixes such as `hwnd`/`hdc` (per rule 3).
 	- Approved standard terms: `Pbr`, `Ibl`, `Brdf`, `Cpu`, `Gpu`, `Hdr`, `Lod`, `Uv`, `Fov`, `Aabb`, `Json`, `Guid`, `Utf8`, `Fps`, `Rtt`.
+	- `Ai`, for any entity the simulation spawns, owns, or controls rather than a human player (e.g., `pVecAiDirections`).
 	Before adding or using an unlisted standard abbreviation, ask the user for approval with the term, its meaning, and its intended use or an example.
 
 57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (a private member, or a `static` file-local function) to distinguish internal from public versions.

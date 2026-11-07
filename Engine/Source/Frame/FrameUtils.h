@@ -43,9 +43,7 @@ template<bool BLEND_VELOCITY_TO_DIRECTION = false>
 	if constexpr (BLEND_VELOCITY_TO_DIRECTION)
 	{
 		float fDecay = common::ExponentialDecay(fVelocityToDirection, fDeltaTime);
-		XMVECTOR vecVelocityComponent = XMVectorMultiply(XMVectorReplicate(fDecay), XMVector3Normalize(vecResult));
-		XMVECTOR vecDirectionComponent = XMVectorMultiply(XMVectorReplicate(1.0f - fDecay), vecDirection);
-		vecResult = XMVectorMultiply(XMVector3Length(vecResult), XMVector3Normalize(XMVectorAdd(vecVelocityComponent, vecDirectionComponent)));
+		vecResult = XMVectorMultiply(XMVector3Length(vecResult), common::LerpDirection(vecDirection, XMVector3Normalize(vecResult), fDecay));
 	}
 
 	return vecResult;

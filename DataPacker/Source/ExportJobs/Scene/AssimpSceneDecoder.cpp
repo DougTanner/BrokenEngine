@@ -560,12 +560,16 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 			if (!bHasSkeleton)
 			{
 				vecPosition = XMVector3TransformCoord(vecPosition, matWorld);
-				vecNormal = XMVector3TransformNormal(vecNormal, matNormal);
+				vecNormal = common::TransformDirection(vecNormal, matNormal);
 			}
-			XMVECTOR vecUnitNormal = XMVector3Normalize(vecNormal);
-			ASSERT(IsFiniteVector(vecPosition) && IsFiniteVector(vecUnitNormal) && XMVectorGetX(XMVector3LengthSq(vecNormal)) > 0.0f);
+			else
+			{
+				vecNormal = XMVector3Normalize(vecNormal);
+			}
+			// Normalizing returns zero for a zero length and NaN for a non-finite one, so this rejects a zero or non-finite raw normal
+			ASSERT(IsFiniteVector(vecPosition) && IsFiniteVector(vecNormal) && XMVectorGetX(XMVector3LengthSq(vecNormal)) > 0.0f);
 			XMStoreFloat3(&vertex.f3Pos, vecPosition);
-			XMStoreFloat3(&vertex.f3Normal, vecUnitNormal);
+			XMStoreFloat3(&vertex.f3Normal, vecNormal);
 			XMFLOAT2* pf2Uvs[] {&vertex.f2Uv, &vertex.f2Uv1, &vertex.f2Uv2, &vertex.f2Uv3, &vertex.f2Uv4};
 			for (int64_t k = 0; k < 5; ++k)
 			{

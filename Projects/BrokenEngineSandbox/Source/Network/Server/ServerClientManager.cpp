@@ -275,9 +275,7 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 					continue;
 				}
 				XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&rBay.f3Direction), 0.0f));
-				float fDirectionX = XMVectorGetX(vecAlignedDirection);
-				float fDirectionY = XMVectorGetY(vecAlignedDirection);
-				XMVECTOR vecLaunchDirection = XMVectorSet(fCos * fDirectionX - fSin * fDirectionY, fSin * fDirectionX + fCos * fDirectionY, 0.0f, 0.0f);
+				XMVECTOR vecLaunchDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 				// Terrain admission uses the Fighter's own avoidance at its authored launch heading.
 				int64_t iLaunchNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecLaunchPosition), iTargetFlightPlane);
 				if (ComputeTerrainAvoidance(gpGame->mCells.at(flagshipCoordinate).staticData, vecLaunchPosition, vecLaunchDirection, 0.0f, iLaunchNavigationPlane) != 0.0f)

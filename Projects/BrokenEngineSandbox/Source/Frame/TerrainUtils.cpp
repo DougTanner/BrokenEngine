@@ -28,8 +28,6 @@ static bool HasTerrainCollision(int64_t iFlightPlane)
 
 AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour, int64_t iFlightPlane)
 {
-	XMVECTOR vecDirection = XMVector3Normalize(vecCurrentDirection);
-
 	XMVECTOR vecNormal = engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition);
 	float fNormalX = XMVectorGetX(vecNormal);
 	float fNormalY = XMVectorGetY(vecNormal);
@@ -55,7 +53,7 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 
 		vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
 
-		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecDirection, kfLookAheadDistance));
+		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecCurrentDirection, kfLookAheadDistance));
 		float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead) - fElevationOffset;
 		if (fElevationAhead > kfHighElevationThreshold)
 		{
@@ -64,16 +62,16 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 	}
 	else
 	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecCellCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
 	}
 
 	if (common::Distance(vecPosition, vecCellCenter) > kfReturnToIslandDistance)
 	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecCellCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
 		fLocalSteerRate = kfSteerRate * kfUrgentSteerMultiplier;
 	}
 
-	XMVECTOR vecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorLerp(vecDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime)));
+	XMVECTOR vecArtificialIntelligenceDirection = common::LerpDirection(vecCurrentDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime));
 
 	return {.vecArtificialIntelligenceDirection = vecArtificialIntelligenceDirection};
 }

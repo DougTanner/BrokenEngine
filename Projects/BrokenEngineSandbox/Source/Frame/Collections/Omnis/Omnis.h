@@ -99,7 +99,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
 	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
-	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
+	// The stored flight plane is kuiNoFlightPlane or a plane the type flies, and every simulation write and ship spawn stores a horizontal unit heading.
 	static void PostRead(const OmnisInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -117,6 +117,10 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kOmni, rCurrent.puiFlightPlanes[i]))
 			{
 				throw std::ios_base::failure("OmnisInterpolate puiFlightPlanes");
+			}
+			if (!IsShipHeadingValid(rCurrent.pVecDirections[i]))
+			{
+				throw std::ios_base::failure("OmnisInterpolate pVecDirections");
 			}
 		}
 	}
@@ -214,7 +218,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
 	// Reject an out-of-range navigation delay too, which no navigation-delay admission accepts, an unknown controller, which
-	// selects no script, and a target flight plane the type disallows, which no controller writes.
+	// selects no script, a target flight plane the type disallows, which no controller writes, and an AI direction failing
+	// IsShipHeadingValid, since every simulation write and ship spawn stores a horizontal unit vector.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -226,6 +231,10 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
 				throw std::ios_base::failure("OmnisPostRender pNavigationDelays");
+			}
+			if (!IsShipHeadingValid(rCurrent.pVecAiDirections[i]))
+			{
+				throw std::ios_base::failure("OmnisPostRender pVecAiDirections");
 			}
 			if (rCurrent.pController[i] >= ShipController::kCount)
 			{

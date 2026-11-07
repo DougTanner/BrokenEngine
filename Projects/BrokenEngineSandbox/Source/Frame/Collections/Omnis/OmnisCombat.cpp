@@ -291,7 +291,7 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 
 		float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kDestroyTime;
 
-		XMVECTOR vecDirection = XMVector4Transform(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(common::Random<XM_2PI>(rFrame.postRender.randomEngine)));
+		XMVECTOR vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), common::Random<XM_2PI>(rFrame.postRender.randomEngine));
 
 		XMVECTOR vecJitteredPosition = common::RandomPositionJitter<1.0f>(rCurrentInterpolate.pVecPositions[i], rFrame.postRender.randomEngine);
 		XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<0.5f>(vecDirection, rFrame.postRender.randomEngine);

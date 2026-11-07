@@ -349,11 +349,11 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 	float fSpeed = gWaterLowSpeed.mfCurrent * std::sqrt(gWaterScale.mfCurrent);
 
 	// Wave 0: fixed primary direction, no RNG draw, no amplitude clamp.
-	auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent));
+	auto vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), gWaterLowAngle.mfCurrent);
 	sLowWaveStaging.pf4WavesOne[0].x = XMVectorGetX(vecDirection);
 	sLowWaveStaging.pf4WavesOne[0].y = XMVectorGetY(vecDirection);
 
-	vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(0.0f));
+	vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
 	sLowWaveStaging.pf4WavesOne[0].z = XMVectorGetX(vecDirection);
 	sLowWaveStaging.pf4WavesOne[0].w = XMVectorGetY(vecDirection);
 
@@ -365,11 +365,11 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 	for (int64_t i = 1; i < iCount; ++i)
 	{
 		float fAngleAdjust = ((i % 2) == 0 ? 1.0f : -1.0f) * gWaterLowAngleAdjust.mfCurrent * common::Random(randomEngine);
-		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent + fAngleAdjust));
+		vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), gWaterLowAngle.mfCurrent + fAngleAdjust);
 		sLowWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
 		sLowWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
 
-		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(XM_2PI * static_cast<float>(i) / static_cast<float>(iCount)));
+		vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XM_2PI * static_cast<float>(i) / static_cast<float>(iCount));
 		sLowWaveStaging.pf4WavesOne[i].z = XMVectorGetX(vecDirection);
 		sLowWaveStaging.pf4WavesOne[i].w = XMVectorGetY(vecDirection);
 
@@ -406,7 +406,7 @@ static void RebuildMediumWaveInvariants(int64_t iCount)
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		float fAngleAdjust = gWaterMediumAngleAdjust.mfCurrent * common::Random(randomEngine);
-		auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngleAdjust));
+		auto vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), fAngleAdjust);
 		sMediumWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
 		sMediumWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
 

@@ -132,7 +132,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 		XMVECTOR vecTrailDirection = vecDirection2dNormal;
 		if (j != 0)
 		{
-			vecTrailDirection = XMVector3RotateSafe(vecTrailDirection, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, rSpawnInformation.fTrailAngle * (common::Random(rFrame.postRender.randomEngine) - 0.5f)));
+			vecTrailDirection = common::RotateDirectionAboutZ(vecTrailDirection, rSpawnInformation.fTrailAngle * (common::Random(rFrame.postRender.randomEngine) - 0.5f));
 		}
 
 		[[maybe_unused]] XMVECTOR vecTrailStart = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(rType.fTrailStart), rSpawnInformation.vecPosition);

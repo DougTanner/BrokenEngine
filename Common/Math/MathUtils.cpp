@@ -54,13 +54,33 @@ XMVECTOR XM_CALLCONV RotateTowardsPercent(FXMVECTOR vecDirection, FXMVECTOR vecT
 {
 	float fCrossZ = XMVectorGetZ(XMVector3Cross(vecTowards, vecDirection));
 	float fAngle = XMVectorGetX(XMVector2AngleBetweenNormals(vecTowards, vecDirection));
-	return XMVector4Transform(vecDirection, XMMatrixRotationZ(fPercent * (fCrossZ > 0.0f ? -fAngle : fAngle)));
+	return RotateDirectionAboutZ(vecDirection, fPercent * (fCrossZ > 0.0f ? -fAngle : fAngle));
 }
 
 XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaximumJitter, RandomEngine& rRandomEngine)
 {
 	float fJitter = -fMaximumJitter + Random<2.0f>(rRandomEngine) * fMaximumJitter;
-	return XMVector4Transform(vecDirection, XMMatrixRotationZ(fJitter));
+	return RotateDirectionAboutZ(vecDirection, fJitter);
+}
+
+XMVECTOR XM_CALLCONV RotateDirectionAboutZ(FXMVECTOR vecDirection, float fAngle)
+{
+	return XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(fAngle)));
+}
+
+XMVECTOR XM_CALLCONV ReflectDirection(FXMVECTOR vecDirection, FXMVECTOR vecNormal)
+{
+	return XMVector3Normalize(XMVector3Reflect(vecDirection, vecNormal));
+}
+
+XMVECTOR XM_CALLCONV LerpDirection(FXMVECTOR vecFrom, FXMVECTOR vecTo, float fPercent)
+{
+	return XMVector3Normalize(XMVectorAdd(XMVectorMultiply(vecFrom, XMVectorReplicate(1.0f - fPercent)), XMVectorMultiply(vecTo, XMVectorReplicate(fPercent))));
+}
+
+XMVECTOR XM_CALLCONV TransformDirection(FXMVECTOR vecDirection, FXMMATRIX matTransform)
+{
+	return XMVector3Normalize(XMVector3TransformNormal(vecDirection, matTransform));
 }
 
 XMMATRIX XM_CALLCONV RotationMatrixFromDirection(FXMVECTOR vecDirection, FXMVECTOR vecOriginNormal, FXMVECTOR vecUp)

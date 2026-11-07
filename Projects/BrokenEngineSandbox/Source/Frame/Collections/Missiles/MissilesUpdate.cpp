@@ -78,7 +78,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 				vecPosition = XMVectorSetZ(vecPosition, fHeight);
 
 				// PostRender::Update already applies the rotation delay percentage.
-				vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i])));
+				vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i]);
 			}
 		}
 
@@ -135,9 +135,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count() * fAdjustedAcceleration), rCurrentInterpolate.pVecDirections[i], vecVelocity);
 
 			float fVelocityToDirectionPercent = 1.0f - deltaTime.count() * kfVelocityToDirection;
-			XMVECTOR vecVelocityComponent = XMVectorMultiply(XMVectorReplicate(fVelocityToDirectionPercent), XMVector3Normalize(vecVelocity));
-			XMVECTOR vecDirectionComponent = XMVectorMultiply(XMVectorReplicate(1.0f - fVelocityToDirectionPercent), rCurrentInterpolate.pVecDirections[i]);
-			vecVelocity = XMVectorMultiply(XMVector3Length(vecVelocity), XMVector3Normalize(XMVectorAdd(vecVelocityComponent, vecDirectionComponent)));
+			vecVelocity = XMVectorMultiply(XMVector3Length(vecVelocity), common::LerpDirection(rCurrentInterpolate.pVecDirections[i], XMVector3Normalize(vecVelocity), fVelocityToDirectionPercent));
 
 			fDeltaRotation = (1.0f - deltaTime.count() * kfDeltaRotationDecay) * fDeltaRotation;
 

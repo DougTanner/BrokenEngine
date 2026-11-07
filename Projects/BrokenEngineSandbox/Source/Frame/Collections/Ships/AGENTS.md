@@ -62,12 +62,14 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
-  navigation delay, an unknown controller, and a target flight plane the type
-  disallows. On every Frame read, Interpolate `PostRead` requires a finite
+  navigation delay, an unknown controller, a target flight plane the type
+  disallows, and an AI direction that fails `IsShipHeadingValid`. On every
+  Frame read, Interpolate `PostRead` requires a finite
   Fighter or Omni height at or above the lowest plane, allowing terrain-raised
   heights above the highest plane; Battleships retain the lowest-to-highest
   plane range. Every type rejects a stored plane that is neither
-  `kuiNoFlightPlane` nor allowed for the type.
+  `kuiNoFlightPlane` nor allowed for the type, and a heading that fails
+  `IsShipHeadingValid`.
 - A ship's target flight plane lives in its orders, set at spawn and changed by
   `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
   by the random-spawn Omni chase (`../Fighters/AGENTS.md`,
@@ -130,6 +132,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   A start already inside terrain logs a warning; spawn sites test at most the
   body's center against terrain, so a warning right after a spawn is expected.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
+  Every simulation write and every ship spawn stores a horizontal unit vector
+  in `pVecAiDirections`, and spawn stores the heading; the agent `edit_frame`
+  command writes raw values, bounded only by the read check
+  (`IsShipHeadingValid`). An Omni row carrying `ShipFlags::kNoAiDirection` has
+  no AI direction it wants, so the Omni thrust ignores it; the
+  [Battleship turning rule](../Battleships/AGENTS.md#turning-invariants) covers
+  Battleship rows.
 - Target choice treats a ship as on its nearest flight plane
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
   missiles and Omni blasters target only an enemy whose nearest plane is the
@@ -197,7 +206,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 
 - After arrival grace expires, a living fleet Fighter or Battleship accelerates
   only when its horizontal AI bearing is within the inclusive +/-45-degree
-  forward cone; a zero AI bearing is outside. Outside the cone it retains drag
+  forward cone. Outside the cone it retains drag
   and skips terrain avoidance; the shared terrain response and pusher response still
   apply. A fleet Fighter outside the cone uses its signed maximum turn rate,
   preserving that navigation turn through terrain response, and inside the cone
@@ -210,7 +219,7 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
   a follower stalls until that row is in its cell again or a fleet wanted cell
   other than its own sends it cross-cell.
-- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes. A tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island destination is dropped keeps the cached steering with no recompute.
+- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode or destination changes. A tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island destination is dropped keeps the cached steering with no recompute.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current
   position. Both tests are needed: containment ahead does not imply containment

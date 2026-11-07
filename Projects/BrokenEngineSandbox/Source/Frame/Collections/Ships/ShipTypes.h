@@ -81,6 +81,8 @@ enum class ShipFlags : uint16_t
 	kHealing              = 0x0002,
 	kFireBlaster          = 0x0004,
 	kBlasterSpawnLeft     = 0x0008,
+	// The AI direction is a kept value, not one the ship wants, so the Battleship heading capture and the Omni thrust ignore it.
+	kNoAiDirection        = 0x0010,
 	kFlee                 = 0x0040,
 	kReturnToIslandCenter = 0x0080,
 

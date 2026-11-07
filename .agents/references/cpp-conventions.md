@@ -19,6 +19,20 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
 - Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`). The class inherits `common::Singleton<T>` (`Common/Singleton.h`) publicly as its last base and registers its global through that base's constructor per the `Common/Singleton.h` header comment; no other code writes a global registered this way.
 - DirectX Math storage: declare stored 3- and 4-component vectors and matrices with the aligned types (`XMFLOAT3A`, `XMFLOAT4A`, `XMFLOAT3X4A`, `XMFLOAT4X4A`), except layouts fixed elsewhere: GPU/shader-mirrored structs, serialized formats (`.pack`, wire, save, replay), and packed or Structure-of-Arrays arrays where 16-byte padding changes the size. `XMFLOAT2` stays unaligned: its aligned load gains nothing and doubles its size. Aligned load/store calls are style-guide rule 44.
 - XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
+- Unit vectors stay unit: a caller never renormalizes a unit vector by hand.
+  Every operation that changes a unit-length heading, direction, or normal
+  (rotation, reflection, blend, or matrix transform) goes through a direction
+  function in `Common/Math/MathUtils.h` that renormalizes its result built in,
+  so repeated application cannot drift the length; an operation no such
+  function covers gets one there rather than an inline normalization. A unit
+  vector stays unit at every write, so a reader uses it as it is and never
+  rescales it. A length-keeping function such as `XMVector3RotateSafe` or
+  `XMVector3Reflect` is for offsets and velocities, not for a unit vector.
+  Normalizing a vector that is not unit length where a unit vector is first
+  built from it (an offset, a velocity, a cross product, a flattened vector, an
+  authored normal) is building, not renormalizing. This bullet governs computed
+  values only; a value read from a packet or file follows the bad-value bullet
+  above (rejected, never normalized).
 - Code placement: place code by who would reuse it. Common holds code more than
   one program needs (Engine, DataPacker, game), under the dependency rule in
   `Common/AGENTS.md` `## Overview`; code shared only by the tool executables

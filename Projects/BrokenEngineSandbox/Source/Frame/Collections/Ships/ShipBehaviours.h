@@ -115,8 +115,12 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 // kReturnToIslandCenter hysteresis; rbHasDestination is false in an island-free cell with no enemy.
 [[nodiscard]] XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, ShipFlags_t& rFlags, bool& rbHasDestination);
 
-// The horizontal AI bearing is inside the inclusive +/-45-degree forward cone; zero AI is outside.
+// The horizontal AI bearing is inside the inclusive +/-45-degree forward cone.
 [[nodiscard]] bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection);
+
+// Aims rVecAiDirection along vecOffset flattened to x/y. An offset with zero x/y length keeps the previous bearing, so
+// the AI direction stays a unit vector.
+void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection);
 
 // A negative fTurnRate turns away from the destination; without a destination the turn only decays.
 void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation);
@@ -156,6 +160,26 @@ void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::durat
 [[nodiscard]] constexpr bool IsNavigationDelayInRange(float fDelay)
 {
 	return fDelay >= 0.0f && fDelay <= 60.0f;
+}
+
+// A ship heading or AI direction has Z and W exactly 0 and an x/y length squared in [0.25, 4]: a coarse corruption test
+// far wider than the rounding of the unit vectors every simulation write and ship spawn stores, and the only bound on
+// an edit_frame write. The length is one range test so NaN and both infinities in any lane fail it.
+[[nodiscard]] inline bool XM_CALLCONV IsShipHeadingValid(FXMVECTOR vecDirection)
+{
+	float fLengthSquared = XMVectorGetX(XMVector2LengthSq(vecDirection));
+	return XMVectorGetZ(vecDirection) == 0.0f && XMVectorGetW(vecDirection) == 0.0f && fLengthSquared >= 0.25f && fLengthSquared <= 4.0f;
+}
+
+// Covers the float rounding of a unit vector's components and of its length squared.
+inline constexpr float kfShipHeadingUnitTolerance = 4.0f * kfEpsilon;
+
+// A horizontal unit heading, as a harness ship spawn must supply: Z and W exactly 0 and an x/y length squared within
+// kfShipHeadingUnitTolerance of 1. NaN and both infinities in any lane fail it.
+[[nodiscard]] inline bool XM_CALLCONV IsShipHeadingUnit(FXMVECTOR vecDirection)
+{
+	float fLengthSquared = XMVectorGetX(XMVector2LengthSq(vecDirection));
+	return XMVectorGetZ(vecDirection) == 0.0f && XMVectorGetW(vecDirection) == 0.0f && std::abs(fLengthSquared - 1.0f) <= kfShipHeadingUnitTolerance;
 }
 
 #if defined(BT_CLIENT)

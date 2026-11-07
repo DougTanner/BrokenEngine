@@ -104,8 +104,8 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 			fWidth = -fWidth;
 		}
 
-		XMVECTOR vecExhaustOffset = XMVectorMultiply(XMVectorReplicate(kfExhaustOffset), XMVector3Normalize(vecDirection));
-		XMVECTOR vecExhaustDirection = XMVector3Normalize(XMVectorAdd(vecDirection, XMVector3Normalize(XMVectorSubtract(vecPosition, vecPreviousPosition))));
+		XMVECTOR vecExhaustOffset = XMVectorMultiply(XMVectorReplicate(kfExhaustOffset), vecDirection);
+		XMVECTOR vecExhaustDirection = common::LerpDirection(vecDirection, XMVector3Normalize(XMVectorSubtract(vecPosition, vecPreviousPosition)), 0.5f);
 		auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(XMVectorAdd(vecPosition, vecExhaustOffset), vecExhaustDirection, 0.0f, fLength, fWidth);
 
 		// Intensity varies from 50% at min length to 100% at max length
@@ -122,7 +122,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 	if ((uiSmokeTrail.uuid.iValue != 0) && !(flags & kFalling))
 	{
 		float fTrailOffset = kfTrailOffset;
-		XMVECTOR vecTrailOffset = XMVectorMultiply(XMVectorReplicate(fTrailOffset), XMVector3Normalize(vecDirection));
+		XMVECTOR vecTrailOffset = XMVectorMultiply(XMVectorReplicate(fTrailOffset), vecDirection);
 		XMVECTOR vecTrailPosition = XMVectorAdd(vecPosition, (lifecycleFlags & engine::LifecycleFlags::kDying) ? XMVectorZero() : vecTrailOffset);
 		SynchronizeMissileTrail(rFrameInterpolate, uiSmokeTrail, vecTrailPosition);
 	}

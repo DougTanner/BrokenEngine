@@ -283,7 +283,10 @@ adding the fields below; the other entries are its own commands. For the engine
   type, on a `SpawnExplosion` `iTrailCount` below 0 or
   `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
   exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a `navigationDelay` or
-  `navigationDelaySeconds` outside `[0,60]`, on a `nextBlasterFireTime`
+  `navigationDelaySeconds` outside `[0,60]`, on a ship spawn whose
+  `vecDirection` is not a horizontal unit vector within
+  `kfShipHeadingUnitTolerance` (`IsShipHeadingUnit`, `ShipBehaviours.h`), on a
+  `nextBlasterFireTime`
   outside `[0,kBlasterFireInterval]`,
   and on a `DestroyShip` whose `iUuid` names a fleet-controlled Battleship in
   its `coord`'s current frame. The command makes no terrain check; a blaster

@@ -57,6 +57,13 @@ AreaVertices XM_CALLCONV CalculateArea(FXMVECTOR vecPosition, FXMVECTOR vecDirec
 XMVECTOR XM_CALLCONV RotateTowardsPercent(FXMVECTOR vecDirection, FXMVECTOR vecTowards, float fPercent);
 XMVECTOR XM_CALLCONV RandomAngleJitter(FXMVECTOR vecDirection, float fMaximumJitter, RandomEngine& rRandomEngine);
 
+// Unit-vector operations: each returns its result renormalized, because the operation or its float rounding can change
+// the length and repeated use would drift it.
+XMVECTOR XM_CALLCONV RotateDirectionAboutZ(FXMVECTOR vecDirection, float fAngle);
+XMVECTOR XM_CALLCONV ReflectDirection(FXMVECTOR vecDirection, FXMVECTOR vecNormal);
+XMVECTOR XM_CALLCONV LerpDirection(FXMVECTOR vecFrom, FXMVECTOR vecTo, float fPercent);
+XMVECTOR XM_CALLCONV TransformDirection(FXMVECTOR vecDirection, FXMMATRIX matTransform);
+
 // Generate random XY offset in range [-JITTER, +JITTER] for each component
 template<float JITTER>
 inline XMVECTOR XM_CALLCONV RandomXYJitter(RandomEngine& rRandomEngine)

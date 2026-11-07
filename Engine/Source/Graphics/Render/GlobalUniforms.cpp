@@ -50,21 +50,18 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 {
 	// Sun/Moon direction: night reverses across the sky from sunset back to sunrise
 	float fDirectionAngle = fSunAngle < XM_PI ? fSunAngle : XM_2PI - fSunAngle;
-	XMVECTOR vecSunMoonNormal = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMMATRIX matSunRotation = XMMatrixRotationY(-fDirectionAngle);
-	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunRotation);
-	glm::quat sunRotation = glm::angleAxis(gSunMoonNormalTilt.mfCurrent, glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::vec3 sunMoonDirection = sunRotation * glm::vec3(XMVectorGetX(vecSunMoonNormal), XMVectorGetY(vecSunMoonNormal), XMVectorGetZ(vecSunMoonNormal));
-	vecSunMoonNormal = XMVector4Normalize(XMVectorSet(sunMoonDirection.x, sunMoonDirection.y, sunMoonDirection.z, 0.0f));
+	XMMATRIX matSunRotation = XMMatrixMultiply(XMMatrixRotationY(-fDirectionAngle), XMMatrixRotationX(gSunMoonNormalTilt.mfCurrent));
+	XMVECTOR vecSunMoonNormal = common::TransformDirection(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), matSunRotation);
 	XMStoreFloat4(&rGlobalLayout.f4SunMoonNormal, vecSunMoonNormal);
-	glm::vec3 modelSunMoonDirection = gpCamera->mModelSunRotation * sunMoonDirection;
-	XMVECTOR vecModelSunMoonNormal = XMVector4Normalize(XMVectorSet(modelSunMoonDirection.x, modelSunMoonDirection.y, modelSunMoonDirection.z, 0.0f));
+	const glm::quat& rModelSunRotation = gpCamera->mModelSunRotation;
+	XMVECTOR vecModelSunMoonNormal = common::TransformDirection(vecSunMoonNormal, XMMatrixRotationQuaternion(XMVectorSet(rModelSunRotation.x, rModelSunRotation.y, rModelSunRotation.z, rModelSunRotation.w)));
 	XMStoreFloat4(&rGlobalLayout.f4ModelSunMoonNormal, vecModelSunMoonNormal);
 
 	// Uniform-only sun-normal products folded here (both need the finished sun/moon normal): Terrain.frag's
 	// snow sun-normal tilt (fTerrainSnowBlend * normal) and Water.frag's skybox biased sun normal.
 	XMStoreFloat4(&rGlobalLayout.f4TerrainSnowSunNormal, XMVectorScale(vecSunMoonNormal, gTerrainSnowBlend.mfCurrent));
-	XMVECTOR vecBiasedSunNormal = XMVector3Normalize(XMVectorAdd(vecSunMoonNormal, XMVectorSet(0.0f, 0.0f, gLightingWaterSkyboxSunBias.mfCurrent, 0.0f)));
+	float fSunBias = gLightingWaterSkyboxSunBias.mfCurrent;
+	XMVECTOR vecBiasedSunNormal = common::LerpDirection(vecSunMoonNormal, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), fSunBias / (1.0f + fSunBias));
 	XMStoreFloat4(&rGlobalLayout.f4WaterBiasedSunNormal, vecBiasedSunNormal);
 
 	return vecSunMoonNormal;

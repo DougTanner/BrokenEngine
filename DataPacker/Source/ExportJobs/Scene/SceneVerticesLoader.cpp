@@ -169,12 +169,16 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 			// Without a skeleton nothing poses these vertices at runtime - the static shader applies no matrix -
 			// so every primitive bakes here, JOINTS_0 or not, or one model would ship two vertex-space conventions
 			vecPosition = XMVector4Transform(vecPosition, rMatMeshWorld);
-			vecNormal = XMVector3TransformNormal(vecNormal, matNormal);
+			vecNormal = common::TransformDirection(vecNormal, matNormal);
 		}
-		// With a skeleton the vertices stay mesh-local: runtime skinning or node matrices place them
+		else
+		{
+			// With a skeleton the vertices stay mesh-local: runtime skinning or node matrices place them
+			vecNormal = XMVector3Normalize(vecNormal);
+		}
 
 		XMStoreFloat3(&rVertex.f3Pos, vecPosition);
-		XMStoreFloat3(&rVertex.f3Normal, XMVector3Normalize(vecNormal));
+		XMStoreFloat3(&rVertex.f3Normal, vecNormal);
 		RequireFiniteComponents(std::array {rVertex.f3Normal.x, rVertex.f3Normal.y, rVertex.f3Normal.z}, "NORMAL", iPrimitive, j);
 
 		if (pfTangents != nullptr)
@@ -182,12 +186,16 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 			auto vecTangent = XMVectorSet(pfTangents[j * iTangentStride], pfTangents[j * iTangentStride + 1], pfTangents[j * iTangentStride + 2], 0.0f);
 			if (!bHasSkeleton)
 			{
-				// XMVector3TransformNormal applies the matrix itself, the forward transform a surface direction takes
-				vecTangent = XMVector3TransformNormal(vecTangent, rMatMeshWorld);
+				// The mesh-world matrix itself, not its inverse transpose: the forward transform a surface direction takes
+				vecTangent = common::TransformDirection(vecTangent, rMatMeshWorld);
+			}
+			else
+			{
+				vecTangent = XMVector3Normalize(vecTangent);
 			}
 			// A mirroring matrix flips the baked normal's side of the tangent-bitangent plane, so the bitangent sign flips with it
 			float fBitangentSign = bMirrored ? -pfTangents[j * iTangentStride + 3] : pfTangents[j * iTangentStride + 3];
-			XMStoreFloat4(&rVertex.f4Tangent, XMVectorSetW(XMVector3Normalize(vecTangent), fBitangentSign));
+			XMStoreFloat4(&rVertex.f4Tangent, XMVectorSetW(vecTangent, fBitangentSign));
 			RequireFiniteComponents(std::array {rVertex.f4Tangent.x, rVertex.f4Tangent.y, rVertex.f4Tangent.z, rVertex.f4Tangent.w}, "TANGENT", iPrimitive, j);
 		}
 

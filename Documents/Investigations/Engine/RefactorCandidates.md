@@ -10,6 +10,7 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-07 claude/35f31600-f877-4044-86d4-1d7c6ccb9721 — refactor observation: Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp:466 — the AI direction is named both `Ai…` (`pVecAiDirections`, `AimAiDirection`, `ShipFlags::kNoAiDirection`) and `ArtificialIntelligence…` (`rVecArtificialIntelligenceDirection`, `ComputeArtificialIntelligenceSteering`); now that `Documents/C++StyleGuide.txt` rule 56 approves `Ai`, rename the long forms so one concept has one name
 - 2026-11-06 claude/2ea16005-f59e-4086-a845-0c0236be3a46 — size observation: `Engine/Data/Shaders/Model/Model.frag` is 5,177 `bt-token-v1`, over the ~5,000 report line; splitting it via `ShaderFunctions.h` or `*Common.h` is follow-up work.
 - 2026-11-06 claude/bce2711e-800d-4a71-886c-78431dc6cb86 — DataPacker/Source/ExportJobs/ExportJob.cpp:139 —
   Compute every job's content key in one place, inside `ExportJob::CheckDirty` under the existing fingerprint catch,

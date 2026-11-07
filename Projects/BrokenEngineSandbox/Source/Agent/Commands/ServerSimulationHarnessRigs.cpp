@@ -246,7 +246,7 @@ static void ValidateInjectedPosition(FXMVECTOR vecPosition)
 }
 
 // Seats the spawn defaults, parses the entry over them, and rejects an outside position, which QueueSpawn asserts on,
-// and a ship navigation delay the frame read would reject.
+// and a ship navigation delay or heading the frame read would reject.
 template <typename SPAWN_INFO>
 static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& rChange, [[maybe_unused]] engine::GridCoord coordinate)
 {
@@ -279,6 +279,10 @@ static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& r
 		if (!IsNavigationDelayInRange(rData.navigationDelay.count()))
 		{
 			throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(SPAWN_INFO, navigationDelay)::kName));
+		}
+		if (!IsShipHeadingUnit(rData.vecDirection))
+		{
+			throw std::runtime_error(std::format("'{}' must be a horizontal unit vector", FRAME_COLUMN(SPAWN_INFO, vecDirection)::kName));
 		}
 	}
 	return rData;
