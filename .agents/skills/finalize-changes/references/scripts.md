@@ -41,9 +41,9 @@ from earlier command text or the dispatch brief. `<session-label>` is the
 identical value to every command below that takes `-SessionLabel`.
 
 ```text
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPaths '<path>,<path>' -CommitMessageFile '<message-file>'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCandidateCommit.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -Baseline '<baseline>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -OwnedPathsFile 'Temp/finalize-owned-paths.txt' -CommitMessageFile '<message-file>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeApprovalPreparation.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' > 'Temp/finalize-approval-preparation-result.json'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' -OwnedPaths '<path>,<path>' > 'Temp/finalize-primary-movement-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizePrimaryMovementCheck.ps1 -CurrentWorktree '<session>' -PrimaryWorktree '<primary>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -CandidateCommit '<candidate-commit>' -CandidateTree '<candidate-tree>' -CandidateParent '<candidate-parent>' > 'Temp/finalize-primary-movement-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
@@ -82,8 +82,9 @@ JSON result. The schema version is
 - `candidate` is `{commit,tree,parent}`, with each member individually nullable.
   `tips` is `{session,livePrimary,relation}`.
 - `ownedPaths` and `foreignCommits` are evidence objects
-  `{totalCount,items,truncated}`. `ownedPaths.items` contains normalized
-  relative POSIX paths. `foreignCommits.items` contains foreign commit
+  `{totalCount,items,truncated}`. `ownedPaths.items` contains the normalized
+  relative POSIX paths the candidate commit changes against
+  `candidate.parent`. `foreignCommits.items` contains foreign commit
   identities ordered oldest-to-newest; the aggregate changed-path manifest is
   in `changes`.
 - `changes` is `{totalCount,items,truncated,overlapPaths}`. Each evidence
@@ -92,8 +93,9 @@ JSON result. The schema version is
   the overlap paths, computed over every changed path.
 - Path collections are ordinal-sorted and deduplicated. Foreign commit items
   retain oldest-to-newest order, and change rows sort by the tuple
-  `(path,status,oldMode,newMode)`. Every bounded collection has a cap of 500;
-  truncation sets its `truncated` field and blocks the result with
+  `(path,status,oldMode,newMode)`. `ownedPaths` is never capped, so its
+  `truncated` is always false. Every other bounded collection has a cap of
+  500; truncation sets its `truncated` field and blocks the result with
   `primary.evidence-truncated` rather than allowing partial evidence to
   proceed.
 
@@ -115,10 +117,10 @@ reconstructs the assessment from Git output.
   paths, preserves disjoint state, and accepts an owned path whose index and
   worktree copies merely differ, landing its on-disk bytes and re-staging them;
   an owned path left unmerged (a conflict stage in the index) still blocks with
-  `git.owned-path-mixed-state` and a message naming the remedy. `pwsh -File`
-  hands every argument over as one literal string, so several owned paths can
-  only travel as one comma-separated `-OwnedPaths` token. `-OwnedPaths` carries
-  the session's full caller-owned landing set, never a hand-trimmed subset: an
+  `git.owned-path-mixed-state` and a message naming the remedy.
+  `-OwnedPathsFile` names a `Temp/` file the worker writes, BOM-less UTF-8 with
+  each repository-relative path followed by one LF, holding the session's full
+  caller-owned landing set, never a hand-trimmed subset: an
   entry already committed as a deletion is a satisfied no-op, so a
   re-preparation dispatch passes the same set unchanged. A path found in neither
   the baseline tree nor the expected-tip tree nor the worktree still blocks with

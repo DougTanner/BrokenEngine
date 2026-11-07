@@ -118,9 +118,9 @@ function Get-InventoryDocument() {
 	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
 	if ($IncludeUntracked) {
 		# The inventory reports an untracked path only when the caller lists it, so the pass-through
-		# switch supplies the whole untracked set in the comma-separated form that script splits.
+		# switch asks it to list every untracked path; the hygiene check enumerates the same set for itself.
 		$script:UntrackedPaths = @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
-		if ($script:UntrackedPaths.Count -gt 0) { $arguments += @('-IncludeUntracked', ($script:UntrackedPaths -join ',')) }
+		$arguments += '-IncludeAllUntracked'
 	}
 	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) $arguments $script:Root
 	$document = $null

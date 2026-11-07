@@ -9,7 +9,7 @@ param(
 	[Parameter(Mandatory)][string] $Baseline,
 	[Parameter(Mandatory)][string] $ExpectedCurrentTip,
 	[Parameter(Mandatory)][string] $ExpectedPrimaryTip,
-	[Parameter(Mandatory)][string[]] $OwnedPaths,
+	[Parameter(Mandatory)][string] $OwnedPathsFile,
 	[Parameter(Mandatory)][string] $CommitMessageFile
 )
 $ErrorActionPreference = 'Stop'; Set-StrictMode -Version Latest
@@ -57,8 +57,7 @@ function Assert-HistoryTreeUnchanged([string]$Root,[string]$Base,[string]$Tip) {
 
 try {
 	if(-not(Test-Path -LiteralPath $CommitMessageFile -PathType Leaf)){Stop-Candidate 1 'input.message-missing' 'CommitMessageFile must be an existing ordinary file.'};foreach($h in @($Baseline,$ExpectedCurrentTip,$ExpectedPrimaryTip)){if($h-cnotmatch'^[0-9a-f]{8,40}\z'){Stop-Candidate 1 'input.commit-invalid' 'Baseline and expected tips must be 8 to 40 lowercase hexadecimal object ID characters.'}}
-	# `pwsh -File` hands every argument over as one literal string, so several owned paths can only travel as one comma-separated token.
-	$declared=@(@($OwnedPaths)|ForEach-Object{$_ -split ','}|ForEach-Object{Normalize-Path $_}|Sort-Object -Unique);$result.ownedPaths=$declared;$current=[IO.Path]::GetFullPath($CurrentWorktree).TrimEnd('\','/');$primary=[IO.Path]::GetFullPath($PrimaryWorktree).TrimEnd('\','/');Assert-CheckoutIdentity $current $primary;$head=(Invoke-Git $current @('rev-parse','HEAD')).Trim();$primaryHead=(Invoke-Git $primary @('rev-parse','HEAD')).Trim();$result.tips.current=$head;$result.tips.primary=$primaryHead
+	$declared=@([IO.File]::ReadAllLines($OwnedPathsFile)|ForEach-Object{Normalize-Path $_}|Sort-Object -Unique);$result.ownedPaths=$declared;$current=[IO.Path]::GetFullPath($CurrentWorktree).TrimEnd('\','/');$primary=[IO.Path]::GetFullPath($PrimaryWorktree).TrimEnd('\','/');Assert-CheckoutIdentity $current $primary;$head=(Invoke-Git $current @('rev-parse','HEAD')).Trim();$primaryHead=(Invoke-Git $primary @('rev-parse','HEAD')).Trim();$result.tips.current=$head;$result.tips.primary=$primaryHead
 	# Only abbreviated inputs are expanded, here, so every later comparison against Git output reads a full ID; a full 40-character input keeps the unchanged path that never resolved it.
 	$expanded=@();foreach($h in @($Baseline,$ExpectedCurrentTip,$ExpectedPrimaryTip)){if($h.Length-eq 40){$expanded+=$h;continue};$x=Invoke-Native $current 'git.exe' @('-C',$current,'rev-parse','--verify','--quiet',"$h^{commit}");$t=$x.Stdout.Trim();if($x.ExitCode-ne 0-or$t-cnotmatch'^[0-9a-f]{40}\z'){Stop-Candidate 1 'input.commit-invalid' "Commit input '$h' does not resolve to exactly one commit."};$expanded+=$t};$Baseline=$expanded[0];$ExpectedCurrentTip=$expanded[1];$ExpectedPrimaryTip=$expanded[2];$result.baseline=$Baseline;$result.tips.expectedCurrent=$ExpectedCurrentTip;$result.tips.expectedPrimary=$ExpectedPrimaryTip
 	if($head-cne$ExpectedCurrentTip-or$primaryHead-cne$ExpectedPrimaryTip){Stop-Candidate 2 'git.tip-changed' 'Session or primary tip changed before candidate creation.'};$owned=$declared;if($owned.Count-eq 0){Stop-Candidate 1 'input.owned-paths-empty' 'At least one caller-owned path is required.'};$alreadyDeleted=@(Assert-LiteralPathEntries $current $ExpectedCurrentTip $Baseline $owned)

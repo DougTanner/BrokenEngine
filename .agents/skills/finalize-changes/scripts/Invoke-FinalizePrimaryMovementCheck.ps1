@@ -7,8 +7,7 @@ param(
 	[string] $PrimaryBranch,
 	[string] $CandidateCommit,
 	[string] $CandidateTree,
-	[string] $CandidateParent,
-	[string[]] $OwnedPaths
+	[string] $CandidateParent
 )
 
 $ErrorActionPreference = 'Stop'
@@ -110,28 +109,6 @@ function Get-OrdinalUnique([object[]] $Values) {
 	return $list.ToArray()
 }
 
-function Get-OwnedPathList([string[]] $InputPaths) {
-	$values = @()
-	if ($null -ne $InputPaths) { $values = @($InputPaths) }
-	if ($values.Count -eq 0) { Throw-Input 'OwnedPaths must contain at least one canonical repository-relative path.' }
-	$set = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($value in $values) {
-		if ($null -eq $value) { Throw-Input 'OwnedPaths contains a null path.' }
-		$pieces = ([string] $value).Split(',', [StringSplitOptions]::None)
-		foreach ($piece in $pieces) {
-			if ([string]::IsNullOrEmpty($piece)) { Throw-Input 'OwnedPaths contains an empty comma-array element.' }
-			try { Assert-FinalizeGitPath $piece }
-			catch { Throw-Input "OwnedPaths contains an invalid path '$piece'." }
-			[void] $set.Add($piece)
-		}
-	}
-	if ($set.Count -eq 0) { Throw-Input 'OwnedPaths must contain at least one canonical repository-relative path.' }
-	$list = [Collections.Generic.List[string]]::new()
-	foreach ($path in $set) { $list.Add($path) }
-	$list.Sort([StringComparer]::Ordinal)
-	return $list.ToArray()
-}
-
 function Invoke-GitAssessment([string] $Root, [string[]] $Arguments, [string] $Operation) {
 	try { return Invoke-FinalizeNativeText 'git.exe' (@('-C', $Root) + $Arguments) $Root }
 	catch { Throw-Assessment "${Operation} could not start: $($_.Exception.Message)" }
@@ -200,8 +177,8 @@ function Test-ZeroObject([string] $ObjectId) {
 	return $ObjectId -match '^0+\z'
 }
 
-function Get-RawChanges([string] $Root, [string] $Parent, [string] $LivePrimary) {
-	$response = Invoke-GitAssessment $Root @('diff', '--raw', '--no-renames', '-z', $Parent, $LivePrimary) 'raw change enumeration'
+function Get-RawChanges([string] $Root, [string] $Parent, [string] $Target) {
+	$response = Invoke-GitAssessment $Root @('diff', '--raw', '--no-renames', '-z', $Parent, $Target) 'raw change enumeration'
 	if ($response.ExitCode -ne 0) { Throw-Assessment "raw change enumeration failed: $($response.Stderr.Trim())" }
 	if ([string]::IsNullOrEmpty($response.Stdout)) { return @() }
 	$tokens = $response.Stdout.Split([char] 0)
@@ -273,7 +250,7 @@ function Set-Evidence([object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) 
 	}
 	return [pscustomobject]@{
 		OverlapPaths = $overlapPaths
-		Truncated = ($script:Result.ownedPaths.truncated -or $script:Result.foreignCommits.truncated -or $script:Result.changes.truncated -or
+		Truncated = ($script:Result.foreignCommits.truncated -or $script:Result.changes.truncated -or
 			$script:Result.changes.overlapPaths.truncated)
 	}
 }
@@ -295,9 +272,6 @@ try {
 	if (-not $session.CommonDirectory.Equals($primary.CommonDirectory, [StringComparison]::OrdinalIgnoreCase)) { Throw-Input 'Session and primary worktrees must share one common Git repository.' }
 	if ($session.Branch -cne $CurrentBranch -or $primary.Branch -cne $PrimaryBranch) { Throw-Input 'Checked-out branch identity does not match the supplied branch.' }
 
-	$owned = Get-OwnedPathList $OwnedPaths
-	$script:Result.ownedPaths = New-Evidence $owned
-
 	Assert-ExactHashInput $CandidateCommit 'CandidateCommit'
 	Assert-ExactHashInput $CandidateTree 'CandidateTree'
 	Assert-ExactHashInput $CandidateParent 'CandidateParent'
@@ -315,8 +289,9 @@ try {
 	$parents = @(Get-CandidateParent $session.Worktree $CandidateCommit)
 	if (@($parents).Count -ne 1 -or $parents[0] -cne $CandidateParent) { Throw-Blocked 'candidate.parent-mismatch' 'Candidate commit does not have the supplied sole parent.' }
 
-	$script:Result.ownedPaths = New-Evidence $owned
-	if ($script:Result.ownedPaths.truncated) { Throw-Blocked 'primary.evidence-truncated' 'Owned path evidence exceeds the 500-item cap.' }
+	$owned = @(Get-OrdinalUnique @(Get-RawChanges $session.Worktree $CandidateParent $CandidateCommit | ForEach-Object { $_.path }))
+	if ($owned.Count -eq 0) { Throw-Input 'Candidate commit changes no paths against its parent.' }
+	$script:Result.ownedPaths = [ordered]@{ totalCount = $owned.Count; items = $owned; truncated = $false }
 	if ($livePrimary -ceq $CandidateParent) {
 		$script:Result.tips.relation = 'equal'
 		Complete-Result 0 'pass' 'ok' 'Primary remains at the candidate parent.'
