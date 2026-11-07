@@ -21,7 +21,7 @@ This table is the authoritative spawned-agent routing policy; native role defini
 | `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
-| `builder` | Haiku | high | `/compile`, which owns the return contract |
+| `builder` | Haiku | high | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
 | `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
@@ -173,7 +173,7 @@ At Tier 3 main only decides and interviews from the `implementer` and `locator` 
 
 Order: the acceptance checks the execution card marks `before the first edit` run first, on the unedited tree; then the slices run in parallel; `/update-affected-code` runs after them.
 
-- `builder` runs `/compile` for the unedited-tree build a check marked `before the first edit` needs — when it needs one.
+- `builder` runs `/compile` for the unedited-tree build a check marked `before the first edit` needs — when it needs one; a check whose steps interleave file edits with builds follows the `/compile` `## Purpose` exception instead.
 - `implementer` records each acceptance check the execution card marks `before the first edit`, on the unedited tree — a card with none adds no step.
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
 - `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
@@ -206,11 +206,12 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 after them; `/verify-external-claims` runs whenever a review or
 `/resolve-findings` handoff raises requests, before main decides the dependent
 finding or resolution; `/resolve-findings` runs after each finding main accepts,
-followed by re-review and retest of the affected regions only; a second round
-needs a reproducible blocker; `/external-diagnose-bug` runs before any further
-`/resolve-findings` attempt on a cause whose fix failed its retest, and its
-proven cause returns to `/resolve-findings` or a plan. Whenever the
-`/over-engineering-review` validator or a `/resolve-findings` round changed
+followed by re-review and retest of the affected regions only; a reviewer with
+no accepted finding whose region a fix changed reruns as a fresh first-round
+pass; a second round needs a reproducible blocker; `/external-diagnose-bug` runs
+before any further `/resolve-findings` attempt on a cause whose fix failed its
+retest, and its proven cause returns to `/resolve-findings` or a plan. Whenever
+the `/over-engineering-review` validator or a `/resolve-findings` round changed
 C++, `/code-style-review` runs over the newly changed ranges and `/compile`
 builds its `Build required`, as in Step 5, and only then do `/repo-code-review`
 and `/comment-review` start, after a round as that round's

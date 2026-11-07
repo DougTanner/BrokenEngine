@@ -8,9 +8,10 @@ allowed-tools: [PowerShell]
 
 ## Purpose
 
-Builds the requested targets through the current checkout's WorktreeCli
-executable and returns each build's structured result. Runs solely inside one
-delegated `builder`; separate-role requirements return to the manager.
+Builds requested targets via WorktreeCli and returns each build's structured
+result in one delegated `builder`; a dispatch assigned an execution-card
+acceptance check whose steps interleave file edits with builds runs these builds
+itself.
 
 ## When to use
 
@@ -71,6 +72,9 @@ skill-specific inputs:
   [references/clang-tidy-mode.md](references/clang-tidy-mode.md)
   `## Authorization and when to use`.
 
+A dispatch that runs this skill under the `## Purpose` exception receives these
+inputs for its builds in its own brief.
+
 ## Handoff
 
 Return the shared handoff form in
@@ -94,8 +98,26 @@ the execution and result discipline in
 - `Residuals` — one row per failed or skipped required build, counting
   `complete: false` as a failure; `none` when absent.
 
-`Changed files` and `Build required` are `none` because this skill changes no
-tracked file; the envelope file is ignored `Temp/` output.
+A `builder`'s `Changed files` and `Build required` are `none` because this skill
+changes no tracked file; the envelope file is ignored `Temp/` output.
+
+When an execution-card acceptance check has its assigned dispatch run this
+skill inside that dispatch's own task, as `## Purpose` routes, the decisive
+field is the per-build `Decisive checks` row above. That dispatch adds one row
+per build under its own shared `Decisive checks` — whether the expected
+observation was met, that run's `Status`, and the build's per-build row — plus
+one row summarizing the resulting working-tree state, never pasting
+`git status --porcelain` output inline. It writes every build's complete
+handoff, not only past the character cap, to one gitignored `Temp/` file with
+one `## Run <n>` heading per build, by the overflow rule in
+[`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`;
+that handoff counts as that build's complete `/compile` handoff for landing. A
+running skill whose own `## Handoff` declares a field for the run's result puts
+that run's row there instead of under `Decisive checks`; one that also places
+each run's complete handoff follows its own placement instead of those
+per-build `Decisive checks` rows and this `Temp/` file. The dispatch reports
+its own `Changed files` and `Build required` instead of the `none` values
+above; an `/implement-plan` slice keeps returning `Build required`.
 
 ## References
 
