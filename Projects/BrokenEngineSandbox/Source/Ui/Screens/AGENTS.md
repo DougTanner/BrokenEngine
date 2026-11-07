@@ -16,10 +16,10 @@ runtime contracts of the screens that remain here.
 - Screen bodies are client-only. `HudScreen.h` is listed in the server project for IDE visibility and guards its client-only members internally, so screen headers must remain parseable in their project affinity.
 - Screens gate themselves from authoritative game/UI state (`../../../../../Engine/Source/Ui/Screens/AGENTS.md` `## Standard Menu Contract`).
 - Networked controls remain disabled through `NetworkUiControl` until authoritative
-  state resolves the request. Fleet Fighter/Omni [x] controls are keyed by stable
-  member ID. The owned-entity death event clears pending; authoritative fleet
-  sync prunes controls for IDs absent from every fleet, and fleet-selection reset
-  clears all controls.
+  state resolves the request. The fleet Fighter/Omni [x] controls share one
+  pending mark and the spawn-into-fleet buttons another; each clears at the next
+  fleet sync the client applies (`FleetSelection::miAppliedFleetSyncCount`) and
+  resets with fleet selection.
 - While the server plays a replay, the HUD disables every control that sends a simulation-affecting request; fleet and member focus change only subscriptions and stay enabled. The server refuses those requests during playback regardless, so this gating keeps players from sending requests that do nothing.
 - The left panel draws one box per squadron (`../../Network/Server/AGENTS.md`
   `## State Ownership`). It filters the unchanged `Fleet::members` per box,

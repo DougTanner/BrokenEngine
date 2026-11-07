@@ -53,6 +53,9 @@ struct HeadingMovementConstants
 // A ship's stored flight plane while it climbs between planes.
 inline constexpr uint8_t kuiNoFlightPlane = 255;
 
+// Every ship type climbs at this fraction of its maximum speed.
+inline constexpr float kfShipClimbSpeedFraction = 0.25f;
+
 // Firing and target picking test line of sight on this clearance tier's graphs for every shooter; movement decisions use
 // the ship type's own tier (ShipTypeClearanceTier, TerrainUtils.h).
 inline constexpr int64_t kiFiringClearanceTier = 0;
@@ -75,17 +78,26 @@ inline constexpr float kfOmniPatrolRadius = 100.0f;
 [[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
 // True on a plane without kTerrainCollision.
 [[nodiscard]] bool SkipsTerrainContact(float fHeight);
+// A dying Fighter or Omni at fHeight takes terrain contact: off an exact plane without terrain collision, and its
+// NavigationFlightPlane has terrain collision.
+[[nodiscard]] bool TakesDeathTerrainContact(float fHeight, int64_t iTargetPlane);
 // Tier iClearanceTier's graph on the plane. The empty graph stands in on a plane the tier has no graph on,
 // kuiNoFlightPlane included, and in a client cell whose static data has not arrived, which holds no graphs.
 [[nodiscard]] const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane);
-// Moves Z toward the ordered plane, or the upper plane while the lower clearance graph blocks descent at vecPosition.
-// Moves at most fClimbRate times the delta and lands on the effective ship height; W is untouched. Stores the plane on
-// arrival and kuiNoFlightPlane in transit.
-[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, int64_t iClearanceTier, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
+// Moves fHeight toward fTargetHeight by at most fStep, landing exactly on it within one step; rbArrived: it landed.
+[[nodiscard]] float StepHeightTowards(float fHeight, float fTargetHeight, float fStep, bool& rbArrived);
+// Moves Z toward the ordered plane, or the upper plane while the type's lower clearance graph blocks descent at
+// vecPosition. Moves at most fClimbRate times the delta and lands on the effective ship height; W is untouched. Stores
+// the plane on arrival and kuiNoFlightPlane in transit.
+[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
 
-// Raises a type that allows the next plane to terrain plus the lowest plane's clearance, without changing XY/W.
-// A raised position stores its exact effective plane, or kuiNoFlightPlane between or above planes.
-[[nodiscard]] XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane);
+// Raises vecPosition to terrain plus the lowest plane's clearance, without changing XY/W; a raised position stores
+// kuiNoFlightPlane, and the next ClimbTowardsFlightPlane arrival stores its plane.
+[[nodiscard]] XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane);
+
+// vecBase's XY plus vecOffset's XY rotated by the horizontal unit vecHeadingDirection, whose (x, y) is the yaw's
+// (cos, sin); Z and W are zero.
+[[nodiscard]] XMVECTOR XM_CALLCONV RotateByHeading(FXMVECTOR vecHeadingDirection, FXMVECTOR vecOffset, FXMVECTOR vecBase);
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 

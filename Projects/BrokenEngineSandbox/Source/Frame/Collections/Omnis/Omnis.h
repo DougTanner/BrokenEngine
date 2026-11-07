@@ -50,8 +50,7 @@ inline constexpr float kfOmniMaximumSpeed = 33.33f;
 inline constexpr float kfOmniCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfOmniJitterRange = 0.60f;
 
-inline constexpr float kfOmniClimbPercentage = 0.25f;
-inline constexpr float kfOmniClimbRate = kfOmniMaximumSpeed * kfOmniClimbPercentage;
+inline constexpr float kfOmniClimbRate = kfOmniMaximumSpeed * kfShipClimbSpeedFraction;
 inline constexpr int64_t kiOmniHighestFlightPlane = 1;
 static_assert(kiOmniHighestFlightPlane < std::ssize(kFlightPlanes));
 
@@ -218,8 +217,9 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
 	// Reject an out-of-range navigation delay too, which no navigation-delay admission accepts, an unknown controller, which
-	// selects no script, a target flight plane the type disallows, which no controller writes, and an AI direction failing
-	// IsShipHeadingValid, since every simulation write and ship spawn stores a horizontal unit vector.
+	// selects no script, a target flight plane the type disallows, which no controller writes, an AI direction failing
+	// IsShipHeadingValid, since every simulation write and ship spawn stores a horizontal unit vector, and a client GUID or
+	// global ID on a row that is not fleet-controlled, which only a fleet spawn writes.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -239,6 +239,14 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			if (rCurrent.pController[i] >= ShipController::kCount)
 			{
 				throw std::ios_base::failure("OmnisPostRender pController");
+			}
+			if (rCurrent.pClientGuids[i] != engine::ClientGuid {} && rCurrent.pController[i] != ShipController::kFleet)
+			{
+				throw std::ios_base::failure("OmnisPostRender pClientGuids");
+			}
+			if (rCurrent.pGlobalIds[i] != engine::GlobalId {} && rCurrent.pController[i] != ShipController::kFleet)
+			{
+				throw std::ios_base::failure("OmnisPostRender pGlobalIds");
 			}
 			if (!IsFlightPlaneAllowed(ShipType::kOmni, GetTargetFlightPlane(rCurrent.pOrders[i])))
 			{
@@ -370,7 +378,7 @@ public:
 		// so none of them is listed.
 		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return {};
 		}
 	};
 

@@ -185,15 +185,12 @@ static void RenderFleetMemberRow(const FleetMember& rMember, int64_t iRowNumber)
 		if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
 		{
 			bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rMember.globalId);
-			// Heap: one pending control per stable fleet member, pruned on fleet sync or selection reset.
-			ScopedSuppressAllocationTracking suppress;
-			engine::NetworkUiControl<bool>& rDestroyControl = gpGame->mFleetSelection.mDestroyMemberControls.try_emplace(rMember.globalId.iValue).first->second;
-			rDestroyControl.Update(bOwnedEntityPresent);
+			engine::NetworkUiControl<int64_t>& rDestroyToggle = gpGame->mFleetSelection.mDestroyMemberToggle;
 			ImGui::SameLine();
-			ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+			ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 			if (ImGui::Button("[x]##DestroyMember", ImVec2(fDestroyButtonWidth, 0.0f)))
 			{
-				rDestroyControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				rDestroyToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendDestroyFleetMemberRequest(rMember.globalId);
 			}
 			ImGui::EndDisabled();
@@ -278,7 +275,8 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	{
 		ImGui::Separator();
 
-		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
+		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(gpGame->mFleetSelection.miAppliedFleetSyncCount);
+		gpGame->mFleetSelection.mDestroyMemberToggle.Update(gpGame->mFleetSelection.miAppliedFleetSyncCount);
 
 		// Above the member list, so a spawn's new row never moves these buttons
 		struct SpawnButton

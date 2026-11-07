@@ -2,8 +2,6 @@
 
 #include "Network/Server/ServerSession.h"
 
-#include "Network/NetworkCursor.h"
-
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/ServerCellStats.h"
@@ -42,9 +40,8 @@ static float AdmitNavigationDelay(float fDelay)
 	return fDelay;
 }
 
-static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
+static ShipType AdmitShipTypeByte(uint8_t uiValue)
 {
-	uint8_t uiValue = engine::ReadUint8(pCursor);
 	if (uiValue >= std::to_underlying(ShipType::kCount))
 	{
 		engine::NetworkMessages::ThrowCorruptStream("ServerSession ship type byte");
@@ -70,23 +67,22 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 	{
 		case GamePacketType::kClientCreateFleetRequest:
 		{
+			GameMessages::CreateFleetRequestMessage message;
+			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
 			mpFleetManager->mPendingCreateFleetRequests.push_back({.iClientId = rPacket.iClientId});
 			break;
 		}
 		case GamePacketType::kClientSpawnIntoFleetRequest:
 		{
-			// 16B fleetGuid + 1B ShipType = 17 bytes (type byte already stripped)
-			const uint8_t* pCursor = rPacket.payload.data();
-			FleetGuid fleetGuid {};
-			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
-			fleetGuid.uiLow = engine::ReadUint64(pCursor);
-			ShipType eType = ReadShipTypeByte(pCursor);
+			GameMessages::SpawnIntoFleetRequestMessage message;
+			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
+			ShipType eType = AdmitShipTypeByte(message.uiShipType);
 			// A fleet's one Battleship is made with the fleet.
 			if (eType == ShipType::kBattleship)
 			{
 				engine::NetworkMessages::ThrowCorruptStream("ServerSession spawn-into Battleship type");
 			}
-			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .eType = eType});
+			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = message.fleetGuid, .eType = eType});
 			break;
 		}
 		case GamePacketType::kClientDestroyFleetMemberRequest:
@@ -102,14 +98,11 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 		}
 		case GamePacketType::kClientFleetNavigationDelay:
 		{
-			// 16B fleetGuid + 4B delay = 20 bytes (type byte already stripped)
-			const uint8_t* pCursor = rPacket.payload.data();
-			FleetGuid fleetGuid {};
-			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
-			fleetGuid.uiLow = engine::ReadUint64(pCursor);
-			float fDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
+			GameMessages::FleetNavigationDelayRequestMessage message;
+			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
+			float fDelay = AdmitNavigationDelay(message.fNavigationDelay);
 			const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
-			mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, fleetGuid, std::chrono::duration<float>(fDelay));
+			mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, message.fleetGuid, std::chrono::duration<float>(fDelay));
 			break;
 		}
 		default:

@@ -93,6 +93,8 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 
 void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 {
+	++miAppliedFleetSyncCount;
+
 	// Heap: LOG argument formatting may allocate.
 	ScopedSuppressAllocationTracking suppress;
 
@@ -108,13 +110,6 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		previousFocusedFleetGuid = rPreviousFocusedFleet.guid;
 	}
 	mClientFleets = std::move(rFleets);
-	std::erase_if(mDestroyMemberControls, [this](const auto& rEntry)
-	{
-		return std::ranges::none_of(mClientFleets, [&](const Fleet& rFleet)
-		{
-			return std::ranges::contains(rFleet.members, engine::GlobalId {.iValue = rEntry.first}, &FleetMember::globalId);
-		});
-	});
 
 	auto FindFleetIndexByGuid = [this](const FleetGuid& rGuid) -> int64_t
 	{
@@ -239,6 +234,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	{
 		mFocusedMemberGlobalId = {};
 		mSpawnIntoFleetToggle.Reset();
+		mDestroyMemberToggle.Reset();
 	}
 
 	engine::GlobalId focusedId = gpGame->ClientOwnedEntityIdentifier();
@@ -274,8 +270,8 @@ void FleetSelection::Clear()
 	mPendingFocusMemberGlobalId = {};
 	mCreateFleetToggle.Reset();
 	mSpawnIntoFleetToggle.Reset();
+	mDestroyMemberToggle.Reset();
 	mNavigationDelayControl.Reset();
-	mDestroyMemberControls.clear();
 }
 
 } // namespace game

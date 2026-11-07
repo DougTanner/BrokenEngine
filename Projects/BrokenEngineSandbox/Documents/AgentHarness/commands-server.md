@@ -34,7 +34,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `registryTargetId` for every ship type: the `registryId` of the row's kept
   attack target, 0 for none;
   missile rows:
-  `index,local,dir,flightPlane,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
+  `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
@@ -47,9 +47,7 @@ adding the fields below; the other entries are its own commands. For the engine
   live missile's nonzero `registryTargetId` matches a ship `registryId` in
   the same cell, or one that ship cleared later in the same tick (death,
   destroy, or transfer) and the missile drops at its next Update; `0` means no
-  target. A missile's `flightPlane` is its assigned logical layer (0 or 1),
-  retained while its launch height returns to that plane. Its
-  `deltaRotation` is the live turn rate and its
+  target. A missile's `deltaRotation` is the live turn rate and its
   `deltaRotationDelay` counts down through zero and stays negative after its
   launch ramp finishes.
 - `edit_frame`: `{"coord":[q,r],"edits":[...]}`; these are the only top-level
@@ -97,11 +95,12 @@ adding the fields below; the other entries are its own commands. For the engine
   `DestroyShip` entry. Identity and handle columns (`engine::Id<T>`, such as
   `pIds`, `pPushers`, and `pRegistryIds`) are refused.
 
-  `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a
-  value that duplicates another frame's or ship's identity gives odd behavior
+  `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked,
+  apart from a ship's `pGlobalIds` and `pClientGuids` under the
+  [shared ship read admission](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants):
+  a value that duplicates another frame's or ship's identity gives odd behavior
   but no assert. Positions are also unchecked, apart from a ship's height under
-  the [shared ship read admission](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants),
-  and a flying (neither falling nor dying) missile's height and
+  that admission, and a flying (neither falling nor dying) missile's height and
   velocity z, which the save reader requires to be finite and 0 respectively.
   Positions must stay inside the cell: an out-of-cell omni position
   transfers to one edge neighbour, so a position more than one neighbour step out
@@ -246,8 +245,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `UpdateFleet` `uiPendingFleetWantedCoordinateTicks` to 32
   (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
-  plane. A missile's `flags` bit 0x01 assigns plane 1; clear assigns plane 0,
-  including when launch height differs from the plane height. Ship spawn height
+  plane. A missile returns to plane 0 from any launch height. Ship spawn height
   follows [shared ship policy](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants).
   A spawn gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
   unless the entry sets them. `bTransfer` defaults to false, so the

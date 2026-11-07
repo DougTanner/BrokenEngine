@@ -108,20 +108,19 @@ struct ShipUuid
 // Armor for Omnis, health otherwise.
 [[nodiscard]] float ShipHull(const Frame& rFrame, ShipLocator locator);
 
-// One registry query window: one context per flight plane, indexed by plane, plus the single workbuffer allocation
-// their spans point into. The owner keeps the whole object alive for the window; the allocation pops when it dies, so
-// no context span outlives it.
+// One registry query window: one context plus the single workbuffer allocation its spans point into. The owner keeps
+// the whole object alive for the window; the allocation pops when it dies, so no context span outlives it.
 struct RegistryWindow
 {
 	common::ScopedWorkbufferAllocation<std::byte*> buffer;
-	std::array<engine::RegistryQueryContext, kFlightPlanes.size()> contexts {};
+	engine::RegistryQueryContext context {};
 };
 
-// Builds one context per flight plane. Each binds the three ship types as source layers in ForEachShipType order and
-// the missile handles as the subscription layer. A row is eligible while it publishes a registry id and its arrival
-// grace has run out, and it joins only the context of the flight plane nearest its current Interpolate position, so a
-// ship climbing between planes joins its nearest plane's. The previous frame's arrival grace decides eligibility and its
-// positions are bound as previous positions.
-[[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame, const MissilesPostRender& rSubscribers);
+// Builds the context for the lowest flight plane. It binds the three ship types as source layers in ForEachShipType
+// order and no subscription layer, so the context derives no subscriber counts. A row is eligible while it publishes a
+// registry id, its arrival grace has run out, and the flight plane nearest its current Interpolate position is the
+// lowest, so a ship climbing away from that plane leaves the context. The previous frame's arrival grace decides
+// eligibility and its positions are bound as previous positions.
+[[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame);
 
 } // namespace game

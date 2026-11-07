@@ -34,8 +34,7 @@ inline constexpr float kfFighterDrag = 0.25f;
 inline constexpr float kfFighterMaxSpeed = 45.0f;
 inline constexpr float kfFighterMaxTurnRate = 8.0f;
 
-inline constexpr float kfFighterClimbPercentage = 0.25f;
-inline constexpr float kfFighterClimbRate = kfFighterMaxSpeed * kfFighterClimbPercentage;
+inline constexpr float kfFighterClimbRate = kfFighterMaxSpeed * kfShipClimbSpeedFraction;
 inline constexpr int64_t kiFighterHighestFlightPlane = 1;
 static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
@@ -179,7 +178,8 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
 	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, every simulation write and
-	// ship spawn stores a horizontal unit AI direction, and no controller writes a target flight plane the type disallows.
+	// ship spawn stores a horizontal unit AI direction, no controller writes a target flight plane the type disallows, and
+	// only a fleet spawn writes a client GUID or a global ID.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -191,6 +191,14 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 			if (rCurrent.pController[i] >= ShipController::kCount)
 			{
 				throw std::ios_base::failure("FightersPostRender pController");
+			}
+			if (rCurrent.pClientGuids[i] != engine::ClientGuid {} && rCurrent.pController[i] != ShipController::kFleet)
+			{
+				throw std::ios_base::failure("FightersPostRender pClientGuids");
+			}
+			if (rCurrent.pGlobalIds[i] != engine::GlobalId {} && rCurrent.pController[i] != ShipController::kFleet)
+			{
+				throw std::ios_base::failure("FightersPostRender pGlobalIds");
 			}
 			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
@@ -306,7 +314,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
 		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBeamFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBeamFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return {};
 		}
 	};
 

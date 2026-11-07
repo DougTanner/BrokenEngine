@@ -4,7 +4,7 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 
 ## Transport Contracts
 
-- Use `NetworkManager` channel helpers for control and per-coordinate reliable/unreliable channels. All sends go through `SendPacket`; opaque game payloads use `SendSimplePacket`, engine packets use `NetworkMessages` layouts.
+- Use `NetworkManager` channel helpers for control and per-coordinate reliable/unreliable channels. All sends go through `SendPacket`; a client game request goes through `ClientSessionRuntime::SendGameRequest`, which writes the game-defined message through `NetworkMessages::Write`, and engine packets use `NetworkMessages` layouts, except the debug-control requests, which `Client::SendSimplePacket` sends.
 - Each coordinate slot has independent ACK floor, bitfield, and epoch state (epoch is the reuse counter). Epoch mismatch drops stale traffic after slot reuse; unsubscribe carries the observed epoch, so a stale request cannot free a reused slot while the server still ACKs the no-op.
 - Load generation identifies the server's current debugging-load world across connection bootstrap and load-scoped subscription traffic. Both receivers compare it with their own before applying the slot epoch or mutating transport/game state; a mismatch logs a Network warning and returns. Epoch stays the reuse counter within one load generation. Wire and reset behavior: [Network architecture](../../../Documents/Architecture/Network.md#debug-load-generation).
 - Engine packet types remain below `kGamePacketStart`; game packets are forwarded opaquely.

@@ -103,6 +103,12 @@ bool SkipsTerrainContact(float fHeight)
 	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
 }
 
+bool TakesDeathTerrainContact(float fHeight, int64_t iTargetPlane)
+{
+	return !SkipsTerrainContact(fHeight)
+	    && (engine::gpFlightPlanes->Plane(NavigationFlightPlane(fHeight, iTargetPlane)).flags & engine::FlightPlaneFlags::kTerrainCollision);
+}
+
 const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
 {
 	static const engine::NavData sEmptyNavData;
@@ -110,32 +116,35 @@ const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStatic
 	return (iGraph >= 0 && iGraph < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iGraph)) : sEmptyNavData;
 }
 
-XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, int64_t iClearanceTier, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
+float StepHeightTowards(float fHeight, float fTargetHeight, float fStep, bool& rbArrived)
+{
+	float fHeightGap = fTargetHeight - fHeight;
+	rbArrived = false;
+	if (fHeightGap > fStep)
+	{
+		return fHeight + fStep;
+	}
+	if (fHeightGap < -fStep)
+	{
+		return fHeight - fStep;
+	}
+	rbArrived = true;
+	return fTargetHeight;
+}
+
+XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
 {
 	// Fixed operation order and the exact effective height on arrival keep client and server bit-identical.
 	float fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
 	float fClimbStep = fClimbRate * deltaTime.count();
 	float fHeight = XMVectorGetZ(vecPosition);
-	if (fTargetHeight < fHeight && engine::NavQueryPointBlocked(vecPosition, NavigationPlaneData(rStaticData, iClearanceTier, iTargetFlightPlane)))
+	if (fTargetHeight < fHeight && engine::NavQueryPointBlocked(vecPosition, NavigationPlaneData(rStaticData, ShipTypeClearanceTier(eType), iTargetFlightPlane)))
 	{
 		iTargetFlightPlane += 1;
 		fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
 	}
-	float fHeightGap = fTargetHeight - fHeight;
 	bool bArrived = false;
-	if (fHeightGap > fClimbStep)
-	{
-		fHeight += fClimbStep;
-	}
-	else if (fHeightGap < -fClimbStep)
-	{
-		fHeight -= fClimbStep;
-	}
-	else
-	{
-		fHeight = fTargetHeight;
-		bArrived = true;
-	}
+	fHeight = StepHeightTowards(fHeight, fTargetHeight, fClimbStep, bArrived);
 	if (ruiFlightPlane != iTargetFlightPlane)
 	{
 		ruiFlightPlane = bArrived ? static_cast<uint8_t>(iTargetFlightPlane) : kuiNoFlightPlane;
@@ -143,27 +152,24 @@ XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStat
 	return XMVectorSetZ(vecPosition, fHeight);
 }
 
-XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane)
+XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane)
 {
-	if (!IsFlightPlaneAllowed(eType, 1))
-	{
-		return vecPosition;
-	}
 	float fMinimumHeight = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) + engine::gpFlightPlanes->Lowest().fHeightMeters;
 	if (XMVectorGetZ(vecPosition) >= fMinimumHeight)
 	{
 		return vecPosition;
 	}
 	ruiFlightPlane = kuiNoFlightPlane;
-	for (int64_t i = 0; i <= HighestFlightPlane(eType); ++i)
-	{
-		if (fMinimumHeight == EffectiveShipFlightHeight(eType, eController, i))
-		{
-			ruiFlightPlane = static_cast<uint8_t>(i);
-			break;
-		}
-	}
 	return XMVectorSetZ(vecPosition, fMinimumHeight);
+}
+
+XMVECTOR XM_CALLCONV RotateByHeading(FXMVECTOR vecHeadingDirection, FXMVECTOR vecOffset, FXMVECTOR vecBase)
+{
+	float fCos = XMVectorGetX(vecHeadingDirection);
+	float fSin = XMVectorGetY(vecHeadingDirection);
+	float fX = XMVectorGetX(vecOffset);
+	float fY = XMVectorGetY(vecOffset);
+	return XMVectorSet((fCos * fX - fSin * fY) + XMVectorGetX(vecBase), (fSin * fX + fCos * fY) + XMVectorGetY(vecBase), 0.0f, 0.0f);
 }
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks)

@@ -36,15 +36,12 @@ struct FrameInterpolate;
 
 enum class MissileFlags : uint8_t
 {
-	kUpperFlightPlane = 0x01,
-	kDirectional      = 0x04,
-	kTargetFleet      = 0x08,
-	kTargetRandom     = 0x10,
-	kFalling          = 0x20,
+	kDirectional  = 0x04,
+	kTargetFleet  = 0x08,
+	kTargetRandom = 0x10,
+	kFalling      = 0x20,
 };
 using MissileFlags_t = common::Flags<MissileFlags>;
-
-[[nodiscard]] int64_t GetMissileFlightPlane(MissileFlags_t flags);
 
 struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 {
@@ -205,7 +202,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 		// Status-change payload members. uiTarget is a registry link only in-tick code may set, so it is not listed.
 		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, vecStoredDirection), FRAME_COLUMN(SpawnInfo, fAcceleration), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, deltaRotationDelay), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, fDeltaRotationMaximum), FRAME_COLUMN(SpawnInfo, fPitch), FRAME_COLUMN(SpawnInfo, time), FRAME_COLUMN(SpawnInfo, nextJitter), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, vecStoredDirection), FRAME_COLUMN(SpawnInfo, fAcceleration), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, deltaRotationDelay), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, fDeltaRotationMaximum), FRAME_COLUMN(SpawnInfo, fPitch), FRAME_COLUMN(SpawnInfo, time), FRAME_COLUMN(SpawnInfo, nextJitter), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return {};
 		}
 	};
 

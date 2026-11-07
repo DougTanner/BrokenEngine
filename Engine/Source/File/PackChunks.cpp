@@ -217,6 +217,11 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 	{
 		return "audio chunk is compressed";
 	}
+	// A model's outline and hardpoint sections are placed from iSize, which bounds the payload only when stored uncompressed.
+	if (eExpectedDataType == data::kDataTypeModel && common::IsCompressed(rChunkHeader.flags))
+	{
+		return "model chunk is compressed";
+	}
 	if (rChunkHeader.crc != rChunkLocation.crc)
 	{
 		return "chunk header CRC mismatch";
@@ -254,6 +259,17 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 		if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
 		{
 			return "chunk header size outside chunk";
+		}
+	}
+	// Readers address the outline and hardpoint sections past iSize without bounds checks. The bounded iSize above keeps
+	// this end offset from overflowing.
+	if (eExpectedDataType == data::kDataTypeModel)
+	{
+		const common::ModelHeader& rModelHeader = rChunkHeader.modelHeader;
+		int64_t iSectionsEnd = common::ModelHeader::FighterLaunchBaysOffset(rChunkHeader.iSize, rModelHeader.uiMissileTubeCount) + static_cast<int64_t>(rModelHeader.uiFighterLaunchBayCount) * static_cast<int64_t>(sizeof(common::PackedModelHardpoint));
+		if (iSectionsEnd > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
+		{
+			return "model sections outside chunk";
 		}
 	}
 	// iUncompressedSize sizes the lazy pool slot and caps the decoder output for both codecs.

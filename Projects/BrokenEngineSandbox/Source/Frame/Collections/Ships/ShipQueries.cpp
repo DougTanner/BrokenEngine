@@ -1,7 +1,5 @@
 #include "ShipQueries.h"
 
-#include "Frame/Collections/Missiles/Missiles.h"
-
 namespace game
 {
 
@@ -291,115 +289,69 @@ float ShipHull(const Frame& rFrame, ShipLocator locator)
 	});
 }
 
-RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame, const MissilesPostRender& rSubscribers)
+RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
 	auto IsEligible = [](const auto& rInterpolate, const auto& rGracePostRender, int64_t i)
 	{
-		return (rInterpolate.pRegistryIds[i].uuid.iValue != 0) && rGracePostRender.pArrivalGracePeriods[i].count() <= 0.0f;
+		return (rInterpolate.pRegistryIds[i].uuid.iValue != 0) && rGracePostRender.pArrivalGracePeriods[i].count() <= 0.0f && NearestFlightPlane(rInterpolate.pVecPositions[i]) == 0;
 	};
 
-	static constexpr int64_t kiPlaneCount = std::ssize(kFlightPlanes);
-	int64_t iSubscriberCount = rSubscribers.iCount;
-	int64_t iAscendingCount = iSubscriberCount;
-	std::array<int64_t, kiPlaneCount> eligibleCounts {};
+	int64_t iEligibleCount = 0;
 	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
 	{
-		iAscendingCount = std::max(iAscendingCount, rInterpolate.iCount);
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 		{
 			if (IsEligible(rInterpolate, rGracePostRender, i))
 			{
-				++eligibleCounts[NearestFlightPlane(rInterpolate.pVecPositions[i])];
+				++iEligibleCount;
 			}
 		}
 	});
 
 	// Reserve all window storage together. PushBuffer may grow the workbuffer, so no pointer is published until
-	// the combined reservation has returned. The source rows, every plane's registry scratch, padding, and every
-	// plane's layer descriptors then remain in one allocation for the contexts' lifetime. Each scratch block starts
-	// 16-byte aligned because its int64_t rows follow the previous block's uint16_t subscriber counts.
+	// the combined reservation has returned. The eligible row indices and the layer descriptors then remain in one
+	// allocation for the context's lifetime. With no subscription layer the registry scratch is the row indices alone.
 	static constexpr int64_t kiLayerCount = std::to_underlying(ShipType::kCount);
-	int64_t iAscendingBytes = iAscendingCount * static_cast<int64_t>(sizeof(int64_t));
-	std::array<int64_t, kiPlaneCount> scratchOffsets {};
-	int64_t iOffset = iAscendingBytes;
-	for (int64_t i = 0; i < kiPlaneCount; ++i)
-	{
-		scratchOffsets[i] = common::RoundUp(iOffset, 16i64);
-		iOffset = scratchOffsets[i] + engine::RegistryScratchBytes(eligibleCounts[i]);
-	}
-	int64_t iLayerOffset = common::RoundUp(iOffset, 16i64);
-	int64_t iTotalBytes = iLayerOffset + kiPlaneCount * kiLayerCount * static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
+	int64_t iScratchBytes = iEligibleCount * static_cast<int64_t>(sizeof(int64_t));
+	int64_t iTotalBytes = iScratchBytes + kiLayerCount * static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
 	std::byte* pBufferBytes = pBuffer.mpData;
-	int64_t* pAscendingRows = reinterpret_cast<int64_t*>(pBufferBytes);
-	// Plane i's layer descriptors start at pLayers + i * kiLayerCount.
-	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iLayerOffset);
+	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iScratchBytes);
 
-	std::iota(pAscendingRows, pAscendingRows + iAscendingCount, 0i64);
-
-	// Each plane's registry block stores that plane's caller-filled eligible rows, layer after layer, before derived
-	// subscriber counts; ascending row order within each layer resolves exact ranking ties deterministically.
-	std::array<int64_t*, kiPlaneCount> eligibleRows {};
-	std::array<int64_t, kiPlaneCount> filledCounts {};
-	for (int64_t i = 0; i < kiPlaneCount; ++i)
-	{
-		eligibleRows[i] = reinterpret_cast<int64_t*>(pBufferBytes + scratchOffsets[i]);
-	}
+	// The eligible rows fill the scratch layer after layer, ascending within each layer as every source layer's rows must be.
+	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(pBufferBytes);
+	int64_t iFilledCount = 0;
 	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
 	{
-		std::array<int64_t, kiPlaneCount> layerFirstRows = filledCounts;
+		int64_t iLayerFirstRow = iFilledCount;
 		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 		{
 			if (IsEligible(rInterpolate, rGracePostRender, i))
 			{
-				int64_t iPlane = NearestFlightPlane(rInterpolate.pVecPositions[i]);
-				eligibleRows[iPlane][filledCounts[iPlane]++] = i;
+				pEligibleRows[iFilledCount++] = i;
 			}
 		}
 
-		for (int64_t i = 0; i < kiPlaneCount; ++i)
+		pLayers[std::to_underlying(eType)] =
 		{
-			pLayers[i * kiLayerCount + std::to_underlying(eType)] =
-			{
-				.pIds = rInterpolate.pRegistryIds,
-				.pVecCurrentPositions = rInterpolate.pVecPositions,
-				.rows = std::span<const int64_t>(eligibleRows[i] + layerFirstRows[i], static_cast<size_t>(filledCounts[i] - layerFirstRows[i])),
-				.iSourceCount = rInterpolate.iCount,
-			};
-		}
-	});
-	ForEachShipType(rFrame, [&](ShipType eType, [[maybe_unused]] const auto& rInterpolate, const auto& rPostRender)
-	{
-		for (int64_t i = 0; i < kiPlaneCount; ++i)
-		{
-			pLayers[i * kiLayerCount + std::to_underlying(eType)].pAlignments = rPostRender.pAlignments;
-		}
+			.pIds = rInterpolate.pRegistryIds,
+			.pVecCurrentPositions = rInterpolate.pVecPositions,
+			.rows = std::span<const int64_t>(pEligibleRows + iLayerFirstRow, static_cast<size_t>(iFilledCount - iLayerFirstRow)),
+			.iSourceCount = rInterpolate.iCount,
+		};
 	});
 	// Previous rows still align with the current ones: no row is added or removed before the Update phase ends.
 	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rPreviousInterpolate, [[maybe_unused]] const auto& rPreviousPostRender)
 	{
-		for (int64_t i = 0; i < kiPlaneCount; ++i)
-		{
-			pLayers[i * kiLayerCount + std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
-		}
+		pLayers[std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
 	});
 
-	engine::RegistrySubscriptionLayer subscriptionLayer
-	{
-		.pTargets = rSubscribers.puiRegistryTargets,
-		.rows = std::span<const int64_t>(pAscendingRows, static_cast<size_t>(iSubscriberCount)),
-		.iSourceCount = iSubscriberCount,
-	};
-
 	RegistryWindow window {.buffer = std::move(pBuffer)};
-	for (int64_t i = 0; i < kiPlaneCount; ++i)
-	{
-		std::span<const engine::RegistrySourceLayer> sourceLayers(pLayers + i * kiLayerCount, static_cast<size_t>(kiLayerCount));
-		std::span<std::byte> scratch(pBufferBytes + scratchOffsets[i], static_cast<size_t>(engine::RegistryScratchBytes(eligibleCounts[i])));
-		window.contexts[i] = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, std::span<const engine::RegistrySubscriptionLayer>(&subscriptionLayer, 1), scratch);
-	}
+	std::span<const engine::RegistrySourceLayer> sourceLayers(pLayers, static_cast<size_t>(kiLayerCount));
+	std::span<std::byte> scratch(pBufferBytes, static_cast<size_t>(iScratchBytes));
+	window.context = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, {}, scratch);
 	return window;
 }
 

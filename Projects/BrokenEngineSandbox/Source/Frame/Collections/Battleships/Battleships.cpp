@@ -208,7 +208,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kBattleship, rPreviousPostRender.pController[i], ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
+		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kBattleship, rPreviousPostRender.pController[i], vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 

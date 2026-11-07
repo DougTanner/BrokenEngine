@@ -45,8 +45,8 @@ public:
 	void PollDiscovery();
 	void PollAndDrain(const NetworkTimeState& rTimeState);
 
-	template <typename TPACKETTYPE, typename TLOGFUNCTION, typename... TARGUMENTS>
-	void SendGameRequest(TPACKETTYPE ePacketType, const TLOGFUNCTION& rLogFunction, const TARGUMENTS&... rArguments)
+	template <typename TPACKETTYPE, typename TLOGFUNCTION, typename TMESSAGE>
+	void SendGameRequest(TPACKETTYPE ePacketType, const TLOGFUNCTION& rLogFunction, TMESSAGE message)
 	{
 		if (mpClient == nullptr)
 		{
@@ -61,7 +61,13 @@ public:
 		InitializeLogTickScope(optionalTickScope);
 
 		rLogFunction();
-		mpClient->SendSimplePacket(ePacketType, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArguments...);
+		{
+			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+			common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+			rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(ePacketType));
+			NetworkMessages::Write(rWorkbuffer, message);
+			NetworkManager::SendPacket(mpClient->mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+		}
 
 		{
 			// Send the user command now instead of waiting for the tick-cadence ack flush.

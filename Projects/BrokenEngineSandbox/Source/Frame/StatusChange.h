@@ -94,7 +94,7 @@ struct DestroyShipData
 
 	static constexpr engine::FrameColumnList<FRAME_COLUMN(DestroyShipData, eType), FRAME_COLUMN(DestroyShipData, iUuid)> Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(DestroyShipData, eType), FRAME_COLUMN(DestroyShipData, iUuid)> {};
+		return {};
 	}
 };
 
@@ -110,7 +110,7 @@ struct UpdateShipData
 
 	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> {};
+		return {};
 	}
 };
 
@@ -123,7 +123,7 @@ struct UpdateFleetData
 
 	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> {};
+		return {};
 	}
 };
 

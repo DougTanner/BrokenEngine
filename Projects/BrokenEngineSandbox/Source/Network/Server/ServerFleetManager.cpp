@@ -147,22 +147,14 @@ void ServerFleetManager::ProcessDestroyFleetMemberRequests()
 			}
 			if (!(memberIt->flags & FleetMemberFlags::kIsDead))
 			{
-				auto frameInputIt = gpGame->mFrameInputs.find(memberIt->coordinate);
-				if (frameInputIt != gpGame->mFrameInputs.end())
+				FrameInput& rFrameInput = gpGame->mFrameInputs.at(memberIt->coordinate);
+				const Frame& rFrame = *gpGame->mCells.at(memberIt->coordinate).pCurrent;
+				ShipLocator ship = FindShipByGlobalId(rFrame, rRequest.globalId).value();
+				int64_t iUuid = VisitShip(rFrame, ship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 				{
-					const Frame& rFrame = *gpGame->mCells.at(memberIt->coordinate).pCurrent;
-					std::optional<ShipLocator> optionalShip = FindShipByGlobalId(rFrame, rRequest.globalId);
-					if (optionalShip)
-					{
-						VisitShip(rFrame, *optionalShip, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
-						{
-							if (!(rPostRender.pLifecycleFlags[iRow] & engine::LifecycleFlags::kDying))
-							{
-								frameInputIt->second.statusChanges.push_back({.eType = StatusChangeType::kDestroyShip, .data = DestroyShipData {.eType = optionalShip->eType, .iUuid = rPostRender.pIds[iRow].uuid.iValue}});
-							}
-						});
-					}
-				}
+					return rPostRender.pIds[iRow].uuid.iValue;
+				});
+				rFrameInput.statusChanges.push_back({.eType = StatusChangeType::kDestroyShip, .data = DestroyShipData {.eType = ship.eType, .iUuid = iUuid}});
 			}
 			rFleet.members.erase(memberIt);
 			SendFleetSyncToClient(pClient->clientGuid);

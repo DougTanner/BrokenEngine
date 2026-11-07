@@ -63,7 +63,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> Values()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> {};
+		return {};
 	}
 
 	static common::crc_t Crcs(const FrameInterpolate& rCurrent);
@@ -108,7 +108,7 @@ struct FramePostRender : public engine::FramePostRenderBase
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> Values()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> {};
+		return {};
 	}
 
 	static common::crc_t Crcs(const FramePostRender& rCurrent);

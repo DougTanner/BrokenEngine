@@ -1,7 +1,6 @@
 #include "Battleships.h"
 
 #include "Data/Audio.h"
-#include "File/PackChunks.h"
 #include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Missiles/Missiles.h"
@@ -309,14 +308,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			continue;
 		}
 
-		common::crc_t uiModel = kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[std::to_underlying(rCurrentPostRender.pController[i])];
-		const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(uiModel);
-		const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
-		ASSERT(rChunk.pHeader->iSize <= std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1) - static_cast<int64_t>(sizeof(common::ModelOutline)));
-		int64_t iTubesOffset = common::ModelHeader::MissileTubesOffset(rChunk.pHeader->iSize);
-		ASSERT(iTubesOffset <= rChunk.iDataSize);
-		ASSERT(rModelHeader.uiMissileTubeCount > 0 && static_cast<int64_t>(rModelHeader.uiMissileTubeCount) <= (rChunk.iDataSize - iTubesOffset) / static_cast<int64_t>(sizeof(common::PackedModelHardpoint)));
-		std::span<const common::PackedModelHardpoint> tubes(reinterpret_cast<const common::PackedModelHardpoint*>(rChunk.pData + iTubesOffset), rModelHeader.uiMissileTubeCount);
+		std::span<const common::PackedModelHardpoint> tubes = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rCurrentPostRender.pController[i])].missileTubes;
 
 		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
 		float fCos = XMVectorGetX(vecHullDirection);
@@ -327,7 +319,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		for (int64_t j = 0; j < std::ssize(tubes); ++j)
 		{
 			const XMFLOAT3& rf3Position = tubes[static_cast<size_t>(j)].f3Position;
-			XMVECTOR vecPosition = XMVectorSet((fCos * rf3Position.x - fSin * rf3Position.y) + XMVectorGetX(vecShipPosition), (fSin * rf3Position.x + fCos * rf3Position.y) + XMVectorGetY(vecShipPosition), fShipHeight + rf3Position.z, 1.0f);
+			XMVECTOR vecPosition = XMVectorSetW(XMVectorSetZ(RotateByHeading(vecHullDirection, XMLoadFloat3(&rf3Position), vecShipPosition), fShipHeight + rf3Position.z), 1.0f);
 			float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecTargetPosition, vecPosition)));
 			if (j == 0 || fDistanceSquared < fNearestTubeDistanceSquared)
 			{
@@ -340,7 +332,6 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		XMVECTOR vecTubeDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
 		MissileFlags_t missileFlags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
-		missileFlags.Set(MissileFlags::kUpperFlightPlane, uiFlightPlane == 1);
 		bool bSpawned = MissilesPostRender::Spawn(rFrame,
 		{
 			.vecPosition = vecTubePosition,

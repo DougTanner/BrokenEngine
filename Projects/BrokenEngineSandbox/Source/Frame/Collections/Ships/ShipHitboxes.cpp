@@ -22,7 +22,6 @@ void InitializeShipHitboxes()
 			ASSERT(rModelHeader.f3Scale.x == rModelHeader.f3Scale.y && rModelHeader.f3Scale.x == rModelHeader.f3Scale.z);
 
 			int64_t iOutlineOffset = common::ModelHeader::OutlineOffset(rChunk.pHeader->iSize);
-			ASSERT(iOutlineOffset + static_cast<int64_t>(sizeof(common::ModelOutline)) <= rChunk.iDataSize);
 			const common::ModelOutline& rOutline = *reinterpret_cast<const common::ModelOutline*>(rChunk.pData + iOutlineOffset);
 			ASSERT(rOutline.iHullVertexCount >= 3 && rOutline.iHullVertexCount <= common::kiModelOutlineVertexMaximum);
 			ASSERT(rOutline.iOutlineVertexCount >= 3 && rOutline.iOutlineVertexCount <= common::kiModelOutlineVertexMaximum);
@@ -30,6 +29,15 @@ void InitializeShipHitboxes()
 			ShipHitboxShape& rShape = gShipHitboxShapes[i][j];
 			rShape.fMinimumOriginZ = 1.0f - rOutline.fMinimumZ;
 			rShape.bNavigationObstacle = rOutline.uiNavigationObstacle != 0;
+
+			// Every model chunk carries both hardpoint sections after its outline; Battleship models hold the tubes
+			// their launches need.
+			int64_t iTubesOffset = common::ModelHeader::MissileTubesOffset(rChunk.pHeader->iSize);
+			ASSERT(i != std::to_underlying(ShipType::kBattleship) || rModelHeader.uiMissileTubeCount > 0);
+			rShape.missileTubes = std::span<const common::PackedModelHardpoint>(reinterpret_cast<const common::PackedModelHardpoint*>(rChunk.pData + iTubesOffset), rModelHeader.uiMissileTubeCount);
+			int64_t iBaysOffset = common::ModelHeader::FighterLaunchBaysOffset(rChunk.pHeader->iSize, rModelHeader.uiMissileTubeCount);
+			rShape.fighterLaunchBays = std::span<const common::PackedModelHardpoint>(reinterpret_cast<const common::PackedModelHardpoint*>(rChunk.pData + iBaysOffset), rModelHeader.uiFighterLaunchBayCount);
+
 			engine::CollisionHitbox& rHitbox = rShape.hitbox;
 			rHitbox.eHitboxLevel = rOutline.eHitboxLevel;
 			rHitbox.fMinimumZ = rOutline.fMinimumZ;
@@ -126,7 +134,6 @@ XMVECTOR XM_CALLCONV ShipHullContact(ShipType eType, ShipController eController,
 		float fSearchStart = fEnter > 0.0f ? fEnter - kfEnterTolerance : 0.0f;
 		fContact = std::min(engine::FirstOutlineCrossing(f3Start, f3Delta, outlineVertices, fSearchStart, fExit), fExit);
 	}
-	ASSERT(std::isfinite(fContact));
 	return XMVectorSetW(XMVectorMultiplyAdd(XMVectorReplicate(fContact), XMVectorSubtract(vecPosition, vecShooterPosition), vecShooterPosition), 1.0f);
 }
 

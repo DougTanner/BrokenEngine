@@ -324,9 +324,7 @@ No directional dependencies or mandatory nondirectional coordination.
 This is one stage: the transport has no order to exercise it until the behaviour lands, so no
 earlier cut can pass acceptance.
 
-The Plan below touches nearby lines. Either order works, and the later landing refreshes against the
-tree it finds and takes its own `Frame::kiVersion` bump from the value it finds:
-
-- `Documents/Plans/Game/ShipCombatAndFleetCleanups.md` edits `HudScreen.cpp` and
-  `ServerFleetManager.cpp`. Its G02 may add a message-taking send: use it if it has landed, else
-  follow `SendDestroyFleetMemberRequest`.
+Client fleet requests define their message in
+`Projects/BrokenEngineSandbox/Source/Network/GameMessages.h`, send it through
+`engine::ClientSessionRuntime::SendGameRequest`, and decode it server-side with
+`engine::NetworkMessages::Read`: follow `ClientSession::SendDestroyFleetMemberRequest`.

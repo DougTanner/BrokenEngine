@@ -116,13 +116,13 @@ RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, st
 #endif
 
 	int64_t iEligibleRows = TotalEligibleRows(sourceLayers);
-	ASSERT(static_cast<int64_t>(scratch.size()) >= RegistryScratchBytes(iEligibleRows));
+	ASSERT(static_cast<int64_t>(scratch.size()) >= (subscriptionLayers.empty() ? iEligibleRows * static_cast<int64_t>(sizeof(int64_t)) : RegistryScratchBytes(iEligibleRows)));
 
 	RegistryQueryContext context {};
 	context.sourceLayers = sourceLayers;
 	context.pAlignments = &rAlignments;
 
-	if (iEligibleRows > 0)
+	if (!subscriptionLayers.empty() && iEligibleRows > 0)
 	{
 		// The row indices already bound into RegistrySourceLayer::rows occupy the front of the block.
 		uint16_t* puiCounts = reinterpret_cast<uint16_t*>(scratch.data() + iEligibleRows * sizeof(int64_t));

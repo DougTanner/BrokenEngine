@@ -2,7 +2,6 @@
 
 #include "Network/Server/ServerClientManager.h"
 
-#include "File/PackChunks.h"
 #include "Frame/IslandChainPlacement.h"
 #include "Network/Server/ServerTransferManager.h"
 
@@ -248,17 +247,7 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 
 			const BattleshipsInterpolate& rBattleshipsInterpolate = *rBattleshipFrame.interpolate.pBattleships;
 			int64_t iBattleshipRow = optionalBattleship->iRow;
-			common::crc_t uiModel = kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[std::to_underlying(rBattleshipFrame.postRender.pBattleships->pController[iBattleshipRow])];
-			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(uiModel);
-			const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
-			ASSERT(rChunk.pHeader->iSize <= std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1) - static_cast<int64_t>(sizeof(common::ModelOutline)));
-			int64_t iTubesOffset = common::ModelHeader::MissileTubesOffset(rChunk.pHeader->iSize);
-			ASSERT(iTubesOffset <= rChunk.iDataSize);
-			ASSERT(static_cast<int64_t>(rModelHeader.uiMissileTubeCount) <= (rChunk.iDataSize - iTubesOffset) / static_cast<int64_t>(sizeof(common::PackedModelHardpoint)));
-			int64_t iBaysOffset = common::ModelHeader::FighterLaunchBaysOffset(rChunk.pHeader->iSize, rModelHeader.uiMissileTubeCount);
-			ASSERT(iBaysOffset <= rChunk.iDataSize);
-			ASSERT(static_cast<int64_t>(rModelHeader.uiFighterLaunchBayCount) <= (rChunk.iDataSize - iBaysOffset) / static_cast<int64_t>(sizeof(common::PackedModelHardpoint)));
-			std::span<const common::PackedModelHardpoint> bays(reinterpret_cast<const common::PackedModelHardpoint*>(rChunk.pData + iBaysOffset), rModelHeader.uiFighterLaunchBayCount);
+			std::span<const common::PackedModelHardpoint> bays = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rBattleshipFrame.postRender.pBattleships->pController[iBattleshipRow])].fighterLaunchBays;
 
 			XMVECTOR vecBattleshipDirection = rBattleshipsInterpolate.pVecDirections[iBattleshipRow];
 			XMVECTOR vecBattleshipPosition = rBattleshipsInterpolate.pVecPositions[iBattleshipRow];
@@ -267,8 +256,7 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 			while (riNextFighterLaunchBay < std::ssize(bays))
 			{
 				const common::PackedModelHardpoint& rBay = bays[static_cast<size_t>(riNextFighterLaunchBay++)];
-				const XMFLOAT3& rf3Position = rBay.f3Position;
-				XMVECTOR vecLaunchPosition = XMVectorSet((fCos * rf3Position.x - fSin * rf3Position.y) + XMVectorGetX(vecBattleshipPosition), (fSin * rf3Position.x + fCos * rf3Position.y) + XMVectorGetY(vecBattleshipPosition), XMVectorGetZ(vecBattleshipPosition), 1.0f);
+				XMVECTOR vecLaunchPosition = XMVectorSetW(XMVectorSetZ(RotateByHeading(vecBattleshipDirection, XMLoadFloat3(&rBay.f3Position), vecBattleshipPosition), XMVectorGetZ(vecBattleshipPosition)), 1.0f);
 				// QueueSpawn asserts the spawn position is inside the cell.
 				if (!engine::IsInsideCell(vecLaunchPosition))
 				{

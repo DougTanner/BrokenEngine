@@ -19,32 +19,24 @@ answers "which row of another collection" questions during the tick, and the
 game opens exactly one window for it, the Missile-Update window, through
 `BuildShipRegistryWindow` in
 [`ShipQueries.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.h).
-The window holds one registry context per flight plane, built once when the
-window opens and reused for the rest of its phase; each context binds one source
-layer per ship type (Fighters, Omnis, Battleships) holding only the ships whose
-current Interpolate position is nearest that plane, so every eligible ship is in
-exactly one context and a ship climbing between planes joins its nearest
-plane's. The Missile-Update window opens inside
-the Update phase before the ship Updates run. A ship of any type is eligible
-while it still publishes a valid registry id and its previous-frame arrival
-grace has run out, and the window binds both
+The window holds one registry context, built once when the window opens and
+reused for the rest of its phase; it binds one source layer per ship type
+(Fighters, Omnis, Battleships) holding only the ships `BuildShipRegistryWindow`
+admits. The Missile-Update window opens inside
+the Update phase before the ship Updates run. The window binds both
 position columns: current positions and previous-frame positions, which a
 retained Missile homes on. It acquires nothing: it only validates the handle
-each Missile received at launch, so the subscriber counts it derives from the
-previous frame's Missile handles go unread.
+each Missile received at launch, so it binds no subscription layer.
 
-The window makes one combined workbuffer reservation for its source rows,
-every plane's registry scratch, alignment padding, and every plane's layer
-descriptors. The pointer-derived spans are formed only after that reservation
-returns, and the single scoped allocation owns them for the contexts' lifetime
+The window makes one combined workbuffer reservation for its eligible source-row
+indices and layer descriptors. The pointer-derived spans are formed only after that reservation
+returns, and the single scoped allocation owns them for the context's lifetime
 ([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The
 worker workbuffer's 64 KiB initial size remains a performance preallocation, not
 a hard bound: a grow while a context is live does not invalidate it (that same
-document). Subscriber accounting uses `uint16_t` storage and asserts before
-accepting the 65,536th subscription. No context outlives its phase. The
-ownership layer is not a window and is never built from a phase; its by-value
-lifetime and post-tick main-thread-only restriction are engine contracts in that
-same document.
+document). No context outlives its phase. The ownership layer is not a window
+and is never built from a phase; its by-value lifetime and post-tick
+main-thread-only restriction are engine contracts in that same document.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

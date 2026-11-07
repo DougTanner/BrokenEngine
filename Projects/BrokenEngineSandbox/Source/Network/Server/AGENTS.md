@@ -52,8 +52,9 @@ game state around the deterministic Frame tick.
   advancing updates, drains destroy-member requests into the first advancing
   tick's input once. Each request retires its sender-owned non-Battleship member
   from the fleet and sends the reduced full fleet sync, even if death races the
-  request. A present, live, non-dying row also queues staged destruction using
-  its current cell, ship type and UUID. Battleships remain members. Paused
+  request. A member not marked dead also queues staged destruction using its
+  current cell, ship type and UUID; a dying row ignores the destruction.
+  Battleships remain members. Paused
   updates retain the queue; consumption,
   disconnect, reset and load clear it through the fleet request lifecycle.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the

@@ -5,6 +5,51 @@
 namespace game::GameMessages
 {
 
+struct CreateFleetRequestMessage
+{
+	static constexpr int64_t kiSize = 0;
+	static_assert(kiSize == 0);
+
+	template <typename TVISITOR>
+	static void Visit([[maybe_unused]] TVISITOR& rVisitor, [[maybe_unused]] CreateFleetRequestMessage& rMessage)
+	{
+	}
+};
+
+struct SpawnIntoFleetRequestMessage
+{
+	static constexpr int64_t kiSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint8_t);
+	static_assert(kiSize == 17);
+
+	FleetGuid fleetGuid {};
+	uint8_t uiShipType = 0;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, SpawnIntoFleetRequestMessage& rMessage)
+	{
+		rVisitor.Field(rMessage.fleetGuid.uiHigh);
+		rVisitor.Field(rMessage.fleetGuid.uiLow);
+		rVisitor.Field(rMessage.uiShipType);
+	}
+};
+
+struct FleetNavigationDelayRequestMessage
+{
+	static constexpr int64_t kiSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(float);
+	static_assert(kiSize == 20);
+
+	FleetGuid fleetGuid {};
+	float fNavigationDelay = 0.0f;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, FleetNavigationDelayRequestMessage& rMessage)
+	{
+		rVisitor.Field(rMessage.fleetGuid.uiHigh);
+		rVisitor.Field(rMessage.fleetGuid.uiLow);
+		rVisitor.Field(rMessage.fNavigationDelay);
+	}
+};
+
 struct DestroyFleetMemberRequestMessage
 {
 	static constexpr int64_t kiSize = sizeof(int64_t);

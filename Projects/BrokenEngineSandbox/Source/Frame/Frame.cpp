@@ -74,7 +74,7 @@ static void ValidatePusherOwners(const Frame& rFrame)
 }
 
 // Flying missile height returns by position stepping; propulsion remains horizontal.
-static void ValidateFlyingMissilePlanes(const Frame& rFrame)
+static void ValidateFlyingMissiles(const Frame& rFrame)
 {
 	const MissilesInterpolate& rInterpolate = *rFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPostRender = *rFrame.postRender.pMissiles;
@@ -90,11 +90,11 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 		}
 		if (!std::isfinite(XMVectorGetZ(rInterpolate.pVecPositions[i])))
 		{
-			throw std::ios_base::failure("Frame flying missile plane");
+			throw std::ios_base::failure("Frame flying missile height");
 		}
 		if (XMVectorGetZ(rPostRender.pVecVelocities[i]) != 0.0f)
 		{
-			throw std::ios_base::failure("Frame flying missile plane");
+			throw std::ios_base::failure("Frame flying missile vertical velocity");
 		}
 	}
 }
@@ -102,7 +102,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 171i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 172i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -743,7 +743,7 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 	engine::ValidateBaseCollectionPairs(loadedFrame.interpolate, loadedFrame.postRender);
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
 	ValidatePusherOwners(loadedFrame);
-	ValidateFlyingMissilePlanes(loadedFrame);
+	ValidateFlyingMissiles(loadedFrame);
 	rCurrent = std::move(loadedFrame);
 	return rStream;
 }

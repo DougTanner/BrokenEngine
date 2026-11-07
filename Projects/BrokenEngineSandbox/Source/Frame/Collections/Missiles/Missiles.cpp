@@ -7,7 +7,6 @@
 #include "Frame/Collections/Collection.h"
 #include "Frame/CellStaticData.h"
 
-#include "Frame/FlightPlaneTable.h"
 #include "Frame/HealthDamage.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
@@ -32,12 +31,6 @@ namespace game
 {
 
 using enum MissileFlags;
-
-int64_t GetMissileFlightPlane(MissileFlags_t flags)
-{
-	static_assert(kFlightPlanes.size() == 2);
-	return (flags & kUpperFlightPlane) ? 1 : 0;
-}
 
 
 #if defined(BT_CLIENT)
@@ -70,8 +63,7 @@ constexpr float kfDeltaRotationLimitMinimum = 2.0f;
 constexpr float kfDeltaRotationLimitRandom = 2.0f;
 
 #if defined(BT_CLIENT)
-static int64_t siFleetExhaustAreaLightTypeIndex = 0xFF;
-static int64_t siRandomExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siExhaustAreaLightTypeIndex = 0xFF;
 
 static int64_t siSmokeTrailTypeIndex = 0xFF;
 #endif // BT_CLIENT
@@ -113,7 +105,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 		{
-			.iTypeIndex = (flags & kTargetFleet) ? siRandomExhaustAreaLightTypeIndex : siFleetExhaustAreaLightTypeIndex,
+			.iTypeIndex = siExhaustAreaLightTypeIndex,
 			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 			.fIntensityMultiplier = fIntensityMultiplier,
 		});
@@ -161,9 +153,7 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		return;
 	}
 
-	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetRandom)
-		? siFleetExhaustAreaLightTypeIndex : siRandomExhaustAreaLightTypeIndex;
-	engine::AreaLightsPostRender::Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
+	engine::AreaLightsPostRender::Add(rFrame, rMissiles.puiAreaLights[iIndex], siExhaustAreaLightTypeIndex);
 
 	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], siSmokeTrailTypeIndex);
 
@@ -189,20 +179,7 @@ void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
 void MissilesInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::AreaLightsInterpolate::RegisterType(siFleetExhaustAreaLightTypeIndex,
-	{
-		.uiCrc = data::kTexturesMissilesBC72pngCrc,
-		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-		.pf2TextureCoordinates = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}},
-		.fVisibleIntensity = gMissileExhaustVisibleIntensity.mfCurrent,
-		.fLightingSize = gMissileExhaustLightingArea.mfCurrent,
-		.fLightingIntensity = gMissileExhaustLightingIntensity.mfCurrent,
-		.pVisibleIntensityWrapper = &gMissileExhaustVisibleIntensity,
-		.pLightingSizeWrapper = &gMissileExhaustLightingArea,
-		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
-	});
-
-	engine::AreaLightsInterpolate::RegisterType(siRandomExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC72pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -295,7 +272,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 		MissileFlags_t missileFlags;
 		missileFlags.Set(alignment == rFrame.postRender.fleetAlignment ? kTargetRandom : kTargetFleet);
-		missileFlags.Set(kUpperFlightPlane, GetMissileFlightPlane(rCurrentPostRender.pFlags[i]) == 1);
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo

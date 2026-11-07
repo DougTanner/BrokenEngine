@@ -64,22 +64,25 @@ The ramped heading turn in `ShipBehaviours` follows the
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
-  navigation delay, an unknown controller, a target flight plane the type
-  disallows, and an AI direction that fails `IsShipHeadingValid`. On every
-  Frame read, Interpolate `PostRead` requires a finite
-  Fighter or Omni height at or above the lowest plane, allowing terrain-raised
-  heights above the highest plane; Battleships retain the lowest-to-highest
-  plane range. Every type rejects a stored plane that is neither
-  `kuiNoFlightPlane` nor allowed for the type, and a heading that fails
+  navigation delay, an unknown controller, a nonzero `pClientGuids` or
+  `pGlobalIds` on a row that is not `ShipController::kFleet`, a target flight
+  plane the type disallows, and an AI direction that fails
+  `IsShipHeadingValid`. On every Frame read, Interpolate `PostRead` requires a
+  finite Fighter or Omni height at or above the lowest plane, allowing
+  terrain-raised heights above the highest plane; Battleships retain the
+  lowest-to-highest plane range. Every type rejects a stored plane that is
+  neither `kuiNoFlightPlane` nor allowed for the type, and a heading that fails
   `IsShipHeadingValid`.
 - A ship's target flight plane lives in its orders, set at spawn and changed by
   `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
   by the random-spawn Omni chase (`../Fighters/AGENTS.md`,
   `../Omnis/AGENTS.md`); target planes must be allowed for the type
   (`IsFlightPlaneAllowed`). Its current plane is stored in the shared
-  Interpolate column `puiFlightPlanes`: the plane index at its exact effective
-  height, `kuiNoFlightPlane` between or above planes. A genuine spawn stores its
-  spawn plane and a transfer arrival carries the stored value.
+  Interpolate column `puiFlightPlanes`: the plane index once ordinary plane
+  travel lands it at that plane's exact effective height, `kuiNoFlightPlane`
+  between or above planes and after a terrain rise, even one ending at an exact
+  effective height. A genuine spawn stores its spawn plane and a transfer
+  arrival carries the stored value.
 - Between the two flight planes, the lower plane carries the union of terrain restrictions because the upper plane has none. A ship navigates on its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
 - Path queries route around large ships. `NavRectangleBoard`, built once per
   ship type's PostRender Update, holds one rectangle per previous-frame row
@@ -119,7 +122,7 @@ The ramped heading turn in `ShipBehaviours` follows the
   Apply this floor after ordinary Interpolate plane travel and after the final
   PostRender pusher correction, without a rise-rate or highest-plane ceiling.
   Preserve XY/W, target orders, and the ordinary effective model-origin floor;
-  a rise recomputes the stored plane under the exact-height rule above. These
+  a rise's stored plane follows the `puiFlightPlanes` rule above. These
   ships bypass horizontal terrain push/contact. Dying ships receive no terrain
   floor; Fighter and Omni death contact retains the exact-height skip and also
   requires the actual navigation plane to enable terrain collision.
@@ -145,8 +148,8 @@ The ramped heading turn in `ShipBehaviours` follows the
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
   missiles and Omni blasters target only an enemy whose nearest plane is the
   shooter's stored plane, hitting a climbing target only by 3D contact: a
-  missile aims along the horizontal offset to its target and retains the
-  shooter's plane as its assigned plane (`../Missiles/AGENTS.md`), and an Omni
+  missile aims along the horizontal offset to its target and flies on the
+  lowest plane (`../Missiles/AGENTS.md`), and an Omni
   bolt flies flat along the Omni's hull. The Fighter beam
   has its own plane rule (`../Fighters/AGENTS.md`). All three weapons fire only
   at an enemy in line of sight (`HasShipLineOfSight`) on the shooter's stored
@@ -211,9 +214,8 @@ The ramped heading turn in `ShipBehaviours` follows the
   only when its horizontal AI bearing is within the inclusive +/-45-degree
   forward cone. Outside the cone it retains drag
   and skips terrain avoidance; the shared terrain response and pusher response still
-  apply. A fleet Fighter outside the cone uses its signed maximum turn rate,
-  preserving that navigation turn through terrain response, and inside the cone
-  uses ordinary steering smoothing. A fleet Battleship turns as
+  apply. A fleet Fighter outside the cone uses its signed maximum turn rate, and
+  inside the cone uses ordinary steering smoothing. A fleet Battleship turns as
   `../Battleships/AGENTS.md` `## Turning Invariants` states. This rule does not
   apply to Omnis or random-spawn ships.
 - Navigation covers roaming, cross-cell movement, island destinations, flagship following, and a fleet Omni's patrol around its flagship (`../Omnis/AGENTS.md`). The patrol runs in the island-destination mode (mode 6) and, on a tick the Omni's flagship is in its cell, replaces the fleet override, flagship following, and the cell-change timer. Mode transitions depend only on shared state.

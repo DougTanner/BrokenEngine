@@ -59,23 +59,8 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 			if (!(flags & kFalling))
 			{
-				float fTargetHeight = engine::gpFlightPlanes->Plane(GetMissileFlightPlane(flags)).fHeightMeters;
-				float fClimbStep = kfBattleshipClimbRate * deltaTime.count();
-				float fHeight = XMVectorGetZ(vecPosition);
-				float fHeightGap = fTargetHeight - fHeight;
-				if (fHeightGap > fClimbStep)
-				{
-					fHeight += fClimbStep;
-				}
-				else if (fHeightGap < -fClimbStep)
-				{
-					fHeight -= fClimbStep;
-				}
-				else
-				{
-					fHeight = fTargetHeight;
-				}
-				vecPosition = XMVectorSetZ(vecPosition, fHeight);
+				bool bArrived = false;
+				vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), engine::gpFlightPlanes->Lowest().fHeightMeters, kfBattleshipClimbRate * deltaTime.count(), bArrived));
 
 				// PostRender::Update already applies the rotation delay percentage.
 				vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i]);
@@ -106,9 +91,8 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Before the ship Updates, current registry ids and interpolated positions still align with previous rows.
-	// Bind previous positions for retained-target homing and previous arrival grace for eligibility. A missile reads
-	// only the context of its assigned flight plane.
-	RegistryWindow window = BuildShipRegistryWindow(rFrame, rPreviousFrame, *rPreviousFrame.postRender.pMissiles);
+	// Bind previous positions for retained-target homing and previous arrival grace for eligibility.
+	RegistryWindow window = BuildShipRegistryWindow(rFrame, rPreviousFrame);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -121,7 +105,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		float fExhaustLength = rPrevious.pfExhaustLengths[i];
 		std::chrono::duration<float> nextJitter = rPrevious.pNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
-		int64_t iFlightPlane = GetMissileFlightPlane(rPrevious.pFlags[i]);
 
 		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime < kMissileLifetime) [[likely]]
 		{
@@ -162,14 +145,13 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 			fExhaustLength = kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 
-			// Validate the retained handle against the rows the registry currently considers eligible on the missile's
-			// plane; a source that died, transferred, is still in arrival grace, or left the missile's plane drops the
-			// handle.
+			// Validate the retained handle against the rows the registry currently considers eligible on the lowest
+			// plane; a source that died, transferred, is still in arrival grace, or left that plane drops the handle.
 			engine::RegistryResult retained {};
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
 			{
-				bRetained = engine::ResolveRegistryHandle(window.contexts[static_cast<size_t>(iFlightPlane)], uiTarget, retained);
+				bRetained = engine::ResolveRegistryHandle(window.context, uiTarget, retained);
 				if (!bRetained)
 				{
 					uiTarget = {};

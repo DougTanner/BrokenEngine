@@ -29,7 +29,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   The [shared ship policy](Collections/Ships/AGENTS.md#ship-invariants) owns the
   death transition. Build-local reads also reject a flying missile — neither
   falling nor dying — whose height is non-finite or whose velocity Z is nonzero;
-  finite off-plane heights are valid during its return to its assigned plane
+  finite off-plane heights are valid during its return to the lowest plane
   (`Collections/Missiles/AGENTS.md` `## Invariants`).
 - Navigation and elevation are deterministic derived data excluded from both the
   CRC and persisted frame payload. The game derives the clearance tiers, the
@@ -72,7 +72,6 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   `Collections/Missiles/AGENTS.md`. This scope builds its only query window, the
   Missile-Update window in Missiles Update, as specified in Frame Registry Query
   Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
-- Acquiring a target writes the frame — it takes a subscription — so the order acquisitions happen in within a tick is part of the deterministic stream. Do not hoist one out of a loop, cache its result, or run it in parallel across entities.
 - `Frame::OwnershipLayers` maps the engine registry's ownership layer onto each ship type's PostRender columns, one layer per type; `Frame::OwnedEntityCount` counts a frame's fleet-controlled rows.
 - Cell containment uses `engine::IsInsideCell`; a transfer producer calls `PrepareTransferRequest` only for a position that fails it, because `CellExitDirection` names no direction for an inside position.
 - `GetServerCellStatistics` and its row labels `kServerEntityCountNames`

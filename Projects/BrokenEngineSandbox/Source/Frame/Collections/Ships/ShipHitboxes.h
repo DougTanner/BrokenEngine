@@ -39,6 +39,9 @@ struct ShipHitboxShape
 	// Cached upright water clearance floor for spawn and per-tick height targets.
 	float fMinimumOriginZ = 0.0f;
 	bool bNavigationObstacle = false;
+	// The model's packed hardpoints, borrowed from its eager chunk; only Battleship models hold any.
+	std::span<const common::PackedModelHardpoint> missileTubes;
+	std::span<const common::PackedModelHardpoint> fighterLaunchBays;
 };
 
 // Indexed by ShipType, then ShipController. Written once by InitializeShipHitboxes before the first frame; read-only

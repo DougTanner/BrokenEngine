@@ -58,14 +58,15 @@ struct RegistryQueryContext
 
 // Size of the registry-internal scratch block for one query window's eligible rows, laid out as the row indices the
 // caller writes and binds into RegistrySourceLayer::rows, followed by the subscriber counts
-// BuildRegistryQueryContext derives. It cannot size RegistryBatch::rows or RegistryBatch::results, which scale
-// with the caller's consumer count rather than with the source layers.
+// BuildRegistryQueryContext derives only when a subscription layer is bound. It cannot size RegistryBatch::rows or
+// RegistryBatch::results, which scale with the caller's consumer count rather than with the source layers.
 [[nodiscard]] constexpr int64_t RegistryScratchBytes(int64_t iEligibleRows)
 {
 	return iEligibleRows * static_cast<int64_t>(sizeof(int64_t) + sizeof(uint16_t));
 }
 
-// scratch is the whole RegistryScratchBytes block, including the row prefix the caller already filled.
+// scratch is the whole RegistryScratchBytes block, including the row prefix the caller already filled, or with no
+// subscription layer only that row prefix.
 [[nodiscard]] RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, std::span<const RegistrySourceLayer> sourceLayers, std::span<const RegistrySubscriptionLayer> subscriptionLayers, std::span<std::byte> scratch);
 
 // Fixed policy: fewest subscribers, then smallest angle, ties by layer order then row order.

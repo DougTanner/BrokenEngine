@@ -34,9 +34,11 @@ public:
 	engine::NetworkUiControl<int64_t> mCreateFleetToggle;
 	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle;
 	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl;
-	std::unordered_map<int64_t, engine::NetworkUiControl<bool>> mDestroyMemberControls;
+	engine::NetworkUiControl<int64_t> mDestroyMemberToggle;
 
 	std::vector<Fleet> mClientFleets;
+	// Advances on every SynchronizeFleets call and never resets; the spawn-into-fleet and destroy-member toggles key on it.
+	int64_t miAppliedFleetSyncCount = 0;
 	int64_t miFocusedFleetIndex = -1;
 	engine::GlobalId mFocusedMemberGlobalId {};
 	engine::GlobalId mPendingFocusMemberGlobalId {};

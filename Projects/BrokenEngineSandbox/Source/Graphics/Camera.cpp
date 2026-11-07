@@ -77,7 +77,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	return engine::CameraTarget::Extrapolate();
 }
 
-// Return sun angle, applying the Time of Day slider override while the Graphics settings screen is up
+// Return sun angle, applying the Sun Angle Override slider while the Graphics settings screen is up
 float Camera::SunAngle() const
 {
 	if (game::gpGame->meUiState == engine::UiState::kGraphicsSettings)

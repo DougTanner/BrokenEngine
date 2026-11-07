@@ -111,7 +111,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		// Status-change payload members.
 		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, alignment)> Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, alignment)> {};
+			return {};
 		}
 	};
 

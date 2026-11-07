@@ -19,10 +19,9 @@ constexpr engine::ClientPacketContract GetGamePacketContract(GamePacketType eTyp
 {
 	switch (eType)
 	{
-		case GamePacketType::kClientFleetNavigationDelay: return {.iMinimumSize = 21, .iMaximumSize = 21, .iMaximumPerTick = 8};     // 16B fleetGuid + 4B delay + 1B type (edge-triggered send)
-		case GamePacketType::kClientCreateFleetRequest: return {.iMinimumSize = 1, .iMaximumSize = 1, .iMaximumPerTick = 4};         // 1B type only
-		case GamePacketType::kClientSpawnIntoFleetRequest: return {.iMinimumSize = 18, .iMaximumSize = 18, .iMaximumPerTick = 8};    // 16B fleetGuid + 1B ShipType + 1B type
-
+		case GamePacketType::kClientFleetNavigationDelay: return {.iMinimumSize = GameMessages::FleetNavigationDelayRequestMessage::kiSize + 1, .iMaximumSize = GameMessages::FleetNavigationDelayRequestMessage::kiSize + 1, .iMaximumPerTick = 8}; // edge-triggered send
+		case GamePacketType::kClientCreateFleetRequest: return {.iMinimumSize = GameMessages::CreateFleetRequestMessage::kiSize + 1, .iMaximumSize = GameMessages::CreateFleetRequestMessage::kiSize + 1, .iMaximumPerTick = 4};
+		case GamePacketType::kClientSpawnIntoFleetRequest: return {.iMinimumSize = GameMessages::SpawnIntoFleetRequestMessage::kiSize + 1, .iMaximumSize = GameMessages::SpawnIntoFleetRequestMessage::kiSize + 1, .iMaximumPerTick = 8};
 		case GamePacketType::kClientDestroyFleetMemberRequest: return {.iMinimumSize = GameMessages::DestroyFleetMemberRequestMessage::kiSize + 1, .iMaximumSize = GameMessages::DestroyFleetMemberRequestMessage::kiSize + 1, .iMaximumPerTick = 8};
 
 		default: return {};
