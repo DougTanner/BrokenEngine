@@ -144,7 +144,11 @@ Order: `/prepare-change` first at Tier 2+, because the alternative investigation
   naming the drafted mechanism as candidate zero, and the assigned axis — never
   the plan's rationale, never the plan's `## In scope`/`## Out of scope`
   sections, and never the plan file's path, in any field and in any form,
-  positive or negative. Main writes the candidate-zero line from the
+  positive or negative. `Governing paths:` never names a path under `Temp/`,
+  `Documents/Plans/`, `Documents/Features/`, or `Documents/Investigations/`
+  other than the `AGENTS.md` of those three `Documents/` trees; main restates
+  any fact held only in such a path as text in the brief, under the same
+  exclusions. Main writes the candidate-zero line from the
   `Mechanism` row of the preparation handoff's `Candidate zero` field whenever
   a preparation handoff returned that field with a value other than `none`,
   reading neither the plan snapshot nor the plan file for it.
@@ -205,15 +209,18 @@ finding or resolution; `/resolve-findings` runs after each finding main accepts,
 followed by re-review and retest of the affected regions only; a second round
 needs a reproducible blocker; `/external-diagnose-bug` runs before any further
 `/resolve-findings` attempt on a cause whose fix failed its retest, and its
-proven cause returns to `/resolve-findings` or a plan. When
-`/over-engineering-review` runs, its finder and validator run first; when the
-validator changed C++, `/code-style-review` runs over the newly changed ranges
-and `/compile` builds its `Build required`, as in Step 5, and only then do
-`/repo-code-review` and `/comment-review` start, with the validator's handoff,
-or the finder's when the validator is skipped, as `/repo-code-review`'s
-implementation handoff. Other per-artifact reviews do not wait for the pair. The
-pair runs once per stage; a later `/resolve-findings` round's re-review covers
-its own fix.
+proven cause returns to `/resolve-findings` or a plan. Whenever the
+`/over-engineering-review` validator or a `/resolve-findings` round changed
+C++, `/code-style-review` runs over the newly changed ranges and `/compile`
+builds its `Build required`, as in Step 5, and only then do `/repo-code-review`
+and `/comment-review` start, after a round as that round's
+re-reviews of the affected regions; when `/over-engineering-review` runs, its
+finder and validator run before `/repo-code-review` and `/comment-review`
+start, with the validator's handoff, or the finder's when the validator is
+skipped, as `/repo-code-review`'s implementation handoff. Other per-artifact
+reviews and re-reviews wait for neither `/over-engineering-review` nor that
+`/code-style-review` run and build. `/over-engineering-review` runs once per
+stage; a later `/resolve-findings` round's re-review covers its own fix.
 
 - fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its brief carries what `.agents/skills/repo-code-review/SKILL.md` `## Inputs` requires.
