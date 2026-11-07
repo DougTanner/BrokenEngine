@@ -6,8 +6,8 @@
 Build one bounded, opt-in client-rendering prototype to decide whether visible
 opaque mesh emission can illuminate opaque terrain and models with useful
 geometry-aware occlusion at the engine's distant RTS camera. This Plan replaces
-the screen-space feature proposal; [planar RC](../../Features/Graphics/PlanarRadianceCascades.md)
-remains a separate proposal. Saving this Plan authorizes no implementation.
+the screen-space feature proposal; [planar RC](PlanarRadianceCascades.md)
+is a separate executable Plan. Saving this Plan authorizes no implementation.
 
 The author records these user decisions: a measurable prototype go/no-go;
 dedicated single-sample terrain/opaque-model scene inputs; visible material
