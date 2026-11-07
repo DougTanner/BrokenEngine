@@ -474,7 +474,8 @@ Pause/timescale persist on an empty server. They reset only when the last connec
   row is zero, since the measured work did not run. For the server `NavQuery`
   raw row, retain every observed sequence and gap marker; do not reconstruct
   skipped sequences or use the overlapping `averageUs`/`maxUs` smoother rows as
-  cohorts.
+  cohorts. The build configuration each side requires is stated in
+  [`../SKILL.md`](../SKILL.md) `## Inputs`.
 - Engine command handlers live under `Engine/Source/Agent`: the shared ones in
   `AgentCommandsShared.cpp`, the client ones in `AgentCommandsClientGeneric.cpp`,
   the server ones in `AgentCommandsServerGeneric.cpp`, and focused command
