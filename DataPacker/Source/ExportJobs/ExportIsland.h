@@ -34,9 +34,9 @@ public:
 
 	// Governs the four BC encodes (AmbientOcclusion / Color / Normals / Masks) only. Deliberately a
 	// plain int64_t rather than Version(...): folding in sizeof(common::ChunkHeader) would retie the
-	// encode to every unrelated chunk-header layout change, re-encoding and rewriting the ~446 MB of
-	// Git-tracked island textures for a change that cannot alter a single texel.
-	static constexpr int64_t kiTextureVersion = 2;
+	// encode to every unrelated chunk-header layout change, re-encoding and rewriting every
+	// Git-tracked island texture for a change that cannot alter a single texel.
+	static constexpr int64_t kiTextureVersion = 3;
 
 	bool CheckDirty(const std::filesystem::path& rPackFile) override;
 	static bool HasAuthorTextureProof(const std::filesystem::path& rLeaf);

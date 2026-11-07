@@ -351,14 +351,6 @@ void Texture::Downsize(int64_t iLevels)
 	miHeight >>= iLevels;
 }
 
-uint32_t Texture::PixelToUint32(const std::vector<float>& rInput, int64_t iWidth, int64_t iX, int64_t iY)
-{
-	return static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 3)) << 24 |
-	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 2)) << 16 |
-	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 1)) <<  8 |
-	       static_cast<uint32_t>(rInput.at(4 * (iY * iWidth + iX) + 0));
-}
-
 void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, VkFormat vkFormat, TextureOptions_t options)
 {
 	if (gpFileManager->mbForbidExpensiveExport)
@@ -400,10 +392,8 @@ void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInpu
 						int64_t iSourceX = std::min(iBlockX * 4 + iPixelX, iWidth - 1);
 						const float* pfSource = rInput.data() + 4 * (iSourceY * iWidth + iSourceX);
 						uint8_t* puiPixel = pixels.data() + 4 * (iPixelY * 4 + iPixelX);
-						for (int64_t iChannel = 0; iChannel < 4; ++iChannel)
-						{
-							puiPixel[iChannel] = static_cast<uint8_t>(std::clamp(pfSource[iChannel], 0.0f, 255.0f));
-						}
+						uint32_t uiPixel = glm::packUnorm4x8(glm::vec4(pfSource[0], pfSource[1], pfSource[2], pfSource[3]) / 255.0f);
+						std::memcpy(puiPixel, &uiPixel, sizeof(uiPixel));
 					}
 				}
 
@@ -457,7 +447,8 @@ void Texture::ToR8G8B8A8(std::byte* puiOutput, const std::vector<float>& rInput,
 	{
 		for (int64_t i = 0; i < iWidth; ++i)
 		{
-			reinterpret_cast<uint32_t*>(puiOutput)[j * iWidth + i] = PixelToUint32(rInput, iWidth, i, j);
+			const float* pfSource = rInput.data() + 4 * (j * iWidth + i);
+			reinterpret_cast<uint32_t*>(puiOutput)[j * iWidth + i] = glm::packUnorm4x8(glm::vec4(pfSource[0], pfSource[1], pfSource[2], pfSource[3]) / 255.0f);
 		}
 	}
 }

@@ -7,25 +7,25 @@
   "leaves": [
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "4ac4bd4cbfb99ad5c381a76479e63566fdda123b27a161a0b1b2747aa98de5ad",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "7868e37e2925a21c89459256d736aa92276ba799b2614b91f1ee8843149a28bf",
         "BakedDimensions.json": "8f5cc29e052da4c8c6bc1258c79aa5ff5c092eec98bb11677aeda53f53fba986",
-        "Color.BC7_UNORM_BLOCK": "a307cde495fc765fb37253c651eacff3021eb7852851d79f48182f6022063bad",
+        "Color.BC7_UNORM_BLOCK": "cfa3efc2f3238bdf666d6528fc4d38ccf0c1a1920cd4b21d27f2604982541ae7",
         "Elevation.r32": "1c3ce08eafd95e153f67d3237c4244039efd1f7f0a14e5db9421502e8c57bcd3",
-        "Masks.BC7_UNORM_BLOCK": "f1855ff50ca6aea3cd5eb6b4e229904c65ab27b836a22e6bddf5572e0070b811",
+        "Masks.BC7_UNORM_BLOCK": "f77881a79f1b83cd056d55bf233c2bf5fb4167894b11fd3cec654f8aabb0866b",
         "MeshProcessed.bin": "c217252f3af7ad81389e24ef705767788d69e999a8edd27a6027a49b31be795a",
-        "Normals.BC5_UNORM_BLOCK": "1eabf10683414345103818af7aaf07b27609e3adaf3daaa011d8f6686e571ccd"
+        "Normals.BC5_UNORM_BLOCK": "07bb39fc21be44082990970b39a3e608dea75fb2f6d9b9b4499f6c0206d1406a"
       },
       "index": 0
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "5f9e281ed861f01d8332c487199b760615d3635e2e7902bcbef13b3a5bf4f7cb",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "9056da03649312f52f206143d3b3215aa5d664ec12d2c16a8c265d1f0a9658f8",
         "BakedDimensions.json": "b3065b8647858e079a817e16e3f7c584bfe8f6c2e420805769193f05978286ff",
-        "Color.BC7_UNORM_BLOCK": "479c69e98d1afefbe57c9fcdd9403340c0f1189f84587c29c6b04acb47a453b7",
+        "Color.BC7_UNORM_BLOCK": "20561d9958eb06f456edfe21052460b419a73c9f4b87b4fe6aec32ae54c0eabd",
         "Elevation.r32": "f064bb958c520fd2eca1e3622ee8c63a5e05ef7f556ea63f11c787fd526293af",
-        "Masks.BC7_UNORM_BLOCK": "b083970f1128e1d31908d0347e37fa1827e27ddaf075698e161d0a218cc8d494",
+        "Masks.BC7_UNORM_BLOCK": "d5d3b406e85e8800f0cac025363e5c66815ba34686dec33da9daef688823f990",
         "MeshProcessed.bin": "085aaf86e890f7e0f5291540266fa641fa161d39298400312b2df370cfc99056",
-        "Normals.BC5_UNORM_BLOCK": "4ebcd3ab85e31713edf7674483c8f02ed7bd2513690cfec7c69a072fb18332e5"
+        "Normals.BC5_UNORM_BLOCK": "7fafd73a7eea421ba33b219bdc23631f94aba4d259f0a942ece85e41255e158b"
       },
       "index": 1
     }
@@ -34,6 +34,6 @@
   "route": "2x1",
   "rows": 2,
   "splitVersion": 8,
-  "textureVersion": 2,
+  "textureVersion": 3,
   "version": 2
 }

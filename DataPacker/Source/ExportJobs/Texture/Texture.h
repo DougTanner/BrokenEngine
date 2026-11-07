@@ -144,7 +144,6 @@ public:
 	// before BC encoding, giving the base codecs and zlib large constant runs to compress.
 	void MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHeightmapWidth, int64_t iHeightmapHeight, int64_t iHeightmapDivisor, float fThresholdMeters, const float pfFlatValue[4]);
 
-	static uint32_t PixelToUint32(const std::vector<float>& rInput, int64_t iWidth, int64_t iX, int64_t iY);
 	static void ToBc4(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
 	static void ToBc5(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight);
 	static void ToBc7(std::byte* puiOutput, const std::vector<float>& rInput, int64_t iWidth, int64_t iHeight, TextureOptions_t options);
