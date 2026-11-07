@@ -849,9 +849,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\ImGuiManager.h">
       <Filter>Engine\Graphics\Managers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h">
-      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClInclude>
@@ -1451,9 +1448,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.cpp">
-      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenPbr.cpp">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>

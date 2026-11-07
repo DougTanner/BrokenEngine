@@ -7,12 +7,12 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 - Active LOD grid dimensions must match both displacement textures. Water-mesh recreation recreates the grid and textures together.
 - Water quality selects wave bands without changing their tuned counts: Low runs no displacement, Medium runs the low-frequency band, and High runs both low- and medium-frequency bands.
 - Low-frequency Gerstner amplitudes come directly from the base values in `MainLayout.pf4LowWavesTwo[i].y`; displacement applies no depth-based Green's-law shoaling multiplier.
-- The low-frequency Gerstner band's breaker boundary weight transitions from `Break Start Depth` (`S`) to `Break End Depth` (`E`). When `S < E`, normalized depth `t` is shaped as `pow(t, exponent)` by `Break Blend Curve` (`gWaterBreakBlendCurve`; `1` is linear, values below `1` introduce low earlier); the clamped endpoints remain exact. When `S >= E`, the boundary is a hard step at `E`.
+- The low-frequency Gerstner band's breaker boundary weight transitions from `Water Break Start Depth` (`S`) to `Water Break End Depth` (`E`). When `S < E`, normalized depth `t` is shaped as `pow(t, exponent)` by `Water Break Blend Curve` (`gWaterBreakBlendCurve`; `1` is linear, values below `1` introduce low earlier); the clamped endpoints remain exact. When `S >= E`, the boundary is a hard step at `E`.
 - The medium-frequency band starts with the complementary boundary weight
   `1 - low`. After both boundaries are calculated, one smooth shore envelope
-  over physical depth `[0, Medium Shore Softness]` multiplies the medium weight
-  only, taking medium to zero at terrain while leaving the low boundary
-  unchanged; `Medium Shore Softness` `0` bypasses the envelope. Both weights
+  over physical depth `[0, Water Medium Shore Softness]` multiplies the medium
+  weight only, taking medium to zero at terrain while leaving the low boundary
+  unchanged; `Water Medium Shore Softness` `0` bypasses the envelope. Both weights
   remain bounded. The shore Z taper applies to both bands; over-land vertices
   remain flat and fragments discard where terrain elevation is above zero.
 - Compute accumulates tangent and bitangent derivatives and uses their cross product for the wave normal. Do not replace that full cross-product form with the simplified first-order normal: as a band's summed steepness x frequency x amplitude approaches 1 — the point where Gerstner waves start folding over on themselves — the simplified normal drifts away from the true one and eventually tilts the wrong way, while the cross product stays correct.
@@ -68,7 +68,7 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
   original full-pixel unwrapped gradients. Nonpositive factors contribute zero
   and stay in the denominator. Only Skybox One samples extra.
 - Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
-- Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
+- Specular beach-lobe reduction uses `Water Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Water Medium Shore Softness`.
 - View-dependent shading — the eye vector, reflected ray, and reflection Fresnel — reads `MainLayout.f4WaterEyePosition`, never `f4EyePosition`; base-height lighting and smoke projections keep the true eye line (`ToEyeLine`).
 - Lighting samples the low lighting layer at a base-height projection and smoke at each flight plane's projection, both derived from the undisplaced world position, keeping them stable under wave animation. Plane k's smoke is lit by layer k's ambient at that plane's projection; the high layer is read only where its plane's smoke shows.
 - Sun-driven energy and skybox sun/moon specular use full effective shadow. Sky ambient uses the separately controlled ambient-shadow mix; EWNS (defined in the shader hub) and ambient emitter deposits remain unshadowed.

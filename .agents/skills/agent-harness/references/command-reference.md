@@ -210,7 +210,8 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   whose visible text repeats within one window carries a hidden `##<section>`
   suffix, such as `Low##Terrain Shadows`. Menu
   controls created with `MenuUtils::WrapperSlider` and
-  `MenuUtils::WrapperPlusMinus` also include optional `value` text for the
+  `MenuUtils::WrapperPlusMinus`, and Tweaks sliders created with
+  `TweaksScreen::WrapperSlider`, also include optional `value` text for the
   current numeric value, using the control's display format. Other items omit
   the field; checkbox state and radio controls created with
   `MenuUtils::RadioRow` expose their state through `checked`.
@@ -233,7 +234,6 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   Enter submits it. Returns found/enabled. Tweaks overlay sliders are reachable
   only in Debug clients, where `kbDebugInput` lets F3 open the overlay; in
   Profile and Release clients they fail with `no widget matches label`.
-- `get_wrapper`: `{"key":string}`. Read-only lookup of a Tweaks-registered wrapper. Returns `value`, `min`, and `max`, each a `"%.6f"` string matching the slider's own display format. `key` is the registrar's slider map key, not the display label where the two differ. Needs no F3 overlay and works in every client build. A missing or non-string `key` fails with `get_wrapper requires string 'key'`; an unregistered key fails with `get_wrapper: no Tweaks slider key '<key>'`.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798`
   (default `1`); a value outside that range is a parameter error. The limit
   counts client drains/frames rather than wall-clock time, so duration varies
@@ -331,11 +331,8 @@ panel's buttons, a row scrolled out of view — is listed with
 `visible:false` and activates like a visible one; only items
 inside a fully clipped child window are skipped. Side effects: offscreen labels
 take part in label resolution, so a label unique on screen can become
-ambiguous — for six frames once per Tweaks screen lifetime, the Tweaks slider
-audit renders every section into an offscreen `##slider-audit` window,
-repeating the sections' tab items and non-slider controls — and `window`
-narrows the match; offscreen widgets also run their full behavior and draw
-code. Mouse-only widgets (curve-editor control points, ImPlot plot
+ambiguous, and `window` narrows the match; offscreen widgets also run their
+full behavior and draw code. Mouse-only widgets (curve-editor control points, ImPlot plot
 interactions) and hover effects, such as hover-opened panels, cannot be driven.
 
 Command results never prove on-screen visibility: a rendered-appearance

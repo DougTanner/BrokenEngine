@@ -4,104 +4,11 @@
 
 #include "Ui/CurveWidget.h"
 #include "Ui/LightingWrappersBase.h"
-#include "TweaksSliderMap.h"
 
 #include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
-
-const TweaksSliderMapRegistrar gLightingRegistrar
-{
-	{"Lighting Blur Sigma", &gLightingBlurSigma},
-	{"Lighting Blur Sample Count", &gLightingBlurSampleCount},
-	{"Lighting Blur Edge Falloff", &gLightingBlurEdgeFalloff},
-	{"Deposit Texture Multiplier", &gLightingDepositTextureMultiplier},
-	{"Deposit Threshold", &gLightingDepositThreshold},
-	{"Deposit Compress", &gLightingDepositCompress},
-	{"Spread Pass Count", &gSpreadPassCount},
-	{"Spread Decay", &gSpreadDecay},
-	{"Spread Accumulation Decay", &gSpreadAccumulationDecay},
-	{"Spread Texture Multiplier Start", &gSpreadTextureMultiplierStart},
-	{"Spread Directionality", &gSpreadDirectionality},
-	{"Spread Direction Count", &gSpreadDirectionCount},
-	{"Spread Distance", &gSpreadDistance},
-	{"Spread Ring Count", &gSpreadRingCount},
-	{"Spread Jitter", &gSpreadJitter},
-	{"Spread Sample Jitter Range Start", &gSpreadSampleJitterRangeStart},
-	{"Spread Sample Jitter Clustering Start", &gSpreadSampleJitterClusteringStart},
-	{"Spread Distance Falloff", &gSpreadDistanceFalloff},
-	{"Spread Height Multiplier", &gSpreadHeightMultiplier},
-	{"Spread Height End Height", &gSpreadHeightEndHeight},
-	{"Spread Height Power", &gSpreadHeightPower},
-	{"Spread Output Threshold", &gSpreadOutputThreshold},
-	{"Spread Output Compress", &gSpreadOutputCompress},
-	{"Spread Texture Multiplier End", &gSpreadTextureMultiplierEnd},
-	{"Spread Directionality End", &gSpreadDirectionalityEnd},
-	{"Spread Direction Count End", &gSpreadDirectionCountEnd},
-	{"Spread Distance End Start Height", &gSpreadDistanceEnd.startHeight},
-	{"Spread Distance End End Height", &gSpreadDistanceEnd.endHeight},
-	{"Spread Distance End Low", &gSpreadDistanceEnd.low},
-	{"Spread Distance End High", &gSpreadDistanceEnd.high},
-	{"Spread Ring Count End", &gSpreadRingCountEnd},
-	{"Spread Jitter End", &gSpreadJitterEnd},
-	{"Spread Sample Jitter Range End", &gSpreadSampleJitterRangeEnd},
-	{"Spread Sample Jitter Clustering End", &gSpreadSampleJitterClusteringEnd},
-	{"Spread Decay End", &gSpreadDecayEnd},
-	{"Spread Accumulation Decay End", &gSpreadAccumulationDecayEnd},
-	{"Spread Distance Falloff End", &gSpreadDistanceFalloffEnd},
-	{"Spread Output Threshold End", &gSpreadOutputThresholdEnd},
-	{"Spread Output Compress End", &gSpreadOutputCompressEnd},
-	{"Texel Ramp Speed", &gLightingTexelRampMetersPerSecond},
-	{"Temporal Blend", &gLightingTemporalBlend},
-	{"Lighting Update Cadence", &gLightingUpdateCadence},
-	{"Combine Max Brightness", &gCombineMaxBrightness},
-	{"Combine Contrast", &gCombineContrast},
-	{"Combine Linear Start", &gCombineLinearStart},
-	{"Combine Linear Length", &gCombineLinearLength},
-	{"Combine Toe", &gCombineToe},
-	{"Combine Black Tightness", &gCombineBlackTightness},
-	{"Combine Pass Normalize", &gCombinePassNormalize},
-	{"Combine Exposure Pass Scale", &gCombineExposurePassScale},
-	{"Combine Hue Preserve", &gCombineHuePreserve},
-	{"Directional Intensity", &gLightingDirectionalIntensity},
-	{"Directional Power", &gLightingDirectionalPower},
-	{"Directional Power Mode", &gLightingDirectionalPowerMode},
-	{"Ambient Intensity", &gLightingAmbientIntensity},
-	{"Ambient Power", &gLightingAmbientPower},
-	{"Ambient Power Mode", &gLightingAmbientPowerMode},
-	{"Terrain", &gLightingTerrain},
-	{"Terrain Add", &gLightingAddTerrain},
-	{"Terrain Below Base Multiplier", &gLightingTerrainBelowBaseMultiplier},
-	{"Terrain Below Base Power", &gLightingTerrainBelowBasePower},
-	{"Objects", &gLightingObjects},
-	{"Objects Add", &gLightingObjectsAdd},
-	{"Day Final Multiplier", &gLightingDayFinalMultiplier},
-	{"Night Final Multiplier", &gLightingNightFinalMultiplier},
-	{"Water EWNS Pow", &gLightingWaterEastWestNorthSouthPower},
-	{"Water EWNS Pow Mode", &gLightingWaterEastWestNorthSouthPowerMode},
-	{"Water Ambient Intensity", &gLightingWaterAmbientIntensity},
-	{"Water Ambient Power", &gLightingWaterAmbientPower},
-	{"Water Ambient Power Mode", &gLightingWaterAmbientPowerMode},
-	{"Water Normal Soften", &gLightingWaterNormalSoften},
-	{"Water Normal Blend Wave", &gLightingWaterNormalBlendWave},
-	{"Water Intensity", &gLightingWaterIntensity},
-	{"Water Add", &gLightingWaterAdd},
-	{"Water One", &gLightingWaterOne},
-	{"Water One Power", &gLightingWaterOnePower},
-	{"Water Two", &gLightingWaterTwo},
-	{"Water Two Power", &gLightingWaterTwoPower},
-	{"Water Three", &gLightingWaterThree},
-	{"Water Three Power", &gLightingWaterThreePower},
-	{"Water Power Mode", &gLightingWaterPowerMode},
-	{"Water Reflected Amount", &gLightingWaterReflectedAmount},
-	{"Water Reflected Normal Blend Wave", &gLightingWaterReflectedNormalBlendWave},
-	{"Water Reflected Distortion", &gLightingWaterReflectedDistortion},
-	{"Water Reflected Falloff Start", &gLightingWaterReflectedFalloffStart},
-	{"Water Reflected Falloff Power", &gLightingWaterReflectedFalloffPower},
-	{"Water Reflected Fresnel", &gLightingWaterReflectedFresnel},
-	{"Water Reflected Intensity", &gLightingWaterReflectedIntensity},
-};
 
 void RenderLightingSection(TweaksScreen& rScreen)
 {
@@ -116,64 +23,64 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("1. Pre-Blur");
-				rScreen.WrapperSlider("Lighting Blur Sigma", iSection, 1.0f, "Lighting Blur Sigma");
-				rScreen.WrapperSlider("Lighting Blur Sample Count", iSection, 1.0f, "Lighting Blur Sample Count");
-				rScreen.WrapperSlider("Lighting Blur Edge Falloff", iSection, 1.0f, "Lighting Blur Edge Falloff");
+				rScreen.WrapperSlider("Lighting Blur Sigma", gLightingBlurSigma, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Blur Sample Count", gLightingBlurSampleCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Blur Edge Falloff", gLightingBlurEdgeFalloff, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("2. Deposit");
-				rScreen.WrapperSlider("Lighting Deposit Texture Multiplier", iSection, 1.0f, "Deposit Texture Multiplier");
-				rScreen.WrapperSlider("Lighting Deposit Threshold", iSection, 1.0f, "Deposit Threshold");
-				rScreen.WrapperSlider("Lighting Deposit Compress", iSection, 1.0f, "Deposit Compress");
+				rScreen.WrapperSlider("Lighting Deposit Texture Multiplier", gLightingDepositTextureMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Deposit Threshold", gLightingDepositThreshold, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Deposit Compress", gLightingDepositCompress, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("3a. Spread");
-				rScreen.WrapperSlider("Spread Pass Count", iSection, 1.0f, "Spread Pass Count");
-				rScreen.WrapperSlider("Spread Decay", iSection, 1.0f, "Spread Decay");
-				rScreen.WrapperSlider("Spread Accumulation Decay", iSection, 1.0f, "Spread Accumulation Decay");
+				rScreen.WrapperSlider("Spread Pass Count", gSpreadPassCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Decay", gSpreadDecay, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Accumulation Decay", gSpreadAccumulationDecay, iSection, 1.0f);
 
 				float fSpreadStartY = ImGui::GetCursorPosY();
 
 				rScreen.WrapperSeparatorText("3b. Spread Start");
-				rScreen.WrapperSlider("Spread Texture Multiplier Start", iSection, 1.0f, "Spread Texture Multiplier Start");
-				rScreen.WrapperSlider("Spread Directionality", iSection, 1.0f, "Spread Directionality");
-				rScreen.WrapperSlider("Spread Direction Count", iSection, 1.0f, "Spread Direction Count");
-				rScreen.WrapperSlider("Spread Distance", iSection, 1.0f, "Spread Distance");
-				rScreen.WrapperSlider("Spread Ring Count", iSection, 1.0f, "Spread Ring Count");
-				rScreen.WrapperSlider("Spread Jitter", iSection, 1.0f, "Spread Jitter");
-				rScreen.WrapperSlider("Spread Sample Jitter Range Start", iSection, 1.0f, "Spread Sample Jitter Range Start");
-				rScreen.WrapperSlider("Spread Sample Jitter Clustering Start", iSection, 1.0f, "Spread Sample Jitter Clustering Start");
-				rScreen.WrapperSlider("Spread Distance Falloff", iSection, 1.0f, "Spread Distance Falloff");
-				rScreen.WrapperSlider("Spread Height Multiplier", iSection, 1.0f, "Spread Height Multiplier");
-				rScreen.WrapperSlider("Spread Height End Height", iSection, 1.0f, "Spread Height End Height");
-				rScreen.WrapperSlider("Spread Height Power", iSection, 1.0f, "Spread Height Power");
-				rScreen.WrapperSlider("Spread Output Threshold", iSection, 1.0f, "Spread Output Threshold");
-				rScreen.WrapperSlider("Spread Output Compress", iSection, 1.0f, "Spread Output Compress");
+				rScreen.WrapperSlider("Spread Texture Multiplier Start", gSpreadTextureMultiplierStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Directionality", gSpreadDirectionality, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Direction Count", gSpreadDirectionCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance", gSpreadDistance, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Ring Count", gSpreadRingCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Jitter", gSpreadJitter, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Sample Jitter Range Start", gSpreadSampleJitterRangeStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Sample Jitter Clustering Start", gSpreadSampleJitterClusteringStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance Falloff", gSpreadDistanceFalloff, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Height Multiplier", gSpreadHeightMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Height End Height", gSpreadHeightEndHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Height Power", gSpreadHeightPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Threshold", gSpreadOutputThreshold, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Compress", gSpreadOutputCompress, iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 
 				ImGui::SetCursorPosY(fSpreadStartY);
 
 				rScreen.WrapperSeparatorText("3c. Spread End");
-				rScreen.WrapperSlider("Spread Texture Multiplier End", iSection, 1.0f, "Spread Texture Multiplier End");
-				rScreen.WrapperSlider("Spread Directionality End", iSection, 1.0f, "Spread Directionality End");
-				rScreen.WrapperSlider("Spread Direction Count End", iSection, 1.0f, "Spread Direction Count End");
-				rScreen.WrapperSlider("Spread Distance End Start Height", iSection, 1.0f, "Spread Distance End Start Height");
-				rScreen.WrapperSlider("Spread Distance End End Height", iSection, 1.0f, "Spread Distance End End Height");
-				rScreen.WrapperSlider("Spread Distance End Low", iSection, 1.0f, "Spread Distance End Low");
-				rScreen.WrapperSlider("Spread Distance End High", iSection, 1.0f, "Spread Distance End High");
-				rScreen.WrapperSlider("Spread Ring Count End", iSection, 1.0f, "Spread Ring Count End");
-				rScreen.WrapperSlider("Spread Jitter End", iSection, 1.0f, "Spread Jitter End");
-				rScreen.WrapperSlider("Spread Sample Jitter Range End", iSection, 1.0f, "Spread Sample Jitter Range End");
-				rScreen.WrapperSlider("Spread Sample Jitter Clustering End", iSection, 1.0f, "Spread Sample Jitter Clustering End");
-				rScreen.WrapperSlider("Spread Decay End", iSection, 1.0f, "Spread Decay End");
-				rScreen.WrapperSlider("Spread Accumulation Decay End", iSection, 1.0f, "Spread Accumulation Decay End");
-				rScreen.WrapperSlider("Spread Distance Falloff End", iSection, 1.0f, "Spread Distance Falloff End");
-				rScreen.WrapperSlider("Spread Output Threshold End", iSection, 1.0f, "Spread Output Threshold End");
-				rScreen.WrapperSlider("Spread Output Compress End", iSection, 1.0f, "Spread Output Compress End");
+				rScreen.WrapperSlider("Spread Texture Multiplier End", gSpreadTextureMultiplierEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Directionality End", gSpreadDirectionalityEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Direction Count End", gSpreadDirectionCountEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End Start Height", gSpreadDistanceEnd.startHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End End Height", gSpreadDistanceEnd.endHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End Low", gSpreadDistanceEnd.low, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End High", gSpreadDistanceEnd.high, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Ring Count End", gSpreadRingCountEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Jitter End", gSpreadJitterEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Sample Jitter Range End", gSpreadSampleJitterRangeEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Sample Jitter Clustering End", gSpreadSampleJitterClusteringEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Decay End", gSpreadDecayEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Accumulation Decay End", gSpreadAccumulationDecayEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance Falloff End", gSpreadDistanceFalloffEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Threshold End", gSpreadOutputThresholdEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Compress End", gSpreadOutputCompressEnd, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("4. Temporal");
-				rScreen.WrapperSlider("Lighting Texel Ramp Meters Per Second", iSection, 1.0f, "Texel Ramp Speed");
-				rScreen.WrapperSlider("Lighting Temporal Blend", iSection, 1.0f, "Temporal Blend");
-				rScreen.WrapperSlider("Lighting Update Cadence", iSection, 1.0f, "Lighting Update Cadence");
+				rScreen.WrapperSlider("Lighting Texel Ramp Meters Per Second", gLightingTexelRampMetersPerSecond, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Temporal Blend", gLightingTemporalBlend, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Update Cadence", gLightingUpdateCadence, iSection, 1.0f);
 
 				ImGui::EndTable();
 			}
@@ -186,15 +93,15 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Tone Curve");
-				rScreen.WrapperSlider("Combine Max Brightness", iSection, 1.0f, "Combine Max Brightness");
-				rScreen.WrapperSlider("Combine Contrast", iSection, 1.0f, "Combine Contrast");
-				rScreen.WrapperSlider("Combine Linear Start", iSection, 1.0f, "Combine Linear Start");
-				rScreen.WrapperSlider("Combine Linear Length", iSection, 1.0f, "Combine Linear Length");
-				rScreen.WrapperSlider("Combine Toe", iSection, 1.0f, "Combine Toe");
-				rScreen.WrapperSlider("Combine Black Tightness", iSection, 1.0f, "Combine Black Tightness");
-				rScreen.WrapperSlider("Combine Pass Normalize", iSection, 1.0f, "Combine Pass Normalize");
-				rScreen.WrapperSlider("Combine Exposure Pass Scale", iSection, 1.0f, "Combine Exposure Pass Scale");
-				rScreen.WrapperSlider("Combine Hue Preserve", iSection, 1.0f, "Combine Hue Preserve");
+				rScreen.WrapperSlider("Combine Max Brightness", gCombineMaxBrightness, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Contrast", gCombineContrast, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Linear Start", gCombineLinearStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Linear Length", gCombineLinearLength, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Toe", gCombineToe, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Black Tightness", gCombineBlackTightness, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Pass Normalize", gCombinePassNormalize, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Exposure Pass Scale", gCombineExposurePassScale, iSection, 1.0f);
+				rScreen.WrapperSlider("Combine Hue Preserve", gCombineHuePreserve, iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 
@@ -238,49 +145,49 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Terrain Lighting");
-				rScreen.WrapperSlider("Lighting Directional Intensity", iSection, 1.0f, "Directional Intensity");
-				rScreen.WrapperSlider("Lighting Directional Power", iSection, 1.0f, "Directional Power");
-				rScreen.WrapperSlider("Lighting Directional Power Mode", iSection, 1.0f, "Directional Power Mode");
-				rScreen.WrapperSlider("Lighting Ambient Intensity", iSection, 1.0f, "Ambient Intensity");
-				rScreen.WrapperSlider("Lighting Ambient Power", iSection, 1.0f, "Ambient Power");
-				rScreen.WrapperSlider("Lighting Ambient Power Mode", iSection, 1.0f, "Ambient Power Mode");
-				rScreen.WrapperSlider("Lighting Terrain", iSection, 1.0f, "Terrain");
-				rScreen.WrapperSlider("Lighting Add Terrain", iSection, 1.0f, "Terrain Add");
-				rScreen.WrapperSlider("Lighting Terrain Below Base Multiplier", iSection, 1.0f, "Terrain Below Base Multiplier");
-				rScreen.WrapperSlider("Lighting Terrain Below Base Power", iSection, 1.0f, "Terrain Below Base Power");
-				rScreen.WrapperSlider("Lighting Objects", iSection, 1.0f, "Objects");
-				rScreen.WrapperSlider("Lighting Objects Add", iSection, 1.0f, "Objects Add");
-				rScreen.WrapperSlider("Lighting Day Final Multiplier", iSection, 1.0f, "Day Final Multiplier");
-				rScreen.WrapperSlider("Lighting Night Final Multiplier", iSection, 1.0f, "Night Final Multiplier");
+				rScreen.WrapperSlider("Lighting Directional Intensity", gLightingDirectionalIntensity, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Directional Power", gLightingDirectionalPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Directional Power Mode", gLightingDirectionalPowerMode, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Ambient Intensity", gLightingAmbientIntensity, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Ambient Power", gLightingAmbientPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Ambient Power Mode", gLightingAmbientPowerMode, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Terrain", gLightingTerrain, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Add Terrain", gLightingAddTerrain, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Terrain Below Base Multiplier", gLightingTerrainBelowBaseMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Terrain Below Base Power", gLightingTerrainBelowBasePower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Objects", gLightingObjects, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Objects Add", gLightingObjectsAdd, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Day Final Multiplier", gLightingDayFinalMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Night Final Multiplier", gLightingNightFinalMultiplier, iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Water Lighting");
-				rScreen.WrapperSlider("Lighting Water East West North South Power", iSection, 1.0f, "Water EWNS Pow");
-				rScreen.WrapperSlider("Lighting Water East West North South Power Mode", iSection, 1.0f, "Water EWNS Pow Mode");
-				rScreen.WrapperSlider("Lighting Water Ambient Intensity", iSection, 1.0f, "Water Ambient Intensity");
-				rScreen.WrapperSlider("Lighting Water Ambient Power", iSection, 1.0f, "Water Ambient Power");
-				rScreen.WrapperSlider("Lighting Water Ambient Power Mode", iSection, 1.0f, "Water Ambient Power Mode");
-				rScreen.WrapperSlider("Lighting Water Normal Soften", iSection, 1.0f, "Water Normal Soften");
-				rScreen.WrapperSlider("Lighting Water Normal Blend Wave", iSection, 1.0f, "Water Normal Blend Wave");
-				rScreen.WrapperSlider("Lighting Water Intensity", iSection, 1.0f, "Water Intensity");
-				rScreen.WrapperSlider("Lighting Water Add", iSection, 1.0f, "Water Add");
-				rScreen.WrapperSlider("Lighting Water One", iSection, 1.0f, "Water One");
-				rScreen.WrapperSlider("Lighting Water One Power", iSection, 1.0f, "Water One Power");
-				rScreen.WrapperSlider("Lighting Water Two", iSection, 1.0f, "Water Two");
-				rScreen.WrapperSlider("Lighting Water Two Power", iSection, 1.0f, "Water Two Power");
-				rScreen.WrapperSlider("Lighting Water Three", iSection, 1.0f, "Water Three");
-				rScreen.WrapperSlider("Lighting Water Three Power", iSection, 1.0f, "Water Three Power");
-				rScreen.WrapperSlider("Lighting Water Power Mode", iSection, 1.0f, "Water Power Mode");
+				rScreen.WrapperSlider("Lighting Water East West North South Power", gLightingWaterEastWestNorthSouthPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water East West North South Power Mode", gLightingWaterEastWestNorthSouthPowerMode, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Ambient Intensity", gLightingWaterAmbientIntensity, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Ambient Power", gLightingWaterAmbientPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Ambient Power Mode", gLightingWaterAmbientPowerMode, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Normal Soften", gLightingWaterNormalSoften, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Normal Blend Wave", gLightingWaterNormalBlendWave, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Intensity", gLightingWaterIntensity, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Add", gLightingWaterAdd, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water One", gLightingWaterOne, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water One Power", gLightingWaterOnePower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Two", gLightingWaterTwo, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Two Power", gLightingWaterTwoPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Three", gLightingWaterThree, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Three Power", gLightingWaterThreePower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Power Mode", gLightingWaterPowerMode, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Water Reflected");
-				rScreen.WrapperSlider("Lighting Water Reflected Amount", iSection, 1.0f, "Water Reflected Amount");
-				rScreen.WrapperSlider("Lighting Water Reflected Normal Blend Wave", iSection, 1.0f, "Water Reflected Normal Blend Wave");
-				rScreen.WrapperSlider("Lighting Water Reflected Distortion", iSection, 1.0f, "Water Reflected Distortion");
-				rScreen.WrapperSlider("Lighting Water Reflected Falloff Start", iSection, 1.0f, "Water Reflected Falloff Start");
-				rScreen.WrapperSlider("Lighting Water Reflected Falloff Power", iSection, 1.0f, "Water Reflected Falloff Power");
-				rScreen.WrapperSlider("Lighting Water Reflected Fresnel", iSection, 1.0f, "Water Reflected Fresnel");
-				rScreen.WrapperSlider("Lighting Water Reflected Intensity", iSection, 1.0f, "Water Reflected Intensity");
+				rScreen.WrapperSlider("Lighting Water Reflected Amount", gLightingWaterReflectedAmount, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Normal Blend Wave", gLightingWaterReflectedNormalBlendWave, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Distortion", gLightingWaterReflectedDistortion, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Falloff Start", gLightingWaterReflectedFalloffStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Falloff Power", gLightingWaterReflectedFalloffPower, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Fresnel", gLightingWaterReflectedFresnel, iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Water Reflected Intensity", gLightingWaterReflectedIntensity, iSection, 1.0f);
 
 				ImGui::EndTable();
 			}

@@ -3,35 +3,11 @@
 #if defined(BT_CLIENT)
 
 #include "Ui/WindWrappersBase.h"
-#include "TweaksSliderMap.h"
 
 #include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
-
-const TweaksSliderMapRegistrar gWindRegistrar
-{
-	{"Wind Time Scale", &gWindTimeScale},
-	{"Wind Threshold Low", &gWindThresholdLow},
-	{"Wind Threshold High", &gWindThresholdHigh},
-	{"Wind Advection Scale High", &gWindAdvectionScaleHigh},
-	{"Wind Advection Scale Low", &gWindAdvectionScaleLow},
-	{"Wind Swirl Scale High", &gWindSwirlScaleHigh},
-	{"Wind Swirl Scale Low", &gWindSwirlScaleLow},
-	{"Wind Swirl Amount High", &gWindSwirlAmountHigh},
-	{"Wind Swirl Amount Low", &gWindSwirlAmountLow},
-	{"Wind Swirl Speed High", &gWindSwirlSpeedHigh},
-	{"Wind Swirl Speed Low", &gWindSwirlSpeedLow},
-	{"Wind Vorticity Confinement High", &gWindVorticityConfinementHigh},
-	{"Wind Vorticity Confinement Low", &gWindVorticityConfinementLow},
-	{"Wind Decay High", &gWindDecayHigh},
-	{"Wind Decay Low", &gWindDecayLow},
-	{"Wind Momentum High", &gWindMomentumHigh},
-	{"Wind Momentum Low", &gWindMomentumLow},
-	{"Wind Diffusion High", &gWindDiffusionHigh},
-	{"Wind Diffusion Low", &gWindDiffusionLow},
-};
 
 void RenderWindSection(TweaksScreen& rScreen)
 {
@@ -42,36 +18,36 @@ void RenderWindSection(TweaksScreen& rScreen)
 		if (rScreen.BeginSubtab("Wind", iSection, 0))
 		{
 			rScreen.WrapperSeparatorText("Time & Global");
-			rScreen.WrapperSlider("Wind Time Scale", iSection);
-			rScreen.WrapperSlider("Wind Threshold Low", iSection);
-			rScreen.WrapperSlider("Wind Threshold High", iSection);
+			rScreen.WrapperSlider("Wind Time Scale", gWindTimeScale, iSection);
+			rScreen.WrapperSlider("Wind Threshold Low", gWindThresholdLow, iSection);
+			rScreen.WrapperSlider("Wind Threshold High", gWindThresholdHigh, iSection);
 
 			rScreen.WrapperSeparatorText("Propagation");
 			if (ImGui::BeginTable("WindPropagation", 2))
 			{
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale Low", gWindAdvectionScaleLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Advection Scale High", gWindAdvectionScaleHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale Low", gWindSwirlScaleLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Scale High", gWindSwirlScaleHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount Low", gWindSwirlAmountLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Amount High", gWindSwirlAmountHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed Low", gWindSwirlSpeedLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Swirl Speed High", gWindSwirlSpeedHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement Low", gWindVorticityConfinementLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Vorticity Confinement High", gWindVorticityConfinementHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay Low", gWindDecayLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Decay High", gWindDecayHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum Low", gWindMomentumLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Momentum High", gWindMomentumHigh, iSection, 1.0f);
 
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion Low", iSection, 1.0f);
-				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion High", iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion Low", gWindDiffusionLow, iSection, 1.0f);
+				ImGui::TableNextColumn(); rScreen.WrapperSlider("Wind Diffusion High", gWindDiffusionHigh, iSection, 1.0f);
 
 				ImGui::EndTable();
 			}

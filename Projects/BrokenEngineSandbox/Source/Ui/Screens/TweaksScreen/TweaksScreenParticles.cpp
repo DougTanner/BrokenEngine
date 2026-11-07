@@ -1,57 +1,11 @@
 #include "Tweaks.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
-
 #include "Ui/ParticleWrappers.h"
 
 #if defined(BT_CLIENT)
 
 namespace game
 {
-
-const engine::TweaksSliderMapRegistrar gParticlesRegistrar
-{
-	{"Missile Particle Width", &gMissileExplosionParticleWidth},
-	{"Missile Particle Length", &gMissileExplosionParticleLength},
-	{"Missile Particle Length Spread", &gMissileExplosionParticleLengthSpread},
-	{"Missile Particle Position Jitter", &gMissileExplosionParticlePositionJitter},
-	{"Missile Particle Velocity Base", &gMissileExplosionParticleVelocityBase},
-	{"Missile Particle Velocity Spread", &gMissileExplosionParticleVelocitySpread},
-	{"Missile Particle Vertical Velocity Base", &gMissileExplosionParticleVerticalVelocityBase},
-	{"Missile Particle Vertical Velocity Spread", &gMissileExplosionParticleVerticalVelocitySpread},
-	{"Missile Particle Velocity Decay", &gMissileExplosionParticleVelocityDecay},
-	{"Missile Particle Gravity", &gMissileExplosionParticleGravity},
-	{"Missile Particle Intensity Spread", &gMissileExplosionParticleIntensitySpread},
-	{"Missile Particle Intensity Decay", &gMissileExplosionParticleIntensityDecay},
-	{"Missile Particle Intensity Power", &gMissileExplosionParticleIntensityPower},
-	{"Omni Particle Width", &gOmniExplosionParticleWidth},
-	{"Omni Particle Length", &gOmniExplosionParticleLength},
-	{"Omni Particle Length Spread", &gOmniExplosionParticleLengthSpread},
-	{"Omni Particle Position Jitter", &gOmniExplosionParticlePositionJitter},
-	{"Omni Particle Velocity Base", &gOmniExplosionParticleVelocityBase},
-	{"Omni Particle Velocity Spread", &gOmniExplosionParticleVelocitySpread},
-	{"Omni Particle Vertical Velocity Base", &gOmniExplosionParticleVerticalVelocityBase},
-	{"Omni Particle Vertical Velocity Spread", &gOmniExplosionParticleVerticalVelocitySpread},
-	{"Omni Particle Velocity Decay", &gOmniExplosionParticleVelocityDecay},
-	{"Omni Particle Gravity", &gOmniExplosionParticleGravity},
-	{"Omni Particle Visible Intensity", &gOmniExplosionParticleVisibleIntensity},
-	{"Omni Particle Intensity Spread", &gOmniExplosionParticleIntensitySpread},
-	{"Omni Particle Intensity Decay", &gOmniExplosionParticleIntensityDecay},
-	{"Omni Particle Intensity Power", &gOmniExplosionParticleIntensityPower},
-	{"Fighter Particle Width", &gFighterExplosionParticleWidth},
-	{"Fighter Particle Length", &gFighterExplosionParticleLength},
-	{"Fighter Particle Length Spread", &gFighterExplosionParticleLengthSpread},
-	{"Fighter Particle Position Jitter", &gFighterExplosionParticlePositionJitter},
-	{"Fighter Particle Velocity Base", &gFighterExplosionParticleVelocityBase},
-	{"Fighter Particle Velocity Spread", &gFighterExplosionParticleVelocitySpread},
-	{"Fighter Particle Vertical Velocity Base", &gFighterExplosionParticleVerticalVelocityBase},
-	{"Fighter Particle Vertical Velocity Spread", &gFighterExplosionParticleVerticalVelocitySpread},
-	{"Fighter Particle Velocity Decay", &gFighterExplosionParticleVelocityDecay},
-	{"Fighter Particle Gravity", &gFighterExplosionParticleGravity},
-	{"Fighter Particle Intensity Spread", &gFighterExplosionParticleIntensitySpread},
-	{"Fighter Particle Intensity Decay", &gFighterExplosionParticleIntensityDecay},
-	{"Fighter Particle Intensity Power", &gFighterExplosionParticleIntensityPower},
-};
 
 void RenderParticlesSection(engine::TweaksScreen& rScreen)
 {
@@ -62,23 +16,23 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 		if (rScreen.BeginSubtab("Missile", iSection, 0))
 		{
 			rScreen.WrapperSeparatorText("Size");
-			rScreen.WrapperSlider("Missile Explosion Particle Width",           iSection, 1.0f, "Missile Particle Width");
-			rScreen.WrapperSlider("Missile Explosion Particle Length",          iSection, 1.0f, "Missile Particle Length");
-			rScreen.WrapperSlider("Missile Explosion Particle Length Spread",   iSection, 1.0f, "Missile Particle Length Spread");
-			rScreen.WrapperSlider("Missile Explosion Particle Position Jitter", iSection, 1.0f, "Missile Particle Position Jitter");
+			rScreen.WrapperSlider("Missile Explosion Particle Width", gMissileExplosionParticleWidth, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Length", gMissileExplosionParticleLength, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Length Spread", gMissileExplosionParticleLengthSpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Position Jitter", gMissileExplosionParticlePositionJitter, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Speed");
-			rScreen.WrapperSlider("Missile Explosion Particle Velocity Base",            iSection, 1.0f, "Missile Particle Velocity Base");
-			rScreen.WrapperSlider("Missile Explosion Particle Velocity Spread",          iSection, 1.0f, "Missile Particle Velocity Spread");
-			rScreen.WrapperSlider("Missile Explosion Particle Vertical Velocity Base",   iSection, 1.0f, "Missile Particle Vertical Velocity Base");
-			rScreen.WrapperSlider("Missile Explosion Particle Vertical Velocity Spread", iSection, 1.0f, "Missile Particle Vertical Velocity Spread");
-			rScreen.WrapperSlider("Missile Explosion Particle Velocity Decay",           iSection, 1.0f, "Missile Particle Velocity Decay");
-			rScreen.WrapperSlider("Missile Explosion Particle Gravity",                  iSection, 1.0f, "Missile Particle Gravity");
+			rScreen.WrapperSlider("Missile Explosion Particle Velocity Base", gMissileExplosionParticleVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Velocity Spread", gMissileExplosionParticleVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Vertical Velocity Base", gMissileExplosionParticleVerticalVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Vertical Velocity Spread", gMissileExplosionParticleVerticalVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Velocity Decay", gMissileExplosionParticleVelocityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Gravity", gMissileExplosionParticleGravity, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Missile Explosion Particle Intensity Spread",  iSection, 1.0f, "Missile Particle Intensity Spread");
-			rScreen.WrapperSlider("Missile Explosion Particle Intensity Decay",   iSection, 1.0f, "Missile Particle Intensity Decay");
-			rScreen.WrapperSlider("Missile Explosion Particle Intensity Power",   iSection, 1.0f, "Missile Particle Intensity Power");
+			rScreen.WrapperSlider("Missile Explosion Particle Intensity Spread", gMissileExplosionParticleIntensitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Intensity Decay", gMissileExplosionParticleIntensityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Missile Explosion Particle Intensity Power", gMissileExplosionParticleIntensityPower, iSection, 1.0f);
 
 			ImGui::EndTabItem();
 		}
@@ -86,24 +40,24 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 		if (rScreen.BeginSubtab("Omni", iSection, 1))
 		{
 			rScreen.WrapperSeparatorText("Size");
-			rScreen.WrapperSlider("Omni Explosion Particle Width",           iSection, 1.0f, "Omni Particle Width");
-			rScreen.WrapperSlider("Omni Explosion Particle Length",          iSection, 1.0f, "Omni Particle Length");
-			rScreen.WrapperSlider("Omni Explosion Particle Length Spread",   iSection, 1.0f, "Omni Particle Length Spread");
-			rScreen.WrapperSlider("Omni Explosion Particle Position Jitter", iSection, 1.0f, "Omni Particle Position Jitter");
+			rScreen.WrapperSlider("Omni Explosion Particle Width", gOmniExplosionParticleWidth, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Length", gOmniExplosionParticleLength, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Length Spread", gOmniExplosionParticleLengthSpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Position Jitter", gOmniExplosionParticlePositionJitter, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Speed");
-			rScreen.WrapperSlider("Omni Explosion Particle Velocity Base",            iSection, 1.0f, "Omni Particle Velocity Base");
-			rScreen.WrapperSlider("Omni Explosion Particle Velocity Spread",          iSection, 1.0f, "Omni Particle Velocity Spread");
-			rScreen.WrapperSlider("Omni Explosion Particle Vertical Velocity Base",   iSection, 1.0f, "Omni Particle Vertical Velocity Base");
-			rScreen.WrapperSlider("Omni Explosion Particle Vertical Velocity Spread", iSection, 1.0f, "Omni Particle Vertical Velocity Spread");
-			rScreen.WrapperSlider("Omni Explosion Particle Velocity Decay",           iSection, 1.0f, "Omni Particle Velocity Decay");
-			rScreen.WrapperSlider("Omni Explosion Particle Gravity",                  iSection, 1.0f, "Omni Particle Gravity");
+			rScreen.WrapperSlider("Omni Explosion Particle Velocity Base", gOmniExplosionParticleVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Velocity Spread", gOmniExplosionParticleVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Vertical Velocity Base", gOmniExplosionParticleVerticalVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Vertical Velocity Spread", gOmniExplosionParticleVerticalVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Velocity Decay", gOmniExplosionParticleVelocityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Gravity", gOmniExplosionParticleGravity, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Omni Explosion Particle Visible Intensity", iSection, 1.0f, "Omni Particle Visible Intensity");
-			rScreen.WrapperSlider("Omni Explosion Particle Intensity Spread",  iSection, 1.0f, "Omni Particle Intensity Spread");
-			rScreen.WrapperSlider("Omni Explosion Particle Intensity Decay",   iSection, 1.0f, "Omni Particle Intensity Decay");
-			rScreen.WrapperSlider("Omni Explosion Particle Intensity Power",   iSection, 1.0f, "Omni Particle Intensity Power");
+			rScreen.WrapperSlider("Omni Explosion Particle Visible Intensity", gOmniExplosionParticleVisibleIntensity, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Intensity Spread", gOmniExplosionParticleIntensitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Intensity Decay", gOmniExplosionParticleIntensityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Omni Explosion Particle Intensity Power", gOmniExplosionParticleIntensityPower, iSection, 1.0f);
 
 			ImGui::EndTabItem();
 		}
@@ -111,23 +65,23 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 		if (rScreen.BeginSubtab("Fighter", iSection, 2))
 		{
 			rScreen.WrapperSeparatorText("Size");
-			rScreen.WrapperSlider("Fighter Explosion Particle Width",           iSection, 1.0f, "Fighter Particle Width");
-			rScreen.WrapperSlider("Fighter Explosion Particle Length",          iSection, 1.0f, "Fighter Particle Length");
-			rScreen.WrapperSlider("Fighter Explosion Particle Length Spread",   iSection, 1.0f, "Fighter Particle Length Spread");
-			rScreen.WrapperSlider("Fighter Explosion Particle Position Jitter", iSection, 1.0f, "Fighter Particle Position Jitter");
+			rScreen.WrapperSlider("Fighter Explosion Particle Width", gFighterExplosionParticleWidth, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Length", gFighterExplosionParticleLength, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Length Spread", gFighterExplosionParticleLengthSpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Position Jitter", gFighterExplosionParticlePositionJitter, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Speed");
-			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Base",            iSection, 1.0f, "Fighter Particle Velocity Base");
-			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Spread",          iSection, 1.0f, "Fighter Particle Velocity Spread");
-			rScreen.WrapperSlider("Fighter Explosion Particle Vertical Velocity Base",   iSection, 1.0f, "Fighter Particle Vertical Velocity Base");
-			rScreen.WrapperSlider("Fighter Explosion Particle Vertical Velocity Spread", iSection, 1.0f, "Fighter Particle Vertical Velocity Spread");
-			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Decay",           iSection, 1.0f, "Fighter Particle Velocity Decay");
-			rScreen.WrapperSlider("Fighter Explosion Particle Gravity",                  iSection, 1.0f, "Fighter Particle Gravity");
+			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Base", gFighterExplosionParticleVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Spread", gFighterExplosionParticleVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Vertical Velocity Base", gFighterExplosionParticleVerticalVelocityBase, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Vertical Velocity Spread", gFighterExplosionParticleVerticalVelocitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Velocity Decay", gFighterExplosionParticleVelocityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Gravity", gFighterExplosionParticleGravity, iSection, 1.0f);
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Spread",  iSection, 1.0f, "Fighter Particle Intensity Spread");
-			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Decay",   iSection, 1.0f, "Fighter Particle Intensity Decay");
-			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Power",   iSection, 1.0f, "Fighter Particle Intensity Power");
+			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Spread", gFighterExplosionParticleIntensitySpread, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Decay", gFighterExplosionParticleIntensityDecay, iSection, 1.0f);
+			rScreen.WrapperSlider("Fighter Explosion Particle Intensity Power", gFighterExplosionParticleIntensityPower, iSection, 1.0f);
 
 			ImGui::EndTabItem();
 		}

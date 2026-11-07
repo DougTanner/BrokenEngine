@@ -105,7 +105,7 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   `### Client command behavior`). Clicks on the 3D world area, such as picking
   an individual ship, may be allowed in future; programmatic picking through a
   command would still be preferred then.
-- `AgentUiRegistry` is client-only and double-buffers fixed-capacity ImGui window/item snapshots, including optional current numeric text from menu controls created with `MenuUtils::WrapperSlider` and `MenuUtils::WrapperPlusMinus` and checked state supplied by `MenuUtils::RadioRow`. Publish after `ImGui::Render()`; label resolution and `describe_ui` read only the completed buffer.
+- `AgentUiRegistry` is client-only and double-buffers fixed-capacity ImGui window/item snapshots, including optional current numeric text from menu controls created with `MenuUtils::WrapperSlider` and `MenuUtils::WrapperPlusMinus` and Tweaks sliders created with `TweaksScreen::WrapperSlider`, and checked state supplied by `MenuUtils::RadioRow`. Publish after `ImGui::Render()`; label resolution and `describe_ui` read only the completed buffer.
 
 ## Constraints
 

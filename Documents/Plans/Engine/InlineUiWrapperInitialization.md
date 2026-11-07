@@ -101,9 +101,11 @@ An unexpected behavior change returns for re-planning instead of widening scope.
 - Every saved row is implemented once, using the exact symbol/type/initializer,
   order, guard and lifetime contracts in Design; no row outside the ledger is changed.
 - Before the first edit retain current-tree build identity and a /agent-harness baseline with isolated
-  settings: connected rendering and advancing server tick; get_wrapper for Water Scale, Lighting Blur Sigma,
-  four Detail Normals Multiplier keys and one setting from each of Lighting, Map, Particle, Smoke, Sound and
-  WindDeposits. Retain values/ranges/defaults, main-menu describe_ui, one label resolution and existing
+  settings: connected rendering and advancing server tick; describe_ui value text, in a Debug client with
+  Tweaks open and, for a slider inside a section subtab, that subtab selected first (only the selected
+  subtab's sliders render), for the sliders Water Scale, Lighting Blur Sigma, the four Terrain Detail Normals
+  Multiplier sliders and one slider from each of Lighting, Map, Particle, Smoke, Sound and WindDeposits.
+  Retain values/defaults, main-menu describe_ui, one label resolution and existing
   text-value capture; exercise Tweaks reset on representative settings. Repeat matching setup after the
   change, require identical values/labels/IDs/reset results and clean shutdown without duplicate registration,
   constructor or lifetime diagnostics. The supplied evidence records no executed runtime setup; capture this

@@ -63,5 +63,5 @@ runtime contracts of the screens that remain here.
 ## Ownership
 
 - Screen construction, invocation, and submission are engine-owned (`../../../../../Engine/Source/Ui/Screens/AGENTS.md`); this directory owns game-state gating and interaction semantics for the HUD.
-- Engine TweaksScreen owns the section registry, persistence, tables, and slider mapping. Game Tweaks files register their own whole sections through it and draw their content inside engine sections from the game functions those sections call by name.
+- Engine TweaksScreen owns the section registry, persistence, tables, and the slider widget. Game Tweaks files register their own whole sections through it and draw their content inside engine sections from the game functions those sections call by name.
 - Making the agent UI snapshot visible to readers belongs to `../../../../../Engine/Source/Agent/AGENTS.md`; visual inspection and input command semantics are outside this directory.

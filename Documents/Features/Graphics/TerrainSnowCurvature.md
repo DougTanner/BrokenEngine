@@ -33,8 +33,9 @@ Signed modulation: crevices (`fConcavity > 0.5`) gain snow, exposed faces lose i
 One `GlobalLayout` float `fTerrainSnowCurvature` after
 `fTerrainSnowAmbientOcclusionExclusion` (`ShaderLayoutsBase.h:438`);
 `Wrapper gTerrainSnowCurvature` in `TerrainWrappersBase.{h,cpp}` next to the two
-existing snow wrappers; "Snow Curvature" entry in the slider map and
-`WrapperSlider` call in `TweaksScreenTerrain.cpp` (next to "Snow AO Exclusion");
+existing snow wrappers; a `WrapperSlider` call passing
+`gTerrainSnowCurvature` in `TweaksScreenTerrain.cpp` (next to "Terrain Snow
+Ambient Occlusion Exclusion");
 upload in `GlobalUniforms.cpp` next to the existing `fTerrainSnow*` assignments
 (~line 396). Suggested range [-1, 1], default 0 (negative flips the effect —
 snow on ridges — probably useless but free and occasionally illustrative while
@@ -45,7 +46,7 @@ tuning).
 - `Engine/Data/Shaders/Terrain/Terrain.frag` — AO fetch hoist + snow modulation block
 - `Engine/Data/Shaders/ShaderLayoutsBase.h` — `fTerrainSnowCurvature`
 - `Engine/Source/Ui/TerrainWrappersBase.{h,cpp}` — wrapper
-- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenTerrain.cpp` — slider map entry + `WrapperSlider`
+- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenTerrain.cpp` — `WrapperSlider` call
 - `Engine/Source/Graphics/Render/GlobalUniforms.cpp` — upload
 
 ## Out of scope

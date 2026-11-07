@@ -157,7 +157,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenTerrain.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWater.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWind.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.cpp"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -328,7 +327,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.h"><Filter>Engine\Ui\Screens</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h"><Filter>Engine\Ui\Screens\TweaksScreen</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h"><Filter>Engine\Ui</Filter></ClInclude>

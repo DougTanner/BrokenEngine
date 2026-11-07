@@ -73,12 +73,10 @@ public:
 
 	void RenderWaveCountRadioButtons(Wrapper& rCountWrapper);
 	bool BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab);
-	void WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier = 2.0f, std::string_view mapKey = {});
+	void WrapperSlider(std::string_view label, Wrapper& rWrapper, int64_t iSection, float fWidthMultiplier = 2.0f);
 	void WrapperSeparatorText(std::string_view label);
 	// Chevron selection wraps; names must contain exactly the wrapper's allowed values.
 	void ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, std::span<const std::string_view> names);
-
-	void RunSliderAuditFrame();
 
 	std::string_view mActiveSlider;
 	int64_t miActiveSliderSection = -1; // -1 for toggle bar, 0+ for sections
@@ -89,14 +87,6 @@ public:
 	common::Flags<TweakSectionFlags> mApplySubtab {};
 	common::Flags<TweakSectionFlags> mSectionCollapsed {};
 	float mfToggleBarBottom = 0.0f;
-
-	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction.
-	// miAuditFrame: 0..(kiAuditFrameCount-1) = audit running, -1 = audit complete.
-	std::unordered_set<std::string_view> mAuditTouched;
-	std::unordered_set<std::string_view> mAuditMissed;
-	int8_t mpiPreAuditSubtab[kiMaxTweakSections] {};
-	int64_t miAuditFrame = 0;
-	bool mbAuditMode = false;
 };
 
 // Startup-assigned dense section indices, written by RegisterEngineTweakSections(). kiInvalidTweakSection until then.

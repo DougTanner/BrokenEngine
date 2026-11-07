@@ -65,8 +65,8 @@ Blur multiplier: `gObjectShadowsBlurMultiplier`
 (`Engine/Source/Graphics/Managers/RenderTargetTextures.cpp:395`). A change
 recreates the object-shadow textures through `DestroyFlags::kObjectShadows`
 (`Engine/Source/Graphics/Graphics.cpp:609-613`, `:648-650`). The wrapper is
-reachable only from Tweaks ("Blur Multiplier",
-`Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenShadow.cpp:28`); no
+reachable only from Tweaks ("Object Shadows Blur Multiplier",
+`Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenShadow.cpp:35`); no
 graphics-menu control or persisted level drives it.
 
 Originating gap: a user-directed follow-up; the requesting session's change did
@@ -189,8 +189,9 @@ The author recommends mirroring the terrain shadow schedule:
   rows. This Plan writes the recommended label below.
 - Add "Object Shadow Update Cadence" to the Tweaks object-shadow section
   (`TweaksScreenShadow.cpp`), next to its terrain counterpart
-  "Shadow Update Cadence". "Blur Multiplier" stays in Tweaks as the derived
-  wrapper's direct control, like "Render Multiplier".
+  "Shadow Update Cadence". "Object Shadows Blur Multiplier" stays in Tweaks as
+  the derived wrapper's direct control, like "Object Shadows Render
+  Multiplier".
 
 ### Persistence
 

@@ -73,9 +73,10 @@ Names below are the author's recommendations.
 - R09 Plane lerp. The normalized plane-index lerp at `LightingUniforms.cpp:395` and
   `SmokeUniforms.cpp:120` becomes one `FlightPlaneLerp(fBottom, fTop, i, iPlaneCount)`
   in `Engine/Source/Graphics/Render/Render.h`.
-- R10 Duplicate smoke sliders. `TweaksScreenSmoke.cpp:74-76` repeats the two smoke
-  shadow sliders that `TweaksScreenShadow.cpp` registers. Delete the Smoke copies
-  and their separator.
+- R10 Duplicate smoke sliders. `TweaksScreenSmoke.cpp:37-39` repeats the two smoke
+  shadow sliders that `TweaksScreenShadow.cpp` also draws. Delete the Smoke copies,
+  their separator, and the `Ui/ShadowWrappersBase.h` include of
+  `TweaksScreenSmoke.cpp` that only they need.
 - R11 Hardpoint kind clause. Remove `!rKind.is_string()` at `Common/ModelMetadata.h:101`:
   a non-string value never equals a name, so `std::find` already returns end.
 - R12 Smoke shadow read. `f4SmokeObjectShadows` is read only through `.x`
@@ -91,7 +92,7 @@ Names below are the author's recommendations.
   - `ModelViewerApplication.cpp:54,58`: merge the two guards in `SelectModel`.
   - `ModelViewerApplication.h:29`: make `miSelected` private with a relative-select
     method for `Projects/ModelViewer/Source/Main.cpp:55`.
-  - `TweaksScreen.cpp:214`: drop the clamp; `SliderInt` with `ImGuiSliderFlags_NoInput`
+  - `TweaksScreen.cpp:174`: drop the clamp; `SliderInt` with `ImGuiSliderFlags_NoInput`
     keeps the index in range.
   - `Engine/Source/Frame/FrameUtils.h:168`: use `const ARGS&...` in
     `ForEachInterpolateUpdate`. Its two callers pass nothing or one lvalue.
@@ -107,7 +108,9 @@ Names below are the author's recommendations.
   `Documents/Plans/Engine/InlineUiWrapperInitialization.md` makes inline the target
   form, so they stay.
 - Removing the `cell_coordinate_probe` navigation feature, which is the user's call.
-- Tweaks slider keys: `Documents/Plans/Engine/TweakSliderKeysMatchLabels.md`.
+- Tweaks slider identity: each `TweaksScreen::WrapperSlider` call passes its
+  wrapper and its label is its only name
+  (`Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.h`).
 - The hardpoint lookup in game code beyond the R04 rename:
   `Documents/Plans/Game/ShipCombatAndFleetCleanups.md`.
 - Any change to packed bytes, layouts, or a uniform's offset or value.

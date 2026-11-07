@@ -2,50 +2,13 @@
 
 #if defined(BT_CLIENT)
 
+#include "Ui/ShadowWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
-#include "TweaksSliderMap.h"
 
 #include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
-
-const TweaksSliderMapRegistrar gSmokeRegistrar
-{
-	{"Smoke Max", &gSmokeMaximum},
-	{"Smoke Power", &gSmokePower},
-	{"Smoke Decay", &gSmokeDecay},
-	{"Smoke Edge Decay Distance", &gSmokeEdgeDecayDistance},
-	{"Smoke Update Cadence", &gSmokeUpdateCadence},
-	{"Smoke Color Min", &gSmokeColorMinimum},
-	{"Smoke Color Multiplier", &gSmokeColorMultiplier},
-	{"Smoke Lighting Multiplier", &gSmokeLightingMultiplier},
-	{"Smoke Noise Scale One", &gSmokeNoiseScaleOne},
-	{"Smoke Noise Scale Two", &gSmokeNoiseScaleTwo},
-	{"Smoke Wind Noise Scale", &gSmokeWindNoiseScale},
-	{"Smoke Noise Quantity", &gSmokeNoiseQuantity},
-	{"Bottom Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantityBottom},
-	{"Top Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantityTop},
-	{"Smoke Curl Strength Low", &gSmokeCurlStrengthLow},
-	{"Smoke Curl Strength High", &gSmokeCurlStrengthHigh},
-	{"Smoke Curl Scale", &gSmokeCurlScale},
-	{"Smoke Curl Speed", &gSmokeCurlSpeed},
-	{"Wind To Smoke Strength", &gWindToSmokeStrength},
-	{"Wind To Smoke Power", &gWindToSmokePower},
-	{"Wind Displacement Noise Scale", &gWindDisplacementNoiseScale},
-	{"Wind Smoke Retention", &gWindSmokeRetention},
-	{"Wind Smoke Advection", &gWindSmokeAdvection},
-	{"Smoke Object Height", &gSmokeObjectHeight},
-	{"Smoke Object Height Power", &gSmokeObjectHeightPower},
-	// Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
-	{"Smoke Trails Quantity", &gSmokeTrailsQuantity},
-	{"Smoke Trails Width Current", &gSmokeTrailsWidthCurrent},
-	{"Smoke Trails Width Previous", &gSmokeTrailsWidthPrevious},
-	{"Smoke Trails Length", &gSmokeTrailsLength},
-	{"Smoke Trails Length Jitter", &gSmokeTrailsLengthJitter},
-	{"Smoke Trails Side Jitter", &gSmokeTrailsSideJitter},
-	{"Smoke Intensity Falloff", &gSmokeIntensityFalloff},
-};
 
 void RenderSmokeSection(TweaksScreen& rScreen)
 {
@@ -60,45 +23,45 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Decay");
-				rScreen.WrapperSlider("Smoke Maximum", iSection, 1.0f, "Smoke Max");
-				rScreen.WrapperSlider("Smoke Power", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Decay", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Edge Decay Distance", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Update Cadence", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Maximum", gSmokeMaximum, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Power", gSmokePower, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Decay", gSmokeDecay, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Edge Decay Distance", gSmokeEdgeDecayDistance, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Update Cadence", gSmokeUpdateCadence, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Color");
-				rScreen.WrapperSlider("Smoke Color Minimum", iSection, 1.0f, "Smoke Color Min");
-				rScreen.WrapperSlider("Smoke Color Multiplier", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Lighting Multiplier", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Color Minimum", gSmokeColorMinimum, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Color Multiplier", gSmokeColorMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Lighting Multiplier", gSmokeLightingMultiplier, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Shadow");
-				rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", iSection, 1.0f, "Bottom Smoke Shadow Intensity");
-				rScreen.WrapperSlider("Smoke Shadow Intensity Top", iSection, 1.0f, "Top Smoke Shadow Intensity");
+				rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", gSmokeShadowIntensityBottom, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Shadow Intensity Top", gSmokeShadowIntensityTop, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Noise");
-				rScreen.WrapperSlider("Smoke Noise Scale One", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Noise Scale Two", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Wind Noise Scale", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Noise Quantity", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Wind Noise Quantity Bottom", iSection, 1.0f, "Bottom Smoke Wind Noise Quantity");
-				rScreen.WrapperSlider("Smoke Wind Noise Quantity Top", iSection, 1.0f, "Top Smoke Wind Noise Quantity");
-				rScreen.WrapperSlider("Smoke Curl Strength Low", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Curl Strength High", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Curl Scale", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Curl Speed", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Noise Scale One", gSmokeNoiseScaleOne, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Noise Scale Two", gSmokeNoiseScaleTwo, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Wind Noise Scale", gSmokeWindNoiseScale, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Noise Quantity", gSmokeNoiseQuantity, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Wind Noise Quantity Bottom", gSmokeWindNoiseQuantityBottom, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Wind Noise Quantity Top", gSmokeWindNoiseQuantityTop, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Strength Low", gSmokeCurlStrengthLow, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Strength High", gSmokeCurlStrengthHigh, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Scale", gSmokeCurlScale, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Speed", gSmokeCurlSpeed, iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Wind Displacement");
-				rScreen.WrapperSlider("Wind To Smoke Strength", iSection, 1.0f);
-				rScreen.WrapperSlider("Wind To Smoke Power", iSection, 1.0f);
-				rScreen.WrapperSlider("Wind Displacement Noise Scale", iSection, 1.0f);
-				rScreen.WrapperSlider("Wind Smoke Retention", iSection, 1.0f);
-				rScreen.WrapperSlider("Wind Smoke Advection", iSection, 1.0f);
+				rScreen.WrapperSlider("Wind To Smoke Strength", gWindToSmokeStrength, iSection, 1.0f);
+				rScreen.WrapperSlider("Wind To Smoke Power", gWindToSmokePower, iSection, 1.0f);
+				rScreen.WrapperSlider("Wind Displacement Noise Scale", gWindDisplacementNoiseScale, iSection, 1.0f);
+				rScreen.WrapperSlider("Wind Smoke Retention", gWindSmokeRetention, iSection, 1.0f);
+				rScreen.WrapperSlider("Wind Smoke Advection", gWindSmokeAdvection, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Object");
-				rScreen.WrapperSlider("Smoke Object Height", iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Object Height Power", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Object Height", gSmokeObjectHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Object Height Power", gSmokeObjectHeightPower, iSection, 1.0f);
 
 				ImGui::EndTable();
 			}

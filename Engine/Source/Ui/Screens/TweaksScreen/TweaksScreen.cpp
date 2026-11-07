@@ -2,8 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Agent/AgentUiRegistry.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "TweaksSliderMap.h"
 
 namespace engine
 {
@@ -143,41 +143,10 @@ bool TweaksScreen::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iT
 	return true;
 }
 
-void TweaksScreen::WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier, std::string_view mapKey)
+void TweaksScreen::WrapperSlider(std::string_view label, Wrapper& rWrapper, int64_t iSection, float fWidthMultiplier)
 {
-	if (mapKey.empty())
-	{
-		mapKey = label;
-	}
-
-	if constexpr (kbDebugInput)
-	{
-		if (mbAuditMode)
-		{
-			// Audit hash-set insertions allocate; exclude them from allocation tracking.
-			ScopedSuppressAllocationTracking suppress;
-			std::unordered_map<std::string_view, Wrapper*>& rSliderMap = TweaksSliderMap::Get();
-			if (rSliderMap.contains(mapKey))
-			{
-				mAuditTouched.insert(mapKey);
-			}
-			else
-			{
-				mAuditMissed.insert(mapKey);
-			}
-			return;
-		}
-	}
-
-	std::unordered_map<std::string_view, Wrapper*>& rSliderMap = TweaksSliderMap::Get();
-	auto it = rSliderMap.find(mapKey);
-	if (it == rSliderMap.end())
-	{
-		return;
-	}
-
 	// Render non-active sliders with alpha=0 to preserve layout
-	bool bIsActiveSlider = (mActiveSlider.empty() || mapKey == mActiveSlider);
+	bool bIsActiveSlider = (mActiveSlider.empty() || label == mActiveSlider);
 	if (!bIsActiveSlider)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
@@ -188,40 +157,46 @@ void TweaksScreen::WrapperSlider(std::string_view label, int64_t iSection, float
 		ImGui::SetNextItemWidth(ImGui::CalcItemWidth() * fWidthMultiplier);
 	}
 
-	Wrapper* pWrapper = it->second;
-	float fValue = pWrapper->mfCurrent;
+	float fValue = rWrapper.mfCurrent;
 
-	// When mapKey differs from label, append ##mapKey for unique ImGui ID
 	char pcImGuiLabel[128] {};
-	if (mapKey != label)
-	{
-		std::snprintf(pcImGuiLabel, sizeof(pcImGuiLabel), "%.*s##%.*s", static_cast<int>(label.size()), label.data(), static_cast<int>(mapKey.size()), mapKey.data());
-	}
-	else
-	{
-		std::snprintf(pcImGuiLabel, sizeof(pcImGuiLabel), "%.*s", static_cast<int>(label.size()), label.data());
-	}
+	std::snprintf(pcImGuiLabel, sizeof(pcImGuiLabel), "%.*s", static_cast<int>(label.size()), label.data());
 
-	if (!pWrapper->mAllowed.empty())
+	if (!rWrapper.mAllowed.empty())
 	{
-		int64_t iIndex = pWrapper->GetIndex();
-		int64_t iMaxIndex = std::ssize(pWrapper->mAllowed) - 1i64;
+		int64_t iIndex = rWrapper.GetIndex();
+		int64_t iMaxIndex = std::ssize(rWrapper.mAllowed) - 1i64;
 		int iSliderIndex = static_cast<int>(iIndex);
 		char pcValue[32] {};
-		std::snprintf(pcValue, sizeof(pcValue), "%.6g", static_cast<double>(pWrapper->mAllowed.at(iIndex)));
+		std::snprintf(pcValue, sizeof(pcValue), "%.6g", static_cast<double>(rWrapper.mAllowed.at(iIndex)));
 		if (ImGui::SliderInt(pcImGuiLabel, &iSliderIndex, 0, static_cast<int>(iMaxIndex), pcValue, ImGuiSliderFlags_NoInput))
 		{
-			pWrapper->SetIndex(std::clamp<int64_t>(iSliderIndex, 0i64, iMaxIndex));
+			rWrapper.SetIndex(std::clamp<int64_t>(iSliderIndex, 0i64, iMaxIndex));
 		}
 	}
-	else if (ImGui::SliderFloat(pcImGuiLabel, &fValue, pWrapper->mfMin, pWrapper->mfMax, "%.6f"))
+	else if (ImGui::SliderFloat(pcImGuiLabel, &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.6f"))
 	{
-		pWrapper->Set(fValue);
+		rWrapper.Set(fValue);
 	}
 	if (ImGui::IsItemActive())
 	{
-		mActiveSlider = mapKey;
+		mActiveSlider = label;
 		miActiveSliderSection = iSection;
+	}
+
+	if (gpAgentUiRegistry != nullptr)
+	{
+		// Same formats as the slider's own text, applied to the post-change value.
+		char pcAgentValue[32] {};
+		if (!rWrapper.mAllowed.empty())
+		{
+			std::snprintf(pcAgentValue, sizeof(pcAgentValue), "%.6g", static_cast<double>(rWrapper.mAllowed.at(rWrapper.GetIndex())));
+		}
+		else
+		{
+			std::snprintf(pcAgentValue, sizeof(pcAgentValue), "%.6f", static_cast<double>(rWrapper.mfCurrent));
+		}
+		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(pcImGuiLabel), pcAgentValue);
 	}
 
 	if (!bIsActiveSlider)
@@ -246,11 +221,6 @@ void TweaksScreen::Render()
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(rStyle.ItemSpacing.x * kfUiScale, rStyle.ItemSpacing.y * kfUiScale));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(rStyle.ItemInnerSpacing.x * kfUiScale, rStyle.ItemInnerSpacing.y * kfUiScale));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(rStyle.WindowPadding.x * kfUiScale, rStyle.WindowPadding.y * kfUiScale));
-
-		if (miAuditFrame >= 0)
-		{
-			RunSliderAuditFrame();
-		}
 
 		RenderToggleBar();
 
@@ -433,70 +403,6 @@ void TweaksScreen::RenderSectionWindow(int64_t iSection)
 	if (bHasActiveSlider)
 	{
 		ImGui::PopStyleColor(4);
-	}
-}
-
-void TweaksScreen::RunSliderAuditFrame()
-{
-	if constexpr (kbDebugInput)
-	{
-		// Water has 6 subtabs ending in Foam; ImGui applies selection on the following tab-bar frame, so frames 0-5 queue tabs and frame 6 renders Foam.
-		static constexpr int64_t kiAuditFrameCount = 7;
-
-		if (miAuditFrame == 0)
-		{
-			std::copy(std::begin(mpiActiveSubtab), std::end(mpiActiveSubtab), std::begin(mpiPreAuditSubtab));
-			ScopedSuppressAllocationTracking suppress;
-			int64_t iSliderCount = std::ssize(TweaksSliderMap::Get());
-			mAuditTouched.reserve(static_cast<size_t>(iSliderCount));
-			mAuditMissed.reserve(8); // typical drift is small; reserve nominal to avoid 1-element bucket churn
-		}
-
-		for (int64_t i = 0; i < msiSectionCount; ++i)
-		{
-			mpiActiveSubtab[i] = static_cast<int8_t>(miAuditFrame);
-			mApplySubtab.Set(SectionFlag(i));
-		}
-
-		mbAuditMode = true;
-
-		// Synthetic offscreen window: BeginTabBar / WrapperSeparatorText / etc. need an active window, but we don't want anything visible or interactive.
-		ImGui::SetNextWindowPos(ImVec2(-10'000.0f, -10'000.0f));
-		ImGui::SetNextWindowSize(ImVec2(1.0f, 1.0f));
-		static constexpr ImGuiWindowFlags kiAuditFlags = ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus;
-		if (ImGui::Begin("##slider-audit", nullptr, kiAuditFlags))
-		{
-			for (int64_t i = 0; i < msiSectionCount; ++i)
-			{
-				mspSectionDescriptions[i].pRender(*this);
-			}
-		}
-		ImGui::End();
-
-		mbAuditMode = false;
-
-		// Restore EVERY frame (not just on completion): the actual UI render later in the same Render() call must draw the user's saved tab, not the audit-cycled one.
-		std::copy(std::begin(mpiPreAuditSubtab), std::end(mpiPreAuditSubtab), std::begin(mpiActiveSubtab));
-		mApplySubtab = AllSectionFlags();
-
-		++miAuditFrame;
-		if (miAuditFrame >= kiAuditFrameCount)
-		{
-			// Heap: TweaksSliderMap iteration touches its hash buckets; mirror the registration-side suppression.
-			ScopedSuppressAllocationTracking suppress;
-			for (std::string_view key : std::views::keys(TweaksSliderMap::Get()))
-			{
-				if (!mAuditTouched.contains(key))
-				{
-					LOG(kDefault, kWarning, "TweaksSliderMap: orphan key '{}'", key);
-				}
-			}
-			for (std::string_view missedKey : mAuditMissed)
-			{
-				LOG(kDefault, kWarning, "TweaksSliderMap: missed key '{}'", missedKey);
-			}
-			miAuditFrame = -1; // sentinel: audit complete
-		}
 	}
 }
 

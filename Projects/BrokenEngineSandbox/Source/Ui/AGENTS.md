@@ -14,7 +14,7 @@ The game-side localization facade over the engine-owned strings, plus game wrapp
 - Wrappers read by shared Frame code compile into both client and server projects even when only the client UI changes them.
 - Rendering-only settings and their consumers remain whole-file `BT_CLIENT`-guarded and client-project-only.
 - A new Frame dependency on a game wrapper must either stay on a client-only path or make that wrapper available to the server build.
-- Game wrapper storage that mirrors engine Tweaks sliders keeps its declaration order matching the `../../../../Engine/Source/Ui/Screens/TweaksScreen/AGENTS.md` slider registration order. Wrapper storage with no Tweaks counterpart keeps a stable local order of its own.
+- Game wrapper storage that mirrors engine Tweaks sliders keeps its declaration order matching the `../../../../Engine/Source/Ui/Screens/TweaksScreen/AGENTS.md` slider order. Wrapper storage with no Tweaks counterpart keeps a stable local order of its own.
 
 ## Graphics Quality Consumption
 

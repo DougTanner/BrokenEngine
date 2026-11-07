@@ -70,11 +70,15 @@ behavior; no migration is added.
 
 - `/compile` builds the BrokenEngineSandbox client and server.
 - A live `/agent-harness` run: set Camera Tilt away from its default with
-  `set_slider`, quit the client in order, relaunch, and `get_wrapper` for key
-  `Camera Tilt` reports the set value. The audit recorded this scenario from
+  `set_slider`, quit the client in order, relaunch, and, with the Graphics
+  screen open, `describe_ui` reports the set value as the `value` of the
+  `##Camera Tilt` item in window `GraphicsMenu`, text with two decimals, so the
+  set value has at most two decimals. The audit recorded this scenario from
   reading the code; the supplied evidence records no harness run or setup.
-- In the same run, the Graphics screen's Defaults button returns `get_wrapper`
-  for that key to the wrapper default.
+- In the same run, after the Graphics screen's Defaults button, with the
+  Graphics screen open, `describe_ui` reports the wrapper default as the
+  `value` of the `##Camera Tilt` item in window `GraphicsMenu`, text with two
+  decimals.
 - A `GraphicsSettings.bin` of the previous version is rejected and defaults
   load; an out-of-range tilt in a current-version file rejects the whole file.
 
