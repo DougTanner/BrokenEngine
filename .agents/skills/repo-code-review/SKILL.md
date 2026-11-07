@@ -37,8 +37,8 @@ Require a self-contained brief containing:
   manager-saved run by
   `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
   -RepositoryRoot '<absolute repository toplevel>'
-  -Baseline <full 40-character SHA> -EmitTargets |
-  Set-Content -LiteralPath Temp/code-review-targets.json -NoNewline`, adding
+  -Baseline <full 40-character SHA> -EmitTargets >
+  Temp/code-review-targets.json`, adding
   `-IncludeUntracked '<comma-separated paths>'` for authorized untracked
   additions and `-Head <commit>` for a committed head, from that
   authorized diff (or focused re-review), listing the script-selected baseline
@@ -58,15 +58,15 @@ The targets file is the authoritative supplied input. A `/codex-review` prompt
 supplies it as the `Targets file: <path>` entry in its evidence section (the
 receipt's `targetsPath`, written next to the prompt file), and inlines the same
 bytes there as a copy of that file. Otherwise the dispatching manager saves one
-read-only run to a file with the targets-file bullet's invocation above, piping
-that script call's own stdout inside the same single PowerShell-tool call.
+read-only run to a file with the targets-file bullet's invocation above, which
+redirects its stdout into the file and runs as one call of either shell tool.
 That invocation's gitignored `Temp/` path is the save-path
 convention, and the manager supplies the path, not
 the targets bytes, to the review worker. The run reports its own `status` rather
 than a field of the saved file: on `pass` (exit 0) stdout carries only the
 targets bytes, while `blocked` (exit 2) or `error` (exit 1) sends no targets
-bytes to the file, so any file at that path is absent or holds a previous run's
-stale bytes while the envelope goes to stderr, and such a run counts as a
+bytes to the file, so the redirect leaves it empty while the envelope goes to
+stderr, and such a run counts as a
 missing targets file below. The saved file itself holds only `schemaVersion`
 and `paths`, so a check of that file confirms those two keys. Never rebuild the
 targets file or restate the class decision inline.
