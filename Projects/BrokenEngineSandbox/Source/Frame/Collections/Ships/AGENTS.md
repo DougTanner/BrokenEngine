@@ -35,7 +35,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
   death shrink. A row's pusher radius is its hitbox sphere radius times its
-  type's `kShipHitboxTypes` pusher radius scale.
+  type's `kShipHitboxTypes` pusher radius scale. Each `kShipHitboxTypes`
+  model's Z range also contains its local origin, which the bake keeps inside
+  its outline and so its box: `ShipHullContact`'s center-directed ray asserts
+  that it meets that prism, and the bake tests the origin against the outline
+  only (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
+  `## Model Alignment`), so a sidecar `offset` must not move the Z range off it.
 - Shared startup caches each controller model's minimum origin height from its
   aligned upright geometry, keeping the hull at least 1 meter above water.
   A ship's effective flight height is the maximum of that minimum and its

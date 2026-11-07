@@ -144,8 +144,8 @@ Names below are the author's recommendations.
 
 ## Out of scope
 
-- `ASSERT(bHit)` at `ShipHitboxes.cpp:115`:
-  `Documents/Plans/Game/ShipHullContactAssert.md` owns it.
+- `ASSERT(bHit)` at `ShipHitboxes.cpp:116`, which stays: every ship model's
+  prism holds its origin (`Ships/AGENTS.md` `## Ship Invariants`).
 - The `PackedModelMissileTube` rename:
   `Documents/Plans/Engine/EngineExportRenderAndViewerCleanups.md` owns it.
 - The Omni heal beam's `.fLightingIntensity` at `Omnis.cpp:193`, which has no
