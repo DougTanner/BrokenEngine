@@ -192,9 +192,10 @@ The ramped heading turn in `ShipBehaviours` follows the
 - Fleet Fighters and fleet Omnis steer by the stance through one shared tactic
   function keyed by ship type (`ChooseFleetTactic`): escort at a Fighter's own
   slot among the fleet's Fighters, and no destination for an Omni, which then
-  patrols (`../Omnis/AGENTS.md`); while weapons free, Attack and Veer-off for
-  Fighters and Attack for Omnis, whose script circles the target
-  (`../Omnis/AGENTS.md`). `../Fighters/AGENTS.md` documents the slots.
+  patrols (`../Omnis/AGENTS.md`); while weapons free, Attack, which an Omni's
+  script turns into circling the target (`../Omnis/AGENTS.md`). A fleet Fighter
+  calls it through `ChooseFighterFleetTactic`, which adds Veer-off.
+  `../Fighters/AGENTS.md` documents the slots.
 - A weapons-free fleet Omni, or fleet Fighter not finishing a veer-off, attacks
   its kept attack target (`## Ship Invariants`), picked from its flagship in
   x/y. Escort and veer-off leave the id untouched, so a target that died or left

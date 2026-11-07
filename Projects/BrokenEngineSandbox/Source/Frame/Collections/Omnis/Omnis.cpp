@@ -636,9 +636,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				{
 					view.eStance = FleetStance::kEscort;
 				}
-				// Omnis never veer off, so the fleet tactic's veer-off point is discarded.
-				XMVECTOR vecVeerOffPoint = XMVectorZero();
-				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], registryTarget);
 				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{

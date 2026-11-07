@@ -324,11 +324,9 @@ No directional dependencies or mandatory nondirectional coordination.
 This is one stage: the transport has no order to exercise it until the behaviour lands, so no
 earlier cut can pass acceptance.
 
-These Plans touch nearby lines. Either order works, and the later landing refreshes against the tree
-it finds and takes its own `Frame::kiVersion` bump from the value it finds:
+The Plan below touches nearby lines. Either order works, and the later landing refreshes against the
+tree it finds and takes its own `Frame::kiVersion` bump from the value it finds:
 
-- `Documents/Plans/Game/SeparateFighterVeerOffFromFleetTactic.md` replaces the Fighter tactic call
-  this document's Fighter override sits on.
 - `Documents/Plans/Game/ShipCombatAndFleetCleanups.md` edits `HudScreen.cpp` and
   `ServerFleetManager.cpp`. Its G02 may add a message-taking send: use it if it has landed, else
   follow `SendDestroyFleetMemberRequest`.

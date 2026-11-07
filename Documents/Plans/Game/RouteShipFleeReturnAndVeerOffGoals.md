@@ -159,12 +159,6 @@ No directional prerequisites. During the ship avoidance change the user worded t
 as "flee behaviour should instead be 'choose a location and navigate to it'"; the `## Design` away
 goal carries the decision that wording leaves to the claim session.
 
-Reciprocal coordination with
-`Documents/Plans/Game/SeparateFighterVeerOffFromFleetTactic.md`: that Plan moves the
-`ContinueVeerOff` and `AttackOrStartVeerOff` call sites into a new `ChooseFighterFleetTactic`
-inside `FleetCoordination.cpp`, so whichever lands second refreshes those call sites. Each Plan
-keeps its own acceptance.
-
 Reciprocal coordination with `Documents/Plans/Game/ConvertFightersToRampedTurn.md`: that Plan
 rewrites the Fighter steering call directly below the `ComputeFleeOrReturnDestination` call and
 also bumps the `Frame::kiVersion` base, so whichever lands second refreshes that block and takes

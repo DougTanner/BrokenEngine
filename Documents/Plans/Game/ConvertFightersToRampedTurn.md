@@ -217,9 +217,8 @@ own acceptance.
 
 ## Notes
 
-- `Documents/Plans/Game/SeparateFighterVeerOffFromFleetTactic.md` edits only the call at
-  `Fighters.cpp:621`, disjoint from this Plan's regions, and its replay compares against its own
-  parent commit, so neither order constrains the other.
+- The Fighter fleet branch calls `ChooseFighterFleetTactic` at `Fighters.cpp:622`, disjoint from this
+  Plan's regions.
 - `Fighters.cpp` measures 9,938 `bt-token-v1`. A scratch measurement of this change gave 9,885
   (-53) with no new comments and 9,968 (+30) with the Battleship comments mirrored, both under the
   10,000 limit in `## Acceptance criteria`.

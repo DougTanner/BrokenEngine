@@ -67,8 +67,8 @@ tentative, so the claim session confirms the intent at its plan interview.
 
 - `AttackOrStartVeerOff`: signature and body, and its call sites inside `FleetCoordination.cpp`.
 - The veer-off distance constants in `FleetCoordination.cpp`.
-- The header comments of the fleet and attack tactics in `FleetCoordination.h`, and the
-  `pVecVeerOffPoints` comment in `Fighters.h`.
+- The header comments of `ChooseFighterFleetTactic` (the fleet-path veer-off comment) and the attack
+  tactic in `FleetCoordination.h`, and the `pVecVeerOffPoints` comment in `Fighters.h`.
 - The `Frame::kiVersion` base.
 - `/update-claude-docs` sync of the veer-off sentence in `Fighters/AGENTS.md`
   `## Behavior Invariants`.
@@ -117,10 +117,6 @@ tentative, so the claim session confirms the intent at its plan interview.
 
 `dependsOn` carries the prerequisite, the routed `VeerOffTactic` and its static-data parameters,
 which also rests on the ship avoidance change, which has no Plan file.
-
-Reciprocal coordination with `Documents/Plans/Game/SeparateFighterVeerOffFromFleetTactic.md`: that
-Plan moves the `AttackOrStartVeerOff` call into `ChooseFighterFleetTactic`, so whichever lands second
-refreshes that call and carries this Plan's added arguments. Each Plan keeps its own acceptance.
 
 ## Notes
 

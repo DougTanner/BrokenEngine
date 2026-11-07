@@ -165,26 +165,17 @@ FleetView FleetBoard::Find(engine::GlobalId flagshipGlobalId) const
 	return {};
 }
 
-ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
+ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryTarget)
 {
 	int64_t iHighestFlightPlane = HighestFlightPlane(eType);
 	if (rView.flagshipGlobalId.iValue == 0)
 	{
-		rFlags.Set(ShipFlags::kVeerOff, false);
 		rRegistryTarget = {};
 		return {.iTargetFlightPlane = DefaultFlightPlane(eType)};
 	}
 
 	if (rView.eStance == FleetStance::kWeaponsFree)
 	{
-		ShipTactic tactic {};
-		if (eType == ShipType::kFighter && ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, tactic))
-		{
-			// Attack ignores enemies above the type's highest plane, so only a veer-off point loaded from a save can lie above it.
-			tactic.iTargetFlightPlane = std::min(tactic.iTargetFlightPlane, iHighestFlightPlane);
-			return tactic;
-		}
-
 		XMVECTOR vecTargetPosition = XMVectorZero();
 		bool bInLineOfSight = false;
 		if (FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, rView.vecFlagshipPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
@@ -196,15 +187,10 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 			{
 				return RouteTactic(rStaticData, iClearanceTier, vecPosition, vecTargetPosition, rNavRectangleBoard);
 			}
-			if (eType == ShipType::kFighter)
-			{
-				return AttackOrStartVeerOff(vecPosition, vecTargetPosition, rFlags, rVecVeerOffPoint);
-			}
 			return AttackTactic(vecTargetPosition);
 		}
 	}
 
-	rFlags.Set(ShipFlags::kVeerOff, false);
 	if (eType == ShipType::kOmni)
 	{
 		return {.iTargetFlightPlane = DefaultFlightPlane(eType)};
@@ -215,6 +201,26 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 		.iTargetFlightPlane = DefaultFlightPlane(eType),
 		.bHasDestination = true,
 	};
+}
+
+ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
+{
+	if (rView.flagshipGlobalId.iValue != 0 && rView.eStance == FleetStance::kWeaponsFree)
+	{
+		ShipTactic tactic {};
+		if (ContinueVeerOff(vecPosition, rVecVeerOffPoint, rFlags, tactic))
+		{
+			return tactic;
+		}
+	}
+
+	ShipTactic tactic = ChooseFleetTactic(ShipType::kFighter, rPreviousFrame, rStaticData, rView, globalId, vecPosition, rNavRectangleBoard, uiFlightPlane, alignment, rRegistryTarget);
+	if (tactic.bAttacking)
+	{
+		return AttackOrStartVeerOff(vecPosition, tactic.vecDestination, rFlags, rVecVeerOffPoint);
+	}
+	rFlags.Set(ShipFlags::kVeerOff, false);
+	return tactic;
 }
 
 bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)

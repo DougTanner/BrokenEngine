@@ -619,7 +619,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			}
 			else if (rPrevious.pController[i] == ShipController::kFleet)
 			{
-				ShipTactic tactic = ChooseFleetTactic(ShipType::kFighter, rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
 				SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{
