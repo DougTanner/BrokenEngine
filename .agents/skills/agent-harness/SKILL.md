@@ -119,9 +119,19 @@ or a launch routes `/compile` for the named target, and a
 `claim.data-directory-mismatch` residual routes `/compile` of both the Server
 and the Client target in one data mode, and a ModelViewer
 `capture.executable-missing` residual routes `/compile` ModelViewer Debug, each
-with no user stop. A claim the worker ended `BLOCKED` at its claim cap is a user
-stop: main tells the user which session (`currentOwner`) or server (its PIDs)
-holds the lock and asks, and never redispatches on its own.
+with no user stop. The `/compile` for a `shared-data.*` residual resolves the
+data mode again
+([`../compile/references/runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
+`## Mode selection`) and may resolve Local, whose data the Shared data
+comparison does not check. A new harness dispatch, its claim and launch, is the
+test of whether the refusal cleared. No comparison is made against a pre-change
+baseline run taken in a data mode other than the one in that build's
+`/p:DataBuildMode` `Decisive checks` row: before the first slice, that run is
+taken again in the build's mode through `runtime-data-mode.md`
+`## Mode selection`; after it, the comparison is not run and is reported as a
+residual naming the data-mode mismatch. A claim the worker ended `BLOCKED` at
+its claim cap is a user stop: main tells the user which session (`currentOwner`)
+or server (its PIDs) holds the lock and asks, and never redispatches on its own.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:
