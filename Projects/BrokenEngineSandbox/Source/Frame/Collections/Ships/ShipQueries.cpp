@@ -145,6 +145,80 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	return true;
 }
 
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+{
+	bool bTargetInRange = false;
+	bool bKeptTargetInRange = false;
+	bool bTargetForLook = false;
+	XMVECTOR vecTargetInRangePosition = XMVectorZero();
+	XMVECTOR vecTargetInRangeVelocity = XMVectorZero();
+	XMVECTOR vecTargetForLookPosition = XMVectorZero();
+	float fBestInRange = fBlasterTargetRange;
+	float fBestForLook = std::numeric_limits<float>::max();
+	// Firing and look targets require a visible enemy past arrival grace.
+	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity)
+	{
+		if (!FrameInterpolate::IsVisible(vecPosition, vecTargetPosition))
+		{
+			return;
+		}
+		int64_t iTargetFlightPlane = NearestFlightPlane(vecTargetPosition);
+		if (iTargetFlightPlane > iHighestFlightPlane)
+		{
+			return;
+		}
+		bool bKeptTarget = registryTarget.uuid.iValue != 0 && VisitShip(rPreviousFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
+		{
+			return rInterpolate.pRegistryIds[iRow];
+		}) == registryTarget;
+		float fDistance = common::Distance(vecPosition, vecTargetPosition);
+		// A kept target within range wins over every nearer candidate.
+		bool bInRangeCandidate = iTargetFlightPlane == uiFlightPlane && (bKeptTarget ? fDistance < fBlasterTargetRange : (!bKeptTargetInRange && fDistance < fBestInRange));
+		bool bLookCandidate = fDistance < fBestForLook;
+		if (!(bInRangeCandidate || bLookCandidate))
+		{
+			return;
+		}
+		if (!HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition))
+		{
+			return;
+		}
+		if (bInRangeCandidate)
+		{
+			fBestInRange = fDistance;
+			vecTargetInRangePosition = vecTargetPosition;
+			vecTargetInRangeVelocity = vecTargetVelocity;
+			bTargetInRange = true;
+			bKeptTargetInRange = bKeptTarget;
+		}
+		if (bLookCandidate)
+		{
+			fBestForLook = fDistance;
+			vecTargetForLookPosition = vecTargetPosition;
+			bTargetForLook = true;
+		}
+	});
+
+	rbLookTargetFound = false;
+	rVecLookPosition = XMVectorZero();
+	if (bTargetInRange)
+	{
+		rVecLookPosition = common::ComputeLeadPosition(vecPosition, vecTargetInRangePosition, vecTargetInRangeVelocity, fBlasterSpeed);
+		rbLookTargetFound = true;
+	}
+	else if (bTargetForLook)
+	{
+		rVecLookPosition = vecTargetForLookPosition;
+		rbLookTargetFound = true;
+	}
+
+	// The blaster spawn timer rate-limits continuous fire.
+	if (bTargetInRange)
+	{
+		rFlags.Set(ShipFlags::kFireBlaster);
+	}
+}
+
 bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryId, XMVECTOR& rVecResult)
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();

@@ -6,7 +6,7 @@ The user asked for an investigation of testing firing line of sight against real
 
 - `HasLineOfSight` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp`) snaps both ends with `NavQuerySnapToNavigable` and tests the 2D segment with `NavQuerySegmentBlocked` (`Engine/Source/Frame/NavQuery.h`) against the shooter's plane graph.
   Firing and target picking pass `kiFiringClearanceTier` (`ShipBehaviours.h`), tier 0, whose polygons are each plane's threshold contour inflated by `kfOmniRadius` plus `kfPushMargin` (`Projects/BrokenEngineSandbox/Source/Frame/TerrainUtils.h`).
-- Firing and target-pick call sites: `AcquireTarget` (`ShipBehaviours.cpp`, Omni firing and facing), `FindAttackTarget` (`ShipQueries.cpp`, every type), the Fighter beam (`FightersCombat.cpp`), and the Battleship missile launch (`BattleshipsCombat.cpp`). Movement decisions test sight on the ship's own tier and are outside this record.
+- Firing and target-pick call sites: `AcquireTarget` (`ShipQueries.cpp`, Omni firing and facing), `FindAttackTarget` (`ShipQueries.cpp`, every type), the Fighter beam (`FightersCombat.cpp`), and the Battleship missile launch (`BattleshipsCombat.cpp`). Movement decisions test sight on the ship's own tier and are outside this record.
 - Because the polygons are inflated, a shot that passes within the clearance of the threshold contour is blocked although it clears the terrain, the early block near terrain that `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/AGENTS.md` `## Ship Invariants` records. The test also reads no height along the shot.
 
 ## Alternatives to test
