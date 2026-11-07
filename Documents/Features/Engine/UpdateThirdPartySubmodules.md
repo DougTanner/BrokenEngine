@@ -210,7 +210,7 @@ Signatures were compared between the old-pin and new-head public headers in the 
   - Fonts: `FontDataOwnedByAtlas = false` (`ImGuiManager.cpp:109`) now borrows the data until the atlas is destroyed. A code read confirms the eager font chunk outlives the context.
   - Accepted visual-only changes: stroke and anti-aliasing (`MenuUtils.cpp:315-366`), 1 px `Separator()`, and typed slider input (`MenuUtils.cpp:64`, `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:205,311`, `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:335`).
 - implot: every function and `ImPlotSpec` field we use is unchanged (`Engine/Source/Profile/NetworkGraphs.cpp:15-20`, `Engine/Source/Ui/CurveWidget.cpp:29-122`). Its head targets imgui 1.93.0, and `implot_items.cpp:168-169` uses obsolete `ImDrawListFlags_AntiAliasedLines*` names; if that fails to build, see `## Decisions`.
-- meshoptimizer 1.0 to 1.3: the five functions we call keep their signatures (`ExportScene.cpp:603,604,694`, `Scene/SceneVerticesLoader.cpp:201,204`, `Island/ProcessBakedRegion.cpp:248`). The new `remesher.cpp` and `tangentspace.cpp` stay out of `ThirdParty/Prebuilts/Source/DataPacker/meshoptimizer.cpp:5-23`.
+- meshoptimizer 1.0 to 1.3: the five functions we call keep their signatures (`ExportScene.cpp:603,604,694`, `Scene/SceneVerticesLoader.cpp:201,204`, `Island/ProcessBakedRegion.cpp:248`). The new `remesher.cpp` stays out of `ThirdParty/Prebuilts/Source/DataPacker/meshoptimizer.cpp:5-24`, which includes the new `tangentspace.cpp`.
 - No API change at our sites:
   - SPIRV-Cross (`ExportShader.cpp:59-291`).
   - DirectXTK (wrappers `ThirdParty/Prebuilts/Source/Engine/DirectXTK.cpp:11-14`, `Source/DataPacker/DirectXTK.cpp:5`).
@@ -292,7 +292,7 @@ Every license file at the new heads was read. All match the old pins except zlib
 
 - Any edit inside a submodule tree, including imgui or implot compatibility fixes (`ThirdParty/AGENTS.md:3`).
 - The tinygltf v3 C API, a port to it, and any DataPacker glTF code change.
-- Compiling OpenJPH, zstd, meshoptimizer `remesher.cpp`/`tangentspace.cpp`, tinyobjloader, or any file a wrapper does not need.
+- Compiling OpenJPH, zstd, meshoptimizer `remesher.cpp`, tinyobjloader, or any file a wrapper does not need.
 - Referencing any nlohmann/json file other than `single_include/nlohmann/json.hpp`, or adding any library other than nlohmann/json.
 - `DataPacker/Source/Attribution.cpp` and `ThirdParty/AGENTS.md`.
 - Changes to provisioning, bootstrap, landing, or compile tooling, including teaching provisioning to accept upstream symbolic links.

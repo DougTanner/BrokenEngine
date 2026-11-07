@@ -17,6 +17,7 @@
 #include "meshoptimizer/src/simplifier.cpp"
 #include "meshoptimizer/src/spatialorder.cpp"
 #include "meshoptimizer/src/stripifier.cpp"
+#include "meshoptimizer/src/tangentspace.cpp"
 #include "meshoptimizer/src/vcacheoptimizer.cpp"
 #include "meshoptimizer/src/vertexcodec.cpp"
 #include "meshoptimizer/src/vertexfilter.cpp"

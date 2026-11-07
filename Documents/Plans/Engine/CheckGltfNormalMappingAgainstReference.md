@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-07T14:08:20.730Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-07T14:08:20.730Z","dependsOn":["Documents/Plans/Engine/GetNormalTangentFrameUvSet.md"]} -->
 # Check glTF normal mapping against the Khronos tangent test models
 
 ## Context
