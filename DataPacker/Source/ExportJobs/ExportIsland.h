@@ -23,7 +23,7 @@ public:
 	// Governs the chunk payload only (heightmap R16 quantize, mesh XY, indices, map thumbnail, valid-area
 	// hull) — the BC texture encode is versioned separately by kiTextureVersion below, so a payload bump
 	// re-packs chunks without rewriting the tracked island textures.
-	static constexpr int64_t kiVersion = Version(35 + common::kiIslandScalePermille);
+	static constexpr int64_t kiVersion = Version(36 + common::kiIslandScalePermille);
 
 	ExportIsland(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 	: ExportJob(rChunkFlags, rFile, kiVersion)
@@ -36,7 +36,7 @@ public:
 	// plain int64_t rather than Version(...): folding in sizeof(common::ChunkHeader) would retie the
 	// encode to every unrelated chunk-header layout change, re-encoding and rewriting every
 	// Git-tracked island texture for a change that cannot alter a single texel.
-	static constexpr int64_t kiTextureVersion = 3;
+	static constexpr int64_t kiTextureVersion = 4;
 
 	bool CheckDirty(const std::filesystem::path& rPackFile) override;
 	static bool HasAuthorTextureProof(const std::filesystem::path& rLeaf);

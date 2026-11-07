@@ -7,13 +7,13 @@
   "leaves": [
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "c3cf7380d67a460aa6e06c75f618d2b08f98bb6c8ebde3d1a42be6c5b8dfa28a",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "a8df8493fd541d94e72aa7cff82f2ac73174c622cfdf4212c64955047e2ad6e2",
         "BakedDimensions.json": "5ca8e243a2980d085df6eb870ac1dfd75d3d1efcb0cc3e3177fde6b959d3af44",
         "Color.BC7_UNORM_BLOCK": "23bfac75b101d52ea4a0d5b16399d53664801ecd233c06c2df2c84c98475b2cc",
         "Elevation.r32": "3a8e01df804a41c1ec10c1813decaf45c7c69ade47141cbc52e07133efa3ddbf",
         "Masks.BC7_UNORM_BLOCK": "705ca9c9651914a23561b180400a6f6fc55fff7376c88de51bb15618fc5b8451",
         "MeshProcessed.bin": "5b3f6b1d510001a92c17ec15a2ddb0bc7dde3c10e494cee65358a10acf804882",
-        "Normals.BC5_UNORM_BLOCK": "cf4cc71f42f80cfb83b221ed4469c9b028dbad73beb2b823f819d0ec19b1049f"
+        "Normals.BC5_UNORM_BLOCK": "9c2f95d7eac815f500a5d446026a8df20a57272d2309904545b7d0a525636a89"
       },
       "index": 0
     }
@@ -22,6 +22,6 @@
   "route": "1x1",
   "rows": 1,
   "splitVersion": 8,
-  "textureVersion": 3,
+  "textureVersion": 4,
   "version": 2
 }

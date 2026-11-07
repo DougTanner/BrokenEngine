@@ -7,25 +7,25 @@
   "leaves": [
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "45d0d982f07b630b8098b8acb382fa4135063fc3c786fedf4e958e301ddb38ce",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "662e061c04728cd2dd276b27dd488118c88a5a8e7b51d631e2b27fdc734515b8",
         "BakedDimensions.json": "8f5cc29e052da4c8c6bc1258c79aa5ff5c092eec98bb11677aeda53f53fba986",
         "Color.BC7_UNORM_BLOCK": "a85348df4e90e31486769ea9bb23ce57adf1a1168bd81a2faa239b0ebafc0f04",
         "Elevation.r32": "301519b170a1fdb23839e86c4417b3c57bdbee57f3555dc3508ebd79ab9610ed",
         "Masks.BC7_UNORM_BLOCK": "865ff26aa2b8f7c6c760cd4bdde3d88f43ce60db1bbbae178d5ce7dda65d8586",
         "MeshProcessed.bin": "2dfb746d34449663d434370f0a4e4254a61ae9cbb1a8e5d61545fb1c0d656cc9",
-        "Normals.BC5_UNORM_BLOCK": "3a918da30f8fe76f35daa299c77379b3bde3ca5804ea18b94d4985fb3bc49096"
+        "Normals.BC5_UNORM_BLOCK": "62b4f12b34da3056dbe55187aa1b4fcf254bf75f488552ffa409a2ad53109a89"
       },
       "index": 0
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "589f15f1a40e4e565b1edb8a28ca08afa69ac3a8d2f089f9d485cbae49204ece",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "1226e2495ee2a45f38a2a24b8145b96a2c2d43e37ac5cce7d3dce9869b5abdfe",
         "BakedDimensions.json": "4dcdac5eb441b800ce486077bc06ab7d081b041bfb8ada30b7144123a7adb71b",
         "Color.BC7_UNORM_BLOCK": "3e2104b23437736c06de673a3af3bb8a8a7b36cff8cd41b44a5a4b5f52f186a0",
         "Elevation.r32": "98dc56ba6ddfc3a82088d96c2a36ce7e579b2dbf79777015cdf58b89a2e7a886",
         "Masks.BC7_UNORM_BLOCK": "f314a336e81249d6fded0ee6b6cb9ec6590c73525d4477430c2c1f2b9ab47dbd",
         "MeshProcessed.bin": "5465e0f04526767f54f7ebe72a24a9889fac1d0735d22e68682ee7c0c491d7f4",
-        "Normals.BC5_UNORM_BLOCK": "89725a2f02018c558b40d2133593fbd0d5b4a0f88bf485f900c5a25d4560ad7e"
+        "Normals.BC5_UNORM_BLOCK": "a9c56dc509b4dcbbf67a831c639c5323ea0e032dd0b411d1c0e7fa40d124de99"
       },
       "index": 1
     }
@@ -34,6 +34,6 @@
   "route": "2x1",
   "rows": 2,
   "splitVersion": 8,
-  "textureVersion": 3,
+  "textureVersion": 4,
   "version": 2
 }

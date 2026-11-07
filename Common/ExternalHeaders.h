@@ -354,7 +354,6 @@ inline constexpr bool XmIsInf(float fValue)
 	// bc7enc_rdo - base BCn encode/decode (consumption only; implementations defined in the Prebuilts unity .cpp)
 	#include "bc7enc_rdo/bc7decomp.h"
 	#include "bc7enc_rdo/bc7enc.h"
-	#include "bc7enc_rdo/rgbcx.h"
 
 	// gli - texture image library (vendors glm)
 	#define GLM_STATIC_ASSERT static_assert

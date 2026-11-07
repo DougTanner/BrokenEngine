@@ -10,9 +10,115 @@ inline constexpr int64_t kiBc7UberLevel = 4;
 // keep this at 0 or 1 — anything higher means a call site forgot to take the lock.
 static std::atomic<int64_t> siActiveEncodeCount(0);
 
+// Fills a BC4 block's eight palette entries in units of 1/35 byte. 35 is the common denominator of the
+// eight-value mode's sevenths and the six-value mode's fifths, so every entry is the exact interpolant
+// the GPU decodes, with no rounding.
+static void ComputeBc4Palette(int64_t iEndpoint0, int64_t iEndpoint1, std::span<int64_t, 8> palette)
+{
+	palette[0] = 35 * iEndpoint0;
+	palette[1] = 35 * iEndpoint1;
+	if (iEndpoint0 > iEndpoint1)
+	{
+		for (int64_t i = 1; i <= 6; ++i)
+		{
+			palette[i + 1] = 5 * ((7 - i) * iEndpoint0 + i * iEndpoint1);
+		}
+	}
+	else
+	{
+		for (int64_t i = 1; i <= 4; ++i)
+		{
+			palette[i + 1] = 7 * ((5 - i) * iEndpoint0 + i * iEndpoint1);
+		}
+		palette[6] = 0;
+		palette[7] = 35 * 255;
+	}
+}
+
+// Texels are scaled by 35 into ComputeBc4Palette's units, so every candidate is scored against the exact
+// palette in integers and the encode stays machine-independent.
+static void EncodeBc4Block(std::byte* puiBlock, const uint8_t* puiPixels, int64_t iStride)
+{
+	int64_t iMinimum = 255;
+	int64_t iMaximum = 0;
+	for (int64_t i = 0; i < 16; ++i)
+	{
+		iMinimum = std::min(iMinimum, static_cast<int64_t>(puiPixels[i * iStride]));
+		iMaximum = std::max(iMaximum, static_cast<int64_t>(puiPixels[i * iStride]));
+	}
+
+	if (iMinimum == iMaximum)
+	{
+		puiBlock[0] = static_cast<std::byte>(iMinimum);
+		puiBlock[1] = static_cast<std::byte>(iMinimum);
+		std::memset(puiBlock + 2, 0, 6);
+		return;
+	}
+
+	int64_t iBestError = std::numeric_limits<int64_t>::max();
+	int64_t iBestEndpoint0 = 0;
+	int64_t iBestEndpoint1 = 0;
+	uint64_t uiBestSelectors = 0;
+	// Mode 0 is the eight-value encoding (endpoint 0 above endpoint 1), mode 1 the six-value encoding.
+	for (int64_t iMode = 0; iMode < 2; ++iMode)
+	{
+		for (int64_t iLowDelta = -kiBc45SearchRadius; iLowDelta <= kiBc45SearchRadius; ++iLowDelta)
+		{
+			for (int64_t iHighDelta = -kiBc45SearchRadius; iHighDelta <= kiBc45SearchRadius; ++iHighDelta)
+			{
+				int64_t iHigh = std::clamp(iMaximum + iHighDelta, 0i64, 255i64);
+				int64_t iLow = std::clamp(iMinimum + iLowDelta, 0i64, 255i64);
+				if (iHigh == iLow)
+				{
+					continue;
+				}
+
+				int64_t iEndpoint0 = iMode == 0 ? std::max(iHigh, iLow) : std::min(iHigh, iLow);
+				int64_t iEndpoint1 = iMode == 0 ? std::min(iHigh, iLow) : std::max(iHigh, iLow);
+				int64_t piPalette[8] {};
+				ComputeBc4Palette(iEndpoint0, iEndpoint1, piPalette);
+
+				int64_t iError = 0;
+				uint64_t uiSelectors = 0;
+				for (int64_t i = 0; i < 16 && iError < iBestError; ++i)
+				{
+					int64_t iTexel = 35 * static_cast<int64_t>(puiPixels[i * iStride]);
+					int64_t iBestTexelError = std::numeric_limits<int64_t>::max();
+					int64_t iBestEntry = 0;
+					for (int64_t j = 0; j < 8; ++j)
+					{
+						int64_t iTexelError = (iTexel - piPalette[j]) * (iTexel - piPalette[j]);
+						if (iTexelError < iBestTexelError)
+						{
+							iBestTexelError = iTexelError;
+							iBestEntry = j;
+						}
+					}
+					iError += iBestTexelError;
+					uiSelectors |= static_cast<uint64_t>(iBestEntry) << (3 * i);
+				}
+
+				if (iError < iBestError)
+				{
+					iBestError = iError;
+					iBestEndpoint0 = iEndpoint0;
+					iBestEndpoint1 = iEndpoint1;
+					uiBestSelectors = uiSelectors;
+				}
+			}
+		}
+	}
+
+	puiBlock[0] = static_cast<std::byte>(iBestEndpoint0);
+	puiBlock[1] = static_cast<std::byte>(iBestEndpoint1);
+	for (int64_t i = 0; i < 6; ++i)
+	{
+		puiBlock[2 + i] = static_cast<std::byte>(uiBestSelectors >> (8 * i));
+	}
+}
+
 void Texture::StaticInitialize()
 {
-	rgbcx::init();
 	bc7enc_compress_block_init();
 }
 
@@ -401,10 +507,11 @@ void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInpu
 				switch (vkFormat)
 				{
 					case VK_FORMAT_BC4_UNORM_BLOCK:
-						rgbcx::encode_bc4_hq(puiBlock, pixels.data(), 4, static_cast<uint32_t>(kiBc45SearchRadius), rgbcx::BC4_USE_ALL_MODES);
+						EncodeBc4Block(puiBlock, pixels.data(), 4);
 						break;
 					case VK_FORMAT_BC5_UNORM_BLOCK:
-						rgbcx::encode_bc5_hq(puiBlock, pixels.data(), 0, 1, 4, static_cast<uint32_t>(kiBc45SearchRadius), rgbcx::BC4_USE_ALL_MODES);
+						EncodeBc4Block(puiBlock, pixels.data(), 4);
+						EncodeBc4Block(puiBlock + 8, pixels.data() + 1, 4);
 						break;
 					case VK_FORMAT_BC7_UNORM_BLOCK:
 						if (bc7enc_compress_block(puiBlock, pixels.data(), &bc7Parameters))
@@ -669,6 +776,22 @@ std::vector<uint8_t> DecodeBcnToRgba8(const std::byte* puiEncoded, int64_t iWidt
 	int64_t iBlockSizeBytes = (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK) ? 8 : 16;
 	std::vector<uint8_t> rgba8(static_cast<size_t>(iWidth * iHeight * 4));
 
+	// Each texel is its exact palette entry rounded to the nearest byte; 35 is odd, so no entry lies halfway.
+	auto DecodeBc4Channel = [](const std::byte* puiBc4Block, int64_t* piChannel)
+	{
+		int64_t piPalette[8] {};
+		ComputeBc4Palette(std::to_integer<int64_t>(puiBc4Block[0]), std::to_integer<int64_t>(puiBc4Block[1]), piPalette);
+		uint64_t uiSelectors = 0;
+		for (int64_t i = 0; i < 6; ++i)
+		{
+			uiSelectors |= std::to_integer<uint64_t>(puiBc4Block[2 + i]) << (8 * i);
+		}
+		for (int64_t i = 0; i < 16; ++i)
+		{
+			piChannel[4 * i] = (piPalette[(uiSelectors >> (3 * i)) & 7] + 17) / 35;
+		}
+	};
+
 	for (int64_t iBlockY = 0; iBlockY < iBlocksY; ++iBlockY)
 	{
 		for (int64_t iBlockX = 0; iBlockX < iBlocksX; ++iBlockX)
@@ -680,23 +803,19 @@ std::vector<uint8_t> DecodeBcnToRgba8(const std::byte* puiEncoded, int64_t iWidt
 			{
 				case VK_FORMAT_BC4_UNORM_BLOCK:
 				{
-					uint8_t puiBc4Pixels[16] = {};
-					rgbcx::unpack_bc4(puiBlock, puiBc4Pixels, 1);
+					DecodeBc4Channel(puiBlock, piBlockRgba);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						piBlockRgba[i * 4 + 0] = puiBc4Pixels[i];
 						piBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
 				case VK_FORMAT_BC5_UNORM_BLOCK:
 				{
-					uint8_t puiBc5Pixels[16 * 2] = {};
-					rgbcx::unpack_bc5(puiBlock, puiBc5Pixels, 0, 1, 2);
+					DecodeBc4Channel(puiBlock, piBlockRgba);
+					DecodeBc4Channel(puiBlock + 8, piBlockRgba + 1);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						piBlockRgba[i * 4 + 0] = puiBc5Pixels[i * 2 + 0];
-						piBlockRgba[i * 4 + 1] = puiBc5Pixels[i * 2 + 1];
 						piBlockRgba[i * 4 + 3] = 255;
 					}
 					break;

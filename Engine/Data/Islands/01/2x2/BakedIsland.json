@@ -7,49 +7,49 @@
   "leaves": [
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "8fbe22d8f3e227f4fc6478f6dcfa5338b409157f388359dca3787d57d14d2e79",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "fe0c3a172b46995bad94333819f9e1db49d5192c2e74a291f43291c2b4ec20ed",
         "BakedDimensions.json": "b5ca6d88b7091ded2705aa01af63f1930039fb34f15934dce1fedbd03c0767a6",
         "Color.BC7_UNORM_BLOCK": "bea896c949e65fccf08effd5d5bee27acdadfb8aec37f6521cdb624fdb28aab0",
         "Elevation.r32": "4ae88190c83782ab16b316ebae5ac44005149fe887cc9b2b5113c22f6ebb79ad",
         "Masks.BC7_UNORM_BLOCK": "5f552867a527d161aad8ea76417381ab049954356f5715855079a55a177da0c1",
         "MeshProcessed.bin": "77a6cceebdbd4ae281f8a13371ca37188bced3202515f137d83b0722cd786ba8",
-        "Normals.BC5_UNORM_BLOCK": "154f9140d2112141aefada80707b07d48fbb18b6ad61176f95cdee3c07986796"
+        "Normals.BC5_UNORM_BLOCK": "e0e3f8d419259a8c2e89d78ada6da639f41ab5b8540e15533520eb774f6ec0e9"
       },
       "index": 0
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "3e07294558f5bff1d9db02bfac146a0433f88d971cfd72f46d87f7dcf728ac52",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "116feb102fdee13394e38e9f057e5161133726fb479b57c38fc0450380ef018b",
         "BakedDimensions.json": "35147d68cb4c0d191388de98289749a71ff92d8570ca2ee30eec77fdd2f67c51",
         "Color.BC7_UNORM_BLOCK": "85012892125037bfaae27a333a77fbc0b812de884022ae3132295ef2deac0444",
         "Elevation.r32": "b280b02c908c014abaccd2cf9d55847921e304b7f1932735a8d182d99b089c48",
         "Masks.BC7_UNORM_BLOCK": "a97b8fa2b8e5ec4ffd7072e4243be42d964f8f34d34d6606e3bf9d7e47ed5688",
         "MeshProcessed.bin": "2c8a0b7e145fbc40e5989f83cfa1f3aaead9e3fa3873a3a249b8baf81ca9d4f0",
-        "Normals.BC5_UNORM_BLOCK": "8694dea200e7825c1733da7b558d26220030e1a32d3f9362c79867015f9a6177"
+        "Normals.BC5_UNORM_BLOCK": "1c74e53e0c3d4ebfa2d1565014f81a9a4f50259592f65603fae326a7451df19a"
       },
       "index": 1
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "b8f76b62630f62bf33b8581604899912471244f83774ff4136997318b78dcfd1",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "b5a451b501dd85f8143b03b5a624671438caf19bcb42adb36c5c31bf68cd6853",
         "BakedDimensions.json": "71eca9be0fe44a8bd91bfe930cd412dc02b5c1f60cc8d9d7b429ffdbec9cb562",
         "Color.BC7_UNORM_BLOCK": "d4a12a0f4a9ab57795ee608dba29b7125c4fbd24853fd83f33b1c20a020708fb",
         "Elevation.r32": "d8e2e2dbc27d0c63b3564b433909af833b81ffcab35301245c0082de39171f6d",
         "Masks.BC7_UNORM_BLOCK": "04f198c0db63be208543e899bf0adbcd4d175af9f3f2dcc19c07e510d513c98f",
         "MeshProcessed.bin": "81df79445b6b23233f12a5f277ccfd0723c4f3a5cafb965e225f2821a8401ee8",
-        "Normals.BC5_UNORM_BLOCK": "17bd096411784b6f08d8c56a3cad58301b8d41b6e7e06da96e4cd8ae47240135"
+        "Normals.BC5_UNORM_BLOCK": "f13038b6593c32aaa03d53b31d632d8c35935295becbac1e4f5885a762525e71"
       },
       "index": 2
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "fcd8c0e21cccfe6d0b0b1d7ed9aeb0ee5360aea2442ac7757044d2fa605561eb",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "ad351c11f93421a7bb015274fa0ccfa3d20b160b304401a744443bb3933c5378",
         "BakedDimensions.json": "8954788a4b3a6ec3ad33aee6a9056ccfc7425f0fffc7765e7381d6a0f4dba689",
         "Color.BC7_UNORM_BLOCK": "6ea3822b2214f6bf6f948c88ac44f448f0161b32922c53fc48d740e21a1876d8",
         "Elevation.r32": "f4a16e4671e791d5d057c3535123367f0dfe961e69bfe791681e6646a77c6563",
         "Masks.BC7_UNORM_BLOCK": "4fb70f82328051e990b5b0f6a52e1c3e77503276b4bc8598ac7f8c26224b38e3",
         "MeshProcessed.bin": "fe1ca91672c817021a85ce0c9e845324e8371603b5b94e4f3a70191c97eb0ce9",
-        "Normals.BC5_UNORM_BLOCK": "c4891cf5b4d5160f6efb9106dcc73dd8520c1cba3e9e5d88c5694d9bd0dd8716"
+        "Normals.BC5_UNORM_BLOCK": "c86ed67b91800297fe5a527afcee94a8bcd8b15939f3473752d14f4b17e086ed"
       },
       "index": 3
     }
@@ -58,6 +58,6 @@
   "route": "2x2",
   "rows": 2,
   "splitVersion": 8,
-  "textureVersion": 3,
+  "textureVersion": 4,
   "version": 2
 }

@@ -7,217 +7,217 @@
   "leaves": [
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "541732e64c737ec986cce32b61e539240e07b520bfe885ccc8ec21b57c425349",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "a78dcfc18700bad577ac7f14b26b480338a69a5923b5e78508e46eeb6ce0509a",
         "BakedDimensions.json": "ead4148b71a40467be142563f4fa79062d5cda4475d45bec5751e18aa3f1e0e8",
         "Color.BC7_UNORM_BLOCK": "2c5d97cb4b4029f1c50304188f2ddc91659ccfc28d522847a8e254603c24e3cc",
         "Elevation.r32": "847ad5230b3792b98101ec99a8067b217fe28c119df2934a55c4e4f1c92851f9",
         "Masks.BC7_UNORM_BLOCK": "3f41d456c4de3e6d36aa4fd78d75fb1779aba19a5d9dc5a7866099ee28574aad",
         "MeshProcessed.bin": "5abe358d5b3057e31c9415ef47359f75d34d15d51a85563057e87de346ff5cad",
-        "Normals.BC5_UNORM_BLOCK": "58f1025fb3c3244630221fcdb7f5e5e09fbd099f0db78ac3f186a41e0cb2dfe4"
+        "Normals.BC5_UNORM_BLOCK": "431e13ee75255a4b5ae7126dabeb63f33a4b755649e4b3a6555cc83408f5d3a6"
       },
       "index": 3
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "f210707e3e069dd088bbe45e5c856e6ad809e3262d409c2cefa60a43645e968f",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "bfda0d6a252a6f676622604bbb25610314bf0a037b9c9f9df63c5b6c3a9da86b",
         "BakedDimensions.json": "11fb9b93c8c666ee006168a51168aa2dc144a80cef2500b9cfa82b1eafc725da",
         "Color.BC7_UNORM_BLOCK": "0bc46c75c026fe6c2fc8d034bebb8333ab211a780454a06395868806a452daa6",
         "Elevation.r32": "cb61cda4daa694c8c5855e15eb7efa3f906fbe8704823ec296e8d223ad2c0f9d",
         "Masks.BC7_UNORM_BLOCK": "9752c9c73283b2711d664412595f480a7112369b29c5571ebe1f352502a437a3",
         "MeshProcessed.bin": "00a937f78a398dd77823d22df300afb9a6f99180bde6884cb268a65ced8ee52c",
-        "Normals.BC5_UNORM_BLOCK": "9a22e71c5f125eb7aeccc2faedb962a70b8d75935e351aac99fcf6d4d866e58a"
+        "Normals.BC5_UNORM_BLOCK": "9622cb037a5ff28f32c2236db303f8560230ebf1140b775c96ab1dd573a23d05"
       },
       "index": 4
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "33bf233988b4efbed09b759bdf09a534ee11396f57a44f50b1b448055d3518db",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "b3dfc040b9087f8ac6f37ac1bb06784dfc8c8582f1172f62099b4b7f19cefb28",
         "BakedDimensions.json": "20dd53e8ac53b9177dd3fff56182ac29013962a8798da0f2077cdb1e691700da",
         "Color.BC7_UNORM_BLOCK": "b192be2cb6080dba41f62dc9167465cd242b9f8e9c54aa9de1a9ecba0ff69f03",
         "Elevation.r32": "1c4f7987fddb09ef4a614c8e6acc8856b8328570b6b5305e4cde5429f2b9f23d",
         "Masks.BC7_UNORM_BLOCK": "cba6dc9ba552f01758df94ce1b6e2b874ff0b6c60da1a90d276f6aad04b0b3f8",
         "MeshProcessed.bin": "94b50eeb01f6bfd6fe73f612bc728ed2415fe5180bf99e3a97da3e0488ecad10",
-        "Normals.BC5_UNORM_BLOCK": "c5f13413c5f0cd14a92ff6d2278cf26a88ef6a9367e14791dcba59015c18f89e"
+        "Normals.BC5_UNORM_BLOCK": "ec6426fab15b3c22eb82c1c831fa8a697de73e8bb15983cba91b0a9195fe3a42"
       },
       "index": 5
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "8a615148096618b2f9fa51e00e7bc472a2253559c871a8b23bff01c94ec38daf",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "ed518624fff42a10909931a9a7cf48096fc2392c1ea3c1b09cd2fc7b1e168dd9",
         "BakedDimensions.json": "a47701f3291c9909a607596f2fc504d0b4b3128e7fd603a872aa05b121503488",
         "Color.BC7_UNORM_BLOCK": "7181849dad323eeef8eafba848b0987e32aed384e98446a69a2f0cf163746deb",
         "Elevation.r32": "c01ebaa3e05529ee96dca6b907a0fd88bf2788113e41fa0a1cd12d488b911e1f",
         "Masks.BC7_UNORM_BLOCK": "db677a61d9a8f6b41a352afd9154be716e7fba4f8a244cda6d312a02201d3ecd",
         "MeshProcessed.bin": "69a49c0a1881d0ec299e1b43a5ac12cb5bfe3bb97463eb74c3ca8d3c1294fb0d",
-        "Normals.BC5_UNORM_BLOCK": "fc1cbee48fb3dc0ca4f22c2673ee8bdc35bb1d43b56dbfbbee4aaaba5954bb4a"
+        "Normals.BC5_UNORM_BLOCK": "78497ae1fc3cd213337b7e730ab2ac33f7b18ef42a0b6f086b11f95b4fd68038"
       },
       "index": 6
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "340eda4fa5d0187cc6383256244d7821056be538afd2fc7aa92cbe856b2d9819",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "11a786b23e654c89d3950a53701516838c2413fe9d39e7fe7f6601878f3840f7",
         "BakedDimensions.json": "6c1794926e30912fce042d5e76cacaf60789b4324661ff29d26dd24223639d29",
         "Color.BC7_UNORM_BLOCK": "951fe42a6d183c6b66cc42fd1f16379333f66b27f674c87bad258667ecc2d0af",
         "Elevation.r32": "ad40f8847736449ad2db55c8e6f7c91c72ad2ffefd75c463e83809013625ea03",
         "Masks.BC7_UNORM_BLOCK": "98a3172c6d27bc8d7d9721d44e5b5ff52c71405e50b6bc210902abdd44a2bbdd",
         "MeshProcessed.bin": "a81f9bfc6b5e478f40136a2095bdb9361f535ecd82e298714c2709ef732af54c",
-        "Normals.BC5_UNORM_BLOCK": "9dd7cd94d876f3e6467e7f7c4b18d7a7695ad4f9ccad779ee1fcec5426cefcd4"
+        "Normals.BC5_UNORM_BLOCK": "1e849be61349d4205a4e20e1cec8093e262945fc76b9acad26960c3c4626bce0"
       },
       "index": 9
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "5da85b16efdb0eca4086c81605ab540dd755ee75903f5d5345dfec8646acca5d",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "bc1036bed61181d277c0e8c83e4bb1d6b1ab5f5d6dc77aa85b32e7d7467ca506",
         "BakedDimensions.json": "3e81c29d9e7b7655c8620f8518cbb9c0cf5a0c5d4d2f138cc4cd43150a81f692",
         "Color.BC7_UNORM_BLOCK": "372c74a13b158c124e5fa80d4fa5d430718d9c19428e94cd5a9827dd89eb4a87",
         "Elevation.r32": "90f16d9adc28c1bf1c46baed48cfbc35f681fd7849b09c769e8fc0dd558717c4",
         "Masks.BC7_UNORM_BLOCK": "8106874c85ddc3ec9db10a466b96c46b2309d15b881a98abe31ea7f69b4cc9ee",
         "MeshProcessed.bin": "b1cf5d470e085a4ec54b82a5178350a69607bd74984da6acb8435ba4ac698f3b",
-        "Normals.BC5_UNORM_BLOCK": "5bbf4ce89ece7668ec683534ff3802dcd1070249f2b5b302500f97a7e4348f89"
+        "Normals.BC5_UNORM_BLOCK": "c77227c353f77d62e76945b7e2bef63f5bd639e66c95301a4e156c42537ef747"
       },
       "index": 10
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "26e0cfd3915933fcc7a37da780ac8127bc8f870a0a6e78401c1f0c2ddbb9780f",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "3f8a64dd220ce05ed8d9a0d9ffee339ba69291944d914a9a7c5d991065613ce3",
         "BakedDimensions.json": "f511af82024b53b858d5db258ce3fcc284e3ae88fbb7719b89194395df569271",
         "Color.BC7_UNORM_BLOCK": "d66ab167f3b0c0622edc7bb3c6db62fbe6bd7d9682547fd5b5826d1d4fd31c2e",
         "Elevation.r32": "7165cd901c7f50d0ef73a0c0fedf65a9a8d2fda7c0e2fb409e0441bd5cf8a66f",
         "Masks.BC7_UNORM_BLOCK": "60819f431c5a7795756a8a9471070e9d77fa6dc1b2fbc5ebd0e8e088df991589",
         "MeshProcessed.bin": "9f04f69b1ea9e0e120597aac485e1be3f5f0ab9dc263504bb8741cf5b2a7e985",
-        "Normals.BC5_UNORM_BLOCK": "b6113316dbcef9a27525b10d1acd55ca9b2754402fb2e97a30720bb31b7f95ee"
+        "Normals.BC5_UNORM_BLOCK": "c37aea1c5c4c364a079a2a5b8a821ad993adf95a2cd2de296216083fac7b9beb"
       },
       "index": 11
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "bcf2e2f268fdb8337a20f830b51cd1e1dadc31d11515ebe68ae37121e9f60dec",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "b568c347114bc4def00da31c8d8de0629ff7876e016e60972e7b1b2b78520911",
         "BakedDimensions.json": "15ab97fa24092861dff424796d9a95632e356ad01ebecd8258606407bbcc0c38",
         "Color.BC7_UNORM_BLOCK": "2ae298e6c21f8bc2e2b5e2a33e9dd6274eac669749bf2a6c41000a6b15c784e1",
         "Elevation.r32": "24ce670851e63ad13ece87ed381f2ffd5d0b77280cf3af55ebf4e8c6afd4cab7",
         "Masks.BC7_UNORM_BLOCK": "fbbc45bcaa17f45ff2d9c3e8ab562478d17b7e264e596ee4d08bb70bdcc2c9cd",
         "MeshProcessed.bin": "c284d31748ceae8c25f859c23b9118e9d5cf95f80df578f4d499d9c548015bf3",
-        "Normals.BC5_UNORM_BLOCK": "94e6416bb3ae787393a0b357e2fdffb7ee4502d0ab1ffe1d9f4451e2fc035a67"
+        "Normals.BC5_UNORM_BLOCK": "13687cf93be10e68a67d8003a1418300b6d29675ff5642c2270c15c0a2d3c51b"
       },
       "index": 12
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "56e09c1601e3aa57f3985b273cf9bbea09ae28304618b5a9a0102f5e4739e132",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "9c48aeb30991e7b3c852acc63c2a5d480f509b4cbfd6a5204813069486a727d7",
         "BakedDimensions.json": "49f3ca18abe81ee5ba6243bb62c22ea4d445e3f960d41b167e4b27f4e5bf39bd",
         "Color.BC7_UNORM_BLOCK": "29f563814e2c17491b689db43db5da07951384b0cfe8841a228ebeacdacd51ab",
         "Elevation.r32": "a1aa2ac9b43cd99e7548ea76ad12eb16571ca3b6a2f81f708e973fdb87d8b84e",
         "Masks.BC7_UNORM_BLOCK": "f94e23ef12c216cf10130a9439e08498fc4ed4f582a9a0546315920204594cb0",
         "MeshProcessed.bin": "80a7b005d07a0faa124e75965d27badeaf91c564d9be9ff1424373c02a825350",
-        "Normals.BC5_UNORM_BLOCK": "bef0b013e01337e04383ef87f5c3c7612f84c49ef337fc5a95d1bdb482a0307f"
+        "Normals.BC5_UNORM_BLOCK": "9f2d9c75d1bc493ebc6bc1da5e805980a201fb77ea8ceebcd0d8fac5e1b3fea5"
       },
       "index": 13
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "9e734a30ea2b890503e639064307bc73e2b39b97d8551037f6cb9428bb097ac5",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "50fbe4ad3f61573a4fe698e783edfad89ee1df4c9bf6afe419b32a87a91932b8",
         "BakedDimensions.json": "a7872181511048b71f1af0cc1dc9a7b7e3d1983cb1b736e88b7387cce9fa687a",
         "Color.BC7_UNORM_BLOCK": "73ce4ebcf06060b3f5998e42b378b77222f2aea3d65d80c3662f199df166a0d0",
         "Elevation.r32": "7399c74b7969c034fc58d6af8ce387b9a04dcf49259beff316ddee56c6b5c8c7",
         "Masks.BC7_UNORM_BLOCK": "127423fd794b8f20dc79c0c5b09513218dd59c60e0be190241a1ad4d7cac4be4",
         "MeshProcessed.bin": "87d8baa5d2f2f77bdd3141088002c7c12a3ec851bb16048cbf9c813501d0b896",
-        "Normals.BC5_UNORM_BLOCK": "5f177c0ad964348b1bc165e60d61f87984b6b0f365a15ad6c863158088c1d978"
+        "Normals.BC5_UNORM_BLOCK": "d8315d17c725778ddd2fb3daf3f43b4885b39a746b436b22ff5738c00aa7a077"
       },
       "index": 14
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "8a07857e8e49cbd961ebe1d69a324c21e5309f4faf8e0875508df364457d17c0",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "3a90cca954105e82965e86e4c8e33bc323fd534e29ae75b7a5972d4b9dc7a55f",
         "BakedDimensions.json": "976b9001eafd079d469dcb0a7ba7d68e7660fb3e6189694facf35f183a074e5e",
         "Color.BC7_UNORM_BLOCK": "72cd3340d2946767e24cab0120d8a70c7fac9968059ee02b9b2516ce0afd6709",
         "Elevation.r32": "17ea800da88bc7d806e8b605dfc0558677554207945dc17d9aa741dd371a3cf5",
         "Masks.BC7_UNORM_BLOCK": "8ba8eb3091a5083811e6ef105c22965689633a8c2b2f41d26e07a29cf0fada35",
         "MeshProcessed.bin": "4cd15afbdc329439f8f1cb7e5b629a076109a191ff7d1c18e629dff77a3911b6",
-        "Normals.BC5_UNORM_BLOCK": "dd336f90a701802c51acee87eddfe54211ced74b942e98e581c949d333e26ab1"
+        "Normals.BC5_UNORM_BLOCK": "b9b15147e795b78b20ee8f0a5f43f6c3a06f3049a7f3574549e3542daf00ac1a"
       },
       "index": 17
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "9eb98ea16e0e60aa0e76bbecd94c2053bc484c3565e1ec75444f713f1f8b596c",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "a5f9dbd2f8c0f40d43aebc7dd9424bb782786c6184cb126c23d618f9217e28cf",
         "BakedDimensions.json": "ca6ed707b690d12d3eeb12baccd869538b0ecd6b3a6001be0e06643f67f4c148",
         "Color.BC7_UNORM_BLOCK": "9644d43e6de951c52247e95de1fe71a0a4ea131510615189d66716856c2dd73f",
         "Elevation.r32": "caf7a6bdd051acd4c43b11b670a761565a2a578b05a40c76042fad16f984dd8d",
         "Masks.BC7_UNORM_BLOCK": "0a7d6142fea3b48472456f90eef9c913f875f8c9938fe067f2c350ca0d18df22",
         "MeshProcessed.bin": "fe3e5f563a3d6ce70b136224eae986fea56c3a2b7eaf0d39ff8e5919ffdb7b8f",
-        "Normals.BC5_UNORM_BLOCK": "220f37d0619a20006054f5f0b461c68d7b1c8ae2715b68b0abf79c0936705c49"
+        "Normals.BC5_UNORM_BLOCK": "a8d5b16194067e8d39d2298de25d9e0bb9e8c9de7f84f1085d8223287245e51e"
       },
       "index": 18
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "9a0bf1b455551a594636d277213814d1699f38193bbfff118a5208d3aa9a0c00",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "d3557066be78b18ba3bd8bc16ec57f62b689840ebf1577fce7376769477646d9",
         "BakedDimensions.json": "1413900303389f59818f48b1056bfb6c65489b5347d25ef23896486473fb9f4a",
         "Color.BC7_UNORM_BLOCK": "38a994b55a4da927b72eeb593931e6bc6697713db2bbe984626f2bc278ca9d1b",
         "Elevation.r32": "d3a1cc7b71f403c956478b90eafde6c634cd68e7529e14e38a08294ab2f763ef",
         "Masks.BC7_UNORM_BLOCK": "fbe70eaaa0cf8b47e2ad33140f0c66d1d994228df03ddec147734486ee1b7cdc",
         "MeshProcessed.bin": "5f40d715a3f9fbabfd96295d4b9a70763f533e7ebfa8868844a4bf51581e246a",
-        "Normals.BC5_UNORM_BLOCK": "22db9c6a7017aa70e5ab88389021f8ae72159afe4b8e3f0e5b7f9b8eba386956"
+        "Normals.BC5_UNORM_BLOCK": "f03b47dc435d74ef9ae3ed4679a6b4ac2413cf383ce47f626a540e09aa9f65bc"
       },
       "index": 19
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "c94dbefe0ecaead9c274fcde9470ce433630797f7f7aada411a8632da87dd90f",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "2921509013728ed5c1564b67d846b43e61cc739b83c8f0f962db848903d234ed",
         "BakedDimensions.json": "7a9c67a1cabd13a97d6390b9c03f0292e15922fcc23594b0d9261ad89a05121f",
         "Color.BC7_UNORM_BLOCK": "9e31ac2fddede9e24d17ce5c8e9e09d11d1dc5d8194c97cceaa32b85dc372385",
         "Elevation.r32": "9ef68530ce9ff792c976dd20af62e95e67e4327d950f6c7a1be6054a7c02f909",
         "Masks.BC7_UNORM_BLOCK": "61fe7e8f0efc810bfe599b00c03d2efc37a3df20ead09cdb84893e4a1b7205c1",
         "MeshProcessed.bin": "3bfe92de3a7c0d3e1fda1a334fa9de2575cb10e4f853a2f44791a1c9d8b36921",
-        "Normals.BC5_UNORM_BLOCK": "9c15f3cb7e7013c3e49f1161cab3ede61249022207c32c109f3665e1c7db08ff"
+        "Normals.BC5_UNORM_BLOCK": "e35e20305e0c4491ac8a0007c0875585735cff9c864d97d1a565754cf02bca4b"
       },
       "index": 22
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "560f7386c98bc0de75429b6dee508a5b7662a2c708cd3bccd6e7754e9febdb71",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "3fcb877802e7e1b1bf0df44f17d8763b13d8b1e624691b34bc58a8c5a76e8c83",
         "BakedDimensions.json": "9b56e0122a081d7a2db7f6d926db65633b0e97f7286f203b4aba940c241b780e",
         "Color.BC7_UNORM_BLOCK": "cd4c42252a9b3ab7eec640a8b643e5a2398a96a99944dd7a5b2dc0d1eb7afc1f",
         "Elevation.r32": "05729fa296ed594fadb634c0d831e9c6e644563ddaf26bc352402f7441aa66b6",
         "Masks.BC7_UNORM_BLOCK": "028bf1168f4ccf348ee5966d3ea6071acbff479e9fa144b6fd6af734855fe48e",
         "MeshProcessed.bin": "a5dc30644c7684b418d0ffe7412a4b0ebac99acd2782474b55b49ec0da83a084",
-        "Normals.BC5_UNORM_BLOCK": "4a0a1029a5a319c4a4b95958253c61e78a6f9d77c2a40bf46be2174207869f75"
+        "Normals.BC5_UNORM_BLOCK": "c01b87def09be553fe74bf6cb7b23feff9679d62d5a1ad8889b8b83fb3cc8bf0"
       },
       "index": 25
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "a5ebf84b0d3b38f5ebffb4473e085d4502aaa0aae5ef5afcc10db560d438a694",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "55632d7db136c238169fb8efba6e8682e50941d4f3f4b0654bd2afc4a89b0289",
         "BakedDimensions.json": "3fe779a636d4b0be791eb8a67e69da13437ef8fb25f9c22eea9f681a89e6b466",
         "Color.BC7_UNORM_BLOCK": "b7653dc2425a5ffd4e91855bd0c1e77f23d841301b5f2f2d24a3559c35745bab",
         "Elevation.r32": "bf2b748311424e24c34da96df804dc9623360bdc4dffa0a4a6d09f0e9ed56ca6",
         "Masks.BC7_UNORM_BLOCK": "b1499a0b68a14789c9d32e11286e5f2879ba2e7fcfcdbdd72942d67537513572",
         "MeshProcessed.bin": "76d27bc7d07a8d1b9f4bcecfbd58a99701b4c8a77a9024d5a85d8446f07754ca",
-        "Normals.BC5_UNORM_BLOCK": "3dc505d1e1ab9918d9ac6be2ab00cf4fb5c2ca349e8ef42b6138ec9ccff10cf5"
+        "Normals.BC5_UNORM_BLOCK": "dd0fd4604e20321b5b29a0ef9eeae96adf1ba8d032dd832a1cd5c9fb6fff1a90"
       },
       "index": 26
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "900adb4525190889f4af4347b377a43e5a1feb4caea580286aa4e78bc242fc11",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "b301319dcbf37a5f00dd6b9219769cc135aba89bc434ddaca47f0041e3823440",
         "BakedDimensions.json": "497494abaad651c5b444af4747732d5e7b865ba19d9f7171fc08fcbe3cf0926d",
         "Color.BC7_UNORM_BLOCK": "4cccee66d2021ee7a10165f423448f772fe3423efeebce2d3a8827c1a91ee31e",
         "Elevation.r32": "21096f14843521ee9298a94326e0baf0d1536d349fb8cff2530a47ae99497f71",
         "Masks.BC7_UNORM_BLOCK": "c61a20892176a60d02fb87acbe3b3c97dbbe9747bcee6f3007a8233bb662be1a",
         "MeshProcessed.bin": "7fa5af6b6cf94707035b30def7c57a9954a859f3af6cc2f34d0ab10dd348f844",
-        "Normals.BC5_UNORM_BLOCK": "98a81627bde187b7656c5635e148c56f13e316f73603ee701a8d3b43bd850174"
+        "Normals.BC5_UNORM_BLOCK": "61fbdea71db63acc3f6b87b598e2ee9c2d109f1777cf25c5dc76f9601b20e905"
       },
       "index": 27
     },
     {
       "files": {
-        "AmbientOcclusion.BC4_UNORM_BLOCK": "c0c795b272924f0de4644b0e5baf5a802509ee7ac98e2d5970d27bf4f413cef1",
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "fb927e745b78477231adc46001dce88396ffc9d65b8a7d938d38a4447fcd16cf",
         "BakedDimensions.json": "c5fd8b978c6c06388f83b56536e01314294d80a61f88e8c15d3baed6e09947f9",
         "Color.BC7_UNORM_BLOCK": "4bff70e98d766c211f5a4aa3900cda3c3d32facf5c74a880facb05a0b099a9d4",
         "Elevation.r32": "c7c8f6484211ba0ba3d05acf34773f0d25aefa1acd771e59d71e2460fe2638f4",
         "Masks.BC7_UNORM_BLOCK": "8fc19fa2a525b744be158e22482c4e1cf0889ee58297a8658d712cfad04d5413",
         "MeshProcessed.bin": "148d23c09dddbb0435cc182e49f1c6eed72fb672fbbf7dbdf37134b159e0cd7d",
-        "Normals.BC5_UNORM_BLOCK": "e84c493dd61d819b1e2a0cfc4b7310923e71dd1d759005ced26a5e68136a88b8"
+        "Normals.BC5_UNORM_BLOCK": "af91d7f386615db26d901267bcca13f58e5349f4a8aab61f2dea57b429cb5c11"
       },
       "index": 28
     }
@@ -226,6 +226,6 @@
   "route": "8x4",
   "rows": 8,
   "splitVersion": 8,
-  "textureVersion": 3,
+  "textureVersion": 4,
   "version": 2
 }

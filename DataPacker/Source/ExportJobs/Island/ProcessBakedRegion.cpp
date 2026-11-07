@@ -287,7 +287,7 @@ static void WriteBakedDimensions(const std::filesystem::path& rLeafIntermediates
 	bakedJson["cropWidth"] = rCrop.iWidth;
 	bakedJson["cropHeight"] = rCrop.iHeight;
 	bakedJson["fullTexturePixels"] = iTexturePixels;
-	std::ofstream bakedStream(rLeafIntermediatesDirectory / kpcBakedDimensionsFile);
+	std::ofstream bakedStream(rLeafIntermediatesDirectory / kpcBakedDimensionsFile, std::ios::binary | std::ios::trunc);
 	bakedStream << bakedJson.dump(4);
 	bakedStream.close();
 	VERIFY_SUCCESS(bakedStream.good());

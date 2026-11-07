@@ -14,9 +14,11 @@ Final texture chunks use LZ4 and store compressed and uncompressed sizes for `Fi
 
 Mip generation, format conversion, underwater masking, and direct BC4/5/7 block
 compression are offline quality-sensitive work. Preserve deterministic inputs
-and the configured base encoders; the optional bc7e.ispc route remains disabled.
-The shared worker pool dispatches bounded block-row ranges, and whole encode
-chains remain serialized by the caller-held `sEncodeMutex`;
+and the configured BC7 base encoder; the optional bc7e.ispc route remains
+disabled. BC4/BC5 encode and the BC4/BC5 cases of `DecodeBcnToRgba8` both stay
+on `ComputeBc4Palette`. The shared worker pool dispatches bounded block-row
+ranges, and whole encode chains remain serialized by the caller-held
+`sEncodeMutex`;
 [Common threading](../../../../Common/Threading/AGENTS.md) owns `Dispatch`
 participation and reentrancy. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` fails
 before encoding in both the job entry point and shared encoding path.
