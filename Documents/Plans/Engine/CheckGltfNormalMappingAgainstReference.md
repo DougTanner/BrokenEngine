@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-07T14:08:20.730Z","dependsOn":["Documents/Plans/Engine/GetNormalTangentFrameUvSet.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-07T14:08:20.730Z","dependsOn":[]} -->
 # Check glTF normal mapping against the Khronos tangent test models
 
 ## Context
@@ -34,10 +34,11 @@ A first run of this check, at primary `97fc2976`, found no pipeline defect:
   the Khronos authored-frame model follows (-V), while their maps are green-up.
   The engine follows w as the glTF spec requires.
 
-This Plan depends on `GetNormalTangentFrameUvSet.md` because that Plan changes
-the code under test: it switches `GetNormal`'s tangent-frame derivatives to the
-normal texture's UV set. The check reruns after that Plan lands, against the
-code it leaves; the first run's result does not carry over.
+The code under test changed after the first run: DataPacker now generates a
+normal-mapped primitive's missing tangents at export from the normal texture's
+own UV set (`ExportScene::GenerateTangents`), and `GetNormal` no longer derives
+a frame. The check reruns against that code; the first run's result does not
+carry over.
 
 Current state of the three models:
 
@@ -66,28 +67,30 @@ Current state of the three models:
   The engine's frame therefore reads that majority green-inverted, the same
   asset-side mismatch as aim-9_missile's.
 
-The engine's frame at `8fa794fa`, from code reading:
+The engine's frame, from code reading:
 
-- `GetNormal` (`Engine/Data/Shaders/Model/Model.frag:140-192`) uses the
+- `GetNormal` (`Engine/Data/Shaders/Model/Model.frag:140-172`) uses the
   authored tangent when the vertex has one, with
-  B = sign(w) * cross(N, T) (`:158`, `:185`). That is the glTF spec's
+  B = sign(w) * cross(N, T) (`:158`, `:165`). That is the glTF spec's
   bitangent formula.
-- Without an authored tangent it derives T = dP/du from screen derivatives
-  (`:161-173`) and sets the bitangent sign to -h (`:178-181`), so B runs -V on
-  both handedness signs.
+- For a normal-mapped primitive without `TANGENT`, DataPacker generates the
+  tangent at export from the normal texture's own UV set
+  (`ExportScene::GenerateTangents`), with w set so B runs -V on both
+  handedness signs, and `GetNormal` reads it on the authored-tangent path.
 - Where h = +1 and w = +1, as on aim-9_missile and MolniaGltf, the two paths
-  disagree: authored B runs +V and derived B runs -V.
+  disagree: authored B runs +V and generated B runs -V.
 - `BuildVertices`
-  (`DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:133`) bakes a
+  (`DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:132`) bakes a
   static export's normals with the inverse transpose of the mesh-world matrix
-  (`:153-155`, `:172`) and TANGENT xyz with the matrix itself, and negates w
-  under a negative-determinant node (`:180-192`); `LoadVertices` sets that
-  mirrored flag, which also flips winding (`:399-400`). A skinned export keeps
+  (`:152-154`, `:171`) and TANGENT xyz with the matrix itself, and negates w
+  under a negative-determinant node (`:183-199`); `LoadVertices` sets that
+  mirrored flag, which also flips winding (`:406-407`). A skinned export keeps
   vertices mesh-local and w unchanged. Every TEXCOORD set passes unchanged.
-  The normal texture's set and scale come from `GltfSceneDecoder.cpp:512-517`.
-- The Assimp path packs no tangents and flips winding for a negative
-  determinant (`AssimpSceneDecoder.cpp:638`).
-- No tracked reference model exercises the derived frame at h = +1, a
+  The normal texture's set and scale come from `GltfSceneDecoder.cpp:524-529`.
+- The Assimp path reads no `TANGENT`, so its normal-mapped materials take
+  generated tangents, and flips winding for a negative determinant
+  (`AssimpSceneDecoder.cpp:642`).
+- No tracked reference model exercises generated tangents at h = +1, a
   negative-determinant glTF node, or a normal `texCoord` other than 0.
 
 The reference models are tracked in BrokenEngineSandbox, from
@@ -96,7 +99,7 @@ The reference models are tracked in BrokenEngineSandbox, from
 `Projects/BrokenEngineSandbox/Data/Models/` holds the supplied files
 byte-for-byte, `LICENSE.md`, `PROVENANCE.md` and the generated intermediates:
 
-- `NormalTangentTest/` (CC0 1.0): no TANGENT, so the derived frame.
+- `NormalTangentTest/` (CC0 1.0): no TANGENT, so export-generated tangents.
 - `NormalTangentMirrorTest/` (CC-BY 4.0): supplied TANGENT and mirrored UVs,
   so the authored frame.
 - `SciFiHelmet/` (CC0 1.0): one TANGENT material, a realistic normal-mapped
@@ -143,21 +146,21 @@ Recorded by:
 
 ## Design
 
-This Plan has an investigation portion: whether the pipeline that
-`GetNormalTangentFrameUvSet.md` leaves still matches the reference is not
-confirmed. The author recommends these steps, in order.
+This Plan has an investigation portion: whether the pipeline, with
+`ExportScene::GenerateTangents` generating missing tangents and `GetNormal`
+deriving no frame, still matches the reference is not confirmed. The author
+recommends these steps, in order.
 
 1. Read the frame at the tested tip. Re-read `GetNormal`, `BuildVertices` and
-   whatever `GetNormalTangentFrameUvSet.md` changed, note any `## Context`
-   citation that moved, and record which frame each tracked reference model
-   now exercises. The rerun covers only the four tracked models; the paths
-   `## Context` lists as unexercised are recorded as not exercised, and no
-   fixture is added for them.
+   `ExportScene::GenerateTangents`, note any `## Context` citation that moved,
+   and record which frame each tracked reference model now exercises. The rerun
+   covers only the four tracked models; the paths `## Context` lists as
+   unexercised are recorded as not exercised, and no fixture is added for them.
 2. Build. Run `/compile -Target ModelViewer -Configuration Debug`. Its summary
    counts only when it shows `RunDataPacker=true` and the worktree
    `GameDataDirectory`. `git status --short` over the four reference model
-   folders must then be empty; any change there means the prerequisite left
-   stale intermediates, so stop and report for re-planning.
+   folders must then be empty; any change there means the tangent-generation
+   export change left stale intermediates, so stop and report for re-planning.
 3. Capture. Capture each model through `/agent-harness`'s ModelViewer capture
    with `-ModelPath` set to `Models\NormalTangentTest\NormalTangentTest.glb`,
    `Models\NormalTangentMirrorTest\NormalTangentMirrorTest.glb`,
@@ -191,7 +194,7 @@ confirmed. The author recommends these steps, in order.
    - The README's horizon and back-view criterion is not used, because
      ModelViewer's capture camera is fixed straight down and back faces are
      culled (`Engine/Source/Graphics/Managers/DynamicPipelines.cpp:103`,
-     `GltfSceneDecoder.cpp:470-473` warns on `doubleSided`), so `doubleSided`
+     `GltfSceneDecoder.cpp:482-485` warns on `doubleSided`), so `doubleSided`
      support stays out of scope.
    - The helmets are informational: record whether their normal-mapped detail
      reads raised and lit consistently with the sun; they gate nothing beyond
@@ -261,8 +264,9 @@ confirmed. The author recommends these steps, in order.
 - Any edit to SeaCreature2, MolniaGltf, MolniaFbx or any other model's art.
 - The Assimp path, `ModelCommon.h`, other shaders, packed material or vertex
   layouts, and the Vulkan-glTF-PBR checkout.
-- `GetNormal`'s derivative UV-set selection, owned by
-  `Documents/Plans/Engine/GetNormalTangentFrameUvSet.md`.
+- `ExportScene::GenerateTangents`, which gives a normal-mapped primitive
+  without `TANGENT` its tangents at export from the normal texture's own UV
+  set; `GetNormal` has no derivative frame.
 - Re-deciding aim-9_missile's height truth, which `aim-9_missile/PROVENANCE.md`
   records as raised slotted screw heads.
 - Any new model, harness command or fixture, and unit tests.

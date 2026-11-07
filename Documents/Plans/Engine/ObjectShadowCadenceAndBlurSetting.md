@@ -36,8 +36,8 @@ frame alternation. It runs in full on every frame:
   called from `Engine/Data/Shaders/Model/ModelCommon.h:119`). Every consumer
   samples the blurred texture through that same per-frame area,
   `globalLayout.f4VisibleArea` (published at
-  `Engine/Source/Graphics/Render/GlobalUniforms.cpp:569`): `Model.frag:262`
-  and `:269`, `Terrain.frag:144` and `:157`, `Water.frag:160` and `:233`. No
+  `Engine/Source/Graphics/Render/GlobalUniforms.cpp:569`): `Model.frag:260`
+  and `:267`, `Terrain.frag:144` and `:157`, `Water.frag:160` and `:233`. No
   held object-shadow area exists, so a frame that skipped the chain would
   leave the texture mapped to the wrong place as the camera moves.
 
@@ -269,7 +269,7 @@ Exposure:
 - `DynamicPipelines::WriteModelPipelineIndirectBuffers`: the shadow count on a
   skipped frame.
 - `GlobalLayout::f4ObjectShadowsArea`; `ShadowStretchProjection`; the
-  object-shadow sample coordinates at `Model.frag:269`, `Terrain.frag:144` and
+  object-shadow sample coordinates at `Model.frag:267`, `Terrain.frag:144` and
   `:157`, and `Water.frag:160` and `:233`.
 - New wrappers `gObjectShadowUpdateCadence`, `gObjectShadowsBlurLevel`, and
   the alternation Boolean, `ApplyObjectShadowsBlurLevel`, and its call in

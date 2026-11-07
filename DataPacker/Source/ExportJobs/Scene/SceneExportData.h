@@ -26,8 +26,22 @@ struct MaterialNodeInfo
 	bool bHasSkinning = false;  // Deformation mode of every primitive routed to this material
 	int64_t iNodeIndex = -1;        // Node index of the mesh contributing to this material
 	XMMATRIX matMeshWorld = XMMatrixIdentity();  // World transform of mesh at bind pose (accumulated matLocal)
-	int64_t iOriginalMaterialIndex = -1;  // Original glTF material index (for split materials)
+	int64_t iOriginalMaterialIndex = -1;  // Source material index; the material's own index when not split
 };
+
+inline std::vector<MaterialNodeInfo> SourceMaterialNodeInfos(int64_t iSourceMaterialCount)
+{
+	std::vector<MaterialNodeInfo> materialNodeInfos(static_cast<size_t>(iSourceMaterialCount));
+	// std::views::enumerate cannot be used here: MSVC then reports C2872 on iter_move inside std::ranges algorithms, between
+	// the enumerate iterator's friend and the customization point, in any translation unit that includes this header and
+	// calls a std::ranges algorithm.
+	for (int64_t i = 0; MaterialNodeInfo& rMaterialNodeInfo : materialNodeInfos)
+	{
+		rMaterialNodeInfo.iOriginalMaterialIndex = i;
+		++i;
+	}
+	return materialNodeInfos;
+}
 
 struct SkeletonData
 {

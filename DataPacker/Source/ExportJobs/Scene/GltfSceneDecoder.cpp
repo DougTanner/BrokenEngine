@@ -210,7 +210,7 @@ static void InsertNormalizationRootNode(tinygltf::Model& rGltfModel, std::string
 	// default pose below is evaluated the way the runtime draws it.
 	std::vector<common::ModelVertex> vertices;
 	std::vector<Material> materials(static_cast<size_t>(std::ssize(rGltfModel.materials)));
-	std::vector<MaterialNodeInfo> materialNodeInfos(static_cast<size_t>(std::ssize(rGltfModel.materials)));
+	std::vector<MaterialNodeInfo> materialNodeInfos = SourceMaterialNodeInfos(std::ssize(rGltfModel.materials));
 	MaterialNodeMap materialNodeMap;
 	LoadVerticesContext loadContext {.rVertices = vertices, .rMaterials = materials, .rMaterialNodeInfos = materialNodeInfos, .rMaterialNodeMap = materialNodeMap, .sourcePath = sourcePath, .bHasSkeleton = true};
 	for (int64_t iNodeIndex : rDefaultScene.nodes)
@@ -407,6 +407,18 @@ void GltfSceneDecoder::DecodeVertices(bool bHasSkeleton, SceneExportData& rData)
 	}
 }
 
+// Reads each normal texture's set as DecodeMaterialShaderDatas does; -1 marks a material without a normal texture.
+std::vector<int64_t> GltfSceneDecoder::GetNormalTextureSets() const
+{
+	std::vector<int64_t> normalTextureSets;
+	normalTextureSets.reserve(static_cast<size_t>(std::ssize(mpGltfModel->materials)));
+	for (const tinygltf::Material& rMaterial : mpGltfModel->materials)
+	{
+		normalTextureSets.push_back(rMaterial.additionalValues.contains("normalTexture") ? rMaterial.additionalValues.at("normalTexture").TextureTexCoord() : -1);
+	}
+	return normalTextureSets;
+}
+
 void GltfSceneDecoder::DecodeMaterialInfos(bool bHasSkeleton, SceneExportData& rData) const
 {
 	const tinygltf::Model& rGltfModel = *mpGltfModel;
@@ -439,7 +451,7 @@ void GltfSceneDecoder::DecodeMaterialInfos(bool bHasSkeleton, SceneExportData& r
 
 	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
 	{
-		int64_t iOriginalMaterialIndex = rMaterialNodeInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialNodeInfos.at(i).iOriginalMaterialIndex : i;
+		int64_t iOriginalMaterialIndex = rMaterialNodeInfos.at(i).iOriginalMaterialIndex;
 		const tinygltf::Material& rTinygltfMaterial = rGltfModel.materials.at(static_cast<size_t>(iOriginalMaterialIndex));
 		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOriginalMaterialIndex != i ? std::format(" (split from {})", iOriginalMaterialIndex) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, std::ssize(rMaterials.at(i).indexBuffer), (rMaterialInfos.at(i).flags & common::MaterialFlags::kSkinned) ? " (skinned)" : "");
 	}
@@ -464,7 +476,7 @@ void GltfSceneDecoder::DecodeMaterialShaderDatas(SceneExportData& rData) const
 	std::span<common::MaterialShaderData> materialShaderDatas(rData.materialShaderDatas);
 	for (int64_t i = 0; i < std::ssize(rMaterialInfos); ++i)
 	{
-		int64_t iOriginalMaterialIndex = rMaterialInfos.at(static_cast<size_t>(i)).iOriginalMaterialIndex >= 0 ? rMaterialInfos.at(static_cast<size_t>(i)).iOriginalMaterialIndex : i;
+		int64_t iOriginalMaterialIndex = rMaterialInfos.at(static_cast<size_t>(i)).iOriginalMaterialIndex;
 		const tinygltf::Material& rMaterial = rGltfModel.materials.at(static_cast<size_t>(iOriginalMaterialIndex));
 		LOG(kDefault, kVerbose, "  {}: {}{}", i, rMaterial.name, (iOriginalMaterialIndex != i ? std::format(" (split from {})", iOriginalMaterialIndex) : ""));
 		if (rMaterial.doubleSided == true)

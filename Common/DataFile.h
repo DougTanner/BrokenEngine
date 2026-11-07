@@ -210,7 +210,7 @@ using MaterialFlags_t = Flags<MaterialFlags>;
 struct MaterialInfo
 {
 	int16_t iParentNodeIndex = -1;  // Node index for mesh world matrix computation (-1 = identity mesh world)
-	int16_t iOriginalMaterialIndex = -1;  // Original glTF material index for split materials (-1 = not split)
+	int16_t iOriginalMaterialIndex = -1;  // Source material index; the material's own index when not split
 	MaterialFlags_t flags;  // kSkinned: the material deforms by Skeleton::uiSkinJointCount joints
 	uint8_t puiPad[3] {};
 	XMFLOAT4X4 f4x4RelativeTransform {};  // Identity for skinned meshes, meshWorldBind * inverse(ancestorWorldBind) for non-skinned
@@ -544,7 +544,7 @@ struct ModelVertex
 	float fJoint = 0.0f;
 	XMFLOAT4 f4Joint0 {};
 	XMFLOAT4 f4Weight0 {};
-	XMFLOAT4 f4Tangent {}; // xyz unit, w the glTF bitangent sign; all zero means the vertex carries no tangent
+	XMFLOAT4 f4Tangent {}; // xyz unit, or zero with w +-1 where tangent generation found only degenerate triangles; w the glTF bitangent sign; all zero means the vertex carries no tangent
 };
 // The DataPacker scene loader dedups vertices via meshoptimizer's raw-byte compare
 // (meshopt_generateVertexRemap), so this lock proves the layout is padding-free — uninitialized

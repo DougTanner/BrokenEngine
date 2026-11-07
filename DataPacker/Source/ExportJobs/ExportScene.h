@@ -15,7 +15,7 @@ public:
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
 	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size layout or semantic changes need the raw version bumped
-	static constexpr int64_t kiVersion = Version(74
+	static constexpr int64_t kiVersion = Version(75
 		+ sizeof(common::MaterialShaderData)
 		+ sizeof(common::AnimationHeader)
 		+ sizeof(common::Skeleton)
@@ -56,6 +56,7 @@ private:
 
 	void ProcessTextures(const SceneExportData& rData);
 	void CleanupTextureAttemptFiles();
+	void GenerateTangents(SceneExportData& rData, std::span<const int64_t> sourceNormalTextureSets);
 	void OptimizeMeshes(std::vector<Material>& rMaterials, std::vector<common::ModelVertex>& rVertices);
 	void WriteModelFile(const std::vector<Material>& rMaterials, const std::vector<common::MaterialInfo>& rMaterialInfos, std::vector<common::ModelVertex>& rVertices);
 

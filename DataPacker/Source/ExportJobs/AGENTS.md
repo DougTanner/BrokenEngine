@@ -224,9 +224,13 @@ A non-finite `NORMAL`, `TANGENT`, or packed `TEXCOORD_n` component, or a
 non-finite `WEIGHTS_0` component on a primitive with `JOINTS_0`, fails the
 export, as does an attribute `BuildVertices` reads whose accessor component
 count differs from the attribute's or whose element count differs from
-`POSITION`'s. A primitive with no `TANGENT` packs none, as does every Assimp
-scene, and `ExportBlenderScene.py` exports no tangents, so an authored scene
-has none. The
+`POSITION`'s. Every Assimp scene decodes no tangents, and
+`ExportBlenderScene.py` exports none, so an authored scene has none. For both
+decoders, `ExportScene::GenerateTangents` then fills every all-zero tangent of a
+material with a normal texture, from the UV set the model shader's `getUV`
+selects for that texture, with `w` set so the bitangent runs along -V of those
+UVs, the glTF normal map convention, and never changes an authored tangent. Any
+other vertex without `TANGENT` packs none. The
 [model shaders](../../../Engine/Data/Shaders/Model/AGENTS.md#architecture-notes)
 own what the frame does with a tangent and with none.
 

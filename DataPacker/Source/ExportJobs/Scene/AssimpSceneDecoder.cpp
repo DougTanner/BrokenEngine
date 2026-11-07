@@ -697,7 +697,7 @@ AssimpSceneDecoder::AssimpSceneDecoder(const std::filesystem::path& rPath, Scene
 	rData.iSourceMaterialCount = std::max<int64_t>(1, pScene->mNumMaterials);
 	ASSERT(rData.iSourceMaterialCount <= common::SceneHeader::kiMaxMaterials);
 	rData.materials.resize(static_cast<size_t>(rData.iSourceMaterialCount));
-	rData.materialNodeInfos.resize(static_cast<size_t>(rData.iSourceMaterialCount));
+	rData.materialNodeInfos = SourceMaterialNodeInfos(rData.iSourceMaterialCount);
 	mSourceMaterialShaderDatas.reserve(static_cast<size_t>(rData.iSourceMaterialCount));
 	for (int64_t i = 0; i < pScene->mNumMaterials; ++i)
 	{
@@ -789,7 +789,17 @@ void AssimpSceneDecoder::DecodeMaterialShaderDatas(SceneExportData& rData) const
 	rData.materialShaderDatas.reserve(static_cast<size_t>(std::ssize(rData.materialInfos)));
 	for (const common::MaterialInfo& rInfo : rData.materialInfos)
 	{
-		int64_t iOriginal = rInfo.iOriginalMaterialIndex >= 0 ? rInfo.iOriginalMaterialIndex : std::ssize(rData.materialShaderDatas);
-		rData.materialShaderDatas.push_back(mSourceMaterialShaderDatas.at(iOriginal));
+		rData.materialShaderDatas.push_back(mSourceMaterialShaderDatas.at(rInfo.iOriginalMaterialIndex));
 	}
+}
+
+std::vector<int64_t> AssimpSceneDecoder::GetNormalTextureSets() const
+{
+	std::vector<int64_t> normalTextureSets;
+	normalTextureSets.reserve(static_cast<size_t>(std::ssize(mSourceMaterialShaderDatas)));
+	for (const common::MaterialShaderData& rMaterialShaderData : mSourceMaterialShaderDatas)
+	{
+		normalTextureSets.push_back(rMaterialShaderData.iNormalTextureSet);
+	}
+	return normalTextureSets;
 }

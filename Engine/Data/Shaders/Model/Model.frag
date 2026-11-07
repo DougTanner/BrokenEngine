@@ -136,7 +136,7 @@ vec3 DiffuseLambert(vec3 diffuseColor)
 	return diffuseColor / kfPi;
 }
 
-// Compute perturbed normal from normal map, in the model's authored tangent frame or a frame from screen-space derivatives
+// Compute perturbed normal from normal map, in the vertex tangent frame
 vec3 GetNormal(PbrMaterialLayout material)
 {
 	vec3 N = normalize(f3InNormal);
@@ -152,33 +152,13 @@ vec3 GetNormal(PbrMaterialLayout material)
 		return N;
 	}
 
-	// An all-zero tangent means the model has none. A tangent left almost parallel to N gives no direction, so it takes the derived frame too.
+	// Zero xyz, which export tangent generation leaves where only degenerate UV triangles meet, or a tangent almost parallel to N gives no direction, so the geometric normal stands.
 	vec3 Tperp = f4InTangent.xyz - N * dot(N, f4InTangent.xyz);
 	// Interpolated w can be exactly 0 inside a mixed-w triangle, where sign() would return 0 and collapse B.
 	float fBitangentSign = f4InTangent.w >= 0.0 ? 1.0 : -1.0;
 	if (dot(Tperp, Tperp) < kfEpsilon * kfEpsilon)
 	{
-		vec3 pos_dx = dFdx(f3InWorldPosition);
-		vec3 pos_dy = dFdy(f3InWorldPosition);
-		vec2 tex_dx = dFdx(f2InUV);
-		vec2 tex_dy = dFdy(f2InUV);
-
-		float det = tex_dx.s * tex_dy.t - tex_dy.s * tex_dx.t;
-		if (abs(det) < 1e-8)
-		{
-			return N;
-		}
-
-		vec3 f3DerivedTangent = (tex_dy.t * pos_dx - tex_dx.t * pos_dy) / det;
-		Tperp = f3DerivedTangent - N * dot(N, f3DerivedTangent);
-		if (dot(Tperp, Tperp) < kfEpsilon * kfEpsilon)
-		{
-			return N;
-		}
-		// UV handedness: the sign of N dot (P_u cross P_v), the position gradients along U and V. (pos_dx cross pos_dy) / det is that UV-axis cross product, so screen Y direction cancels out.
-		float fHandedness = det * dot(N, cross(pos_dx, pos_dy)) >= 0.0 ? 1.0 : -1.0;
-		// Negated so the bitangent runs along -V on both handedness signs, the glTF normal map convention.
-		fBitangentSign = -fHandedness;
+		return N;
 	}
 	vec3 T = normalize(Tperp);
 	// cross of two perpendicular unit vectors is already unit (N is unit; T is unit and Gram-Schmidt-orthogonalized to N above)

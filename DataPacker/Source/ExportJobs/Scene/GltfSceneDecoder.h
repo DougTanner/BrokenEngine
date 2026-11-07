@@ -17,6 +17,7 @@ public:
 	bool SetupSkeletonAndMaterials() const;
 	void ValidateSkinAnimation() const;
 	void DecodeVertices(bool bHasSkeleton, SceneExportData& rData) const;
+	std::vector<int64_t> GetNormalTextureSets() const;
 	void DecodeMaterialInfos(bool bHasSkeleton, SceneExportData& rData) const;
 	void ValidateSamplers() const;
 	void DecodeMaterialShaderDatas(SceneExportData& rData) const;

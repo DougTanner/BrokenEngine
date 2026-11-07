@@ -156,7 +156,7 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
       (`DataPacker/Source/ExportJobs/ExportAudio.h:13`),
       `ExportIsland::kiVersion` and `kiTextureVersion` (`ExportIsland.h:26,39`),
       `ExportModel::kiVersion` (`ExportModel.h:14`), `ExportRaw::kiVersion`
-      (`ExportRaw.h:13`), `ExportScene::kiVersion` (`ExportScene.h:17`),
+      (`ExportRaw.h:13`), `ExportScene::kiVersion` (`ExportScene.h:18`),
       `ExportShader::kiVersion` (`ExportShader.h:13`),
       `ExportTexture::kiVersion` (`ExportTexture.h:15`), `kiSplitVersion`
       (`Island/BakeRoute.cpp:38`), and `kiCubemapIblFingerprintVersion`
@@ -189,7 +189,7 @@ Signatures were compared between the old-pin and new-head public headers in the 
 - tinygltf: `Common/ExternalHeaders.h:379-381` and `ThirdParty/Prebuilts/Source/DataPacker/tinygltf.cpp:7` include `tinygltf/attic/tiny_gltf.h` after `#define TINYGLTF_NO_INCLUDE_JSON` and the json include. The `attic/tiny_gltf.h:1713-1719` guard skips its own `json.hpp`, and `:1874` uses `nlohmann::json`. The comment at `ExternalHeaders.h:379-380` is corrected. The DataPacker glTF consumers stay as they are.
 - nlohmann::json 3.10.4 to develop `5683f5e0`. Its version macros still read 3.12.0 (`json.hpp:84-86`).
   - Includes: `Common/ExternalHeaders.h:317-323` (BT_ENGINE and BT_DATA_PACKER) and `Tools/ToolCommon/ToolCliCommon.h:19-24` switch to `json/single_include/nlohmann/json.hpp`, and their comments name the `ThirdParty/json` submodule. Every project already has `ThirdParty` on its include path, so no project or filter changes. `git grep -l nlohmann -- '*.h' '*.cpp'` lists the two include sites plus 51 consumers.
-  - API: nothing we use was removed or re-signatured. `parse` gained a defaulted `ignore_trailing_commas` (new `json.hpp:36051-36055`), so `DataPacker/Source/ExportJobs/ExportScene.cpp:194` is unchanged. `dump` is unchanged (`Tools/WorktreeCli/BuildCommand.cpp:621`). We use no deprecated API, and `InputFingerprint.cpp:277` `>>` is the current overload. Our tree has no `namespace nlohmann` forward declaration.
+  - API: nothing we use was removed or re-signatured. `parse` gained a defaulted `ignore_trailing_commas` (new `json.hpp:36051-36055`), so `DataPacker/Source/ExportJobs/ExportScene.cpp:129,134` is unchanged. `dump` is unchanged (`Tools/WorktreeCli/BuildCommand.cpp:621`). We use no deprecated API, and `InputFingerprint.cpp:277` `>>` is the current overload. Our tree has no `namespace nlohmann` forward declaration.
   - Pragmas: `_json` is now declared `operator""_json` (new `json.hpp:38448-38451`), so the C5311 pragma lines `ExternalHeaders.h:320-321,323` and `ToolCliCommon.h:21-22,24` are removed. If the build still reports C5311, they stay with a corrected comment.
   - Behavior: `dump()` of a binary64 now uses Zmij shortest digits instead of Grisu2 (new `json.hpp:27798-27888`); the text of a rare double can differ, but it round-trips to the same value. Parsing moves to correctly rounded Eisel-Lemire with a `strtod` fallback (new `json.hpp:9795`). Compile errors at the 51 consumers, such as the 3.11 comparison operators, are ported in our code.
 - openexr RB-3.1 to main. The OpenEXRCore calls and `exr_decode_pipeline_t`/`exr_coding_channel_info_t` fields used at `DataPacker/Source/ExportJobs/Texture/Texture.cpp:146-215` are unchanged.
@@ -210,7 +210,7 @@ Signatures were compared between the old-pin and new-head public headers in the 
   - Fonts: `FontDataOwnedByAtlas = false` (`ImGuiManager.cpp:109`) now borrows the data until the atlas is destroyed. A code read confirms the eager font chunk outlives the context.
   - Accepted visual-only changes: stroke and anti-aliasing (`MenuUtils.cpp:315-366`), 1 px `Separator()`, and typed slider input (`MenuUtils.cpp:64`, `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:205,311`, `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:335`).
 - implot: every function and `ImPlotSpec` field we use is unchanged (`Engine/Source/Profile/NetworkGraphs.cpp:15-20`, `Engine/Source/Ui/CurveWidget.cpp:29-122`). Its head targets imgui 1.93.0, and `implot_items.cpp:168-169` uses obsolete `ImDrawListFlags_AntiAliasedLines*` names; if that fails to build, see `## Decisions`.
-- meshoptimizer 1.0 to 1.3: the five functions we call keep their signatures (`ExportScene.cpp:603,604,694`, `Scene/SceneVerticesLoader.cpp:201,204`, `Island/ProcessBakedRegion.cpp:248`). The new `remesher.cpp` stays out of `ThirdParty/Prebuilts/Source/DataPacker/meshoptimizer.cpp:5-24`, which includes the new `tangentspace.cpp`.
+- meshoptimizer 1.0 to 1.3: of the six functions we call (`ExportScene.cpp:669,726,727,770`, `Scene/SceneVerticesLoader.cpp:271,274`, `Island/ProcessBakedRegion.cpp:248`), `meshopt_generateTangents` (`ExportScene.cpp:669`) comes from the new `tangentspace.cpp` and the other five keep their signatures. The new `remesher.cpp` stays out of `ThirdParty/Prebuilts/Source/DataPacker/meshoptimizer.cpp:5-24`, which includes the new `tangentspace.cpp`.
 - No API change at our sites:
   - SPIRV-Cross (`ExportShader.cpp:59-291`).
   - DirectXTK (wrappers `ThirdParty/Prebuilts/Source/Engine/DirectXTK.cpp:11-14`, `Source/DataPacker/DirectXTK.cpp:5`).
@@ -236,7 +236,7 @@ Signatures were compared between the old-pin and new-head public headers in the 
   - openexr (`Normals.exr` decode)
   - gli/glm (IBL pre-pass)
 - Island chunks feed deterministic placement through the hull (`DataPacker/Source/ExportJobs/Island/AGENTS.md` `## Island Outputs`), so step 12 must prove their bytes unchanged.
-- nlohmann::json's Zmij `dump()` can change the text of a fingerprint (`ExportScene.cpp:280,356`, `ExportIsland.cpp:501,535`, `ExportCubemapIbl.cpp:47,59`, `BakeRoute.cpp:91`, `InputFingerprint.cpp:210,314`) and so force a re-export, which step 12 does anyway. The Gaea bake fingerprint (`BakeRoute.cpp:73-81`) holds no doubles. `BakedDimensions.json` text (`Island/ProcessBakedRegion.cpp:291`) may change, but the value parsed back from it does not.
+- nlohmann::json's Zmij `dump()` can change the text of a fingerprint (`ExportScene.cpp:231,445`, `ExportIsland.cpp:501,535`, `ExportCubemapIbl.cpp:47,59`, `BakeRoute.cpp:91`, `InputFingerprint.cpp:210,314`) and so force a re-export, which step 12 does anyway. The Gaea bake fingerprint (`BakeRoute.cpp:73-81`) holds no doubles. `BakedDimensions.json` text (`Island/ProcessBakedRegion.cpp:291`) may change, but the value parsed back from it does not.
 
 ## License review
 

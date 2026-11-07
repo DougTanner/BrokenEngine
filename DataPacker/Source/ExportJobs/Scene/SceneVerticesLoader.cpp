@@ -99,7 +99,6 @@ int64_t ResolveEffectiveMaterial(std::vector<Material>& rMaterials, std::vector<
 		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).bHasSkinning = bHasSkinning;
 		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).iNodeIndex = iCurrentNodeIndex;
 		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).matMeshWorld = rMatMeshWorld;
-		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).iOriginalMaterialIndex = iOriginalMaterial;
 		return iOriginalMaterial;
 	}
 

@@ -28,12 +28,12 @@ skip, so a fully transparent Assimp mesh still sizes the model and its hitbox.
   (:632-642). An Assimp mesh has exactly one material (`mMaterialIndex`), so a
   per-mesh skip is the per-primitive skip of the glTF path.
 - Bounds come from `AccumulateDrawnBounds` over every material's indices
-  (`AssimpSceneDecoder.cpp:734`); the outline is baked from every `.MODEL`
+  (`AssimpSceneDecoder.cpp:739`); the outline is baked from every `.MODEL`
   vertex by `DataPacker/Source/ExportJobs/ExportModel.cpp`.
 - A material left without indices is already a supported state: materials are
-  sized to the source material count up front (`AssimpSceneDecoder.cpp:694`),
-  `DecodeMaterialShaderDatas` falls back to its own index for an unset
-  `iOriginalMaterialIndex` (:787), and the glTF skip relies on the same
+  sized to the source material count up front (`AssimpSceneDecoder.cpp:699-700`),
+  every material slot carries its source `iOriginalMaterialIndex`, its own
+  index when not split (:792), and the glTF skip relies on the same
   zero-index material slot.
 - No tracked scene uses the Assimp path today (`git ls-files` has no `.dae`,
   `.ply`, `.stl`, or `.3ds` file), so no tracked `.MODEL` or texture

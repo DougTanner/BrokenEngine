@@ -488,6 +488,7 @@ void ExportScene::Export()
 		{
 			std::filesystem::remove(GetPreExportMarkerPath());
 			ProcessTextures(sceneData);
+			GenerateTangents(sceneData, decoder.GetNormalTextureSets());
 			OptimizeMeshes(sceneData.materials, sceneData.vertices);
 			WriteModelFile(sceneData.materials, sceneData.materialInfos, sceneData.vertices);
 		}
@@ -519,10 +520,11 @@ void ExportScene::PreExport(const GltfSceneDecoder& rDecoder, SceneExportData& r
 
 	LOG(kDefault, kDebug, "Loading {} materials", rData.iSourceMaterialCount);
 	rData.materials.resize(static_cast<size_t>(rData.iSourceMaterialCount));
-	rData.materialNodeInfos.resize(static_cast<size_t>(rData.iSourceMaterialCount));
+	rData.materialNodeInfos = SourceMaterialNodeInfos(rData.iSourceMaterialCount);
 	bool bHasSkeleton = rDecoder.SetupSkeletonAndMaterials();
 	rDecoder.ValidateSkinAnimation();
 	rDecoder.DecodeVertices(bHasSkeleton, rData);
+	GenerateTangents(rData, rDecoder.GetNormalTextureSets());
 	OptimizeMeshes(rData.materials, rData.vertices);
 	rDecoder.DecodeMaterialInfos(bHasSkeleton, rData);
 	WriteModelFile(rData.materials, rData.materialInfos, rData.vertices);
@@ -630,6 +632,85 @@ void ExportScene::ProcessTextures(const SceneExportData& rData)
 	{
 		std::filesystem::remove(rOrphanedIntermediate);
 		LOG(kDefault, kDebug, "Removed orphaned scene texture intermediate: \"{}\"", rOrphanedIntermediate.filename().native());
+	}
+}
+
+// Generates tangents from each normal-mapped material's normal texture UV set into the vertices that carry none, leaving
+// authored tangents untouched. No vertex is shared between effective materials, so a split stays inside its material.
+void ExportScene::GenerateTangents(SceneExportData& rData, std::span<const int64_t> sourceNormalTextureSets)
+{
+	// The UV field getUV (Model.frag) samples for each set: sets 4 and above share f2Uv4.
+	static constexpr XMFLOAT2 common::ModelVertex::* kpUvMembers[] = {&common::ModelVertex::f2Uv, &common::ModelVertex::f2Uv1, &common::ModelVertex::f2Uv2, &common::ModelVertex::f2Uv3, &common::ModelVertex::f2Uv4};
+
+	std::vector<bool> authoredTangents(static_cast<size_t>(std::ssize(rData.vertices)));
+	for (int64_t i = 0; i < std::ssize(rData.vertices); ++i)
+	{
+		authoredTangents.at(i) = !XMVector4Equal(XMLoadFloat4(&rData.vertices.at(i).f4Tangent), XMVectorZero());
+	}
+
+	// Each vertex's appended copies, each carrying a generated tangent that differs from the vertex's own.
+	std::unordered_map<uint32_t, std::vector<uint32_t>> vertexCopies;
+	for (int64_t i = 0; i < std::ssize(rData.materials); ++i)
+	{
+		std::vector<uint32_t>& rIndexBuffer = rData.materials.at(i).indexBuffer;
+		int64_t iNormalTextureSet = sourceNormalTextureSets[static_cast<size_t>(rData.materialNodeInfos.at(i).iOriginalMaterialIndex)];
+		if (rIndexBuffer.empty())
+		{
+			continue;
+		}
+		if (iNormalTextureSet < 0)
+		{
+			continue;
+		}
+
+		std::vector<float> tangents(static_cast<size_t>(4 * std::ssize(rIndexBuffer)));
+		const common::ModelVertex& rFirstVertex = rData.vertices.at(0);
+		const XMFLOAT2& rf2FirstUv = rFirstVertex.*kpUvMembers[std::min<int64_t>(iNormalTextureSet, std::ssize(kpUvMembers) - 1)];
+		meshopt_generateTangents(tangents.data(), rIndexBuffer.data(), static_cast<size_t>(std::ssize(rIndexBuffer)), &rFirstVertex.f3Pos.x, static_cast<size_t>(std::ssize(rData.vertices)), sizeof(common::ModelVertex), &rFirstVertex.f3Normal.x, sizeof(common::ModelVertex), &rf2FirstUv.x, sizeof(common::ModelVertex), meshopt_TangentCompatible | meshopt_TangentZeroFallback);
+
+		int64_t iSplitCount = 0;
+		for (int64_t j = 0; j < std::ssize(rIndexBuffer); ++j)
+		{
+			uint32_t uiVertex = rIndexBuffer.at(j);
+			if (authoredTangents.at(uiVertex))
+			{
+				continue;
+			}
+
+			// Negating meshoptimizer's w turns the bitangent w * cross(N, T) from +V to -V of the normal texture's UVs.
+			XMFLOAT4 f4Tangent(tangents.at(4 * j), tangents.at(4 * j + 1), tangents.at(4 * j + 2), -tangents.at(4 * j + 3));
+			common::ModelVertex& rVertex = rData.vertices.at(uiVertex);
+			// Generated w is +-1, so a vertex without an authored tangent stays all zero until its first corner writes one.
+			if (XMVector4Equal(XMLoadFloat4(&rVertex.f4Tangent), XMVectorZero()))
+			{
+				rVertex.f4Tangent = f4Tangent;
+				continue;
+			}
+			if (std::memcmp(&rVertex.f4Tangent, &f4Tangent, sizeof(XMFLOAT4)) == 0)
+			{
+				continue;
+			}
+
+			std::vector<uint32_t>& rCopies = vertexCopies.try_emplace(uiVertex).first->second;
+			std::vector<uint32_t>::iterator copyIterator = std::ranges::find_if(rCopies, [&rData, &f4Tangent](uint32_t uiCopy)
+			{
+				return std::memcmp(&rData.vertices.at(uiCopy).f4Tangent, &f4Tangent, sizeof(XMFLOAT4)) == 0;
+			});
+			if (copyIterator != rCopies.end())
+			{
+				rIndexBuffer.at(j) = *copyIterator;
+				continue;
+			}
+
+			common::ModelVertex vertexCopy = rVertex;
+			vertexCopy.f4Tangent = f4Tangent;
+			uint32_t uiCopy = static_cast<uint32_t>(std::ssize(rData.vertices));
+			rData.vertices.push_back(vertexCopy);
+			rCopies.push_back(uiCopy);
+			rIndexBuffer.at(j) = uiCopy;
+			++iSplitCount;
+		}
+		LOG(kDefault, kVerbose, "  Material {}: generated tangents from UV set {}, {} vertices split", i, iNormalTextureSet, iSplitCount);
 	}
 }
 

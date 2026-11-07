@@ -8,6 +8,7 @@ public:
 
 	AssimpSceneDecoder(const std::filesystem::path& rPath, SceneExportData& rData);
 	void DecodeMaterialShaderDatas(SceneExportData& rData) const;
+	std::vector<int64_t> GetNormalTextureSets() const;
 
 	std::vector<std::filesystem::path> mDependencies;
 
