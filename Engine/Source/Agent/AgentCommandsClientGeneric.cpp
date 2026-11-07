@@ -1095,13 +1095,7 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 		throw std::runtime_error("set_client_grid_coord accepts only 'coord'");
 	}
 
-	const nlohmann::json& rCoordinate = rParameters.at("coord");
-	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
-	{
-		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
-	}
-
-	GridCoord coordinate {.iQ = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord 'coord'")), .iR = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord 'coord'"))};
+	GridCoord coordinate = CoordinateFromParameter(rParameters);
 
 	// Before owned-entity assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	RequireAcceptedClient("set_client_grid_coord");

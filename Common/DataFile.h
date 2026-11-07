@@ -336,7 +336,7 @@ struct ModelHeader
 	uint32_t uiPad = 0;
 
 	// Runtime model chunk layout: [indices ALIGN4] [vertices] [ModelOutline ALIGN16]
-	// [PackedModelMissileTube[]] [PackedModelFighterLaunchBay[]].
+	// [PackedModelHardpoint[] missile tubes] [PackedModelHardpoint[] fighter launch bays].
 	static constexpr int64_t VerticesOffset(int64_t iIndexCount, int64_t iIndexElementSize)
 	{
 		return RoundUp<int64_t, 4>(iIndexCount * iIndexElementSize);
@@ -397,25 +397,15 @@ struct ModelOutline
 static_assert(sizeof(ModelOutline) == 1'564, "ModelOutline layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportModel::kiVersion's raw version (sizeof fold catches size changes only)");
 
 // Full authored alignment is baked into both vectors; directions exclude offset translation and remain unnormalized.
-struct PackedModelMissileTube
+struct PackedModelHardpoint
 {
 	XMFLOAT3 f3Position {};
 	XMFLOAT3 f3Direction {};
 };
-static_assert(sizeof(PackedModelMissileTube) == 24, "PackedModelMissileTube layout changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(BT_OFFSETOF(PackedModelMissileTube, f3Position) == 0, "PackedModelMissileTube position offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(BT_OFFSETOF(PackedModelMissileTube, f3Direction) == 12, "PackedModelMissileTube direction offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(std::is_trivially_copyable_v<PackedModelMissileTube>);
-
-struct PackedModelFighterLaunchBay
-{
-	XMFLOAT3 f3Position {};
-	XMFLOAT3 f3Direction {};
-};
-static_assert(sizeof(PackedModelFighterLaunchBay) == 24, "PackedModelFighterLaunchBay layout changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(BT_OFFSETOF(PackedModelFighterLaunchBay, f3Position) == 0, "PackedModelFighterLaunchBay position offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(BT_OFFSETOF(PackedModelFighterLaunchBay, f3Direction) == 12, "PackedModelFighterLaunchBay direction offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
-static_assert(std::is_trivially_copyable_v<PackedModelFighterLaunchBay>);
+static_assert(sizeof(PackedModelHardpoint) == 24, "PackedModelHardpoint layout changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelHardpoint, f3Position) == 0, "PackedModelHardpoint position offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(BT_OFFSETOF(PackedModelHardpoint, f3Direction) == 12, "PackedModelHardpoint direction offset changed — bump DataHeader::kiVersion and ExportModel::kiVersion's raw version");
+static_assert(std::is_trivially_copyable_v<PackedModelHardpoint>);
 
 constexpr int64_t ModelHeader::MissileTubesOffset(int64_t iChunkSize)
 {
@@ -424,7 +414,7 @@ constexpr int64_t ModelHeader::MissileTubesOffset(int64_t iChunkSize)
 
 constexpr int64_t ModelHeader::FighterLaunchBaysOffset(int64_t iChunkSize, uint32_t uiMissileTubeCount)
 {
-	return MissileTubesOffset(iChunkSize) + static_cast<int64_t>(uiMissileTubeCount) * static_cast<int64_t>(sizeof(PackedModelMissileTube));
+	return MissileTubesOffset(iChunkSize) + static_cast<int64_t>(uiMissileTubeCount) * static_cast<int64_t>(sizeof(PackedModelHardpoint));
 }
 
 // Complete authored alignment in exported model coordinates: offset, XYZ scale, then XYZ pre-rotation.

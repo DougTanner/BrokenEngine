@@ -163,12 +163,12 @@ consteval int64_t SumVersions(TypeList<TS...>)
 }
 
 template<typename... TS, typename... ARGS>
-void ForEachInterpolateUpdate(TypeList<TS...>, game::FrameInterpolate& __restrict rCurrent, const game::Frame& __restrict rPreviousFrame, ARGS&&... rArguments)
+void ForEachInterpolateUpdate(TypeList<TS...>, game::FrameInterpolate& __restrict rCurrent, const game::Frame& __restrict rPreviousFrame, const ARGS&... rArguments)
 {
 	([&]
 	{
-		static_assert(requires { TS::Update(rCurrent, rPreviousFrame, std::forward<ARGS>(rArguments)...); });
-		TS::Update(rCurrent, rPreviousFrame, std::forward<ARGS>(rArguments)...);
+		static_assert(requires { TS::Update(rCurrent, rPreviousFrame, rArguments...); });
+		TS::Update(rCurrent, rPreviousFrame, rArguments...);
 	}(), ...);
 }
 

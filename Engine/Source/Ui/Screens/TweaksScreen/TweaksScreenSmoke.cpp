@@ -2,7 +2,6 @@
 
 #if defined(BT_CLIENT)
 
-#include "Ui/ShadowWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
 
 #include "Ui/Screens/TweaksScreen/Tweaks.h"
@@ -33,10 +32,6 @@ void RenderSmokeSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Smoke Color Minimum", gSmokeColorMinimum, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Color Multiplier", gSmokeColorMultiplier, iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Lighting Multiplier", gSmokeLightingMultiplier, iSection, 1.0f);
-
-				rScreen.WrapperSeparatorText("Shadow");
-				rScreen.WrapperSlider("Smoke Shadow Intensity Bottom", gSmokeShadowIntensityBottom, iSection, 1.0f);
-				rScreen.WrapperSlider("Smoke Shadow Intensity Top", gSmokeShadowIntensityTop, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Noise");
 				rScreen.WrapperSlider("Smoke Noise Scale One", gSmokeNoiseScaleOne, iSection, 1.0f);

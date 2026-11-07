@@ -156,8 +156,8 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void WindTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

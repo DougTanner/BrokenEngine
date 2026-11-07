@@ -59,7 +59,9 @@ skill-specific inputs:
   agent-harness scenario; a delegator requesting the build states this trigger,
   counting any acceptance criterion or check settled by running `/agent-harness`
   as such a scenario. An included agent-harness scenario adds the client and
-  the server of every game built to the targets, so name both;
+  the server of every game built to the targets, so name both. One that
+  captures the ModelViewer adds ModelViewer Debug x64, per
+  [`model-viewer.md`](../agent-harness/references/model-viewer.md) `## Capture`;
 - for a game build, any Gaea authorization (`-AllowGaeaExport`) that a
   user-approved plan or acceptance criterion requiring an island re-bake
   grants; the build resolves the data mode itself —

@@ -234,7 +234,7 @@ void main()
 	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
 	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Only plane 0
 	// receives the combined object shadow at the base-height projected position.
-	vec4 f4SmokeObjectShadows = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea));
+	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea)).x;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane);
@@ -248,6 +248,6 @@ void main()
 		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.
-		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? f4SmokeObjectShadows.x : 1.0f);
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? fSmokeObjectShadow : 1.0f);
 	}
 }

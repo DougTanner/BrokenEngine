@@ -42,12 +42,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 		throw std::runtime_error("cell_coordinate_probe 'navigation' is server-only");
 	}
 #endif
-	const nlohmann::json& rCoordinate = rParameters.at("coord");
-	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
-	{
-		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
-	}
-	GridCoord coordinate {.iQ = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'")), .iR = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'"))};
+	GridCoord coordinate = CoordinateFromParameter(rParameters);
 
 	if (gpIslandTerrain == nullptr)
 	{
@@ -69,23 +64,17 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 			throw std::runtime_error("cell_coordinate_probe 'navigation' requires only 'graphs' and 'points'");
 		}
 		const nlohmann::json& rGraphs = rNavigation.at("graphs");
-		if (!rGraphs.is_array() || rGraphs.empty())
+		if (!rGraphs.is_array() || rGraphs.empty() || !std::ranges::all_of(rGraphs, [](const nlohmann::json& rGraph)
 		{
-			throw std::runtime_error("cell_coordinate_probe 'graphs' must be a nonempty array of distinct valid graph indices");
+			return rGraph.is_number_integer() && rGraph.get<int64_t>() >= 0 && rGraph.get<int64_t>() < gpIslandTerrain->miNavigationGraphCount;
+		}))
+		{
+			throw std::runtime_error("cell_coordinate_probe 'graphs' must be a nonempty array of valid graph indices");
 		}
 		graphs.reserve(rGraphs.size());
 		for (const nlohmann::json& rGraph : rGraphs)
 		{
-			if (!rGraph.is_number_integer() || (rGraph.is_number_unsigned() && !std::in_range<int64_t>(rGraph.get<uint64_t>())))
-			{
-				throw std::runtime_error("cell_coordinate_probe 'graphs' must contain valid integer graph indices");
-			}
-			int64_t iGraph = rGraph.get<int64_t>();
-			if (iGraph < 0 || iGraph >= gpIslandTerrain->miNavigationGraphCount || std::ranges::contains(graphs, iGraph))
-			{
-				throw std::runtime_error("cell_coordinate_probe 'graphs' must contain distinct valid graph indices");
-			}
-			graphs.push_back(iGraph);
+			graphs.push_back(rGraph.get<int64_t>());
 		}
 		const nlohmann::json& rPoints = rNavigation.at("points");
 		if (!rPoints.is_array())

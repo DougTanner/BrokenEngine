@@ -81,8 +81,8 @@ Changes (11 files)
          vec3 color = texture(skyboxSampler, cubemapDir).rgb;
 
          // Apply exposure and gamma from PBR settings
-         vec3 mapped = ACESFilm(color * mainLayout.fPhysicallyBasedRenderingExposure);
-         mapped = pow(mapped, vec3(1.0 / mainLayout.fPbrGamma));
+         vec3 mapped = ACESFilm(color * mainLayout.fPbrExposure);
+         mapped = pow(mapped, vec3(mainLayout.fPbrGammaInverse));
 
          f4OutColor = vec4(mapped, 1.0);
      }
@@ -228,7 +228,7 @@ HDR resolve landed (HdrResolveAndColorGrading)
   HDR-resolve pass tone-maps + color-grades the whole frame into the
   swapchain. Sky.frag must therefore output LINEAR HDR (cubemap sample
   x optional sky exposure only) -- drop this plan's spec'd
-  ACESFilm(...) + pow(1/fPbrGamma); that per-material tone-map/gamma
+  ACESFilm(...) + pow(fPbrGammaInverse); that per-material tone-map/gamma
   code no longer exists in Model.frag (the resolve pass owns final
   tone mapping).
 - This plan's CommandBufferManager.cpp / WrapperBase / TweaksSliderMap

@@ -136,6 +136,9 @@ CONSTEXPR int kiWaterBindingDisplacementNormal = 14;
 CONSTEXPR int kiWaterBindingFoam = 15;
 CONSTEXPR int kiWaterBindingFoamColor = 16;
 CONSTEXPR int kiWaterFoamTextureCount = 3;
+// Sizes MainLayout's water skybox one ring sample offsets; gWaterSkyboxOneSampleCount's largest value is this plus one (the center
+// sample).
+CONSTEXPR int kiMaxWaterSkyboxOneSampleOffsets = 8;
 CONSTEXPR int kiWaterBindingFoamBreakup = 17;
 CONSTEXPR int kiWaterFoamBreakupTextureCount = 3;
 CONSTEXPR int kiWaterFoamWidth = 1024;

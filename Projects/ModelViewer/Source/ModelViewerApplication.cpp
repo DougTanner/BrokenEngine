@@ -51,11 +51,7 @@ void ModelViewerApplication::TogglePause()
 
 void ModelViewerApplication::SelectModel(int64_t iSelection)
 {
-	if (iSelection < 0 || iSelection >= std::ssize(mPreviews))
-	{
-		return;
-	}
-	if (iSelection == miSelected)
+	if (iSelection < 0 || iSelection >= std::ssize(mPreviews) || iSelection == miSelected)
 	{
 		return;
 	}
@@ -64,6 +60,11 @@ void ModelViewerApplication::SelectModel(int64_t iSelection)
 	mAnimationTime = 0s;
 	mFlags.Set(ViewerFlags::kPlaying, false);
 	LoadModelMetadata();
+}
+
+void ModelViewerApplication::SelectAdjacentModel(int64_t iStep)
+{
+	SelectModel(miSelected + iStep);
 }
 
 struct LightingPreset
@@ -811,7 +812,7 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 		const common::SceneHeader& rSceneHeader = rChunkMap.at(rPreview.crc).pHeader->sceneHeader;
 		const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
-		engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
+		engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
 		XMMATRIX matPackedAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
 		XMMATRIX matAlignmentDelta = XMMatrixInverse(nullptr, matPackedAlignment) * mMatModelAlignment;
 		XMMATRIX matInstanceTransform = XMMatrixIdentity();
@@ -1503,10 +1504,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	rMainLayout.iRenderNumber = static_cast<int32_t>(engine::gpGraphics->miFrameCounter);
 	if (engine::gpGraphics->mFlags & engine::GraphicsFlags::kDrawModelsOverWorld)
 	{
-		rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;
-		rMainLayout.fPhysicallyBasedRenderingLightingSpecular = 0.0f;
-		rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
-		rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
+		rMainLayout.fPbrLighting = 0.0f;
+		rMainLayout.fPbrLightingSpecular = 0.0f;
+		rMainLayout.fPbrSmoke = 0.0f;
+		rMainLayout.fPbrShadowFloor = 1.0f;
 	}
 	game::gpModelViewerApplication->RenderModel(iCommandBuffer);
 }

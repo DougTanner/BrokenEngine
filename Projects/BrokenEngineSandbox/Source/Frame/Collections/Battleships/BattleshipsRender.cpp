@@ -336,7 +336,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[iPipeline]);
 	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
 	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
-	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)

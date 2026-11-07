@@ -171,7 +171,7 @@ void TweaksScreen::WrapperSlider(std::string_view label, Wrapper& rWrapper, int6
 		std::snprintf(pcValue, sizeof(pcValue), "%.6g", static_cast<double>(rWrapper.mAllowed.at(iIndex)));
 		if (ImGui::SliderInt(pcImGuiLabel, &iSliderIndex, 0, static_cast<int>(iMaxIndex), pcValue, ImGuiSliderFlags_NoInput))
 		{
-			rWrapper.SetIndex(std::clamp<int64_t>(iSliderIndex, 0i64, iMaxIndex));
+			rWrapper.SetIndex(iSliderIndex);
 		}
 	}
 	else if (ImGui::SliderFloat(pcImGuiLabel, &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.6f"))

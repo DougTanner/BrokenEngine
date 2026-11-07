@@ -130,6 +130,8 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - kfPusherAreaMinimumX) / kfPusherZoneWidth), 0i64, kiPusherZones - 1);
 	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - kfPusherAreaMinimumY) / kfPusherZoneHeight), 0i64, kiPusherZones - 1);
 	auto [iLayerStart, iLayerEnd] = gpFlightPlanes->OccupiedPlanes(XMVectorGetZ(vecPosition));
+	const int64_t* piStartZone = PusherZone(iLayerStart, iZoneX, iZoneY);
+	int64_t iPushersInStartZone = spppiPushersPerZone[iLayerStart][iZoneX][iZoneY];
 
 	auto vecPush = XMVectorZero();
 	for (int64_t iLayer = iLayerStart; iLayer <= iLayerEnd; ++iLayer)
@@ -157,14 +159,9 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 				continue;
 			}
 
+			// OccupiedPlanes gives one plane or two adjacent ones, so only the start layer can hold an earlier registration.
 			// SetupZones appends rows in ascending order; only successful registrations suppress a duplicate.
-			bool bAlreadyQueried = std::ranges::any_of(std::views::iota(iLayerStart, iLayer), [&](int64_t iEarlierLayer)
-			{
-				const int64_t* piEarlierZone = PusherZone(iEarlierLayer, iZoneX, iZoneY);
-				int64_t iEarlierPushersInZone = spppiPushersPerZone[iEarlierLayer][iZoneX][iZoneY];
-				return std::binary_search(piEarlierZone, piEarlierZone + iEarlierPushersInZone, i);
-			});
-			if (bAlreadyQueried)
+			if (iLayer != iLayerStart && std::binary_search(piStartZone, piStartZone + iPushersInStartZone, i))
 			{
 				continue;
 			}

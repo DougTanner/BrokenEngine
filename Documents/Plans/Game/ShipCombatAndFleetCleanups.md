@@ -146,8 +146,7 @@ Names below are the author's recommendations.
 
 - `ASSERT(bHit)` at `ShipHitboxes.cpp:116`, which stays: every ship model's
   prism holds its origin (`Ships/AGENTS.md` `## Ship Invariants`).
-- The `PackedModelMissileTube` rename:
-  `Documents/Plans/Engine/EngineExportRenderAndViewerCleanups.md` owns it.
+- The packed hardpoint record type, `common::PackedModelHardpoint` (`Common/DataFile.h`).
 - The Omni heal beam's `.fLightingIntensity` at `Omnis.cpp:193`, which has no
   wrapper and is live.
 - Any change to Battleship flight planes or missile plane behavior.
@@ -187,9 +186,3 @@ Names below are the author's recommendations.
 ## Coordination
 
 No directional dependencies or mandatory nondirectional coordination.
-
-## Notes
-
-G01 and `Documents/Plans/Engine/EngineExportRenderAndViewerCleanups.md` touch the
-same hardpoint reads. Either order works: the later landing uses whichever struct
-name and site the tree then has.

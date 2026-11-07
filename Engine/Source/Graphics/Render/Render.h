@@ -12,15 +12,15 @@ struct FrameInterpolate;
 namespace engine
 {
 
-
 struct ModelShadowBounds
 {
 	XMFLOAT3A f3Minimum {};
 	XMFLOAT3A f3Maximum {};
 };
 
-inline ModelShadowBounds ComputeModelShadowBounds(const common::ModelOutline& rOutline)
+inline ModelShadowBounds ComputeModelShadowBounds(const EagerChunk& rModelChunk)
 {
+	const common::ModelOutline& rOutline = *reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize));
 	ModelShadowBounds bounds
 	{
 		.f3Minimum = {rOutline.pf2HullVertices[0].x, rOutline.pf2HullVertices[0].y, rOutline.fMinimumZ},
@@ -183,6 +183,13 @@ struct PresentationContinuitySnapshot
 };
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
+
+// Lerps from fBottom at the lowest flight plane to fTop at the highest by plane index; a single plane takes fBottom.
+inline float FlightPlaneLerp(float fBottom, float fTop, int64_t i, int64_t iPlaneCount)
+{
+	float fPlaneFraction = iPlaneCount > 1 ? static_cast<float>(i) / static_cast<float>(iPlaneCount - 1) : 0.0f;
+	return std::lerp(fBottom, fTop, fPlaneFraction);
+}
 
 float MoonAmount(float fSunAngle);
 

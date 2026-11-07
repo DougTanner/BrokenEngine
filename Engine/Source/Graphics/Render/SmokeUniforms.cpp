@@ -117,8 +117,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	float fWindNoiseQuantityTop = gSmokeWindNoiseQuantityTop.mfCurrent;
 	for (int64_t i = 0; i < iPlaneCount; ++i)
 	{
-		float fPlaneFraction = iPlaneCount > 1 ? static_cast<float>(i) / static_cast<float>(iPlaneCount - 1) : 0.0f;
-		rGlobalLayout.pfSmokeWindNoiseQuantities[i] = std::lerp(fWindNoiseQuantityBottom, fWindNoiseQuantityTop, fPlaneFraction);
+		rGlobalLayout.pfSmokeWindNoiseQuantities[i] = FlightPlaneLerp(fWindNoiseQuantityBottom, fWindNoiseQuantityTop, i, iPlaneCount);
 	}
 
 	// Persisted across frames so the next frame's spread starts with previous == current

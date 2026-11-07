@@ -57,7 +57,7 @@ struct MainLayout
 	int32_t iLightingWaterSkyboxOneSampleCount INIT;
 	// CPU folds clock angles and pixel radius into offsets and the effective total into its reciprocal;
 	// position and geometry-normal derivatives remain raw per fragment, with full-pixel texture gradients.
-	vec2 pf2LightingWaterSkyboxOneSampleOffsets[8] INIT;
+	vec2 pf2LightingWaterSkyboxOneSampleOffsets[kiMaxWaterSkyboxOneSampleOffsets] INIT;
 	float fLightingWaterSkyboxOneSampleCountInverse INIT;
 	float fLightingWaterSkyboxOneSampleBlend INIT;
 	float fLightingWaterSkyboxTwo INIT;
@@ -103,35 +103,35 @@ struct MainLayout
 	float fLightingTerrainBelowBaseMultiplier INIT;
 	float fLightingTerrainBelowBasePower INIT;
 
-	float fPhysicallyBasedRenderingExposure INIT;
-	float fPhysicallyBasedRenderingGammaInverse INIT; // 1 / gamma, applied in HdrResolve.frag
+	float fPbrExposure INIT;
+	float fPbrGammaInverse INIT; // 1 / gamma, applied in HdrResolve.frag
 	float fColorGradingSaturation INIT;
 	float fColorGradingContrast INIT;
 	float fColorGradingTemperature INIT;
-	float fPhysicallyBasedRenderingDayBrightness INIT;
-	float fPhysicallyBasedRenderingAmbient INIT;
+	float fPbrDayBrightness INIT;
+	float fPbrAmbient INIT;
 
-	float fPhysicallyBasedRenderingMipmapCount INIT;
-	float fPhysicallyBasedRenderingSmoke INIT;
+	float fPbrMipmapCount INIT;
+	float fPbrSmoke INIT;
 
-	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse INIT;
-	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower INIT;
-	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular INIT;
-	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingDiffuse INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingDiffusePower INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingSpecular INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingSpecularPower INIT;
-	float fPhysicallyBasedRenderingSun INIT;
-	float fPhysicallyBasedRenderingLighting INIT;
-	float fPhysicallyBasedRenderingLightingPower INIT;
-	float fPhysicallyBasedRenderingLightingSpecular INIT;
-	float fPhysicallyBasedRenderingLightingSpecularPower INIT;
-	float fPhysicallyBasedRenderingEmissive INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingShadowBlend INIT;
-	float fPhysicallyBasedRenderingShadowFloor INIT;
-	float fPhysicallyBasedRenderingCubemapLevelOfDetailPower INIT;
-	float fPhysicallyBasedRenderingCubemapLevelOfDetailOffset INIT;
+	float fPbrBrdfDiffuse INIT;
+	float fPbrBrdfDiffusePower INIT;
+	float fPbrBrdfSpecular INIT;
+	float fPbrBrdfSpecularPower INIT;
+	float fPbrIblDiffuse INIT;
+	float fPbrIblDiffusePower INIT;
+	float fPbrIblSpecular INIT;
+	float fPbrIblSpecularPower INIT;
+	float fPbrSun INIT;
+	float fPbrLighting INIT;
+	float fPbrLightingPower INIT;
+	float fPbrLightingSpecular INIT;
+	float fPbrLightingSpecularPower INIT;
+	float fPbrEmissive INIT;
+	float fPbrIblShadowBlend INIT;
+	float fPbrShadowFloor INIT;
+	float fPbrCubemapLodPower INIT;
+	float fPbrCubemapLodOffset INIT;
 
 	float pfSmokeShadowIntensities[kiMaxFlightPlanes] INIT; // CPU-interpolated by normalized flight-plane index; avoids per-fragment interpolation.
 

@@ -89,13 +89,14 @@ void ExportModel::Export()
 		outline.uiNavigationObstacle = metadata.bNavigationObstacle ? 1ui32 : 0ui32;
 		int64_t iMissileTubeCount = std::ranges::count(metadata.hardpoints, common::ModelHardpointKind::kMissileTube, &common::ModelHardpoint::eKind);
 		int64_t iFighterLaunchBayCount = std::ssize(metadata.hardpoints) - iMissileTubeCount;
-		if (!std::in_range<uint32_t>(iMissileTubeCount) || !std::in_range<uint32_t>(iFighterLaunchBayCount))
-		{
-			throw std::runtime_error("ExportModel::Export hardpoint count is not representable");
-		}
 		modelHeader.uiMissileTubeCount = static_cast<uint32_t>(iMissileTubeCount);
 		modelHeader.uiFighterLaunchBayCount = static_cast<uint32_t>(iFighterLaunchBayCount);
 		hardpoints = std::move(metadata.hardpoints);
+		// The packed sections hold missile tubes then fighter launch bays, each kind in authored order.
+		std::ranges::stable_partition(hardpoints, [](common::ModelHardpointKind eKind)
+		{
+			return eKind == common::ModelHardpointKind::kMissileTube;
+		}, &common::ModelHardpoint::eKind);
 	}
 
 	int64_t iStride = sizeof(common::ModelVertex);
@@ -185,31 +186,19 @@ void ExportModel::Export()
 
 	// Bake the outline in the same authored alignment used to render the model.
 	XMMATRIX matAlignment = common::GetModelAlignment(modelHeader);
-	std::vector<common::PackedModelMissileTube> packedMissileTubes;
-	std::vector<common::PackedModelFighterLaunchBay> packedFighterLaunchBays;
-	packedMissileTubes.reserve(modelHeader.uiMissileTubeCount);
-	packedFighterLaunchBays.reserve(modelHeader.uiFighterLaunchBayCount);
+	std::vector<common::PackedModelHardpoint> packedHardpoints;
+	packedHardpoints.reserve(static_cast<size_t>(std::ssize(hardpoints)));
 	for (const common::ModelHardpoint& rHardpoint : hardpoints)
 	{
-		common::PackedModelMissileTube packedHardpoint {};
-		XMStoreFloat3(&packedHardpoint.f3Position, XMVector3Transform(XMLoadFloat3A(&rHardpoint.f3Position), matAlignment));
-		XMStoreFloat3(&packedHardpoint.f3Direction, XMVector3TransformNormal(XMLoadFloat3A(&rHardpoint.f3Direction), matAlignment));
-		if (!std::isfinite(packedHardpoint.f3Position.x) || !std::isfinite(packedHardpoint.f3Position.y) || !std::isfinite(packedHardpoint.f3Position.z)
-		 || !std::isfinite(packedHardpoint.f3Direction.x) || !std::isfinite(packedHardpoint.f3Direction.y) || !std::isfinite(packedHardpoint.f3Direction.z))
+		common::PackedModelHardpoint& rPackedHardpoint = packedHardpoints.emplace_back();
+		XMStoreFloat3(&rPackedHardpoint.f3Position, XMVector3Transform(XMLoadFloat3A(&rHardpoint.f3Position), matAlignment));
+		XMStoreFloat3(&rPackedHardpoint.f3Direction, XMVector3TransformNormal(XMLoadFloat3A(&rHardpoint.f3Direction), matAlignment));
+		if (!std::isfinite(rPackedHardpoint.f3Position.x) || !std::isfinite(rPackedHardpoint.f3Position.y)
+		 || !std::isfinite(rPackedHardpoint.f3Position.z) || !std::isfinite(rPackedHardpoint.f3Direction.x)
+		 || !std::isfinite(rPackedHardpoint.f3Direction.y) || !std::isfinite(rPackedHardpoint.f3Direction.z)
+		 || (rPackedHardpoint.f3Direction.x == 0.0f && rPackedHardpoint.f3Direction.y == 0.0f && rPackedHardpoint.f3Direction.z == 0.0f))
 		{
 			throw std::runtime_error("ExportModel::Export aligned hardpoint must be finite with nonzero direction");
-		}
-		if (packedHardpoint.f3Direction.x == 0.0f && packedHardpoint.f3Direction.y == 0.0f && packedHardpoint.f3Direction.z == 0.0f)
-		{
-			throw std::runtime_error("ExportModel::Export aligned hardpoint must be finite with nonzero direction");
-		}
-		if (rHardpoint.eKind == common::ModelHardpointKind::kMissileTube)
-		{
-			packedMissileTubes.push_back(packedHardpoint);
-		}
-		else
-		{
-			packedFighterLaunchBays.emplace_back(common::PackedModelFighterLaunchBay {.f3Position = packedHardpoint.f3Position, .f3Direction = packedHardpoint.f3Direction});
 		}
 	}
 	const common::ModelVertex* pVertices = reinterpret_cast<const common::ModelVertex*>(vertices.data());
@@ -281,24 +270,13 @@ void ExportModel::Export()
 
 	// The resize below invalidates pHeader and dataSpan.
 	int64_t iOutlineOffset = common::kiChunkDataOffset + common::ModelHeader::OutlineOffset(iDataSize);
-	int64_t iMissileTubesOffset = common::kiChunkDataOffset + common::ModelHeader::MissileTubesOffset(iDataSize);
-	uintmax_t uiMissileTubeBytes = MultiplySourceBytes(static_cast<uintmax_t>(std::ssize(packedMissileTubes)), sizeof(common::PackedModelMissileTube), kpcContext);
-	uintmax_t uiFighterLaunchBaysOffset = AddSourceBytes(static_cast<uintmax_t>(iMissileTubesOffset), uiMissileTubeBytes, kpcContext);
-	uintmax_t uiFighterLaunchBayBytes = MultiplySourceBytes(static_cast<uintmax_t>(std::ssize(packedFighterLaunchBays)), sizeof(common::PackedModelFighterLaunchBay), kpcContext);
-	uintmax_t uiChunkBytes = AddSourceBytes(uiFighterLaunchBaysOffset, uiFighterLaunchBayBytes, kpcContext);
-	if (!std::in_range<int64_t>(uiChunkBytes))
-	{
-		throw std::runtime_error("ExportModel::Export model chunk size is not representable");
-	}
-	mHeaderAndData.resize(static_cast<size_t>(uiChunkBytes));
+	int64_t iHardpointsOffset = common::kiChunkDataOffset + common::ModelHeader::MissileTubesOffset(iDataSize);
+	int64_t iHardpointBytes = common::VectorByteSize(packedHardpoints);
+	mHeaderAndData.resize(static_cast<size_t>(iHardpointsOffset + iHardpointBytes));
 	std::memcpy(mHeaderAndData.data() + iOutlineOffset, &outline, sizeof(outline));
-	if (!packedMissileTubes.empty())
+	if (!packedHardpoints.empty())
 	{
-		std::memcpy(mHeaderAndData.data() + iMissileTubesOffset, packedMissileTubes.data(), static_cast<size_t>(uiMissileTubeBytes));
-	}
-	if (!packedFighterLaunchBays.empty())
-	{
-		std::memcpy(mHeaderAndData.data() + static_cast<size_t>(uiFighterLaunchBaysOffset), packedFighterLaunchBays.data(), static_cast<size_t>(uiFighterLaunchBayBytes));
+		std::memcpy(mHeaderAndData.data() + iHardpointsOffset, packedHardpoints.data(), static_cast<size_t>(iHardpointBytes));
 	}
 }
 

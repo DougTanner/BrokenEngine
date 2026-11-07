@@ -119,7 +119,7 @@ inline ModelMetadata ReadModelMetadata(const std::filesystem::path& rMetadataPat
 		}
 		const nlohmann::json& rKind = rHardpoint.at("kind");
 		const char* const* ppcKindName = std::find(std::begin(kpcModelHardpointKindNames), std::end(kpcModelHardpointKindNames), rKind);
-		if (!rKind.is_string() || ppcKindName == std::end(kpcModelHardpointKindNames))
+		if (ppcKindName == std::end(kpcModelHardpointKindNames))
 		{
 			throw std::runtime_error(std::format("\"{}\" hardpoint kind must be missileTube or fighterLaunchBay", rMetadataPath.string()));
 		}

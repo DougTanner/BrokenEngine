@@ -52,12 +52,12 @@ struct GlobalLayout
 	float fWaterShadowWeightSumInverse INIT; // 1 / max(fWaterSunWeight + fWaterMoonWeight, 0.001)
 	float fSmokeLightingCombinedMultiplier INIT; // fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier (AddSmoke/BlendSmokePrecomputed)
 
-	// Model.frag uses separate direct BRDF and IBL specular products. IBL stays linear in fPhysicallyBasedRenderingSun
+	// Model.frag uses separate direct BRDF and IBL specular products. IBL stays linear in fPbrSun
 	// because its Rec.709 luminance uses the unscaled sun/moon color. w unused.
-	vec4 f4PhysicallyBasedRenderingSunColorObjects INIT;     // fSunIntensityObjects * fPhysicallyBasedRenderingSun * f4SunColor (Model.frag direct BRDF sun term)
-	vec4 f4PhysicallyBasedRenderingMoonColorObjects INIT;    // fMoonIntensityObjects * fPhysicallyBasedRenderingSun * f4MoonColor (Model.frag direct BRDF moon term)
-	vec4 f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting INIT;  // (dot(f4SunColor.rgb, kRec709) / fPhysicallyBasedRenderingDayBrightness) * f4PhysicallyBasedRenderingSunColorObjects (Model.frag IBL specular sun term)
-	vec4 f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting INIT; // (dot(f4MoonColor.rgb, kRec709) / fPhysicallyBasedRenderingDayBrightness) * f4PhysicallyBasedRenderingMoonColorObjects (Model.frag IBL specular moon term)
+	vec4 f4PhysicallyBasedRenderingSunColorObjects INIT;     // fSunIntensityObjects * fPbrSun * f4SunColor (Model.frag direct BRDF sun term)
+	vec4 f4PhysicallyBasedRenderingMoonColorObjects INIT;    // fMoonIntensityObjects * fPbrSun * f4MoonColor (Model.frag direct BRDF moon term)
+	vec4 f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting INIT;  // (dot(f4SunColor.rgb, kRec709) / fPbrDayBrightness) * f4PhysicallyBasedRenderingSunColorObjects (Model.frag IBL specular sun term)
+	vec4 f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting INIT; // (dot(f4MoonColor.rgb, kRec709) / fPbrDayBrightness) * f4PhysicallyBasedRenderingMoonColorObjects (Model.frag IBL specular moon term)
 
 	vec4 pf4SmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the world area its smoke texture lies in this frame; wind reads [0]
 	vec4 pf4PreviousSmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the area held before this frame's refresh, equal to pf4SmokeAreas on a skip; wind reads [0]

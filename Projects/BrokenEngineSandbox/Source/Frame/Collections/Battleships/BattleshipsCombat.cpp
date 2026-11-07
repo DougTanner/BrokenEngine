@@ -315,8 +315,8 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		ASSERT(rChunk.pHeader->iSize <= std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1) - static_cast<int64_t>(sizeof(common::ModelOutline)));
 		int64_t iTubesOffset = common::ModelHeader::MissileTubesOffset(rChunk.pHeader->iSize);
 		ASSERT(iTubesOffset <= rChunk.iDataSize);
-		ASSERT(rModelHeader.uiMissileTubeCount > 0 && static_cast<int64_t>(rModelHeader.uiMissileTubeCount) <= (rChunk.iDataSize - iTubesOffset) / static_cast<int64_t>(sizeof(common::PackedModelMissileTube)));
-		std::span<const common::PackedModelMissileTube> tubes(reinterpret_cast<const common::PackedModelMissileTube*>(rChunk.pData + iTubesOffset), rModelHeader.uiMissileTubeCount);
+		ASSERT(rModelHeader.uiMissileTubeCount > 0 && static_cast<int64_t>(rModelHeader.uiMissileTubeCount) <= (rChunk.iDataSize - iTubesOffset) / static_cast<int64_t>(sizeof(common::PackedModelHardpoint)));
+		std::span<const common::PackedModelHardpoint> tubes(reinterpret_cast<const common::PackedModelHardpoint*>(rChunk.pData + iTubesOffset), rModelHeader.uiMissileTubeCount);
 
 		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
 		float fCos = XMVectorGetX(vecHullDirection);

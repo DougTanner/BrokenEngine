@@ -52,12 +52,7 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	const WindRadialsInterpolate& rCurrent = rFrameInterpolate.windRadials;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
-	if (gbGameplayPaused)
-	{
-		return;
-	}
-
-	if (!gWindEnabled.Get<bool>())
+	if (gbGameplayPaused || !gWindEnabled.Get<bool>())
 	{
 		return;
 	}
@@ -96,8 +91,8 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void WindRadialsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, !gbGameplayPaused && giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

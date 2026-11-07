@@ -32,11 +32,11 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   missing `coord` fail with
   `cell_coordinate_probe accepts only 'coord' and optional 'navigation'`. Any
   pair of integers in the signed-int32 range is valid — the cell needs no
-  subscription, no loaded frame, and no adjacency — while an integer outside
-  that range fails with
-  `cell_coordinate_probe 'coord' values must fit in a signed 32-bit integer` and
-  a non-integer value, a non-array `coord`, or an array of any other size fails
-  with `cell_coordinate_probe 'coord' must be an array of 2 integers`. Its one
+  subscription, no loaded frame, and no adjacency — while a non-array `coord`
+  or an array of any other size fails with `'coord' must be a [q,r] array`, a
+  non-integer value with `'coord' must be an array of 2 integers`, and an
+  integer outside that range with
+  `'coord' values must fit in a signed 32-bit integer`. Its one
   precondition is loaded island templates; without them it fails with
   `cell_coordinate_probe requires loaded island templates`. Read-only: it
   generates throwaway static data for the requested cell, reports it, and
@@ -60,9 +60,9 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   island `BuildMenuIslandPlacement` picks, so there it need not match `crc`.
   Optional `navigation` is server-only; the client rejects it with
   `cell_coordinate_probe 'navigation' is server-only`. Its object requires
-  exactly `graphs` and `points`. `graphs` is a nonempty array of distinct valid
-  integer indices into the production cell navigation data; `points` is an
-  array of finite float XY pairs in centered cell-local meters and may be
+  exactly `graphs` and `points`. `graphs` is a nonempty array of valid integer
+  indices into the production cell navigation data, repeats allowed; `points`
+  is an array of finite float XY pairs in centered cell-local meters and may be
   empty for contour discovery. Malformed requests return ordinary command
   errors. Graph indices carry no ship-type or flight-plane mapping.
   Only navigation requests build the production navigation graphs. They append

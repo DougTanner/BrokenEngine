@@ -149,7 +149,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kOmni)].models[iPipeline]);
 	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
 	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
-	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
 
 	float fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kOmni)][iPipeline].fRadius;
 	int64_t iInstance = 0;

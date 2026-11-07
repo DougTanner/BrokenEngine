@@ -47,7 +47,7 @@ void main()
 	// Exposure -> ACES tone map the accumulated HDR scene
 	vec3 hdr = texel.rgb;
 	hdr = min(hdr, vec3(65000.0f)); // Kill F16 Inf
-	hdr *= mainLayout.fPhysicallyBasedRenderingExposure;
+	hdr *= mainLayout.fPbrExposure;
 	vec3 mapped = ACESFilm(hdr);
 
 	// Saturation: mix toward Rec.709 luminance
@@ -65,7 +65,7 @@ void main()
 	mapped = clamp(mapped, 0.0f, 1.0f);
 
 	// Gamma
-	vec3 linearColor = pow(mapped, vec3(mainLayout.fPhysicallyBasedRenderingGammaInverse));
+	vec3 linearColor = pow(mapped, vec3(mainLayout.fPbrGammaInverse));
 	vec3 encodedColor = mix(1.055f * pow(linearColor, vec3(1.0f / 2.4f)) - 0.055f, 12.92f * linearColor, lessThanEqual(linearColor, vec3(0.0031308f)));
 	f4OutColor = vec4(encodedColor, 1.0f);
 }

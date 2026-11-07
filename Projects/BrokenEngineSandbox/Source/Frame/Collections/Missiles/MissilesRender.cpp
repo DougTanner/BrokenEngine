@@ -78,7 +78,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kMissileModelCrc).pHeader->sceneHeader;
 	const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
 	XMMATRIX matAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
-	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(*reinterpret_cast<const common::ModelOutline*>(rModelChunk.pData + common::ModelHeader::OutlineOffset(rModelChunk.pHeader->iSize)));
+	engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
 
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);

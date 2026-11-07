@@ -191,8 +191,8 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	rGlobalLayout.fWaterShadowWeightSumInverse = 1.0f / std::max(0.001f, fWaterSunWeight + fWaterMoonWeight);
 
 	// Fold Main-phase PBR tunables here while day-cycle colors are CPU-local; reading mapped write-combined uniforms back stalls. Direct BRDF
-	// products include Object intensity and fPhysicallyBasedRenderingSun. IBL uses separate unscaled Rec.709 luminance / fPhysicallyBasedRenderingDayBrightness so it stays linear in
-	// fPhysicallyBasedRenderingSun; scaling that luminance compounds to fPhysicallyBasedRenderingSun^3. The brightness reciprocal is intentionally unguarded.
+	// products include Object intensity and fPbrSun. IBL uses separate unscaled Rec.709 luminance / fPbrDayBrightness so it stays linear in
+	// fPbrSun. The brightness reciprocal is intentionally unguarded.
 	XMVECTOR vecRecommendation709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
 	float fPhysicallyBasedRenderingSun = gPbrSun.mfCurrent;
 	float fPhysicallyBasedRenderingDayBrightnessInverse = 1.0f / gPbrDayBrightness.mfCurrent;

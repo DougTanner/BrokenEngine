@@ -201,8 +201,8 @@ vec3 ToCubemapCoord(vec3 worldNormal)
 void GetIBLContribution(float NdotV, float perceptualRoughness, vec3 diffuseColor, vec3 specularColor,
                         vec3 n, vec3 reflection, out vec3 f3Diffuse, out vec3 f3Specular)
 {
-	float lod = pow(perceptualRoughness, mainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower) * mainLayout.fPhysicallyBasedRenderingMipmapCount
-	            + perceptualRoughness * mainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset;
+	float lod = pow(perceptualRoughness, mainLayout.fPbrCubemapLodPower) * mainLayout.fPbrMipmapCount
+	            + perceptualRoughness * mainLayout.fPbrCubemapLodOffset;
 	vec3 brdf = texture(samplerBRDFLUT, vec2(NdotV, 1.0 - perceptualRoughness)).rgb;
 	vec3 diffuseLight = texture(samplerIrradiance, ToCubemapCoord(n)).rgb;
 	vec3 specularLight = min(textureLod(prefilteredMap, ToCubemapCoord(reflection), lod).rgb, vec3(kfIblSpecularMax));
@@ -270,17 +270,17 @@ void main()
 	}
 
 	// Engine-specific lighting. Sun and moon split: the sun receives terrain and object shadow, the moon only
-	// object shadow. The sun/moon color terms are precomputed CPU-side
-	// (GlobalUniforms.cpp PopulateDayCycleColors): the per-target Objects intensity and fPhysicallyBasedRenderingSun fold into
-	// f4PbrSun/MoonColorObjects, and the IBL specular path multiplies in the Rec.709 luminance / fPhysicallyBasedRenderingDayBrightness
-	// via the separate f4PbrSun/MoonColorObjectsIbl. Kept as two fields so the IBL path stays linear in fPhysicallyBasedRenderingSun
-	// (its luminance comes from the UNSCALED color; folding fPhysicallyBasedRenderingSun into the luminance would compound to fPhysicallyBasedRenderingSun^3).
+	// object shadow. The sun/moon color terms are precomputed CPU-side (GlobalUniforms.cpp PopulateDayCycleColors):
+	// the per-target Objects intensity and fPbrSun fold into f4PhysicallyBasedRenderingSun/MoonColorObjects, and the
+	// IBL specular path multiplies in the Rec.709 luminance / fPbrDayBrightness via the separate
+	// f4PhysicallyBasedRenderingSun/MoonColorObjectsImageBasedLighting. Kept as two fields so the IBL path stays
+	// linear in fPbrSun, because its luminance comes from the UNSCALED color.
 	vec3 f3AmbientColor = globalLayout.f4AmbientColor.rgb;
 
 	vec2 f2VisibleAreaPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4VisibleArea);
 	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
 	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ShadowArea);
-	float fShadow = max(mainLayout.fPhysicallyBasedRenderingShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
+	float fShadow = max(mainLayout.fPbrShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
 	// Only ships on the planes above iInLayer shade this ship; the smoke loop below reuses this sample.
@@ -303,8 +303,8 @@ void main()
 	float V = V_SmithGGXCorrelated(NdotL, NdotV, alphaRoughness);
 	vec3 diffuseContrib = (1.0 - F) * DiffuseLambert(diffuseColor);
 	vec3 specularContrib = F * D * V;
-	vec3 diffuseResult = pow(mainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse * diffuseContrib, vec3(mainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower));
-	vec3 specularResult = pow(mainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular * specularContrib, vec3(mainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower));
+	vec3 diffuseResult = pow(mainLayout.fPbrBrdfDiffuse * diffuseContrib, vec3(mainLayout.fPbrBrdfDiffusePower));
+	vec3 specularResult = pow(mainLayout.fPbrBrdfSpecular * specularContrib, vec3(mainLayout.fPbrBrdfSpecularPower));
 	vec3 brdf = NdotL * (diffuseResult + specularResult);
 	color += max(globalLayout.f4PhysicallyBasedRenderingSunColorObjects.rgb  * fShadow * fShadow,
 	             globalLayout.f4PhysicallyBasedRenderingMoonColorObjects.rgb * fShadowMoon * fShadowMoon) * brdf;
@@ -315,11 +315,11 @@ void main()
 	vec3 f3IblDiffuse;
 	vec3 f3IblSpecular;
 	GetIBLContribution(NdotV, perceptualRoughness, diffuseColor, specularColor, n, reflection, f3IblDiffuse, f3IblSpecular);
-	f3IblDiffuse *= mainLayout.fPhysicallyBasedRenderingAmbient * f3AmbientColor * mix(1.0, fShadow, mainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend);
+	f3IblDiffuse *= mainLayout.fPbrAmbient * f3AmbientColor * mix(1.0, fShadow, mainLayout.fPbrIblShadowBlend);
 	f3IblSpecular *= max(globalLayout.f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting.rgb  * fShadow,
 	                     globalLayout.f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting.rgb * fShadowMoon);
-	vec3 f3IblDiffuseResult = pow(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse * f3IblDiffuse, vec3(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower));
-	vec3 f3IblSpecularResult = pow(mainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecular * f3IblSpecular, vec3(mainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecularPower));
+	vec3 f3IblDiffuseResult = pow(mainLayout.fPbrIblDiffuse * f3IblDiffuse, vec3(mainLayout.fPbrIblDiffusePower));
+	vec3 f3IblSpecularResult = pow(mainLayout.fPbrIblSpecular * f3IblSpecular, vec3(mainLayout.fPbrIblSpecularPower));
 	color += fEffectiveAo * (f3IblDiffuseResult + f3IblSpecularResult);
 #endif
 
@@ -389,11 +389,11 @@ void main()
 		vec3 lightIntensity = vec3(pf4Lighting[0][i], pf4Lighting[1][i], pf4Lighting[2][i]);
 		specLightAccum += cNdotL * specBrdf * lightIntensity;
 	}
-	color += pow(mainLayout.fPhysicallyBasedRenderingLightingSpecular * specLightAccum, vec3(mainLayout.fPhysicallyBasedRenderingLightingSpecularPower));
+	color += pow(mainLayout.fPbrLightingSpecular * specLightAccum, vec3(mainLayout.fPbrLightingSpecularPower));
 #endif
 
 #if ENABLE_DIRECTIONAL_LIGHTING
-	color += pow(mainLayout.fPhysicallyBasedRenderingLighting * mainLayout.fPhysicallyBasedRenderingDayBrightness * directionalLighting, vec3(mainLayout.fPhysicallyBasedRenderingLightingPower));
+	color += pow(mainLayout.fPbrLighting * mainLayout.fPbrDayBrightness * directionalLighting, vec3(mainLayout.fPbrLightingPower));
 #endif
 
 	// Add emissive
@@ -403,7 +403,7 @@ void main()
 	{
 		emissive *= SRGBtoLinear(texture(sampler2D(pTextures[nonuniformEXT(int(material.fEmissiveTextureIndex))], samplerRepeat), getUV(material.iEmissiveTextureSet)).rgb);
 	}
-	color += mainLayout.fPhysicallyBasedRenderingEmissive * emissive;
+	color += mainLayout.fPbrEmissive * emissive;
 #endif
 
 	// Apply smoke/fog per flight plane, lowest first, projecting the position to each plane. Planes below the model's
@@ -425,7 +425,7 @@ void main()
 			fSmokeFade = SmokeObjectHeightFade(globalLayout, f3InWorldPosition.z, iPlane);
 		}
 		float fSmoke = ReadSmoke(globalLayout, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane);
-		float fSmokeMax = fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke;
+		float fSmokeMax = fSmokeFade * mainLayout.fPbrSmoke;
 		if (fSmoke * fSmokeMax > 0.0f)
 		{
 			if (iPlane == 0)
