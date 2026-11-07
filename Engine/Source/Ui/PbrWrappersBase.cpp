@@ -21,7 +21,7 @@ Wrapper gPbrLightingPower(1.5f, 0.5f, 2.0f);
 Wrapper gPbrIblAmbient(1.000f, 0.0f, 10.0f);
 Wrapper gPbrIblDiffuse(2.008f, 0.0f, 3.0f);
 Wrapper gPbrIblDiffusePower(0.811f, 0.5f, 2.0f);
-Wrapper gPbrIblSpecular(2.5f, 0.0f, 10.0f);
+Wrapper gPbrIblSpecular(5.0f, 0.0f, 10.0f);
 Wrapper gPbrIblSpecularPower(0.6f, 0.1f, 2.0f);
 Wrapper gPbrIblShadowBlend(0.3f, 0.0f, 1.0f);
 Wrapper gPbrCubemapLodPower(0.4f, 0.1f, 2.0f);
