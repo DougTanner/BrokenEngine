@@ -6,7 +6,16 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
 
 - The material push-constant index also selects the mesh-data slot relative to the instance base. CPU draw generation must keep one material/primitive draw aligned with that mesh slot.
 - The generated BRDF lookup stores inverted roughness on its V axis. Generator and runtime lookup must remain paired.
-- Tangent space is derived from screen-space position and UV derivatives. Degenerate UV gradients, a collapsed orthogonalized tangent, or a normal texture scale of 0 fall back to the geometric normal to avoid NaNs.
+- `GetNormal` builds tangent space from the vertex's authored tangent: T is that
+  tangent orthogonalized against the normal, and the bitangent is the sign of
+  its `w` times cross(N, T), so each normal map's green axis follows its own
+  file's bitangent. An all-zero tangent (`ModelVertex::f4Tangent` owns the
+  encoding) or one left almost parallel to the normal instead derives tangent
+  space from screen-space position and UV derivatives, with the bitangent
+  following -V on both UV handedness signs, which assumes the map's green axis
+  follows -V, the glTF convention. On that derived path, degenerate UV gradients
+  or a collapsed orthogonalized tangent fall back to the geometric normal to
+  avoid NaNs, as a normal texture scale of 0 does on either path.
 - Authored occlusion strength blends the linear red sample from neutral 1 and attenuates only the diffuse/specular image-based lighting sum. Direct sun/moon, engine directional lighting, and emissive remain independent of ambient occlusion.
 - Skinning uses compact three-row joint matrices in a buffer separate from mesh
   data. That split is a layout choice — each mesh indexes the shared buffer

@@ -80,7 +80,11 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   engine's navigation rectangle contract
   (`../../../../../../Engine/Source/Frame/AGENTS.md`
   `## Terrain and Navigation`). A way round cheaper than the crossing penalty
-  wins; otherwise the ship crosses and pushers separate them.
+  wins; otherwise the ship crosses and pushers separate them. A ship can also
+  cross that way when it or its target sits in the margin between a model box
+  and its rectangle: line of sight can read the target as hidden while the
+  route, without the rectangle `NavRectangleBoard::Select` left out, ignores
+  that hull.
 - A query sees only the rectangles `NavRectangleBoard::Select` picks, so no
   exception code exists for a ship's own rectangle, a flagship, or an attack
   target. Plane sharing reads each ship's `CappedOccupiedPlanes`, and the terrain
@@ -89,8 +93,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   left beside a ship that moves on might never be reached.
 - Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles.
   In-sight attack, chase, and Omni circling steering, flee, return to an island,
-  veer-off, roaming, escort, terrain snaps, and line of sight all ignore them,
-  and a ship in a neighbouring cell makes none.
+  veer-off, roaming, escort, and terrain snaps all ignore them, and a ship in a
+  neighbouring cell makes none.
+- Line of sight reads no rectangle. `HasShipLineOfSight` tests the unmodified
+  model box of every `IsNavRectangleRow` Battleship in the frame its caller
+  reads that occupies the tested plane. That Battleship-only walk matches the
+  rows `NavRectangleBoard` holds only while `navigationObstacle` stays on the
+  two Battleship models.
 - Interpolate Update owns ordinary plane travel: `ClimbTowardsFlightPlane` lands
   exactly on the effective flight height, so client and server match bit-exactly.
   A descent blocked by the lower plane's clearance graph at the integrated XY
@@ -124,10 +133,12 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   shooter's plane as its assigned plane (`../Missiles/AGENTS.md`), and an Omni
   bolt flies flat along the Omni's hull. The Fighter beam
   has its own plane rule (`../Fighters/AGENTS.md`). All three weapons fire only
-  at an enemy in line of sight (`HasLineOfSight`) on the shooter's stored plane.
-  The test is 2D against tier 0's inflated navigation polygons for every
-  shooter (`kiFiringClearanceTier`), so it blocks slightly early near terrain;
-  it is unchecked on a plane without terrain collision. An Omni faces only an
+  at an enemy in line of sight (`HasShipLineOfSight`) on the shooter's stored
+  plane. The test is 2D against the Battleship model boxes above and tier 0's
+  inflated navigation polygons for every shooter (`kiFiringClearanceTier`), so
+  it blocks slightly early near terrain; it is unchecked on a plane without
+  terrain collision, which no Battleship box occupies
+  (`kiBattleshipHighestFlightPlane`). An Omni faces only an
   enemy in line of sight. A ship storing `kuiNoFlightPlane` fires none of them,
   and a Battleship launches missiles only while exactly at its stored plane's
   effective flight height. No Omni targets, chases, or faces an enemy above its
@@ -145,12 +156,14 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   attack pattern. In `FindAttackTarget`'s pick an enemy in line of sight always
   wins: a hidden kept target is kept, and routed to, only while no enemy is in
   sight. An enemy above the type's highest plane is never a target; a
-  pick that finds no other enemy clears a kept target there. Movement decisions
-  test sight on the ship's own clearance tier, which can hide a target the
-  tier-0 pick saw. While the target is hidden the ship steers at its
-  `NextRouteWaypoint` on the target's nearest plane every tick, an exception to
-  the path-query cadence (`## Fleet Navigation Invariants`), and starts no
-  veer-off; a random-spawn ship returning to an island and a fleeing
+  pick that finds no other enemy clears a kept target there. The pick and the
+  flagship chases test `HasShipLineOfSight`, a chase on the ship's own clearance
+  tier. Movement decisions after a pick retest terrain only (`HasLineOfSight`)
+  on the ship's own clearance tier, which can hide a target the tier-0 pick saw;
+  the box test does not depend on the tier. While the target is hidden the ship
+  steers at its `NextRouteWaypoint` on the target's nearest plane every tick, an
+  exception to the path-query cadence (`## Fleet Navigation Invariants`), and
+  starts no veer-off; a random-spawn ship returning to an island and a fleeing
   random-spawn Battleship skip that route. Fleet Battleships pick none.
 
 ## Fleet Coordination Invariants

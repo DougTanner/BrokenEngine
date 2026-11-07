@@ -21,7 +21,9 @@ Execution card:
   fixed behavior names a check the unedited tree could not pass, and a bug-fix
   criterion (one stating a defect no longer occurs) also names its pre-change
   red run: an /external-diagnose-bug Reproducing signal, a run on a build of
-  the unedited tree, or, for a defect in the instruction prose
+  the unedited tree (a run needing a Local build takes the route in
+  `.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`),
+  or, for a defect in the instruction prose
   /progressive-disclosure-review reviews, a read at the session baseline commit
   that shows the defect unambiguously, citing the defective rule by path and
   line and the case it mishandles; a criterion compared against the unedited

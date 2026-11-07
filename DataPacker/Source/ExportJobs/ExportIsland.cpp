@@ -1,6 +1,7 @@
 #include "ExportIsland.h"
 
 #include "Island/BakeIslandIntermediates.h"
+#include "Island/BeachPass.h"
 #include "Island/PublishedIslandBake.h"
 #include "Texture/Texture.h"
 #include "FileManager.h"
@@ -436,6 +437,15 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	}
 	rOut.iHeightmapWidth = iElevationWidth;
 	rOut.iHeightmapHeight = iElevationHeight;
+	for (const auto& [i, rfSample] : std::views::enumerate(std::as_const(rOut.cpuHeightmapData)))
+	{
+		if (!std::isfinite(rfSample))
+		{
+			throw std::runtime_error(std::format("Island leaf \"{}\" elevation sample {} at texel ({}, {}) is not finite.", elevationFile.string(), rfSample, i % iElevationWidth, i / iElevationWidth));
+		}
+	}
+
+	ApplyBeachPass(rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, baked.fWidthMeters / static_cast<float>(iElevationWidth));
 
 	// Only land scales: the sea floor and underwater mask threshold are constants at or below 0, so
 	// the masks, and with them the tracked BC textures, stay byte-identical.
@@ -447,12 +457,12 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		}
 	}
 
-	// max_element compares with '<', so a NaN first sample is never replaced and an infinite sample wins; both fail here.
 	auto peakIterator = std::ranges::max_element(rOut.cpuHeightmapData);
 	int64_t iPeakIndex = peakIterator - rOut.cpuHeightmapData.begin();
 	rOut.fPeakHeightMeters = *peakIterator;
 	rOut.iPeakTexelX = iPeakIndex % iElevationWidth;
 	rOut.iPeakTexelY = iPeakIndex / iElevationWidth;
+	// The samples were read finite, so this catches a sample the island scale overflowed.
 	if (!std::isfinite(rOut.fPeakHeightMeters))
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" elevation peak {} at texel ({}, {}) is not finite.", rInputPath.string(), rOut.fPeakHeightMeters, rOut.iPeakTexelX, rOut.iPeakTexelY));
@@ -567,6 +577,8 @@ std::string ExportIsland::GetInputFingerprint() const
 			fingerprint[pcFile] = gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
 		}
 	}
+	fingerprint["beachBarCoveragePercent"] = kfBeachBarCoveragePercent;
+	fingerprint["beachBarDepthMeters"] = kfBeachBarDepthMeters;
 	return fingerprint.dump();
 }
 

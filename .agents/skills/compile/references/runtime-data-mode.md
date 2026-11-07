@@ -59,6 +59,33 @@ Local never falls back to Shared data.
   unrecognized reparse point or insufficient disk — never a user-prepared
   directory.
 
+A pre-change red run on a build of the unedited tree or a pre-change baseline
+run ([execution-card.md](../../../references/execution-card.md) `## Template`)
+that needs a Local build gets it by changing a data input, which overrides
+nothing: the one rule above and `## Build invocation and derived properties`
+still decide the mode.
+
+- Place one untracked temporary file under a data input before the build. A
+  gitignored path and a file the `AGENTS.md` exclusion drops do not count, so
+  before building, the context from [worker.md](worker.md) step 1 must show
+  `dataBuildMode` `Local` with that path in `dataInputChanges`.
+- No-effect form, for a defect outside an export job or a baseline comparing
+  outputs: a file under `DataPacker/`, which no export reads. It gets Local and
+  logs no `Exported:` line on a warm DataPacker cache.
+- Export form, for a defect inside an export job: a copy of an asset that job
+  handles, in the same directory, under a file name no earlier run used
+  (`DataPacker/Source/AGENTS.md` `## Design Patterns` Export processing owns
+  the dirty rule). The first build of that name exports the copy and logs
+  `Exported:`; a later build of that name is clean, so the build holding the
+  evidence is the first one.
+- The build still counts as a build of the unedited tree, because no tracked
+  byte differs. The file stays for every build of that run and is deleted by
+  exact path after the last of them and before the first slice, with every
+  file the build generated beside a copy
+  (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`). The run ends
+  only when neither `dataInputChanges` nor `git status` shows any of those
+  files.
+
 ## Repository-root detection and mode derivation
 
 The game projects detect the authoritative repository-root Git marker. A linked worktree has a `.git` file and defaults `RunDataPacker=false`; the primary checkout has a `.git` directory and preserves ordinary Local Visual Studio behavior by defaulting true. An explicit Local `RunDataPacker=true` permits deliberate worktree generation; Shared rejects true.

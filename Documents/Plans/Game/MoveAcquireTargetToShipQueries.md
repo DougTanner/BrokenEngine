@@ -18,8 +18,8 @@ The file is over its threshold because of ordinary growth, and `AcquireTarget`
 - `ShipQueries` already owns the cross-type target picks, `FindAttackTarget`,
   `FindNearestEnemyShip`, and `FindNearestEnemyFlagship` (`ShipQueries.h:76-90`).
 - Its only caller is `Omnis.cpp:699`, which already includes `ShipQueries.h`.
-- It reads no file-local symbol of `ShipBehaviours.cpp`. `HasLineOfSight`, `NearestFlightPlane`, and
-  `kiFiringClearanceTier` are declared in `ShipBehaviours.h`, and `ShipQueries.cpp` already uses
+- It reads no file-local symbol of `ShipBehaviours.cpp`. `HasShipLineOfSight`, `NearestFlightPlane`,
+  and `kiFiringClearanceTier` are declared in `ShipBehaviours.h`, and `ShipQueries.cpp` already uses
   them; `ForEachEnemyShip` and `VisitShip` are in `ShipQueries.h`.
 - `ShipQueries.cpp` compiles in both the client and server projects, as `ShipBehaviours.cpp` does.
 
@@ -75,12 +75,6 @@ tokens, so this move shrinks `ShipBehaviours.cpp` but leaves it above its thresh
 - The diff is a pure move: the moved lines are byte-identical at both ends.
 - The client and server build through `/compile`.
 - The diff settles behavior, so no harness run is required.
-
-## Coordination
-
-Reciprocal coordination with `Documents/Plans/Game/BlockLineOfSightWithLargeShips.md`: that Plan edits
-the `AcquireTarget` signature and its sight test, so whichever lands second works from the function
-where it finds it. This Plan still moves the text it finds verbatim.
 
 ## Notes
 

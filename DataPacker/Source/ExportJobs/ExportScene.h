@@ -46,6 +46,7 @@ private:
 	bool SceneDependenciesDirty() const;
 	void CaptureSceneDependencies(const std::vector<std::filesystem::path>& rDependencies);
 	std::filesystem::path GetPreExportMarkerPath() const;
+	std::filesystem::path GetPreExportSidecarPath() const;
 	std::optional<std::string> GetPreExportFingerprint() const;
 	std::filesystem::path GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const;
 	std::filesystem::path GetTextureIntermediateStagePath(int64_t iStageIndex) const;

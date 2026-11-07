@@ -79,10 +79,11 @@ a run, come from that documented run of
 mandatory `-RepositoryRoot` and `-Baseline` along with any switch the skill
 requires — rather than from a call composed ad hoc or from anything retyped into
 the brief. When composing a brief for a dispatched skill, read that skill by a
-section-bounded search — such as `Grep '^## (Inputs|Handoff)'` with trailing
-context — of the public sections
+section-bounded read — such as `Grep '^## '` to find the line range of
+`## Inputs`, then a read of that range alone — of the public sections
 [`skill-skeleton.md`](skill-skeleton.md#section-placement) names, never its
-whole `SKILL.md`. `## Inputs` states its exact form, and for
+whole `SKILL.md`; `## Handoff` opens by path only when routing a returned
+result needs it. `## Inputs` states its exact form, and for
 `/repo-code-review` who performs the run:
 `.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
 form, and `.agents/skills/adversarial-review/SKILL.md` `## Inputs` for the plain

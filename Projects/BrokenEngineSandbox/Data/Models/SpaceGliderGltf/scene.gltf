@@ -100,22 +100,11 @@
     },
     {
       "uri": "textures/model_metallicRoughness.png"
-    },
-    {
-      "uri": "textures/model_emissive.png"
     }
   ],
   "materials": [
     {
       "doubleSided": true,
-      "emissiveFactor": [
-        1.0,
-        1.0,
-        1.0
-      ],
-      "emissiveTexture": {
-        "index": 2
-      },
       "name": "model",
       "pbrMetallicRoughness": {
         "baseColorTexture": {
@@ -254,10 +243,6 @@
     {
       "sampler": 0,
       "source": 1
-    },
-    {
-      "sampler": 0,
-      "source": 2
     }
   ]
 }

@@ -4,8 +4,20 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
 
 ## Shared Pipeline
 
-- `ExportJob` owns content-fingerprint dirty checks, cache metadata, chunk I/O, and failure cleanup. `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>` holds chunks and fingerprints; a job's chunk, fingerprint metadata, and shader dependency sidecar names carry that job's export-format version. Checkout-local packs and manifests can be rebuilt from clean shared chunks without re-exporting sources.
-- Before a clean cached chunk body is republished, its chunk-header identity (magic, the job's path CRC, and the NUL-terminated path text) and body extent are validated; a mismatch logs a warning and falls back to a full re-export.
+- `ExportJob` owns content-fingerprint dirty checks, cache metadata, chunk I/O,
+  and failure cleanup. `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>`
+  holds chunks and fingerprints; a job's chunk, fingerprint metadata, and shader
+  dependency sidecar names carry that job's export-format version. Every job's
+  entry names also carry a content key from `ExportJob::SetContentKey`, built
+  from content fingerprints only, so trees with equal key inputs share one entry
+  and trees with different key inputs keep separate entries. The Shader and
+  Blender-source Scene constructors set their own keys, and
+  `ExportJob::CheckDirty` keys every other job from `GetInputFingerprint`. The
+  Shader key covers its source and every `.h` under both input roots' `Shaders`
+  directories. Checkout-local packs and manifests can be rebuilt from clean
+  shared chunks without re-exporting sources. The `.meta` also records the chunk
+  body's CRC, so comparing a clean job with the manifest reads no chunk body.
+- Before a clean cached chunk body is republished, its CRC is checked against the `.meta` record and its chunk-header CRC against the job's path CRC; a failed read or a mismatch logs a warning and falls back to a full re-export.
 - A successful export writes derived metadata before the primary fingerprint. Interrupted or failed work therefore remains dirty, and jobs remove incomplete sidecars in `CleanupOnFailure()`.
 - `ExportJob::Version(N)` folds in `sizeof(common::ChunkHeader)`. Jobs that serialize additional payload structs also fold in their sizes (`ExportScene.h` and `ExportModel.h` show the pattern). Same-size reorder or semantic changes need the owning manual version bump; the layout `static_assert`s in `Common/DataFile.h` name which job's version owns each payload struct, so read the failing assertion message instead of guessing which version to bump.
 - A job may version an expensive sub-stage independently of its chunk payload
@@ -16,9 +28,14 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   Island texture encoding uses this pattern; the scene `.PreExport` marker
   also guards tracked outputs but departs from all three: its filename carries
   no version, its version is the scene's own `Version(...)` export version, and
-  it fingerprints the stage's generated outputs instead of its inputs. Every
-  such marker goes through `ExportJob::ReadMarkerFile`/`WriteMarkerFile` and is
-  removed before the first output write.
+  it fingerprints the stage's generated outputs instead of its inputs. The
+  Blender conversion marker departs from the name rule: its filename also
+  carries the job's content key, because a marker named by version alone is one
+  slot that trees with different inputs overwrite. Every such marker goes
+  through `ExportJob::ReadMarkerFile`/`WriteMarkerFile` and is removed before
+  the first output write. The scene `.pre-export` sidecar uses the same two
+  functions and is exempt from the removal rule
+  (`ExportScene::UpdateCacheMetadata` holds the reason).
 - Each job's `std::async` launch wraps `RunExport` in `common::ThreadLocal::Entry`, so the job runs with its own worker's `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other parallel exports.
 - `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline and hardpoint sections are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
 - `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.
@@ -69,6 +86,10 @@ that conversion replaces after the fingerprint is captured. A separate shared
 cache marker uses the converter's own version, independent of scene payload
 and `.PreExport` versions. It records source, tool identity/content, script and
 recipe, consumed external dependency hashes, and published GLB content.
+The Blender key covers the source, script, and candidate image fingerprints
+(`BlenderExportContentKey`).
+The key leaves out the tool and every dependency conversion alone discovers, so
+trees differing only in those still convert in turn.
 Dependencies include transitive linked Blender data and unpacked images used
 by exported content, excluding unrelated datablocks, plus each existing file an
 OBJ's `mtllib` statements name, the `.mtl` file sharing the OBJ's stem (`X.mtl`
@@ -151,7 +172,10 @@ The ordinary two-phase export's `.PreExport` marker
 covers the scene's generated
 outputs — the `<scene>.MODEL` file and every matched texture intermediate — not
 just the source scene, so a deleted, reverted, or edited output re-runs
-pre-export. The main phase writes scene metadata and optional animation data.
+pre-export. A clean scene also needs its keyed `.pre-export` sidecar, which
+records the same fingerprint for that entry, to match, so a restored source
+re-runs pre-export when the tree still holds another entry's outputs.
+The main phase writes scene metadata and optional animation data.
 Pre-export also removes orphaned scene texture intermediates so recursive
 texture discovery cannot ship stale assets. Generated assets are referenced by
 relative-path CRC. An export-only glTF scene's dirty check covers the source plus every external
@@ -192,6 +216,15 @@ When multiple mesh nodes reuse one source material, or primitives under one mate
 Vertex colors are not part of the packed model format. Scene export warns with
 source path and primitive identity when `COLOR_0` is present and ignores that attribute
 without modifying the source.
+
+`BuildVertices` packs a glTF primitive's `TANGENT` into
+`ModelVertex::f4Tangent`, whose comment owns the encoding. A static export bakes
+the direction with the mesh-world matrix, and `f3Normal` is packed normalized.
+A non-finite `NORMAL` or `TANGENT` component fails the export. A primitive with
+no `TANGENT` packs none, as does every Assimp scene, and `ExportBlenderScene.py`
+exports no tangents, so an authored scene has none. The
+[model shaders](../../../Engine/Data/Shaders/Model/AGENTS.md#architecture-notes)
+own what the frame does with a tangent and with none.
 
 ## Model Alignment
 

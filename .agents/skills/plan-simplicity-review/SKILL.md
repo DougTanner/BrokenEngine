@@ -33,8 +33,8 @@ fire skips it.
 New code means a new tracked file, function, class, system, script, guard or
 recovery path, or configuration surface absent at the session baseline —
 including an addition inside an existing file. Non-documentation behavior means
-C++, shaders, scripts, or the skill behavior defined in
-`### Trigger: when a skill edit is behavior` below.
+C++, shaders, scripts, or the skill or `.agents/references/` behavior defined in
+`### Trigger: when a skill or reference edit is behavior` below.
 
 Dispatch it once per `../../references/subagent-reporting.md`
 `## Delegated execution context`, in parallel with
@@ -45,14 +45,10 @@ standalone where it does not (Tier 1, and the save-time dispatch from
 The Change Workflow Plan review step owns the one difference rerun; any further
 expansion is a separately approved planning stage.
 
-### Trigger: when a skill edit is behavior
+### Trigger: when a skill or reference edit is behavior
 
-A skill edit is behavior when it changes frontmatter, an invocation, delegation,
-or routing rule, a bundled script or that script's documented invocation, a
-workflow step or its ordering, an input, output, or handoff contract, a trigger
-condition, or a threshold. It is documentation — which takes precedence,
-including for a frontmatter edit — when it only rewords, reorders, formats,
-retitles, or clarifies behavior that stays exactly as it was.
+A skill or `.agents/references/` edit is behavior unless it only rewords,
+reorders, formats, retitles, or clarifies behavior that stays exactly as it was.
 
 ## Inputs
 

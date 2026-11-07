@@ -42,8 +42,8 @@ that root cause requires inside the Plan's named region: a fix outside it
 returns as a scope-widened `Verification` row, and a choice between fixes that
 only the user can make becomes an `## Unresolved decisions` entry with its
 `unresolved decision` row. When current code and the supplied evidence cannot
-confirm the root cause, stop before writing the snapshot and return, as the one
-`Residuals` row, the inputs `/external-diagnose-bug` `## Inputs` requires.
+confirm the root cause, stop before writing the snapshot and return the form
+[`## Handoff`](../SKILL.md#handoff) declares for that stop.
 
 ## Leftovers
 

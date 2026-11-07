@@ -159,12 +159,40 @@ std::filesystem::path ExportShader::PreprocessShader()
 	return result;
 }
 
+// A shader's dependencies are unknown before it compiles, so every header under the input roots' Shaders directories
+// stands in for them; CheckDirty's dependency comparison stays the correctness check. Sorting keeps the key independent
+// of directory order.
+static common::crc_t ComputeShaderContentKey(std::string_view sourceFingerprint)
+{
+	std::vector<std::string> headerFingerprints;
+	for (const std::filesystem::path& rInputRoot : gpFileManager->mpInputDirectories)
+	{
+		for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rInputRoot / "Shaders"))
+		{
+			if (rEntry.path().extension() == ".h")
+			{
+				headerFingerprints.push_back(gpFileManager->mpInputFingerprintCache->Get(rEntry.path()));
+			}
+		}
+	}
+	std::ranges::sort(headerFingerprints);
+
+	std::string keyInput(sourceFingerprint);
+	for (const std::string& rFingerprint : headerFingerprints)
+	{
+		keyInput += rFingerprint;
+	}
+	return common::Crc(keyInput);
+}
+
 ExportShader::ExportShader(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 : ExportJob(rChunkFlags, rFile, kiVersion)
 {
+	SetContentKey(ComputeShaderContentKey(gpFileManager->mpInputFingerprintCache->Get(mInputPath)));
+
 	mDependencyFile = gpFileManager->mCacheDirectory / mRelativeDirectory / (mInputPath.filename().native() + L".d");
 	mDependencyMetadataFile = gpFileManager->mCacheDirectory / mRelativeDirectory / mInputPath.filename();
-	mDependencyMetadataFile += std::format(".v{}.deps.meta", miVersion);
+	mDependencyMetadataFile += std::format(".v{}.{}.deps.meta", miVersion, mContentKey);
 
 	if (rFile.extension() == ".comp")
 	{

@@ -215,8 +215,10 @@ function Get-InventoryIdentity([string] $Mode, [string] $Oid, [string] $Relative
 	# On the working-tree side rename detection can print a destination OID that diffcore computed for the
 	# working-tree content but never wrote to the object database, so only the file bytes are a readable
 	# identity there. $script:ManifestModes is exactly the ordinary-file modes; any other mode (a symlink,
-	# for one) is not the file's own bytes and keeps blob hashing.
-	$fromFile = ($WorkingTreeSide -and $script:ManifestModes -ccontains $Mode) -or ($Oid -ceq $script:ZeroOid)
+	# for one) is not the file's own bytes and keeps blob hashing. A working-tree row with a nonzero mode and
+	# no file is an index entry Git does not compare with the disk, such as a path sparse checkout omits: a
+	# removed file Git does compare reports mode 000000 and returned above, so this OID names the index's blob.
+	$fromFile = ($WorkingTreeSide -and $script:ManifestModes -ccontains $Mode -and (Test-InventoryHeadPath $RelativePath)) -or ($Oid -ceq $script:ZeroOid)
 	$sha256 = if ($fromFile) { Get-InventoryFileSha256 $RelativePath } else { Get-InventoryBlobSha256 $Oid }
 	return [ordered]@{ mode = $Mode; sha256 = $sha256 }
 }

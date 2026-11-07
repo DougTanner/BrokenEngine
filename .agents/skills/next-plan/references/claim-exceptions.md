@@ -53,7 +53,7 @@ clean wrapper-created worktree.
 ## Takeover
 
 A targeted `none-available` result naming another session's claim keeps its
-`nextAction`: report the result's `holder` ([claim-results.md](claim-results.md))
+`nextAction`: report the result's `holder`
 and that worktree's state, read only with
 `git --no-optional-locks -C <holder worktree> status --porcelain` plus a
 read-only check whether its HEAD is already on the primary branch, never a

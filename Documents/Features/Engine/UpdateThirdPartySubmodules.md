@@ -163,11 +163,11 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
       (`ExportCubemapIbl.cpp:8`).
     - Leave alone `kiBakeVersion` (`BakeRoute.cpp:37`, Gaea) and the cache-bookkeeping versions (`ExportJob.cpp:9`, `ExportShader.cpp:319`, `InputFingerprint.cpp:86,90`).
     - Run `/compile -Target Client -Configuration Release`, whose envelope reports `/p:DataBuildMode=Local` and `/p:RunDataPacker=true`. If the Gaea guard blocks a route, stop and report it.
-    - Byte-compare all 23 `Output/Data` files with `Temp/ThirdPartyUpdate/BaselineData/`, and confirm `git status` shows no tracked change under `Engine/Data` or `Projects/BrokenEngineSandbox/Data` other than the four `.PreExport` markers.
+    - Byte-compare all 23 `Output/Data` files with `Temp/ThirdPartyUpdate/BaselineData/`, and confirm `git status` shows no tracked change under `Engine/Data` or `Projects/BrokenEngineSandbox/Data` other than the `.PreExport` markers.
     - Report any difference to the user before the commit, with the owning version bump (`DataPacker/Source/ExportJobs/AGENTS.md` `## Shared Pipeline`, `Island/AGENTS.md` `## Versioning`). Nothing differing lands without the user's approval.
 13. Revert the re-export.
-    - Revert every bump and `git restore` the four `.PreExport` markers.
-    - Delete the cache entries that carry the temporary versions under `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<project>`: `*.v<temp>.chunk`, `*.v<temp>.meta`, and `*.v<temp>.deps.meta` (`ExportJob.cpp:148,153`, `ExportShader.cpp:167`), plus `*.t<temp>.textures` (`ExportIsland.cpp:510`).
+    - Revert every bump and `git restore` the `.PreExport` markers.
+    - Delete the cache entries that carry the temporary versions under `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<project>`: `*.v<temp>.*.chunk` and `*.v<temp>.*.meta` (`ExportJob::SetContentKey`; the latter also matches the Shader `.deps.meta`, `ExportShader.cpp:195`), plus `*.v<temp>.*.meta.pre-export` (`ExportScene::GetPreExportSidecarPath`) and `*.t<temp>.textures` (`ExportIsland.cpp:609`).
     - Re-run the step-12 generation build at the real versions only while `Resolve-CompileContext.ps1` reports Local. It re-splits and re-convolves once, because `SplitVersion.meta` and the IBL `.meta` files are not named by version, and its outputs must still equal the snapshot.
 14. Harness. Through `/agent-harness`, run a smoke run and a replay determinism check against primary's executables.
 15. Pre-commit checks. Confirm the following, then fill the acceptance table from `## Acceptance criteria`:

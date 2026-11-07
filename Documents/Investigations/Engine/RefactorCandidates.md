@@ -10,6 +10,23 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-06 claude/2ea16005-f59e-4086-a845-0c0236be3a46 — size observation: `Engine/Data/Shaders/Model/Model.frag` is 5,177 `bt-token-v1`, over the ~5,000 report line; splitting it via `ShaderFunctions.h` or `*Common.h` is follow-up work.
+- 2026-11-06 claude/bce2711e-800d-4a71-886c-78431dc6cb86 — DataPacker/Source/ExportJobs/ExportJob.cpp:139 —
+  Compute every job's content key in one place, inside `ExportJob::CheckDirty` under the existing fingerprint catch,
+  through a virtual key-input function, instead of in the Scene and Shader constructors. A failed read of a shader
+  source, a shader header, or a Blender source or script then fails only that asset, where it kills the run today.
+  `ExportScene::CheckDirty` must then derive the key before it reads the Blender marker, and `ExportShader` must build
+  its dependency sidecar path after the key exists.
+  — makes unnecessary: DataPacker/Source/BlenderExport.cpp:168-184, DataPacker/Source/ExportJobs/ExportJob.cpp:149
+- 2026-11-06 claude/bce2711e-800d-4a71-886c-78431dc6cb86 — DataPacker/Source/ExportJobs/ExportJob.cpp:114 —
+  Fold `mCrc` (the path CRC) into the content key in `SetContentKey`, so a case-only rename gets its own cache entry
+  instead of resolving to the old one on the case-insensitive volume. Trees sharing a relative path and content still
+  share one entry, and the verified body CRC then proves the header holds the job's own path CRC. Existing entry names
+  change, so old entries are orphaned and those jobs re-export once.
+  — makes unnecessary: DataPacker/Source/ExportJobs/ExportJob.cpp:234-238
+- 2026-11-06 claude/7da75c20-196f-414a-9394-05ed10b2d13e — refactor observation Engine/Source/Frame/NavQuery.cpp:702 — A* scratch scales with graph vertices, yet it runs on a dispatch worker whose workbuffer starts at 65,536 bytes (Common/Threading/Multithreading.cpp:12), so a graph of about 3,600 vertices grew it mid-frame on a temporary sealed-cell build — size the worker buffer from the largest navigation graph.
+- 2026-11-06 claude/574f4faa-873a-4ce7-8a18-9457ba135b3a — refactor observation: Tools/AgentHarness/AgentHarness.cpp:136 — pre-existing; every `RefreshHeartbeatIfDue` caller passes a deadline, so the `nullopt` default and the `:150` branch are unreachable — make the deadline a required parameter and drop that branch
+
 - 2026-11-05 claude/02d81b1e-9526-44c9-b600-56fc582cd210 — Engine/Source/Profile/ProfileManager.cpp:378 — `GpuRead` treats a query still in flight and a query this recording never writes the same way, so an inactive row keeps its old sample; clearing the `mpGpuTimers` rows when command buffers are re-recorded would fix that at the base, since a row only changes between active and inactive at re-recording
   — makes unnecessary: the paired empty timestamps the inactive water foam recording keeps (`Engine/Source/Graphics/Managers/AGENTS.md` `### CommandBufferManager`)
 - 2026-11-05 claude/4a3377b2-9193-4035-830d-1b0d217e7190 — refactor observation Engine/Source/Frame/NavQuery.cpp:544 —

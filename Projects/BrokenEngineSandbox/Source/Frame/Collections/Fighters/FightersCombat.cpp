@@ -106,7 +106,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 		{
 			return rInterpolate.pRegistryIds[iRow];
 		}) == registryTarget;
-		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasLineOfSight(rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShooterPosition, vecPosition))
+		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShooterPosition, vecPosition))
 		{
 			optionalTarget = locator;
 			bKeptTargetChosen = bKeptTarget;

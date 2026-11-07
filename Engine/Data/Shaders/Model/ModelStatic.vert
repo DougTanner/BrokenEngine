@@ -10,5 +10,5 @@ void main()
 	ModelLayout model = pModels[gl_InstanceIndex];
 
 	// Static models: use vertex position directly, no mesh matrix transform needed
-	ModelVertexOutput(f3InPosition, f3InNormal, model);
+	ModelVertexOutput(f3InPosition, f3InNormal, f4Tangent.xyz, model);
 }

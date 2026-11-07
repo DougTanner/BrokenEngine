@@ -882,7 +882,7 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellSt
 		{
 			return;
 		}
-		if (!HasLineOfSight(rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition))
+		if (!HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition))
 		{
 			return;
 		}
@@ -926,6 +926,57 @@ bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64
 {
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iClearanceTier, uiFlightPlane);
 	return !engine::NavQuerySegmentBlocked(engine::NavQuerySnapToNavigable(vecShooterPosition, rNavData), engine::NavQuerySnapToNavigable(vecTargetPosition, rNavData), rNavData);
+}
+
+bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
+{
+	if (!HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecShooterPosition, vecTargetPosition))
+	{
+		return false;
+	}
+
+	XMFLOAT2 f2Shooter {XMVectorGetX(vecShooterPosition), XMVectorGetY(vecShooterPosition)};
+	XMFLOAT2 f2Target {XMVectorGetX(vecTargetPosition), XMVectorGetY(vecTargetPosition)};
+	// A zero Z range at Z 0 makes the prism clip 2D.
+	XMFLOAT3A f3Start {f2Shooter.x, f2Shooter.y, 0.0f};
+	XMFLOAT3A f3Delta {f2Target.x - f2Shooter.x, f2Target.y - f2Shooter.y, 0.0f};
+
+	const BattleshipsInterpolate& rInterpolate = *rFrame.interpolate.pBattleships;
+	const BattleshipsPostRender& rPostRender = *rFrame.postRender.pBattleships;
+	for (int64_t i = 0; i < rPostRender.iCount; ++i)
+	{
+		if (!IsNavRectangleRow(ShipType::kBattleship, rInterpolate, rPostRender, i))
+		{
+			continue;
+		}
+
+		XMVECTOR vecPosition = rInterpolate.pVecPositions[i];
+		auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), ShipType::kBattleship);
+		if (uiFlightPlane < iLowestPlane || uiFlightPlane > iHighestPlane)
+		{
+			continue;
+		}
+
+		const ShipHitboxShape& rShape = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rPostRender.pController[i])];
+		XMVECTOR vecDirection = rInterpolate.pVecDirections[i];
+		XMFLOAT2 f2Position {XMVectorGetX(vecPosition), XMVectorGetY(vecPosition)};
+		float fCos = XMVectorGetX(vecDirection);
+		float fSin = XMVectorGetY(vecDirection);
+		XMFLOAT2 pf2Box[4] {};
+		common::BuildWorldHull(rShape.hitbox.pf2BoxVertices, f2Position, fCos, fSin, pf2Box);
+		if (common::PointInPolygon(f2Shooter, pf2Box) || common::PointInPolygon(f2Target, pf2Box))
+		{
+			continue;
+		}
+
+		float fEnter = 0.0f;
+		float fExit = 1.0f;
+		if (common::ClipSegmentToPrism(f3Start, f3Delta, pf2Box, 0.0f, 0.0f, fEnter, fExit))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield)

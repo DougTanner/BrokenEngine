@@ -269,13 +269,30 @@ bool RefreshHarnessHeartbeat(std::wstring_view owner, int64_t iMaximumWaitMillis
 	Guard guard(optionalLocator->path.wstring() + L".guard", bContentionObserved, failureReason, iMaximumWaitMilliseconds);
 	if (!guard.mbValid)
 	{
+		Fail("could not acquire lock transition guard (" + failureReason + ")");
 		return false;
 	}
 	nlohmann::json metadata;
-	if (!ReadMetadata(optionalLocator->path, metadata) || !ValidateMetadataEnvelope(metadata, *optionalLocator, coordination::kiSchemaVersion) || !HasOwner(metadata, owner))
+	if (!ReadMetadata(optionalLocator->path, metadata))
 	{
+		Fail("lock metadata is missing or unreadable");
 		return false;
 	}
-	return StampHarnessHeartbeat(optionalLocator->path, metadata);
+	if (!ValidateMetadataEnvelope(metadata, *optionalLocator, coordination::kiSchemaVersion))
+	{
+		Fail("lock metadata envelope is invalid");
+		return false;
+	}
+	if (!HasOwner(metadata, owner))
+	{
+		Fail("lock is not owned by this token");
+		return false;
+	}
+	if (!StampHarnessHeartbeat(optionalLocator->path, metadata))
+	{
+		Fail("write lock metadata failed");
+		return false;
+	}
+	return true;
 }
 }

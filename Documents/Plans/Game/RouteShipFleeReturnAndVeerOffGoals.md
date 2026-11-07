@@ -171,9 +171,6 @@ refreshes that block. Reciprocal coordination with
 `Documents/Plans/Game/ConvertFightersToRampedTurn.md`: that Plan rewrites the Fighter steering call
 directly below the `ComputeFleeOrReturnDestination` call and also bumps the `Frame::kiVersion` base,
 so whichever lands second refreshes that block and takes its own bump from the value it finds.
-Reciprocal coordination with `Documents/Plans/Game/BlockLineOfSightWithLargeShips.md`: that Plan
-edits the sight tests beside this Plan's flee lines in `Battleships.cpp`, so whichever lands second
-refreshes that block.
 
 ## Notes
 

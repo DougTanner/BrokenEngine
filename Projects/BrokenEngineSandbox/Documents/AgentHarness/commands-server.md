@@ -311,7 +311,7 @@ adding the fields below; the other entries are its own commands. For the engine
   on the first tick after the one it is applied. For another edge, rotate both
   vectors to that edge's direction: edge k of the `kCellDirections` table
   (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`) faces
-  30 - 60k degrees from +x, for example `[375.73,216.93]` and `[28.87,16.67]` for
+  30 - 60k degrees from +x, for example `[375.73,216.93]` and `[28.86,16.66]` for
   the NE edge (k = 0), and the omni arrives at `<cell>` plus that entry's axial
   delta. Terrain near that path can push the coast off its line; then pick
   another cell.

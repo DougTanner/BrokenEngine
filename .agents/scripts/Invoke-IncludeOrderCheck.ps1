@@ -3,7 +3,8 @@
 # -Fix. -All takes tracked *.h/*.cpp files under Common/, DataPacker/, Engine/,
 # Projects/ and Tools/.
 # A -Path entry that does not exist or is not *.h/*.cpp is skipped, as is an excluded file; an existing
-# *.h/*.cpp entry outside those roots, or with no owning project, is an input error.
+# *.h/*.cpp entry outside those roots, or with no owning project, is an input error, as is a -Path
+# list with no existing *.h/*.cpp entry.
 # A segment is a maximal run of #include lines and the blank lines between them; any other line ends it.
 # A segment is checked at conditional depth 0 or directly inside a whole-file guard (an #if whose
 # matching #endif is the last non-blank line); other segments keep their hand order and are not read.
@@ -323,9 +324,13 @@ try {
 			if (-not $inRoot) {
 				Complete-IncludeOrder 2 'error' "-Path entries must be repository-relative files under $($script:SourceRoots -join '/, ')/: '$entry'."
 			}
-			if ((Test-ExcludedFile $file) -or $files.Contains($file)) { continue }
+			if ($files.Contains($file)) { continue }
 			$files.Add($file)
 		}
+		if ($files.Count -eq 0) {
+			Complete-IncludeOrder 2 'error' "No -Path entry is an existing *.h/*.cpp file: '$($Path -join "', '")'."
+		}
+		[void] $files.RemoveAll([Predicate[string]] { param($file) Test-ExcludedFile $file })
 	}
 	foreach ($file in $files) {
 		if ($null -eq (Get-ProjectFile $file)) { Complete-IncludeOrder 2 'error' "No owning vcxproj for '$file'." }

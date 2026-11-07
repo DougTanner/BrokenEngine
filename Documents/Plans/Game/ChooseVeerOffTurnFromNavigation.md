@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-05T22:08:09.395Z","dependsOn":["Documents/Plans/Game/BlockLineOfSightWithLargeShips.md","Documents/Plans/Game/RouteShipFleeReturnAndVeerOffGoals.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-05T22:08:09.395Z","dependsOn":["Documents/Plans/Game/RouteShipFleeReturnAndVeerOffGoals.md"]} -->
 # Choose a Fighter's Veer-off Turn Direction From Navigation
 
 ## Context
@@ -31,10 +31,11 @@ tentative, so the claim session confirms the intent at its plan interview.
 
 - Side choice, once, at veer-off start in `AttackOrStartVeerOff`: test the two segments from the ship
   to the points the veer-off end distance out on each side, perpendicular to the away direction,
-  with `HasLineOfSight` on the Fighter's clearance tier, its stored plane, and the pass's
-  `NavRectangleBoard`, whose rectangles test as their model box with no per-tier inflation
-  (`Documents/Plans/Game/BlockLineOfSightWithLargeShips.md` `## Design`). Rationale: a side test covers a clear away line that a route cannot, and it reuses the one blocked
-  test both terrain and rectangles already go through. Two tests per veer-off start is rare work.
+  with `HasShipLineOfSight` (`Ships/ShipBehaviours.h`) on the Fighter's clearance tier and stored
+  plane, over the previous frame its callers hold, which tests each Battleship's model box with no
+  per-tier inflation. Rationale: a side test covers a clear away line that a route cannot, and it
+  reuses the one blocked test both terrain and rectangles already go through. Two tests per veer-off
+  start is rare work.
 - Only a difference decides. One side clear and the other blocked selects the clear side. Both clear,
   both blocked, or a zero horizontal offset keep today's stored point, so an open veer-off does not
   change. On the highest plane, with no graph, and for a climbing ship, that is every veer-off. A
@@ -84,7 +85,8 @@ tentative, so the claim session confirms the intent at its plan interview.
 
 - Tier 3. Trigger: determinism/CRC, because this changes CRC-visible Fighter steering and the
   meaning of the CRC'd `pVecVeerOffPoints` column.
-- No random draw is added, and the side tests read only the frame `AttackOrStartVeerOff` already reads.
+- No random draw is added, and the side tests read only the previous frame the callers of
+  `AttackOrStartVeerOff` already hold, which that function gains as an argument.
 - Ordering: the veer-off continuation still precedes `FindAttackTarget`, so a veer-off leaves a kept
   attack target untouched (`Ships/AGENTS.md` `## Fleet Coordination Invariants`).
 - The end distance is measured from the shifted point, so a shifted veer-off ends slightly earlier or
@@ -113,9 +115,8 @@ tentative, so the claim session confirms the intent at its plan interview.
 
 ## Coordination
 
-`dependsOn` carries both prerequisites: the routed `VeerOffTactic` and its static-data parameters, and
-the rectangle-aware `HasLineOfSight`. Both also rest on the ship avoidance change, which has no Plan
-file.
+`dependsOn` carries the prerequisite, the routed `VeerOffTactic` and its static-data parameters,
+which also rests on the ship avoidance change, which has no Plan file.
 
 Reciprocal coordination with `Documents/Plans/Game/SeparateFighterVeerOffFromFleetTactic.md`: that
 Plan moves the `AttackOrStartVeerOff` call into `ChooseFighterFleetTactic`, so whichever lands second

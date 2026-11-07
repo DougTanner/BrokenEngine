@@ -21,6 +21,7 @@ public:
 
 	virtual bool CheckDirty(const std::filesystem::path& rPackFile);
 	std::vector<std::byte>& RunExport();
+	bool ReadCachedChunk(std::vector<std::byte>& rHeaderAndData) const;
 
 	int64_t miId = 0;
 	int64_t miVersion = 0;
@@ -32,10 +33,14 @@ public:
 	std::string mRelativeFile;
 	std::filesystem::path mChunkFile;
 	std::filesystem::path mCacheMetadataFile;
+	// Set by SetContentKey; empty until CheckDirty on a job whose constructor sets no key, and after a failed fingerprint.
+	std::string mContentKey;
 
 	std::future<std::vector<std::byte>&> mFuture;
 
 	common::crc_t mCrc = 0;
+	// The chunk body CRC CheckDirty read from the .meta; meaningful on a clean job.
+	common::crc_t muiCachedChunkCrc = 0;
 
 protected:
 
@@ -43,6 +48,11 @@ protected:
 	virtual void CleanupOnFailure() {}
 	virtual std::string GetInputFingerprint() const;
 	virtual void UpdateCacheMetadata() {}
+
+	// Called from a derived constructor or from CheckDirty, before any cache entry is touched. The key holds content
+	// fingerprints only, so trees with equal inputs resolve to one entry and trees with different inputs keep separate
+	// entries.
+	void SetContentKey(common::crc_t uiContentKey);
 
 	// Output-freshness marker sidecar, shared by the jobs whose generated outputs are tracked in the checkout.
 	// Plain text (no magic / version prefix): the stored bytes are the whole comparison, and the caller puts its

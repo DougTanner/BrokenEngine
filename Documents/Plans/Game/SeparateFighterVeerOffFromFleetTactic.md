@@ -138,13 +138,10 @@ call sites inside `FleetCoordination.cpp`. `ChooseFighterFleetTactic` already ta
 `rNavRectangleBoard` and passes them through. Each Plan keeps its own acceptance; this Plan's replay
 compares against its own parent commit, so it holds in either order.
 
-Reciprocal coordination with `Documents/Plans/Game/BlockLineOfSightWithLargeShips.md`: that Plan
-passes the `NavRectangleBoard&` that `ChooseFleetTactic` and `ChooseFighterFleetTactic` already take
-into its `FindAttackTarget` and `HasLineOfSight` calls, so whichever lands second refreshes those
-calls. Reciprocal coordination with
+Reciprocal coordination with
 `Documents/Plans/Game/ChooseVeerOffTurnFromNavigation.md`: that Plan adds arguments to
 `AttackOrStartVeerOff`, so whichever lands second refreshes the call. The same replay reasoning holds
-for both.
+for that Plan.
 
 ## Notes
 

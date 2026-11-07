@@ -145,6 +145,9 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellSt
 // positions, each first snapped clear of terrain as a route destination is; always true on a plane without terrain
 // collision.
 [[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
+// HasLineOfSight, and no model box of a live rFrame Battleship occupying uiFlightPlane crosses the unsnapped segment. A
+// box holding either position does not block, which spares the shooter's and the target's own.
+[[nodiscard]] bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield);
 

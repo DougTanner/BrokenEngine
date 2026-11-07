@@ -108,6 +108,18 @@ int64_t ResolveEffectiveMaterial(std::vector<Material>& rMaterials, std::vector<
 	return iEffectiveMaterial;
 }
 
+// Takes the packed value, not the source: a finite source whose squared length overflows also normalizes to NaN, and NaN reaches the shaders.
+static void RequireFiniteComponents(std::span<const float> components, std::string_view attributeName, int64_t iPrimitive, int64_t iVertex)
+{
+	for (const auto& [k, rfComponent] : std::views::enumerate(components))
+	{
+		if (!std::isfinite(rfComponent))
+		{
+			throw std::runtime_error(std::format("Scene primitive {} vertex {} packed {} component {} is not finite", iPrimitive, iVertex, attributeName, k));
+		}
+	}
+}
+
 static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<int64_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, int64_t iPrimitive, int64_t iSkinJointCount)
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
@@ -115,6 +127,7 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 	auto [pfPositions, iPositionStride] = FindAttribute<float>(rPrimitive, rModel, "POSITION", rPositionAccessor.count, 3);
 
 	auto [pfNormals, iNormalStride] = FindAttribute<float>(rPrimitive, rModel, "NORMAL", rPositionAccessor.count, 3);
+	auto [pfTangents, iTangentStride] = FindAttribute<float>(rPrimitive, rModel, "TANGENT", rPositionAccessor.count, 4);
 	auto [pfTexcoords0, iTexcoordStride0] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_0", rPositionAccessor.count, 2);
 	auto [pfTexcoords1, iTexcoordStride1] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_1", rPositionAccessor.count, 2);
 	auto [pfTexcoords2, iTexcoordStride2] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_2", rPositionAccessor.count, 2);
@@ -148,6 +161,19 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 
 		XMStoreFloat3(&rVertex.f3Pos, vecPosition);
 		XMStoreFloat3(&rVertex.f3Normal, XMVector3Normalize(vecNormal));
+		RequireFiniteComponents(std::array {rVertex.f3Normal.x, rVertex.f3Normal.y, rVertex.f3Normal.z}, "NORMAL", iPrimitive, j);
+
+		if (pfTangents != nullptr)
+		{
+			auto vecTangent = XMVectorSet(pfTangents[j * iTangentStride], pfTangents[j * iTangentStride + 1], pfTangents[j * iTangentStride + 2], 0.0f);
+			if (!bHasSkeleton)
+			{
+				// XMVector3TransformNormal applies the matrix itself, the forward transform a surface direction takes
+				vecTangent = XMVector3TransformNormal(vecTangent, rMatMeshWorld);
+			}
+			XMStoreFloat4(&rVertex.f4Tangent, XMVectorSetW(XMVector3Normalize(vecTangent), pfTangents[j * iTangentStride + 3]));
+			RequireFiniteComponents(std::array {rVertex.f4Tangent.x, rVertex.f4Tangent.y, rVertex.f4Tangent.z, rVertex.f4Tangent.w}, "TANGENT", iPrimitive, j);
+		}
 
 		rVertex.f2Uv = pfTexcoords0 != nullptr ? XMFLOAT2(&pfTexcoords0[j * iTexcoordStride0]) : XMFLOAT2(0.0f, 0.0f);
 		rVertex.f2Uv1 = pfTexcoords1 != nullptr ? XMFLOAT2(&pfTexcoords1[j * iTexcoordStride1]) : rVertex.f2Uv;

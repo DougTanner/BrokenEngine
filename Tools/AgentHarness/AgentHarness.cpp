@@ -253,10 +253,6 @@ static SocketOperationResult SendAll(SOCKET socket, std::span<const char> data, 
 		{
 			data = data.subspan(static_cast<size_t>(iChunk));
 			operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-			if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
-			{
-				return SocketOperationResult::kOwnershipLoss;
-			}
 			continue;
 		}
 		SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, owner, rNextHeartbeatDue);
@@ -289,10 +285,6 @@ static SocketOperationResult ReceiveAll(SOCKET socket, std::span<char> data, int
 		{
 			data = data.subspan(static_cast<size_t>(iChunk));
 			operationDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(iTimeoutMilliseconds);
-			if (!RefreshHeartbeatIfDue(owner, rNextHeartbeatDue, operationDeadline))
-			{
-				return SocketOperationResult::kOwnershipLoss;
-			}
 			continue;
 		}
 		SocketOperationResult ePostOperationResult = CheckDeadlineAndRefreshHeartbeatAfterNoProgress(operationDeadline, owner, rNextHeartbeatDue);
@@ -309,11 +301,11 @@ static SocketOperationResult ReceiveAll(SOCKET socket, std::span<char> data, int
 	return SocketOperationResult::kSuccess;
 }
 
-static void FailSocketOperation(SocketOperationResult eResult, std::string_view transportFailure)
+static void FailSocketOperation(SocketOperationResult eResult, std::string_view transportFailure, bool bRequestSent)
 {
 	if (eResult == SocketOperationResult::kOwnershipLoss)
 	{
-		Fail("harness heartbeat refresh failed");
+		Fail(bRequestSent ? "harness heartbeat refresh failed during receive; command was sent" : "harness heartbeat refresh failed during send; command incomplete, not dispatched");
 	}
 	else if (eResult == SocketOperationResult::kReadinessFailure)
 	{
@@ -541,7 +533,7 @@ static std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSoc
 	{
 		if (bHeartbeatFailed)
 		{
-			Fail("harness heartbeat refresh failed");
+			Fail("harness heartbeat refresh failed during connect; command not sent");
 		}
 		else if (bSocketCreateFailed)
 		{
@@ -576,7 +568,7 @@ static std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSoc
 	}
 	if (eSendResult != SocketOperationResult::kSuccess)
 	{
-		FailSocketOperation(eSendResult, "send failed");
+		FailSocketOperation(eSendResult, "send failed", false);
 		return std::nullopt;
 	}
 
@@ -584,7 +576,7 @@ static std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSoc
 	SocketOperationResult eReceiveResult = ReceiveAll(rSocket.mSocket, std::span<char>(reinterpret_cast<char*>(pResponseLengthPrefix), sizeof(pResponseLengthPrefix)), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 	if (eReceiveResult != SocketOperationResult::kSuccess)
 	{
-		FailSocketOperation(eReceiveResult, "no response (timed out or peer closed)");
+		FailSocketOperation(eReceiveResult, "no response (timed out or peer closed)", true);
 		return std::nullopt;
 	}
 	uint32_t uiResponseLength = static_cast<uint32_t>(pResponseLengthPrefix[0]) |
@@ -601,7 +593,7 @@ static std::optional<std::string> ExchangeFramedSocketCommand(ScopedSocket& rSoc
 	eReceiveResult = ReceiveAll(rSocket.mSocket, std::span<char>(response.data(), uiResponseLength), rArguments.iTimeoutMilliseconds, rArguments.owner, rNextHeartbeatDue);
 	if (eReceiveResult != SocketOperationResult::kSuccess)
 	{
-		FailSocketOperation(eReceiveResult, "incomplete response (timed out or peer closed)");
+		FailSocketOperation(eReceiveResult, "incomplete response (timed out or peer closed)", true);
 		return std::nullopt;
 	}
 	return response;
@@ -653,7 +645,7 @@ static int64_t RunSocketCommand(int64_t iArgumentCount, wchar_t* const pArgument
 		}
 		if (!RefreshHarnessHeartbeat(arguments.owner))
 		{
-			Fail("harness heartbeat refresh failed");
+			Fail("harness heartbeat refresh failed before connect; command not sent");
 			return kiExitFailure;
 		}
 		std::chrono::steady_clock::time_point nextHeartbeatDue = std::chrono::steady_clock::now() + std::chrono::milliseconds(kiHeartbeatIntervalMilliseconds);
@@ -672,7 +664,7 @@ static int64_t RunSocketCommand(int64_t iArgumentCount, wchar_t* const pArgument
 		}
 		if (!RefreshHarnessHeartbeat(arguments.owner))
 		{
-			Fail("harness heartbeat refresh failed");
+			Fail("harness heartbeat refresh failed after the response; command was sent");
 			return kiExitFailure;
 		}
 		return PrintResponseAndInterpretExitCode(*optionalResponse);

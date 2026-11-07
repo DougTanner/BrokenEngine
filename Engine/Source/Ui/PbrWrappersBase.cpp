@@ -9,7 +9,7 @@ Wrapper gPbrBrdfDiffuse(4.0f, 0.0f, 20.0f);
 Wrapper gPbrBrdfDiffusePower(0.795f, 0.5f, 2.0f);
 Wrapper gPbrBrdfSpecular(0.822f, 0.0f, 2.0f);
 Wrapper gPbrBrdfSpecularPower(0.349f, 0.1f, 2.0f);
-Wrapper gPbrExposure(0.924f, 0.0f, 2.0f);
+Wrapper gPbrExposure(1.0f, 0.0f, 2.0f);
 Wrapper gPbrGamma(0.558f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPbrGamma.mfCurrent as the HdrResolve.frag pow exponent.
 Wrapper gColorGradingSaturation(1.207f, 0.0f, 2.0f);
 Wrapper gColorGradingContrast(1.205f, 0.5f, 2.0f);

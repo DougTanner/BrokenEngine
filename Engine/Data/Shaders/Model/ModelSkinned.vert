@@ -14,6 +14,7 @@ void main()
 
 	vec3 f3LocalPosition;
 	vec3 f3LocalNormal;
+	vec3 f3LocalTangent;
 
 	if (data.jointCount > 0)
 	{
@@ -36,15 +37,17 @@ void main()
 		vec4 skinnedPos = skinMatrix * vec4(f3InPosition, 1.0f);
 		f3LocalPosition = (data.matrix * skinnedPos).xyz;
 		// Use precomputed mesh normal matrix with skin approximation (rigid transforms)
-		mat3 normalMatrix = mat3(skinMatrix) * GetNormalMatrix(data);
+		mat3 normalMatrix = GetNormalMatrix(data) * mat3(skinMatrix);
 		f3LocalNormal = normalize(normalMatrix * f3InNormal);
+		f3LocalTangent = mat3(data.matrix) * mat3(skinMatrix) * f4Tangent.xyz;
 	}
 	else
 	{
 		f3LocalPosition = (data.matrix * vec4(f3InPosition, 1.0f)).xyz;
 		// Use precomputed normal matrix directly
 		f3LocalNormal = normalize(GetNormalMatrix(data) * f3InNormal);
+		f3LocalTangent = mat3(data.matrix) * f4Tangent.xyz;
 	}
 
-	ModelVertexOutput(f3LocalPosition, f3LocalNormal, model);
+	ModelVertexOutput(f3LocalPosition, f3LocalNormal, f3LocalTangent, model);
 }

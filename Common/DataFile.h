@@ -532,7 +532,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 65 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 66 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;
@@ -554,10 +554,11 @@ struct ModelVertex
 	float fJoint = 0.0f;
 	XMFLOAT4 f4Joint0 {};
 	XMFLOAT4 f4Weight0 {};
+	XMFLOAT4 f4Tangent {}; // xyz unit, w the glTF bitangent sign; all zero means the vertex carries no tangent
 };
 // The DataPacker scene loader dedups vertices via meshoptimizer's raw-byte compare
 // (meshopt_generateVertexRemap), so this lock proves the layout is padding-free — uninitialized
 // padding would otherwise make byte-equal vertices compare unequal and defeat the dedup.
-static_assert(sizeof(ModelVertex) == 100, "ModelVertex layout changed — keep it padding-free for the meshoptimizer raw-byte vertex dedup; bump DataHeader::kiVersion; same-size reorder also bumps ExportScene/ExportModel kiVersion raw versions (sizeof fold catches size changes only)");
+static_assert(sizeof(ModelVertex) == 116, "ModelVertex layout changed — keep it padding-free for the meshoptimizer raw-byte vertex dedup; bump DataHeader::kiVersion; same-size reorder also bumps ExportScene/ExportModel kiVersion raw versions (sizeof fold catches size changes only)");
 
 } // namespace common

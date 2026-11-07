@@ -135,6 +135,58 @@ static nlohmann::json BlenderDependency(const std::filesystem::path& rSource, co
 	return nlohmann::json {{"root", -1}, {"path", BlenderPathText(relative.empty() ? dependency : relative)}, {"hash", gpFileManager->mpInputFingerprintCache->Get(dependency)}};
 }
 
+// Mirrors ExportBlenderScene.py's source and sibling textures roots.
+static std::vector<std::filesystem::path> FindBlenderCandidateImages(const std::filesystem::path& rSource)
+{
+	std::vector<std::filesystem::path> images;
+	std::vector<std::filesystem::path> roots {std::filesystem::canonical(rSource).parent_path()};
+	std::filesystem::path textures = roots.at(0).parent_path() / "textures";
+	if (std::filesystem::is_directory(textures) && !std::filesystem::equivalent(textures, roots.at(0)))
+	{
+		roots.push_back(std::filesystem::canonical(textures));
+	}
+	static constexpr std::string_view kpCandidateImageExtensions[] = {".png", ".jpg", ".jpeg", ".tga"};
+	for (const std::filesystem::path& rRoot : roots)
+	{
+		for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rRoot))
+		{
+			if (rEntry.is_regular_file() && std::ranges::contains(kpCandidateImageExtensions, common::ToLower(BlenderPathText(rEntry.path().extension()))))
+			{
+				images.push_back(rEntry.path());
+			}
+		}
+	}
+	return images;
+}
+
+// Runs from the job's constructor, where a throw would kill the run. The tool stays out of the key: it does not vary by
+// tree, and FindBlender throws. A failed image walk leaves the images out, and BlenderExportDirty's catch then reports
+// dirty, so the failure stays per asset. Sorting keeps the key independent of directory order.
+common::crc_t BlenderExportContentKey(const std::filesystem::path& rSource)
+{
+	std::string keyInput = gpFileManager->mpInputFingerprintCache->Get(rSource) + gpFileManager->mpInputFingerprintCache->Get(BlenderScript());
+	try
+	{
+		std::vector<std::filesystem::path> images = FindBlenderCandidateImages(rSource);
+		std::vector<std::string> imageFingerprints;
+		imageFingerprints.reserve(static_cast<size_t>(std::ssize(images)));
+		for (const std::filesystem::path& rImage : images)
+		{
+			imageFingerprints.push_back(gpFileManager->mpInputFingerprintCache->Get(rImage));
+		}
+		std::ranges::sort(imageFingerprints);
+		for (const std::string& rFingerprint : imageFingerprints)
+		{
+			keyInput += rFingerprint;
+		}
+	}
+	catch (const std::exception& rException)
+	{
+		LOG(kDefault, kWarning, "Could not fingerprint the candidate images of \"{}\": {}", rSource.string(), rException.what());
+	}
+	return common::Crc(keyInput);
+}
+
 bool BlenderExportDirty(const std::filesystem::path& rSource, const std::filesystem::path& rOutput, const std::optional<std::string>& rOptionalMarker) noexcept
 {
 	try
@@ -178,22 +230,12 @@ bool BlenderExportDirty(const std::filesystem::path& rSource, const std::filesys
 				return true;
 			}
 		}
-		// Mirror ExportBlenderScene.py's source and sibling textures roots to detect added candidates.
-		std::vector<std::filesystem::path> roots {std::filesystem::canonical(rSource).parent_path()};
-		std::filesystem::path textures = roots.at(0).parent_path() / "textures";
-		if (std::filesystem::is_directory(textures) && !std::filesystem::equivalent(textures, roots.at(0)))
+		// An added candidate has no recorded dependency.
+		for (const std::filesystem::path& rImage : FindBlenderCandidateImages(rSource))
 		{
-			roots.push_back(std::filesystem::canonical(textures));
-		}
-		static constexpr std::string_view kpCandidateImageExtensions[] = {".png", ".jpg", ".jpeg", ".tga"};
-		for (const std::filesystem::path& rRoot : roots)
-		{
-			for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rRoot))
+			if (!std::ranges::contains(marker.at("dependencies"), BlenderDependency(rSource, rImage)))
 			{
-				if (rEntry.is_regular_file() && std::ranges::contains(kpCandidateImageExtensions, common::ToLower(BlenderPathText(rEntry.path().extension()))) && !std::ranges::contains(marker.at("dependencies"), BlenderDependency(rSource, rEntry.path())))
-				{
-					return true;
-				}
+				return true;
 			}
 		}
 		return false;

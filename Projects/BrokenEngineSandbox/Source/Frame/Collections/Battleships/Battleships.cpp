@@ -566,7 +566,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 					flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 					vecDestination = vecTarget;
 					bHasDestination = true;
-					bRouteToTarget = !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+					bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
 				}
 				else
 				{

@@ -10,6 +10,11 @@ timeout.
 
 ## Capture
 
+The ModelViewer executable has no help or dry-run mode and ignores unknown
+arguments, so run it only through `Invoke-ModelViewerCapture.ps1`. Its launch
+window behavior is in
+[ModelViewer application contracts](../../../../Projects/ModelViewer/AGENTS.md#application-contracts).
+
 No harness claim, launch script, process check, or release applies: the viewer
 binds no port, so the capture takes no harness lock and touches no other session's
 process. The native application mutex still applies under

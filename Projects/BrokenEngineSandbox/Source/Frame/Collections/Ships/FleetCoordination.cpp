@@ -228,7 +228,7 @@ bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::C
 	bool bInLineOfSight = false;
 	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition))
 	{
-		bInLineOfSight = HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
+		bInLineOfSight = HasShipLineOfSight(rPreviousFrame, rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
 	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 	{

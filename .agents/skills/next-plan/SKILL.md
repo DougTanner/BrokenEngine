@@ -3,7 +3,7 @@ name: next-plan
 description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, presents the `/plan-alternatives` candidates before the Plan reviews, and presents the execution card's summary, the Plan review changes, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
-allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
+allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, Skill, AskUserQuestion]
 ---
 
 # Next Plan
@@ -44,7 +44,10 @@ The `argument-hint` value selects the Plan:
    user asks to see the queue — see it before selecting:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
    It is read-only and reports a bounded point-in-time projection — widen with
-   `-Top <n>` only when a decision needs more. A bare or plain named-Plan
+   `-Top <n>` only when a decision needs more. For a tier-constrained request,
+   read its result through
+   [claim-results.md](references/claim-results.md) `## Reading the queue listing`.
+   A bare or plain named-Plan
    invocation skips this step, because step 3 selects and reports every stop
    itself. Done when this file's `## Inputs` resolves exactly
    one Plan or blocks.
@@ -54,6 +57,9 @@ The `argument-hint` value selects the Plan:
    or with the requested normalized path or partial pattern quoted after
    `-Plan`, for example:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md'`
+   Once the result returns, a result reporting `nextAction: prepare` needs no
+   reference read at this step, and any other result is read through
+   [claim-results.md](references/claim-results.md) `## nextAction`.
    Done when the result reports `nextAction: prepare`.
 4. Dispatch one preparation `implementer` to verify every Plan statement against
    current code, on the single task brief in
@@ -98,12 +104,13 @@ The `argument-hint` value selects the Plan:
    unvalidated. That is an expectation of the dispatch, not a gate the Done
    condition tests.
 
-   When that handoff returns, in place of the snapshot, the
-   `/external-diagnose-bug` inputs
-   [preparation-brief.md](references/preparation-brief.md)
-   `## Investigation portion` names for an unconfirmed root cause, main
-   dispatches one `implementer` for `/external-diagnose-bug` on them, then a
-   fresh preparation `implementer` whose continuation capsule carries that
+   When that handoff returns `Status: BLOCKED` with the `Residuals` row this
+   file's `## Handoff` declares for an unconfirmed root cause, main dispatches
+   one `implementer` for `/external-diagnose-bug` on a brief citing the recorded
+   baseline and, from the heading Grep above, the line ranges of the sections
+   carrying the claimed Plan's investigation portion
+   (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main reads, then
+   a fresh preparation `implementer` whose continuation capsule carries that
    diagnosis handoff, unless that handoff returns without a proven root cause,
    which main reports to the user as a blocker under the approval-refused row of
    `### Post-checkpoint outcomes` with the claim held; the handoff that
@@ -147,6 +154,9 @@ The `argument-hint` value selects the Plan:
    `## Final-refresh sync brief` defines it, the tree moved under the
    preparation evidence: main never lists or reads that range itself, and
    dispatches one `researcher` on the sync brief in that section.
+   From that file main reads for that brief only that section and the first
+   paragraph of `## Session baseline and the sync object`, which sets the
+   session baseline.
 
    When any row of that `researcher`'s handoff reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;
@@ -183,7 +193,9 @@ The `argument-hint` value selects the Plan:
 
    Main never performs the review itself; it dispatches it per
    [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when both
-   follow-up lines are recorded per run-checkpoint.md.
+   follow-up lines are recorded per
+   [run-checkpoint.md](references/run-checkpoint.md) `## Measurement states` and
+   `## Follow-up routing`.
 10. Only after implementation is accepted and verified, or after the user
    explicitly authorizes rejection, exit the held claim before landing-commit
    creation: main runs, as its own shell call from the PowerShell tool,
@@ -258,6 +270,14 @@ per-statement enumeration of unaffected results.
   file nor its `Temp/` snapshot;
   `none` for an empty realized change and for every preparation handoff after
   the `/plan-alternatives` pick.
+
+On the stop before the snapshot that
+[preparation-brief.md](references/preparation-brief.md)
+`## Investigation portion` directs for an unconfirmed root cause, the handoff
+returns `Status: BLOCKED`, `Evidence: none`, and one short `Residuals` row
+stating that the root cause is unconfirmed and diagnosis is next, and cites no
+card; no field this section declares is returned, which overrides their
+entries above.
 
 ### Execution card
 

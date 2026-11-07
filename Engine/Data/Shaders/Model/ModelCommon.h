@@ -9,6 +9,7 @@ layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in float fJoint;
 layout (location = 8) in vec4 f4Joint0;
 layout (location = 9) in vec4 f4Weight0;
+layout (location = 10) in vec4 f4Tangent;
 
 // Vertex outputs
 layout (location = 0) out vec3 f3OutWorldPosition;
@@ -21,6 +22,7 @@ layout (location = 6) out vec2 f2OutUV4;
 layout (location = 7) out vec4 f4OutColorAdd;
 layout (location = 8) out float fOutHeightAboveBase;
 layout (location = 9) out flat int iOutLayer;
+layout (location = 10) out vec4 f4OutTangent;
 
 // Push constants
 layout(push_constant) uniform pushConstants
@@ -81,7 +83,7 @@ layout (scalar, set = 1, binding = kiModelBindingJointMatrix) buffer readonly jo
 
 layout (set = 1, binding = kiModelBindingTerrainElevation) uniform sampler2D elevationTextureSampler;
 
-void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout model)
+void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, vec3 f3LocalTangent, ModelLayout model)
 {
 	vec3 f3WorldPosition = Transform(vec4(f3LocalPosition, 1.0f), model.f3x4Transform);
 	vec3 f3WorldNormal = normalize(Transform(vec4(f3LocalNormal, 0.0f), model.f3x4TransformNormal));
@@ -95,6 +97,8 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	f2OutUV2 = f2InUV2;
 	f2OutUV3 = f2InUV3;
 	f2OutUV4 = f2InUV4;
+	// A tangent is a surface direction, so it takes the forward transform. Not normalized: all zero means the vertex carries no tangent and must stay zero.
+	f4OutTangent = vec4(Transform(vec4(f3LocalTangent, 0.0f), model.f3x4Transform), f4Tangent.w);
 	f4OutColorAdd = model.f4ColorAdd;
 	// The model centre, not the vertex, so every vertex of a ship on the lowest flight plane gets exactly 0.
 	fOutHeightAboveBase = max(model.f4PositionLayer.z - globalLayout.fBaseHeight, 0.0f);

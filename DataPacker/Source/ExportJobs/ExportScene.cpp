@@ -25,6 +25,12 @@ ExportScene::ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem
 : ExportJob(rChunkFlags, IsBlenderSource(rFile) ? std::filesystem::path(rFile) += ".glb" : rFile, kiVersion)
 , mBlenderSourcePath(IsBlenderSource(rFile) ? rFile : std::filesystem::path())
 {
+	// The chunk and .meta take the key with the conversion marker: the .meta holds the source hash alone, so trees that
+	// differ only in the script would otherwise share one chunk and publish each other's scene without a dirty report.
+	if (!mBlenderSourcePath.empty())
+	{
+		SetContentKey(BlenderExportContentKey(mBlenderSourcePath));
+	}
 }
 
 std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
@@ -79,11 +85,14 @@ bool ExportScene::CheckDirty(const std::filesystem::path& rPackFile)
 	{
 		// Main file is clean, but the generated .MODEL and texture intermediates are tracked in the checkout, so a
 		// deleted, reverted, or edited one leaves the chunk cache clean while the scene's published path CRCs name
-		// files that no longer exist or no longer match. The marker records exactly those outputs, so any difference
-		// - including a missing or unreadable marker - re-runs pre-export before the scene is published again.
+		// files that no longer exist or no longer match. A matching marker proves the outputs are the last set written,
+		// and a matching sidecar proves they are this entry's: a restored source returns to a clean entry while the tree
+		// still holds the outputs of the edit. Any difference - including a missing or unreadable marker or sidecar -
+		// re-runs pre-export before the scene is published again.
 		std::optional<std::string> optionalStoredFingerprint = ReadMarkerFile(GetPreExportMarkerPath());
 		std::optional<std::string> optionalCurrentFingerprint = GetPreExportFingerprint();
-		if (!optionalStoredFingerprint.has_value() || !optionalCurrentFingerprint.has_value() || optionalStoredFingerprint.value() != optionalCurrentFingerprint.value())
+		std::optional<std::string> optionalSidecarFingerprint = ReadMarkerFile(GetPreExportSidecarPath());
+		if (!optionalCurrentFingerprint.has_value() || optionalStoredFingerprint != optionalCurrentFingerprint || optionalSidecarFingerprint != optionalCurrentFingerprint)
 		{
 			LOG(kDefault, kDebug, "Pre-export outputs stale for \"{}\", forcing pre-export", mInputPath.string());
 			mbDirty = true;
@@ -348,7 +357,7 @@ std::filesystem::path ExportScene::GetBlenderExportMarkerPath() const
 {
 	std::filesystem::path markerPath = mCacheMetadataFile.parent_path();
 	markerPath /= mInputPath.filename();
-	markerPath += std::format(".b{}.blender", kiBlenderExportVersion);
+	markerPath += std::format(".b{}.{}.blender", kiBlenderExportVersion, mContentKey);
 	return markerPath;
 }
 
@@ -359,11 +368,19 @@ std::filesystem::path ExportScene::GetPreExportMarkerPath() const
 	return path;
 }
 
+std::filesystem::path ExportScene::GetPreExportSidecarPath() const
+{
+	std::filesystem::path path = mCacheMetadataFile;
+	path += ".pre-export";
+	return path;
+}
+
 // The content of every generated output pre-export owns: the .MODEL file and each scene texture intermediate on
 // disk. Entries are keyed by bare filename, the same key the orphan sweep compares, so the marker is independent
 // of where the checkout lives; nlohmann's object keys sort, so the dumped string is deterministic. Those filenames
-// are also the text MainExport builds its texture and model path CRCs from, so a matching marker proves every CRC
-// the scene chunk publishes still names a file with the contents it was published for.
+// are also the text MainExport builds its texture and model path CRCs from. A matching marker proves the files are the
+// last set written, and a matching sidecar proves they are this entry's, so every CRC its chunk publishes still names a
+// file with the contents it was published for.
 // Returns nullopt on any filesystem error so CheckDirty treats an unreadable scene directory as dirty.
 std::optional<std::string> ExportScene::GetPreExportFingerprint() const
 {
@@ -933,6 +950,8 @@ void ExportScene::UpdateCacheMetadata()
 		return;
 	}
 	WriteMarkerFile(GetPreExportMarkerPath(), optionalFingerprint.value());
+	// No removal pairs with this write: a clean result also needs the marker, whose removal keeps an interrupted set dirty.
+	WriteMarkerFile(GetPreExportSidecarPath(), optionalFingerprint.value());
 }
 
 void ExportScene::CleanupOnFailure()

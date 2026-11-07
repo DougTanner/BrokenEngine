@@ -36,6 +36,7 @@ layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in float fJoint;
 layout (location = 8) in vec4 f4Joint0;
 layout (location = 9) in vec4 f4Weight0;
+layout (location = 10) in vec4 f4Tangent;
 
 // Output
 layout (location = 0) out flat int32_t iOutInstanceIndex;

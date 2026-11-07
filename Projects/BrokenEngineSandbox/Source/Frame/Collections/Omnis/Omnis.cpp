@@ -664,7 +664,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
 				bool bFinalWaypoint = false;
-				XMVECTOR vecDestination = HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
+				XMVECTOR vecDestination = HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
 				vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
 			}
 			else

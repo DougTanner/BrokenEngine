@@ -595,7 +595,10 @@ and the handoff this run returns.
       report, so retry nothing and report the finding's role, report path,
       exception headline, exit code, and retained evidence path.
     - A check exit of `0` leaves the transport failure an ordinary one and the
-      retry proceeds.
+      retry proceeds, unless the failure may follow a fully sent request, such
+      as stderr saying `command was sent`, `no response`, `incomplete response`,
+      `response length out of range`, or `socket readiness wait failed`: then
+      re-read the state first, because the command may have been applied.
 
 34. Keep every request on the envelope. Done when every request matches that
     envelope.

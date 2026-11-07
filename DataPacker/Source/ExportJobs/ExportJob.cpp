@@ -6,8 +6,8 @@ static int64_t siNextJobId = 0;
 
 
 constexpr int64_t kiFingerprintMetadataMagic = 0x465052494E544D31;
-constexpr int64_t kiFingerprintMetadataVersion = 1;
-static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& rPath)
+constexpr int64_t kiFingerprintMetadataVersion = 2;
+static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem::path& rPath, common::crc_t& ruiChunkCrc)
 {
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
 	int64_t iMagic = 0;
@@ -15,6 +15,7 @@ static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem:
 	int64_t iFingerprintCharacters = 0;
 	stream.read(reinterpret_cast<char*>(&iMagic), sizeof(iMagic));
 	stream.read(reinterpret_cast<char*>(&iVersion), sizeof(iVersion));
+	stream.read(reinterpret_cast<char*>(&ruiChunkCrc), sizeof(ruiChunkCrc));
 	stream.read(reinterpret_cast<char*>(&iFingerprintCharacters), sizeof(iFingerprintCharacters));
 	if (!stream)
 	{
@@ -37,67 +38,17 @@ static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem:
 	return stream ? std::optional(std::move(fingerprint)) : std::nullopt;
 }
 
-static void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_view fingerprint)
+static void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_view fingerprint, common::crc_t uiChunkCrc)
 {
 	std::fstream stream(rPath, std::ios::out | std::ios::binary);
 	int64_t iFingerprintCharacters = static_cast<int64_t>(fingerprint.size());
 	stream.write(reinterpret_cast<const char*>(&kiFingerprintMetadataMagic), sizeof(kiFingerprintMetadataMagic));
 	stream.write(reinterpret_cast<const char*>(&kiFingerprintMetadataVersion), sizeof(kiFingerprintMetadataVersion));
+	stream.write(reinterpret_cast<const char*>(&uiChunkCrc), sizeof(uiChunkCrc));
 	stream.write(reinterpret_cast<const char*>(&iFingerprintCharacters), sizeof(iFingerprintCharacters));
 	stream.write(fingerprint.data(), fingerprint.size());
 	stream.close();
 	VERIFY_SUCCESS(stream.good());
-}
-
-// Trust boundary: a cached chunk body is opaque bytes an earlier run left on disk, and CheckDirty only covers the
-// outer marker and the source fingerprint, so a same-size edit of the body would be republished into a new pack.
-// Checks identity and extent only, and returns nullptr when they hold or the reason to report. Payload bytes are
-// deliberately not covered; the runtime enforces the compressed-payload contract when the pack is loaded.
-static const char* ValidateCachedChunkBody(std::span<const std::byte> body, common::crc_t crc, std::string_view rRelativeFile, bool bAllowTail)
-{
-	if (body.size() < static_cast<size_t>(common::kiChunkDataOffset))
-	{
-		return "body smaller than its header";
-	}
-
-	const common::ChunkHeader* pHeader = reinterpret_cast<const common::ChunkHeader*>(body.data());
-	if (pHeader->iMagic != common::ChunkHeader::kiMagic)
-	{
-		return "chunk header magic mismatch";
-	}
-	if (pHeader->crc != crc)
-	{
-		return "chunk header CRC mismatch";
-	}
-	// Compare the path bytes and check the following cached byte for NUL termination.
-	if (rRelativeFile.size() >= std::size(pHeader->pcPath))
-	{
-		return "chunk header path mismatch";
-	}
-	if (std::memcmp(pHeader->pcPath, rRelativeFile.data(), rRelativeFile.size()) != 0)
-	{
-		return "chunk header path mismatch";
-	}
-	if (pHeader->pcPath[rRelativeFile.size()] != '\0')
-	{
-		return "chunk header path mismatch";
-	}
-
-	// Bound iSize by the body before rounding it up, so a corrupt near-maximum value cannot overflow the round.
-	if (pHeader->iSize < 0 || pHeader->iSize > static_cast<int64_t>(body.size()))
-	{
-		return "chunk header size outside chunk";
-	}
-	// AllocateHeaderAndData gives a fresh body exactly the header plus the alignment-rounded data, so any other
-	// extent was not produced by this job. Scene jobs append animation data past that point (ExportScene::Export), and
-	// Model jobs the outline section (ExportModel::Export).
-	int64_t iExpectedSize = common::kiChunkDataOffset + common::RoundUp<int64_t, common::kiAlignmentBytes>(pHeader->iSize);
-	if (bAllowTail ? static_cast<int64_t>(body.size()) < iExpectedSize : static_cast<int64_t>(body.size()) != iExpectedSize)
-	{
-		return "chunk header size does not match body";
-	}
-
-	return nullptr;
 }
 
 
@@ -142,6 +93,7 @@ ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::pa
 
 	// The cache directory is shared across worktrees, so the exporter version is part of the entry name:
 	// exporters built from different sources then keep separate entries instead of invalidating each other's.
+	// SetContentKey does the same for inputs that differ between worktrees.
 	mChunkFile = gpFileManager->mCacheDirectory;
 	mChunkFile /= mRelativeDirectory;
 	std::filesystem::create_directories(mChunkFile);
@@ -155,6 +107,13 @@ ExportJob::ExportJob(common::ChunkFlags_t rChunkFlags, const std::filesystem::pa
 
 	mRelativeFile = mRelativeDirectory.string() + mInputPath.filename().string();
 	mCrc = common::Crc(mRelativeFile);
+}
+
+void ExportJob::SetContentKey(common::crc_t uiContentKey)
+{
+	mContentKey = std::format("{:016x}", uiContentKey);
+	mChunkFile.replace_extension(std::format("{}.chunk", mContentKey));
+	mCacheMetadataFile.replace_extension(std::format("{}.meta", mContentKey));
 }
 
 std::tuple<common::ChunkHeader*, std::span<std::byte>> ExportJob::AllocateHeaderAndData(int64_t iDataSize)
@@ -171,7 +130,26 @@ std::tuple<common::ChunkHeader*, std::span<std::byte>> ExportJob::AllocateHeader
 bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFile)
 {
 	// The pack is not inspected per job: RunExportJobs compares the published pack's timestamp against
-	// every clean job's .meta fingerprint, so an export killed before the pack rename stays dirty there.
+	// every clean job's .meta fingerprint, so an export killed before the pack rename stays dirty there,
+	// and every clean job's .meta chunk CRC against the published manifest, so an entry returned to by a revert does too.
+
+	// A fingerprint throws on an unreadable file, and discovery has no per-asset catch. A dirty job fingerprints again
+	// in RunExport, which throws into the job's future, so the failure stays per asset.
+	std::string inputFingerprint;
+	try
+	{
+		inputFingerprint = GetInputFingerprint();
+	}
+	catch (const std::exception& rException)
+	{
+		LOG(kDefault, kWarning, "Could not fingerprint \"{}\": {}", mInputPath.string(), rException.what());
+		mbDirty = true;
+		return mbDirty;
+	}
+	if (mContentKey.empty())
+	{
+		SetContentKey(common::Crc(inputFingerprint));
+	}
 
 	if (!std::filesystem::exists(mChunkFile))
 	{
@@ -199,8 +177,7 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 		return mbDirty;
 	}
 
-	std::string inputFingerprint = GetInputFingerprint();
-	std::optional<std::string> optionalCachedFingerprint = ReadFingerprintMetadata(mCacheMetadataFile);
+	std::optional<std::string> optionalCachedFingerprint = ReadFingerprintMetadata(mCacheMetadataFile, muiCachedChunkCrc);
 	if (!optionalCachedFingerprint.has_value() || optionalCachedFingerprint.value() != inputFingerprint)
 	{
 		LOG(kDefault, kDebug, "Input fingerprint changed for \"{}\"", mInputPath.string());
@@ -212,6 +189,27 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 	return mbDirty;
 }
 
+bool ExportJob::ReadCachedChunk(std::vector<std::byte>& rHeaderAndData) const
+{
+	int64_t iChunkFileSize = std::filesystem::file_size(mChunkFile);
+	int64_t iHeaderAndDataSize = iChunkFileSize - sizeof(kiMagic) - sizeof(int64_t);
+	rHeaderAndData.resize(iHeaderAndDataSize);
+
+	std::fstream fileStream(mChunkFile, std::ios::in | std::ios::binary);
+	fileStream.seekg(sizeof(kiMagic) + sizeof(int64_t)); // Skip magic and version
+	fileStream.read(reinterpret_cast<char*>(rHeaderAndData.data()), static_cast<std::streamsize>(std::ssize(rHeaderAndData)));
+
+	// CheckDirty only validated the 16-byte header, and resize() zero-inits the buffer, so a short read
+	// (truncated/interrupted chunk) would silently pack a zero tail. Verify the full body was read; if not,
+	// the caller discards the cache and takes a full dirty re-export rather than shipping the zeroed bytes.
+	if (!fileStream.good() || fileStream.gcount() != std::ssize(rHeaderAndData))
+	{
+		LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), std::ssize(rHeaderAndData));
+		return false;
+	}
+	return true;
+}
+
 std::vector<std::byte>& ExportJob::RunExport()
 {
 	ScopedLogIndent scopedLogIndentOuter;
@@ -219,25 +217,23 @@ std::vector<std::byte>& ExportJob::RunExport()
 
 	if (!mbDirty)
 	{
-		int64_t iChunkFileSize = std::filesystem::file_size(mChunkFile);
-		int64_t iHeaderAndDataSize = iChunkFileSize - sizeof(kiMagic) - sizeof(int64_t);
-		mHeaderAndData.resize(iHeaderAndDataSize);
-
-		std::fstream fileStream(mChunkFile, std::ios::in | std::ios::binary);
-		fileStream.seekg(sizeof(kiMagic) + sizeof(int64_t)); // Skip magic and version
-		fileStream.read(reinterpret_cast<char*>(mHeaderAndData.data()), static_cast<std::streamsize>(std::ssize(mHeaderAndData)));
-
-		// CheckDirty only validated the 16-byte header, and resize() zero-inits the buffer, so a short read
-		// (truncated/interrupted chunk) would silently pack a zero tail. Verify the full body was read; if not,
-		// discard the cache and fall through to a full dirty re-export rather than shipping the zeroed bytes.
-		if (!fileStream.good() || fileStream.gcount() != std::ssize(mHeaderAndData))
+		// Trust boundary: a cached chunk body is opaque bytes an earlier run left on disk, and CheckDirty does not read
+		// them. The .meta CRC proves the body is the one RunExport wrote, so a truncated or edited body re-exports. The
+		// header CRC still needs its own check: a case-only rename keeps the fingerprint and so the key, the cache's
+		// case-insensitive volume resolves the new path to the old entry, and that header holds the old path's CRC,
+		// which the runtime halts on beside a manifest holding the new one.
+		if (!ReadCachedChunk(mHeaderAndData))
 		{
-			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), std::ssize(mHeaderAndData));
 			mbDirty = true;
 		}
-		else if (const char* pcReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, (mChunkFlags & common::ChunkFlags::kScene) || (mChunkFlags & common::ChunkFlags::kModel)); pcReason != nullptr)
+		else if (common::Crc(std::span<const std::byte>(mHeaderAndData)) != muiCachedChunkCrc)
 		{
-			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation ({}); re-exporting", mChunkFile.string(), pcReason);
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation (body CRC mismatch); re-exporting", mChunkFile.string());
+			mbDirty = true;
+		}
+		else if (reinterpret_cast<const common::ChunkHeader*>(mHeaderAndData.data())->crc != mCrc)
+		{
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" failed validation (chunk header CRC mismatch); re-exporting", mChunkFile.string());
 			mbDirty = true;
 		}
 		else
@@ -285,7 +281,7 @@ std::vector<std::byte>& ExportJob::RunExport()
 	VERIFY_SUCCESS(fileStream.good());
 
 	UpdateCacheMetadata();
-	WriteFingerprintMetadata(mCacheMetadataFile, inputFingerprint);
+	WriteFingerprintMetadata(mCacheMetadataFile, inputFingerprint, common::Crc(std::span<const std::byte>(mHeaderAndData)));
 
 	return mHeaderAndData;
 }

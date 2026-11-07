@@ -78,6 +78,17 @@ hull has fewer than three vertices fails its export.
 `IslandHeader` also carries the leaf's peak height and texel, defined in its
 `Common/DataFile.h` field comment.
 
+The chunk stage edits each leaf's heights through `BeachPass` before the island
+scale, while `Elevation.r32` stays the pre-edit canonical input. The pass keeps
+each texel on its side of `common::kfUnderwaterMaskThresholdMeters`, and the
+mesh and BC textures are not rebuilt against the edited heights. `BeachPass.h`
+owns the tuning constants. To tune them in the primary checkout, build and run
+DataPacker from Visual Studio in the Release configuration, because the next
+game build overwrites a Debug run's chunks; `PreBuildEvent` and
+`CustomBuildStep` in
+`../../../../Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
+own the mechanics.
+
 Export multiplies the footprint, mesh XY, and elevation samples above 0 by
 `common::kfIslandScale`, so the runtime and shaders only ever see scaled
 values. The hull and peak are derived after that and carry the scale with no
@@ -98,7 +109,9 @@ require the shared data-format version. The chunk fingerprint also covers a publ
 and AO, which the map thumbnail derives from. `common::kiIslandScalePermille` joins `ExportIsland::kiVersion`
 and `engine::kiFrameBaseVersion` directly, so changing it takes no manual bump. A change to the island set
 placement picks from also takes the version bump `../../../../Engine/Source/Frame/AGENTS.md`
-`## Terrain and Navigation` owns, which no version here reaches.
+`## Terrain and Navigation` owns, which no version here reaches. Landing a changed `BeachPass.h`
+constant bumps `Frame::kiVersion` (`../../../../Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`
+`## Invariants`), and a local try does not.
 
 The BC outputs are tracked in the checkout, which shapes the texture stage: its version stays a plain `int64_t` outside `ExportJob::Version(...)`, so a chunk-header layout change cannot rewrite hundreds of megabytes of tracked textures for byte-identical output. Its marker fingerprints only the encode's own inputs; the processed mesh is deliberately excluded so a mesh-only rebake re-packs the chunk without touching the textures.
 

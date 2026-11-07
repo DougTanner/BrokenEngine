@@ -366,8 +366,9 @@ static ExportJobList<T> DiscoverExportJobsAndAggregateDirty(const std::filesyste
 
 	// An added, deleted, or renamed source asset changes which paths the published .pack/.manifest (and
 	// the constants in the generated header) describe, but dirties nothing above: the per-job cache is
-	// keyed by path and shared across worktrees, so a path exported earlier under another branch checks
-	// clean the moment it comes back, and a rename that preserves the count hides behind an equal count.
+	// keyed by path and content and shared across worktrees, so a path exported earlier
+	// under another branch checks clean the moment it comes back, and a rename that preserves the count
+	// hides behind an equal count.
 	// The manifest's chunk key and ExportJob::mCrc are the same quantity — Crc(relative path) — so
 	// comparing the two path-CRC sets catches every such difference, count changes included. Neither
 	// side is in numeric order (jobs follow directory iteration, manifest chunks follow lowered path),
@@ -413,6 +414,24 @@ static ExportJobList<T> DiscoverExportJobsAndAggregateDirty(const std::filesyste
 			if (packError || metadataError || packTime < metadataTime)
 			{
 				LOG(kDefault, kDebug, "Pack file \"{}\" is older than fingerprint \"{}\"", rPackFile.string(), rpExportJob->mCacheMetadataFile.string());
+				rbDirty = true;
+				break;
+			}
+		}
+	}
+
+	// An entry returned to by an edit-then-revert checks clean with its old timestamp while the pack still holds the
+	// other content, so each job's .meta chunk CRC must match the published manifest. A mismatch dirties the aggregate,
+	// and the clean jobs reassemble the pack from their cached chunks. Every job here is clean, so it has read its .meta,
+	// and the path-CRC comparison above guarantees it a manifest entry.
+	if (!rbDirty)
+	{
+		for (const std::unique_ptr<T>& rpExportJob : exportJobs)
+		{
+			auto locationIterator = std::ranges::find(rManifestChunkLocations, rpExportJob->mCrc, &common::ChunkLocation::crc);
+			if (rpExportJob->muiCachedChunkCrc != locationIterator->contentCrc)
+			{
+				LOG(kDefault, kDebug, "Cached chunk \"{}\" differs from the published manifest", rpExportJob->mChunkFile.string());
 				rbDirty = true;
 				break;
 			}

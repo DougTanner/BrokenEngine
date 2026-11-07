@@ -112,7 +112,11 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   add, removal, or count-preserving rename cannot keep a stale pack, manifest,
   or generated header, and also when the published pack is older than any job's
   `.meta` fingerprint, so an export killed between fingerprint commit and pack
-  rename republishes from cached chunks on the next run. Case-folded relative
+  rename republishes from cached chunks on the next run, and also when any
+  job's `.meta` chunk CRC differs from the published manifest's `contentCrc`,
+  so a return to an earlier entry cannot keep a stale pack
+  ([ExportJobs/AGENTS.md](ExportJobs/AGENTS.md)
+  `## Shared Pipeline` owns content keys). Case-folded relative
   paths must be unique before deterministic sorting and aggregate assembly.
   Generated CRC header symbols must be unique per project run, and every
   discovered job participates in that check even when its type is clean.
@@ -140,7 +144,7 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   discards that type's temporary manifest and pack and fails the type; an
   already-published manifest then stays beside an unreplaced or missing pack
   until the next run re-dirties the type and republishes it.
-- Reproducibility: Chunk ordering and direct base BC encoding are machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes assume one authoritative bake host.
+- Reproducibility: Chunk ordering and direct base BC encoding are machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes assume one authoritative bake host; island chunk heights, which `BeachPass` computes with `std::sin` and `std::pow`, also assume one authoritative host.
 
 ## Output Structure
 
