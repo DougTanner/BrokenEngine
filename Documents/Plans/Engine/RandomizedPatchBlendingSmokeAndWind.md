@@ -6,9 +6,9 @@
 Stage 3 of three stages of randomized patch blending for tiled world textures. The user chose
 randomized patch blending on a stationary triangular lattice (over two-layer superposition,
 noise-masked rotated fetch and a shared domain warp) and chose to land it in stages: stage 1, the
-shared mechanism plus water, landed in the same commit that added this Plan; stage 2
-(`Documents/Plans/Engine/RandomizedPatchBlendingTerrain.md`) covers terrain; stage 3 (this Plan)
-covers smoke and wind. This record of those choices is the authoring agent's, not the user's words.
+shared mechanism plus water, landed in the same commit that added this Plan; the user rejected
+stage 2, terrain, so it never landed; stage 3 (this Plan) covers smoke and wind. This record of
+those choices is the authoring agent's, not the user's words.
 
 The smoke and wind spreads read one tiled noise texture by camera-cell-local world position, so its
 repeats show in plume and swirl shapes. `Smoke/SmokeSpreadCommon.h` `SmokeSpread` reads it three
@@ -69,8 +69,8 @@ the larger of its Low/High scales. This stage publishes six descriptors:
 | `windSwirl` | wind swirl read | `max(fWindSwirlScaleLow, fWindSwirlScaleHigh)` |
 
 The table's first column is also each descriptor's probe key. Each descriptor passes its own fixed
-seed index to `PopulatePatchLattice`: 22 to 27 in the table's key order (water uses 0 to 7 and
-terrain 14 to 21; see `## Coordination`). At default settings and `length(B.q)=900` m
+seed index to `PopulatePatchLattice`: 22 to 27 in the table's key order (water uses 0 to 7; see
+`## Coordination`). At default settings and `length(B.q)=900` m
 the exponents are natural wind 5 and 1, swirl 11 and 7, curl 2 and wind swirl 10. The coarse
 `k<0` path is reached by natural wind and curl at low settings (curl at its minimum scale `0.0001`
 gives `k=-3`), and natural wind reaches the `-6` clamp near its minimums.
@@ -153,7 +153,7 @@ to the user because it changes this Plan's read scope.
 ## Out of scope
 
 - Smoke and wind field, occupancy, ping-pong, lookup-table and deposit reads; water and terrain
-  reads; stage 2's controls and descriptors.
+  reads.
 - Changing the stage 1 mechanism's behavior, its water reads or its water descriptors.
 - Fixing pre-existing source-UV behavior on a camera cell change or over long times; changing
   pass B's extinction terms, decay, thresholds, remap or occupancy logic.
@@ -211,14 +211,9 @@ The supplied evidence records no harness setup; the executing session records it
 
 ## Coordination
 
-Stage 1 landed with this Plan and has no Plan file. Reciprocal
-coordination with `Documents/Plans/Engine/RandomizedPatchBlendingTerrain.md`: both extend
-`ShaderGlobalLayout.h`, `PresentationContinuitySnapshot` and its ownership comment, the probe's
-`"lattices"` object, its command-reference description and possibly `ShaderFunctions.h`; whichever
-lands second refreshes those regions and reuses any helper variant the first added. Seed indices
-passed to `PopulatePatchLattice` are fixed regardless of landing order: water 0 to 7
-(`PopulateWaterReducedUv` order), terrain 14 to 21, smoke and wind 22 to 27. Each Plan keeps its own
-acceptance.
+Stage 1 landed with this Plan and has no Plan file. Seed indices passed to
+`PopulatePatchLattice` are fixed: water 0 to 7 (`PopulateWaterReducedUv` order), smoke and wind 22
+to 27.
 
 ## Notes
 
