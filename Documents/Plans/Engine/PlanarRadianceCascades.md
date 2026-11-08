@@ -6,8 +6,8 @@
 Build one bounded client-render experiment replacing the selected local-light
 spread contribution with Holographic Radiance Cascades (HRC). Retain the current
 renderer temporarily for A/B comparison. This Plan is the executable successor
-to the former planar feature proposal; the [screen-space alternative](ScreenSpaceRadianceCascades.md)
-is a separate executable Plan. Saving this Plan authorizes no implementation; its claim still
+to the former planar feature proposal; the pending [screen-space alternative](ScreenSpaceIndirectLighting.md)
+is the separate stage-2 SSRT3 transport Plan; its stage-1 input capture adds no indirect lighting. Saving this Plan authorizes no implementation; its claim still
 requires user approval under the Change Workflow. Implementation is Tier 3
 (render architecture, GPU resources, shader and receiver contracts).
 

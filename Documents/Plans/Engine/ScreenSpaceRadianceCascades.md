@@ -1,376 +1,276 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-11-07T23:42:44.499Z","dependsOn":[]} -->
-# Screen-Space Radiance Cascades Prototype
+# SSRT3 Stage 1: Opaque Inputs and Measurement
 
-## Context and decision authority
+## Context
 
-Build one bounded, opt-in client-rendering prototype to decide whether visible
-opaque mesh emission can illuminate opaque terrain and models with useful
-geometry-aware occlusion at the engine's distant RTS camera. This Plan replaces
-the screen-space feature proposal; [planar RC](PlanarRadianceCascades.md)
-is a separate executable Plan. Saving this Plan authorizes no implementation.
+Prepare inspectable scene inputs for the selected SSRT3 visibility-bitmask
+experiment. This is one future, independently buildable stage; it produces no
+indirect lighting. The transport and complete experiment verdict live in
+[stage 2](ScreenSpaceIndirectLighting.md). The historical filename is retained
+for scheduler identity. The separate [planar experiment](PlanarRadianceCascades.md)
+remains independent.
 
-The author records these user decisions: a measurable prototype go/no-go;
-dedicated single-sample terrain/opaque-model scene inputs; visible material
-emission as the source; terrain and opaque models as receivers; water, shields,
-transparent models, particles and visible-light sprites retain current lighting;
-target this PC at 3840x2160. Maintaining current FPS is ideal; complete new effect
-cost may be up to twice the baseline current lighting-producer cost. No absolute
-millisecond or memory ceiling was approved. Windows reports an AMD Radeon RX 9070
-XT and a separate integrated adapter; verify the actual Vulkan adapter at runtime.
+The author's record of the selected decisions is SSRT3 shader-core adaptation,
+current opaque visibility (the user's “Option 1”), and “Two stages”. Current
+non-BLEND models remain solid even when authored MASK; doubleSided remains
+unsupported and existing backface culling stays. These replace the former
+cascade hierarchy and unsupported cutout/two-sided promises. The latest request
+finalizes Plans only; neither stage has executed. Saving or scheduling a Plan
+is not implementation approval. Future execution is Tier 3 and uses the
+Change Workflow's plan reviews and approval before editing runtime code.
 
-All numerical algorithm choices, visual gates, half-resolution inputs and
-composition details below are the author's concrete recommended design, subject
-to approval when this Plan is executed. They are not additional recorded user
-decisions. Research baseline: `07f763e2d96271ebf4b4794ea1185763a40451b7`.
-No builds, GPU captures or runtime performance measurements informed this Plan.
-The present change is Tier 1 documentation only. Execution is Tier 3: it changes
-render-pass ordering, shared CPU/GPU layouts, directional transport, material
-composition and resource synchronization. Run the required implementation-plan
-reviews and user approval before coding; do not infer approval from scheduling.
+Target UHD on this PC's actual Vulkan adapter, verified at runtime. Existing
+lighting stays. The complete effect's allowance is twice baseline lighting
+producer cost, with no absolute millisecond or memory ceiling; only stage 2
+can evaluate it. Parameters and numerical gates here are author recommendations
+for execution approval, not user quotations or measurements. No build, capture,
+quality, allocation or timing result supports feasibility yet.
 
 ## Design
 
-### Source, receiver and composition contract
+### Raster inputs and geometry
 
-Keep the complete production lighting deposit/spread/combine/temporal path and
-all current direct sun/moon, shadows, IBL, reflections, local diffuse/specular,
-smoke and fog terms. Baseline disables all new passes and shader contribution;
-candidate adds only the new diffuse term on eligible opaque receivers before
-their existing smoke/fog composition. An existing debug-texture view displays
-RC alone. This is an additive experiment, not an energy-correct production
-replacement: an emitter that also has a planar light depositor can contribute
-twice. Use a material-only emissive mesh with no associated light deposit in
-controlled quality fixtures. Production replacement requires another approved
-Plan identifying the exact old terms and sources to remove.
+After existing Main preparation (object shadows/water included), before
+`CommandBufferRecordMain::RecordImageRenderPass`, rasterize dedicated terrain
+and non-BLEND model MRT variants. Reuse actual visible draws, vertex variants,
+transforms, LOD/elevation, skinning, material/primitive ranges and backface
+culling. Do not reuse UI depth, resolved MSAA depth or the model-over-world
+presentation's depth clear. When `GraphicsFlags::kDrawModelsOverWorld` is set,
+visibly disable the experiment. Water, shields, BLEND, particles, light sprites
+and UI are absent from these inputs.
 
-Source RGB is the same pre-fog linear mesh emission currently added by
-`Model.frag`: decoded emissive texture times material emissive factor times
-`mainLayout.fPbrEmissive`. Interpret it as outgoing radiance in the renderer's
-existing arbitrary linear HDR units; no exposure, Uchimura mapping, IBL,
-sun-lit albedo, old local field, instance glow or current RC enters the source.
-Terrain currently has no material-emission term and writes zero emission.
-Use nearest opaque visibility, including the opaque model path's existing alpha
-cutout/discard and culling rules. BLEND materials never participate. Emit into
-the outward geometric-normal hemisphere; a backface hit blocks but emits zero.
-For a double-sided material use the geometric normal oriented toward the input
-camera, explicitly accepting that this is only a visible-front-layer model.
+At the exact output extent, allocate single-sample sampled depth and two
+RGBA16F color attachments: linear emission and geometric normal XYZ/validity A.
+Clear colors/validity to zero and depth to the existing far clear; nearest
+opaque depth wins. Valid geometry writes unit normals and A=1. Use geometric
+normals before material normal maps, with transformed/skinned vertex normals
+or position derivatives consistent with the rasterized geometry; terrain
+normals must follow actual elevation, not its detail-normal layers. Do not
+filter depth or interpolate normals across silhouettes. Inputs are coherent
+because all attachments are rasterized with the same depth test/pass.
 
-At final material shading integrate incoming radiance with the actual current
-shading normal, then multiply once by diffuse response divided by pi. Models
-reuse the already computed metallic-aware `diffuseColor`; terrain uses its
-linear layered `f3Color`. Do not multiply transported radiance by source albedo,
-or apply the old art-directed local-light power/add/mix controls to RC. Leave
-self-emission unchanged. No indirect specular, recursive bounce, sun/IBL bounce,
-transparent transport, sky fallback or native projectile-sprite emission.
-Water and excluded effects are neither RC sources, blockers nor receivers;
-they can visually cover a receiver while RC still travels through their absent
-representation. That limitation must appear in the result.
+Require sampled depth-attachment support and usage support, preferring
+D32_SFLOAT, using a depth-only sampled view. Require RGBA16F sampled/color
+attachment support (and storage only for a chosen diagnostic compute output).
+A required unsupported format/usage or descriptor/resource limit is a measured
+stage no-go; no new format fallback architecture or device feature is licensed.
+Record the selected depth format and actual extents. Scene MSAA stays unchanged.
 
-### Scene inputs and reconstruction
+Source RGB matches Model.frag's decoded emissive texture times material
+emissive factor times `mainLayout.fPbrEmissive`, before fog/exposure, in current
+linear HDR units. Missing emissive texture leaves the material factor, as in
+forward rendering. Terrain writes zero. Input-only multiplier 0/1/2 changes
+only captured source emission, never forward self-emission or geometry.
+No shaded color, sun/IBL, old local light field, instance glow or feedback enters
+it. Geometric normals preserve the outward orientation of actual culled draws;
+stage 2 treats back-facing source hits as blockers emitting zero.
 
-After existing Main preparation (including object shadows/water preparation),
-before `RecordImageRenderPass`, rasterize the same currently visible terrain and
-opaque-model geometry into a separate single-sample pass. Reuse draw lists,
-transforms, LOD, skinning/material bindings and alpha cutoff, with no UI depth
-mask, water or transparent draws. Use the actual shaken scene view-projection.
-Support the ordinary world camera in orthographic and perspective modes. When
-`GraphicsFlags::kDrawModelsOverWorld` is set, disable the prototype and expose
-that status; its depth-clear presentation has no single physical scene depth.
+### Reconstruction and publication
 
-Input extent is ceil(output extent / 2) on each axis: 1920x1080 at UHD.
-Attachments are sampled single-sample depth, RGBA16F linear emission, and
-RGBA16F geometric normal XYZ plus validity A. Clear emission/normal/validity to
-zero and depth to the current renderer's far-depth clear. Store depth; use a
-depth-only sampled view. Select a supported sampled depth-attachment format by
-checking format features and image-format usage, preferring a 32-bit depth
-format; inability to support this path is a no-go, not permission for an MSAA
-redesign. Normal reconstruction from depth is insufficient at material edges;
-the final shading normal stays in the forward material shader.
+Extend the parallel C++/GLSL MainLayout and `RenderFrameMain` uploads with a
+CPU inverse of the same shaken world view-projection used for these draws,
+view orientation/inverse, projection mode and current framebuffer slot. Match
+CPU transpose/storage conventions. Unproject pixel centers with Vulkan [0,1]
+depth, actual negative-height viewport Y mapping and homogeneous divide into
+camera-cell RenderBasis positions. Support both orthographic and perspective;
+neither a shader inverse nor an upstream reversed-Z shortcut is acceptable.
+No absolute position or simulation column is introduced. Current-frame data
+is rebuilt after camera-cell/footprint changes; no history exists.
 
-Add a CPU-computed inverse of the same shaken world view-projection and the
-camera orientation to the Main uniform contract; mirror C++/GLSL layout and
-uploads. Never call GLSL matrix inverse. Reconstruct positions in the camera's
-`RenderBasis`, using Vulkan depth convention and actual viewport Y orientation.
-No absolute positions or simulation columns. All origins are current-frame;
-camera cell changes need no retained-surface reprojection. Input sampling uses
-nearest depth/normal/emission, never filtered depth across a silhouette.
+Register the new model-input variant beside main/shadow variants throughout
+`DynamicPipelines::CreateModelPipelines`, descriptor updates, indirect-buffer
+writes (including zero instances) and `UpdateAllModelPipelineDescriptors`.
+Include lazy model creation and instance/material/mesh/joint-buffer growth.
+Reuse ModelPipeline's material splitting and static/skinned vertex selection;
+do not silently limit the input pass to already-created static models.
 
-### Fixed initial hierarchy and trace
+### Resources, synchronization and inspection
 
-This is an engineering extension of RC interval composition to spherical
-surface probes, not a claim to reproduce PoE2's unpublished production tracer.
-Use four levels i=0..3. Probe spacing is `32*2^i` output pixels, equivalently
-`16*2^i` input pixels. Probe origin is the nearest input pixel to the regular
-grid cell center, clamped at the image edge; invalid/background origins remain
-invalid. No search or relocation onto another surface. Spatial dimensions at
-UHD are 120x68, 60x34, 30x17 and 15x9. Ceil dimensions cover the whole viewport.
+Own targets through RenderTargetTextures/TextureManager with one set per actual
+swapchain framebuffer slot, without assuming a slot count. At UHD with D32,
+input payload is 165888000 bytes (158.203125 MiB) per slot before diagnostics,
+alignment and resize overlap. This arithmetic proves neither residency nor
+speed. Report actual all-live VMA delta and resize peak. Allocate only while
+opt-in is enabled; fully off omits all new passes and releases targets safely.
 
-Angular grids are 4x4, 8x8, 16x16 and 32x32. Use equal-solid-angle full-sphere
-bins: midpoint phi uniform in [0,2pi), midpoint mu uniform in [-1,1]; direction
-is `(sqrt(1-mu^2)*cos(phi), sqrt(1-mu^2)*sin(phi), mu)` rotated from camera
-orientation into RenderBasis. Each angular bin has four children at the next
-level. Keep this basis fixed within a frame; no stochastic rotation or history.
+Add a narrow `Graphics::Refresh`/`RecreateResources` toggle hook using existing
+drained recreation: wait all users, replace resources, republish descriptors
+and rerecord immutable Main commands. Cover resize, minimize/restore, off/on,
+world-hidden/resume, empty cells and rewind. Preserve texture retirement,
+bindless publication epochs, Global/Main/particle/ImGui dependencies, HDR/MSAA
+attachments and existing submission serialization. Never mutate pending sets.
 
-Define world pitch p as max(width/outputWidth, height/outputHeight) of the
-camera's current ground-plane visible area, using the existing camera visible
-area, in engine meters. Set d=32p for all probes in that frame. The intervals
-are [0,d), [d,2d), [2d,4d), [4d,8d). Thus range is finite and intentionally
-zoom dependent; perspective probes above ground can have different projected
-density. Offset each origin by geometric normal*d/128; omit ray distances below
-d/128. Reject the originating input pixel until the ray leaves its slab;
-this rejection ends at the first other pixel, so it cannot skip another visible
-surface. Use positive linear eye-depth slab thickness d/32. These are prototype
-settings owned by its parameter definitions, not new global engine constants.
+Sampled-image arrays may hold live slots with a dynamically uniform slot index
+under the existing sampled-image indexing feature. A diagnostic storage image,
+if needed, is a singleton descriptor/non-array image in a
+`PipelineFlags::kPerCommandBuffer` pipeline. In drained creation/recreation,
+call existing `PipelineDescriptorWriter::UpdateImageDescriptorInSet` for each
+slot's resolved binding/view, VK_NULL_HANDLE sampler, GENERAL layout and
+STORAGE_IMAGE type. Republish after pipeline-only recreation too. No helper
+implementation/API edit or storage-image array indexing feature is needed.
 
-Trace with perspective-correct screen-space DDA following McGuire/Mara, including
-the orthographic case. Clip the world segment against near plane and viewport;
-compare its positive linear eye-depth span across each visited pixel with
-`[surfaceDepth,surfaceDepth+d/32]`, with signs converted from the engine's RH
-view convention. Do not compare nonlinear device-depth epsilon. Check the
-first intersected opaque slab only. It yields `(radiance,transmittance)=(source,0)`;
-a completed interval without a hit yields `(0,1)`. Viewport/near-plane loss or
-the hard cap of 128 visited input pixels yields `(0,0)` and a distinct unavailable
-flag; it must not borrow a farther cascade through unknown space. Background
-pixels do not block; no sky or offscreen source is invented. Degenerate projected
-rays still test their depth segment in the containing pixel. Preserve hit,
-completed-miss, out-of-representation and exhausted counters separately.
+Use Vulkan 1.2 barriers/layouts for early/late depth writes and color attachment
+writes to shader reads, diagnostic writes to transfer reads, and slot reuse.
+Keep source pass clears/transitions within its measured scope. Extend existing
+debug selection and `DumpRenderTarget` target resolution with completed-slot
+emission/normal/validity and depth inspection. Convert sampled depth to an
+R32_SFLOAT color diagnostic before readback; never read it with COLOR aspect.
+Reuse one selected diagnostic color target, add required TRANSFER_SRC usage
+and raw RGBA16F conversion; preserve linear numeric dumps independently of
+view tonemapping. Debug registration also refreshes on pipeline recreation.
+Diagnostics/readback are off during timing. Reuse current lighting tweaks for
+opt-in, disabled status and source multiplier; no harness protocol addition.
 
-### Merge and directional resolve
+### Exact baseline and input timing
 
-Store RGBA16F interval RGB and scalar transmittance; use separate raw-trace and
-merged hierarchies. Each level is one image tiled by spatial probe, with its
-angular grid inside that probe's tile; UHD image extents are 480x272 for the
-first three levels and 480x288 for the fourth. Process far to near. Coarsest far
-radiance is zero. For each
-fine bin, fetch four spatially neighboring coarse origins and four corresponding
-angular children per origin. Reject invalid origins or 3D displacement greater
-than `4*max(d, intervalNearDistance)` of the fine origin, or geometric-normal
-dot below 0.8; bilinear spatial
-weights renormalize over survivors. Average the four angular children before
-spatial interpolation. No survivors means zero far radiance and a rejection
-counter. Compose `L=Ln+Tn*Lf`, `T=Tn*Tf`; raw input is immutable during merge.
-This interpolation is approximate: different visible surface origins do not
-share exact adjacent intervals. Do not use the paper's flatland translated
-interval extension, which the paper excludes for depth-varying screen probes.
+Add a containing lighting-producer timestamp scope around deposit and all
+spread/combine/temporal/history/unconditional work in Main. Include scheduled
+layer and refresh-skip frames; exclude shadows, smoke, wind, water and forward.
+Separate input raster scope includes its clears/transitions. Preserve existing
+root query ranges, aligning GpuTimers, name/row tables and reset ranges.
 
-Keep all 16 base directions until the consumer normal is known. In each forward
-opaque material, obtain four neighboring base probes; reject invalid origins,
-position displacement greater than 1.5d, or geometric-normal dot below 0.8;
-renormalize bilinear weights, zero when none survive. Also reject when current
-fragment position differs from the nearest input surface by more than d/32,
-preventing half-resolution foreground data from lighting unrelated MSAA edge
-samples. For Q=16, compute
-`E(n)=sum(Lk*max(dot(n,wk),0)*4pi/Q)` and add `diffuseResponse*E/pi`.
-This is finite angular quadrature, not exact Lambertian integration. Measure
-its normal dependence. Resolve executes in forward shading so full-resolution
-material normals are available; there is no separate full-screen material G-buffer
-or resolved irradiance texture. A debug pass resolves the same equation for
-inspection using the stored geometric normal.
+Extend `ProfileManager::GpuRead`'s completed-query path to log bounded cohorts:
+one record per completed submitted frame/slot, mode and sequence, ready paired
+timestamp sums/counts, and named-scope means. Read after the owning fence and
+before slot reset/reuse; consume each frame once. Skip not-ready query pairs
+without reusing a prior value, count skipped samples and continue until the
+required completed sample count. Reset/disable absent scopes to prevent stale
+values; a legitimately skipped producer frame is a measured zero only when
+that frame's containing scope was executed. Use timestampPeriod/valid-bit wrap
+rules. For total-frame GPU time use valid Global-start to final Image/HDR-end
+endpoints belonging to the same frame, respecting command-buffer reset/submit
+ownership; do not sum overlapping roots. Existing smoothed `query_profile`
+rows are context, never the exact cohort source. Use existing log output.
 
-### Resources, ordering and bounded memory
+For each ordinary/dense-effects UHD paused fixture, collect five alternating
+fully-off/input-on pairs in one instrumented executable/process/device,
+identical content/settings. Each side has 120 warm-up and 600 completed
+measured frames. Report raw records, lighting L and input means, median/range,
+whole-frame GPU/CPU/FPS and memory. No complete-effect C<=2L verdict is possible
+here. Before editing capture original-tree preservation evidence separately;
+the original tree lacks the new containing timer, so its smoothed rows cannot
+be substituted for the instrumented fully-off L baseline.
 
-Own inputs, raw/merged atlases, origin records, counters and debug images in
-`RenderTargetTextures`, created/destroyed with screen-dependent resources in
-`TextureManager`. Use one set per command-buffer frame slot and bind that set
-through existing indexed descriptor machinery; do not assume shared HDR
-attachment serialization automatically protects new resources. Allocate only
-while the opt-in prototype is enabled. Mode changes request the existing
-graphics/command-buffer recreation, since Main is recorded once. Drain the
-appropriate in-flight work before destroying or republishing descriptors.
-Resize/minimize/restore recreates extents; no history survives or exists.
+### Profile-accessible comparison controls
 
-Raster depth/color writes -> compute sampled reads; raw compute storage writes
--> merge sampled reads; each coarse merged write -> finer merge read; merged
-compute writes -> forward fragment sampled reads. Specify image layouts and
-Vulkan 1.2 barriers with the actual stage/access scopes, including slot reuse.
-Keep the existing Global/Main semaphore dependencies, final HDR resolve and
-MSAA attachments untouched. RC input samples stay single-sample regardless of
-scene MSAA; verify scene multisample edges against the declared rejection rule.
+In `Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp::Render`, immediately after
+its Lighting controls' `EndDisabled` and before Smoke, add the ordinary
+`SSRT3 experiment` toggle, `Record SSRT3 cohort` button and bounded status.
+Use the same opt-in wrapper as the Debug tweaks, default off; do not persist
+these experimental controls or change GraphicsSettings.bin. They remain outside
+`kbDebugInput` and independent of the old Lighting checkbox. Debug input views
+and source multiplier stay in Tweaks. This adds no harness command/key binding.
 
-At UHD there are 529,920 angular bins; each RGBA16F hierarchy is 4,239,360 bytes
-(4.04 MiB), two are 8.09 MiB. Depth at four bytes plus two eight-byte input
-targets is 39.55 MiB. Core payload is 47.64 MiB per set, or 142.92 MiB for three
-sets, before origins, counters, debug images, driver alignment and resize overlap.
-If selected depth format or actual slot count differs, recompute the inventory.
-At the fixed trace cap there are at most 67,829,760 depth visits before merge
-and resolve. Neither count predicts GPU time. Report actual all-live allocation
-delta and peak during recreation using VMA statistics, not just texel payload.
-There is no approved memory ceiling; memory is a reported decision input.
+Existing `PauseMenuScreen::Render` reaches GraphicsMenu and `RenderUiScreens`
+invokes it without a Debug guard. In Profile use existing `key` Escape,
+`describe_ui`, `click` Graphics, toggle/record, Back and Resume routes, using
+full labels/window returned by `describe_ui`. Record arms one 120-warm-up/
+600-completed-frame cohort through ProfileManager; counting starts only after
+return to `UiState::kNone`, required recreation/drain and valid world rendering.
+Exclude menu/world-hidden frames; cancel an active cohort on subsequent mode,
+fixture/settings or resource changes. Save completion/status to the existing
+log. The harness repeats the documented alternating sides/pairs in that same
+process; no automatic multi-scene runner is added. Keep presentation mode and
+sun override identical on both sides, since opening Graphics can alter them.
+Acceptance must demonstrate these controls in an actual Profile client and
+show that menu/recreation frames cannot enter its exact timing cohort.
+
+## Critical files
+
+Paths below are relative to the repository root; links name current anchors.
+New input/debug helper filenames may follow local conventions inside Lighting.
+
+- [Main recording](../../../Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp): `Record`, `RecordLightingDeposit`, `RecordLightingSpreadPipeline`, `RecordImageRenderPass`; add only the input pass and scopes here. Global recording owns total-frame start/reset coordination.
+- [Uniform upload](../../../Engine/Source/Graphics/Render/MainUniforms.cpp): `RenderFrameMain` shaken matrix region; [MainLayout](../../../Engine/Data/Shaders/ShaderMainLayout.h) mirrored fields.
+- [Model variants](../../../Engine/Source/Graphics/Managers/DynamicPipelines.cpp): named publication functions above; [ModelPipeline](../../../Engine/Source/Graphics/Objects/ModelPipeline.cpp) `Create`, `RecordDrawIndirect`, `WriteIndirectBuffer`, `UpdateStorageBufferDescriptors`; [BufferManager](../../../Engine/Source/Graphics/Managers/BufferManager.cpp) growth callers.
+- [Resources](../../../Engine/Source/Graphics/Managers/RenderTargetTextures.h), RenderTargetTextures.cpp and RenderTargetTexturesLighting.cpp: new per-slot input owners/create/destroy/debug registration; [TextureManager](../../../Engine/Source/Graphics/Managers/TextureManager.cpp) screen-dependent create/destroy and retirement. A dedicated RenderTargetTexturesScreenSpaceIndirectLighting.cpp may hold this owner.
+- [Graphics](../../../Engine/Source/Graphics/Graphics.cpp): `Refresh`, `RecreateResources`, `WaitFramebuffer`; PipelineManager, WorldLightingShadowPipelines and TextureDescriptors create/registration regions as required for the input variant.
+- [Model emission](../../../Engine/Data/Shaders/Model/Model.frag) `main` emissive region and [terrain](../../../Engine/Data/Shaders/Terrain/Terrain.frag) geometry interface; dedicated input fragments and Lighting input/debug helpers. Share only necessary meaning-preserving source/geometry evaluation with forward shaders.
+- [Inspection](../../../Engine/Source/Graphics/Screenshot.cpp): `ResolveRenderTarget`, format/conversion functions and `DumpRenderTarget`; RenderTargetTextures debug registration and TweaksScreenLighting opt-in/inspection region.
+- [Ordinary Profile controls](../../../Engine/Source/Ui/Screens/GraphicsMenuScreen.cpp): `Render` Lighting-to-Smoke region; existing pause/graphics UI route is reused unchanged outside this owner.
+- [Profiler](../../../Engine/Source/Profile/ProfileManager.cpp): `GpuRead`, `GpuStart`, `GpuStop`, `ResetQueryPools`; ProfileManager.h and ProfileRows.h enums/names/rows. Existing [singleton descriptor writer](../../../Engine/Source/Graphics/Objects/PipelineDescriptorWriter.cpp) is reused unchanged.
 
 ## In scope
 
-Paths are relative to repository root. Add only the prototype and evidence
-needed for this one complete buildable stage; the following are ordered tasks,
-not separately landable stages.
-
-| Region | Required work |
-| --- | --- |
-| `Engine/Source/Graphics/Managers/CommandBufferRecordMain.{h,cpp}`: `Record`, opaque draw recording, `RecordImageRenderPass` | Insert scene-input and trace/merge work before forward rendering; reuse terrain/opaque draws; disabled path preserves baseline; bracket timing regions. |
-| `Engine/Source/Graphics/Managers/RenderTargetTextures.{h,cpp}`, new `RenderTargetTexturesRadianceCascades.cpp`; `TextureManager.cpp`: screen-dependent lifecycle | Own slot-indexed attachments, atlases, origins/debug/counters, render pass/framebuffers and debug registration. Reuse existing texture wrappers. |
-| `Engine/Source/Graphics/Managers/{PipelineManager,DynamicPipelines,WorldLightingShadowPipelines}.{h,cpp}`; `Engine/Source/Graphics/Objects/ModelPipeline.{h,cpp}` | Register dedicated scene-input terrain/model variants and compute/debug pipelines; reuse `PipelineCreator` MRT support and material draw bindings, not a deferred-renderer abstraction. |
-| `Engine/Source/Graphics/Managers/TextureDescriptors.{h,cpp}` and `Engine/Source/Graphics/Render/{MainUniforms,LightingUniforms}.cpp`; `Engine/Data/Shaders/ShaderMainLayout.h` | Publish per-slot bindings, inverse shaken projection/camera orientation and fixed prototype parameters/mode; keep CPU/GPU contract parallel. |
-| `Engine/Data/Shaders/Model/Model.frag`, `Terrain/Terrain.frag` and their scene-input variants; new `Engine/Data/Shaders/Lighting/RadianceCascades*.{comp,h}` | Share material emission/alpha semantics without importing final shaded color; implement trace, merge, forward directional resolve, selected-pixel reference and debug visualization. Reuse current vertex variants. |
-| `Engine/Source/Graphics/Graphics.{h,cpp}`, `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenLighting.cpp`: lighting tweaks/debug texture selection | Opt-in prototype toggle/status and existing debug selection; disabled for model-over-world. Controls only for mode and diagnostic fixture/emission on/off; no general tuning UI. |
-| `Engine/Source/Profile/ProfileManager.{h,cpp}`, profile-name table and existing profile display | Timers for baseline lighting producer, scene input, trace, merge, added resolve and total-frame measurements using existing timestamp machinery. Valid endpoints in both modes; no stale disabled values. |
-| Relevant shader/project manifests and Visual Studio `.vcxproj`/`.filters`, subsystem `AGENTS.md` | Register new files through `/update-vcxproj`, compile shaders through existing DataPacker path, document only changed contracts. |
-
-### Ordered implementation work
-
-1. Revalidate these anchors after rebase, classify Tier 3, complete required
-   alternatives/plan reviews and approval. Establish the fixed fixtures below
-   with existing `/agent-harness` scene/collection/camera/UI commands. Record
-   baseline device, settings, screenshots, timings and memory before enabling RC.
-2. Implement resources, inverse upload, source pass and debug inspection first;
-   confirm matching opaque silhouettes, alpha cutoff and source linearity.
-3. Implement the fixed hierarchy, bounded DDA, merge and selected-pixel reference.
-   Add the diffuse contribution and baseline toggle without modifying old terms.
-4. Apply affected-site propagation, shader/code/comment/style/documentation
-   reviews and Tier-3 adversarial review; build through `/compile`. Run the full
-   acceptance matrix through `/agent-harness`; record a go/no-go and evidence.
-   A failed quality or cost gate means no-go, not permission to add history,
-   sources, backends, broader geometry or parameter-search infrastructure.
+Implement exactly the input/reconstruction/publication/resource/inspection/timing
+regions above, including GraphicsMenuScreen::Render Profile controls, as one integrated stage. Header declarations, shader generation,
+project/filter entries and correctness-dependent callers of those regions are
+included. Update only owning AGENTS.md descriptions made incorrect by this
+stage. Complete pre-edit preservation checks and the acceptance table below.
+No upstream SSRT3 code or license is copied in this stage.
 
 ## Out of scope
 
-Production replacement/removal of planar lighting; water/shields/transparents,
-particles or light-sprite transport; generic effect-source injection; hidden or
-offscreen recovery; full 3D volumes, hardware ray tracing, HRC, distance fields,
-hierarchical depth acceleration, stochastic sampling, temporal accumulation,
-motion vectors, multi-bounce, indirect specular, new harness commands, scheduler
-changes, simulation/CRC/network/save changes and unrelated renderer cleanup.
-No unit tests. No runtime implementation is part of creating this Plan.
+Stage-2 gather/filter/upsample/composition, sector transport diagnostics,
+independent radiance reference, SSRT3 port/notice delivery, full quality/cost
+verdict; production replacement/removal of lighting; MASK/doubleSided expansion
+or material/pack changes; new art or simulation types; water/shield/transparent/
+particle/sprite transport; generic sources; offscreen/hidden recovery; HRC or
+custom cascade/merge; hardware ray tracing, volumes, distance fields/HZB;
+stochastic/history/motion-vector/multibounce/indirect-specular paths; new
+harness commands/dependencies; async compute; scheduler/simulation/CRC/network/
+save/replay changes; unrelated cleanup; unit tests.
 
-## Risk triggers and invariants
+## Verification and acceptance
 
-- All work is client rendering. Preserve deterministic PostRender state and
-  current server behavior. RenderBasis conversion happens at GPU use, once.
-- Additional geometry/material evaluation and input bandwidth can dominate;
-  single-layer visibility loses tiny emitters, hidden backsides and thin
-  geometry. Camera motion can change lighting without world changes.
-- Probe spacing is not a bound on 3D separation; silhouette rejection can erase
-  illumination or still leak. Spherical interpolation and 16-direction resolve
-  need empirical validation; published flatland examples do not prove them.
-- Existing local lighting is tone mapped before its consumers; it cannot serve
-  as the new linear radiance source. Current planar history is not reusable
-  surface history. Preserve direct/reflection roles and final display grading.
-- Other Plans may touch lighting uniforms/shadows; preserve their approved
-  behavior after rebase. No logical prerequisite Plan is required here.
+Before the first runtime edit, `/compile` and `/agent-harness` capture the
+original tree's device/driver/build, exact requests/settings, assets/material
+IDs and streaming readiness, camera/projection/transforms, screenshots,
+whole-frame/FPS/raw existing profile observations and VMA/resize observations.
+Use ordinary and dense-effects UHD paused fixtures. Include packed emissive
+ships without planar depositors, nonemissive ships and terrain/cliffs,
+static/skinned/material splits, excluded effects, both camera modes and the
+lifecycle matrix below. These are preservation baselines, not fabricated new
+timer evidence. Record actual Vulkan GPU rather than Windows adapter order.
 
-## Verification and go/no-go
+Use existing `inject_payload`, `edit_frame`, pause/describe/debug,
+`query_profile`, `dump_render_target`, `renderdoc_capture` and camera/settings
+routes via `/agent-harness`; save exact reproducible requests with the evidence.
+Debug-only scene edits/captures run in Debug. Profile timing uses identical
+Profile-supported setup on both sides, no Debug-only client commands; server-side fixture authoring may use a Debug server with the client remaining Profile; if existing
+packed content cannot reproduce a fixture in Profile, report a blocked timing
+check rather than add a protocol. Wait for textures before sampling.
 
-Use `/compile` for BrokenEngineSandbox client Profile|x64 (timing) and Debug|x64
-(validation), and required DataPacker shader generation; use `/agent-harness`
-for all launch, drive, query, screenshot, target-dump and RenderDoc work. Existing
-routes: `Projects/BrokenEngineSandbox/Documents/AgentHarness.md`, its
-`AgentHarness/{verification,commands-server,commands-client}.md`, and
-`.agents/skills/agent-harness/references/command-reference.md`. Use existing
-`inject_payload`/`edit_frame`, pause, UI/camera input, `describe_scene`,
-`describe_state`, `query_profile`, `dump_render_target` and `renderdoc_capture`;
-no new command protocol. Record exact request sequences, IDs, camera state,
-settings and packed asset identities in the run evidence so another session
-can replay them. Synthetic shader diagnostics below use the existing debug UI
-and texture readback, not a new test framework.
-
-### Fixed quality fixtures
-
-Use two fixture classes. A diagnostic input generator writes depth/normal/emission
-for a plane, an emissive rectangle and an opaque box in camera-local coordinates
-with exactly the same projection/units as real inputs. Add a second raised plane
-and tilted receiver patches for height and normal checks. Positions are specified
-in d units relative to the camera ground-plane look-at point: receiver plane
-z=0 with normal +z, horizontal square emitter centered (0,0,d/2) with side d/2
-and emitting normal -z,
-box centered (d/2,0,d/4) with side d/4, raised patch at z=d/2, tilted patches at
-0/45/90 degrees. Fit these within viewport and range with the normal world camera.
-Source radiance is (4,1,0.25), receiver diffuse response (0.5,0.5,0.5). This tests
-transport against known inputs, not geometry integration. The ordinary input
-pass stays disabled only during this diagnostic mode.
-
-For real integration use existing packed emissive ship materials (for example
-`Projects/BrokenEngineSandbox/Data/Models/Spaceship/scene.gltf` has an emissive
-texture/factor) beside nonemissive ships and an island cliff, spawned/positioned
-with existing game commands. Freeze simulation for comparisons. Add a
-prototype-only source multiplier 0/1 after extracting actual material emission
-so on/off comparisons do not change geometry, forward self-emission or planar
-deposits; do not fabricate a glow where the material has none. Confirm the
-isolated source has no associated planar depositor in this fixture. Include
-native projectiles/effects to demonstrate their deliberate absence as RC sources.
-For reproducibility record the selected material/mesh and transforms, normal
-orientation, material texture streaming readiness and camera. Run at source
-sizes of 16, 8, 4 and 2 output pixels at the intended camera zoom; below one
-input pixel is a documented representation limit, not a successful tiny-light
-result. These fixtures use current engine assets; no new art or simulation type.
-
-At a fixed 8x8 grid of valid receiver pixels in each diagnostic view, compute
-a reference with 32x32 equal-solid-angle directions traced over [0,8d), using
-the same input depth, thickness, source and cap per interval. For every base
-direction also compare its RC merged radiance with a direct full-range trace
-of that direction; this separates merge error from angular quadrature. Perform
-reference work only in diagnostic capture mode, excluded from cost cohorts.
-Dump reference, RC, validity and counters through debug textures. Reference rays
-that exhaust the cap are invalid evidence and fail the reference-coverage gate.
-
-### Acceptance table
-
-| Criterion | Required evidence and pass condition |
+| ID | Required evidence and result |
 | --- | --- |
-| Source contract and integration | Input/debug dumps and a RenderDoc frame show coherent nearest opaque depth/normal/emission, alpha discard agreement, no old shaded color or RC feedback. Source multiplier zero makes RC black; doubling source in diagnostic data doubles linear RC within 2% before display mapping. Direct/IBL/shadows and self-emission stay present in baseline/candidate. |
-| Reference coverage | At least 48 of the fixed 64 sample pixels are valid in each unblocked/blocked/raised/tilted fixture, with at least eight lit samples in its unblocked counterpart; no more than 5% of their traced reference directions exhaust or leave representation. Otherwise report no-go or invalid fixture evidence, never silently drop difficult samples. |
-| Directional response and merge | Constant-radiance diagnostic has at most 20% irradiance error across the declared normal angles relative to pi*L. On the scene fixtures, luminance-normalized RMS error versus 1024-direction reference <=35%, using denominator max(reference luminance, 1% of fixture peak). Report same-direction merge error separately; no negative/NaN/infinite outputs. |
-| Blocker and height behavior | On receiver samples whose reference blocked result is <=10% of its unblocked result, RC is <=20% of that unblocked reference. Raised/tilted surfaces obey the reference-error gate rather than lighting unrelated depth layers. Document thin-slab and hidden-layer failure examples explicitly. |
-| Intended camera/source sizes | Real terrain/model receiver response is visible and changes under source on/off and cliff occlusion at 16/8/4 output-pixel source sizes; record 2-pixel disappearance as a limit. If required 4-pixel sources do not survive or show useful occlusion at the intended RTS zoom, no-go. Record zoom/perspective state rather than claim all zoom levels work. |
-| Motion and boundaries | Capture a 120-frame pan/zoom sequence, source crossing screen edge/behind cliff, neighbor-cell crossing and multi-cell jump. No history trails, stale-cell lighting or coordinate seams; stationary valid reference samples keep the error gate. Record screen-edge/source loss and ringing; instability that defeats useful 4-pixel response is no-go, not authority for history. |
-| Excluded materials and modes | Water/shields/transparents/particles/light sprites retain their baseline shaders/lighting; demonstrate absent transport and potential transparent-cover limitation. Model-over-world reports disabled. Test perspective and orthographic world views. |
-| Vulkan/lifecycle | MSAA off and highest supported configured setting; UHD -> smaller window -> UHD, minimize/restore, toggle off/on, camera cut/cell moves. No validation errors, stale descriptor/resource access, nonfinite outputs or wrong input/forward alignment. RenderDoc verifies per-slot resources, barriers and unchanged final HDR/MSAA path. |
-| Relative cost and memory | Apply the timing protocol below at UHD on verified target Vulkan GPU, normal and dense-effects fixtures. Complete new effect <=2L in every cohort pair; report total-frame/FPS changes and actual all-live allocation/resize peak. No absolute memory or ms cap is claimed. |
-| Decision record | Save build/device/settings, fixture requests, captures, raw timing cohorts, input/resource inventory, every failed gate and a clear go/no-go. Prototype completion may record no-go; no-go does not authorize production deployment or silently relax criteria. |
+| A1 Inputs | Raw output-exact depth/normal/validity/emission match nearest actual forward silhouettes, elevation, skinning, material ranges and current solid/backface coverage. Terrain/background emission zero. Multiplier 0 gives zero captured emission; 2 versus 1 doubles valid RGB within 2%, forward self-emission unchanged. |
+| A2 Reconstruction | Logged pixels plus CPU projection/unprojection and captures align reconstructed geometry with real draws under both projections, shake, neighbor-cell crossing and multicell jump; no nonfinite/stale-cell/misaligned data. |
+| A3 Preservation | Fully-off versus original-tree baselines preserves direct/IBL/shadows/self-emission/display and water/shields/transparents/particles/sprites. On changes inspection only, adds no indirect scene contribution; excluded classes absent from inputs. Model-over-world visibly disables. Record authored MASK/two-sided limits. |
+| A4 Lifecycle | Repeat MSAA off/highest supported setting, UHD->smaller->UHD, minimize/restore, off/on, world-hidden/resume, empty cells/rewind and pipeline-only recreation across all slots. No validation errors, stale accesses or pending-set writes. Capture plus lifetime review prove barriers/slot views/publication and retained submission graph/HDR/MSAA. Fully off frees targets/omits work. |
+| A5 Descriptors | Generated SPIR-V/reflection and writes match singleton diagnostic storage counts/bindings/slot-selected views, no StorageImageArrayDynamicIndexing capability/new feature/helper extension. Do not add compute/storage diagnostics gratuitously if raster conversion suffices. |
+| A6 Timing | Exact five-pair cohorts above, 600 unique completed frames per side, valid frame endpoints and query resets in on/off/hidden paths; report L/input/full frame/FPS, raw means/median/range and readiness counts. No stale disabled values or repeated smoothed rows, no full-effect budget claim. |
+| A7 Memory | Record actual slot count/formats/limits, payload inventory versus all-live VMA delta and resize peak including diagnostics/retirement. No imposed memory ceiling or feasibility claim from arithmetic. |
+| A8 Integration | `/compile` shader generation/DataPacker Release|x64, BES client Debug|x64 validation/Profile|x64 timing and affected server-safe builds; project/layout/static checks and triggered reviews pass. Server/simulation/CRC/network/save/replay/.pack contracts untouched. Independent stage acceptance review verifies A1-A7. |
 
-### Timing protocol
+Timing needs 7200 completed frames per fixture, excluding loading/draining/
+captures. Duration is unmeasured. Follow [Change Workflow User Interaction](../../../.agents/references/change-workflow.md#user-interaction)
+Long test runs: before dispatching a run expected to exceed 10 minutes, obtain
+user approval with expected duration, checks and a shorter alternative. Do not
+truncate mandatory cohorts or treat a spot check as full acceptance.
 
-L is baseline GPU time for the contiguous current lighting producer:
-deposit + spread + combine + temporal, including all passes/layers the renderer
-actually schedules, excluding shadows, smoke/wind, water and forward material
-shading. Add a containing timestamp pair instead of summing unrelated latest
-`query_profile` samples. Measure baseline with prototype fully off, then candidate
-with unchanged content, camera, GPU, resolution, settings and simulation pause.
-Use three alternating baseline/candidate cohort pairs, each 120 warm-up rendered
-frames then 600 measured frames. Read a timer only when its timestamp query is
-available. Use arithmetic means over equal completed-frame counts; no percentile
-or same-frame subtraction claim from the current profile query API. Record both
-cohort sums/counts through the existing profiler/log output; no new harness API.
+A required unsupported resource is a documented stage no-go. Shader defects,
+incoherent inputs or invalid evidence require correction; input-only completion
+never claims useful four-pixel lighting or a complete experiment verdict.
 
-Instrument scene input, trace and merge separately. Resolve occurs in terrain/model
-forward shaders, so its cost includes the candidate-minus-baseline difference in
-their complete forward GPU scopes, clamped to zero for the budget calculation.
-Define C = candidate input+trace+merge mean plus that nonnegative forward delta.
-The required per-pair gate is C<=2L. Include allocation-independent per-frame
-clears/counter work in the new scopes. Disable reference/debug readback/capture
-work during cohorts. Report diagnostic overhead separately. Report complete
-frame GPU time and presented FPS, including retained planar lighting and all
-other passes; C is not a claim that whole frame costs 2L. Use a full-frame query
-span with valid endpoints across Global/Main and preserve their ordering; show
-the whole-frame cohort mean and CPU/present limits. Do not use captured RenderDoc
-timings as normal frame cost or subtract unrelated latest/maximum timer rows.
+## Risks and invariants
 
-## Primary research and limits
+Future Tier 3 triggers are shared CPU/GLSL layout, sampled-depth MRT,
+per-slot model publication, immutable recording and GPU lifetime/synchronization.
+Keep current Vulkan 1.2 feature requirements, camera-cell RenderBasis,
+server-safe file affinity, deterministic simulation/CRC and retained lighting.
+All original and new resource users must be drained before descriptor/resource
+replacement; no assumed shared-HDR serialization protects new slot resources.
+Use `/update-affected-code`, `/update-vcxproj`, `/update-claude-docs` and required
+C++/GLSL/comment/style/overengineering/coherence/progressive/adversarial reviews
+as triggered; `/verify-acceptance` verifies stage completion. No unit tests.
 
-- [Sannikov, Radiance Cascades paper source](https://github.com/Raikiri/RadianceCascadesPaper/blob/main/RadianceCascades.tex),
-  sections Radiance Interval, Analysis, Radiant 2d and Path of Exile 2 GI:
-  interval composition, screen-space depth probes, visible-data limitations,
-  mainly single bounce. The production tracer is outside the paper; translated
-  flatland interval extension does not apply to depth-varying screen-space
-  probes. Spherical bins, rejection thresholds and this engine's recipe are
-  author choices.
-- [McGuire and Mara, Efficient GPU Screen-Space Ray Tracing (JCGT 2014)](https://jcgt.org/published/0003/04/04/): perspective-correct contiguous-pixel DDA and finite linear-depth thickness. It supplies tracing mechanics, not RC merging or this renderer's budget.
-- [Khronos image usage](https://docs.vulkan.org/refpages/latest/refpages/source/VkImageUsageFlagBits.html) and [depth/stencil resolve properties](https://docs.vulkan.org/refpages/latest/refpages/source/VkPhysicalDeviceDepthStencilResolveProperties.html): sampled use must be requested; MSAA depth resolve is a capability/attachment contract. This Plan avoids depth resolve through separate single-sample inputs.
+## Supporting documentation and research
 
-Engine evidence anchors are the critical files above plus
-`Engine/Source/Graphics/Managers/SwapchainManager.cpp` (`CreateFramebuffers`:
-current depth is attachment-only, discarded and unresolved),
-`Engine/Source/Graphics/Objects/PipelineCreator.cpp` (existing MRT count support),
-`Engine/Source/Graphics/CameraBase.cpp` (RH orthographic/perspective projection),
-`Engine/Source/Profile/ProfileScreens.cpp` (VMA allocation statistics), and
-`Engine/Source/Agent/AgentCommandsClientGeneric.cpp` (existing profile/debug dump
-and RenderDoc commands). Read their owning AGENTS.md contracts before coding.
-The older 2D tutorials are explanatory rather than proof of 3D engine behavior;
-no independent renderer code is required or licensed for copying here.
+Source anchors were checked at baseline 379a17c99d379c1e6ad4e3ce3ad1a46977c0fc08
+and primary f6c5a7befa65f4792037fce372b82c5488740b81: the graphics/shader/profile
+and attribution code named here is unchanged between them. These are navigation
+and contract evidence, never performance proof. Recheck after future drift.
+
+- [Graphics ownership](../../../Engine/Source/Graphics/AGENTS.md), [manager publication](../../../Engine/Source/Graphics/Managers/AGENTS.md), [pipeline ownership](../../../Engine/Source/Graphics/Objects/AGENTS.md), [render ordering](../../../Engine/Source/Graphics/Render/AGENTS.md), [profiling](../../../Engine/Source/Profile/AGENTS.md) and [shader contracts](../../../Engine/Data/Shaders/AGENTS.md) govern the named integration sites.
+- [Model decoder](../../../DataPacker/Source/ExportJobs/Scene/GltfSceneDecoder.cpp) `DecodeMaterialShaderDatas` warns on unsupported doubleSided; Model.frag and pipeline culling establish current visibility. Input fixtures test agreement, not glTF feature compliance.
+- [SSRT3 pinned source](https://github.com/cdrinmatane/SSRT3/blob/b38d82140acf646ee485f9ab16a5fa84906f2231/HDRP/Shaders/Resources/SSRTCS.compute) establishes why coherent inputs are needed; stage 2 owns its port and licensing. This stage claims no transport implementation.
