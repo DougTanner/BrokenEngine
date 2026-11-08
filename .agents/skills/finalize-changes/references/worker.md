@@ -67,10 +67,10 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
    - When the landing content changed after the commit was first created, pass
      approval preparation the `-CommitMessageFile` override `scripts.md`
      documents so the prepared commit's message describes what it now contains.
-   - Every `-CommitMessageFile` text this worker writes ends with the trailer
-     the brief's `Attribution trailer` field carries; this worker's own session
-     configuration never overrides it. A brief without that field returns
-     `BLOCKED` naming the missing field before the candidate commit is created.
+   - When the brief carries an `Attribution trailer` line, every
+     `-CommitMessageFile` text this worker writes ends with exactly that line;
+     this worker's own session configuration never overrides it. When the brief
+     omits the field or gives `none`, the text ends with no trailer.
    - Only when the brief carries the `-RequireExportOutputsRewritten` switch
      (`SKILL.md` `### Landing confirmation`), add it to the candidate-commit
      invocation. Its `candidate.export-output-not-regenerated` block returns a

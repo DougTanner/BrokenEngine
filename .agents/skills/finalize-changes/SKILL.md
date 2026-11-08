@@ -24,12 +24,13 @@ Produces the landing acceptance table and the landing summary main presents.
 
 ## Inputs
 
-Require the approved objective, its stage decisions, the caller-owned changed
-paths, and an `Attribution trailer` brief field carrying the dispatching
-session's own attribution trailer line. That path set is the session's full
-landing set, including paths already committed — a deletion among them
-included — so a re-preparation dispatch passes it unchanged rather than trimming
-it to what is still dirty. The finalizer produces the landing acceptance table
+Require the approved objective, its stage decisions, and the caller-owned
+changed paths. That path set is the session's full landing set, including paths
+already committed — a deletion among them included — so a re-preparation
+dispatch passes it unchanged rather than trimming it to what is still dirty. An
+optional `Attribution trailer` brief field carries the dispatching session's own
+attribution trailer line; when the brief omits it or gives `none`, the commit
+message has no trailer. The finalizer produces the landing acceptance table
 itself, inside the workflow in `references/worker.md`, from the prepared diff
 final preparation and reconciliation produced — do not reuse an earlier table.
 When a Plan completion or rejection belongs to the landing, the brief also
@@ -130,7 +131,7 @@ plus the continuation capsule below
   reply.
 
 Branches, the session label, and the receipt path are re-resolved by the
-landing worker or fixed; the path set and the `Attribution trailer` stay
+landing worker or fixed; the path set and any `Attribution trailer` stay
 ordinary brief fields; the owner token never crosses the dispatch boundary —
 the landing worker claims the lock itself. A decline or non-answer leaves
 primary unchanged. A reply that asks for changes instead also leaves primary
