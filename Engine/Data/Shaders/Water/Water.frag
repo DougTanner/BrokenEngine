@@ -72,7 +72,7 @@ void main()
 	}
 	PatchTriangle pWaterNormalPatchTriangles[3];
 	MakeWaterNormalPatchTriangles(f2InInitialPosition, pWaterNormalPatchTriangles);
-	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles);
+	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles, true);
 	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy, pWaterNormalPatchTriangles);
 
 	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).

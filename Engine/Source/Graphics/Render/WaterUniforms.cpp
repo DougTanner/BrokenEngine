@@ -163,10 +163,11 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	// One patch lattice per blended texture read, at that read's own frequency; each read's seed is its position in this
 	// order. Only each normal band's octave One read is blended.
 	bool bBreakRepetition = gBreakRepetition.Get<bool>();
-	rGlobalLayout.fWaterNormalPatchBlendOne = bBreakRepetition ? gWaterNormalPatchBlendOne.mfCurrent : 0.0f;
-	rGlobalLayout.fWaterNormalPatchBlendTwo = bBreakRepetition ? gWaterNormalPatchBlendTwo.mfCurrent : 0.0f;
-	rGlobalLayout.fWaterNormalPatchBlendThree = bBreakRepetition ? gWaterNormalPatchBlendThree.mfCurrent : 0.0f;
-	rGlobalLayout.fWaterColorNoisePatchBlend = bBreakRepetition ? gWaterColorNoisePatchBlend.mfCurrent : 0.0f;
+	rGlobalLayout.fWaterNormalPatchBlendOne = bBreakRepetition && gWaterNormalPatchBlendOneEnabled.Get<bool>() ? gWaterNormalPatchBlendOne.mfCurrent : 0.0f;
+	rGlobalLayout.fWaterNormalPatchBlendTwo = bBreakRepetition && gWaterNormalPatchBlendTwoEnabled.Get<bool>() ? gWaterNormalPatchBlendTwo.mfCurrent : 0.0f;
+	rGlobalLayout.fWaterNormalPatchBlendThree = bBreakRepetition && gWaterNormalPatchBlendThreeEnabled.Get<bool>() ? gWaterNormalPatchBlendThree.mfCurrent : 0.0f;
+	rGlobalLayout.fWaterColorNoisePatchBlend = bBreakRepetition && gWaterColorNoisePatchBlendEnabled.Get<bool>() ? gWaterColorNoisePatchBlend.mfCurrent : 0.0f;
+	rGlobalLayout.iWaterNormalExtraSamplePatchBlend = bBreakRepetition && gWaterNormalExtraSamplePatchBlendEnabled.Get<bool>() ? 1 : 0;
 	static constexpr float kpfNormalSizeMultipliers[] = {shaders::kfWaterNormalOneOctaveOneSizeMultiplier, shaders::kfWaterNormalTwoOctaveOneSizeMultiplier, shaders::kfWaterNormalThreeOctaveOneSizeMultiplier};
 	static_assert(std::size(kpfNormalSizeMultipliers) == std::extent_v<decltype(shaders::GlobalLayout::pWaterNormalPatchLattices)>);
 	double pfSizeBases[] = {fSizeBaseOne, fSizeBaseTwo, fSizeBaseThree};
@@ -197,9 +198,9 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 		float fSpawnNoiseInverseTileSize = ReduceFoamOrigin(gWaterFoamSpawnNoiseTileSize.mfCurrent, rGlobalLayout.f2WaterFoamSpawnNoiseReducedOrigin);
 		rGlobalLayout.fWaterFoamSpawnNoiseInverseTileSize = fSpawnNoiseInverseTileSize;
 
-		rGlobalLayout.fWaterFoamTexturePatchBlend = bBreakRepetition ? gWaterFoamTexturePatchBlend.mfCurrent : 0.0f;
-		rGlobalLayout.fWaterFoamBreakupPatchBlend = bBreakRepetition ? gWaterFoamBreakupPatchBlend.mfCurrent : 0.0f;
-		rGlobalLayout.fWaterFoamSpawnNoisePatchBlend = bBreakRepetition ? gWaterFoamSpawnNoisePatchBlend.mfCurrent : 0.0f;
+		rGlobalLayout.fWaterFoamTexturePatchBlend = bBreakRepetition && gWaterFoamTexturePatchBlendEnabled.Get<bool>() ? gWaterFoamTexturePatchBlend.mfCurrent : 0.0f;
+		rGlobalLayout.fWaterFoamBreakupPatchBlend = bBreakRepetition && gWaterFoamBreakupPatchBlendEnabled.Get<bool>() ? gWaterFoamBreakupPatchBlend.mfCurrent : 0.0f;
+		rGlobalLayout.fWaterFoamSpawnNoisePatchBlend = bBreakRepetition && gWaterFoamSpawnNoisePatchBlendEnabled.Get<bool>() ? gWaterFoamSpawnNoisePatchBlend.mfCurrent : 0.0f;
 		gPresentationContinuity.waterFoamTextureLattice = PopulatePatchLattice(rGlobalLayout.waterFoamTexturePatchLattice, static_cast<double>(fTextureInverseTileSize), uiSeed++);
 		gPresentationContinuity.waterFoamBreakupLattice = PopulatePatchLattice(rGlobalLayout.waterFoamBreakupPatchLattice, static_cast<double>(fBreakupInverseTileSize), uiSeed++);
 		gPresentationContinuity.waterFoamSpawnNoiseLattice = PopulatePatchLattice(rGlobalLayout.waterFoamSpawnNoisePatchLattice, static_cast<double>(fSpawnNoiseInverseTileSize), uiSeed++);

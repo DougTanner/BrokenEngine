@@ -86,10 +86,9 @@ vec3 DecodeWaterNormal(vec2 f2Encoded)
 
 // Randomized patch blending: up to three reads of one tiled texture, each shifted by the UV offset hashed from one vertex
 // of the stationary lattice triangle around the fragment, weighted by that vertex's normalized cubed barycentric less
-// kfPatchWeightThreshold, floored at 0 and renormalized. A vertex's weight falls continuously to 0 before the triangle
-// edge opposite it, so no seam forms, and a vertex at weight 0 skips its hash and read; its offset stays unset.
-const float kfPatchWeightThreshold = 0.05f;
-
+// GlobalLayout::fPatchWeightThreshold capped just below the largest normalized cube, floored at 0 and renormalized. A
+// vertex's weight falls continuously to 0 at or before the triangle edge opposite it, so no seam forms, and a vertex at
+// weight 0 skips its hash and read; its offset stays unset.
 struct PatchTriangle
 {
 	vec3 f3Weights;
@@ -137,9 +136,12 @@ PatchTriangle MakePatchTriangle(GlobalLayout globalLayout, PatchLatticeLayout la
 		f3Barycentrics = vec3(f2Fraction.x + f2Fraction.y - 1.0f, 1.0f - f2Fraction);
 	}
 	// max(cube / sum - threshold, 0) renormalized equals max(cube - threshold * sum, 0) renormalized. Barycentrics sum to
-	// 1, so their cubes sum to at least 1/9 and the largest is at least a third of the sum: the excess sum stays positive.
+	// 1, so the largest cube is at least 1/27 and at least a third of the sum. Capping the subtracted term at 0.999 of the
+	// largest cube leaves that vertex a positive excess for every threshold, and the cap is not reached while the
+	// threshold stays at or below 0.333.
 	vec3 f3Cubes = f3Barycentrics * f3Barycentrics * f3Barycentrics;
-	vec3 f3Excess = max(f3Cubes - kfPatchWeightThreshold * (f3Cubes.x + f3Cubes.y + f3Cubes.z), 0.0f);
+	float fLargestCube = max(max(f3Cubes.x, f3Cubes.y), f3Cubes.z);
+	vec3 f3Excess = max(f3Cubes - min(globalLayout.fPatchWeightThreshold * (f3Cubes.x + f3Cubes.y + f3Cubes.z), 0.999f * fLargestCube), 0.0f);
 	PatchTriangle patchTriangle;
 	patchTriangle.f3Weights = f3Excess / (f3Excess.x + f3Excess.y + f3Excess.z);
 	for (int i = 0; i < 3; ++i)

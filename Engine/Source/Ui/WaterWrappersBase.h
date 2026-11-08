@@ -142,4 +142,15 @@ extern Wrapper gWaterFoamSpawnNoiseAmount;
 extern Wrapper gWaterFoamSpawnNoiseTileSize;
 inline Wrapper gWaterFoamSpawnNoisePatchBlend(1.0f, 0.0f, 1.0f);
 
+// Break Repetition
+inline Wrapper gPatchWeightThreshold(0.4f, 0.0f, 1.0f); // MakePatchTriangle caps the subtracted threshold below the largest normalized cube, so the excess sum stays positive.
+inline Wrapper gWaterNormalPatchBlendOneEnabled(true);
+inline Wrapper gWaterNormalPatchBlendTwoEnabled(false);
+inline Wrapper gWaterNormalPatchBlendThreeEnabled(false);
+inline Wrapper gWaterColorNoisePatchBlendEnabled(false);
+inline Wrapper gWaterFoamTexturePatchBlendEnabled(false);
+inline Wrapper gWaterFoamBreakupPatchBlendEnabled(false);
+inline Wrapper gWaterFoamSpawnNoisePatchBlendEnabled(false);
+inline Wrapper gWaterNormalExtraSamplePatchBlendEnabled(true);
+
 } // namespace engine

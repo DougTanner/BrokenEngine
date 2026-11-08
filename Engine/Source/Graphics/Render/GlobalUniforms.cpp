@@ -610,6 +610,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	double fBasisRY = static_cast<double>(kCellDirections.f2BasisR.y);
 	double fBasisDeterminantInverse = 1.0 / (fBasisQX * fBasisRY - fBasisRX * fBasisQY);
 	rGlobalLayout.f4PatchInverseBasis = {static_cast<float>(fBasisRY * fBasisDeterminantInverse), static_cast<float>(-fBasisQY * fBasisDeterminantInverse), static_cast<float>(-fBasisRX * fBasisDeterminantInverse), static_cast<float>(fBasisQX * fBasisDeterminantInverse)};
+	rGlobalLayout.fPatchWeightThreshold = gPatchWeightThreshold.mfCurrent;
 
 	float fDayPercent = 0.0f;
 	float fNoonPercent = 0.0f;

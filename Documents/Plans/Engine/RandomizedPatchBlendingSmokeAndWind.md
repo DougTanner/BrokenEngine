@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-08T13:52:08.495Z","dependsOn":["Documents/Plans/Engine/BreakRepetitionQualityLevels.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-08T13:52:08.495Z","dependsOn":[]} -->
 # Randomized Patch Blending for Smoke and Wind Noise
 
 ## Context
@@ -34,7 +34,7 @@ Stage 1 added, and this Plan reuses without changing its behavior:
 
 - Shader helpers in `ShaderFunctions.h` that build a triangle description on the stationary lattice
   (axial `floor`/`fract` split on `f.x+f.y<=1`; weights are the cubed nonnegative barycentrics
-  normalized by their sum, less `kfPatchWeightThreshold`, floored at 0 and renormalized), hash each
+  normalized by their sum, less `GlobalLayout::fPatchWeightThreshold` capped just below the largest normalized cube, floored at 0 and renormalized), hash each
   canonical vertex identity with the descriptor's seed, which `PopulatePatchLattice` has already
   mixed with the exponent, through one pcg3d integer hash into two offsets in `[0,1)` (upper 24
   bits times `2^-24`), and blend up to three offset-only reads, skipping a read whose weight is 0.
@@ -107,14 +107,12 @@ The author recommends:
   publishes the curl strength and descriptor beside `f2SmokeCurlTimeOffset`; `RenderWindGlobal`
   publishes the wind Low/High strengths and descriptor. Each writer also writes its
   `LatticeReport`s, all before the water publication that advances `iPublishedFrames`.
-- The Graphics screen's Break Repetition toggle (`gBreakRepetition`, persisted, default on) and its
-  Low/Medium/High level (`gBreakRepetitionLevel`, from the prerequisite in `## Coordination`) are
-  the player switch for the whole repetition-breaking feature. Smoke and wind blend only at High:
-  each writer above publishes each smoke and wind strength as its wrapper value when
-  `gBreakRepetition` is on and the level is High, and 0 otherwise, without writing the wrappers. If
-  the cost measurement (criterion 8) suggests a Medium or Low subset, return it to the user.
-  Strength 0, through the toggle, a level below High or a Tweaks slider, is the zero-strength path
-  of criterion 2.
+- The Graphics screen's Break Repetition toggle (`gBreakRepetition`, persisted, default on) is
+  the player switch for the whole repetition-breaking feature: each writer above publishes each
+  smoke and wind strength as its wrapper value when `gBreakRepetition` is on, and 0 otherwise,
+  without writing the wrappers. If the cost measurement (criterion 8) suggests a cheaper subset of
+  smoke and wind reads, return it to the user. Strength 0, through the toggle or a Tweaks slider,
+  is the zero-strength path of criterion 2.
 
 Cost: each read costs one fetch at zero strength, at most four at intermediate and at most three at
 full; the curl early-out at zero curl strength still skips all curl reads. The blend is a convex
@@ -213,9 +211,7 @@ The supplied evidence records no harness setup; the executing session records it
 
 ## Coordination
 
-Directional prerequisite (metadata): `Documents/Plans/Engine/BreakRepetitionQualityLevels.md`,
-which adds the Break Repetition level the smoke and wind strength publication reads. Stage 1 landed
-with this Plan and has no Plan file. Reciprocal
+Stage 1 landed with this Plan and has no Plan file. Reciprocal
 coordination with `Documents/Plans/Engine/RandomizedPatchBlendingTerrain.md`: both extend
 `ShaderGlobalLayout.h`, `PresentationContinuitySnapshot` and its ownership comment, the probe's
 `"lattices"` object, its command-reference description and possibly `ShaderFunctions.h`; whichever

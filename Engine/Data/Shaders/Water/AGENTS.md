@@ -65,7 +65,8 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 
 - Skybox One extra sampling: capture position and geometry-normal derivatives
   before terrain rejection and sample branches; every normal sample uses the
-  original full-pixel unwrapped gradients and the fragment's patch triangles. Nonpositive factors contribute zero
+  original full-pixel unwrapped gradients; the extra samples read the fragment's patch triangles while
+  `iWaterNormalExtraSamplePatchBlend` is set and plain octave One reads otherwise. Nonpositive factors contribute zero
   and stay in the denominator. Only Skybox One samples extra.
 - Shoreline skybox-lobe reductions are applied once, scaling each lobe's intensity: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Water Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Water Medium Shore Softness`.

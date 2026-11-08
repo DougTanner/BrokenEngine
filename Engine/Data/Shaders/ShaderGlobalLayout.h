@@ -27,6 +27,7 @@ struct GlobalLayout
 	vec2 f2CameraPosition INIT;
 	vec4 f4VisibleArea INIT;
 	vec4 f4PatchInverseBasis INIT; // Column-major mat2 inverse of the axial cell basis: camera-cell position to cell steps (MakePatchTriangle)
+	float fPatchWeightThreshold INIT; // MakePatchTriangle's weight threshold, its subtracted term capped just below the largest normalized cube
 	vec4 f4ShadowArea INIT;
 	vec4 f4ShadowAreaExtra INIT;
 	vec4 f4ShadowAreaPrevious INIT; // f4ShadowArea as it stood before the latest refresh, for ShadowTemporal.comp reprojection
@@ -298,6 +299,7 @@ struct GlobalLayout
 	float fWaterFoamTexturePatchBlend INIT;
 	float fWaterFoamBreakupPatchBlend INIT;
 	float fWaterFoamSpawnNoisePatchBlend INIT;
+	int32_t iWaterNormalExtraSamplePatchBlend INIT; // Nonzero: Skybox One's extra normal samples blend band octave One reads too
 	PatchLatticeLayout pWaterNormalPatchLattices[3] INIT; // Octave One of bands One, Two, Three
 	PatchLatticeLayout pWaterColorNoisePatchLattices[2] INIT; // Octaves One, Two
 	PatchLatticeLayout waterFoamTexturePatchLattice INIT;

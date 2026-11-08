@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-08T13:52:04.099Z","dependsOn":["Documents/Plans/Engine/BreakRepetitionQualityLevels.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-08T13:52:04.099Z","dependsOn":[]} -->
 # Randomized Patch Blending for Terrain Materials
 
 ## Context
@@ -35,7 +35,7 @@ Stage 1 added, and this Plan reuses without changing its behavior:
 
 - Shader helpers in `ShaderFunctions.h` that build a triangle description on the stationary lattice
   (axial `floor`/`fract` split on `f.x+f.y<=1`; weights are the cubed nonnegative barycentrics
-  normalized by their sum, less `kfPatchWeightThreshold`, floored at 0 and renormalized), hash each
+  normalized by their sum, less `GlobalLayout::fPatchWeightThreshold` capped just below the largest normalized cube, floored at 0 and renormalized), hash each
   canonical vertex identity with the descriptor's seed, which `PopulatePatchLattice` has already
   mixed with the exponent, through one pcg3d integer hash into two offsets in `[0,1)` (upper 24
   bits times `2^-24`), and blend up to three offset-only reads with the caller's original
@@ -92,14 +92,12 @@ The author recommends:
   `LatticeReport`s there, which precedes the water publication that advances `iPublishedFrames`.
   Probe keys: `rockColor`, `rockNormalOne`, `rockNormalTwo`, `rockNormalThree`, `sandColor`,
   `sandNormalOne`, `sandNormalTwo`, `sandNormalThree`.
-- The Graphics screen's Break Repetition toggle (`gBreakRepetition`, persisted, default on) and its
-  Low/Medium/High level (`gBreakRepetitionLevel`, from the prerequisite in `## Coordination`) are
-  the player switch for the whole repetition-breaking feature. Terrain blends only at High:
-  `PopulateTerrainParameters` publishes each terrain strength as its wrapper value when
-  `gBreakRepetition` is on and the level is High, and 0 otherwise, without writing the wrappers. If
-  the cost measurement (criterion 8) suggests a Medium or Low subset, return it to the user.
-  Strength 0, through the toggle, a level below High or a Tweaks slider, is the zero-strength path
-  of criterion 2.
+- The Graphics screen's Break Repetition toggle (`gBreakRepetition`, persisted, default on) is
+  the player switch for the whole repetition-breaking feature: `PopulateTerrainParameters`
+  publishes each terrain strength as its wrapper value when `gBreakRepetition` is on, and 0
+  otherwise, without writing the wrappers. If the cost measurement (criterion 8) suggests a
+  cheaper subset of terrain reads, return it to the user. Strength 0, through the toggle or a
+  Tweaks slider, is the zero-strength path of criterion 2.
 
 At the default sizes and `length(B.q)=900` m (`kfCellApothem` 450, `GridCoord.h:45`) the exponents
 are rock color 8, rock normals 5/5/8, sand color 6, sand normals 6/2/6; the wrapper ranges keep
@@ -192,9 +190,7 @@ The supplied evidence records no harness setup; the executing session records it
 
 ## Coordination
 
-Directional prerequisite (metadata): `Documents/Plans/Engine/BreakRepetitionQualityLevels.md`,
-which adds the Break Repetition level the terrain strength publication reads. Stage 1 landed with
-this Plan and has no Plan file. Reciprocal
+Stage 1 landed with this Plan and has no Plan file. Reciprocal
 coordination with `Documents/Plans/Engine/RandomizedPatchBlendingSmokeAndWind.md`: both extend
 `ShaderGlobalLayout.h`, `PresentationContinuitySnapshot` and its ownership comment, the probe's
 `"lattices"` object, its command-reference description and possibly `ShaderFunctions.h`; whichever

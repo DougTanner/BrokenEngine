@@ -4,7 +4,7 @@ struct WaterNormalSamplingResult
 };
 
 // Each normal band's octave One patch triangle at f2InitialPosition, built only for a drawn band with a positive patch
-// blend strength; SampleWaterNormals reads the same three at every sample position of one fragment.
+// blend strength; every SampleWaterNormals call of one fragment that sets bPatchBlend reads the same three.
 void MakeWaterNormalPatchTriangles(vec2 f2InitialPosition, out PatchTriangle pPatchTriangles[3])
 {
 	// Undisplaced, unrotated camera-cell position, so each lattice stays still under band rotation and scroll.
@@ -23,9 +23,13 @@ void MakeWaterNormalPatchTriangles(vec2 f2InitialPosition, out PatchTriangle pPa
 	}
 }
 
-WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2LocalDx, vec2 f2LocalDy, PatchTriangle pPatchTriangles[3])
+// bPatchBlend false passes strength 0 to every octave One read, so none reads its patch triangle.
+WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2LocalDx, vec2 f2LocalDy, PatchTriangle pPatchTriangles[3], bool bPatchBlend)
 {
 	WaterNormalSamplingResult result;
+	float fPatchBlendOne = bPatchBlend ? globalLayout.fWaterNormalPatchBlendOne : 0.0f;
+	float fPatchBlendTwo = bPatchBlend ? globalLayout.fWaterNormalPatchBlendTwo : 0.0f;
+	float fPatchBlendThree = bPatchBlend ? globalLayout.fWaterNormalPatchBlendThree : 0.0f;
 
 	float fSizeOne = mainLayout.fLightingSampledNormalsOneSize;
 	float fSizeTwo = mainLayout.fLightingSampledNormalsTwoSize;
@@ -68,7 +72,7 @@ WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2Loca
 		mat2 m2UvRotOne = mat2(globalLayout.f4WaterNormalRotationOne);
 		mat2 m2NormalRotOne = mat2(globalLayout.f4WaterNormalRotationOne.xzyw);
 		vec3 f3Accum = vec3(0.0f);
-		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexOne], fSizeOne, f2ReducedOrigin, f2ReducedTime, m2UvRotOne, kfWaterNormalOneOctaveOneSizeMultiplier, 1.1f, vec2(0.1f, 0.2f), pPatchTriangles[0], globalLayout.fWaterNormalPatchBlendOne)
+		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexOne], fSizeOne, f2ReducedOrigin, f2ReducedTime, m2UvRotOne, kfWaterNormalOneOctaveOneSizeMultiplier, 1.1f, vec2(0.1f, 0.2f), pPatchTriangles[0], fPatchBlendOne)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexOne], fSizeOne, f2ReducedOrigin, f2ReducedTime, m2UvRotOne, kfWaterNormalOneOctaveTwoSizeMultiplier, 1.2f, vec2(0.2f, 0.3f), pPatchTriangles[0], 0.0f)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexOne], fSizeOne, f2ReducedOrigin, f2ReducedTime, m2UvRotOne, kfWaterNormalOneOctaveThreeSizeMultiplier, 1.3f, vec2(0.3f, 0.4f), pPatchTriangles[0], 0.0f)
 		f3SampledNormalOne = f3Accum;
@@ -81,7 +85,7 @@ WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2Loca
 		mat2 m2UvRotTwo = mat2(globalLayout.f4WaterNormalRotationTwo);
 		mat2 m2NormalRotTwo = mat2(globalLayout.f4WaterNormalRotationTwo.xzyw);
 		vec3 f3Accum = vec3(0.0f);
-		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexTwo], fSizeTwo, f2ReducedOriginTwo, f2ReducedTimeTwo, m2UvRotTwo, kfWaterNormalTwoOctaveOneSizeMultiplier, 1.4f, vec2(0.4f, 0.5f), pPatchTriangles[1], globalLayout.fWaterNormalPatchBlendTwo)
+		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexTwo], fSizeTwo, f2ReducedOriginTwo, f2ReducedTimeTwo, m2UvRotTwo, kfWaterNormalTwoOctaveOneSizeMultiplier, 1.4f, vec2(0.4f, 0.5f), pPatchTriangles[1], fPatchBlendTwo)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexTwo], fSizeTwo, f2ReducedOriginTwo, f2ReducedTimeTwo, m2UvRotTwo, kfWaterNormalTwoOctaveTwoSizeMultiplier, 1.5f, vec2(0.6f, 0.7f), pPatchTriangles[1], 0.0f)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexTwo], fSizeTwo, f2ReducedOriginTwo, f2ReducedTimeTwo, m2UvRotTwo, kfWaterNormalTwoOctaveThreeSizeMultiplier, 1.6f, vec2(0.8f, 0.9f), pPatchTriangles[1], 0.0f)
 		f3SampledNormalTwo = f3Accum;
@@ -94,7 +98,7 @@ WaterNormalSamplingResult SampleWaterNormals(vec2 f2InitialPosition, vec2 f2Loca
 		mat2 m2UvRotThree = mat2(globalLayout.f4WaterNormalRotationThree);
 		mat2 m2NormalRotThree = mat2(globalLayout.f4WaterNormalRotationThree.xzyw);
 		vec3 f3Accum = vec3(0.0f);
-		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexThree], fSizeThree, f2ReducedOriginThree, f2ReducedTimeThree, m2UvRotThree, kfWaterNormalThreeOctaveOneSizeMultiplier, 1.7f, vec2(1.0f, 1.1f), pPatchTriangles[2], globalLayout.fWaterNormalPatchBlendThree)
+		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexThree], fSizeThree, f2ReducedOriginThree, f2ReducedTimeThree, m2UvRotThree, kfWaterNormalThreeOctaveOneSizeMultiplier, 1.7f, vec2(1.0f, 1.1f), pPatchTriangles[2], fPatchBlendThree)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexThree], fSizeThree, f2ReducedOriginThree, f2ReducedTimeThree, m2UvRotThree, kfWaterNormalThreeOctaveTwoSizeMultiplier, 1.8f, vec2(1.2f, 1.3f), pPatchTriangles[2], 0.0f)
 		SAMPLE_NORMAL_PRECISE(pWaterNormalSamplers[mainLayout.uiWaterNormalIndexThree], fSizeThree, f2ReducedOriginThree, f2ReducedTimeThree, m2UvRotThree, kfWaterNormalThreeOctaveThreeSizeMultiplier, 1.9f, vec2(1.4f, 1.5f), pPatchTriangles[2], 0.0f)
 		f3SampledNormalThree = f3Accum;

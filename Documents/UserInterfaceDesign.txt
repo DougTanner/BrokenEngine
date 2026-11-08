@@ -342,11 +342,11 @@ Screen-specific commitments this contract makes, each verified visually:
     four decimals, and whole-frame Shadow Update Cadence, Lighting Update
     Cadence, and Smoke Update Cadence use no decimals.
   - Graphics: heavy features use Low/Medium/High rows rather than raw detail
-    sliders — Terrain Shadows, Object Shadows, Lighting Detail, and Smoke Detail
-    (replacing Smoke Pixels), all on the right. A Low/Medium/High Water row
-    sits first; Terrain Shadows
-    follows with its update-cadence slider, then Object Shadows as a standalone
-    row. The Lighting group follows with its toggle, detail row, and
+    sliders — Terrain Shadows, Lighting, and Smoke Detail (replacing Smoke
+    Pixels), all on the right. A Low/Medium/High Water row sits first, followed
+    by the Water Foam and Break Repetition toggles; Terrain Shadows follows
+    with its update-cadence slider.
+    The Lighting group follows with its toggle, detail row, and
     update-cadence slider; the Smoke group then carries its toggle, detail row,
     area slider, update-cadence slider, and Stagger Smoke Layer Updates toggle
     directly above Wind.

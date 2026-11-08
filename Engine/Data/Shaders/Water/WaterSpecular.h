@@ -50,8 +50,9 @@ WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult,
 		{
 			vec2 f2SampleOffset = mainLayout.pf2LightingWaterSkyboxOneSampleOffsets[i];
 			vec2 f2SamplePosition = f2InitialPosition + f2SampleOffset.x * f2InitialDx + f2SampleOffset.y * f2InitialDy;
-			// Sample positions at most a pixel away reuse the fragment's patch triangles rather than rebuilding them.
-			WaterNormalSamplingResult sampleNormalResult = SampleWaterNormals(f2SamplePosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles);
+			// While iWaterNormalExtraSamplePatchBlend is set, sample positions at most a pixel away reuse the fragment's patch
+			// triangles rather than rebuilding them; otherwise their octave One reads stay plain.
+			WaterNormalSamplingResult sampleNormalResult = SampleWaterNormals(f2SamplePosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles, globalLayout.iWaterNormalExtraSamplePatchBlend != 0);
 			vec3 f3SampleToEyeNormal = normalize(vec3(-f2SamplePosition, mainLayout.f4WaterEyePosition.z));
 			f3SampleToEyeNormal = normalize(mix(f3SampleToEyeNormal, vec3(0.0f, 0.0f, 1.0f), globalLayout.fLightingWaterSkyboxNormalSoften));
 			vec3 f3SampleGeometryNormal = normalize(f3InNormal + f2SampleOffset.x * f3NormalDx + f2SampleOffset.y * f3NormalDy);

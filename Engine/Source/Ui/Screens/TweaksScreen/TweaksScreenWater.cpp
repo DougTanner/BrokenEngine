@@ -202,6 +202,19 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Water Foam Spawn Noise Patch Blend", gWaterFoamSpawnNoisePatchBlend, iSection);
 			ImGui::EndTabItem();
 		}
+		if (rScreen.BeginSubtab("Break Repetition", iSection, 6))
+		{
+			rScreen.WrapperSlider("Patch Weight Threshold", gPatchWeightThreshold, iSection);
+			WrapperToggle("Water Normal Patch Blend One Enabled", &gWaterNormalPatchBlendOneEnabled);
+			WrapperToggle("Water Normal Patch Blend Two Enabled", &gWaterNormalPatchBlendTwoEnabled);
+			WrapperToggle("Water Normal Patch Blend Three Enabled", &gWaterNormalPatchBlendThreeEnabled);
+			WrapperToggle("Water Color Noise Patch Blend Enabled", &gWaterColorNoisePatchBlendEnabled);
+			WrapperToggle("Water Foam Texture Patch Blend Enabled", &gWaterFoamTexturePatchBlendEnabled);
+			WrapperToggle("Water Foam Breakup Patch Blend Enabled", &gWaterFoamBreakupPatchBlendEnabled);
+			WrapperToggle("Water Foam Spawn Noise Patch Blend Enabled", &gWaterFoamSpawnNoisePatchBlendEnabled);
+			WrapperToggle("Water Normal Extra Sample Patch Blend Enabled", &gWaterNormalExtraSamplePatchBlendEnabled);
+			ImGui::EndTabItem();
+		}
 		ImGui::EndTabBar();
 	}
 }
