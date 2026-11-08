@@ -12,7 +12,7 @@ Client-only, debug-input-gated ImGui screen for engine and game wrapper settings
 - Wrapper declaration order and each section's slider order stay aligned.
 - Tabbed sections persist their active tab. Loading force-selects the saved tab for one frame, after which normal rendering updates the stored selection.
 - A render path uses at most one ImGui table. When game content an engine section calls owns a table, that section renders outside one. Sliders inside multi-column tables use the cell-width multiplier rather than the full-window default.
-- While dragging, only the owning section remains visible; the toggle bar and saved window layouts stay stable.
+- While a slider is dragged, only its owning section remains visible, or only the Sun Angle slider when that is the one dragged; the rest of the toggle bar keeps its layout while drawn invisibly, and saved window layouts stay stable.
 
 ## See Also
 

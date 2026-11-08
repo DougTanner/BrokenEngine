@@ -51,6 +51,30 @@ void MainMenuScreen::Render()
 		seAutoConnectState = AutoConnectState::kReady;
 	}
 
+	if (model.features & StandardMenuFeature::kLocalServer)
+	{
+		if (!(model.state & StandardMenuState::kClientPresent) && !(model.state & StandardMenuState::kDiscoveryScannerPresent) && !(model.state & StandardMenuState::kServerDiscovered))
+		{
+			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kStartDiscovery);
+			// Discovery changes the live state the auto-connect decision below reads this same pass.
+			model = game::gpGame->GetStandardMenuModel();
+		}
+
+		if ((model.state & StandardMenuState::kAutoConnect) && seAutoConnectState == AutoConnectState::kReady && !(model.state & StandardMenuState::kClientPresent) && (model.state & StandardMenuState::kServerDiscovered))
+		{
+			seAutoConnectState = AutoConnectState::kAttempted;
+			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kConnectToDiscoveredServer);
+			// Connecting changes the live state the Local Server entry below reads this same pass.
+			model = game::gpGame->GetStandardMenuModel();
+		}
+	}
+
+	// Open Tweaks hides the menu; discovery and auto-connect above still run so the client keeps progressing.
+	if (gbShowImGui)
+	{
+		return;
+	}
+
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	ScopedMenuScale menuScale;
 
@@ -86,21 +110,6 @@ void MainMenuScreen::Render()
 
 	if (model.features & StandardMenuFeature::kLocalServer)
 	{
-		if (!(model.state & StandardMenuState::kClientPresent) && !(model.state & StandardMenuState::kDiscoveryScannerPresent) && !(model.state & StandardMenuState::kServerDiscovered))
-		{
-			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kStartDiscovery);
-			// Discovery changes the live state the auto-connect decision below reads this same pass.
-			model = game::gpGame->GetStandardMenuModel();
-		}
-
-		if ((model.state & StandardMenuState::kAutoConnect) && seAutoConnectState == AutoConnectState::kReady && !(model.state & StandardMenuState::kClientPresent) && (model.state & StandardMenuState::kServerDiscovered))
-		{
-			seAutoConnectState = AutoConnectState::kAttempted;
-			game::gpGame->ApplyStandardMenuAction(StandardMenuAction::kConnectToDiscoveredServer);
-			// Connecting changes the live state the Local Server entry below reads this same pass.
-			model = game::gpGame->GetStandardMenuModel();
-		}
-
 		// The Local Server entry connects to the discovered localhost or LAN server.
 		if (model.state & StandardMenuState::kServerDiscovered)
 		{

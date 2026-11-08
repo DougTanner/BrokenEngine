@@ -6,7 +6,7 @@ struct WaterSpecularResult
 	float fReflection;
 };
 
-WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult, vec3 f3ToEyeNormal, vec3 f3InNormal, vec3 f3SunOrMoon, float fTerrainElevation, vec2 f2InitialPosition, vec2 f2InitialDx, vec2 f2InitialDy, vec3 f3NormalDx, vec3 f3NormalDy)
+WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult, vec3 f3ToEyeNormal, vec3 f3InNormal, vec3 f3SunOrMoon, float fTerrainElevation, vec2 f2InitialPosition, vec2 f2InitialDx, vec2 f2InitialDy, vec3 f3NormalDx, vec3 f3NormalDy, PatchTriangle pWaterNormalPatchTriangles[3])
 {
 	WaterSpecularResult result = WaterSpecularResult(vec3(0.0f), vec3(0.0f), 0.0f, 0.0f);
 
@@ -50,7 +50,8 @@ WaterSpecularResult ComposeWaterSpecular(WaterNormalSamplingResult normalResult,
 		{
 			vec2 f2SampleOffset = mainLayout.pf2LightingWaterSkyboxOneSampleOffsets[i];
 			vec2 f2SamplePosition = f2InitialPosition + f2SampleOffset.x * f2InitialDx + f2SampleOffset.y * f2InitialDy;
-			WaterNormalSamplingResult sampleNormalResult = SampleWaterNormals(f2SamplePosition, f2InitialDx, f2InitialDy);
+			// Sample positions at most a pixel away reuse the fragment's patch triangles rather than rebuilding them.
+			WaterNormalSamplingResult sampleNormalResult = SampleWaterNormals(f2SamplePosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles);
 			vec3 f3SampleToEyeNormal = normalize(vec3(-f2SamplePosition, mainLayout.f4WaterEyePosition.z));
 			f3SampleToEyeNormal = normalize(mix(f3SampleToEyeNormal, vec3(0.0f, 0.0f, 1.0f), globalLayout.fLightingWaterSkyboxNormalSoften));
 			vec3 f3SampleGeometryNormal = normalize(f3InNormal + f2SampleOffset.x * f3NormalDx + f2SampleOffset.y * f3NormalDy);

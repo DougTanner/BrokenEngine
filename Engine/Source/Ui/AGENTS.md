@@ -45,11 +45,11 @@ is engine-owned here.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
 - `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
-  Water quality, Water Foam, the Stagger Smoke Layer Updates flag, Smoke Update
+  Water quality, Water Foam, Break Repetition, the Stagger Smoke Layer Updates flag, Smoke Update
   Cadence, Shadow Update Cadence, Field of View, Camera Tilt, and Orthographic
   Projection.
-  Lighting and Water Foam default on, and Defaults restores them. Older versions fail the current-format gate
-  and use defaults. Water Foam and Orthographic Projection are validated Boolean
+  Lighting, Water Foam and Break Repetition default on, and Defaults restores them. Older versions fail the current-format gate
+  and use defaults. Water Foam, Break Repetition and Orthographic Projection are validated Boolean
   bytes; any value other than zero or one rejects the whole file before
   application.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.

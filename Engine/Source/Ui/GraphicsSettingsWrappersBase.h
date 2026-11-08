@@ -28,6 +28,7 @@ extern Wrapper gFieldOfView;
 extern Wrapper gCameraTilt;
 extern Wrapper gWaterShapeDetail;
 extern Wrapper gWaterFoamSystemEnabled;
+extern Wrapper gBreakRepetition;
 extern Wrapper gSmokeSimulationPixels;
 extern Wrapper gSmokeSimulationArea;
 extern Wrapper gOpaqueUi;

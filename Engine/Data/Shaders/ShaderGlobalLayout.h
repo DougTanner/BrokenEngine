@@ -3,6 +3,16 @@
 #endif
 #if !defined(SHADER_GLOBAL_LAYOUT_H)
 #define SHADER_GLOBAL_LAYOUT_H
+// One texture read's stationary patch lattice (ShaderFunctions.h MakePatchTriangle), from engine::PopulatePatchLattice;
+// the lattice has 2^iExponent vertices per axial cell step.
+struct PatchLatticeLayout
+{
+	int32_t iExponent INIT;
+	uint32_t uiSeed INIT; // The read's fixed seed mixed with iExponent CPU-side, so the shader hashes only the vertex identity
+	uint32_t puiAnchor[2] INIT; // Camera cell q, r bits; for iExponent < 0 their floor quotients by 2^-iExponent
+	vec2 f2Remainder INIT; // For iExponent < 0, the camera cell's q, r remainders times 2^iExponent; 0 otherwise
+};
+
 struct GlobalLayout
 {
 	uint32_t uiRandomSeed INIT;
@@ -16,6 +26,7 @@ struct GlobalLayout
 
 	vec2 f2CameraPosition INIT;
 	vec4 f4VisibleArea INIT;
+	vec4 f4PatchInverseBasis INIT; // Column-major mat2 inverse of the axial cell basis: camera-cell position to cell steps (MakePatchTriangle)
 	vec4 f4ShadowArea INIT;
 	vec4 f4ShadowAreaExtra INIT;
 	vec4 f4ShadowAreaPrevious INIT; // f4ShadowArea as it stood before the latest refresh, for ShadowTemporal.comp reprojection
@@ -278,6 +289,20 @@ struct GlobalLayout
 	float fWaterReducedNormalTimeTwoY INIT;
 	float fWaterReducedNormalTimeThreeX INIT;
 	float fWaterReducedNormalTimeThreeY INIT;
+	// Randomized patch blend strengths in [0, 1]; 0 keeps the plain read. One lattice per blended texture read, at that
+	// read's own frequency.
+	float fWaterNormalPatchBlendOne INIT; // Band One's octave One read; octaves Two and Three stay plain
+	float fWaterNormalPatchBlendTwo INIT;
+	float fWaterNormalPatchBlendThree INIT;
+	float fWaterColorNoisePatchBlend INIT; // Covers both color-noise octaves
+	float fWaterFoamTexturePatchBlend INIT;
+	float fWaterFoamBreakupPatchBlend INIT;
+	float fWaterFoamSpawnNoisePatchBlend INIT;
+	PatchLatticeLayout pWaterNormalPatchLattices[3] INIT; // Octave One of bands One, Two, Three
+	PatchLatticeLayout pWaterColorNoisePatchLattices[2] INIT; // Octaves One, Two
+	PatchLatticeLayout waterFoamTexturePatchLattice INIT;
+	PatchLatticeLayout waterFoamBreakupPatchLattice INIT;
+	PatchLatticeLayout waterFoamSpawnNoisePatchLattice INIT;
 
 	float fParticlesStretchVelocityStart INIT;
 	float fParticlesStretchVelocityMultiplier INIT;

@@ -70,8 +70,10 @@ void main()
 		discard;
 		return;
 	}
-	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy);
-	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy);
+	PatchTriangle pWaterNormalPatchTriangles[3];
+	MakeWaterNormalPatchTriangles(f2InInitialPosition, pWaterNormalPatchTriangles);
+	WaterNormalSamplingResult normalResult = SampleWaterNormals(f2InInitialPosition, f2InitialDx, f2InitialDy, pWaterNormalPatchTriangles);
+	WaterSpecularResult specularResult = ComposeWaterSpecular(normalResult, f3ToEyeNormal, f3InNormal, globalLayout.f4WaterSunOrMoon.xyz, fTerrainElevation, f2InInitialPosition, f2InitialDx, f2InitialDy, f3NormalDx, f3NormalDy, pWaterNormalPatchTriangles);
 
 	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).
 	// CPU stores fmod(freq*camera, 10.0) so mult * 10 must be integer for fract() to absorb the wrap.
@@ -85,12 +87,23 @@ void main()
 	float fMultTwo = globalLayout.fWaterColorNoiseMultiplierTwo;
 	vec2 f2NoiseLocalDx = dFdx(f2LocalDisplacedPos);
 	vec2 f2NoiseLocalDy = dFdy(f2LocalDisplacedPos);
-	float fScaleOne = fMultOne * globalLayout.fWaterColorNoiseFrequency;
-	vec2 f2NoiseUvOne = fScaleOne * f2LocalDisplacedPos + fMultOne * f2ReducedNoiseOrigin;
-	float fNoiseColorOne = clamp(globalLayout.fWaterColorNoiseWeightOne * globalLayout.fWaterColorNoiseAmount * textureGrad(noiseTextureSampler, fract(f2NoiseUvOne), fScaleOne * f2NoiseLocalDx, fScaleOne * f2NoiseLocalDy).x, -1.0f, 1.0f);
-	float fScaleTwo = fMultTwo * globalLayout.fWaterColorNoiseFrequency;
-	vec2 f2NoiseUvTwo = fScaleTwo * f2LocalDisplacedPos + fMultTwo * f2ReducedNoiseOrigin;
-	float fNoiseColorTwo = clamp(globalLayout.fWaterColorNoiseWeightTwo * globalLayout.fWaterColorNoiseAmount * textureGrad(noiseTextureSampler, fract(f2NoiseUvTwo), fScaleTwo * f2NoiseLocalDx, fScaleTwo * f2NoiseLocalDy).x, -1.0f, 1.0f);
+	// A noise weight is a uniform and may be negative; at zero the read contributes nothing, so it is skipped whole.
+	float fNoiseWeightOne = globalLayout.fWaterColorNoiseWeightOne * globalLayout.fWaterColorNoiseAmount;
+	float fNoiseColorOne = 0.0f;
+	if (fNoiseWeightOne != 0.0f)
+	{
+		float fScaleOne = fMultOne * globalLayout.fWaterColorNoiseFrequency;
+		vec2 f2NoiseUvOne = fScaleOne * f2LocalDisplacedPos + fMultOne * f2ReducedNoiseOrigin;
+		fNoiseColorOne = clamp(fNoiseWeightOne * TextureGradPatched(globalLayout, noiseTextureSampler, f2NoiseUvOne, fScaleOne * f2NoiseLocalDx, fScaleOne * f2NoiseLocalDy, true, globalLayout.pWaterColorNoisePatchLattices[0], f3InPosition.xy, globalLayout.fWaterColorNoisePatchBlend).x, -1.0f, 1.0f);
+	}
+	float fNoiseWeightTwo = globalLayout.fWaterColorNoiseWeightTwo * globalLayout.fWaterColorNoiseAmount;
+	float fNoiseColorTwo = 0.0f;
+	if (fNoiseWeightTwo != 0.0f)
+	{
+		float fScaleTwo = fMultTwo * globalLayout.fWaterColorNoiseFrequency;
+		vec2 f2NoiseUvTwo = fScaleTwo * f2LocalDisplacedPos + fMultTwo * f2ReducedNoiseOrigin;
+		fNoiseColorTwo = clamp(fNoiseWeightTwo * TextureGradPatched(globalLayout, noiseTextureSampler, f2NoiseUvTwo, fScaleTwo * f2NoiseLocalDx, fScaleTwo * f2NoiseLocalDy, true, globalLayout.pWaterColorNoisePatchLattices[1], f3InPosition.xy, globalLayout.fWaterColorNoisePatchBlend).x, -1.0f, 1.0f);
+	}
 	vec3 f3WaterColor = mix(1.0f * vec3(0.0f, 15.0f / 100.0f, 25.0f / 100.0f), 1.5f * vec3(15.0f / 100.0f, 30.0f / 100.0f, 50.0f / 100.0f), clamp(fNoiseColorOne + fNoiseColorTwo + (f3InPosition.z * globalLayout.fWaterColorHeightInverse + globalLayout.fWaterColorBottom), 0.0f, 1.0f));
 
 	vec3 f3DepthColor = texture(depthLutSampler, vec2(globalLayout.fWaterDepthLookupTableFeather * -fTerrainElevation, 0.0f)).xyz;
@@ -98,7 +111,8 @@ void main()
 	float fHeight = f3InPosition.z - fTerrainElevation;
 	vec3 f3PreLightingColor = mix(f3DepthColor, f3WaterColor, clamp(fHeight * globalLayout.fWaterDepthColorFeather + globalLayout.fWaterDepthLookupTableSunsetFade, globalLayout.fWaterDepthColorFloor, 1.0f));
 
-	bool bFoamEnabled = globalLayout.iWaterFoamEnabled != 0;
+	// A nonpositive texture strength clamps foam opacity to 0, so the foam reads and blends are skipped as when inactive.
+	bool bFoamEnabled = globalLayout.iWaterFoamEnabled != 0 && globalLayout.fWaterFoamTextureStrength > 0.0f;
 	vec3 f3FoamColor;
 	float fFoamShade;
 	if (bFoamEnabled)
@@ -106,10 +120,15 @@ void main()
 		vec2 f2FoamUv = vec2(f2WorldInitialPosition.x - globalLayout.f4WaterFoamArea.x, globalLayout.f4WaterFoamArea.y - f2WorldInitialPosition.y) * globalLayout.f2WaterFoamAreaInverseSize;
 		float fCoverage = texture(foamTextureSampler, f2FoamUv).x;
 		vec2 f2FoamTextureUv = globalLayout.fWaterFoamTextureInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamReducedTextureOrigin;
-		f3FoamColor = textureGrad(pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, globalLayout.fWaterFoamTextureInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamTextureInverseTileSize * dFdy(f2InInitialPosition)).rgb;
-		vec2 f2FoamBreakupUv = globalLayout.fWaterFoamBreakupInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamBreakupReducedTextureOrigin;
-		float fFoamBreakupOpacity = textureGrad(pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamBreakupInverseTileSize * dFdy(f2InInitialPosition)).x;
-		float fFoamMask = mix(1.0f, fFoamBreakupOpacity, globalLayout.fWaterFoamBreakupAmount);
+		f3FoamColor = TextureGradPatched(globalLayout, pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, globalLayout.fWaterFoamTextureInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamTextureInverseTileSize * dFdy(f2InInitialPosition), false, globalLayout.waterFoamTexturePatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamTexturePatchBlend).rgb;
+		// mix(1, opacity, 0) is exactly 1, so a zero breakup amount skips the breakup read.
+		float fFoamMask = 1.0f;
+		if (globalLayout.fWaterFoamBreakupAmount != 0.0f)
+		{
+			vec2 f2FoamBreakupUv = globalLayout.fWaterFoamBreakupInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamBreakupReducedTextureOrigin;
+			float fFoamBreakupOpacity = TextureGradPatched(globalLayout, pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamBreakupInverseTileSize * dFdy(f2InInitialPosition), false, globalLayout.waterFoamBreakupPatchLattice, f2WorldInitialPosition, globalLayout.fWaterFoamBreakupPatchBlend).x;
+			fFoamMask = mix(1.0f, fFoamBreakupOpacity, globalLayout.fWaterFoamBreakupAmount);
+		}
 		fFoamShade = clamp(fCoverage * fFoamMask * globalLayout.fWaterFoamTextureStrength, 0.0f, 1.0f);
 		f3FoamColor = pow(f3FoamColor, vec3(2.2));
 	}

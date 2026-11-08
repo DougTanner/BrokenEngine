@@ -26,7 +26,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 26;
+	static constexpr int64_t kiVersion = 27;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -51,6 +51,8 @@ struct GraphicsSettings
 	float fFieldOfView = 15.0f;
 	float fSmokeUpdateCadence = 2.0f;
 	float fCameraTilt = 20.0f;
+	uint8_t uiBreakRepetition = 1;
+	uint8_t puiBreakRepetitionPadding[3] {};
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -75,7 +77,9 @@ static_assert(BT_OFFSETOF(GraphicsSettings, puiProjectionPadding) == 43, "Graphi
 static_assert(BT_OFFSETOF(GraphicsSettings, fFieldOfView) == 44, "GraphicsSettings::fFieldOfView offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeUpdateCadence) == 48, "GraphicsSettings::fSmokeUpdateCadence offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fCameraTilt) == 52, "GraphicsSettings::fCameraTilt offset changed — existing setting bytes move");
-static_assert(sizeof(GraphicsSettings) == 56, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiBreakRepetition) == 56, "GraphicsSettings::uiBreakRepetition offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiBreakRepetitionPadding) == 57, "GraphicsSettings padding changed — sizeof must stay a multiple of four");
+static_assert(sizeof(GraphicsSettings) == 60, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -103,6 +107,7 @@ void SaveGraphicsSettings()
 		.fFieldOfView = gFieldOfView.mfCurrent,
 		.fSmokeUpdateCadence = gSmokeUpdateCadence.mfCurrent,
 		.fCameraTilt = gCameraTilt.mfCurrent,
+		.uiBreakRepetition = static_cast<uint8_t>(gBreakRepetition.Get<bool>()),
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -210,6 +215,11 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "fCameraTilt";
 	}
 
+	if (rGraphicsSettings.uiBreakRepetition > 1)
+	{
+		return "uiBreakRepetition";
+	}
+
 	return nullptr;
 }
 
@@ -259,6 +269,7 @@ bool LoadGraphicsSettings()
 		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
 		gWaterFoamSystemEnabled.Set(graphicsSettings.uiWaterFoamEnabled != 0);
+		gBreakRepetition.Set(graphicsSettings.uiBreakRepetition != 0);
 		LoadGraphicsQualityLevel(gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
 		LoadGraphicsQualityLevel(gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
 		LoadGraphicsQualityLevel(gLightingLevel, graphicsSettings.uiLightingLevel);
@@ -288,6 +299,7 @@ void ResetGraphicsSettings()
 	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
 	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;
+	gBreakRepetition.mfCurrent = gBreakRepetition.mfDefault;
 	gSmokeLayerStagger.mfCurrent = gSmokeLayerStagger.mfDefault;
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
 	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;

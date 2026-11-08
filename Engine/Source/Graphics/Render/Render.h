@@ -160,14 +160,23 @@ struct TemporalAreaLatch
 // What the last published frame actually sent, for the read-only presentation_continuity_probe agent command; nothing
 // in rendering reads it back. Every field is written on the client main loop thread inside RenderFrameGlobal, each by
 // its own owner: GlobalUniforms.cpp writes shadow, LightingUniforms.cpp writes pLighting, SmokeUniforms.cpp writes
-// smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, and — because it is
-// populated last — iPublishedFrames, so the counter advances only for a frame whose whole snapshot is complete. Each
-// iHistoryResets counts only the multi-cell basis advances that discarded that owner's history.
+// smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, the water lattices, and —
+// because it is populated last — iPublishedFrames, so the counter advances only for a frame whose whole snapshot is
+// complete. Each iHistoryResets counts only the multi-cell basis advances that discarded that owner's history.
 struct RetainedAreaReport
 {
 	XMFLOAT4 f4CurrentArea {};
 	XMFLOAT4 f4PreviousArea {};
 	int64_t iHistoryResets = 0;
+};
+
+// The varying part of a published shaders::PatchLatticeLayout; its seed follows from the read and iExponent, and the
+// shared inverse basis is constant.
+struct LatticeReport
+{
+	int32_t iExponent = 0;
+	uint32_t puiAnchor[2] {};
+	XMFLOAT2 f2Remainder {};
 };
 
 struct PresentationContinuitySnapshot
@@ -180,9 +189,19 @@ struct PresentationContinuitySnapshot
 	RetainedAreaReport shadow {};
 	RetainedAreaReport pLighting[shaders::kiLightingLayers] {}; // Per lighting layer
 	RetainedAreaReport smoke {};
+	LatticeReport pWaterNormalLattices[std::extent_v<decltype(shaders::GlobalLayout::pWaterNormalPatchLattices)>] {}; // In GlobalLayout order
+	LatticeReport pWaterColorNoiseLattices[std::extent_v<decltype(shaders::GlobalLayout::pWaterColorNoisePatchLattices)>] {};
+	LatticeReport waterFoamTextureLattice {}; // Foam lattices hold their last values while foam is inactive
+	LatticeReport waterFoamBreakupLattice {};
+	LatticeReport waterFoamSpawnNoiseLattice {};
 };
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
+
+// Writes rLattice for a texture read repeating fFrequency times per meter, giving patches about one repeat across:
+// 2^k lattice steps per axial cell step, k the nearest whole exponent to log2(|basis q| * fFrequency) within the
+// supported range, or 0 for zero frequency, anchored at the camera cell. Returns what it wrote, without the seed.
+LatticeReport PopulatePatchLattice(shaders::PatchLatticeLayout& rLattice, double fFrequency, uint32_t uiSeed);
 
 // Lerps from fBottom at the lowest flight plane to fTop at the highest by plane index; a single plane takes fBottom.
 inline float FlightPlaneLerp(float fBottom, float fTop, int64_t i, int64_t iPlaneCount)

@@ -8,7 +8,7 @@ namespace engine
 // Global
 extern Wrapper gWaterScale;
 
-// Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
+// Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction | patch-blend)
 extern Wrapper gWaterNormalIndexOne;
 extern Wrapper gLightingSampledNormalsOneSize;
 extern Wrapper gLightingSampledNormalsWeightOneMinimum;
@@ -17,6 +17,7 @@ extern Wrapper gWaterNormalRotationOne;
 extern Wrapper gLightingSampledNormalsSpeedOneMinimum;
 extern Wrapper gLightingSampledNormalsSpeedOneMaximum;
 extern Wrapper gWaterNormalSpeedDirectionOne;
+inline Wrapper gWaterNormalPatchBlendOne(1.0f, 0.0f, 1.0f);
 extern Wrapper gWaterNormalIndexTwo;
 extern Wrapper gLightingSampledNormalsTwoSize;
 extern Wrapper gLightingSampledNormalsWeightTwoMinimum;
@@ -25,6 +26,7 @@ extern Wrapper gWaterNormalRotationTwo;
 extern Wrapper gLightingSampledNormalsSpeedTwoMinimum;
 extern Wrapper gLightingSampledNormalsSpeedTwoMaximum;
 extern Wrapper gWaterNormalSpeedDirectionTwo;
+inline Wrapper gWaterNormalPatchBlendTwo(1.0f, 0.0f, 1.0f);
 extern Wrapper gWaterNormalIndexThree;
 extern Wrapper gLightingSampledNormalsThreeSize;
 extern Wrapper gLightingSampledNormalsWeightThreeMinimum;
@@ -33,6 +35,7 @@ extern Wrapper gWaterNormalRotationThree;
 extern Wrapper gLightingSampledNormalsSpeedThreeMinimum;
 extern Wrapper gLightingSampledNormalsSpeedThreeMaximum;
 extern Wrapper gWaterNormalSpeedDirectionThree;
+inline Wrapper gWaterNormalPatchBlendThree(1.0f, 0.0f, 1.0f);
 extern Wrapper gWaterDepthReflectionFeather;
 extern Wrapper gWaterWaveNormalBlend;
 
@@ -110,6 +113,7 @@ extern Wrapper gWaterColorNoiseWeightOne;
 extern Wrapper gWaterColorNoiseMultiplierOne;
 extern Wrapper gWaterColorNoiseWeightTwo;
 extern Wrapper gWaterColorNoiseMultiplierTwo;
+inline Wrapper gWaterColorNoisePatchBlend(1.0f, 0.0f, 1.0f);
 
 // Beach
 extern Wrapper gWaterBreakStartDepth;
@@ -129,10 +133,13 @@ extern Wrapper gWaterFoamHalfLife;
 extern Wrapper gWaterFoamTextureIndex;
 extern Wrapper gWaterFoamTextureTileSize;
 extern Wrapper gWaterFoamTextureStrength;
+inline Wrapper gWaterFoamTexturePatchBlend(1.0f, 0.0f, 1.0f);
 extern Wrapper gWaterFoamBreakupTextureIndex;
 extern Wrapper gWaterFoamBreakupTileSize;
 extern Wrapper gWaterFoamBreakupAmount;
+inline Wrapper gWaterFoamBreakupPatchBlend(1.0f, 0.0f, 1.0f);
 extern Wrapper gWaterFoamSpawnNoiseAmount;
 extern Wrapper gWaterFoamSpawnNoiseTileSize;
+inline Wrapper gWaterFoamSpawnNoisePatchBlend(1.0f, 0.0f, 1.0f);
 
 } // namespace engine

@@ -153,6 +153,19 @@ CONSTEXPR int kiModelBindingTerrainElevation = 17;
 // (Water.frag pWaterNormalSamplers[] sampler array).
 CONSTEXPR int kiWaterNormalCount = 17;
 
+// Water normal octave size multipliers, each scaling its band's size: the UV scale of each SAMPLE_NORMAL_PRECISE read
+// (WaterNormalSampling.h) and, for octave One, its patch lattice frequency (WaterUniforms.cpp). Tenths keep the
+// modulo-10 reduced origin's wrap an integral UV shift.
+CONSTEXPR float kfWaterNormalOneOctaveOneSizeMultiplier = 0.2f;
+CONSTEXPR float kfWaterNormalOneOctaveTwoSizeMultiplier = 1.1f;
+CONSTEXPR float kfWaterNormalOneOctaveThreeSizeMultiplier = 2.5f;
+CONSTEXPR float kfWaterNormalTwoOctaveOneSizeMultiplier = 0.3f;
+CONSTEXPR float kfWaterNormalTwoOctaveTwoSizeMultiplier = 1.2f;
+CONSTEXPR float kfWaterNormalTwoOctaveThreeSizeMultiplier = 3.0f;
+CONSTEXPR float kfWaterNormalThreeOctaveOneSizeMultiplier = 0.4f;
+CONSTEXPR float kfWaterNormalThreeOctaveTwoSizeMultiplier = 1.3f;
+CONSTEXPR float kfWaterNormalThreeOctaveThreeSizeMultiplier = 3.5f;
+
 // Island bindless-slot ceiling: shared by C++ and the terrain shaders, it sizes the bindless
 // sampler arrays (Terrain.frag / TerrainElevation.frag), their descriptor counts (PipelineManager),
 // and the TextureManager render-target pointer vectors.

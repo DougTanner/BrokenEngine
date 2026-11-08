@@ -29,8 +29,18 @@ static nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
 	};
 }
 
-// presentation_continuity_probe: report what the last published render frame sent for water phase reduction and for
-// each retained-history owner, so the harness can observe continuity across a camera cell change.
+static nlohmann::json LatticeJson(const LatticeReport& rReport)
+{
+	return nlohmann::json
+	{
+		{"exponent", rReport.iExponent},
+		{"anchor", nlohmann::json::array({rReport.puiAnchor[0], rReport.puiAnchor[1]})},
+		{"remainder", OriginJson(rReport.f2Remainder)},
+	};
+}
+
+// presentation_continuity_probe: report what the last published render frame sent for water phase reduction, for each
+// retained-history owner, and for each patch lattice, so the harness can observe continuity across a camera cell change.
 void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	if (!rParameters.empty())
@@ -54,6 +64,17 @@ void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohm
 		rLighting.push_back(RetainedAreaJson(rLightingLayer));
 	}
 	rResult["smoke"] = RetainedAreaJson(rSnapshot.smoke);
+	rResult["lattices"] =
+	{
+		{"waterNormalOneOctaveOne", LatticeJson(rSnapshot.pWaterNormalLattices[0])},
+		{"waterNormalTwoOctaveOne", LatticeJson(rSnapshot.pWaterNormalLattices[1])},
+		{"waterNormalThreeOctaveOne", LatticeJson(rSnapshot.pWaterNormalLattices[2])},
+		{"waterColorNoiseOne", LatticeJson(rSnapshot.pWaterColorNoiseLattices[0])},
+		{"waterColorNoiseTwo", LatticeJson(rSnapshot.pWaterColorNoiseLattices[1])},
+		{"foamColor", LatticeJson(rSnapshot.waterFoamTextureLattice)},
+		{"foamBreakup", LatticeJson(rSnapshot.waterFoamBreakupLattice)},
+		{"foamSpawn", LatticeJson(rSnapshot.waterFoamSpawnNoiseLattice)},
+	};
 }
 
 } // namespace engine

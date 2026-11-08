@@ -535,6 +535,40 @@ static void PopulateTerrainParameters(shaders::GlobalLayout& rGlobalLayout, floa
 	rGlobalLayout.fTerrainBeachNormalsBlend = std::max(fDayPercent * fDayPercent, 0.25f) * gTerrainBeachNormalsBlend.mfCurrent * fTerrainDetailNormalsMultiplier;
 }
 
+LatticeReport PopulatePatchLattice(shaders::PatchLatticeLayout& rLattice, double fFrequency, uint32_t uiSeed)
+{
+	static constexpr double kfMinimumExponent = -6.0;
+	static constexpr double kfMaximumExponent = 15.0;
+	LatticeReport report {};
+	if (fFrequency > 0.0)
+	{
+		double fBasisLength = std::hypot(static_cast<double>(kCellDirections.f2BasisQ.x), static_cast<double>(kCellDirections.f2BasisQ.y));
+		report.iExponent = static_cast<int32_t>(std::clamp(std::floor(std::log2(fBasisLength * fFrequency) + 0.5), kfMinimumExponent, kfMaximumExponent));
+	}
+
+	// A coarse lattice (k < 0) steps 2^-k cells: vertex identities count from each camera cell index's floor quotient by
+	// 2^-k, and the shader's lattice position adds the remainder times 2^k (exact in float). C++20 >> floors a negative
+	// index. Otherwise the anchor is the camera cell itself and the remainder 0.
+	int64_t iShift = std::max(-report.iExponent, 0);
+	auto Split = [&](int32_t iCell, uint32_t& ruiAnchor, float& rfRemainder)
+	{
+		int64_t iQuotient = static_cast<int64_t>(iCell) >> iShift;
+		ruiAnchor = static_cast<uint32_t>(iQuotient);
+		rfRemainder = static_cast<float>(std::ldexp(static_cast<double>(static_cast<int64_t>(iCell) - (iQuotient << iShift)), report.iExponent));
+	};
+	GridCoord cameraCoordinate = engine::gpCamera->mBasisCoordinate;
+	Split(cameraCoordinate.iQ, report.puiAnchor[0], report.f2Remainder.x);
+	Split(cameraCoordinate.iR, report.puiAnchor[1], report.f2Remainder.y);
+
+	rLattice.iExponent = report.iExponent;
+	rLattice.uiSeed = static_cast<uint32_t>(common::RandomEngine(static_cast<uint64_t>(uiSeed) << 32 | static_cast<uint32_t>(report.iExponent)).State() >> 32);
+	rLattice.puiAnchor[0] = report.puiAnchor[0];
+	rLattice.puiAnchor[1] = report.puiAnchor[1];
+	rLattice.f2Remainder.x = report.f2Remainder.x;
+	rLattice.f2Remainder.y = report.f2Remainder.y;
+	return report;
+}
+
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime)
 {
 	RenderLightingGlobal(iCommandBuffer);
@@ -569,6 +603,13 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	rGlobalLayout.f2CameraPosition.x = f4CameraPositionGlobal.x;
 	rGlobalLayout.f2CameraPosition.y = f4CameraPositionGlobal.y;
 	rGlobalLayout.f4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
+	// Analytic inverse of the float basis the cell centers use, in double: columns (r.y, -q.y) and (-r.x, q.x) over det.
+	double fBasisQX = static_cast<double>(kCellDirections.f2BasisQ.x);
+	double fBasisQY = static_cast<double>(kCellDirections.f2BasisQ.y);
+	double fBasisRX = static_cast<double>(kCellDirections.f2BasisR.x);
+	double fBasisRY = static_cast<double>(kCellDirections.f2BasisR.y);
+	double fBasisDeterminantInverse = 1.0 / (fBasisQX * fBasisRY - fBasisRX * fBasisQY);
+	rGlobalLayout.f4PatchInverseBasis = {static_cast<float>(fBasisRY * fBasisDeterminantInverse), static_cast<float>(-fBasisQY * fBasisDeterminantInverse), static_cast<float>(-fBasisRX * fBasisDeterminantInverse), static_cast<float>(fBasisQX * fBasisDeterminantInverse)};
 
 	float fDayPercent = 0.0f;
 	float fNoonPercent = 0.0f;

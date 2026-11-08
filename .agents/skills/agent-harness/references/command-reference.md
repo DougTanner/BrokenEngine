@@ -314,7 +314,14 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   `currentArea`/`previousArea` is a cell-local rectangle in the top-level
   `basisCoord`, in the shared component order `x`=left, `y`=top, `z`=right,
   `w`=bottom. `historyResets` is a monotonic per-owner count of the multi-cell
-  camera jumps that discarded that owner's history.
+  camera jumps that discarded that owner's history. A `lattices` object holds
+  one randomized patch blending lattice per blended texture read, keyed
+  `waterNormalOneOctaveOne`, `waterNormalTwoOctaveOne`,
+  `waterNormalThreeOctaveOne`, `waterColorNoiseOne`, `waterColorNoiseTwo`,
+  `foamColor`, `foamBreakup`, and `foamSpawn`, each shaped
+  `{"exponent":int,"anchor":[q,r],"remainder":[x,y]}`, mirroring the
+  `PatchLatticeLayout` field comments in
+  `Engine/Data/Shaders/ShaderGlobalLayout.h`.
 
 ### Client command behavior
 

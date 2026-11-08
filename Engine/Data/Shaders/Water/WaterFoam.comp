@@ -29,12 +29,16 @@ float NativeSource(ivec2 i2Coord, ivec2 i2Active)
 	{
 		return 0.0f;
 	}
-	vec2 f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
-	vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
-	vec2 f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
-	float fSignedNoise = 2.0f * textureLod(spawnNoiseTextureSampler, f2NoiseUv, 0.0f).r - 1.0f;
-	float fJ = texelFetch(normalTextureSampler, i2Coord, 0).w;
-	float fJEffective = fJ + globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
+	float fJEffective = texelFetch(normalTextureSampler, i2Coord, 0).w;
+	// Zero spawn amplitude leaves J unmodified, so the noise read is skipped.
+	if (globalLayout.fWaterFoamSpawnNoiseAmount != 0.0f)
+	{
+		vec2 f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
+		vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
+		vec2 f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
+		float fSignedNoise = 2.0f * TextureLodPatched(globalLayout, spawnNoiseTextureSampler, f2NoiseUv, 0.0f, globalLayout.waterFoamSpawnNoisePatchLattice, f2WorldPosition, globalLayout.fWaterFoamSpawnNoisePatchBlend).r - 1.0f;
+		fJEffective += globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
+	}
 	return clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
 }
 

@@ -10,6 +10,14 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-08 claude/996e9f9a-6fe0-4dea-bd36-5b66496381a0 — Engine/Source/Ui/WaterWrappersBase.cpp:111 —
+  give gWaterColorNoiseFrequency, gWaterColorNoiseMultiplierOne and gWaterColorNoiseMultiplierTwo a minimum above
+  zero (the multipliers' existing 0.1 step works as the floor). Every frequency passed to PopulatePatchLattice would
+  then be positive.
+  — makes unnecessary: Engine/Source/Graphics/Render/GlobalUniforms.cpp:542 (the `fFrequency > 0.0` branch and its
+  "0 for zero frequency" case in the Render.h:200 contract)
+- 2026-11-08 claude/996e9f9a-6fe0-4dea-bd36-5b66496381a0 — size observation: Engine/Data/Shaders/ShaderFunctions.h is 6161 bt-token-v1, over ~5,000; splitting it into a *Common.h is follow-up work
+- 2026-11-08 claude/996e9f9a-6fe0-4dea-bd36-5b66496381a0 — size observation: Engine/Data/Shaders/ShaderGlobalLayout.h is 5216 bt-token-v1, over the ~5000 threshold; splitting it is follow-up work.
 - 2026-11-07 claude/35f31600-f877-4044-86d4-1d7c6ccb9721 — refactor observation: Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp:466 — the AI direction is named both `Ai…` (`pVecAiDirections`, `AimAiDirection`, `ShipFlags::kNoAiDirection`) and `ArtificialIntelligence…` (`rVecArtificialIntelligenceDirection`, `ComputeArtificialIntelligenceSteering`); now that `Documents/C++StyleGuide.txt` rule 56 approves `Ai`, rename the long forms so one concept has one name
 - 2026-11-07 claude/7a8d4a30-d920-433a-abad-a08b724a3378 — refactor observation Projects/ModelViewer/Source/ModelViewerApplication.cpp:65 — `SelectAdjacentModel` only forwards `miSelected` plus a step to `SelectModel`, a pass-through style guide rule 49 forbids; `miSelected` may stay private because `SelectModel` changes it together with playback and metadata state, so let `SelectModel` take the step (or Main.cpp compute the index through a public read) and drop the wrapper.
 - 2026-11-06 claude/2ea16005-f59e-4086-a845-0c0236be3a46 — size observation: `Engine/Data/Shaders/Model/Model.frag` is 5,177 `bt-token-v1`, over the ~5,000 report line; splitting it via `ShaderFunctions.h` or `*Common.h` is follow-up work.

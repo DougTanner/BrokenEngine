@@ -16,6 +16,7 @@ Wrapper gFieldOfView(15.0f, 5.0f, 25.0f); // True vertical angle in degrees
 Wrapper gCameraTilt(20.0f, 0.0f, 45.0f); // Rotation about world X in degrees; positive looks north
 Wrapper gWaterShapeDetail(1.0f / 4.0f, 1.0f / 8.0f, 1.0f / 2.0f); // Fixed WaterDetailTextureSize scale; not exposed or persisted
 Wrapper gWaterFoamSystemEnabled(true);
+Wrapper gBreakRepetition(true);
 Wrapper gSmokeSimulationPixels(1.0f, 0.5f, 1.5f);
 Wrapper gSmokeSimulationArea(1.2f, 1.0f, 1.5f);
 Wrapper gOpaqueUi(false);

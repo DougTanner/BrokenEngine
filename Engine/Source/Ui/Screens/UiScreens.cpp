@@ -1,5 +1,6 @@
 #if defined(BT_CLIENT)
 
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
@@ -43,10 +44,17 @@ void RenderUiScreens()
 	// First, under every other screen, and whatever the UI state: a world-hidden frame shows only this overlay of the world.
 	spMapScreen->Render();
 
-	// Menu screens required to progress past the pre-game / rejection flows must render even
-	// with Tweaks open — otherwise a persisted-active Tweaks menu strands a fresh client with
-	// no way to reach Connect/Spawn. Each self-gates internally on the game's UI state.
+	// Called whatever Tweaks shows, because its discovery and auto-connect must keep running; it draws nothing while Tweaks is open.
 	spMainMenuScreen->Render();
+
+	// A Tweaks slider drag hides every screen but the map screen, so the dragged value's effect on the scene stays visible.
+	if (gbShowImGui && !GetTweaksScreen().mActiveSlider.empty())
+	{
+		return;
+	}
+
+	// The modal must render even with Tweaks open, or a persisted-active Tweaks menu strands a rejected client
+	// behind an unacknowledgeable modal. It self-gates on the game's UI state.
 	spModalScreen->Render();
 
 	if (!gbShowImGui)

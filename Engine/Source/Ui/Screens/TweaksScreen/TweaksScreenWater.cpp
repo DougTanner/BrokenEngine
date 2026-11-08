@@ -32,6 +32,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed One Minimum", gLightingSampledNormalsSpeedOneMinimum, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed One Maximum", gLightingSampledNormalsSpeedOneMaximum, iSection, 1.0f);
 				rScreen.WrapperSlider("Water Normal Speed Direction One", gWaterNormalSpeedDirectionOne, iSection, 1.0f);
+				rScreen.WrapperSlider("Water Normal Patch Blend One", gWaterNormalPatchBlendOne, iSection, 1.0f);
 
 				rScreen.ChevronIndexSelector("Sample 2", gWaterNormalIndexTwo, TextureManager::kpWaterNormalNames);
 				rScreen.WrapperSlider("Lighting Sampled Normals Two Size", gLightingSampledNormalsTwoSize, iSection, 1.0f);
@@ -41,6 +42,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed Two Minimum", gLightingSampledNormalsSpeedTwoMinimum, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed Two Maximum", gLightingSampledNormalsSpeedTwoMaximum, iSection, 1.0f);
 				rScreen.WrapperSlider("Water Normal Speed Direction Two", gWaterNormalSpeedDirectionTwo, iSection, 1.0f);
+				rScreen.WrapperSlider("Water Normal Patch Blend Two", gWaterNormalPatchBlendTwo, iSection, 1.0f);
 
 				rScreen.ChevronIndexSelector("Sample 3", gWaterNormalIndexThree, TextureManager::kpWaterNormalNames);
 				rScreen.WrapperSlider("Lighting Sampled Normals Three Size", gLightingSampledNormalsThreeSize, iSection, 1.0f);
@@ -50,6 +52,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed Three Minimum", gLightingSampledNormalsSpeedThreeMinimum, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Sampled Normals Speed Three Maximum", gLightingSampledNormalsSpeedThreeMaximum, iSection, 1.0f);
 				rScreen.WrapperSlider("Water Normal Speed Direction Three", gWaterNormalSpeedDirectionThree, iSection, 1.0f);
+				rScreen.WrapperSlider("Water Normal Patch Blend Three", gWaterNormalPatchBlendThree, iSection, 1.0f);
 
 				rScreen.WrapperSlider("Water Depth Reflection Feather", gWaterDepthReflectionFeather, iSection, 1.0f);
 				rScreen.WrapperSlider("Water Wave Normal Blend", gWaterWaveNormalBlend, iSection, 1.0f);
@@ -160,6 +163,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Water Color Noise Multiplier One", gWaterColorNoiseMultiplierOne, iSection);
 			rScreen.WrapperSlider("Water Color Noise Weight Two", gWaterColorNoiseWeightTwo, iSection);
 			rScreen.WrapperSlider("Water Color Noise Multiplier Two", gWaterColorNoiseMultiplierTwo, iSection);
+			rScreen.WrapperSlider("Water Color Noise Patch Blend", gWaterColorNoisePatchBlend, iSection);
 
 			ImGui::EndTabItem();
 		}
@@ -188,11 +192,14 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.ChevronIndexSelector("Foam Texture", gWaterFoamTextureIndex, TextureManager::kpWaterFoamNames);
 			rScreen.WrapperSlider("Water Foam Texture Tile Size", gWaterFoamTextureTileSize, iSection);
 			rScreen.WrapperSlider("Water Foam Texture Strength", gWaterFoamTextureStrength, iSection);
+			rScreen.WrapperSlider("Water Foam Texture Patch Blend", gWaterFoamTexturePatchBlend, iSection);
 			rScreen.ChevronIndexSelector("Foam Breakup Texture", gWaterFoamBreakupTextureIndex, TextureManager::kpWaterFoamBreakupNames);
 			rScreen.WrapperSlider("Water Foam Breakup Tile Size", gWaterFoamBreakupTileSize, iSection);
 			rScreen.WrapperSlider("Water Foam Breakup Amount", gWaterFoamBreakupAmount, iSection);
+			rScreen.WrapperSlider("Water Foam Breakup Patch Blend", gWaterFoamBreakupPatchBlend, iSection);
 			rScreen.WrapperSlider("Water Foam Spawn Noise Amount", gWaterFoamSpawnNoiseAmount, iSection);
 			rScreen.WrapperSlider("Water Foam Spawn Noise Tile Size", gWaterFoamSpawnNoiseTileSize, iSection);
+			rScreen.WrapperSlider("Water Foam Spawn Noise Patch Blend", gWaterFoamSpawnNoisePatchBlend, iSection);
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();

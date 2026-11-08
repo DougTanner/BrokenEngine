@@ -263,7 +263,7 @@ void TweaksScreen::RenderToggleBar()
 
 	float fButtonWidth = (fContentWidth - ImGui::GetStyle().ItemSpacing.x * (msiSectionCount - 1)) / msiSectionCount;
 
-	// Render toggle buttons with alpha=0 when slider is active to preserve layout
+	// Render toggle buttons, and the Sun Angle slider unless it is the one dragged, with alpha=0 when a slider is active to preserve layout
 	if (bSliderActive)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
@@ -298,15 +298,25 @@ void TweaksScreen::RenderToggleBar()
 		ImGui::PopStyleVar();
 	}
 
+	static constexpr char kpcSunAngleLabel[] = "##Sun Angle";
+	bool bHideSunAngle = bSliderActive && mActiveSlider != kpcSunAngleLabel;
+	if (bHideSunAngle)
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
+	}
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
 	ImGui::SetNextItemWidth(fContentWidth);
-	ImGui::SliderFloat("##Sun Angle", &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::SliderFloat(kpcSunAngleLabel, &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
 	if (ImGui::IsItemActive())
 	{
-		mActiveSlider = "##Sun Angle";
+		mActiveSlider = kpcSunAngleLabel;
 		miActiveSliderSection = -1;
 	}
 	ImGui::PopStyleVar();
+	if (bHideSunAngle)
+	{
+		ImGui::PopStyleVar();
+	}
 
 	mfToggleBarBottom = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y;
 
