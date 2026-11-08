@@ -13,7 +13,7 @@ requires user approval under the Change Workflow. Implementation is Tier 3
 
 Recorded user decisions: comparison prototype; HRC only; the existing two flight
 planes are independent transport layers; no cross-layer transport; terrain
-height and packed convex-hull/vertical-bound ship blockers are acceptable.
+height and packed convex-hull/vertical-bound ship blockers are acceptable. The user selected finite terrain attenuation and requires terrain, water and model vertices above/below both planes to remain lighting receivers. Implementation is deferred to a future session; this session finalizes the Plan only.
 Current FPS is ideal; complete candidate lighting GPU time must be at most twice
 baseline lighting GPU time on the identical GPU, resolution, camera and scene.
 No memory ceiling was approved: report actual allocation and peak usage.
@@ -37,20 +37,26 @@ Replace point/area-light local transport only. Use existing point and oriented
 area render producers, including weapon flashes, blasters, missile exhaust,
 fighter beams, Omni heal beams and explosions. Preserve source color, preblurred
 lighting texture RGB/alpha, orientation, lighting size and scalar intensity.
-Visible sprites continue through their existing independent scene draws.
+Multiply packed color alpha AND blurred texture alpha; preserve point rotated/clamped UVs, area authored/repeat UVs and area per-instance intensity. Derive original size before baseline minimum-size floors, retaining area centre-to-corner conventions. Visible sprites continue through their existing independent scene draws.
 
 Define emission density j(x,y) as existing source color times texture RGB/alpha
 times lighting intensity, in artistic linear RGB per world metre of ray travel.
 This deliberately defines new transport units; it does not claim photometric
 equivalence with spread controls. The source budget Q is the area integral of j
-over its original lighting quad. Overlapping sources add j; sources do not
-absorb. Empty cells have T=1. Opaque hull/terrain cells have T=0 and j=0,
-including sources inside those blockers. A DDA segment of world length d in an
-empty/emitting cell returns (j*d,1); the first opaque cell returns (0,0).
-Compose near/far as (Ln+Tn*Lf,Tn*Tf). No reflection, bounce iteration, ambient
-injection, existing spread snapshots, compressed deposits or scene color enters
-transport. Never trace the final UNORM combine output.
-
+over its original lighting quad. Overlapping sources add j; sources add no
+extinction. Terrain extinction and emission coexist: do not erase sources merely
+because their XY overlaps terrain. Hard ship cells alone have T=0 and j=0,
+including sources inside those blockers. Every nonship DDA segment of world
+length d uses tau=sigma*d, T=exp(-tau), L=j*d*phi(tau),
+phi(tau)=(1-exp(-tau))/tau, phi(0)=1. Use the stable small-tau limit
+1-tau/2+tau*tau/6 to avoid subtracting nearly equal values; cross-check its switch
+against the analytic reference. Transparent emission yields (j*d,1); hard ships
+return (0,0). Compose near/far as (Ln+Tn*Lf,Tn*Tf). Sigma is inverse world metre,
+j is artistic linear RGB per world metre, and d is world metres including diagonal
+and clipped partial-texel lengths. Never substitute texel/UV distance or blindly
+copy upstream (1-T)*emiss source-function units. No reflection, bounce iteration,
+ambient injection, spread snapshots, compressed deposits or scene color enters
+transport. Never trace final UNORM combine output.
 For grid subpixel support, expand each source quad's local axes to at least two
 field texels, preserve UV orientation, and multiply j by original area / expanded
 area. Rasterize with additive blending and 4x4 deterministic subpixel quadrature
@@ -67,11 +73,11 @@ and separately show normal shield-rich baseline versus candidate to document the
 unsupported contribution. Exclude material glTF emission extraction, arbitrary
 particles as emitters/receivers, smoke absorption, transparent media and arbitrary
 static models as blockers. Existing smoke shading that consumes terrain/model/
-water local-light values remains; this adds no particle-lighting system.
+water local-light values remains; this adds no particle-lighting system. Mode-gate all deferred low/high reads in the model smoke loop as well as initial reads; preserve unblended per-plane smoke lighting. Terrain/water smoke retains four times the mapped ambient average.
 
 Terrain, live BES ships and water retain their current material lighting
 responses, height blending, cardinal model specular approximation and ambient
-scaling, subject to the terrain per-plane visibility policy below. These are
+scaling, subject to the finite terrain extinction policy below. These are
 stylized responses to planar transport, including upward
 surfaces; a planar ray has no physical vertical Lambert contribution. Preserve
 direct sun/moon, their shadow products, IBL, water reflections and final scene
@@ -101,36 +107,53 @@ Publish the actual area,
 pitch and N for captures. This explicit experimental resolution is independent
 of the window, like other world targets; it changes no terrain/water grid policy.
 
-Use the full finite footprint for transport; no arbitrary additional range or
-distance attenuation. Trace to its boundary, where incoming L=0 and T=1.
+Use the full finite footprint for transport; no arbitrary additional range or distance attenuation beyond the explicitly selected finite terrain extinction. Trace to its boundary, where incoming L=0 and T=1.
 Outside samples are black, never clamped copies of an edge source. Restrict
 quality comparisons to the visible rectangle unless testing the edge itself.
 Sources entirely outside the footprint contribute zero. Include all existing
 subscribed render-interpolate cells whose source or blocker bounds overlap the
-footprint, even offscreen; visible-sprite frustum culling must not remove
+footprint, even offscreen; gather sources before sprite culls and hulls before visible-model selection with capacity for full subscribed contributors. Visible-sprite frustum culling must not remove
 transport contributors. Do not expand subscriptions or promise unseen cells.
 
-Source centre Z selects the nearest existing flight plane using `FlightPlanes`'
-current tie rule. Never duplicate a source across layers. A terrain sample
-blocks a plane when raw terrain elevation is at or above that plane. Render raw
-terrain elevations over the entire padded footprint using existing packed
-heightmaps and placement buffers; the visible-area elevation texture and sun
-shadow map are insufficient. Preserve submerged raw elevations.
+Source centre Z selects the nearest existing flight plane using FlightPlanes'
+current tie rule. Never duplicate a source across layers or reject it merely
+for being above/below its selected plane. Terrain, water and model vertices
+sample actual geometric XY and retain existing clamped low/high height blending
+at actual Z, including below the low plane and above the high plane. Add no
+above/below-plane eligibility cutoff. Terrain never hard-masks receiving or
+emission; finite footprint and opaque ship masks can still make a sample black.
 
-Terrain receivers sample their true XY. At or above a plane, terrain receives
-no local HRC contribution from that plane because it occupies the opaque field;
-above both planes it receives no local HRC, while direct sun/moon and IBL remain.
-Record unlit high terrain as the user-selected prototype limitation. Do not add
-terrain boundary sampling or an ambient floor. Preserve height blending of the
-remaining per-layer contributions; measure and report this limitation rather
-than classifying the expected darkness as a shader bug.
+Render raw terrain elevations over the entire padded footprint using existing
+packed heightmaps and placement buffers; visible-area elevation texture and sun
+shadow map are insufficient. Preserve submerged raw elevations. The existing
+LightingSpread.frag low-layer profile supplies
+h=pow(clamp((rawElevation-fBaseHeight)*fSpreadHeightEndHeightInverse,0,1),
+fSpreadHeightPower)*fSpreadHeightMultiplier. Publish the same current profile
+inputs, retaining baseline tuning. Use sigma0=ln(2)*h/D and sigma1=0. Terrain extinction is finite and nonnegative, not a plane-intersection threshold. Derive the low-layer extinction image from raw elevation and the current profile before tracing; high-layer initialization uses uniform sigma=0 without a redundant zero image. Clear
+raw elevation to the existing no-terrain/submerged representation giving h=0.
 
+Use fixed prototype D=80 world metres, an author recommendation for this bounded
+experiment. It is the half-transmittance distance at h=1, anchored to the nominal
+island-chain water-span scale named kfWaterSpanMeters in IslandChainPlacement.cpp.
+This tests attenuation over an island-scale horizontal traversal independently
+of grid resolution. D is a separate fixed experiment constant, not a runtime
+placement dependency, tuning UI or calibration framework. No baseline-equivalent
+value is established: spread distance/per-pass decay is not a Beer-Lambert
+coefficient. Record D/profile inputs with diagnostic captures. At h=1 paths D
+and 2D yield T=1/2 and 1/4; h=0 and high-layer terrain yield T=1.
+
+Terrain/water remain eligible at true XY even above both planes. Existing
+height blending and material responses remain; no forced high-terrain darkness,
+exterior terrain sampling or ambient floor. Source/terrain overlap integrates
+simultaneous j/sigma exactly. Finite low-layer terrain attenuation and transparent
+high terrain do not promise opaque cliff shadows. No vertical/cross-layer
+transport is introduced.
 For live Fighters, Omnis and Battleships, obtain `ModelOutline` through the
 packed model header's `OutlineOffset`, as `ComputeModelShadowBounds` does.
 Transform the vertices at both packed MinZ and MaxZ with the same remaining
 interpolated pose/scale as the rendered instance. Authored alignment is already
 baked into the packed hull: do not apply it twice. Project the transformed prism
-to a conservative XY convex hull and transformed min/max Z; rasterize it in each
+with common::BuildConvexHull to a conservative XY convex hull and transformed min/max Z; rasterize it in each
 plane its Z interval intersects. Use conservative texel overlap, filling gaps
 and concavities. Do not use inset gameplay hitboxes or change the pack format.
 Exclude sinking wrecks and skeletal deformation. This is an intentionally
@@ -143,17 +166,16 @@ shader through a client-only storage range referenced by its model layout.
 For each EWNS channel, cast a cardinal XY ray from the fragment: if inside its
 own hull, solve the convex polygon exit and sample one field texel beyond that
 exit; otherwise sample its true XY. Use that channel only from this exterior
-position. This applies only on a layer the ship blocks. For nonblocking layers
+position. This applies only on a layer the ship blocks, including vertices above/below that plane; no extra vertex-height rejection. For nonblocking layers
 use the fragment's true XY. Resolve ambient from these four corrected channel
 samples, preserving current height blending and downstream material equations.
 
 Use four nearest exterior field taps with bilinear weights, discarding opaque
-taps and renormalizing surviving weights; if none survive return black. Opaque
-taps include terrain and other ships. Do not scan farther through another
+taps and renormalizing surviving weights; if none survive return black. Hard opaque taps include other ships; finite terrain never invalidates a tap. Do not scan farther through another
 blocker, erase a hull from transport, or add an ambient floor. Keep model pose,
 blocker hull and receiver range from the same Main publication frame.
 
-This rule deliberately shades convex outer boundaries rather than exact inset
+Independent planar ship masks cannot distinguish an XY-overlapping receiver above/below another hull from one at its plane, or resolve vertically overlapping ships. Record that overocclusion; do not invent a height cutoff. This rule deliberately shades convex outer boundaries rather than exact inset
 mesh surfaces. It cannot resolve light inside concavities, overlapping hulls,
 subtexel gaps or angular variation within a quadrant. Those are explicit test
 limitations and promotion risks, not open architecture choices. Demonstrate a
@@ -163,32 +185,41 @@ mesh tracing or another receiver backend.
 
 ### HRC construction and EWNS adaptation
 
-Implement the paper's sections 3–4.3 and Algorithm 1, using the reference
-functions linked under Sources to cross-check math. Four 90-degree quadrants
-look toward source directions centred on +X, -X, +Y, -Y; rotate grid coordinates
-accordingly, including texture Y sign. Thus a source east of a receiver fills E,
-as `DirectionalLighting` requires. Do not reverse this as an outgoing direction.
+Adapt only the licensed Yaazarai kernels pinned in Source reuse and provenance. HrcUp.comp
+implements Shd_Extensions: ordered near/far composition of lower/upper indices and swapped
+upper/lower indices, averaging completed extension paths. HrcDown.comp implements Shd_MergingCones
+angular endpoint weights and distinct parity cases: even planes interpolate completed merged
+estimates, not incoming higher-level cones. Translate this concrete algorithm into native Vulkan
+rather than independently inventing a solver or importing GameMaker.
 
-For a quadrant, level n uses parallel probe stride 2^n, transverse stride 1,
-2^n cones and 2^n+1 interval directions with endpoint offsets
-v_n(k)=(2^n,2k-2^n). Levels n=0 through log2(N) are retained. Directly DDA-trace
-levels 0,1,2; compose higher intervals upward, using straight two-segment paths
-for even k and the average of the two bent converging paths for odd k. Keep
-ordered radiance/transmittance composition. Downward reconstruction uses the
-paper's distinct odd/even probe cases: even probes blend same-position higher
-cones with their extended merged estimate; never just reuse the higher cone.
-Use the paper's forward one-pixel base offset and opacity-aware cross filter.
-Use the paper as authority where reference TODOs/alternative base code differ.
+For level n retain parallel probe stride 2^n, transverse stride 1, 2^n cones and 2^n+1 interval
+directions with offsets v_n(k)=(2^n,2k-2^n), through log2(N). Engine HrcInitialize directly
+DDA-traces levels 0,1,2 using the exact j/sigma and hard-ship contract above; extensions construct
+higher levels. Replace normalized texture2D access with explicit bounded integer atlas fetches,
+preserving probe centres/parity/endpoints. Absent intervals are (0,1); absent reconstructed radiance
+and out-of-grid samples are zero. Clip direct intervals to the footprint.
 
-Weight cones with the difference of atan edge angles. Carry integrated RGB
-angular radiance, never angular-scale transmittance. Divide each reconstructed
-quadrant's integral by pi/2 exactly once to obtain its directional average.
-Keep four outputs, mapped to EWNS, rather than summing into scalar fluence.
-The reference uses normalization by tau; do not import that extra normalization.
-Topmost absent radiance and out-of-grid lookups are zero; absent interval
-transport is (0,1). Clip direct DDA intervals at the footprint. Check parity,
-rotations, base offset and boundary independently with the reference shader.
+Rotate the four source-facing quadrants to +X,-X,+Y,-Y, including texture Y sign, then retain EWNS
+outputs. Preserve the kernel's half endpoint-angle factors with its two-edge summation; normalize
+the integrated quadrant RGB by pi/2 exactly once. Never angular-scale interval transmittance or
+treat summed reconstructed cone transmittance as physical interval T. Uniform emission and the
+independent DDA oracle must settle normalization, units and orientation. No tau normalization or
+omnidirectional sum.
 
+Replace Shd_FrustumSeed gamma/input logic with engine linear emission, finite terrain extinction and
+hard-ship occupancy. Replace Shd_FluenceSum gamma encoding and frustum addition with directional
+output plus existing local-light presentation. Preserve the forward one-pixel offset in each rotated
+quadrant and opacity-aware cross filter, checking parity/base-offset/boundary behavior
+independently. Upstream math is reusable; finite-domain source integration, directional outputs and
+engine acceptance remain the adaptation contract.
+
+Resolve C0(P+e_q), one field texel forward in quadrant q, then apply the
+paper opacity-aware cross filter. This is the deliberate anti-overlap approximation
+relative to physical receiver P, not same-origin transport. Level 0 has diagonal
+intervals (1,+/-1); the first cardinal interval is n=1,k=1, offset (2,0).
+Diagnostic expected paths use these offsets. The direct oracle starts at P,
+charging shifted-base error to the candidate. Cross-filter hard occupancy means
+ships only; finite terrain must not invalidate receiving taps.
 ### Storage, pass order and lifetime
 
 Reuse `RenderTargetTextures`, `WorldLightingShadowPipelines` and `PipelineManager`;
@@ -206,7 +237,7 @@ before row padding, allocation alignment, inputs and outputs. These are derived
 payload estimates, not measured allocation or memory budgets.
 
 Allocate per-layer N-by-N emission RGBA16F and occupancy R32_UINT images; use
-separate raw elevation R32_SFLOAT, the shared interval hierarchy, reconstruction
+separate raw elevation R32_SFLOAT and one low-layer extinction N-by-N R32_SFLOAT image, the shared interval hierarchy, reconstruction
 ping-pong and per-layer RGB-separated RGBA16F EWNS images. The three directional
 images hold four channels per RGB component. Candidate presentation targets use
 existing combine format and include ambient; baseline resources remain allocated
@@ -218,7 +249,7 @@ explicit unsupported-device result; no alternative algorithm or silent precision
 fallback. Query actual row counts rather than using estimated memory arithmetic.
 
 Record the candidate chain once in Main before scene drawing, after current
-source and ship-pose CPU publication. Do not mutate GlobalLayout from Main.
+source and ship-pose CPU publication. RenderLightingMain publishes footprint/control before BeginRender; finalize source/hull counts and candidate indirect parameters after EndFrameInterpolateRender in BOTH RenderFrameMain branches. Missing-camera and zero-count paths explicitly clear counts. Do not mutate GlobalLayout from Main.
 Publish candidate area/control data in MainLayout, using a separate candidate
 receiver path; baseline continues to use its existing Global lighting areas.
 Keep execution on the existing graphics queue. Per-framebuffer source/hull
@@ -235,7 +266,7 @@ Prototype` (Baseline/HRC) and `HRC Grid` (256/512), in existing lighting Tweaks;
 changing grid requests texture/pipeline recreation. They default to Baseline
 and 256 and are developer controls, not production quality settings.
 
-Sequence: clear inputs; render padded raw terrain and ship occupancy; additive
+Sequence: clear inputs; render padded raw terrain, derive low-layer extinction and render ship occupancy; additive
 source deposit with opacity clipping; for each layer/quadrant initialize short
 intervals, construct upward, reconstruct downward, cross-filter and store that
 quadrant; resolve presentation/ambient; scene sampling. Instrument input,
@@ -253,11 +284,47 @@ normal texture/pipeline destruction and partial/device recreation. Disable and
 re-enable, empty active cells, rewind, footprint/basis change and world hide/show
 must never expose prior candidate data. Current-only rebuilding needs no history.
 
+## Resource inventory proof
+
+This algebra preserves every resource category; it is payload arithmetic, not measured allocation or a feasibility verdict.
+
+| Resource | Count/payload |
+|---|---|
+| Intervals | One RGBA16F image, level n count (N/2^n)*N*(2^n+1). Each level uses integer N+N/2^n rows; total height N*(log2(N)+3)-1, hence 2815/6143 at 256/512. Bytes 8*N*height. |
+| Reconstruction | Two N*N RGBA16F images: 16*N*N bytes. |
+| Emission | Two N*N RGBA16F images: 16*N*N bytes. |
+| Occupancy | Two N*N R32_UINT: 8*N*N bytes. |
+| Raw elevation | One N*N R32_SFLOAT: 4*N*N bytes. |
+| Terrain extinction | One low-layer N*N R32_SFLOAT: 4*N*N bytes; high layer uses uniform zero. |
+| Linear EWNS | Three RGBA16F per layer, two layers: 48*N*N bytes. |
+| Presentation | Three directional plus one ambient R8G8B8A8_UNORM per layer: 32*N*N bytes if N*N; publish actual extents. |
+| Diagnostics | Optional indexed reference, HRC debug output and readback; inventory actual formats/extents. |
+| Source/hull buffers | Every framebuffer slot, counts/ranges/vertices and actual capacity. |
+| Baseline | All simultaneous retained baseline images/buffers. |
+| Lifetime overhead | VMA alignment, staging, retired allocations and recreation overlap, measured live/peak. |
+
+Core intervals plus reconstruction/emission/occupancy/raw/extinction/linear EWNS are about 11.50/48.00 MiB at 256/512, excluding presentation and every subsequent category. N*N presentation adds 2/8 MiB. No memory ceiling or throughput prediction follows. Actual device formats/limits and allocations remain runtime checks. Source quadrature and accuracy targets are unvalidated proposed gates.
+
+## Source reuse and provenance
+
+Pin https://github.com/Yaazarai/Volumetric-HRC/tree/ed153d18f284acce9515880614b1091e9669adcf . Root LICENSE is Unlicense. The selected source paths are HolographicRadianceCascades/shaders/Shd_Extensions/Shd_Extensions.fsh and HolographicRadianceCascades/shaders/Shd_MergingCones/Shd_MergingCones.fsh. FrustumSeed and FluenceSum at the same subtree/commit are adaptation-boundary references, not copied engine input/output stages.
+
+Smallest source reuse shape: adapt directly into planned HrcUp.comp and HrcDown.comp and add Lighting/Hrc.LICENSE.txt with full upstream license, exact commit, upstream-to-adapted file mapping and change description. Preserve the engine shader license. No pristine mirror, submodule, GameMaker project/runtime, new rendering framework or ThirdParty edits. 
+
+Verified upstream: Extensions swaps lower/upper indices between completed paths. MergingCones uses
+half endpoint-angle weights, ordered composition and completed-merge interpolation on even planes.
+FrustumSeed applies pow(rgb,2.2); FluenceSum sums four frusta and applies pow(rgb,1/2.2). Replace
+those gamma/scalar-output assumptions. Do not treat summed reconstructed alpha as interval T. The
+algebra/directions and transport-accuracy acceptance rows independently verify engine
+normalization/indexing/parity.
+
+Supplied upstream research excludes ppmpreetham/hrc-gi as a primary source because zero-extinction emitter accumulation and four orientations are incomplete. amitabha and AdrianMargel remain math cross-checks only, with reusable licenses unestablished; no source copying. Paper benchmarks are not engine estimates.
+
 ## Critical files
 
 Existing integration anchors below bound the implementation; support shader
 names listed under In scope are new. Read their local AGENTS.md before editing.
-No deterministic collection columns, network messages or pack changes are needed.
+No deterministic collection columns, network messages or pack changes are needed. On successful implementation landing rewrite ScreenSpaceRadianceCascades.md's separate-Plan citation to the current implementation; on rejection remove its pending claim. Its existing link remains correct during this documentation-only finalization.
 
 ## In scope
 
@@ -265,7 +332,7 @@ No deterministic collection columns, network messages or pack changes are needed
   and candidate footprint/control publication; `MainUniforms.cpp`/`Render.h`:
   candidate Main publication and shared render-only state.
 - `Engine/Source/Frame/Collections/PointLights/PointLightsRender.cpp` and
-  `AreaLights/AreaLightsRender.cpp`: candidate true-XY source records, layer
+  `Engine/Source/Frame/Collections/AreaLights/AreaLightsRender.cpp`: candidate true-XY source records, layer
   assignment and footprint culling; corresponding collection headers only for
   client render staging, never new simulation data.
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/{Fighters/FightersRender.cpp,Omnis/OmnisRender.cpp,Battleships/BattleshipsRender.cpp}`:
@@ -276,12 +343,13 @@ No deterministic collection columns, network messages or pack changes are needed
   from existing rendered ship/source capacities, with zeroed unused counts.
 - `Engine/Source/Graphics/Managers/{RenderTargetTextures.h,RenderTargetTexturesLighting.cpp,WorldLightingShadowPipelines.h,WorldLightingShadowPipelines.cpp,PipelineManager.h,PipelineManager.cpp,CommandBufferRecordMain.cpp}`:
   candidate resources, descriptors, pass recording and A/B indirect gating.
-- `Engine/Data/Shaders/ShaderLayoutsBase.h`: CPU/GLSL Main/model and candidate
-  binding/layout contract; `Model/ModelCommon.h`, `Model/ModelStatic.vert` and
+- `Engine/Data/Shaders/ShaderMainLayout.h`: MainLayout candidate publication; `ShaderLayoutsBase.h` aggregates CPU/GLSL layouts and model/candidate binding contracts; `Engine/Data/Shaders/Model/ModelCommon.h`, `Model/ModelStatic.vert` and
   `Model/ModelSkinned.vert`:
   matching hull reference delivery where model layout is owned there.
+- `Engine/Source/Graphics/Objects/ModelPipeline.cpp::Create`: appended model candidate bindings, kiModelAdditionalDescriptors, vector capacity/count and valid static/skinned/material/shadow variants.
+- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesRender.cpp` and `Projects/ModelViewer/Source/ModelViewerApplication.cpp`: initialize empty hull references for excluded shared-layout producers only.
 - New `Engine/Data/Shaders/Lighting/{HrcCommon.h,HrcSource.vert,HrcSource.frag,HrcBlocker.vert,HrcBlocker.frag,HrcTerrain.frag,HrcInitialize.comp,HrcUp.comp,HrcDown.comp,HrcResolve.comp,HrcReference.comp}`:
-  inputs, interval construction, reconstruction/filter, adapter and diagnostic
+  inputs, raw elevation/low-layer extinction preparation, interval construction, reconstruction/filter, adapter and diagnostic
   bounded sampled direct DDA oracle described under Verification and acceptance.
   Reuse terrain elevation vertex/placement input and existing
   local presentation math; move shared Uchimura math to HrcCommon only if needed
@@ -294,7 +362,7 @@ No deterministic collection columns, network messages or pack changes are needed
   Uniform/SourceHull/Gap/TinyMoving/Edge), with raw field debug selection only.
   Analytical fixtures supply shader inputs, never simulated entities. Diagnostic
   `HRC Blockers` and `Baseline Shield Deposits` checkboxes allow blocker-disabled
-  and source-matched references without hiding geometry; both default enabled.
+  and source-matched references without hiding geometry; both default enabled. HRC Blockers=false zeroes ship occupancy and terrain sigma, retaining source data; analytical fixtures separately isolate terrain extinction from ship masks.
 - `Engine/Source/Profile/{ProfileManager.h,ProfileManager.cpp}` and
   `Engine/Source/Agent/AgentCommandsClientGeneric.cpp`: named GPU timing rows and
   a narrow client `query_profile` extension reporting candidate allocation bytes,
@@ -306,13 +374,16 @@ No deterministic collection columns, network messages or pack changes are needed
   matching-frame GPU results become available. Publish frame count and completed
   status so polling cannot lose or double-count frames. Read-only
   diagnostics only; no new capture command or timer percentile framework.
-- Debug name registration in `RenderTargetTexturesLighting.cpp`: `HrcEmission`,
+- Debug name registration in `RenderTargetTexturesLighting.cpp` and `Engine/Source/Graphics/Screenshot.cpp::{ResolveRenderTarget,FormatName,kpcValidDumpNames}`: `HrcEmission`,
   `HrcOccupancy`, `HrcIntervals`, `HrcResolved`, `HrcReference`, using layer as
   index except interval scratch (index 0, last processed quadrant/layer).
-  `HrcReference` holds only indexed receiver samples, never a full-grid oracle.
-  Its raw dump records actual width, height, format and completed sample count;
+  `HrcReference` holds only indexed FP32 receiver samples, never a full-grid oracle.
+  Explicitly expose raw R32_UINT occupancy, layer/RGB channel selection and target extents/formats. Its raw dump records actual width, height, format, completed sample count, snapshot/world-frame identity, footprint/pitch/N, D/profile inputs and scratch layer/quadrant;
   the run manifest maps each sample index to physical XY, layer, lattice/targeted
   role and validity/exclusion reason, with matching sampled HRC values.
+- `Engine/Data/Shaders/Lighting/Hrc.LICENSE.txt`: full pinned upstream Unlicense, exact commit, upstream/adapted file mapping and changes; no license-unknown source copying or ThirdParty edits.
+- `Engine/Source/Graphics/Graphics.cpp`: only completed-frame submission/query association if ProfileManager cannot own it alone; preserve rendering behavior.
+- `Documents/Plans/Engine/ScreenSpaceRadianceCascades.md`: successful implementation landing citation update or rejected experiment claim removal only.
 - Necessary shader pack discovery and project/filter membership for precisely
   these new files through `/update-vcxproj`; owning AGENTS.md lighting/layout/
   publication notes through `/update-claude-docs`; harness command docs solely
@@ -329,11 +400,29 @@ to improve the comparison. `RemoveLightingHeldFlag.md` overlaps only the
 baseline publisher; it is a simplification with no functional prerequisite.
 There is no dependency edge; preserve its result if it lands first.
 
+## Timing evidence sequence
+
+P0 before the first edit: untouched baseline fixtures/source-off images, GPU/driver/build/settings manifest, FPS and existing timer snapshots. These preserve regression evidence but cannot settle exact completed-frame A9.
+
+P1 first implementation work: only existing scoped read-only accumulator and query_profile fields,
+at GpuRead's submission/query handoff. Associate selected mode/grid generation and one world-frame
+submission with ready GPU results; consume once, keep unavailable samples pending, distinguish
+zero/skipped work from unavailable timestamps and exclude UI-only frames/LogTimers rereads. Inspect
+fence/query-reset order; Graphics.cpp changes only if needed for profiling association. Preserve
+rendering/cadence/shaders.
+
+P2 audit diagnostics-only diff and verify unchanged baseline output against P0; collect exact
+baseline 300-warmup/1000-completed-frame cohorts before transport/receiver edits. P3 compare matched
+alternating baseline/candidate cohorts in the same diagnostic-enabled final executable. The <=2x
+gate, five cohorts per scene/mode, full-frame reporting and positive receiver-cost charge remain
+unchanged. Invalid instrumentation is fixed in scope, never converted into a false pass.
+Compile/harness owns future execution; no build or runtime verification has occurred for this Plan.
+
 ## Verification and acceptance
 
 Execute builds through `/compile`: DataPacker Release|x64 for shaders and
 BrokenEngineSandbox client and server Debug|x64 and Release|x64 for shared-layout
-and affinity checks. Run `/agent-harness` for every live operation; its command
+and affinity checks; ModelViewer Release|x64 verifies the excluded shared-layout producer. Run `/agent-harness` for every live operation; its command
 reference owns transport/launch syntax. The request names and params below are
 actual commands, not shell commands. Save the completed run manifest, raw dumps,
 screenshots, timings and verdict under the implementation session's Temp evidence
@@ -364,9 +453,9 @@ does not satisfy unexecuted acceptance criteria.
    sequences for motion and dense combat. Replays provide identical combat A/B.
 3. Capture `screenshot {"format":"png"}` and raw
    `dump_render_target {"name":"HrcResolved","index":0,"raw":true}`;
-   repeat for emission, occupancy, reference, both layers and baseline Combine.
+   repeat for emission, occupancy, reference, both layers, RGB selections and baseline Combine. HrcResolved uses index=layer and channel=RGB component (0/1/2), each carrying EWNS in RGBA; intervals use index=0 with last processed layer/quadrant metadata.
    Enable the diagnostic DDA shader only in quality cohorts, not timing runs.
-   It integrates the identical raster inputs to the boundary with 4096 uniform
+   It uses FP32 accumulation and integrates identical emission, hard ship masks and raw-terrain/profile/D inputs to the boundary with 4096 uniform
    angle samples per receiver, preserving quadrant separation and source units.
    Select a fixed 16-by-16 stratified receiver lattice across the visible
    rectangle, plus at most 32 documented targeted edge/parity/shadow probes.
@@ -376,7 +465,7 @@ does not satisfy unexecuted acceptance criteria.
    participate in the metric, including targeted probes; report coverage,
    selected/valid/excluded counts and reasons per layer/grid. This is sampled
    receiver error, never a full-pixel RMS claim.
-   Freeze only diagnostic input data: footprint, source/blocker snapshot and
+   Freeze only diagnostic input data: footprint, source/ship/raw-terrain/profile/D snapshot and
    reference inputs remain fixed across capture; do not change simulation.
    Reuse that snapshot for matched candidate samples and the entire oracle.
    Process at most 8 receivers times 256 directions per rendered frame,
@@ -394,12 +483,12 @@ does not satisfy unexecuted acceptance criteria.
 
 | Criterion | Proposed prototype target and required evidence |
 |---|---|
-| Algebra/directions | Empty field exactly black, finite outputs and T in [0,1]; constant transparent emission matches analytic path lengths within 2%; four rotated source fixtures select their matching EWNS dominant channel. Capture parity/edge probes and initialization/up/down debug data. |
+| Algebra/directions | Empty field exactly black, finite outputs and T in [0,1]; constant transparent emission matches analytic path lengths within 2%; simultaneous positive j/sigma matches analytic integration within 2% including small tau and clipped diagonals; four rotated source fixtures select their matching EWNS dominant channel. Capture parity/edge probes and initialization/up/down debug data. |
 | Transport accuracy | Against the completed sampled direct DDA oracle, linear RGB normalized RMS error <=10% of reference peak over all selected valid unobstructed visible-region receiver probes with reference >=1% of peak. Report sample coverage/counts and exclusions, worst error and images; targeted probes outside the visible rectangle remain explicit edge diagnostics. No full-pixel RMS claim; the target is a proposed gate, not an HRC guarantee. |
-| Real hull and cliff | In a fixed same-height source/blocker scene, mean shadow luminance <=20% of a blocker-disabled reference, while source-facing visible hull receives >=50% of its blocker-disabled response. Keep source, sun and camera unchanged; measure local contribution separately. Cliff and hull require distinct actual geometry captures. |
+| Real hull and terrain | A real hull gives mean shadow luminance <=20% of ship-blocker-disabled reference and source-facing visible hull >=50% of blocker-disabled response. Keep source, sun and camera fixed; isolate local contribution. Distinct actual island/cliff captures demonstrate finite low-layer attenuation against terrain-extinction-disabled reference. Uniform h=1 paths D/2D match analytic attenuation within 2%; high terrain remains transparent. An opaque cliff shadow is not this contract. |
 | Receiver limitations | Show concave mesh inside convex hull, two nearby/overlapping ships, tilted hull, grazing source and 1/2/4-texel gaps. Mark false convex blocking and cardinal-boundary approximation in result. No disappearing lit hull, unrelated exterior tap through another blocker, NaN or ambient-floor workaround. Subtexel-gap closure is a declared limitation. |
 | Tiny/moving sources | 0.25/0.5/1/2/8-texel sources: deposited area-integral error <=5% against original continuous quad quadrature; moving-source visible-region total linear output varies <=10% between adjacent equal-speed subtexel phases in empty space. Removed source/blocker has no residual after the next rendered world frame. Report Moire, broadening and ringing even when thresholds pass. |
-| Heights/materials | Low and high source scenes show no transport in the other layer; terrain below a plane never blocks it. Preserve receiver height interpolation of available contributions. Verify EWNS normal turns, flat terrain below a plane and water ambient, model cardinal specular, smoke's existing ambient scaling, and unsupported shields with screenshots. Measure terrain at/above each plane receiving zero local HRC from that plane, including above both with no local HRC but sun/moon and IBL retained; record this as a prototype limitation, with no terrain boundary sampling or ambient floor. |
+| Heights/materials | No cross-layer transport. Low h=0 terrain and all high terrain have T=1; positive low h follows finite extinction. Terrain/water/model vertices below low, between and above high planes receive at true XY using clamped existing height blending. Show reachable nonzero local light on high terrain and object vertices above/below planes, plus real ship-shadowed samples; no terrain eligibility mask. Verify EWNS normal turns, terrain/water ambient, model cardinal specular, all model deferred smoke reads and terrain/water smoke scaling, unsupported shields, own-hull exterior and vertical overlap limitations. |
 | Coverage/continuity | Edge source disappears only at declared finite boundary; no repeated edge streak. Pan, zoom and adjacent cell crossing at equivalent physical sample points change stationary raw lighting <=10% outside newly exposed/occlusion-edge texels. Large jumps, empty cell, disable/re-enable, hide/show, resize/minimize/restore and recreation show no old data; use `presentation_continuity_probe {}` plus recorded candidate areas. |
 | Preserved lighting | With local sources off, baseline/candidate scene images match within 1/255 per channel away from animated content; direct sun/shadows/reflections and visible sprites remain. No baseline+candidate duplicate local contribution. Baseline mode remains reproducible. |
 | Cost | Candidate complete lighting mean GPU time <=2x baseline complete lighting mean in every matched cohort below. Report maxima and full-frame GPU/CPU/FPS, allocation and peak, including simultaneous A/B resource residency; no asserted p95 from average/max queries. |
@@ -438,6 +527,14 @@ production replacement requires a separately approved Plan.
 
 ## Risks and invariants
 
+RGBA16F interval radiance/transmittance storage can round near-unity finite
+transmittance to one or underflow small values; reconstruction/presentation also
+rounds. Keep the selected formats and compare both grids against the raw FP32
+DDA oracle. Include uniform weak-extinction long paths, h=0, h=1 and simultaneous
+j/sigma fixtures, recording lost attenuation, underflow and grid dependence.
+The accuracy gate charges these errors; no unmeasured precision/performance
+success or automatic float32 fallback is assumed.
+
 Spatial aliasing from a large world texel, tiny-source Moire, source broadening,
 conservative hull blocking, boundary loss, quadrant receiver approximation,
 planar height ambiguity and storage bandwidth may prevent promotion. Preserve
@@ -450,28 +547,54 @@ decision rather than extending this experiment.
 
 ## Sources and verified research
 
-- [Holographic Radiance Cascades paper](https://arxiv.org/pdf/2505.02041),
-  sections 3–4.3, equations 13–21 and Algorithm 1: parallel-only probe decimation,
-  slope bins, interval hierarchy, parity reconstruction, base offset and filter.
-  Full paper reviewed during primary research; small-source Moire, blur and poor 3D
-  scaling are stated limitations. Published CUDA/LuisaCompute timings are not
-  Broken Engine estimates.
-- Primary [reference grid/reconstruction](https://github.com/entropylost/amitabha/blob/main/src/lib.rs),
-  `Grid::next`, `merge`; [interval construction](https://github.com/entropylost/amitabha/blob/main/src/trace.rs),
-  `StorageTracer::trace`, `merge_up`; [composition/units](https://github.com/entropylost/amitabha/blob/main/src/fluence.rs),
-  `FluenceType::over`, `restrict_angle`; [storage](https://github.com/entropylost/amitabha/blob/main/src/storage.rs).
-  These cross-check paper math; TODOs and alternate reconstruction do not override
-  the paper. The proposed flattened Vulkan images are engine adaptation.
-- [Original RC manuscript](https://raw.githubusercontent.com/Raikiri/RadianceCascadesPaper/main/RadianceCascades.tex):
-  ordered interval composition and hierarchy context. It is not a second backend.
-- Engine evidence: `PointLightsRender.cpp`/`AreaLightsRender.cpp` and their deposit
-  shaders own source texture/intensity; `FlightPlaneProjection.cpp` and
-  `ShaderFunctions.h` prove existing eye-ray projection must migrate on both
-  sides; `LightCombine.comp` owns early local-field mapping, separately from
-  final scene HDR resolve. `Common/DataFile.h::ModelOutline`,
-  `Render.h::ComputeModelShadowBounds` and `ExportModel.cpp` establish packed
-  hull availability, baked alignment and inset-hitbox mismatch. No pack change.
-- Runtime verification owners: [engine harness commands](../../../.agents/skills/agent-harness/references/command-reference.md)
-  and [BES server commands](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md).
-  `query_profile` already supplies GPU averages/maxima, not memory or percentile
-  distributions; the narrow diagnostics addition above closes that evidence gap.
+- [Original HRC paper v1](https://arxiv.org/abs/2505.02041v1), [PDF](https://arxiv.org/pdf/2505.02041v1): sections 2-4.3, emission/extinction transfer equations and ordered composition; equations 13-21 and Algorithm 1 establish hierarchy/parity. Section 4.3 discusses diagonal-ray overlap, the shifted base resolve and opacity-aware cross filter. Paper benchmarks are not Broken Engine estimates.
+- Pinned Yaazarai
+  [Unlicense](https://github.com/Yaazarai/Volumetric-HRC/blob/ed153d18f284acce9515880614b1091e9669adcf/LICENSE),
+  [Extensions](https://github.com/Yaazarai/Volumetric-HRC/blob/ed153d18f284acce9515880614b1091e9669adcf/HolographicRadianceCascades/shaders/Shd_Extensions/Shd_Extensions.fsh)
+  and
+  [MergingCones](https://github.com/Yaazarai/Volumetric-HRC/blob/ed153d18f284acce9515880614b1091e9669adcf/HolographicRadianceCascades/shaders/Shd_MergingCones/Shd_MergingCones.fsh)
+  are the licensed adaptation inputs.
+  [FrustumSeed](https://github.com/Yaazarai/Volumetric-HRC/blob/ed153d18f284acce9515880614b1091e9669adcf/HolographicRadianceCascades/shaders/Shd_FrustumSeed/Shd_FrustumSeed.fsh)
+  and
+  [FluenceSum](https://github.com/Yaazarai/Volumetric-HRC/blob/ed153d18f284acce9515880614b1091e9669adcf/HolographicRadianceCascades/shaders/Shd_FluenceSum/Shd_FluenceSum.fsh)
+  define seed/gamma/scalar-output adaptation boundaries. The full license and adapted file mapping
+  belong in the future Hrc.LICENSE.txt.
+- [LightingSpread.frag](../../../Engine/Data/Shaders/Lighting/LightingSpread.frag) owns the current low-layer profile; [LightingUniforms.cpp](../../../Engine/Source/Graphics/Render/LightingUniforms.cpp) publishes its inputs. [IslandChainPlacement.cpp](../../../Engine/Source/Frame/IslandChainPlacement.cpp)::kfWaterSpanMeters is the proposed D scale reference, not evidence of baseline-equivalent extinction.
+- [PointLightsRender.cpp](../../../Engine/Source/Frame/Collections/PointLights/PointLightsRender.cpp), [AreaLightsRender.cpp](../../../Engine/Source/Frame/Collections/AreaLights/AreaLightsRender.cpp), [PointLight.frag](../../../Engine/Data/Shaders/Lighting/PointLight.frag), [AreaLight.frag](../../../Engine/Data/Shaders/Lighting/AreaLight.frag): texture/packed alpha, UV/clamp/repeat, instance intensity, original size and offscreen staging integration.
+- [FlightPlaneProjection.cpp](../../../Engine/Source/Graphics/FlightPlaneProjection.cpp),
+  [ShaderFunctions.h](../../../Engine/Data/Shaders/ShaderFunctions.h),
+  [Model.frag](../../../Engine/Data/Shaders/Model/Model.frag),
+  [Terrain.frag](../../../Engine/Data/Shaders/Terrain/Terrain.frag) and
+  [Water.frag](../../../Engine/Data/Shaders/Water/Water.frag) own receiver projection,
+  height/material response and all retained smoke paths.
+  [LightCombine.comp](../../../Engine/Data/Shaders/Lighting/LightCombine.comp) owns the separate
+  local-field presentation mapping.
+- [DataFile.h](../../../Common/DataFile.h)::ModelOutline, [Render.h](../../../Engine/Source/Graphics/Render/Render.h)::ComputeModelShadowBounds, [ExportModel.cpp](../../../DataPacker/Source/ExportJobs/ExportModel.cpp), [ConvexHull.h](../../../Common/Math/ConvexHull.h)::BuildConvexHull and [FlightPlanes.cpp](../../../Engine/Source/Frame/FlightPlanes.cpp)::NearestPlaneIndex establish packed bounds, baked alignment, hull reuse and ties.
+- [MainUniforms.cpp](../../../Engine/Source/Graphics/Render/MainUniforms.cpp)::RenderFrameMain and
+  [render ordering](../../../Engine/Source/Graphics/Render/AGENTS.md#ordering-and-publication) own
+  both post-EndFrameInterpolateRender count publications.
+  [ShaderMainLayout.h](../../../Engine/Data/Shaders/ShaderMainLayout.h)::MainLayout,
+  [ModelPipeline.cpp](../../../Engine/Source/Graphics/Objects/ModelPipeline.cpp)::Create and
+  [Screenshot.cpp](../../../Engine/Source/Graphics/Screenshot.cpp)::{ResolveRenderTarget,FormatName}
+  are actual layout/descriptor/dump owners.
+- [MissilesRender.cpp](../../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesRender.cpp) and [ModelViewerApplication.cpp](../../../Projects/ModelViewer/Source/ModelViewerApplication.cpp) are excluded shared-layout producers requiring empty hull references.
+- [ProfileManager.cpp](../../../Engine/Source/Profile/ProfileManager.cpp)::GpuRead, [Graphics.cpp](../../../Engine/Source/Graphics/Graphics.cpp) and [AgentCommandsClientGeneric.cpp](../../../Engine/Source/Agent/AgentCommandsClientGeneric.cpp)::query_profile own the narrow completed-frame diagnostic association. Current/average/max snapshots alone cannot establish completed-frame cohorts.
+- [Engine harness commands](../../../.agents/skills/agent-harness/references/command-reference.md) and [BES server commands](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md) own future runtime operations. No runtime/build evidence is claimed.
+
+## Execution card
+
+Execution card:
+### What does this plan do?
+Build one opt-in two-layer native Vulkan HRC comparison by adapting licensed
+Yaazarai kernels, with finite low-layer terrain extinction, hard ship prisms and
+actual-XY terrain/water/model receivers above and below both planes.
+### Why this is good for the codebase
+It measures a bounded transport technique against shipped lighting using existing
+source assets, packed hulls and renderer ownership. A measured negative result
+settles the experiment without requiring production replacement.
+- Goal: one complete evidence-backed 256/512 comparison; promotion requires every proposed quality/cost gate.
+- Out of scope: Out of scope above; no production replacement, additional backend, simulation/pack changes, calibration system or unit tests.
+- Tier trigger: future implementation is Tier 3: rendering architecture, GPU lifetime/synchronization and shared CPU/GLSL contracts. Saving the finalized Plan authorizes no implementation.
+- Interfaces and invariants: source-facing EWNS; independent planes; finite terrain sigma0 and sigma1=0; exact simultaneous j/sigma integration; separate hard ship occupancy; true-XY receivers with existing clamped height blend; RenderBasis only; client-only non-CRC state; Main candidate publication finalized after EndRender in both branches; zero-count clears; current-frame complete resources; unchanged baseline cadence.
+- Acceptance checks: every Verification and acceptance row, full resource inventory, timing sequence and required build; oracle remains at physical P with FP32 accumulation, charging shifted-base and storage errors. Above/below receiving and every smoke read require actual captures. No build/runtime evidence exists yet.
+- Roles: main owns future approval/workflow; implementers own bounded changes, assumption audit and propagation; independent reviewers own technical plan/code/shader/coherence/adversarial reviews; builder owns compile; harness worker owns live verification. Licensed kernel adaptation and finite terrain are settled; no further user choice remains. Implementation is deferred to a future claimed session.
