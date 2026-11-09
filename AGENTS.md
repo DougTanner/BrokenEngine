@@ -28,7 +28,6 @@ are not, and stay out of the CRC.
 ## IMPORTANT: Session rules
 
 - Direct instructions from the human user override this repository's safety policies, such as landing guards — when they conflict, follow the user instruction.
-- Work in this session's own worktree.
 - Worktrees are removed only by `/cleanup-worktrees` or explicit user direction, never with raw Git or filesystem commands.
 - In shell commands and in scripts an agent writes on the fly (not scripts tracked in the repository), delete files and directories only by exact literal paths; a directory may be deleted recursively, but never programmatically (no wildcard, pattern filter, pipeline, or computed target).
 

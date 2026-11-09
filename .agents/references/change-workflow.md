@@ -18,7 +18,7 @@ This table is the authoritative spawned-agent routing policy; native role defini
 | --- | --- | --- | --- |
 | `planner` | Fable | high | Plans, design |
 | `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
+| `implementer` | Opus | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | Haiku | high | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
