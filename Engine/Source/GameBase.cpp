@@ -1106,11 +1106,15 @@ void GameBase::ChangeFrameToMainMenu()
 
 #if defined(BT_CLIENT)
 	game::gpGame->StartMenuMusic();
+	static_cast<game::Camera&>(*gpCamera).StorePose(false);
 #endif // BT_CLIENT
 
 	mGameFlags.Set(GameFlags::kMainMenu);
 	CreateNewFrame();
 	ResetSession();
+#if defined(BT_CLIENT)
+	static_cast<game::Camera&>(*gpCamera).ApplyPose(true);
+#endif // BT_CLIENT
 }
 
 void GameBase::PrepareActiveSet()

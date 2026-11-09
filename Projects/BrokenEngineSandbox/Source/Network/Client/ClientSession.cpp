@@ -4,6 +4,7 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
+#include "Graphics/Camera.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
 #include "Profile/ProfileRows.h"
@@ -167,9 +168,12 @@ void ClientSession::OnConnectionAccepted()
 	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		gpGame->StartGameMusic();
+		Camera& rCamera = static_cast<Camera&>(*engine::gpCamera);
+		rCamera.StorePose(true);
 		gpGame->mGameFlags.Set(engine::GameFlags::kMainMenu, false);
 		gpGame->CreateNewFrame();
 		gpGame->ResetSession();
+		rCamera.ApplyPose(false);
 		gpGame->meUiState = engine::UiState::kNone;
 	}
 }

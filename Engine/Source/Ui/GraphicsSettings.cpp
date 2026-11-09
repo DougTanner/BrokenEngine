@@ -26,7 +26,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 27;
+	static constexpr int64_t kiVersion = 28;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -35,7 +35,7 @@ struct GraphicsSettings
 	float fMaximumAnisotropy = 0.0f;
 	float fMinimumSampleShading = 0.0f;
 	float fSmokeSimulationArea = 0.0f;
-	float fMinimumAmbient = 0.0f;
+	float fDayMinimumAmbient = 0.0f;
 	float fLightingUpdateCadence = 1.0f;
 	float fShadowUpdateCadence = 4.0f;
 	// The quality levels are the single source of truth for the wrappers they drive; those wrapper values are
@@ -53,6 +53,7 @@ struct GraphicsSettings
 	float fCameraTilt = 20.0f;
 	uint8_t uiBreakRepetition = 1;
 	uint8_t puiBreakRepetitionPadding[3] {};
+	float fNightMinimumAmbient = 0.0f;
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -63,7 +64,7 @@ static_assert(BT_OFFSETOF(GraphicsSettings, vkSampleCount) == 8, "GraphicsSettin
 static_assert(BT_OFFSETOF(GraphicsSettings, fMaximumAnisotropy) == 12, "GraphicsSettings::fMaximumAnisotropy offset changed — VkSampleCountFlagBits must stay four bytes");
 static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumSampleShading) == 16, "GraphicsSettings::fMinimumSampleShading offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeSimulationArea) == 20, "GraphicsSettings::fSmokeSimulationArea offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumAmbient) == 24, "GraphicsSettings::fMinimumAmbient offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, fDayMinimumAmbient) == 24, "GraphicsSettings::fDayMinimumAmbient offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fLightingUpdateCadence) == 28, "GraphicsSettings::fLightingUpdateCadence offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fShadowUpdateCadence) == 32, "GraphicsSettings::fShadowUpdateCadence offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterLevel) == 36, "GraphicsSettings::uiWaterLevel offset changed — the quality bytes are appended after the floats");
@@ -79,7 +80,8 @@ static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeUpdateCadence) == 48, "Graphic
 static_assert(BT_OFFSETOF(GraphicsSettings, fCameraTilt) == 52, "GraphicsSettings::fCameraTilt offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiBreakRepetition) == 56, "GraphicsSettings::uiBreakRepetition offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, puiBreakRepetitionPadding) == 57, "GraphicsSettings padding changed — sizeof must stay a multiple of four");
-static_assert(sizeof(GraphicsSettings) == 60, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, fNightMinimumAmbient) == 60, "GraphicsSettings::fNightMinimumAmbient offset changed — existing setting bytes move");
+static_assert(sizeof(GraphicsSettings) == 64,"GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -94,7 +96,7 @@ void SaveGraphicsSettings()
 		.fMaximumAnisotropy = gMaximumAnisotropy.mfCurrent,
 		.fMinimumSampleShading = gMinimumSampleShading.mfCurrent,
 		.fSmokeSimulationArea = gSmokeSimulationArea.mfCurrent,
-		.fMinimumAmbient = gSunMoonMinimumAmbient.mfCurrent,
+		.fDayMinimumAmbient = gSunMoonDayMinimumAmbient.mfCurrent,
 		.fLightingUpdateCadence = gLightingUpdateCadence.mfCurrent,
 		.fShadowUpdateCadence = gShadowUpdateCadence.mfCurrent,
 		.uiWaterLevel = static_cast<uint8_t>(gWaterLevel.Get<int64_t>()),
@@ -108,6 +110,7 @@ void SaveGraphicsSettings()
 		.fSmokeUpdateCadence = gSmokeUpdateCadence.mfCurrent,
 		.fCameraTilt = gCameraTilt.mfCurrent,
 		.uiBreakRepetition = static_cast<uint8_t>(gBreakRepetition.Get<bool>()),
+		.fNightMinimumAmbient = gSunMoonNightMinimumAmbient.mfCurrent,
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -150,9 +153,14 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "fSmokeSimulationArea";
 	}
 
-	if (!gSunMoonMinimumAmbient.IsInRange(rGraphicsSettings.fMinimumAmbient))
+	if (!gSunMoonDayMinimumAmbient.IsInRange(rGraphicsSettings.fDayMinimumAmbient))
 	{
-		return "fMinimumAmbient";
+		return "fDayMinimumAmbient";
+	}
+
+	if (!gSunMoonNightMinimumAmbient.IsInRange(rGraphicsSettings.fNightMinimumAmbient))
+	{
+		return "fNightMinimumAmbient";
 	}
 
 	if (!gLightingUpdateCadence.IsInRange(rGraphicsSettings.fLightingUpdateCadence))
@@ -261,7 +269,8 @@ bool LoadGraphicsSettings()
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
 		gSmokeLayerStagger.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmokeLayerStagger);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
-		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
+		gSunMoonDayMinimumAmbient.Set(graphicsSettings.fDayMinimumAmbient);
+		gSunMoonNightMinimumAmbient.Set(graphicsSettings.fNightMinimumAmbient);
 		gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
 		gShadowUpdateCadence.Set(graphicsSettings.fShadowUpdateCadence);
 		gSmokeUpdateCadence.Set(graphicsSettings.fSmokeUpdateCadence);
@@ -302,7 +311,8 @@ void ResetGraphicsSettings()
 	gBreakRepetition.mfCurrent = gBreakRepetition.mfDefault;
 	gSmokeLayerStagger.mfCurrent = gSmokeLayerStagger.mfDefault;
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
-	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;
+	gSunMoonDayMinimumAmbient.mfCurrent = gSunMoonDayMinimumAmbient.mfDefault;
+	gSunMoonNightMinimumAmbient.mfCurrent = gSunMoonNightMinimumAmbient.mfDefault;
 	gLightingUpdateCadence.mfCurrent = gLightingUpdateCadence.mfDefault;
 	gShadowUpdateCadence.mfCurrent = gShadowUpdateCadence.mfDefault;
 	gSmokeUpdateCadence.mfCurrent = gSmokeUpdateCadence.mfDefault;

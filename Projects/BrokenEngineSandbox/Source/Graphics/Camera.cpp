@@ -14,6 +14,48 @@ namespace game
 Camera::Camera()
 : engine::CameraBase(engine::CameraSetup {.vecInitialPosition = XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset)})
 {
+	// The client starts in the main menu, so it opens at the menu pose even when no ClientState.bin loads.
+	ResetMenuPose();
+	ApplyPose(true);
+}
+
+void Camera::StorePose(bool bMainMenu)
+{
+	if (!bMainMenu)
+	{
+		mfGameFraming = mfCameraFramingTarget;
+		return;
+	}
+
+	if constexpr (kbFreeCamera)
+	{
+		XMStoreFloat2(&mf2MenuPosition, mVecPosition);
+		mfMenuFraming = mfCameraFramingTarget;
+	}
+}
+
+void Camera::ApplyPose(bool bMainMenu)
+{
+	if (!bMainMenu)
+	{
+		RestoreFraming(mfGameFraming);
+		return;
+	}
+
+	RestoreFraming(mfMenuFraming);
+	// Without the free camera the menu target pulls the position to the default pose.
+	if constexpr (kbFreeCamera)
+	{
+		// The menu renders the origin cell; rebasing now keeps the next update from shifting the stored position.
+		mBasisCoordinate = engine::kOriginCoordinate;
+		mVecPosition = XMVectorSet(mf2MenuPosition.x, mf2MenuPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+	}
+}
+
+void Camera::ResetMenuPose()
+{
+	XMStoreFloat2(&mf2MenuPosition, XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset));
+	mfMenuFraming = kfMenuCameraFraming;
 }
 
 engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate)

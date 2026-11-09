@@ -70,10 +70,11 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 // Piecewise day-cycle sun/moon color + ambient ramp, the sun/moon intensity stores, and the precomputed
 // uniform-only sun/moon/ambient products consumed by SunLighting, the smoke helpers, and Water.frag. Returns
 // the finished ambient color so the shadow-ambient split can be folded without re-reading write-only memory.
-static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
+static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent)
 {
-	float fAmbientNight = gSunMoonMinimumAmbient.mfCurrent;
-	float fAmbientMorning = std::max(0.075f, gSunMoonMinimumAmbient.mfCurrent);
+	float fMinimumAmbient = std::lerp(gSunMoonNightMinimumAmbient.mfCurrent, gSunMoonDayMinimumAmbient.mfCurrent, fDayPercent);
+	float fAmbientNight = fMinimumAmbient;
+	float fAmbientMorning = std::max(0.075f, fMinimumAmbient);
 	XMVECTOR vecSunMorning = XMVectorScale(XMVectorSet(1.0f, 219.0f / 255.0f, 0.0f, 1.0f), 0.5f);
 	XMVECTOR vecAmbientMorning = XMVectorSet(fAmbientMorning, fAmbientMorning, fAmbientMorning, 1.0f);
 	XMVECTOR vecSunNoon = XMVectorSet(0.8f, 0.8f, 0.8f, 1.0f);
@@ -155,7 +156,8 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	rGlobalLayout.fSunIntensitySmoke    = fSunIntensitySmoke;
 	rGlobalLayout.fMoonIntensitySmoke   = fMoonIntensitySmoke;
 
-	vecAmbient = XMVectorSetW(XMVectorScale(vecAmbient, gSunMoonAmbientMultiplier.mfCurrent), 1.0f);
+	float fAmbientMultiplier = std::lerp(gSunMoonNightAmbientMultiplier.mfCurrent, gSunMoonDayAmbientMultiplier.mfCurrent, fDayPercent);
+	vecAmbient = XMVectorSetW(XMVectorScale(vecAmbient, fAmbientMultiplier), 1.0f);
 	XMStoreFloat4(&rGlobalLayout.f4AmbientColor, vecAmbient);
 
 	// Terrain, smoke, and water shaders consume these day-cycle products; all operands are uniform across a draw.
@@ -233,8 +235,8 @@ static void PopulateDayCycleFeatherWindows(float fSunAngle, float& rfDayPercent,
 static void PopulateSunAndLighting(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float& rfDayPercent, float& rfNoonPercent, XMVECTOR& rvecSunMoonNormalOut, XMVECTOR& rvecAmbientColorOut)
 {
 	rvecSunMoonNormalOut = PopulateSunMoonDirection(rGlobalLayout, fSunAngle);
-	rvecAmbientColorOut = PopulateDayCycleColors(rGlobalLayout, fSunAngle);
 	PopulateDayCycleFeatherWindows(fSunAngle, rfDayPercent, rfNoonPercent);
+	rvecAmbientColorOut = PopulateDayCycleColors(rGlobalLayout, fSunAngle, rfDayPercent);
 
 	float fLightingTimeOfDayMultiplier = rfDayPercent * gLightingDayFinalMultiplier.mfCurrent + (1.0f - rfDayPercent) * gLightingNightFinalMultiplier.mfCurrent;
 	rGlobalLayout.fLightingTimeOfDayMultiplier = fLightingTimeOfDayMultiplier;

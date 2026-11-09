@@ -265,8 +265,8 @@ moving a button.
 A row that draws its own label text (the Graphics sliders, whose label sits left
 of the bar) gives the widget a hidden-label id — "##" plus the same name — so
 ImGui does not draw the name a second time. The registry records that id
-verbatim, so describe_ui reports "##Sun Moon Minimum Ambient" while the player
-still sees "Sun Moon Minimum Ambient", and a query for the human-readable name
+verbatim, so describe_ui reports "##Field of View" while the player
+still sees "Field of View", and a query for the human-readable name
 resolves through ResolveLabel's case-insensitive substring tier. Adding the prefix is itself a
 deliberate label-set change: it is allowed only where the visible text is
 unchanged and the name still resolves to exactly one widget.
@@ -338,8 +338,8 @@ Screen-specific commitments this contract makes, each verified visually:
     directly below Multisampling, with the sampling settings it belongs to.
   - Graphics: every slider row reads label first, then bar — the name is drawn
     left of a bar that fills the rest of the column, instead of trailing it.
-    Display precision follows behavior: smooth Sun Moon Minimum Ambient uses
-    four decimals, and whole-frame Shadow Update Cadence, Lighting Update
+    Display precision follows behavior: smooth Sun Moon Day and Night Minimum
+    Ambient use four decimals, and whole-frame Shadow Update Cadence, Lighting Update
     Cadence, and Smoke Update Cadence use no decimals.
   - Graphics: heavy features use Low/Medium/High rows rather than raw detail
     sliders — Terrain Shadows, Lighting, and Smoke Detail (replacing Smoke

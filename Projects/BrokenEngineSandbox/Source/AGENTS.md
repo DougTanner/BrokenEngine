@@ -12,7 +12,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - `ClientSession` and `ServerSession` inherit the engine session bases, which own the reusable session mechanics, compose the engine-owned session runtimes through them, and add game policy. See `Network/AGENTS.md`.
 - Server save, load, reset, and autosave, like replay recording and playback, are engine-owned (`../../../Engine/Source/File/AGENTS.md`); the game half of those contracts and of the grid save lives in `Save/AGENTS.md`.
 - The Server Monitor snapshot is engine-owned (`../../../Engine/Source/Server/AGENTS.md`); the game reaches it only through the per-cell population snapshot in `Frame/AGENTS.md` and the profile counters it publishes for its own reasons.
-- Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy and the engine's debug-control requests: it polls its own keys through the borrowed `engine::InputPoll`. Everything it does is `kbDebugInput`-only except TAB, which toggles the map in game with no menu open (`Ui/Screens/AGENTS.md`).
+- Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy and the engine's debug-control requests: it polls its own keys through the borrowed `engine::InputPoll`. Everything it does is `kbDebugInput`-only except TAB, which toggles the map in game with no menu open (`Ui/Screens/AGENTS.md`), and the `kbFreeCamera`-only main-menu Backspace (`Graphics/AGENTS.md`).
 - Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic and server-generic handlers are engine-owned;
   the dispatcher tries the engine shared handlers first, then its own side-specific handlers, then the engine side-generic handler, so a game handler can take over an engine command and append its own fields. `Game` teardown clears any deferred agent response first, while its captured runtime dependencies are still live. See `Agent/AGENTS.md`.
 
@@ -24,8 +24,8 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - The game-owned persisted client setting `ClientState.bin` is versioned POD
   written through the engine versioned-file helpers. `ClientState.bin` loads once at startup, the focused
   fleet and ship into an in-memory mirror that focus changes refresh and the
-  zoom straight into the camera; orderly client shutdown writes that mirror plus
-  the camera's zoom target once, while abnormal exits do not guarantee
+  gameplay zoom and main-menu pose into the camera (`Graphics/AGENTS.md`);
+  orderly client shutdown writes that mirror plus both camera poses once, while abnormal exits do not guarantee
   current-session changes are saved and may leave the previous orderly-exit
   snapshot on disk. Bump the owning version on layout change. Tweaks, game,
   sound, and graphics settings persistence is engine-owned

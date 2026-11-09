@@ -440,6 +440,9 @@ void CameraBase::RestoreFraming(float fFraming)
 {
 	mfCameraFraming = fFraming;
 	mfCameraFramingTarget = fFraming;
+	// An unfinished wheel ease would otherwise pull the framing back from its old start.
+	mfFramingVelocity = 0.0f;
+	mbZooming = false;
 }
 
 float XM_CALLCONV CameraBase::AddVisualErrorOffset(FXMVECTOR vecError)

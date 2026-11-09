@@ -46,14 +46,14 @@ Wrapper gLightingWaterSkyboxNormalBlendWave(0.1216f, 0.0f, 0.4f);
 Wrapper gLightingWaterSkyboxIntensity(0.000289f, 0.0001f, 0.002f);
 Wrapper gLightingWaterSkyboxAdd(1.6619f, 0.0f, 4.0f);
 Wrapper gLightingWaterSkyboxOne(4'000.0f, 0.0f, 10'000.0f);
-Wrapper gLightingWaterSkyboxOneNight(1'300.0f, 0.0f, 10'000.0f);
+Wrapper gLightingWaterSkyboxOneNight(750.0f, 0.0f, 10'000.0f);
 Wrapper gLightingWaterSkyboxOnePower(200.0f, 50.0f, 400.0f);
 Wrapper gLightingWaterSkyboxTwo(1'200.0f, 0.0f, 5'000.0f);
-Wrapper gLightingWaterSkyboxTwoNight(950.0f, 0.0f, 5'000.0f);
+Wrapper gLightingWaterSkyboxTwoNight(400.0f, 0.0f, 5'000.0f);
 Wrapper gLightingWaterSkyboxTwoPower(25.035f, 1.0f, 100.0f);
-Wrapper gLightingWaterSkyboxThree(475.0f, 1.0f, 800.0f);
-Wrapper gLightingWaterSkyboxThreeNight(475.0f, 1.0f, 800.0f);
-Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
+Wrapper gLightingWaterSkyboxThree(455.0f, 1.0f, 800.0f);
+Wrapper gLightingWaterSkyboxThreeNight(800.0f, 1.0f, 1600.0f);
+Wrapper gLightingWaterSkyboxThreePower(0.9f, 0.001f, 4.0f);
 Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
 
 // Specular - Skybox One Sampling

@@ -119,7 +119,8 @@ void GraphicsMenuScreen::Render()
 		ImGui::TableNextColumn();
 
 		ColumnSlider("Sun Angle Override", &gSunAngleOverride);
-		ColumnSlider("Sun Moon Minimum Ambient", &gSunMoonMinimumAmbient, "%.4f");
+		ColumnSlider("Sun Moon Day Minimum Ambient", &gSunMoonDayMinimumAmbient, "%.4f");
+		ColumnSlider("Sun Moon Night Minimum Ambient", &gSunMoonNightMinimumAmbient, "%.4f");
 
 		ImGui::Separator();
 

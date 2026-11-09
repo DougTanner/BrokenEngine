@@ -13,7 +13,7 @@ HeightLerpWrapperQuartet gTerrainDetailNormalsMultiplier
 	.high = Wrapper(0.0f, 0.0f, 1.0f),
 };
 
-Wrapper gTerrainSnowBlend(2.0f, 0.0f, 2.0f);
+Wrapper gTerrainSnowBlend(0.2f, 0.0f, 2.0f);
 Wrapper gTerrainSnowAmbientOcclusionExclusion(1.0f, 0.0f, 1.0f);
 Wrapper gTerrainBeachSandSize(0.1f, 0.01f, 0.4f);
 Wrapper gTerrainBeachSandBlend(0.8f, 0.0f, 1.0f);

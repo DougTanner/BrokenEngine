@@ -12,7 +12,7 @@
 namespace engine
 {
 
-constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
+constexpr int64_t kiDynamicBufferInitialCapacity = 2'048;
 
 static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
 static int64_t siTotalCount = 0;

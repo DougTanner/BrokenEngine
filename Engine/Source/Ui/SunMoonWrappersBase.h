@@ -32,8 +32,10 @@ extern Wrapper gSunMoonMoonsetStart;
 extern Wrapper gSunMoonMoonsetEnd;
 
 // Ambient
-extern Wrapper gSunMoonMinimumAmbient;
-extern Wrapper gSunMoonAmbientMultiplier;
+extern Wrapper gSunMoonDayMinimumAmbient;
+extern Wrapper gSunMoonNightMinimumAmbient;
+extern Wrapper gSunMoonDayAmbientMultiplier;
+extern Wrapper gSunMoonNightAmbientMultiplier;
 
 // Tilt in radians affects f4SunMoonNormal, derived terrain/water lighting, and shadow-stretch translation.
 extern Wrapper gSunMoonNormalTilt;

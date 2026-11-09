@@ -369,8 +369,10 @@ struct LightingDescriptor
 
 constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
 {
-	LightingDescriptor {.pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Sun Moon Minimum Ambient", .pcHeading = "Ambient and environment"},
-	LightingDescriptor {.pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Sun Moon Ambient Multiplier", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonDayMinimumAmbient, .pcLabel = "Sun Moon Day Minimum Ambient", .pcHeading = "Ambient and environment"},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonNightMinimumAmbient, .pcLabel = "Sun Moon Night Minimum Ambient", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonDayAmbientMultiplier, .pcLabel = "Sun Moon Day Ambient Multiplier", .pcHeading = nullptr},
+	LightingDescriptor {.pWrapper = &engine::gSunMoonNightAmbientMultiplier, .pcLabel = "Sun Moon Night Ambient Multiplier", .pcHeading = nullptr},
 	LightingDescriptor {.pWrapper = &engine::gPbrIblAmbient, .pcLabel = "Pbr Ibl Ambient", .pcHeading = nullptr},
 	LightingDescriptor {.pWrapper = &engine::gPbrIblDiffuse, .pcLabel = "Pbr Ibl Diffuse", .pcHeading = nullptr},
 	LightingDescriptor {.pWrapper = &engine::gPbrIblDiffusePower, .pcLabel = "Pbr Ibl Diffuse Power", .pcHeading = nullptr},

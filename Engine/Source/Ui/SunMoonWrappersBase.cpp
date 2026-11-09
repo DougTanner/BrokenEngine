@@ -18,7 +18,7 @@ Wrapper gSunMoonSunIntensitySmoke(1.0f, 0.0f, 4.0f);
 
 // Moon Intensity (per target) + Blue Tint
 Wrapper gSunMoonMoonIntensityTerrain(0.06f, 0.0f, 0.1f);
-Wrapper gSunMoonMoonIntensityWater(0.07f, 0.0f, 0.1f);
+Wrapper gSunMoonMoonIntensityWater(0.05f, 0.0f, 0.1f);
 Wrapper gSunMoonMoonIntensityObjects(0.03f, 0.0f, 1.0f);
 Wrapper gSunMoonMoonIntensitySmoke(0.05f, 0.0f, 1.0f);
 Wrapper gSunMoonMoonBlueTint(1.0f, 0.0f, 4.0f);
@@ -30,8 +30,10 @@ Wrapper gSunMoonMoonsetStart(XM_PIDIV128, 0.0f, XM_PIDIV2);
 Wrapper gSunMoonMoonsetEnd(XM_PIDIV32, 0.0f, XM_PIDIV2);
 
 // Ambient
-Wrapper gSunMoonMinimumAmbient(0.02f, 0.0f, 0.1f);
-Wrapper gSunMoonAmbientMultiplier(1.212f, 0.0f, 4.0f);
+Wrapper gSunMoonDayMinimumAmbient(0.0f, 0.0f, 0.2f);
+Wrapper gSunMoonNightMinimumAmbient(0.02f, 0.0f, 0.2f);
+Wrapper gSunMoonDayAmbientMultiplier(0.75f, 0.0f, 4.0f);
+Wrapper gSunMoonNightAmbientMultiplier(1.75f, 0.0f, 4.0f);
 
 // Tilt in radians affects f4SunMoonNormal, derived terrain/water lighting, and the object-shadow away-from-light direction.
 Wrapper gSunMoonNormalTilt(-0.45f, -XM_PIDIV2, XM_PIDIV2);

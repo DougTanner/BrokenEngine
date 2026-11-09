@@ -4,6 +4,7 @@
 
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
+#include "Graphics/Camera.h"
 #include "Ui/Localization.h"
 #include "Ui/MapWrappers.h"
 
@@ -209,6 +210,16 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 	if (rInputPoll.KeyboardPressed(VK_TAB) && !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone)
 	{
 		ToggleMap();
+	}
+
+	if constexpr (kbFreeCamera)
+	{
+		if (rInputPoll.KeyboardPressed(VK_BACK) && (mGameFlags & engine::GameFlags::kMainMenu))
+		{
+			Camera& rCamera = static_cast<Camera&>(*engine::gpCamera);
+			rCamera.ResetMenuPose();
+			rCamera.ApplyPose(true);
+		}
 	}
 
 	if constexpr (kbDebugInput)

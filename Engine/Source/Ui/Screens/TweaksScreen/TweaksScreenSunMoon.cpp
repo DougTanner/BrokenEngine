@@ -38,8 +38,10 @@ void RenderSunMoonSection(TweaksScreen& rScreen)
 	rScreen.WrapperSlider("Sun Moon Moonset End", gSunMoonMoonsetEnd, iSection);
 
 	rScreen.WrapperSeparatorText("Ambient");
-	rScreen.WrapperSlider("Sun Moon Minimum Ambient", gSunMoonMinimumAmbient, iSection);
-	rScreen.WrapperSlider("Sun Moon Ambient Multiplier", gSunMoonAmbientMultiplier, iSection);
+	rScreen.WrapperSlider("Sun Moon Day Minimum Ambient", gSunMoonDayMinimumAmbient, iSection);
+	rScreen.WrapperSlider("Sun Moon Night Minimum Ambient", gSunMoonNightMinimumAmbient, iSection);
+	rScreen.WrapperSlider("Sun Moon Day Ambient Multiplier", gSunMoonDayAmbientMultiplier, iSection);
+	rScreen.WrapperSlider("Sun Moon Night Ambient Multiplier", gSunMoonNightAmbientMultiplier, iSection);
 
 	rScreen.WrapperSeparatorText("Normal Tilt (radians)");
 	rScreen.WrapperSlider("Sun Moon Normal Tilt", gSunMoonNormalTilt, iSection);
