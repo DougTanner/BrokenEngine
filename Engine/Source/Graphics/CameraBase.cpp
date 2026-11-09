@@ -127,6 +127,7 @@ void CameraBase::DiscardTrackingCaches()
 	mVecPreviousTargetPosition = {};
 	mfJumpStartTime = 0.0f;
 	mbJumping = false;
+	mbPreviousCellLoadedAreaValid = false;
 }
 
 void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
@@ -136,23 +137,12 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 		return;
 	}
 
-	int64_t iStepDistance = GridDistance(mBasisCoordinate, cameraCoordinate);
 	// Z and W stay zero: the step is planar, and the cached values it moves are homogeneous points.
 	RenderBasis previousBasis = MakeRenderBasis(mBasisCoordinate, cameraCoordinate);
 	XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
 	mBasisCoordinate = cameraCoordinate;
 
-	if (iStepDistance > 1)
-	{
-		// Farther than the subscribed ring: nothing the camera cached describes a place inside the new cell, so drop
-		// the tracking state and re-enter the cell at its center. The sun angle and the zoom state are not positional
-		// and keep running.
-		mVecPosition = XMVectorSetY(XMVectorSetX(mVecPosition, 0.0f), 0.0f);
-		DiscardTrackingCaches();
-		return;
-	}
-
-	// Edge-neighbour step: move the whole cached set by the same whole-cell delta. Both flight endpoints shift
+	// A step of any distance moves the whole cached set by the same cell-centre offset. Both flight endpoints shift
 	// together, so the smoothstep parameter and the elapsed jump clock are untouched and the flight stays monotonic
 	// across the boundary.
 	mVecPosition = XMVectorAdd(mVecPosition, vecShift);
@@ -161,6 +151,7 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 	mVecJumpStartPosition = XMVectorAdd(mVecJumpStartPosition, vecShift);
 	mVecPreviousTargetPosition = XMVectorAdd(mVecPreviousTargetPosition, vecShift);
 	mVecLastKnownTargetPosition = XMVectorAdd(mVecLastKnownTargetPosition, vecShift);
+	ShiftArea(mf4PreviousCellLoadedArea, previousBasis.f2Offset);
 }
 
 void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget)
@@ -216,8 +207,18 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 
 	if (!bFreeCameraActive)
 	{
+		// Until the first tracked target after DiscardTrackingCaches the position holds; that target sets it, no jump.
+		bool bHolding = mfLastKnownTargetTime == 0.0f;
 		XMVECTOR vecTargetPosition = ResolveTarget(rPulledTarget);
-		UpdatePosition(vecTargetPosition, fDeltaTime);
+		if (!bHolding)
+		{
+			UpdatePosition(vecTargetPosition, fDeltaTime);
+		}
+		else if (rPulledTarget.meKind == CameraTarget::Kind::kTracked)
+		{
+			mVecPosition = vecTargetPosition;
+			mVecPreviousTargetPosition = vecTargetPosition;
+		}
 	}
 	UpdateFraming();
 	UpdateFramingOverride();
@@ -513,17 +514,33 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	float fLookAtY = XMVectorGetY(mVecPosition);
 	mf4LargeVisibleArea = XMFLOAT4 {fLookAtX + f4Footprint.x, fLookAtY + f4Footprint.y, fLookAtX + f4Footprint.z, fLookAtY + f4Footprint.w};
 
-	// Cell selection reads the world framing's area, so an override loads no extra cells.
+	// The cell loaded areas read the world framing's footprint, so an override loads no extra cells. During a jump the
+	// cell loaded area sits at the destination, and the previous cell loaded area holds the footprint at the jump's
+	// start, through any re-anchor or retarget, until the jump ends.
+	XMFLOAT4 f4LoadedFootprint = f4Footprint;
 	if (mbFramingOverride)
 	{
 		float fWorldHalfHeight = mfCameraFraming * std::tan(0.5f * XMConvertToRadians(kfFramingFieldOfView));
 		float fWorldEyeDistance = fWorldHalfHeight / std::tan(0.5f * XMConvertToRadians(fEyeFieldOfView));
-		XMFLOAT4 f4WorldFootprint = TiltedFootprint(fTilt, mbOrthographicProjection, fWorldEyeDistance, fWorldHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
-		mf4WorldVisibleArea = XMFLOAT4(fLookAtX + f4WorldFootprint.x, fLookAtY + f4WorldFootprint.y, fLookAtX + f4WorldFootprint.z, fLookAtY + f4WorldFootprint.w);
+		f4LoadedFootprint = TiltedFootprint(fTilt, mbOrthographicProjection, fWorldEyeDistance, fWorldHalfHeight, fTangentHalfFieldOfView, fAspectRatio, fLookAtHeight);
 	}
-	else
+	auto LoadedFootprintAt = [&](FXMVECTOR vecCenter)
 	{
-		mf4WorldVisibleArea = mf4LargeVisibleArea;
+		XMFLOAT2 f2Center {};
+		XMStoreFloat2(&f2Center, vecCenter);
+		XMFLOAT4 f4Area = f4LoadedFootprint;
+		ShiftArea(f4Area, f2Center);
+		return f4Area;
+	};
+	mf4CellLoadedArea = LoadedFootprintAt(mbJumping ? mVecPreviousTargetPosition : mVecPosition);
+	if (!mbJumping)
+	{
+		mbPreviousCellLoadedAreaValid = false;
+	}
+	else if (!mbPreviousCellLoadedAreaValid)
+	{
+		mf4PreviousCellLoadedArea = LoadedFootprintAt(mVecJumpStartPosition);
+		mbPreviousCellLoadedAreaValid = true;
 	}
 
 	if (gpGraphics->mFramebufferVkExtent2D.width > gpGraphics->mFramebufferVkExtent2D.height) [[likely]]

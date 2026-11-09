@@ -210,9 +210,8 @@ spawning without accumulating past the staging limit. Bindless texture-index
 assignment mutates descriptor bookkeeping while spawning; its safety relies on
 this tick/render phase exclusion. Keep that exclusion if spawn or descriptor
 work moves between phases. The pool follows the camera's cell through
-`RetainedAreaBasis`: a step to an edge neighbour shifts every allocated
-particle by the whole-cell offset in the update pass, and a larger step resets
-the pool.
+`RetainedAreaBasis`: a camera cell change of any distance shifts every
+allocated particle by the whole-cell offset in the update pass.
 
 ### ImGuiManager
 

@@ -43,13 +43,9 @@ void Camera::ApplyPose(bool bMainMenu)
 	}
 
 	RestoreFraming(mfMenuFraming);
-	// Without the free camera the menu target pulls the position to the default pose.
-	if constexpr (kbFreeCamera)
-	{
-		// The menu renders the origin cell; rebasing now keeps the next update from shifting the stored position.
-		mBasisCoordinate = engine::kOriginCoordinate;
-		mVecPosition = XMVectorSet(mf2MenuPosition.x, mf2MenuPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
-	}
+	// The menu renders the origin cell; rebasing now keeps the next update from shifting the stored position.
+	mBasisCoordinate = engine::kOriginCoordinate;
+	mVecPosition = XMVectorSet(mf2MenuPosition.x, mf2MenuPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 }
 
 void Camera::ResetMenuPose()

@@ -134,20 +134,13 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	}
 
 	// The retained areas — plane 0's of which wind also consumes through pf4PreviousSmokeAreas[0] — are in the camera
-	// cell's frame, so follow a camera cell change before they are published beside this frame's area. A one-cell step
-	// keeps the smoke and wind textures usable; a larger step leaves no overlap, so it takes the existing clear below.
+	// cell's frame, so follow a camera cell change before they are published beside this frame's area; the shift keeps
+	// the smoke and wind textures usable.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	XMFLOAT2 f2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate);
+	for (int64_t i = 0; i < iPlaneCount; ++i)
 	{
-		for (int64_t i = 0; i < iPlaneCount; ++i)
-		{
-			ShiftArea(spf4PreviousSmokeAreas[i], *optionalShift);
-		}
-	}
-	else
-	{
-		gbSmokeClear = true;
-		++gPresentationContinuity.smoke.iHistoryResets;
+		ShiftArea(spf4PreviousSmokeAreas[i], f2Shift);
 	}
 
 	// A plane's refresh runs its dilates and spreads once, advancing its smoke by every unpaused frame since its previous

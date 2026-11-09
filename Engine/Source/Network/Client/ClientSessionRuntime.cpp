@@ -514,29 +514,34 @@ void ClientSessionRuntime::UpdateDesiredCoordinates(std::string_view reason)
 	std::optional<common::LogTickScope> optionalTickScope;
 	InitializeLogTickScope(optionalTickScope);
 
-	static constexpr int64_t kiMaximumDesiredCoordinates = 1 + common::kiHexDirectionCount;
-	GridCoord pDesiredCoordinates[kiMaximumDesiredCoordinates] {};
-	int64_t iDesiredCount = 0;
-	auto PushCoordinate = [&](GridCoord coordinate)
-	{
-		ASSERT(iDesiredCount < kiMaximumDesiredCoordinates);
-		pDesiredCoordinates[iDesiredCount++] = coordinate;
-	};
-
+	common::ScopedWorkbufferArena desiredArena = common::gpThreadLocal->mWorkbuffer.Push();
 	if (game::gpGame->HasFocusedClientEntity())
 	{
-		PushCoordinate(game::gpGame->mClientGridCoordinate);
+		desiredArena.mBuffer.PushBack(game::gpGame->mClientGridCoordinate);
 		for (const GridCoord& rCoordinate : std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)))
 		{
-			PushCoordinate(rCoordinate);
+			desiredArena.mBuffer.PushBack(rCoordinate);
 		}
 	}
 	else
 	{
-		PushCoordinate(kOriginCoordinate);
+		desiredArena.mBuffer.PushBack(kOriginCoordinate);
 	}
 
-	SetDesiredCoordinates(std::span<const GridCoord>(pDesiredCoordinates, static_cast<size_t>(iDesiredCount)), reason, game::gpGame->miTickCounter);
+	// During a camera jump the confirmed cells under the previous cell loaded area stay desired until the jump ends.
+	// They already hold their slots, so keeping them subscribes no new cell.
+	if (gpCamera->mbPreviousCellLoadedAreaValid)
+	{
+		for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
+		{
+			if (rCell.iConfirmedTick >= 0 && !ContainsCoordinate(desiredArena.mBuffer.Span<GridCoord>(), rCoordinate) && common::RectangleOverlapsHex(gpCamera->mf4PreviousCellLoadedArea, CellCenterOffset(gpCamera->mBasisCoordinate, rCoordinate), kCellDirections))
+			{
+				desiredArena.mBuffer.PushBack(rCoordinate);
+			}
+		}
+	}
+
+	SetDesiredCoordinates(desiredArena.mBuffer.Span<GridCoord>(), reason, game::gpGame->miTickCounter);
 }
 
 void ClientSessionRuntime::SynchronizeSubscriptions()
@@ -683,10 +688,10 @@ void ClientSessionRuntime::ComputeActiveSet()
 		miVisibleNeighborCount = 0;
 		if (game::gpGame->HasFocusedClientEntity())
 		{
-			// The world framing's visible area, packed (minX, maxY, maxX, minY), so a framing override (the map) loads no
-			// extra cells.
-			const XMFLOAT4& rf4Visible = gpCamera->mf4WorldVisibleArea;
-			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
+			// The cell loaded area, packed (minX, maxY, maxX, minY): the world framing's footprint, so a framing
+			// override (the map) loads no extra cells, centred on the destination during a camera jump.
+			const XMFLOAT4& rf4CellLoadedArea = gpCamera->mf4CellLoadedArea;
+			// The cell loaded area is in the camera basis cell's frame, which is not always the client cell: it lags a
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
 			// neighbour hexagon is therefore centered at that neighbour's own offset from the camera basis, so both
 			// sides of the test are always in the same frame.
@@ -703,8 +708,8 @@ void ClientSessionRuntime::ComputeActiveSet()
 				}
 			};
 
-			// Edge-neighbour-only clamp: at wide zoom the VisibleArea may extend past the six edge neighbours;
-			// only that ring is ever subscribed regardless.
+			// Edge-neighbour-only clamp: at wide zoom the cell loaded area may extend past the six edge neighbours;
+			// only that ring is ever newly subscribed.
 			for (const common::HexDirection& rDirection : kCellDirections.pEntries)
 			{
 				// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than wrap
@@ -714,7 +719,7 @@ void ClientSessionRuntime::ComputeActiveSet()
 				{
 					continue;
 				}
-				if (common::RectangleOverlapsHex(rf4Visible, CellCenterOffset(gpCamera->mBasisCoordinate, neighbor), kCellDirections))
+				if (common::RectangleOverlapsHex(rf4CellLoadedArea, CellCenterOffset(gpCamera->mBasisCoordinate, neighbor), kCellDirections))
 				{
 					mpVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
 					EnsureNeighbor(neighbor);

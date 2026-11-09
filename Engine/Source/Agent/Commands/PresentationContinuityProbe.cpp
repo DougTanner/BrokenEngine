@@ -25,7 +25,6 @@ static nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
 	{
 		{"currentArea", AreaJson(rReport.f4CurrentArea)},
 		{"previousArea", AreaJson(rReport.f4PreviousArea)},
-		{"historyResets", rReport.iHistoryResets},
 	};
 }
 

@@ -10,6 +10,7 @@ Prefix each row with `<YYYY-MM-DD> <session branch> — `. Add new rows directly
 
 ## Entries
 
+- 2026-11-09 claude/fd1e46f2-b608-4a00-82ea-ede366954800 — size observation — Engine/Data/Shaders/ShaderGlobalLayout.h measures 5281 bt-token-v1 (over ~5000); it was large before this change, and splitting it is follow-up work outside this review
 - 2026-11-08 claude/996e9f9a-6fe0-4dea-bd36-5b66496381a0 — Engine/Source/Ui/WaterWrappersBase.cpp:111 —
   give gWaterColorNoiseFrequency, gWaterColorNoiseMultiplierOne and gWaterColorNoiseMultiplierTwo a minimum above
   zero (the multipliers' existing 0.1 step works as the floor). Every frequency passed to PopulatePatchLattice would

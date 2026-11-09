@@ -6,8 +6,8 @@ Guided missiles own client-side exhaust light, smoke trail, and looping sound ef
 
 - Homing begins with a boost ramp, then tracks the target the missile received at launch with smoothed steering; the launch target affects homing from the next tick, preserving previous/current frame semantics. Missiles Update never acquires a target: a lost target is dropped and never replaced, and the missile flies on unguided along its stored direction until its lifetime ends. A missile launched with no target flies unguided the same way.
 - A missile flies on the lowest flight plane. It keeps a target only in that
-  plane's registry context, which holds ships whose nearest flight plane it is;
-  a target leaving that context is dropped. A flying missile — neither falling
+  plane's registry window, which holds ships whose nearest flight plane it is;
+  a target leaving that window is dropped. A flying missile — neither falling
   nor dying — moves vertically from its launch height toward the lowest plane
   at the Battleship climb speed, clamping exactly on arrival, while direction
   and propulsion velocity Z remain zero. Falling and dying missiles do not

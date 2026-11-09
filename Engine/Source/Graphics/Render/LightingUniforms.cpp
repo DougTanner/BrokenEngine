@@ -53,25 +53,14 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	// fast pan escaping both crops every frame alternates the layers instead of starving one.
 	static int64_t siPendingLayer = -1;
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
-	// the refresh test compares them with this frame's areas, and let a multi-cell jump take the existing reset.
+	// the refresh test compares them with this frame's areas.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	XMFLOAT2 f2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate);
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-		{
-			ShiftArea(spTemporalAreaLatches[i].f4CurrentArea, *optionalShift);
-			ShiftArea(spTemporalAreaLatches[i].f4PreviousArea, *optionalShift);
-			ShiftArea(spf4HeldVisibleAreas[i], *optionalShift);
-		}
-	}
-	else
-	{
-		gbLightingTemporalReset = true;
-		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-		{
-			spbHeldVisibleAreas[i] = false;
-			++gPresentationContinuity.pLighting[i].iHistoryResets;
-		}
+		ShiftArea(spTemporalAreaLatches[i].f4CurrentArea, f2Shift);
+		ShiftArea(spTemporalAreaLatches[i].f4PreviousArea, f2Shift);
+		ShiftArea(spf4HeldVisibleAreas[i], f2Shift);
 	}
 	if (gbLightingTemporalReset)
 	{

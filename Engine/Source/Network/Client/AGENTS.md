@@ -6,13 +6,17 @@ Client-only (`BT_CLIENT`) ENet peer, `ClientSessionRuntime`, and
 `ClientSessionBase`. The peer owns wire dispatch, slots, ACK/timing/bandwidth
 state, and receive buffers. The runtime owns connection and GUID persistence,
 discovery, the client active set and its visible-neighbor cache, the desired
-coordinates derived from them, the harness viewer pin, subscription and clock
-state, generic full-state and delta adoption, received-update buffering and
-confirmation, ordered receive draining, ACK/flush, and resets.
+coordinates derived from them, which during a camera jump also keep the
+confirmed cells under the camera's previous cell loaded area, the harness
+viewer pin, subscription and clock state, generic full-state and delta
+adoption, received-update buffering and confirmation, ordered receive
+draining, ACK/flush, and resets.
 `ClientSessionBase`, which the game client session inherits, holds the runtime
 and the desync core and owns static-data application, owned-entity event
 application, `Reconcile`, and the resync, disconnect, and server-load session
-resets. This directory also owns replay and desync machinery and the client
+resets. Like `GameBase::ResetSession`, the server-load reset discards the
+camera tracking caches and clears smoke and particles, so no previous-world
+view carries into the new one. This directory also owns replay and desync machinery and the client
 crash-report upload. The game client
 session (the game project's own `Source/Network/Client/AGENTS.md`) owns the
 reconciler, each owned-entity event's gameplay effect, gameplay hydration and

@@ -102,9 +102,13 @@ public:
 	XMFLOAT2 mf2VisibleAreaQuadSize {};
 	XMFLOAT4 mf4RenderVisibleArea {};
 	XMFLOAT4 mf4LargeVisibleArea {};
-	// The world framing's ground footprint (minX, maxY, maxX, minY) at the look-at, which cell selection reads; a copy of
-	// mf4LargeVisibleArea while no framing override is active.
-	XMFLOAT4 mf4WorldVisibleArea {};
+	// The cell loaded area: the world framing's ground footprint (minX, maxY, maxX, minY), which decides which cells
+	// load and are kept, instead of the visible areas. It sits at the look-at, or at the destination during a jump.
+	XMFLOAT4 mf4CellLoadedArea {};
+	// The cell loaded area at the look-at where the current jump started, held until that jump ends.
+	XMFLOAT4 mf4PreviousCellLoadedArea {};
+	// Set while mf4PreviousCellLoadedArea holds a jump's departure.
+	bool mbPreviousCellLoadedAreaValid = false;
 
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
@@ -120,8 +124,7 @@ public:
 	bool mbOrthographicProjection = false;
 
 	// The cell every cached camera position, and every basis built for this render, is local to. Update follows the
-	// rendered camera coord: on a one-cell step it shifts the cached positions so the flight stays continuous, on a
-	// larger step it restarts tracking.
+	// rendered camera coord: on a step of any distance it shifts the cached positions so the flight stays continuous.
 	GridCoord mBasisCoordinate {};
 
 	float mfShake = 0.0f;
@@ -141,7 +144,7 @@ public:
 
 	float mfTime = 0.0f;
 
-	// The world framing: wheel-driven and saved, it sets the chase rate, audio, and cell selection. The view reads
+	// The world framing: wheel-driven and saved, it sets the chase rate, audio, and the cell loaded area. The view reads
 	// RenderFraming().
 	float mfCameraFraming = kfCameraFramingInitial;
 	float mfCameraFramingTarget = kfCameraFramingInitial;
@@ -192,6 +195,7 @@ public:
 	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, float fSunDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget);
 
 	void ResetForSession();
+	void DiscardTrackingCaches();
 	void RestoreFraming(float fFraming);
 	// A call during the other's unfinished ease retraces it backward, keeping the framing and speed with the direction
 	// reversed; otherwise the ease starts at rest from the current rendered framing.
@@ -234,7 +238,6 @@ protected:
 
 private:
 
-	void DiscardTrackingCaches();
 	void ShiftToRenderedCell(GridCoord cameraCoordinate);
 	XMVECTOR ResolveTarget(const CameraTarget& rCameraTarget);
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);

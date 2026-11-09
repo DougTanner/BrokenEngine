@@ -19,22 +19,22 @@ answers "which row of another collection" questions during the tick, and the
 game opens exactly one window for it, the Missile-Update window, through
 `BuildShipRegistryWindow` in
 [`ShipQueries.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.h).
-The window holds one registry context, built once when the window opens and
-reused for the rest of its phase; it binds one source layer per ship type
+The window is built once when it opens and reused for the rest of its phase;
+it binds one source layer per ship type
 (Fighters, Omnis, Battleships) holding only the ships `BuildShipRegistryWindow`
 admits. The Missile-Update window opens inside
 the Update phase before the ship Updates run. The window binds both
 position columns: current positions and previous-frame positions, which a
-retained Missile homes on. It acquires nothing: it only validates the handle
-each Missile received at launch, so it binds no subscription layer.
+retained Missile homes on. It only validates the handle each Missile received
+at launch.
 
 The window makes one combined workbuffer reservation for its eligible source-row
 indices and layer descriptors. The pointer-derived spans are formed only after that reservation
-returns, and the single scoped allocation owns them for the context's lifetime
+returns, and the single scoped allocation owns them for the window's lifetime
 ([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The
-worker workbuffer's 64 KiB initial size remains a performance preallocation, not
-a hard bound: a grow while a context is live does not invalidate it (that same
-document). No context outlives its phase. The ownership layer is not a window
+worker workbuffer's initial size (`common::Multithreading`) remains a performance
+preallocation, not a hard bound: a grow while a window is live does not invalidate it
+(that same document). No window outlives its phase. The ownership layer is not a window
 and is never built from a phase; its by-value lifetime and post-tick
 main-thread-only restriction are engine contracts in that same document.
 

@@ -85,15 +85,17 @@ static int64_t siWrecksRendered = 0;
 // fSeconds.
 static void UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates, float fSeconds)
 {
-	// The non-map camera's visible area, the client subscription's test; map view leaves it unchanged.
-	auto OverlapsWorldVisibleArea = [](engine::GridCoord coordinate)
+	// The client subscription's cell loaded area, or during a camera jump the previous cell loaded area too; map view
+	// leaves both unchanged.
+	auto OverlapsCellLoadedArea = [](engine::GridCoord coordinate)
 	{
-		return common::RectangleOverlapsHex(engine::gpCamera->mf4WorldVisibleArea, engine::CellCenterOffset(engine::gpCamera->mBasisCoordinate, coordinate), engine::kCellDirections);
+		XMVECTOR vecCellCenter = engine::CellCenterOffset(engine::gpCamera->mBasisCoordinate, coordinate);
+		return common::RectangleOverlapsHex(engine::gpCamera->mf4CellLoadedArea, vecCellCenter, engine::kCellDirections) || (engine::gpCamera->mbPreviousCellLoadedAreaValid && common::RectangleOverlapsHex(engine::gpCamera->mf4PreviousCellLoadedArea, vecCellCenter, engine::kCellDirections));
 	};
 
 	std::erase_if(sWrecks, [&](const BattleshipWreck& rWreck)
 	{
-		bool bVisible = std::ranges::contains(rActiveCoordinates, rWreck.coordinate) && rRenderInterpolates.contains(rWreck.coordinate) && OverlapsWorldVisibleArea(rWreck.coordinate);
+		bool bVisible = std::ranges::contains(rActiveCoordinates, rWreck.coordinate) && rRenderInterpolates.contains(rWreck.coordinate) && OverlapsCellLoadedArea(rWreck.coordinate);
 		return !bVisible || (rWreck.bSinks && XMVectorGetZ(rWreck.vecPosition) + rWreck.fTopOffset < 0.0f);
 	});
 
@@ -105,7 +107,7 @@ static void UpdateWrecks(const std::unordered_map<engine::GridCoord, game::Frame
 			continue;
 		}
 
-		if (!OverlapsWorldVisibleArea(rCoordinate))
+		if (!OverlapsCellLoadedArea(rCoordinate))
 		{
 			continue;
 		}

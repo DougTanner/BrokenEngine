@@ -434,9 +434,12 @@ offering a shorter cohort spot-check. A spot-check records its reduced scope and
 does not satisfy unexecuted acceptance criteria.
 
 1. Start from a fresh/load-paused server (`load {"pauseAfterLoad":true}`);
-   `create_cell`/`edit_frame` before any injection. Use client
-   `set_client_grid_coord {"coord":[q,r]}` and `describe_scene {}` to establish
-   framing and unit positions. Use `cell_coordinate_probe {"coord":[q,r]}` to
+   `create_cell`/`edit_frame` before any injection. Client
+   `set_client_grid_coord {"coord":[q,r]}` moves the client cell and requests its
+   subscription, which the server accepts only for origin or a cell within 1 of
+   an authorized coordinate, and `describe_scene {}` reads framing and unit
+   positions. The camera stays on the owned entity, so a cell is framed only by
+   moving the entity there. Use `cell_coordinate_probe {"coord":[q,r]}` to
    select and record an actual island/cliff placement; do not assume origin is
    a cliff. `describe_ui {}`, `click` and `set_slider` control camera/Tweaks;
    wheel input controls zoom. There is no invented `set_camera` command.

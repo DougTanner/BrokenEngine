@@ -16,7 +16,7 @@ This table is the authoritative spawned-agent routing policy; native role defini
 
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
-| `planner` | Opus | medium | Plans, design |
+| `planner` | Fable | high | Plans, design |
 | `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
 | `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
@@ -37,7 +37,7 @@ This table is the authoritative spawned-agent routing policy; native role defini
   only because a reviewer lacked context; add context only when a human reader
   or the implementer needs it.
 
-ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
+ChatGPT Codex: Fable -> Sol (gpt-6.1-sol medium, through `opus.toml`); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
 
 ## Main-session conduct

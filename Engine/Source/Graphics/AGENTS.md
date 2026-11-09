@@ -88,16 +88,25 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   and extrapolated targets retain their full height through the chase, raising
   the look-at and eye together without changing tilt or framing.
 - Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the render clock's per-frame advance the caller passes separately, so it stops whenever on-screen game time stops, and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
-- Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with framing. Mouse-wheel input updates a persisted, clamped framing target, with framing and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary.
+- Long-distance target changes use a bounded smoothstep jump that may
+  re-anchor from the current position; normal tracking tightens with framing.
+  During a jump the cell loaded area sits at the destination, and the previous
+  cell loaded area (`mf4PreviousCellLoadedArea`), copied as the jump starts,
+  holds the departure through any re-anchor or retarget until the jump ends.
+  Until the first tracked target after a session reset or a server load
+  (`DiscardTrackingCaches`) the position holds, and that target sets it
+  directly, with no jump. Mouse-wheel input updates a persisted, clamped
+  framing target, with framing and velocity re-anchored while scrolling so
+  repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid
+  boundary.
   A host may override the rendered framing with its own eased target and release it back to the world framing; the wheel is ignored while an override is active. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame
-  (`../Frame/AGENTS.md`). A rendered-cell change to an edge neighbour
-  (`GridDistance` at most 1) shifts every cached camera position by the
-  whole-cell centre offset (`CellCenterOffset`); a larger change discards the
-  tracking caches. A new cached position must join
-  that shift or it will describe a place in the previous cell.
+  (`../Frame/AGENTS.md`). A rendered-cell change of any distance shifts every
+  cached camera position by the cell-centre offset (`CellCenterOffset`). A new
+  cached position must join that shift or it will describe a place in the
+  previous cell.
 - Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
 - The zoom value is the framing (`mfCameraFraming`): the eye distance from the
   look-at along the view axis that would show the current view at
@@ -111,7 +120,8 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   LOD, zoom buckets, texel references, height-lerped render tunables — read
   `RenderFraming()`, the override while one is active and otherwise the world
   framing `mfCameraFraming`; the chase rate, audio blends, the saved zoom, and
-  cell selection (`mf4WorldVisibleArea`) read the world framing. Camera tilt
+  the cell loaded area (`mf4CellLoadedArea`) read the world framing. The cell
+  loaded area, not the visible areas, decides which cells load. Camera tilt
   orbits the eye about the look-at around world X, tilt 0 straight down and
   positive tilt moving the eye south so the view looks north. Perspective uses
   the stored Camera Tilt; orthographic uses zero tilt and disables its control

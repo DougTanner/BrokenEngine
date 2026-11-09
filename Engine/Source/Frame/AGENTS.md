@@ -109,21 +109,15 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
 ## Frame Registry
 
 - The frame registry (`FrameRegistry.h`) lets one collection find rows of another by binding columns the collections already own: it copies no records, allocates nothing, and keeps no state between query windows, so nothing it produces is serialized, CRC'd, or transferred.
-- The game builds its one query window and owns its timing, bound columns, and batch storage (`../../../Documents/Architecture/FrameUpdatePipeline.md`); the engine never names a game collection.
+- The game builds its one query window and owns its timing and bound columns (`../../../Documents/Architecture/FrameUpdatePipeline.md`); the engine never names a game collection.
 - The caller owns one combined workbuffer reservation per query window, holding
-  the source-row indices, registry scratch, and layer descriptors, and keeps it
-  alive until the context is destroyed; form every pointer and span the context
-  uses only after the reservation returns. A workbuffer grow while a context is
-  live keeps the context's published pointers valid and only signals an
-  under-sized reservation (`../../../Common/AGENTS.md`). `RegistryScratchBytes`
-  sizes only the eligible-row and subscriber-count storage, whose `uint16_t`
-  counts assert before the 65,536th subscription so ranking state cannot wrap;
-  a context built with no subscription layer derives no counts, needs scratch
-  for its row indices only, and cannot acquire. `RegistryBatch::rows` and
-  `results` are caller-provided. A context never survives source-layer
-  movement, reallocation, or cell transfer.
-- Source ids are unique across every bound layer and eligible row spans are strictly ascending and in range; debug builds validate both when the context is built.
-- Acquisition is a deterministic direct scan feeding CRC'd state: one fixed ranking — fewest subscribers, then smallest angle, exact ties by layer order then row order — always bounded by the caller's radius. Alignment filtering needs the source and consumer alignment columns both bound.
+  the source-row indices and layer descriptors, and keeps it alive for the
+  query window; form every pointer and span the window uses only after the
+  reservation returns. A workbuffer grow while a window is live keeps the
+  window's published pointers valid and only signals an under-sized
+  reservation (`../../../Common/AGENTS.md`). A window never survives
+  source-layer movement, reallocation, or cell transfer.
+- Source ids are unique across every bound layer and eligible row spans are strictly ascending and in range; `ValidateRegistrySourceLayers` checks both, and the caller runs it in debug builds when it builds the window.
 - `AssignRegistryClientGuid` is the registry's only write. It is legal only on the main thread after the tick, through an ownership layer whose client-GUID column is CRC-excluded. The caller holds that layer by value and never retains it across a tick, a transfer, or a reallocation.
 
 ## Collection and Serialization Invariants

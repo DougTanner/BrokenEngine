@@ -76,11 +76,11 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   checkbox controls presentation only, so retained coverage continues updating
   while that checkbox hides it. Active foam delta uses `steady_clock` between
   published updates, including render gaps; simulation time detects rewinds
-  only. First use, recreation, rewind, and a multi-cell basis jump reset history;
+  only. First use, recreation, and rewind reset history;
   ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
   without resetting retained coverage. Threshold resolution preserves a positive
   J range.
-- Each frame that publishes also copies what it published — camera basis, water origins, each owner's area pair and history-reset count, and each water patch lattice's `LatticeReport` — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
+- Each frame that publishes also copies what it published — camera basis, water origins, each owner's area pair, and each water patch lattice's `LatticeReport` — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
 - GameBase publishes gameplay pause before Global. Paused smoke skips cadence
   and crop refreshes while retaining its pending steps; held areas still follow

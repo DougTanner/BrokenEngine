@@ -160,9 +160,10 @@ alignment. Native submit/wait CPU elapsed is not GPU execution time.
 
 Use existing `/agent-harness` `set_client_grid_coord` with `coord:[q,r]` to pin
 the observed initial viewer cell before measurement, switch to a distinct target,
-then return. The controlled log runs used 20 seconds per phase (60 total), two
-timed setters and zero timed queries. Record actual dispatch and acknowledgement
-UTC/QPC brackets, not nominal 20/40-second boundaries. Choose duration with the
+then return. The camera keeps tracking the owned entity and does not move to the
+target cell. The controlled log runs used 20 seconds per phase (60 total), two timed setters
+and zero timed queries. Record actual dispatch and acknowledgement UTC/QPC
+brackets, not nominal 20/40-second boundaries. Choose duration with the
 existing 300-render-frame eviction grace and references in mind: elapsed wall
 time or setter acknowledgement does not prove eviction/subscription completion.
 Release the pin through the harness after measurement.

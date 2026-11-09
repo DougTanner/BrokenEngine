@@ -77,15 +77,15 @@ private:
 	void ResetFlight();
 	void SelectDestination();
 	void UpdateFlight(float fDeltaTime);
-	void ApplyLightingValues(const std::array<float, 19>& rValues);
-	void SaveLightingPreset(const std::array<float, 19>& rValues);
+	void ApplyLightingValues(const std::array<float, 21>& rValues);
+	void SaveLightingPreset(const std::array<float, 21>& rValues);
 	std::vector<Preview> mPreviews;
 	int64_t miSelected = 0;
 	int64_t miFittedSelection = -1;
 	int64_t miSelectedAnimation = -1;
 	std::chrono::duration<float> mAnimationTime {};
 	common::Flags<ViewerFlags> mFlags;
-	std::array<float, 19> mLightingTweaks {};
+	std::array<float, 21> mLightingTweaks {};
 	int64_t miSelectedLightingPreset = 0;
 	uint32_t muiLightingRevision = 0;
 	int64_t miDragButton = -1;

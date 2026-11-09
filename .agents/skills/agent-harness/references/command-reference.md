@@ -109,8 +109,9 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   an array of exactly two integers anywhere in the signed-int32 range; only an
   integer that does not fit in `int32` is rejected. Moves the client's grid cell
   and immediately refreshes its desired subscriptions, so automation can drive
-  the cross-cell subscribe and full-state adoption path. Requires an accepted
-  connected client with a valid assigned owned entity. Returns
+  the cross-cell subscribe and full-state adoption path. The camera does not
+  follow the pinned cell: it keeps tracking the owned entity. Requires an
+  accepted connected client with a valid assigned owned entity. Returns
   `{"clientGridCoord":[q,r]}`. Any invalid input returns the normal
   `ok:false`/`error` envelope and changes no state. The command also pins the
   coordinate: while pinned, every other write of the client's cell — the game's
@@ -300,7 +301,7 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   `{"publishedFrames":int,"basisCoord":[q,r],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
   plus a `shadow` and `smoke` object and a `lighting` array of one such object
   per lighting layer, layer 0 first, each shaped
-  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`;
+  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w]}`;
   `smoke` reports flight plane 0's area pair, the pair wind reads. Take
   every sample with the client restored (`window_state {"minimized":false}`): a
   minimized client defers swapchain recreation, publishes no frame, and leaves
@@ -313,8 +314,7 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   absolute camera position before reducing modulo 10. Each
   `currentArea`/`previousArea` is a cell-local rectangle in the top-level
   `basisCoord`, in the shared component order `x`=left, `y`=top, `z`=right,
-  `w`=bottom. `historyResets` is a monotonic per-owner count of the multi-cell
-  camera jumps that discarded that owner's history. A `lattices` object holds
+  `w`=bottom. A `lattices` object holds
   one randomized patch blending lattice per blended texture read, keyed
   `waterNormalOneOctaveOne`, `waterNormalTwoOctaveOne`,
   `waterNormalThreeOctaveOne`, `waterColorNoiseOne`, `waterColorNoiseTwo`,

@@ -103,12 +103,15 @@ void ClientSessionBase::ResetSessionForServerLoad()
 	game::gpGame->mTimeStep.mRealTime.Reset();
 	game::gpGame->ResetRenderClock();
 
-	// Discard cells from the previous server state.
+	// Discard cells, the camera tracking, smoke, and particles from the previous server state.
 	for ([[maybe_unused]] auto& [rCoordinate, rCell] : game::gpGame->mCells)
 	{
 		rCell.ResetClientState();
 	}
 	game::gpGame->mCells.clear();
+	gpCamera->DiscardTrackingCaches();
+	gbSmokeClear = true;
+	gpParticleManager->mbReset = true;
 
 	game::gpClientSession->mpReconciler->Reset();
 	mpDesynchronizationCore->Reset();

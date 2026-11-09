@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Frame/Collections/CollectionId.h"
-#include "Frame/Alignments.h"
 #include "Network/NetworkProtocol.h" // ClientGuid
 
 namespace engine
@@ -15,17 +14,8 @@ struct RegistrySourceLayer
 {
 	const registry_id_t* pIds = nullptr;           // Required; ids stay unique across every bound layer
 	const XMVECTOR* pVecCurrentPositions = nullptr;  // Required
-	const XMVECTOR* pVecPreviousPositions = nullptr; // Optional; results fall back to the current position
-	const AlignmentIdentifier* pAlignments = nullptr;        // Optional; both sides bound enables Alignments::CanCollide
+	const XMVECTOR* pVecPreviousPositions = nullptr; // Required
 	std::span<const int64_t> rows {};                // Eligible rows: strictly ascending, in range
-	int64_t iSourceCount = 0;
-};
-
-// One consumer collection's target column, read to derive how many consumers already hold each source.
-struct RegistrySubscriptionLayer
-{
-	const registry_id_t* pTargets = nullptr;
-	std::span<const int64_t> rows {};
 	int64_t iSourceCount = 0;
 };
 
@@ -36,43 +26,12 @@ struct RegistryResult
 	XMVECTOR vecPreviousPosition {};
 };
 
-// One acquisition submission. pTargets and the origin/direction/alignment columns are indexed by consumer
-// row; rows selects the consumer rows to acquire for and results carries one entry per rows entry.
-struct RegistryBatch
-{
-	registry_id_t* pTargets = nullptr;
-	const XMVECTOR* pVecOrigins = nullptr;
-	const XMVECTOR* pVecDirections = nullptr;
-	const AlignmentIdentifier* pAlignments = nullptr;
-	std::span<const int64_t> rows {};
-	std::span<RegistryResult> results {};
-	int64_t iSourceCount = 0;
-};
+#if defined(BT_DEBUG)
+void ValidateRegistrySourceLayers(std::span<const RegistrySourceLayer> sourceLayers);
+#endif
 
-struct RegistryQueryContext
-{
-	std::span<const RegistrySourceLayer> sourceLayers {};
-	std::span<uint16_t> subscriberCounts {};
-	const Alignments* pAlignments = nullptr;
-};
-
-// Size of the registry-internal scratch block for one query window's eligible rows, laid out as the row indices the
-// caller writes and binds into RegistrySourceLayer::rows, followed by the subscriber counts
-// BuildRegistryQueryContext derives only when a subscription layer is bound. It cannot size RegistryBatch::rows or
-// RegistryBatch::results, which scale with the caller's consumer count rather than with the source layers.
-[[nodiscard]] constexpr int64_t RegistryScratchBytes(int64_t iEligibleRows)
-{
-	return iEligibleRows * static_cast<int64_t>(sizeof(int64_t) + sizeof(uint16_t));
-}
-
-// scratch is the whole RegistryScratchBytes block, including the row prefix the caller already filled, or with no
-// subscription layer only that row prefix.
-[[nodiscard]] RegistryQueryContext BuildRegistryQueryContext(const Alignments& rAlignments, std::span<const RegistrySourceLayer> sourceLayers, std::span<const RegistrySubscriptionLayer> subscriptionLayers, std::span<std::byte> scratch);
-
-// Fixed policy: fewest subscribers, then smallest angle, ties by layer order then row order.
-void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch& rBatch, float fRadius);
-
-[[nodiscard]] bool ResolveRegistryHandle(const RegistryQueryContext& rContext, registry_id_t id, RegistryResult& rResult);
+// id must be nonzero.
+[[nodiscard]] bool ResolveRegistryHandle(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id, RegistryResult& rResult);
 
 // Binds a foreign-typed id column as bytes. Viewing an Id<T> array through a const Uuid* or a
 // const registry_id_t* is undefined behavior — the specializations are not similar types — so the ownership

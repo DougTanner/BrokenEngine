@@ -108,18 +108,17 @@ struct ShipUuid
 // Armor for Omnis, health otherwise.
 [[nodiscard]] float ShipHull(const Frame& rFrame, ShipLocator locator);
 
-// One registry query window: one context plus the single workbuffer allocation its spans point into. The owner keeps
-// the whole object alive for the window; the allocation pops when it dies, so no context span outlives it.
+// One registry query window: its source layers plus the single workbuffer allocation their spans point into. The owner
+// keeps the whole object alive for the window; the allocation pops when it dies, so no source-layer span outlives it.
 struct RegistryWindow
 {
 	common::ScopedWorkbufferAllocation<std::byte*> buffer;
-	engine::RegistryQueryContext context {};
+	std::span<const engine::RegistrySourceLayer> sourceLayers {};
 };
 
-// Builds the context for the lowest flight plane. It binds the three ship types as source layers in ForEachShipType
-// order and no subscription layer, so the context derives no subscriber counts. A row is eligible while it publishes a
-// registry id, its arrival grace has run out, and the flight plane nearest its current Interpolate position is the
-// lowest, so a ship climbing away from that plane leaves the context. The previous frame's arrival grace decides
+// Builds the window for the lowest flight plane. It binds the three ship types as source layers in ForEachShipType
+// order. A row is eligible while it publishes a registry id, its arrival grace has run out, and the flight plane nearest
+// its current Interpolate position is the lowest, so a ship climbing away from that plane leaves the window. The previous frame's arrival grace decides
 // eligibility and its positions are bound as previous positions.
 [[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame);
 

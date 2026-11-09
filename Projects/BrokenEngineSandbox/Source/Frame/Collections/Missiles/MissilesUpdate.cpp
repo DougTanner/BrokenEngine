@@ -151,7 +151,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
 			{
-				bRetained = engine::ResolveRegistryHandle(window.context, uiTarget, retained);
+				bRetained = engine::ResolveRegistryHandle(window.sourceLayers, uiTarget, retained);
 				if (!bRetained)
 				{
 					uiTarget = {};

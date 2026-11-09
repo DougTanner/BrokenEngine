@@ -224,10 +224,9 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	}
 
 	std::chrono::steady_clock::time_point updateTime = std::chrono::steady_clock::now();
-	std::optional<XMFLOAT2> optionalOffset = sRetainedBasis.Advance(engine::gpCamera->mBasisCoordinate);
-	bool bBasisReset = sbInitialized && !optionalOffset.has_value();
+	XMFLOAT2 f2Offset = sRetainedBasis.Advance(engine::gpCamera->mBasisCoordinate);
 	bool bClockReset = elapsedTime < sPreviousElapsedTime;
-	bool bReset = !sbInitialized || gbWaterFoamReset || bBasisReset || bClockReset;
+	bool bReset = !sbInitialized || gbWaterFoamReset || bClockReset;
 	XMFLOAT4 f4Area = engine::gpCamera->mf4RenderVisibleArea;
 	XMFLOAT4 f4PreviousArea = sf4PreviousArea;
 	if (bReset)
@@ -236,7 +235,7 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	}
 	else
 	{
-		ShiftArea(f4PreviousArea, *optionalOffset);
+		ShiftArea(f4PreviousArea, f2Offset);
 	}
 	// Wave elapsedTime follows simulation time; foam lifetime uses wall time across render gaps.
 	float fDeltaTime = sbInitialized && !bClockReset ? std::chrono::duration<float>(updateTime - sPreviousUpdate).count() : 0.0f;

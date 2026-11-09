@@ -60,20 +60,12 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	std::memcpy(&rSquareParticlesSpawnLayout.pParticles[0], &mSquareParticlesSpawnLayout.pParticles[0], rSquareParticlesSpawnLayout.iCount * sizeof(shaders::ParticleLayout));
 	mSquareParticlesSpawnLayout.iCount = 0;
 
-	// Live particles and this iteration's staged spawns are in the previous camera cell's frame. A one-cell step shifts
-	// them in the update pass; a larger step leaves nothing worth keeping, so it clears the pool. Written every call
-	// because each command buffer has its own global uniform.
+	// Live particles and this iteration's staged spawns are in the previous camera cell's frame; a camera cell change
+	// shifts them in the update pass. Written every call because each command buffer has its own global uniform.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
-	{
-		rGlobalLayout.f2ParticlesBasisShift.x = optionalShift->x;
-		rGlobalLayout.f2ParticlesBasisShift.y = optionalShift->y;
-	}
-	else
-	{
-		rGlobalLayout.f2ParticlesBasisShift = {};
-		mbReset = true;
-	}
+	XMFLOAT2 f2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate);
+	rGlobalLayout.f2ParticlesBasisShift.x = f2Shift.x;
+	rGlobalLayout.f2ParticlesBasisShift.y = f2Shift.y;
 
 	rLongParticlesSpawnLayout.iReset = mbReset ? 1 : 0;
 	rSquareParticlesSpawnLayout.iReset = mbReset ? 1 : 0;

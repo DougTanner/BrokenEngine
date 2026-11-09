@@ -124,6 +124,12 @@ void HudScreen::Render()
 	// Final shared targets. When right has content: both panels see max(force, mouse) — strict sync.
 	// When right has no content: left can still auto-un-hide (force only), right stays hidden.
 	float fForceTarget = bForceOpen ? 1.0f : 0.0f;
+	// Both panels slide off while the map shows.
+	if (gpGame->MapOpacity() > 0.0f)
+	{
+		fForceTarget = 0.0f;
+		fMouseTarget = 0.0f;
+	}
 	float fLeftTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : fForceTarget;
 	float fRightTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : 0.0f;
 

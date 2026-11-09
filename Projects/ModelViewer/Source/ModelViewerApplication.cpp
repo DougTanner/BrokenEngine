@@ -69,11 +69,11 @@ void ModelViewerApplication::SelectAdjacentModel(int64_t iStep)
 
 struct LightingPreset
 {
-	static constexpr int64_t kiVersion = 4;
-	std::array<float, 19> values {};
+	static constexpr int64_t kiVersion = 5;
+	std::array<float, 21> values {};
 };
 
-static_assert(sizeof(LightingPreset) == 76, "LightingPreset::kiVersion must be bumped with its layout or participant order");
+static_assert(sizeof(LightingPreset) == 84, "LightingPreset::kiVersion must be bumped with its layout or participant order");
 static_assert(std::is_trivially_copyable_v<LightingPreset>);
 
 constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.bin", "ModelViewerPresetE.bin", "ModelViewerPresetR.bin"};
@@ -367,7 +367,7 @@ struct LightingDescriptor
 	const char* pcHeading = nullptr;
 };
 
-constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
+constexpr std::array<LightingDescriptor, 21> kLightingDescriptors
 {
 	LightingDescriptor {.pWrapper = &engine::gSunMoonDayMinimumAmbient, .pcLabel = "Sun Moon Day Minimum Ambient", .pcHeading = "Ambient and environment"},
 	LightingDescriptor {.pWrapper = &engine::gSunMoonNightMinimumAmbient, .pcLabel = "Sun Moon Night Minimum Ambient", .pcHeading = nullptr},
@@ -392,9 +392,9 @@ constexpr std::array<LightingDescriptor, 19> kLightingDescriptors
 	LightingDescriptor {.pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Color Grading Temperature", .pcHeading = nullptr},
 };
 
-static std::array<float, 19> GetLightingDefaults()
+static std::array<float, 21> GetLightingDefaults()
 {
-	std::array<float, 19> values {};
+	std::array<float, 21> values {};
 	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 	{
 		values.at(i) = rDescriptor.pWrapper->mfDefault;
@@ -422,7 +422,7 @@ void ModelViewerApplication::UpdateDefaultComparison(bool bHeld)
 	mFlags.Set(ViewerFlags::kComparingDefaults, bHeld);
 }
 
-void ModelViewerApplication::ApplyLightingValues(const std::array<float, 19>& rValues)
+void ModelViewerApplication::ApplyLightingValues(const std::array<float, 21>& rValues)
 {
 	// End slider interactions with the previous lighting state.
 	++muiLightingRevision;
@@ -437,7 +437,7 @@ void ModelViewerApplication::ApplyLightingValues(const std::array<float, 19>& rV
 	}
 }
 
-void ModelViewerApplication::SaveLightingPreset(const std::array<float, 19>& rValues)
+void ModelViewerApplication::SaveLightingPreset(const std::array<float, 21>& rValues)
 {
 	// Heap: preset file I/O allocates paths and streams.
 	ScopedSuppressAllocationTracking suppress;
@@ -474,7 +474,7 @@ void ModelViewerApplication::SelectLightingPreset(int64_t iSlot)
 
 void ModelViewerApplication::ResetLightingPreset()
 {
-	std::array<float, 19> values = GetLightingDefaults();
+	std::array<float, 21> values = GetLightingDefaults();
 	ApplyLightingValues(values);
 	SaveLightingPreset(values);
 }
@@ -1176,7 +1176,7 @@ void ModelViewerApplication::RenderUi()
 						if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
 						{
 							rWrapper.Set(fValue);
-							std::array<float, 19> values {};
+							std::array<float, 21> values {};
 							for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 							{
 								values.at(i) = rDescriptor.pWrapper->mfCurrent;

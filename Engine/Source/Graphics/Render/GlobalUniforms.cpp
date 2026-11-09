@@ -308,18 +308,11 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	// samples that land outside the previous footprint.
 	static TemporalAreaLatch sTemporalAreaLatch {};
 	// Both retained rectangles are in the camera cell's frame; follow a camera cell change before either is compared
-	// or published, and let a multi-cell jump take the existing reset.
+	// or published.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
-	{
-		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *optionalShift);
-		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *optionalShift);
-	}
-	else
-	{
-		gbShadowTemporalReset = true;
-		++gPresentationContinuity.shadow.iHistoryResets;
-	}
+	XMFLOAT2 f2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate);
+	ShiftArea(sTemporalAreaLatch.f4CurrentArea, f2Shift);
+	ShiftArea(sTemporalAreaLatch.f4PreviousArea, f2Shift);
 
 	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety). Shadow phase 1
 	// against lighting's phase 0 keeps the two refreshes off the same frame whenever their cadences share a factor.

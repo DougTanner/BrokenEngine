@@ -11,6 +11,12 @@ constexpr ImVec4 kMapBackgroundColor(0.02f, 0.05f, 0.09f, 1.0f);
 constexpr ImVec4 kMapCellLineColor(0.55f, 0.75f, 0.9f, 1.0f);
 // At the 2160-pixel reference height.
 constexpr float kfMapCellLineThickness = 3.0f;
+// Fraction of the squared map opacity.
+constexpr float kfMapHoverFillAlpha = 0.15f;
+// Fraction of the hexagon width.
+constexpr float kfMapHoverTextWidth = 0.8f;
+// Fraction of the squared map opacity.
+constexpr float kfMapHoverTextAlpha = 0.5f;
 
 // Projects a ground point in the camera cell's frame at z = 0; false when its depth falls outside [0, 1].
 static bool ProjectGroundPoint(float fX, float fY, ImVec2& rOutPoint)
@@ -91,8 +97,14 @@ void MapScreen::Render()
 	int64_t iRadius = static_cast<int64_t>(std::ceil((fFarthestDistance + fCellReach) / (std::numbers::sqrt3_v<float> * engine::kfCellApothem)));
 
 	ImU32 uiLineColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapCellLineColor.x, kMapCellLineColor.y, kMapCellLineColor.z, fOpacity));
+	ImU32 uiHoverFillColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapCellLineColor.x, kMapCellLineColor.y, kMapCellLineColor.z, fOpacity * fOpacity * kfMapHoverFillAlpha));
 	ImU32 uiPictureColor = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, fOpacity));
 	float fLineThickness = kfMapCellLineThickness * engine::UiScale();
+	const ImVec2& rvMousePosition = ImGui::GetIO().MousePos;
+	XMFLOAT2 f2MousePosition(rvMousePosition.x, rvMousePosition.y);
+	bool bHovered = false;
+	engine::GridCoord hoveredCoordinate {};
+	ImVec2 vHoveredCenter {};
 	for (int64_t i = -iRadius; i <= iRadius; ++i)
 	{
 		for (int64_t j = std::max(-iRadius, -i - iRadius); j <= std::min(iRadius, -i + iRadius); ++j)
@@ -106,7 +118,8 @@ void MapScreen::Render()
 			float fCenterY = XMVectorGetY(vecCenter);
 
 			engine::GridCoord coordinate {};
-			if (engine::TryAddGridCoordinate(engine::gpCamera->mBasisCoordinate, i, j, coordinate))
+			bool bHasCoordinate = engine::TryAddGridCoordinate(engine::gpCamera->mBasisCoordinate, i, j, coordinate);
+			if (bHasCoordinate)
 			{
 				auto [itCell, bInserted] = mOptionalCellPlacements->try_emplace(coordinate);
 				if (bInserted)
@@ -157,9 +170,49 @@ void MapScreen::Render()
 			}
 			if (bProjected)
 			{
+				if (bHasCoordinate && !bHovered)
+				{
+					XMFLOAT2 pf2Points[std::size(pPoints)] {};
+					for (const auto& [k, rvPoint] : std::views::enumerate(pPoints))
+					{
+						pf2Points[k] = XMFLOAT2(rvPoint.x, rvPoint.y);
+					}
+					if (common::PointInPolygon(f2MousePosition, pf2Points))
+					{
+						bHovered = true;
+						hoveredCoordinate = coordinate;
+						vHoveredCenter = ImVec2(0.5f * (pPoints[0].x + pPoints[3].x), 0.5f * (pPoints[0].y + pPoints[3].y));
+						pDrawList->AddConvexPolyFilled(pPoints, static_cast<int>(std::size(pPoints)), uiHoverFillColor);
+					}
+				}
 				pDrawList->AddPolyline(pPoints, static_cast<int>(std::size(pPoints)), uiLineColor, ImDrawFlags_Closed, fLineThickness);
 			}
 		}
+	}
+
+	// Drawn after the loop so no later cell's outline or island picture covers it.
+	if (bHovered)
+	{
+		char pcCoordinate[32];
+		int64_t iCoordinateLength = std::snprintf(pcCoordinate, sizeof(pcCoordinate), "(%d,%d)", hoveredCoordinate.iQ, hoveredCoordinate.iR);
+
+		// A hexagon's width at the look-at on the settled map, so neither camera translation nor the open and close ease
+		// changes the font size.
+		float fFramingHalfHeight = engine::gpCamera->mfOverrideTarget * std::tan(0.5f * XMConvertToRadians(engine::CameraBase::kfFramingFieldOfView));
+		float fHexagonWidth = engine::kfCellHalfWidth * ImGui::GetIO().DisplaySize.y / fFramingHalfHeight;
+
+		ImFont* pFont = ImGui::GetFont();
+		float fBaseFontSize = ImGui::GetFontSize();
+		// Sized from the label's length, not its text, so labels of one length share one baked font size.
+		float fBaseTextWidth = pFont->CalcTextSizeA(fBaseFontSize, FLT_MAX, 0.0f, "8").x * static_cast<float>(iCoordinateLength);
+		float fFontSize = fBaseFontSize * kfMapHoverTextWidth * fHexagonWidth / fBaseTextWidth;
+		ImVec2 vTextSize = pFont->CalcTextSizeA(fFontSize, FLT_MAX, 0.0f, pcCoordinate);
+		ImU32 uiTextColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapCellLineColor.x, kMapCellLineColor.y, kMapCellLineColor.z, fOpacity * fOpacity * kfMapHoverTextAlpha));
+
+		// Unsnapped, the text moves sub-pixel with the outlines.
+		pDrawList->PushDrawFlag(ImDrawFlags_TextNoPixelSnap, true);
+		pDrawList->AddText(pFont, fFontSize, ImVec2(vHoveredCenter.x - 0.5f * vTextSize.x, vHoveredCenter.y - 0.5f * vTextSize.y), uiTextColor, pcCoordinate);
+		pDrawList->PopDrawFlag();
 	}
 }
 

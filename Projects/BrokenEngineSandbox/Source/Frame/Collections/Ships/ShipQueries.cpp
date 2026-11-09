@@ -312,15 +312,15 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPrevio
 
 	// Reserve all window storage together. PushBuffer may grow the workbuffer, so no pointer is published until
 	// the combined reservation has returned. The eligible row indices and the layer descriptors then remain in one
-	// allocation for the context's lifetime. With no subscription layer the registry scratch is the row indices alone.
+	// allocation for the window's lifetime.
 	static constexpr int64_t kiLayerCount = std::to_underlying(ShipType::kCount);
-	int64_t iScratchBytes = iEligibleCount * static_cast<int64_t>(sizeof(int64_t));
-	int64_t iTotalBytes = iScratchBytes + kiLayerCount * static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
+	int64_t iRowBytes = iEligibleCount * static_cast<int64_t>(sizeof(int64_t));
+	int64_t iTotalBytes = iRowBytes + kiLayerCount * static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
 	std::byte* pBufferBytes = pBuffer.mpData;
-	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iScratchBytes);
+	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iRowBytes);
 
-	// The eligible rows fill the scratch layer after layer, ascending within each layer as every source layer's rows must be.
+	// The eligible rows fill the front of the buffer layer after layer, ascending within each layer as every source layer's rows must be.
 	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(pBufferBytes);
 	int64_t iFilledCount = 0;
 	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
@@ -348,11 +348,11 @@ RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPrevio
 		pLayers[std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
 	});
 
-	RegistryWindow window {.buffer = std::move(pBuffer)};
 	std::span<const engine::RegistrySourceLayer> sourceLayers(pLayers, static_cast<size_t>(kiLayerCount));
-	std::span<std::byte> scratch(pBufferBytes, static_cast<size_t>(iScratchBytes));
-	window.context = engine::BuildRegistryQueryContext(rFrame.postRender.alignments, sourceLayers, {}, scratch);
-	return window;
+#if defined(BT_DEBUG)
+	engine::ValidateRegistrySourceLayers(sourceLayers);
+#endif
+	return {.buffer = std::move(pBuffer), .sourceLayers = sourceLayers};
 }
 
 } // namespace game

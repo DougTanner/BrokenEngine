@@ -77,8 +77,10 @@ model as a wreck (`## Wreck Invariants`).
   only a combat death makes one; a `kDestroyShip` or harness `kDestroy` removal
   leaves none.
 - A cell is visible while it is active, has a render interpolate, and its
-  hexagon overlaps the non-map camera's `mf4WorldVisibleArea` by the client
-  subscription's `RectangleOverlapsHex` test. Each `BeginRender` drops every
+  hexagon overlaps the camera's cell loaded area (`mf4CellLoadedArea`), or
+  during a camera jump the previous cell loaded area
+  (`mf4PreviousCellLoadedArea`), by the client subscription's
+  `RectangleOverlapsHex` test. Each `BeginRender` drops every
   wreck whose cell is not visible and every sinking wreck whose hull top is
   below the water.
 - Capture samples the cell's elevation under the hull box's center and four

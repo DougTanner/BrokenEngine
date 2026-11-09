@@ -94,8 +94,7 @@ The author recommends mirroring the terrain shadow schedule:
   lighting (phase 0) and terrain shadow (phase 1) whenever the cadences allow;
   `### Shadow texture frame alternation` covers the terrain pairs it cannot
   avoid. Forced refreshes stay outside the schedule: first use, object-shadow
-  texture recreation (new texture contents are undefined), a camera basis reset
-  (a multi-cell jump), and crop safety.
+  texture recreation (new texture contents are undefined), and crop safety.
 - Hold one object-shadow area, set to `mf4RenderVisibleArea` on each refresh.
   Express it in the camera cell's frame and shift it with a
   `RetainedAreaBasis` on a camera cell change, as the other retained areas do
