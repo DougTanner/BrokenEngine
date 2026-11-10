@@ -17,8 +17,8 @@ This table is the authoritative spawned-agent routing policy; native role defini
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
 | `planner` | Fable | high | Plans, design |
-| `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | Opus | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
+| `reviewer` | Fable | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
+| `implementer` | Fable | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | Haiku | high | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
@@ -114,6 +114,7 @@ Definitions:
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, or `.opencode/opencode-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex and OpenCode; never adopt an arbitrary worktree.
+  If the user opens a session directly on main, work in that checkout and do not use the worktree flow.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.
 - Residual — a known leftover problem reported at the end of a task instead of fixed inside it.

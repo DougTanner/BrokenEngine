@@ -337,7 +337,12 @@ struct ActiveFrameReference
 	const CellStaticData* pStaticData = nullptr;
 };
 
+#if defined(BT_CLIENT)
+struct FrameTickPhaseTimings;
+void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, FrameTickPhaseTimings* pPhaseTimings = nullptr);
+#else
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter);
+#endif
 
 // The game::FrameInput stream and its CRC; the read hands each StatusChange to game::AdmitFrameInputStatusChange.
 void WriteFrameInput(std::ostream& rStream, const game::FrameInput& rInput);

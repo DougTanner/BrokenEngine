@@ -23,6 +23,10 @@ namespace engine
 
 struct ReconcileProfiling
 {
+	int64_t iExecutedCoordTicks = 0;
+	int64_t iRecalculatedCoordTicks = 0;
+	int64_t iTickExecutionNanoseconds = 0;
+	FrameTickPhaseTimings phaseTimings;
 	int64_t iCrcValidatedFrameTicks = 0;
 	int64_t iAssumedFrameTicks = 0;
 	int64_t iCrcFastPathEvents = 0;

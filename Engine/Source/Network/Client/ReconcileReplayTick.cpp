@@ -115,7 +115,21 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 		.pFrameInput = &rFrameInput,
 		.pStaticData = &rCell.staticData,
 	};
-	engine::RunFrameTick(activeFrameReference, iTick);
+	if constexpr (kbProfilingFrameSpike)
+	{
+		std::chrono::steady_clock::time_point tickStartTime = std::chrono::steady_clock::now();
+		engine::RunFrameTick(activeFrameReference, iTick, &rScratch.profiling.phaseTimings);
+		rScratch.profiling.iTickExecutionNanoseconds += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - tickStartTime).count();
+		++rScratch.profiling.iExecutedCoordTicks;
+		if (iTick <= rScratch.iPreReconcileTailTick)
+		{
+			++rScratch.profiling.iRecalculatedCoordTicks;
+		}
+	}
+	else
+	{
+		engine::RunFrameTick(activeFrameReference, iTick);
+	}
 
 	// Apply the post-tick batch, spawn and transfer StatusChanges, after the tick to match server ordering
 	int64_t iTransferCount = 0;

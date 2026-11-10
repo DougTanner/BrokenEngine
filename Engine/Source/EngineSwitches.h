@@ -41,7 +41,7 @@ inline constexpr const char* kpcBuildConfigurationName = "Profile";
 inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbDebugBreak = false;
-inline constexpr bool kbDebugInput = false;
+inline constexpr bool kbDebugInput = true;
 inline constexpr bool kbDebugNavigationCrossingCheck = false;
 inline constexpr bool kbDebugRender = false;
 inline constexpr bool kbDxDiag = false;

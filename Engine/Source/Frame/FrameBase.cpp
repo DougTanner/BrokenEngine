@@ -232,8 +232,40 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	PushersInterpolate::SetupZones(rFrame);
 }
 
+#if defined(BT_CLIENT)
+void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, FrameTickPhaseTimings* pPhaseTimings)
+#else
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
+#endif
 {
+#if defined(BT_CLIENT)
+	using Phase = FrameTickPhaseTimings::Phase;
+	auto StartPhase = [&]() -> std::chrono::steady_clock::time_point
+	{
+		if constexpr (kbProfilingFrameSpike)
+		{
+			if (pPhaseTimings != nullptr)
+			{
+				return std::chrono::steady_clock::now();
+			}
+		}
+		return {};
+	};
+	std::chrono::steady_clock::time_point phaseStartTime = StartPhase();
+	auto RecordPhase = [&](Phase ePhase, std::chrono::steady_clock::time_point& rStartTime)
+	{
+		if constexpr (kbProfilingFrameSpike)
+		{
+			if (pPhaseTimings != nullptr)
+			{
+				std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+				pPhaseTimings->nanoseconds[ePhase] += std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - rStartTime).count();
+				rStartTime = endTime;
+			}
+		}
+	};
+#endif
+
 	// Mark this thread as inside a deterministic tick so a stray render-path GlobalElevation
 	// call (which walks mCells with libm trig) fails fast instead of silently desyncing across CPUs.
 	common::FrameTickScope frameTickScope;
@@ -269,7 +301,13 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
+#if defined(BT_CLIENT)
+		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
+#endif
 		gpIslandTerrain->BuildElevationGrid(rStaticData.islands, rStaticData.elevationGrid);
+#if defined(BT_CLIENT)
+		RecordPhase(Phase::kElevationGridBuild, buildStartTime);
+#endif
 	}
 
 #if defined(BT_CLIENT)
@@ -281,16 +319,25 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	if (rStaticData.islandRenderQueries.empty() && !rStaticData.islands.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
+		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
 		rStaticData.BuildRenderPlacementCache(*gpIslandTerrain);
+		RecordPhase(Phase::kRenderPlacementCacheBuild, buildStartTime);
 	}
+	RecordPhase(Phase::kCellSetup, phaseStartTime);
 #endif
 
 	game::FrameInterpolate::AllocateAndCopy(rNext.interpolate, rCurrent.interpolate);
 	game::FrameInterpolate::Update(rNext.interpolate, rCurrent, kfDeltaTime, rStaticData);
 	rNext.interpolate.iTick = iTickCounter;
+#if defined(BT_CLIENT)
+	RecordPhase(Phase::kInterpolateCopyUpdate, phaseStartTime);
+#endif
 
 	game::FramePostRender::AllocateAndCopy(rNext.postRender, rCurrent.postRender);
 	game::FramePostRender::Update(rNext, rCurrent, *rReference.pFrameInput, rStaticData);
+#if defined(BT_CLIENT)
+	RecordPhase(Phase::kPostRenderCopyUpdate, phaseStartTime);
+#endif
 
 	// Each phase walks the engine collections ahead of the game's, and each shared queue clears only after
 	// every collection has run the phase that consumes it.
@@ -303,6 +350,9 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	ForEachPostRenderAreaDamage(PostRenderBaseTypes {}, rNext, rCurrent, rStaticData);
 	game::FramePostRender::AreaDamage(rNext, rCurrent, rStaticData);
 	AreaDamage::siAreaDamageSourceCount = 0;
+#if defined(BT_CLIENT)
+	RecordPhase(Phase::kCollisionAreaDamage, phaseStartTime);
+#endif
 
 	ForEachPostRenderTransfer(PostRenderBaseTypes {}, rNext, rStaticData);
 	game::FramePostRender::Transfer(rNext, rStaticData);
@@ -311,9 +361,15 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	game::FramePostRender::Destroy(rNext, rStaticData);
 	ForEachPostRenderSpawn(PostRenderBaseTypes {}, rNext, rStaticData);
 	game::FramePostRender::Spawn(rNext, *rReference.pFrameInput, rStaticData);
+#if defined(BT_CLIENT)
+	RecordPhase(Phase::kTransferDestroySpawn, phaseStartTime);
+#endif
 
 	// Compute CRCs after all phases complete
 	rNext.postRender.uiSharedCrc = rNext.Crc();
+#if defined(BT_CLIENT)
+	RecordPhase(Phase::kSharedCrc, phaseStartTime);
+#endif
 }
 
 void WriteFrameInput(std::ostream& rStream, const game::FrameInput& rInput)

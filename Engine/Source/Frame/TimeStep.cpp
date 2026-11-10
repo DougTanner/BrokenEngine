@@ -11,20 +11,30 @@ int64_t TimeStep::TickRealtime()
 
 	if constexpr (kbProfilingFrameSpike)
 	{
-		float fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNanoseconds);
-		if (mAverageDelta.miCount > 200 && fDelta > 1.9f * mAverageDelta.Average())
+#if defined(BT_CLIENT)
+		bool bSampleDelta = (mDiagnosticFlags & DiagnosticFlags::kFocused) && !(mDiagnosticFlags & DiagnosticFlags::kDiscardNextInterval);
+		if (mDiagnosticFlags & DiagnosticFlags::kFocused)
 		{
-			LOG(kDefault, kWarning, "deltaNs spike {} > {}", common::Wb(fDelta, 4), common::Wb(mAverageDelta.Average(), 4));
-			static bool sbOnce = false;
-			if (!sbOnce)
-			{
-				sbOnce = true;
-				gpProfileManager->LogTimers();
-			}
+			mDiagnosticFlags.Set(DiagnosticFlags::kDiscardNextInterval, false);
 		}
-		LOG(kDefault, kVerbose, "\n\n");
+		if (bSampleDelta)
+#endif // BT_CLIENT
+		{
+			float fDelta = common::NanosecondsToFloatSeconds<float>(realDeltaNanoseconds);
+			if (mAverageDelta.miCount > 200 && fDelta > 1.9f * mAverageDelta.Average())
+			{
+				LOG(kDefault, kWarning, "deltaNs spike {}ms > {}ms", common::Wb(fDelta * 1'000.0f, 1), common::Wb(mAverageDelta.Average() * 1'000.0f, 1));
+				static bool sbOnce = false;
+				if (!sbOnce)
+				{
+					sbOnce = true;
+					gpProfileManager->LogTimers();
+				}
+			}
+			LOG(kDefault, kVerbose, "\n\n");
 
-		mAverageDelta = fDelta;
+			mAverageDelta = fDelta;
+		}
 	}
 
 	mTickRemainderNanoseconds += WallToSimulation(realDeltaNanoseconds);
@@ -56,6 +66,18 @@ int64_t TimeStep::TickRealtime()
 
 	return iTicks;
 }
+
+#if defined(BT_CLIENT)
+void TimeStep::SetDiagnosticFocus(bool bHasFocus)
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		mAverageDelta = common::Smoothed<float, 256> {};
+		mDiagnosticFlags.Set(DiagnosticFlags::kFocused, bHasFocus);
+		mDiagnosticFlags.Set(DiagnosticFlags::kDiscardNextInterval);
+	}
+}
+#endif // BT_CLIENT
 
 void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)
 {

@@ -139,6 +139,11 @@ void Game::ToggleMap()
 
 float Game::MapOpacity() const
 {
+	if (!engine::gpCamera->mbFramingOverride)
+	{
+		return 0.0f;
+	}
+
 	return std::clamp(std::log(engine::gpCamera->RenderFraming() / engine::CameraBase::kfFramingMaximum) / std::log(gMapOpaqueFraming.mfCurrent / engine::CameraBase::kfFramingMaximum), 0.0f, 1.0f);
 }
 #endif // BT_CLIENT
@@ -207,9 +212,17 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 #if defined(BT_CLIENT)
 void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 {
-	if (rInputPoll.KeyboardPressed(VK_TAB) && !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone)
+	if (rInputPoll.KeyboardPressed(VK_TAB))
 	{
-		ToggleMap();
+		bool bToggleMap = !(mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kNone;
+		if constexpr (kbDebugInput)
+		{
+			bToggleMap |= (mGameFlags & engine::GameFlags::kMainMenu) && meUiState == engine::UiState::kPause;
+		}
+		if (bToggleMap)
+		{
+			ToggleMap();
+		}
 	}
 
 	if constexpr (kbFreeCamera)

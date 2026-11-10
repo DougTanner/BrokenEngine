@@ -46,10 +46,12 @@ runtime contracts of the screens that remain here.
   and ring bound reach past the hexagon by the largest template's half
   footprint diagonal. The map is open
   exactly while the camera's framing override is set and not releasing, so no
-  separate open flag exists; TAB eases the override out to the map framing, or
+  separate open flag exists; TAB is admitted in gameplay with no menu open and
+  on the Debug main menu in `UiState::kPause`. It eases the override out to the map framing, or
   releases it back to the world framing, which the map never changes, so cells
-  and islands load for the gameplay view. Opacity is a log-scale function of the
-  rendered framing alone, so the fade matches the camera through a reversal
+  and islands load for the gameplay view. Opacity is zero while the framing
+  override is inactive; while active, including release, it is a log-scale
+  function of the rendered framing, so the fade matches the camera through a reversal
   mid-ease; at full opacity the frame is a world-hidden frame
   (`../../../../../Engine/Source/Graphics/AGENTS.md`
   `## Frame and Resource Lifecycle`). A session reset closes an open map with

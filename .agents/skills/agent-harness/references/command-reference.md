@@ -145,7 +145,7 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   snapshot, exact schema
   `{"action":"inspect"|"play"|"clear"|"suspend"|"resume"|"clear_history"|"hold_read"|"release_read"|"stall_loaders"|"release_loaders"|"stop_publication"|"resume_publication"|"load_chunk"}`
   plus exactly the fields its action lists; an extra or missing field fails.
-  Other builds return an error naming `kbDebugInput`. Every action returns a
+  Other builds return an error requiring a Debug build. Every action returns a
   snapshot. `inspect` changes nothing. `play` `{"crc"}` plays that music track
   through the ordinary stream path; the first `play` in a process clears the
   playing music and stops playlist transitions for the rest of the process. It

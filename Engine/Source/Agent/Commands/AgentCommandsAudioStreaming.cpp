@@ -251,12 +251,9 @@ static engine::LoadPriority ReadAudioStreamingHarnessRigPriority(const nlohmann:
 
 void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("audio_streaming_harness_rig requires kbDebugInput build");
-	}
-#if defined(BT_DEBUG)
-	else
+#if !defined(BT_DEBUG)
+	throw std::runtime_error("audio_streaming_harness_rig requires Debug build");
+#else
 	{
 		// Heap: hostile-input validation and the bounded JSON harness rig response
 		ScopedSuppressAllocationTracking suppress;

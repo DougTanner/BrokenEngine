@@ -349,7 +349,11 @@ void GameBase::ClientUpdate()
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
 	{
-		ScopedSlowOperation scopedSlowOperation(kNetwork, "Client reconciliation");
+		if constexpr (kbProfilingFrameSpike)
+		{
+			gpProfileManager->mReconciliationDiagnostics = {};
+		}
+		ScopedSlowOperation scopedSlowOperation(kNetwork, "Client reconciliation", &gpProfileManager->mReconciliationDiagnostics);
 		game::gpClientSession->Reconcile();
 	}
 	gpProfileManager->CpuStop(game::kCpuTimerFrameUpdate);
@@ -388,7 +392,7 @@ void GameBase::ServerUpdate()
 	int64_t iFullTicks = mTimeStep.TickRealtime();
 	// Second poll of the update: drains commands that arrived during WaitForTick so they enter the imminent
 	// tick rather than the next one. It runs before the pause/timespeed decision below, so a pause request
-	// arriving in the boundary window (Debug builds only, kbDebugInput) prevents the imminent tick. A record-stop
+	// arriving in the boundary window (when kbDebugInput is enabled) prevents the imminent tick. A record-stop
 	// or load-replay request arriving here is serviced next update by design -- SaveLoadReplay already ran; a
 	// record-start request waits for the first dispatched tick's SyncReplayTick.
 	game::gpServerSession->mpRuntime->PollTickBoundary(networkTimeState);
@@ -1066,8 +1070,8 @@ void GameBase::CreateNewFrame()
 	Cell& rCell = mCells.try_emplace(kOriginCoordinate).first->second;
 	CreateCellFrame(rCell, kOriginCoordinate);
 
-	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
-	// release builds keep the procedural island chain. Gameplay cells always use the chain.
+	// kbDebugInput turns the main-menu cell into a single centered island browser ('E' cycles it);
+	// otherwise it keeps the procedural island chain. Gameplay cells always use the chain.
 	bool bMenuBrowse = false;
 	if constexpr (kbDebugInput)
 	{
@@ -1084,7 +1088,7 @@ void GameBase::CreateNewFrame()
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
 }
 
-// Debug-only main-menu island browser: build the origin cell as a single island centered at (0,0),
+// Developer main-menu island browser: build the origin cell as a single island centered at (0,0),
 // selected by index into the boot-fixed area-sorted list of all packed islands (largest footprint
 // first). clear()+push_back reuses the vector's capacity (grown once under
 // ScopedSuppressAllocationTracking in CreateNewFrame), so the cycle path never heap-allocates in the

@@ -218,7 +218,7 @@ public:
 	void ChangeFrameToMainMenu();
 
 	static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput);
-	// Debug-only main-menu island browser index into gpIslandTerrain->mIslandCrcsByArea (largest footprint first);
+	// Developer main-menu island browser index into gpIslandTerrain->mIslandCrcsByArea (largest footprint first);
 	// advanced by 'E'.
 	int64_t miMenuIslandIndex = 0;
 

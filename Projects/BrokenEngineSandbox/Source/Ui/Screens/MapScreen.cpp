@@ -193,6 +193,11 @@ void MapScreen::Render()
 	// Drawn after the loop so no later cell's outline or island picture covers it.
 	if (bHovered)
 	{
+		if (!std::isfinite(engine::gpCamera->mfOverrideTarget) || engine::gpCamera->mfOverrideTarget <= 0.0f)
+		{
+			return;
+		}
+
 		char pcCoordinate[32];
 		int64_t iCoordinateLength = std::snprintf(pcCoordinate, sizeof(pcCoordinate), "(%d,%d)", hoveredCoordinate.iQ, hoveredCoordinate.iR);
 
@@ -205,7 +210,16 @@ void MapScreen::Render()
 		float fBaseFontSize = ImGui::GetFontSize();
 		// Sized from the label's length, not its text, so labels of one length share one baked font size.
 		float fBaseTextWidth = pFont->CalcTextSizeA(fBaseFontSize, FLT_MAX, 0.0f, "8").x * static_cast<float>(iCoordinateLength);
+		if (!std::isfinite(fBaseTextWidth) || fBaseTextWidth <= 0.0f)
+		{
+			return;
+		}
 		float fFontSize = fBaseFontSize * kfMapHoverTextWidth * fHexagonWidth / fBaseTextWidth;
+		if (!std::isfinite(fFontSize) || fFontSize < 0.5f || !(fFontSize <= ImGui::GetIO().DisplaySize.y) || fFontSize >= static_cast<float>(std::numeric_limits<int>::max()))
+		{
+			return;
+		}
+
 		ImVec2 vTextSize = pFont->CalcTextSizeA(fFontSize, FLT_MAX, 0.0f, pcCoordinate);
 		ImU32 uiTextColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapCellLineColor.x, kMapCellLineColor.y, kMapCellLineColor.z, fOpacity * fOpacity * kfMapHoverTextAlpha));
 

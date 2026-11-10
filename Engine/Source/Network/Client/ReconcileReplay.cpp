@@ -397,6 +397,11 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 
 ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 {
+	std::chrono::steady_clock::time_point dispatchStartTime;
+	if constexpr (kbProfilingFrameSpike)
+	{
+		dispatchStartTime = std::chrono::steady_clock::now();
+	}
 	// Heap: work list growth and per-coord scratch retention
 	ScopedSuppressAllocationTracking suppress;
 
@@ -430,9 +435,28 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 
 	ReconcileDispatchResult result;
 	result.iActiveCount = miActiveCount;
+	auto PublishDiagnostics = [&]()
+	{
+		if constexpr (kbProfilingFrameSpike)
+		{
+			gpProfileManager->mReconciliationDiagnostics = ReconciliationDiagnostics
+			{
+				.iActiveCoords = result.iActiveCount,
+				.iExecutedCoordTicks = result.profiling.iExecutedCoordTicks,
+				.iRecalculatedCoordTicks = result.profiling.iRecalculatedCoordTicks,
+				.iTickExecutionNanoseconds = result.profiling.iTickExecutionNanoseconds,
+				.iDispatcherNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - dispatchStartTime).count(),
+				.phaseTimings = result.profiling.phaseTimings,
+				.iStatusChangeReplayTicks = result.profiling.iStatusChangeReplayTicks,
+				.iKnockOnReplayTicks = result.profiling.iKnockOnReplayTicks,
+				.bDesync = result.desync.bDesync,
+			};
+		}
+	};
 
 	if (iActiveCount == 0)
 	{
+		PublishDiagnostics();
 		return result;
 	}
 
@@ -455,6 +479,16 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	for (CoordWork& rWork : activeWorks)
 	{
 		const CoordScratch& rScratch = rWork.scratch;
+		if constexpr (kbProfilingFrameSpike)
+		{
+			result.profiling.iExecutedCoordTicks += rScratch.profiling.iExecutedCoordTicks;
+			result.profiling.iRecalculatedCoordTicks += rScratch.profiling.iRecalculatedCoordTicks;
+			result.profiling.iTickExecutionNanoseconds += rScratch.profiling.iTickExecutionNanoseconds;
+			for (int64_t i = 0; i < std::ssize(result.profiling.phaseTimings.nanoseconds); ++i)
+			{
+				result.profiling.phaseTimings.nanoseconds[i] += rScratch.profiling.phaseTimings.nanoseconds[i];
+			}
+		}
 		result.profiling.iCrcValidatedFrameTicks += rScratch.profiling.iCrcValidatedFrameTicks;
 		result.profiling.iAssumedFrameTicks += rScratch.profiling.iAssumedFrameTicks;
 		result.profiling.iCrcFastPathEvents += rScratch.profiling.iCrcFastPathEvents;
@@ -505,6 +539,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		result.desync.desyncExpectedCrc = rScratch.desyncExpectedCrc;
 		result.desync.desyncActualCrc = rScratch.desyncActualCrc;
 		result.desync.pDesyncClientFrame = std::move(rScratch.pDesyncClientFrame);
+		PublishDiagnostics();
 		return result;
 	}
 
@@ -526,6 +561,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		gpAudioManager->mpStaticVoices->mbSkipNextInvalidation = true;
 	}
 
+	PublishDiagnostics();
 	return result;
 }
 

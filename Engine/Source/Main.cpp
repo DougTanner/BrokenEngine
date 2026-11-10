@@ -275,8 +275,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	}
 	common::ScopedLambda destroyWindow([]()
 	{
-		// No client pump here: Game, Graphics/ImGui, and Input are already destroyed, and the client WindowProcedure
-		// dereferences game::gpGame on WM_SETFOCUS.
+		// No client pump here: on a fully started client, Game, Graphics/ImGui, and Input are destroyed before the window.
 
 		if (sHwnd != nullptr)
 		{
@@ -373,6 +372,11 @@ static int64_t MainThread(HINSTANCE hinstance)
 	}
 #endif
 	ProcessMessages();
+
+#if defined(BT_CLIENT)
+	pGame->mTimeStep.SetDiagnosticFocus(sbHasFocus);
+	gpProfileManager->SetDiagnosticFocus(sbHasFocus);
+#endif // BT_CLIENT
 
 	gpProfileManager->BootLog();
 
@@ -746,7 +750,12 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 				sbHasFocus = true;
 
 #if defined(BT_CLIENT)
-				SetCursor(game::gpGame->ShouldUseCrosshair() ? sHcursorCrosshair : sHcursorArrow);
+				if (game::gpGame != nullptr)
+				{
+					game::gpGame->mTimeStep.SetDiagnosticFocus(true);
+					SetCursor(game::gpGame->ShouldUseCrosshair() ? sHcursorCrosshair : sHcursorArrow);
+				}
+				gpProfileManager->SetDiagnosticFocus(true);
 
 				gpAudioManager->Resume();
 
@@ -766,6 +775,12 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 				sbHasFocus = false;
 
 #if defined(BT_CLIENT)
+				if (game::gpGame != nullptr)
+				{
+					game::gpGame->mTimeStep.SetDiagnosticFocus(false);
+				}
+				gpProfileManager->SetDiagnosticFocus(false);
+
 				if (gMuteInBackground.Get<bool>())
 				{
 					gpAudioManager->Suspend();

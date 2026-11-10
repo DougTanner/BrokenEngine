@@ -30,7 +30,9 @@ public:
 	// Returns 0 if not enough time accumulated for a tick
 	int64_t TickRealtime();
 
-
+#if defined(BT_CLIENT)
+	void SetDiagnosticFocus(bool bHasFocus);
+#endif // BT_CLIENT
 
 	// Convert a wall-clock duration into sim-clock duration using the current time ratio.
 	std::chrono::nanoseconds WallToSimulation(std::chrono::nanoseconds wallNanoseconds) const
@@ -72,6 +74,16 @@ public:
 	std::chrono::nanoseconds mTickRemainderNanoseconds = 0ns;
 	common::Smoothed<float, 256> mAverageDelta;
 	bool mbTimeScaleChanged = false;
+
+#if defined(BT_CLIENT)
+private:
+	enum class DiagnosticFlags : uint8_t
+	{
+		kFocused = 1 << 0,
+		kDiscardNextInterval = 1 << 1,
+	};
+	common::Flags<DiagnosticFlags> mDiagnosticFlags {DiagnosticFlags::kFocused};
+#endif // BT_CLIENT
 };
 
 } // namespace engine

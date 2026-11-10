@@ -17,7 +17,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
   `GameBase::ProcessInput` calls last, after engine menu policy and the
   engine's debug-control requests: it polls its own keys through the borrowed
   `engine::InputPoll`. Everything it does is `kbDebugInput`-only except TAB,
-  which toggles the map in game with no menu open (`Ui/Screens/AGENTS.md`),
+  which follows the map input contract in `Ui/Screens/AGENTS.md`,
   and the `kbFreeCamera`-only main-menu Backspace (`Graphics/AGENTS.md`).
 - Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic and server-generic handlers are engine-owned;
   the dispatcher tries the engine shared handlers first, then its own side-specific handlers, then the engine side-generic handler, so a game handler can take over an engine command and append its own fields. `Game` teardown clears any deferred agent response first, while its captured runtime dependencies are still live. See `Agent/AGENTS.md`.

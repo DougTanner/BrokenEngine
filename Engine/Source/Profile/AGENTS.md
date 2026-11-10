@@ -17,14 +17,34 @@ Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileMana
 
 ## Slow-operation Diagnostics
 
-Client slow-operation diagnostics run only under `kbProfilingFrameSpike`, on
+Client slow-operation warnings run only under `kbProfilingFrameSpike`, on
 the main thread. `ProfileManager` owns the rendered-interval history and cached
-threshold across graphics recreation; `RecordRenderedFrameInterval` owns the
-warmup and multiplier, and the history declaration owns the window size.
-`ScopedSlowOperation` captures that threshold before timing its operation, so
-the operation cannot raise its own warning boundary. Without a warmed baseline
-it does no timing or warning. These warnings measure elapsed wall time, not a
-CPU/GPU cause, and remain independent of aggregated CPU timers.
+expected interval across graphics recreation; `RecordRenderedFrameInterval`
+owns the warmup, and the history declaration owns the window size.
+`ScopedSlowOperation` captures that interval before timing its operation and
+owns the warning multiplier, so the operation cannot raise its own warning
+boundary. Without a warmed baseline it does no timing or warning. Client focus
+notifications clear diagnostic histories, cancel active warnings, and restart
+warmup after discarding each diagnostic's next interval; unfocused intervals
+never enter the histories. Hosts without focus notifications remain eligible.
+These warnings measure elapsed wall time, not a CPU/GPU cause, and remain
+independent of aggregated CPU timers.
+
+`ProfileManager` also owns the per-call reconciliation snapshot and prior normal
+tick-cost history. `GameBase::ClientUpdate` clears the snapshot before each
+reconciliation; the dispatcher publishes worker diagnostics after joining them.
+Executed coord-ticks include failed replay and fallback attempts, unlike CRC
+validation counts. `FrameTickPhaseTimings` stores steady-clock nanoseconds per
+coord before the merge. The warning prints milliseconds for intervals and
+microseconds for per-coord-tick averages. When a positive dispatcher interval
+was measured, subtract it from the outer interval to get remaining
+reconciliation wall time. `RunFrameTick`
+and phase totals sum elapsed wall time across workers and can exceed dispatcher
+time. Lazy build timings are included in cell setup. The normal comparison uses
+earlier eligible calls with executions, no recalculation, and no desync.
+`ScopedSlowOperation` adds the current sample after comparison, regardless of
+whether it warns. This history follows the same focus and warmup eligibility as
+the slow-operation diagnostics.
 
 ## GPU Timing
 

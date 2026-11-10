@@ -540,12 +540,32 @@ void ProfileManager::RecordRenderedFrameInterval(std::chrono::nanoseconds interv
 {
 	if constexpr (kbProfilingFrameSpike)
 	{
+		if (!(mDiagnosticFlags & DiagnosticFlags::kFocused))
+		{
+			return;
+		}
+		if (mDiagnosticFlags & DiagnosticFlags::kDiscardNextInterval)
+		{
+			mDiagnosticFlags.Set(DiagnosticFlags::kDiscardNextInterval, false);
+			return;
+		}
 		mRenderedFrameIntervals = interval.count();
 		if (mRenderedFrameIntervals.miCount > 200)
 		{
-			static constexpr double kfSlowOperationFrameMultiplier = 1.9;
-			mSlowOperationThreshold = std::chrono::nanoseconds(static_cast<int64_t>(kfSlowOperationFrameMultiplier * static_cast<double>(mRenderedFrameIntervals.Average())));
+			mExpectedRenderedFrameInterval = std::chrono::nanoseconds(mRenderedFrameIntervals.Average());
 		}
+	}
+}
+
+void ProfileManager::SetDiagnosticFocus(bool bHasFocus)
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		mRenderedFrameIntervals = common::Smoothed<int64_t, 256> {};
+		mNormalReconciliationTickNanoseconds = common::Smoothed<double> {};
+		mExpectedRenderedFrameInterval = 0ns;
+		mDiagnosticFlags.Set(DiagnosticFlags::kFocused, bHasFocus);
+		mDiagnosticFlags.Set(DiagnosticFlags::kDiscardNextInterval);
 	}
 }
 
@@ -718,14 +738,122 @@ ScopedCpuProfile::~ScopedCpuProfile()
 }
 
 #if defined(BT_CLIENT)
-ScopedSlowOperation::ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation)
+static void LogReconciliationDiagnostics(const ReconciliationDiagnostics& rDetails, std::chrono::nanoseconds elapsed, const common::Smoothed<double>& rNormalTickNanoseconds)
+{
+	static constexpr double kfMinimumTimingFraction = 0.05;
+	auto IsRelevantTiming = [](int64_t iNanoseconds, int64_t iParentNanoseconds)
+	{
+		return iNanoseconds > 0 && static_cast<double>(iNanoseconds) >= kfMinimumTimingFraction * static_cast<double>(iParentNanoseconds);
+	};
+	auto Milliseconds = [](int64_t iNanoseconds)
+	{
+		return static_cast<float>(iNanoseconds) / 1'000'000.0f;
+	};
+
+	if (rDetails.iDispatcherNanoseconds > 0)
+	{
+		LOG(kNetwork, kWarning, "  Dispatcher wall time: {}ms", common::Wb(Milliseconds(rDetails.iDispatcherNanoseconds), 3));
+	}
+	if (rDetails.iExecutedCoordTicks > 0)
+	{
+		if (rDetails.iTickExecutionNanoseconds > 0)
+		{
+			LOG(kNetwork, kWarning, "    Summed RunFrameTick wall time (parallel workers): {}ms", common::Wb(Milliseconds(rDetails.iTickExecutionNanoseconds), 3));
+		}
+		LOG(kNetwork, kWarning, "    Coords: {} Executed coord-ticks: {} New: {}", rDetails.iActiveCoords, rDetails.iExecutedCoordTicks, rDetails.iExecutedCoordTicks - rDetails.iRecalculatedCoordTicks);
+		float fCurrentMicroseconds = static_cast<float>(rDetails.iTickExecutionNanoseconds) / static_cast<float>(rDetails.iExecutedCoordTicks) / 1'000.0f;
+		if (rNormalTickNanoseconds.miCount > 0)
+		{
+			LOG(kNetwork, kWarning, "    RunFrameTick wall time per coord-tick: {}us, prior normal {}us", common::Wb(fCurrentMicroseconds, 3), common::Wb(static_cast<float>(rNormalTickNanoseconds.Average()) / 1'000.0f, 3));
+		}
+		else
+		{
+			LOG(kNetwork, kWarning, "    RunFrameTick wall time per coord-tick: {}us", common::Wb(fCurrentMicroseconds, 3));
+		}
+	}
+	if (rDetails.iRecalculatedCoordTicks > 0)
+	{
+		LOG(kNetwork, kWarning, "    Recalculated coord-ticks: {}", rDetails.iRecalculatedCoordTicks);
+	}
+	if (rDetails.iStatusChangeReplayTicks > 0)
+	{
+		LOG(kNetwork, kWarning, "    Status-change replay ticks: {}", rDetails.iStatusChangeReplayTicks);
+	}
+	if (rDetails.iKnockOnReplayTicks > 0)
+	{
+		LOG(kNetwork, kWarning, "    Knock-on replay ticks: {}", rDetails.iKnockOnReplayTicks);
+	}
+	if (rDetails.bDesync)
+	{
+		LOG(kNetwork, kWarning, "    Desync");
+	}
+
+	if (rDetails.iExecutedCoordTicks > 0)
+	{
+		using Phase = FrameTickPhaseTimings::Phase;
+		const std::array<int64_t, Phase::kCount>& rPhaseNanoseconds = rDetails.phaseTimings.nanoseconds;
+		struct PhaseTiming
+		{
+			Phase ePhase = Phase::kCellSetup;
+			std::string_view name;
+			int64_t iNanoseconds = 0;
+		};
+		PhaseTiming pPhases[]
+		{
+			{.ePhase = Phase::kCellSetup, .name = "Cell setup", .iNanoseconds = rPhaseNanoseconds[Phase::kCellSetup]},
+			{.ePhase = Phase::kInterpolateCopyUpdate, .name = "Interpolate copy/update", .iNanoseconds = rPhaseNanoseconds[Phase::kInterpolateCopyUpdate]},
+			{.ePhase = Phase::kPostRenderCopyUpdate, .name = "PostRender copy/update", .iNanoseconds = rPhaseNanoseconds[Phase::kPostRenderCopyUpdate]},
+			{.ePhase = Phase::kCollisionAreaDamage, .name = "Collision and area damage", .iNanoseconds = rPhaseNanoseconds[Phase::kCollisionAreaDamage]},
+			{.ePhase = Phase::kTransferDestroySpawn, .name = "Transfer/destroy/spawn", .iNanoseconds = rPhaseNanoseconds[Phase::kTransferDestroySpawn]},
+			{.ePhase = Phase::kSharedCrc, .name = "Shared CRC", .iNanoseconds = rPhaseNanoseconds[Phase::kSharedCrc]},
+		};
+		std::ranges::sort(pPhases, std::ranges::greater {}, &PhaseTiming::iNanoseconds);
+		for (const PhaseTiming& rPhase : pPhases)
+		{
+			if (rPhase.iNanoseconds <= 0)
+			{
+				break;
+			}
+			if (&rPhase != pPhases && !IsRelevantTiming(rPhase.iNanoseconds, rDetails.iTickExecutionNanoseconds))
+			{
+				break;
+			}
+			LOG(kNetwork, kWarning, "      {} summed wall time: {}ms", rPhase.name, common::Wb(Milliseconds(rPhase.iNanoseconds), 3));
+			if (rPhase.ePhase == Phase::kCellSetup)
+			{
+				int64_t iElevationGridNanoseconds = rPhaseNanoseconds[Phase::kElevationGridBuild];
+				if (IsRelevantTiming(iElevationGridNanoseconds, rPhase.iNanoseconds))
+				{
+					LOG(kNetwork, kWarning, "        Elevation grid build summed wall time: {}ms", common::Wb(Milliseconds(iElevationGridNanoseconds), 3));
+				}
+				int64_t iRenderPlacementCacheNanoseconds = rPhaseNanoseconds[Phase::kRenderPlacementCacheBuild];
+				if (IsRelevantTiming(iRenderPlacementCacheNanoseconds, rPhase.iNanoseconds))
+				{
+					LOG(kNetwork, kWarning, "        Render placement cache build summed wall time: {}ms", common::Wb(Milliseconds(iRenderPlacementCacheNanoseconds), 3));
+				}
+			}
+		}
+	}
+
+	if (rDetails.iDispatcherNanoseconds > 0)
+	{
+		int64_t iRemainingNanoseconds = elapsed.count() - rDetails.iDispatcherNanoseconds;
+		if (IsRelevantTiming(iRemainingNanoseconds, elapsed.count()))
+		{
+			LOG(kNetwork, kWarning, "  Remaining reconciliation wall time: {}ms", common::Wb(Milliseconds(iRemainingNanoseconds), 3));
+		}
+	}
+}
+
+ScopedSlowOperation::ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics)
 {
 	if constexpr (kbProfilingFrameSpike)
 	{
 		meCategory = eCategory;
 		mpcOperation = pcOperation;
-		mThreshold = gpProfileManager->mSlowOperationThreshold;
-		if (mThreshold != 0ns)
+		mpReconciliationDiagnostics = pReconciliationDiagnostics;
+		mExpectedRenderedFrameInterval = gpProfileManager->mExpectedRenderedFrameInterval;
+		if (mExpectedRenderedFrameInterval != 0ns)
 		{
 			mStartTime = std::chrono::steady_clock::now();
 		}
@@ -736,13 +864,19 @@ ScopedSlowOperation::~ScopedSlowOperation()
 {
 	if constexpr (kbProfilingFrameSpike)
 	{
-		if (mThreshold == 0ns)
+		if (mExpectedRenderedFrameInterval == 0ns)
+		{
+			return;
+		}
+		if (gpProfileManager->mExpectedRenderedFrameInterval == 0ns)
 		{
 			return;
 		}
 
 		std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - mStartTime;
-		if (elapsed > mThreshold)
+		static constexpr double kfSlowOperationFrameMultiplier = 1.9;
+		std::chrono::nanoseconds threshold(static_cast<int64_t>(kfSlowOperationFrameMultiplier * static_cast<double>(mExpectedRenderedFrameInterval.count())));
+		if (elapsed > threshold)
 		{
 			// The category is selected at runtime, so apply both LOG filters before formatting.
 			if constexpr (kbLogging)
@@ -750,9 +884,21 @@ ScopedSlowOperation::~ScopedSlowOperation()
 				if (kWarning >= kpeLogLevels[static_cast<int64_t>(meCategory)] && kWarning >= common::gpeLogRuntimeLevels[static_cast<int64_t>(meCategory)].load(std::memory_order_relaxed))
 				{
 					float fElapsedMilliseconds = std::chrono::duration<float, std::milli>(elapsed).count();
-					float fThresholdMilliseconds = std::chrono::duration<float, std::milli>(mThreshold).count();
-					common::Log(meCategory, "{} took {}ms (threshold {}ms)", mpcOperation, common::Wb(fElapsedMilliseconds, 3), common::Wb(fThresholdMilliseconds, 3));
+					float fExpectedMilliseconds = std::chrono::duration<float, std::milli>(mExpectedRenderedFrameInterval).count();
+					common::Log(meCategory, "{} took {}ms > {}ms", mpcOperation, common::Wb(fElapsedMilliseconds, 1), common::Wb(fExpectedMilliseconds, 1));
+					if (mpReconciliationDiagnostics != nullptr)
+					{
+						LogReconciliationDiagnostics(*mpReconciliationDiagnostics, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed), gpProfileManager->mNormalReconciliationTickNanoseconds);
+					}
 				}
+			}
+		}
+		if (mpReconciliationDiagnostics != nullptr)
+		{
+			const ReconciliationDiagnostics& rDetails = *mpReconciliationDiagnostics;
+			if (rDetails.iExecutedCoordTicks > 0 && rDetails.iRecalculatedCoordTicks == 0 && !rDetails.bDesync)
+			{
+				gpProfileManager->mNormalReconciliationTickNanoseconds = static_cast<double>(rDetails.iTickExecutionNanoseconds) / static_cast<double>(rDetails.iExecutedCoordTicks);
 			}
 		}
 	}

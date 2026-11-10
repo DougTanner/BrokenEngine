@@ -153,6 +153,37 @@ inline constexpr std::string_view kpEngineCpuTimerNames[]
 static_assert(std::size(kpEngineCpuTimerNames) == static_cast<size_t>(kEngineCpuTimerCount));
 
 #if defined(BT_CLIENT)
+struct FrameTickPhaseTimings
+{
+	enum Phase : size_t
+	{
+		kCellSetup,
+		kInterpolateCopyUpdate,
+		kPostRenderCopyUpdate,
+		kCollisionAreaDamage,
+		kTransferDestroySpawn,
+		kSharedCrc,
+		kElevationGridBuild,
+		kRenderPlacementCacheBuild,
+		kCount,
+	};
+
+	std::array<int64_t, kCount> nanoseconds {};
+};
+
+struct ReconciliationDiagnostics
+{
+	int64_t iActiveCoords = 0;
+	int64_t iExecutedCoordTicks = 0;
+	int64_t iRecalculatedCoordTicks = 0;
+	int64_t iTickExecutionNanoseconds = 0;
+	int64_t iDispatcherNanoseconds = 0;
+	FrameTickPhaseTimings phaseTimings;
+	int64_t iStatusChangeReplayTicks = 0;
+	int64_t iKnockOnReplayTicks = 0;
+	bool bDesync = false;
+};
+
 enum GpuTimers : int64_t
 {
 	kGpuTimerGlobal,
@@ -352,6 +383,7 @@ public:
 	void DiscardSkippedFrameSamples();
 
 	void RecordRenderedFrameInterval(std::chrono::nanoseconds interval);
+	void SetDiagnosticFocus(bool bHasFocus);
 #endif // BT_CLIENT
 
 	void BootStart(BootTimers eBootTimer);
@@ -371,8 +403,10 @@ public:
 	std::string_view GetCpuTimerName(int64_t iIndex);
 
 #if defined(BT_CLIENT)
+	ReconciliationDiagnostics mReconciliationDiagnostics {};
+	common::Smoothed<double> mNormalReconciliationTickNanoseconds;
 	GpuShadowSample mGpuShadowSample {};
-	std::chrono::nanoseconds mSlowOperationThreshold = 0ns;
+	std::chrono::nanoseconds mExpectedRenderedFrameInterval = 0ns;
 #endif // BT_CLIENT
 	// Guards CPU-timer arrays and per-thread states shared by dispatch, submit, and network threads. Timer scopes must remain coarse to avoid distorting measurements. FormatCpuTimersText and LogTimers hold this mutex while reading.
 	std::mutex mCpuTimerMutex;
@@ -440,8 +474,14 @@ protected:
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
-	// Main-thread diagnostic history survives Graphics recreation; scopes read the cached threshold in O(1).
+	// Main-thread diagnostic history survives Graphics recreation; scopes read the cached expected interval in O(1).
 	common::Smoothed<int64_t, 256> mRenderedFrameIntervals;
+	enum class DiagnosticFlags : uint8_t
+	{
+		kFocused = 1 << 0,
+		kDiscardNextInterval = 1 << 1,
+	};
+	common::Flags<DiagnosticFlags> mDiagnosticFlags {DiagnosticFlags::kFocused};
 
 	VkQueryPool mVkQueryPool = VK_NULL_HANDLE;
 
@@ -507,7 +547,7 @@ class [[nodiscard]] ScopedSlowOperation
 {
 public:
 
-	ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation);
+	ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics = nullptr);
 	~ScopedSlowOperation();
 	ScopedSlowOperation(const ScopedSlowOperation&) = delete;
 	ScopedSlowOperation& operator=(const ScopedSlowOperation&) = delete;
@@ -516,7 +556,8 @@ private:
 
 	common::LogCategory meCategory = kDefault;
 	const char* mpcOperation = nullptr;
-	std::chrono::nanoseconds mThreshold = 0ns;
+	const ReconciliationDiagnostics* mpReconciliationDiagnostics = nullptr;
+	std::chrono::nanoseconds mExpectedRenderedFrameInterval = 0ns;
 	std::chrono::steady_clock::time_point mStartTime = std::chrono::steady_clock::time_point();
 };
 #endif // BT_CLIENT
