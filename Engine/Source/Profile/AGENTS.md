@@ -15,6 +15,17 @@ Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileMana
 - Normal CPU timers latch into smoothing rings once per render frame. Timers that complete outside that cadence request latch-at-stop. A main-loop path that skips rendering while timers keep accumulating must discard those samples before rendering resumes, as the deferred-swapchain resume does, so the first rendered frame reports only its own work.
 - Server raw timer samples are diagnostic-only and latch after all active-cell workers join, but only an accepted normal one-tick update at timescale 1/1 advances the sample. Paused, burst, recording/replay, and no-dispatch paths discard pending raw values, so those updates never advance the sample.
 
+## Slow-operation Diagnostics
+
+Client slow-operation diagnostics run only under `kbProfilingFrameSpike`, on
+the main thread. `ProfileManager` owns the rendered-interval history and cached
+threshold across graphics recreation; `RecordRenderedFrameInterval` owns the
+warmup and multiplier, and the history declaration owns the window size.
+`ScopedSlowOperation` captures that threshold before timing its operation, so
+the operation cannot raise its own warning boundary. Without a warmed baseline
+it does no timing or warning. These warnings measure elapsed wall time, not a
+CPU/GPU cause, and remain independent of aggregated CPU timers.
+
 ## GPU Timing
 
 - GPU queries and ImGui output are client-only. Query reads never stall; `VK_NOT_READY` retains the previous smoothed result, and devices without timestamp support leave the pool unused.

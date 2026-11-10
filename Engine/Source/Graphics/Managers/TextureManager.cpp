@@ -625,6 +625,7 @@ void TextureManager::EndAcquireCommandBuffer()
 
 void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 {
+	ScopedSlowOperation scopedSlowOperation(kGraphics, "Required texture readiness wait");
 	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(crcs, LoadPriority::kRealtime);
 
 	// Boot and device recreation: no frame is in flight and each pass waits its own acquire submission, so every set is writable.

@@ -350,6 +350,8 @@ public:
 
 	// Called when rendering resumes after skipped frames, so the first rendered frame reports only its own samples.
 	void DiscardSkippedFrameSamples();
+
+	void RecordRenderedFrameInterval(std::chrono::nanoseconds interval);
 #endif // BT_CLIENT
 
 	void BootStart(BootTimers eBootTimer);
@@ -370,6 +372,7 @@ public:
 
 #if defined(BT_CLIENT)
 	GpuShadowSample mGpuShadowSample {};
+	std::chrono::nanoseconds mSlowOperationThreshold = 0ns;
 #endif // BT_CLIENT
 	// Guards CPU-timer arrays and per-thread states shared by dispatch, submit, and network threads. Timer scopes must remain coarse to avoid distorting measurements. FormatCpuTimersText and LogTimers hold this mutex while reading.
 	std::mutex mCpuTimerMutex;
@@ -437,6 +440,9 @@ protected:
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
+	// Main-thread diagnostic history survives Graphics recreation; scopes read the cached threshold in O(1).
+	common::Smoothed<int64_t, 256> mRenderedFrameIntervals;
+
 	VkQueryPool mVkQueryPool = VK_NULL_HANDLE;
 
 	std::unique_ptr<common::DiagnosticLog> mpDumpLog;
@@ -495,6 +501,25 @@ private:
 
 	int64_t miCpuTimer = 0;
 };
+
+#if defined(BT_CLIENT)
+class [[nodiscard]] ScopedSlowOperation
+{
+public:
+
+	ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation);
+	~ScopedSlowOperation();
+	ScopedSlowOperation(const ScopedSlowOperation&) = delete;
+	ScopedSlowOperation& operator=(const ScopedSlowOperation&) = delete;
+
+private:
+
+	common::LogCategory meCategory = kDefault;
+	const char* mpcOperation = nullptr;
+	std::chrono::nanoseconds mThreshold = 0ns;
+	std::chrono::steady_clock::time_point mStartTime = std::chrono::steady_clock::time_point();
+};
+#endif // BT_CLIENT
 
 void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);

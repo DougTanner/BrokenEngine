@@ -455,20 +455,23 @@ static int64_t MainThread(HINSTANCE hinstance)
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-			try
 			{
-				gpTextureUploadManager->RethrowException();
-				pGame->Render();
-			}
-			catch (const std::system_error& rException)
-			{
-				if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+				common::LogTickScope logTickScope(pGame->miTickCounter);
+				try
 				{
-					throw;
+					gpTextureUploadManager->RethrowException();
+					pGame->Render();
 				}
-				LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
-				pGraphics.reset();
-				pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
+				catch (const std::system_error& rException)
+				{
+					if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+					{
+						throw;
+					}
+					LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
+					pGraphics.reset();
+					pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
+				}
 			}
 
 			auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);

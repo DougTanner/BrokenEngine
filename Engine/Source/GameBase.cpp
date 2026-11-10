@@ -348,7 +348,10 @@ void GameBase::ClientUpdate()
 	miTickCounter += iFullTicks;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
-	game::gpClientSession->Reconcile();
+	{
+		ScopedSlowOperation scopedSlowOperation(kNetwork, "Client reconciliation");
+		game::gpClientSession->Reconcile();
+	}
 	gpProfileManager->CpuStop(game::kCpuTimerFrameUpdate);
 
 	if constexpr (kbProfiling)
@@ -894,6 +897,7 @@ bool GameBase::HandleDeferredSwapchain()
 		gpSwapchainManager->AcquireNextImage();
 		mOptionalMinimizedThrottleLast.reset(); // Recreate resumed: drop the throttle timestamp so a fresh minimize starts clean.
 		gpGraphics->mRenderFrameTimer.Reset(); // The next frame delta steps wind, so it must not span the skipped interval.
+		gpGraphics->mRenderFrameDeltaNanoseconds = 0ns;
 	}
 	else
 	{

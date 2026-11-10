@@ -536,6 +536,19 @@ void ProfileManager::DumpTimers()
 	}
 }
 
+void ProfileManager::RecordRenderedFrameInterval(std::chrono::nanoseconds interval)
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		mRenderedFrameIntervals = interval.count();
+		if (mRenderedFrameIntervals.miCount > 200)
+		{
+			static constexpr double kfSlowOperationFrameMultiplier = 1.9;
+			mSlowOperationThreshold = std::chrono::nanoseconds(static_cast<int64_t>(kfSlowOperationFrameMultiplier * static_cast<double>(mRenderedFrameIntervals.Average())));
+		}
+	}
+}
+
 void ProfileManager::DiscardSkippedFrameSamples()
 {
 	if constexpr (kbProfiling)
@@ -703,5 +716,47 @@ ScopedCpuProfile::~ScopedCpuProfile()
 		gpProfileManager->CpuStop(miCpuTimer);
 	}
 }
+
+#if defined(BT_CLIENT)
+ScopedSlowOperation::ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation)
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		meCategory = eCategory;
+		mpcOperation = pcOperation;
+		mThreshold = gpProfileManager->mSlowOperationThreshold;
+		if (mThreshold != 0ns)
+		{
+			mStartTime = std::chrono::steady_clock::now();
+		}
+	}
+}
+
+ScopedSlowOperation::~ScopedSlowOperation()
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		if (mThreshold == 0ns)
+		{
+			return;
+		}
+
+		std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - mStartTime;
+		if (elapsed > mThreshold)
+		{
+			// The category is selected at runtime, so apply both LOG filters before formatting.
+			if constexpr (kbLogging)
+			{
+				if (kWarning >= kpeLogLevels[static_cast<int64_t>(meCategory)] && kWarning >= common::gpeLogRuntimeLevels[static_cast<int64_t>(meCategory)].load(std::memory_order_relaxed))
+				{
+					float fElapsedMilliseconds = std::chrono::duration<float, std::milli>(elapsed).count();
+					float fThresholdMilliseconds = std::chrono::duration<float, std::milli>(mThreshold).count();
+					common::Log(meCategory, "{} took {}ms (threshold {}ms)", mpcOperation, common::Wb(fElapsedMilliseconds, 3), common::Wb(fThresholdMilliseconds, 3));
+				}
+			}
+		}
+	}
+}
+#endif // BT_CLIENT
 
 } // namespace engine

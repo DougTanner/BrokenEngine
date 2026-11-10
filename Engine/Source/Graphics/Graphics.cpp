@@ -121,6 +121,7 @@ void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 	if (vkResult == VK_NOT_READY)
 	{
 		ScopedCpuProfile scopedCpuProfile(kCpuTimerWaitFence);
+		ScopedSlowOperation scopedSlowOperation(kGraphics, "Framebuffer fence wait");
 		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 	}
 	else if (vkResult != VK_SUCCESS)
@@ -132,7 +133,15 @@ void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 	gpTextureManager->MarkFramebufferWaited(iCommandBuffer);
 	gpIslands->MarkFramebufferWaited(iCommandBuffer);
 
+	bool bPreviousIntervalValid = mRenderFrameDeltaNanoseconds != 0ns;
 	mRenderFrameDeltaNanoseconds = mRenderFrameTimer.GetDeltaNs(true);
+	if constexpr (kbProfilingFrameSpike)
+	{
+		if (bPreviousIntervalValid && mRenderFrameDeltaNanoseconds > 0ns)
+		{
+			gpProfileManager->RecordRenderedFrameInterval(mRenderFrameDeltaNanoseconds);
+		}
+	}
 }
 
 void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
@@ -154,7 +163,10 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 		TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors, iCommandBuffer);
 		gpIslandTerrainResidency->EvictionSweep();
 		// Before RestorationSweep: it names the acquire command buffer the restoration uploads record into.
-		gpTextureManager->ProcessPendingTextures(iCommandBuffer);
+		{
+			ScopedSlowOperation scopedSlowOperation(kGraphics, "Foreground texture adoption");
+			gpTextureManager->ProcessPendingTextures(iCommandBuffer);
+		}
 		gpIslandTerrainResidency->RestorationSweep();
 		gpTextureManager->EndAcquireCommandBuffer();
 		gpTextureManager->mTextureDescriptors.PublishFramebuffer(iCommandBuffer);
@@ -275,7 +287,10 @@ void Graphics::PresentAcquire(int64_t iCommandBuffer)
 	if constexpr (kbRenderThread)
 	{
 		gpProfileManager->CpuStart(kCpuTimerWaitPresentFuture);
-		gpSwapchainManager->mPresent.Wait();
+		{
+			ScopedSlowOperation scopedSlowOperation(kGraphics, "Presentation worker wait");
+			gpSwapchainManager->mPresent.Wait();
+		}
 		gpProfileManager->CpuStop(kCpuTimerWaitPresentFuture);
 	}
 
@@ -710,12 +725,14 @@ void Graphics::Destroy()
 		// an upload, and the reset maps kUploading back to kDiskLoaded and re-arms the pending-adoption counter —
 		// so without this wait the reset could rewrite a chunk whose upload thread is still writing vkUploadImage and
 		// vmaAllocation.
+		ScopedSlowOperation scopedSlowOperation(kGraphics, "Texture upload drain");
 		gpTextureUploadManager->WaitIdle();
 	}
 
 	if (gpDeviceManager != nullptr)
 	{
 		// Teardown must continue even if the device is already lost; result escalation is not actionable here.
+		ScopedSlowOperation scopedSlowOperation(kGraphics, "Device idle wait");
 		vkDeviceWaitIdle(gpDeviceManager->mVkDevice);
 	}
 

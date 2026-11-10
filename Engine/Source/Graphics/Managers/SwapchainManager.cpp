@@ -530,6 +530,7 @@ VkSwapchainKHR SwapchainManager::ReleaseHandleForRecreation()
 
 void SwapchainManager::AcquireNextImage()
 {
+	ScopedSlowOperation scopedSlowOperation(kGraphics, "Swapchain image acquisition");
 	ScopedCpuProfile scopedCpuProfile(kCpuTimerAcquireImage);
 
 	if (mCurrentImageAvailableVkFence != VK_NULL_HANDLE)

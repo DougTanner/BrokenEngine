@@ -65,6 +65,9 @@ Update `../../Documents/Architecture/FrameUpdatePipeline.md` when main-loop orde
 - Client startup waits for terrain elevation before renderer construction and for priority textures after it, before the first render, then renders once per framebuffer before showing the window; an iteration is skipped, not retried, while a swapchain recreate is pending.
 - `wWinMain` installs the main thread's `ThreadLocal` through `ThreadLocal::Entry` around `ProcessMain`, so it spans launch-option parsing, crash handling, and teardown.
 - `TextureUploadManager` and `FileManager` outlive `MainThread` so crash handling and teardown can use them. Device loss recreates `Graphics` in place.
+  The client render `LogTickScope` spans both rendering and device-loss recovery,
+  including replacement renderer construction, so recovery diagnostics retain
+  the current tick context.
 - Client COM uses `RO_INIT_MULTITHREADED`. Process and worker priorities, worker counts, and the single-instance policy are set in `Main.cpp`.
 
 ## Frame Ownership

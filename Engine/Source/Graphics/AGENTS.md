@@ -59,7 +59,12 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   iteration in `GameBase::Render`'s skip path (staged particle spawns, the
   texture-upload frame signal), and render-frame-paced accumulators reset once
   in `GameBase::HandleDeferredSwapchain`'s resume branch (profiler frame
-  samples, `mRenderFrameTimer`).
+  samples, `mRenderFrameTimer`, and its delta validity marker).
+- `WaitFramebuffer` supplies actual rendered-frame wall intervals to
+  [Profile's slow-operation diagnostics](../Profile/AGENTS.md#slow-operation-diagnostics).
+  Skip the first partial interval after renderer creation or a render-timer
+  reset; skipped render iterations supply no samples. Reset the delta validity
+  marker together with the timer so a resumed interval cannot span the gap.
 - Every source in this subtree is whole-file `BT_CLIENT`-guarded and client-project-only. Shared simulation code that touches client graphics state needs its own `BT_CLIENT` guard.
 
 ## World and Camera Contracts
