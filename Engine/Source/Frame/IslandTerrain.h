@@ -203,6 +203,9 @@ public:
 	// Number of cell navigation graphs, one per NavigationGraphBake entry. Declared in both builds because BuildCellNavigationData
 	// compiles in both; only the server's WaitForElevationMaps writes it.
 	int64_t miNavigationGraphCount = 0;
+
+	// Constructor-derived accepted columns avoid repeating the hex predicate for each placement's samples.
+	std::array<std::pair<int64_t, int64_t>, kiElevationGridDimension> mElevationRowSpans;
 };
 
 inline IslandTerrain* gpIslandTerrain = nullptr;

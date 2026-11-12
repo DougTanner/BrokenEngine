@@ -73,7 +73,305 @@ static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord
 
 ClientSessionRuntime::ClientSessionRuntime() = default;
 
-ClientSessionRuntime::~ClientSessionRuntime() = default;
+ClientSessionRuntime::~ClientSessionRuntime()
+{
+	if (mTerrainPreparation.valid())
+	{
+		mTerrainPreparation.wait();
+		std::ignore = mTerrainPreparation.get();
+	}
+}
+
+static bool EqualPlacements(const CellStaticData& rLeft, const CellStaticData& rRight)
+{
+	return std::ranges::equal(rLeft.islands, rRight.islands, [](const IslandPlacement& rA, const IslandPlacement& rB)
+	{
+		return rA.islandCrc == rB.islandCrc && std::bit_cast<uint32_t>(rA.f2WorldPosition.x) == std::bit_cast<uint32_t>(rB.f2WorldPosition.x) && std::bit_cast<uint32_t>(rA.f2WorldPosition.y) == std::bit_cast<uint32_t>(rB.f2WorldPosition.y) && std::bit_cast<uint32_t>(rA.fRotation) == std::bit_cast<uint32_t>(rB.fRotation);
+	});
+}
+
+bool ClientSessionRuntime::IsCurrentIdentity(const ReceivedCellIdentity& rIdentity) const
+{
+	if (mpClient == nullptr)
+	{
+		return false;
+	}
+	if (rIdentity.iLoadGeneration != mpClient->miCommittedLoadGeneration)
+	{
+		return false;
+	}
+	const ClientCoordSlot& rSlot = mpClient->mSubscriptions.mCoordinateSlots.at(rIdentity.iSlot);
+	if (IsSlotActive(rSlot))
+	{
+		return rSlot.coordinate == rIdentity.coordinate && rSlot.acknowledgementState.uiEpoch == rIdentity.iEpoch;
+	}
+	return mpClient->mSubscriptions.mSubscribeRequests.IsLive(rIdentity.coordinate) && !mpClient->mSubscriptions.IsStaleRetainedEpoch(rIdentity.iSlot, rIdentity.iEpoch, rIdentity.coordinate);
+}
+
+bool ClientSessionRuntime::HoldsSlotOrRequest(GridCoord coordinate) const
+{
+	return mpClient != nullptr && (mpClient->mSubscriptions.mSubscribeRequests.IsLive(coordinate) || std::ranges::any_of(mpClient->mSubscriptions.mCoordinateSlots, [coordinate](const ClientCoordSlot& rSlot)
+	{
+		return IsSlotActive(rSlot) && rSlot.coordinate == coordinate;
+	}));
+}
+
+ClientSessionRuntime::PendingCell& ClientSessionRuntime::PendingForIdentity(const ReceivedCellIdentity& rIdentity)
+{
+	PendingCell& rPending = mPendingCells.try_emplace(rIdentity.coordinate).first->second;
+	if (rPending.identity.iSlot >= 0 && rPending.identity != rIdentity)
+	{
+		rPending = {};
+	}
+	if (rPending.uiPreparation == 0)
+	{
+		rPending.uiPreparation = ++muiNextPreparation;
+	}
+	rPending.identity = rIdentity;
+	return rPending;
+}
+
+void ClientSessionRuntime::StageLocalCell(GridCoord coordinate)
+{
+	// Heap: pending terrain, frame ownership and procedural placements persist until publication.
+	ScopedSuppressAllocationTracking suppress;
+	PendingCell& rPending = mPendingCells.try_emplace(coordinate).first->second;
+	if (rPending.uiPreparation != 0)
+	{
+		return;
+	}
+	rPending.uiPreparation = ++muiNextPreparation;
+	rPending.identity.coordinate = coordinate;
+	Cell localCell;
+	game::gpGame->CreateCellFrame(localCell, coordinate).interpolate.iTick = game::gpGame->miTickCounter;
+	rPending.pLocalFrame = std::move(localCell.ppSnapshots[0]);
+	rPending.optionalStaticData.emplace();
+	rPending.optionalStaticData->coordinate = coordinate;
+	GenerateIslandChain(coordinate, rPending.optionalStaticData->islands);
+}
+
+void ClientSessionRuntime::ResolveAuthoritativeTerrain(PendingCell& rPending)
+{
+	if (!rPending.optionalAuthoritativeStaticData.has_value())
+	{
+		return;
+	}
+	if (rPending.bTerrainReady && EqualPlacements(*rPending.optionalStaticData, *rPending.optionalAuthoritativeStaticData))
+	{
+		rPending.optionalStaticData->navigationData = std::move(rPending.optionalAuthoritativeStaticData->navigationData);
+		rPending.optionalStaticData->flags.Set(CellStaticDataFlags::kNavigationDataBuilt, rPending.optionalAuthoritativeStaticData->flags & CellStaticDataFlags::kNavigationDataBuilt);
+	}
+	else
+	{
+		rPending.optionalStaticData = std::move(rPending.optionalAuthoritativeStaticData);
+		rPending.bTerrainReady = false;
+		rPending.uiPreparation = ++muiNextPreparation;
+	}
+	rPending.optionalAuthoritativeStaticData.reset();
+}
+
+void ClientSessionRuntime::StageStaticData(ReceivedStaticData received)
+{
+	// Heap: retained authoritative records outlive Client's transient poll buffers.
+	ScopedSuppressAllocationTracking suppress;
+	if (!IsCurrentIdentity(received.identity))
+	{
+		return;
+	}
+	PendingCell& rPending = PendingForIdentity(received.identity);
+	received.staticData.coordinate = received.identity.coordinate;
+	for (const IslandPlacement& rPlacement : received.staticData.islands)
+	{
+		gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
+	}
+	auto it = game::gpGame->mCells.find(received.identity.coordinate);
+	if (it != game::gpGame->mCells.end() && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && EqualPlacements(it->second.staticData, received.staticData))
+	{
+		it->second.staticData.navigationData = std::move(received.staticData.navigationData);
+		it->second.staticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt, received.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt);
+		rPending.bTerrainReady = true;
+		return;
+	}
+	rPending.optionalAuthoritativeStaticData = std::move(received.staticData);
+	if (mTerrainPreparation.valid() && mPreparingCoordinate == received.identity.coordinate && muiPreparingIdentity == rPending.uiPreparation)
+	{
+		return;
+	}
+	if (!rPending.optionalStaticData.has_value())
+	{
+		rPending.optionalStaticData = std::move(rPending.optionalAuthoritativeStaticData);
+		rPending.optionalAuthoritativeStaticData.reset();
+		rPending.bTerrainReady = false;
+		rPending.uiPreparation = ++muiNextPreparation;
+	}
+	else
+	{
+		ResolveAuthoritativeTerrain(rPending);
+	}
+}
+
+void ClientSessionRuntime::PollTerrainPreparation()
+{
+	if (!mTerrainPreparation.valid() || mTerrainPreparation.wait_for(0s) != std::future_status::ready)
+	{
+		return;
+	}
+	CellStaticData prepared = mTerrainPreparation.get();
+	auto it = mPendingCells.find(mPreparingCoordinate);
+	if (it == mPendingCells.end())
+	{
+		return;
+	}
+	if (it->second.uiPreparation != muiPreparingIdentity)
+	{
+		return;
+	}
+	PendingCell& rPending = it->second;
+	if (rPending.identity.iSlot < 0 && mPreparingCoordinate != game::gpGame->mClientGridCoordinate && !ContainsCoordinate(std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)), mPreparingCoordinate) && !HoldsSlotOrRequest(mPreparingCoordinate))
+	{
+		mPendingCells.erase(it);
+		return;
+	}
+	if (rPending.identity.iSlot >= 0 && !IsCurrentIdentity(rPending.identity))
+	{
+		mPendingCells.erase(it);
+		return;
+	}
+	rPending.optionalStaticData = std::move(prepared);
+	rPending.bTerrainReady = true;
+	ResolveAuthoritativeTerrain(rPending);
+}
+
+void ClientSessionRuntime::StartTerrainPreparation()
+{
+	if (mTerrainPreparation.valid())
+	{
+		return;
+	}
+	auto it = mPendingCells.find(game::gpGame->mClientGridCoordinate);
+	auto NeedsPreparation = [](const PendingCell& rPending)
+	{
+		return rPending.optionalStaticData.has_value() && !rPending.bTerrainReady;
+	};
+	if (it == mPendingCells.end() || !NeedsPreparation(it->second))
+	{
+		it = std::ranges::find_if(mPendingCells, [&](const auto& rPair)
+		{
+			return NeedsPreparation(rPair.second);
+		});
+	}
+	if (it == mPendingCells.end())
+	{
+		return;
+	}
+	PendingCell& rPending = it->second;
+	for (const IslandPlacement& rPlacement : rPending.optionalStaticData->islands)
+	{
+		gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
+	}
+	mPreparingCoordinate = it->first;
+	muiPreparingIdentity = rPending.uiPreparation;
+	// Heap: async state and the complete owned terrain record outlive this main-thread call.
+	ScopedSuppressAllocationTracking suppress;
+	mTerrainPreparation = std::async(std::launch::async, common::ThreadLocal::Entry([staticData = std::move(*rPending.optionalStaticData)]() mutable
+	{
+		if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL))
+		{
+			throw std::runtime_error("Terrain preparation thread priority failed");
+		}
+		// Heap: derived terrain vectors belong exclusively to the returned record.
+		ScopedSuppressAllocationTracking suppressBuild;
+		if (!staticData.islands.empty())
+		{
+			gpIslandTerrain->BuildElevationGrid(staticData.islands, staticData.elevationGrid);
+		}
+		staticData.BuildRenderPlacementCache(*gpIslandTerrain);
+		staticData.flags.Set(CellStaticDataFlags::kTerrainPrepared);
+		return std::move(staticData);
+	}, common::kiMinWorkbufferSize));
+	rPending.optionalStaticData.reset();
+}
+
+void ClientSessionRuntime::PublishPreparedCells()
+{
+	// Heap: publication moves persistent records, snapshot frames and retained updates into cells.
+	ScopedSuppressAllocationTracking suppress;
+	for (auto& [rCoordinate, rPending] : mPendingCells)
+	{
+		if (!rPending.bTerrainReady)
+		{
+			continue;
+		}
+		if (rPending.optionalAuthoritativeStaticData.has_value())
+		{
+			continue;
+		}
+		bool bAuthoritative = rPending.identity.iSlot >= 0;
+		if (bAuthoritative)
+		{
+			if (!IsCurrentIdentity(rPending.identity))
+			{
+				continue;
+			}
+			if (!rPending.optionalFullState.has_value())
+			{
+				continue;
+			}
+		}
+		if (!bAuthoritative && rPending.pLocalFrame == nullptr)
+		{
+			continue;
+		}
+		auto it = game::gpGame->mCells.find(rCoordinate);
+		if (bAuthoritative && !(rPending.optionalStaticData.has_value() ? (rPending.optionalStaticData->flags & CellStaticDataFlags::kNavigationDataBuilt) : it != game::gpGame->mCells.end() && (it->second.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt)))
+		{
+			continue;
+		}
+		Cell& rCell = game::gpGame->mCells.try_emplace(rCoordinate).first->second;
+		if (rPending.optionalStaticData.has_value())
+		{
+			rCell.staticData = std::move(*rPending.optionalStaticData);
+			rPending.optionalStaticData.reset();
+		}
+		if (bAuthoritative)
+		{
+			AdoptFullState(*rPending.optionalFullState);
+			rPending.optionalFullState.reset();
+			rPending.pLocalFrame.reset();
+		}
+		else
+		{
+			rCell.iSnapshotHead = 0;
+			rCell.iSnapshotCount = 1;
+			rCell.ppSnapshots[0] = std::move(rPending.pLocalFrame);
+		}
+		common::ScopedWorkbufferArena updateArena = common::gpThreadLocal->mWorkbuffer.Push();
+		for (const auto& [rTick, rUpdate] : rPending.updates)
+		{
+			updateArena.mBuffer.PushBack(rTick);
+		}
+		std::span<int64_t> ticks = updateArena.mBuffer.Span<int64_t>();
+		std::ranges::sort(ticks);
+		for (int64_t iTick : ticks)
+		{
+			ReceivedCoordUpdate& rUpdate = rPending.updates.at(iTick);
+			if (iTick > rCell.iConfirmedTick)
+			{
+				rCell.serverUpdates.try_emplace(iTick, Cell::CoordServerUpdate {.uiSharedCrc = rUpdate.uiSharedCrc, .statusChanges = std::move(rUpdate.statusChanges)});
+			}
+		}
+		rPending.updates.clear();
+	}
+}
+
+void ClientSessionRuntime::ResetPendingFrames()
+{
+	for (auto& [rCoordinate, rPending] : mPendingCells)
+	{
+		rPending.optionalFullState.reset();
+		rPending.updates.clear();
+	}
+}
 
 void ClientSessionRuntime::InitializeLogTickScope(std::optional<common::LogTickScope>& rOptionalTickScope) const
 {
@@ -204,6 +502,8 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	ASSERT(common::gpMultithreading->IsMainThread());
 	PollPendingCrashReport(mpClient.get());
 	PollDiscovery();
+	PollTerrainPreparation();
+	PublishPreparedCells();
 	if (mpClient == nullptr)
 	{
 		return;
@@ -258,81 +558,89 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	game::gpClientSession->ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
+	PublishPreparedCells();
 
 	SendAckAndFlush();
 }
 
 void ClientSessionRuntime::ApplyReceivedFullStates()
 {
-	// Heap: try_emplace may insert new Cell; full state is moved directly into snapshot ring slot 0
+	// Heap: accepted frames remain owned until matching terrain is ready.
 	ScopedSuppressAllocationTracking suppress;
-
-	std::vector<ReceivedCoordFullState>& rFullStates = mpClient->mReceivedFullStates;
-	if (rFullStates.empty())
+	for (ReceivedCoordFullState& rFullState : mpClient->mReceivedFullStates)
 	{
-		return;
+		if (!IsCurrentIdentity(rFullState.identity))
+		{
+			continue;
+		}
+		PendingCell& rPending = PendingForIdentity(rFullState.identity);
+		if (!rPending.optionalFullState.has_value() || rFullState.iTick > rPending.optionalFullState->iTick)
+		{
+			rPending.optionalFullState = std::move(rFullState);
+		}
 	}
+	mpClient->mReceivedFullStates.clear();
+}
 
-	for (ReceivedCoordFullState& rFullState : rFullStates)
+void ClientSessionRuntime::AdoptFullState(ReceivedCoordFullState& rFullState)
+{
+	GridCoord coordinate = rFullState.identity.coordinate;
+	int64_t iTick = rFullState.iTick;
+
+	Cell& rCell = game::gpGame->mCells.try_emplace(coordinate).first->second;
+
+	game::gpClientSession->HydrateReceivedFullState(*rFullState.pFrame, rCell.TailFrame());
+
+	if (rCell.iConfirmedTick < 0)
 	{
-		GridCoord coordinate = rFullState.coordinate;
-		int64_t iTick = rFullState.iTick;
+		bool bInitialSetup = (GetConfirmedTick() < 0);
 
-		Cell& rCell = game::gpGame->mCells.try_emplace(coordinate).first->second;
+		rCell.iSnapshotHead = 0;
+		rCell.ppSnapshots[0] = std::move(rFullState.pFrame);
+		rCell.ppSnapshots[0]->postRender.uiSharedCrc = rCell.ppSnapshots[0]->Crc();
+		rCell.iSnapshotCount = 1;
+		rCell.iConfirmedTick = iTick;
+		rCell.iLastFullStateTick = iTick;
+		rCell.iConfirmedOffset = 0;
 
-		game::gpClientSession->HydrateReceivedFullState(*rFullState.pFrame, rCell.TailFrame());
-
-		if (rCell.iConfirmedTick < 0)
+		// A full state carries the server's tick when sent and a paused server sends no delta, so without this
+		// seed a load reset or connect while paused leaves no clock reference to bound the simulation ceiling.
+		if (miLatestServerTick < 0)
 		{
-			bool bInitialSetup = (GetConfirmedTick() < 0);
-
-			rCell.iSnapshotHead = 0;
-			rCell.ppSnapshots[0] = std::move(rFullState.pFrame);
-			rCell.ppSnapshots[0]->postRender.uiSharedCrc = rCell.ppSnapshots[0]->Crc();
-			rCell.iSnapshotCount = 1;
-			rCell.iConfirmedTick = iTick;
-			rCell.iLastFullStateTick = iTick;
-			rCell.iConfirmedOffset = 0;
-
-			// A full state carries the server's tick when sent and a paused server sends no delta, so without this
-			// seed a load reset or connect while paused leaves no clock reference to bound the simulation ceiling.
-			if (miLatestServerTick < 0)
-			{
-				miLatestServerTick = iTick;
-				mLatestServerTickArrival = std::chrono::steady_clock::now();
-			}
-
-			// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
-			// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
-			// Clamp the offset to iTick so a freshly loaded server cannot produce a negative simulation tick.
-			if (bInitialSetup && game::gpGame->miTickCounter < iTick)
-			{
-				// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
-				// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
-				int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
-				int64_t iInitialTargetBehind = (engine::kiJitterSafetyMicroseconds * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
-				int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
-				int64_t iTickCounter = iTick - iAppliedBehind;
-				ASSERT(iTickCounter >= 0);
-				game::gpGame->miTickCounter = iTickCounter;
-				game::gpGame->ResetRenderClock();
-			}
+			miLatestServerTick = iTick;
+			mLatestServerTickArrival = std::chrono::steady_clock::now();
 		}
-		else
+
+		// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
+		// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
+		// Clamp the offset to iTick so a freshly loaded server cannot produce a negative simulation tick.
+		if (bInitialSetup)
 		{
-			if (iTick <= rCell.iConfirmedTick)
-			{
-				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coordinate.iQ, coordinate.iR, iTick, rCell.iConfirmedTick);
-				continue;
-			}
-
-			// Coord already has confirmed state: store as pending for reconcile injection
-			rCell.optionalPendingFullState = Cell::PendingFullState
-			{
-				.iTick = iTick,
-				.pFrame = std::move(rFullState.pFrame),
-			};
+			// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
+			// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
+			int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
+			int64_t iInitialTargetBehind = (engine::kiJitterSafetyMicroseconds * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
+			int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
+			int64_t iTickCounter = iTick - iAppliedBehind;
+			ASSERT(iTickCounter >= 0);
+			game::gpGame->miTickCounter = iTickCounter;
+			game::gpGame->ResetRenderClock();
 		}
+	}
+	else
+	{
+		if (iTick <= rCell.iConfirmedTick)
+		{
+			LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coordinate.iQ, coordinate.iR, iTick, rCell.iConfirmedTick);
+			return;
+		}
+
+		// Coord already has confirmed state: store as pending for reconcile injection
+		rCell.optionalPendingFullState = Cell::PendingFullState
+		{
+			.iTick = iTick,
+			.pFrame = std::move(rFullState.pFrame),
+		};
 	}
 }
 
@@ -353,19 +661,18 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 			continue;
 		}
 
-		const ClientCoordSlot& rSlot = rCoordinateSlots.at(i);
-		if (rSlot.eState != CoordSubscriptionState::kActive)
-		{
-			rSlotUpdates.clear();
-			continue;
-		}
-
-		GridCoord coordinate = rSlot.coordinate;
-		Cell& rCell = game::gpGame->mCells.at(coordinate);
-
 		for (ReceivedCoordUpdate& rUpdate : rSlotUpdates)
 		{
-			if (rUpdate.iTick <= rCell.iConfirmedTick)
+			if (!IsCurrentIdentity(rUpdate.identity))
+			{
+				continue;
+			}
+			GridCoord coordinate = rUpdate.identity.coordinate;
+			PendingCell& rPending = PendingForIdentity(rUpdate.identity);
+			auto it = game::gpGame->mCells.find(coordinate);
+			Cell* pCell = it != game::gpGame->mCells.end() && rPending.bTerrainReady && !rPending.optionalAuthoritativeStaticData.has_value() && it->second.iConfirmedTick >= 0 ? &it->second : nullptr;
+			int64_t iConfirmedTick = pCell != nullptr ? pCell->iConfirmedTick : rPending.optionalFullState.has_value() ? rPending.optionalFullState->iTick : -1;
+			if (rUpdate.iTick <= iConfirmedTick)
 			{
 				continue;
 			}
@@ -383,9 +690,15 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				mLatestServerTickArrival = now - iLeadTicks * game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds);
 			}
 
-			if (static_cast<int64_t>(rCell.serverUpdates.size()) >= engine::kiMaximumBufferedFrames)
+			int64_t iBufferedCount = pCell != nullptr ? std::ssize(pCell->serverUpdates) : std::ssize(rPending.updates);
+			bool bDuplicate = pCell != nullptr ? pCell->serverUpdates.contains(rUpdate.iTick) : rPending.updates.contains(rUpdate.iTick);
+			if (bDuplicate)
 			{
-				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coordinate.iQ, coordinate.iR, rCell.serverUpdates.size(), rUpdate.iTick);
+				continue;
+			}
+			if (iBufferedCount >= engine::kiMaximumBufferedFrames)
+			{
+				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coordinate.iQ, coordinate.iR, iBufferedCount, rUpdate.iTick);
 
 				// The engine already acked these ticks, so a dropped update would never be resent: abandon the
 				// whole drain and take authoritative state instead. Returning here sends exactly one request even
@@ -400,15 +713,15 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				return false;
 			}
 
-			bool bInserted = rCell.serverUpdates.try_emplace(rUpdate.iTick, Cell::CoordServerUpdate
+			if (pCell != nullptr)
 			{
-				.uiSharedCrc = rUpdate.uiSharedCrc,
-				.statusChanges = std::move(rUpdate.statusChanges),
-			}).second;
-			if (bInserted)
-			{
-				bHasNewData = true;
+				pCell->serverUpdates.try_emplace(rUpdate.iTick, Cell::CoordServerUpdate {.uiSharedCrc = rUpdate.uiSharedCrc, .statusChanges = std::move(rUpdate.statusChanges)});
 			}
+			else
+			{
+				rPending.updates.try_emplace(rUpdate.iTick, std::move(rUpdate));
+			}
+			bHasNewData = true;
 		}
 
 		rSlotUpdates.clear();
@@ -447,6 +760,10 @@ int64_t ClientSessionRuntime::GetClientConfirmedTick() const
 int64_t ClientSessionRuntime::GetServerUpdateBufferSize() const
 {
 	int64_t iTotal = 0;
+	for (const auto& [rCoordinate, rPending] : mPendingCells)
+	{
+		iTotal += std::ssize(rPending.updates);
+	}
 	for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 	{
 		if (rCell.iConfirmedTick >= 0)
@@ -598,6 +915,7 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 		if (rSlots.at(i).eState == CoordSubscriptionState::kUnsubscribing)
 		{
 			game::gpGame->mCells.erase(coordinate);
+			mPendingCells.erase(coordinate);
 		}
 	}
 
@@ -607,6 +925,7 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 		{
 			mpClient->mSubscriptions.mSubscribeRequests.Cancel(rRecord.coordinate);
 			game::gpGame->mCells.erase(rRecord.coordinate);
+			mPendingCells.erase(rRecord.coordinate);
 		}
 	}
 }
@@ -652,9 +971,11 @@ void ClientSessionRuntime::TrySubscribeNext()
 
 void ClientSessionRuntime::ClearSubscriptionState()
 {
+	mPendingCells.clear();
 	mDesiredCoordinates.clear();
 	mUnwantedTimestamps.clear();
 	mSubscriptionQueue.clear();
+	miVisibleNeighborCount = 0;
 }
 
 void ClientSessionRuntime::ComputeActiveSet()
@@ -662,12 +983,15 @@ void ClientSessionRuntime::ComputeActiveSet()
 	// Heap: mActiveCoordinates vector clear/push_back may allocate. Persists as Game member across frame updates
 	ScopedSuppressAllocationTracking suppress;
 
+	PollTerrainPreparation();
+	PublishPreparedCells();
+
 	if (!(game::gpGame->mGameFlags & GameFlags::kMainMenu))
 	{
 		game::gpGame->mActiveCoordinates.clear();
 		for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 		{
-			if (rCell.iSnapshotCount > 0 && (rCell.iConfirmedTick >= 0 || rCoordinate == game::gpGame->mClientGridCoordinate))
+			if ((rCell.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && rCell.iSnapshotCount > 0 && (rCell.iConfirmedTick >= 0 || rCoordinate == game::gpGame->mClientGridCoordinate))
 			{
 				game::gpGame->mActiveCoordinates.push_back(rCoordinate);
 			}
@@ -679,9 +1003,18 @@ void ClientSessionRuntime::ComputeActiveSet()
 			{
 				game::gpGame->CreateCellAtCoordinate(game::gpGame->mClientGridCoordinate);
 			}
-			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
+			it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
+			if (it != game::gpGame->mCells.end() && it->second.iSnapshotCount > 0 && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && !std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
 			{
 				game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
+			}
+		}
+		if (!std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
+		{
+			auto it = game::gpGame->mCells.find(gpCamera->mBasisCoordinate);
+			if (it != game::gpGame->mCells.end() && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && it->second.iSnapshotCount > 0 && !std::ranges::contains(game::gpGame->mActiveCoordinates, it->first))
+			{
+				game::gpGame->mActiveCoordinates.push_back(it->first);
 			}
 		}
 
@@ -702,7 +1035,8 @@ void ClientSessionRuntime::ComputeActiveSet()
 				{
 					game::gpGame->CreateCellAtCoordinate(neighbor);
 				}
-				if (!std::ranges::contains(game::gpGame->mActiveCoordinates, neighbor))
+				it = game::gpGame->mCells.find(neighbor);
+				if (it != game::gpGame->mCells.end() && it->second.iSnapshotCount > 0 && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && !std::ranges::contains(game::gpGame->mActiveCoordinates, neighbor))
 				{
 					game::gpGame->mActiveCoordinates.push_back(neighbor);
 				}
@@ -734,13 +1068,16 @@ void ClientSessionRuntime::ComputeActiveSet()
 		game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
 	}
 
-	auto HoldsSlotOrRequest = [this](GridCoord coordinate)
+	std::erase_if(mPendingCells, [&](const std::pair<const GridCoord, PendingCell>& rPair)
 	{
-		return mpClient != nullptr && (mpClient->mSubscriptions.mSubscribeRequests.IsLive(coordinate) || std::ranges::any_of(mpClient->mSubscriptions.mCoordinateSlots, [coordinate](const ClientCoordSlot& rSlot)
+		const PendingCell& rPending = rPair.second;
+		if (rPending.identity.iSlot >= 0)
 		{
-			return IsSlotActive(rSlot) && rSlot.coordinate == coordinate;
-		}));
-	};
+			return !IsCurrentIdentity(rPending.identity);
+		}
+		return rPair.first != game::gpGame->mClientGridCoordinate && !ContainsCoordinate(std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)), rPair.first) && !HoldsSlotOrRequest(rPair.first);
+	});
+	StartTerrainPreparation();
 
 	// Delete local-only cells outside the active set, preserve network-subscribed cells. A cell whose coordinate holds an
 	// active subscription slot or a live subscribe request counts as subscribed even while unconfirmed, as between a
@@ -748,13 +1085,13 @@ void ClientSessionRuntime::ComputeActiveSet()
 	// its static data live as long as that slot or request.
 	std::erase_if(game::gpGame->mCells, [&](const std::pair<const GridCoord, Cell>& rPair)
 	{
-		return !std::ranges::contains(game::gpGame->mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
+		return !std::ranges::contains(game::gpGame->mActiveCoordinates, rPair.first) && rPair.first != game::gpGame->mClientGridCoordinate && !ContainsCoordinate(std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)), rPair.first) && rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
 	});
 
 	ASSERT(std::ranges::count_if(game::gpGame->mCells, [&](const std::pair<const GridCoord, Cell>& rPair)
 	{
 		return rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
-	}) <= 1 + common::kiHexDirectionCount);
+	}) <= 2 + common::kiHexDirectionCount);
 }
 
 void ClientSessionRuntime::PinClientGridCoordinate(GridCoord coordinate)

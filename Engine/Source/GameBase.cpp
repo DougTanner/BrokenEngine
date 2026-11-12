@@ -1049,6 +1049,13 @@ game::Frame& GameBase::CreateCellFrame(Cell& rCell, GridCoord coordinate)
 
 void GameBase::CreateCellAtCoordinate(GridCoord coordinate)
 {
+#if defined(BT_CLIENT)
+	if (!(mGameFlags & GameFlags::kMainMenu))
+	{
+		game::gpClientSession->mpRuntime->StageLocalCell(coordinate);
+		return;
+	}
+#endif
 	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
 	ScopedSuppressAllocationTracking suppress;
 
@@ -1066,6 +1073,15 @@ void GameBase::CreateNewFrame()
 	// game state lifetime, so workbuffer (lost on Pop) can't hold it.
 	ScopedSuppressAllocationTracking suppress;
 
+#if defined(BT_CLIENT)
+	if (!(mGameFlags & GameFlags::kMainMenu))
+	{
+		game::gpClientSession->mpRuntime->ClearSubscriptionState();
+		mCells.clear();
+		CreateCellAtCoordinate(kOriginCoordinate);
+		return;
+	}
+#endif
 	mCells.clear();
 	Cell& rCell = mCells.try_emplace(kOriginCoordinate).first->second;
 	CreateCellFrame(rCell, kOriginCoordinate);
@@ -1169,6 +1185,7 @@ void GameBase::ResetSession()
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
+	game::gpClientSession->mpRuntime->ClearSubscriptionState();
 	gpCamera->ResetForSession();
 	gbSmokeClear = true;
 	gpParticleManager->mbReset = true;
@@ -1182,19 +1199,28 @@ void GameBase::ResetSession()
 #endif // BT_CLIENT
 	SetClientGridCoordinate(kOriginCoordinate);
 	mActiveCoordinates.clear();
+#if defined(BT_CLIENT)
+	if (!(mGameFlags & GameFlags::kMainMenu))
+	{
+		return;
+	}
+#endif
 	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
 
 #if defined(BT_CLIENT)
 void GameBase::UpdateActiveIslands()
 {
-	// Include confirmed cells and the client cell's provisional frame, skipping empty-ring cells that have nothing rendered.
+	// Include confirmed cells and the local render camera, skipping empty-ring cells that have nothing rendered.
 	// The filtered static data pointers use per-frame workbuffer storage; Islands::UpdateActiveIslands' nested reservation pops before this arena.
+	GridCoord cameraCoordinate = mClientGridCoordinate;
+	bool bHaveRenderableCamera = false;
+	SelectRenderCamera(mActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
 	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (const GridCoord& rCoordinate : mActiveCoordinates)
 	{
 		auto it = mCells.find(rCoordinate);
-		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate) && it->second.iSnapshotCount != 0)
+		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || (bHaveRenderableCamera && rCoordinate == cameraCoordinate)) && it->second.iSnapshotCount != 0)
 		{
 			subscribedArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
 		}

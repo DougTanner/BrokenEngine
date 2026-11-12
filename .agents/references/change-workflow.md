@@ -12,17 +12,19 @@ This file, `.agents/references/change-workflow.md`, carries the Change Workflow,
 
 ### Delegation roles
 
-This table is the authoritative spawned-agent routing policy; native role definitions and the Codex TOMLs are required enforcement mirrors of it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named, and the ChatGPT Codex line below the table names any exception.
+This table owns role-to-definition routing and work assignments. The
+definitions own model and effort settings. Skills name a role and describe the
+work.
 
-| `subagent_type` | Model | Effort | Work |
+| `subagent_type` | Claude Code definition | Codex definition | Work |
 | --- | --- | --- | --- |
-| `planner` | Fable | high | Plans, design |
-| `reviewer` | Fable | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | Fable | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
-| `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
-| `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
-| `builder` | Haiku | high | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
-| `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
+| `planner` | .claude/agents/planner.md | .codex/agents/astra-planner.toml | Plans, design |
+| `reviewer` | .claude/agents/reviewer.md | .codex/agents/astra.toml | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
+| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Preparation, implementation, propagation, docs, plans, harness, finalization |
+| `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives |
+| `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
+| `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
+| `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
@@ -36,9 +38,6 @@ This table is the authoritative spawned-agent routing policy; native role defini
   finding to the user instead of rejecting it. Never add plan or document text
   only because a reviewer lacked context; add context only when a human reader
   or the implementer needs it.
-
-ChatGPT Codex: Fable -> Sol (gpt-6.1-sol medium, through `opus.toml`); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
-OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
 
 ## Main-session conduct
 
@@ -113,7 +112,7 @@ Definitions:
 - Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card. Field template: `.agents/references/execution-card.md`.
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
-- Wrapper session — session started through `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, or `.opencode/opencode-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex and OpenCode; never adopt an arbitrary worktree.
+- Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
   If the user opens a session directly on main, work in that checkout and do not use the worktree flow.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.

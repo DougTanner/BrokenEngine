@@ -57,6 +57,12 @@ Owns the one command pool and fence shared by every `OneShotCommandBuffer`. Beca
 
 Swapchain creation and recreation, framebuffers, depth and multisampling textures, and frame synchronization. Out-of-date and suboptimal swapchains defer recreation. Presentation is async through a `PersistentWorker` at time-critical priority.
 
+Acquisition warnings supply per-invocation raw wall times for the prior
+acquisition fence wait and `vkAcquireNextImageKHR` separately to
+[Profile's slow-operation diagnostics](../../Profile/AGENTS.md#slow-operation-diagnostics).
+The outer duration includes setup and other scope work; a skipped fence wait
+or unavailable result stays explicit rather than borrowing a smoothed timer.
+
 Owns two render passes. The scene pass (all default pipelines, plus the F16 multisample attachment) renders into an F16 (`R16G16B16A16_SFLOAT`) HDR target; a fullscreen resolve pipeline tone-maps it into the single-sample present pass, whose only client is that resolve. That preserves HDR highlights direct-to-`UNORM` rendering would clamp, and is the one hook for whole-frame tone mapping and grading.
 
 The HDR attachments (color, depth, MSAA) are single images reused every frame in flight, so the incoming `EXTERNAL -> 0` subpass dependency must keep depth stage and access (`EARLY|LATE_FRAGMENT_TESTS` + `DEPTH_STENCIL_ATTACHMENT_WRITE`) in its src scopes against the previous frame's depth write.

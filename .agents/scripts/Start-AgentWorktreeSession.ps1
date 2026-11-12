@@ -33,7 +33,7 @@ function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	$skillsItem = Get-Item -LiteralPath $skillsLink -Force -ErrorAction SilentlyContinue
 	if ($null -ne $skillsItem -and $skillsItem.PSIsContainer -and ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
 		$null -ne (Get-ChildItem -LiteralPath $skillsLink -ErrorAction SilentlyContinue | Select-Object -First 1)) { return }
-	$preservedMessage = "'.claude\skills' in worktree '$Worktree' is not a working directory link or an unchanged tracked placeholder. Local changes were preserved; resolve this path and its index entry manually, then rerun startup or reattach."
+	$preservedMessage = "'.claude\skills' in worktree '$Worktree' is not a working directory link or an unchanged tracked placeholder. Local changes were preserved; resolve this path and its index entry manually."
 	if ($null -eq $skillsItem -or $skillsItem.PSIsContainer -or ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw $preservedMessage }
 	$placeholderBytes = [IO.File]::ReadAllBytes($skillsLink)
 	$expectedBytes = [Text.Encoding]::UTF8.GetBytes('../.agents/skills')
@@ -63,7 +63,7 @@ function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 			}
 			catch { $repairError += " Placeholder restoration failed: $($_.Exception.Message)" }
 		}
-		throw "Could not repair '.claude\skills' in worktree '$Worktree': $repairError Enable Windows Developer Mode or use a terminal with symlink privilege, then rerun startup or reattach."
+		throw "Could not repair '.claude\skills' in worktree '$Worktree': $repairError Enable Windows Developer Mode or use a terminal with symlink privilege and repair the link manually."
 	}
 }
 
@@ -83,12 +83,11 @@ function Assert-AgentWorktreeOpenCodeSkills([string] $Worktree) {
 $worktreeCreated = $false
 $exitCode = 1
 try {
-	$primary = Get-AgentWorktreePrimaryIdentity $RepositoryRoot
+	$primary = Get-AgentWorktreePrimaryCheckout $RepositoryRoot
 	$root = $primary.Root
 	$worktreeCli = Join-Path $root 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe'
 	$identity = $null
 	$rebaseInProgress = $false
-	$firstTask = $null
 
 	if (-not [string]::IsNullOrWhiteSpace($ReattachWorktree)) {
 		# Reattach identity is Git-derived: the worktree must be uniquely registered against this primary
@@ -108,32 +107,10 @@ try {
 			if ([string]::IsNullOrWhiteSpace($branch) -and (Test-Path -LiteralPath $headName)) { $branch = (Get-Content -LiteralPath $headName -Raw).Trim() -replace '^refs/heads/', '' }
 		}
 		if ($branch -cnotmatch "^$Client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
-		if ($rebaseInProgress) {
-			$baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim()
-			$firstTask = "this worktree has a rebase in progress - resolve your rebase first. Fix the conflicted files and run 'git rebase --continue'."
-		}
-		else {
-			# The primary branch name and the primary HEAD are read separately, so they disagree if that
-			# checkout switched branches between the two reads. Resolving the tip from the branch ref binds
-			# every step below - fork point, ancestor test, rebase target, baseline - to one branch, because
-			# rebasing onto another branch's tip would relocate this session's work.
-			$primaryTip = @(Invoke-AgentGit @('-C', $reattachTarget, 'rev-parse', "refs/heads/$($primary.Branch)"))[0].Trim()
-			# Rewriting the primary branch (a daily history squash) orphans the commits this branch was
-			# created from, so the shared repair recovers the real fork point and, when that fork point left
-			# primary's history, replays only this session's own commits onto the new tip. Here an ancestor
-			# fork point simply means no repair is needed.
-			try { $baseline = (Repair-AgentWorktreeForkPoint $reattachTarget $primary.Branch $primaryTip $branch).Baseline }
-			catch {
-				if ($_.Exception.Data['Rebased'] -ne $true) { throw }
-				# The branch already sits on the new tip, so the session starts and resolves the restore
-				# itself, like an in-progress rebase.
-				$baseline = $primaryTip
-				$firstTask = "the reattach rebased this branch, but restoring its saved local work failed: $($_.Exception.Message) Do not run that stash apply command: before anything else, resolve any conflicts and make sure every saved change is back, taking only missing ones from that recovery stash, never reapplying what it already restored."
-			}
-		}
-		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $reattachTarget; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $baseline }
+		$identity = [pscustomobject]@{ Worktree = $reattachTarget; Branch = $branch }
 	}
 	else {
+		$primary = Get-AgentWorktreePrimaryIdentity $RepositoryRoot
 		$repositoryName = Split-Path -Leaf $root
 		$uuid = [guid]::NewGuid().ToString()
 		$branch = "$Client/$uuid"
@@ -177,17 +154,16 @@ try {
 		if (-not (Test-Path -LiteralPath (Join-Path $worktree 'AGENTS.md') -PathType Leaf)) { throw "Worktree '$worktree' checked out no files: '$worktree\AGENTS.md' is missing." }
 	}
 
-	# Record the branch this session lands onto; Get-AgentWorktreeSessionContext refuses to resolve a
-	# session worktree without it. Rewritten on every create and reattach, so it reflects the primary
-	# branch observed at the most recent wrapper start.
-	$sidecarDirectory = Join-Path $identity.Worktree 'Temp'
-	New-Item -ItemType Directory -Path $sidecarDirectory -Force | Out-Null
-	$sidecar = [ordered]@{ schemaVersion = 'broken-engine-session-sidecar/v1'; targetBranch = $identity.TargetBranch } | ConvertTo-Json
-	[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-sidecar.json'), $sidecar, [Text.UTF8Encoding]::new($false))
-	# The baseline hint Get-AgentWorktreeSessionContext reads. A file, not an environment variable, so a
-	# child process repairing the fork point can rewrite it. Rewritten on every create and reattach.
-	[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-baseline'), $identity.Baseline + "`n", [Text.UTF8Encoding]::new($false))
 	if ($worktreeCreated) {
+		# Record the branch this session lands onto; Get-AgentWorktreeSessionContext refuses to resolve a
+		# session worktree without it. Creation records the primary branch observed at startup.
+		$sidecarDirectory = Join-Path $identity.Worktree 'Temp'
+		New-Item -ItemType Directory -Path $sidecarDirectory -Force | Out-Null
+		$sidecar = [ordered]@{ schemaVersion = 'broken-engine-session-sidecar/v1'; targetBranch = $identity.TargetBranch } | ConvertTo-Json
+		[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-sidecar.json'), $sidecar, [Text.UTF8Encoding]::new($false))
+		# The baseline hint Get-AgentWorktreeSessionContext reads. A file, not an environment variable, so a
+		# child process repairing the fork point can rewrite it.
+		[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-baseline'), $identity.Baseline + "`n", [Text.UTF8Encoding]::new($false))
 		# Seed the shared harness app-data root with the two caches whose cold rebuild dominates a first
 		# launch. The runtime validates both on load and regenerates them on any mismatch, so a stale or
 		# foreign copy costs nothing and needs no verification here. Seeding is a speed-up only, so any
@@ -216,34 +192,27 @@ try {
 			}
 		}
 		catch { Write-Warning "Seeding the worktree shader caches failed, so the first launch rebuilds them: $($_.Exception.Message)" }
+		# Each step below is separated by a blank line so its output reads as its own block in the transcript.
+		& (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
+		Write-Host ''
+		& (Join-Path $root '.agents\scripts\Provision-WorktreeThirdParty.ps1') -RepositoryRoot $identity.Worktree -WaitSeconds $WaitSeconds
+		if ($Client -ceq 'opencode') { Assert-AgentWorktreeOpenCodeSkills $identity.Worktree }
+		else { Assert-AgentWorktreeSkillsLink $identity.Worktree }
 	}
-	# Each step below is separated by a blank line so its output reads as its own block in the transcript.
-	& (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
-	Write-Host ''
-	& (Join-Path $root '.agents\scripts\Provision-WorktreeThirdParty.ps1') -RepositoryRoot $identity.Worktree -WaitSeconds $WaitSeconds
-	if ($Client -ceq 'opencode') { Assert-AgentWorktreeOpenCodeSkills $identity.Worktree }
-	else { Assert-AgentWorktreeSkillsLink $identity.Worktree }
 	if ($clearClaudeArgumentTransport) { $env:BROKEN_ENGINE_CLIENT_ARGUMENTS = $null }
 	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
 		$ClientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	}
-	# Skip the DataPacker and ModelViewer builds while a rebase is in progress or a restore failed after the reattach rebase:
-	# a tree with conflict markers cannot build, and a wrapper exit here would block the very session that
-	# must resolve the conflict from launching. The session runs the builds itself after resolving it.
-	# Provisioning above is conflict-insensitive.
-	if ($null -eq $firstTask) {
+	if ($worktreeCreated) {
 		Write-Host ''
 		& (Join-Path $root '.agents\scripts\Build-WorktreeTarget.ps1') -Target DataPacker -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root -Baseline $identity.Baseline
 		Write-Host ''
 		& (Join-Path $root '.agents\scripts\Build-WorktreeTarget.ps1') -Target ModelViewer -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root -Baseline $identity.Baseline
 	}
 	Write-Host ''
-	$banner = "$(if ($worktreeCreated) { 'Created' } else { 'Reattached' }) worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)."
-	if ($null -ne $firstTask) {
-		$buildCommand = "pwsh -NoProfile -File '.agents\scripts\Build-WorktreeTarget.ps1' -Target DataPacker -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
-		$viewerBuildCommand = "pwsh -NoProfile -File '.agents\scripts\Build-WorktreeTarget.ps1' -Target ModelViewer -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
-		$banner = "FIRST TASK: $firstTask Then run $buildCommand to build the deferred DataPacker, followed by $viewerBuildCommand to build the deferred ModelViewer.`n" + $banner
-	}
+	$banner = if ($worktreeCreated) { "Created worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)." }
+		else { "Reattached worktree $($identity.Worktree) on branch $($identity.Branch)." }
+	if ($rebaseInProgress) { $banner += "`nThis worktree has a rebase in progress." }
 	Write-Host $banner
 	if ($PrepareOnly) { $exitCode = 0 }
 	else { $exitCode = Invoke-WorktreeCliTrackedProcess -Executable $ClientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree }

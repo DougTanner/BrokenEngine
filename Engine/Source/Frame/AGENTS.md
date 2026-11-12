@@ -129,6 +129,11 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
 
 ## Terrain and Navigation
 
+- Live clients prepare elevation and render queries before publishing a cell,
+  using the ownership and lifetime rules in
+  [Live Terrain Preparation](../Network/Client/AGENTS.md#live-terrain-preparation).
+  Menu and server ticks retain synchronous lazy terrain construction. Live tick
+  entry asserts readiness; it never repairs missing preparation.
 - An island-free cell is a supported state whose elevation samples all return the sea floor (no grid is built) and whose navigation data is built empty. A cell whose list holds only islands centred elsewhere is island-free to inside-cell decisions alone: its `CentredIslands` prefix is empty, and its terrain still reads the full list.
 - `GenerateIslandChain` owns region growth (its declaration comment in
   `IslandChainPlacement.h`); two regions never overlap. Preserve each of its RNG
@@ -166,7 +171,7 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
 - Two terrain-sampling paths exist and must not be mixed. Simulation code calls
   `CellElevationSampler::Sample`/`CellNormal`, which read only the cell's own
   `CellStaticData` elevation grid, never `mCells` or a neighbouring cell, so
-  parallel per-cell ticks cannot race the tick-time grid build. Client render
+  parallel per-cell ticks cannot race terrain construction. Client render
   code may also call them on one cell's own static data, since render runs after
   the tick join. Render code reaches the other path through the client-only
   `ProjectToFlightPlane`/`ProjectToBaseHeight`, whose elevation query walks
@@ -222,6 +227,12 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   and segment-blocked queries ignore rectangles, and an empty span gives the
   same result as no rectangles, bit for bit.
 - Navigation data arrives only from the server, which built it, so its deserialization trusts it under the corrupt-input policy (`../Network/AGENTS.md`); the acceleration build, runtime queries, and debug nav rendering must not validate it either.
+- `CellStaticData::Write`/`Read` own a network-only compact encoding, separate
+  from `NavData::Write`/`Read`. Preserve placement and vertex bits and polygon
+  and visibility-edge order: polygon offsets use gaps, and visibility edges
+  require source-grouped, ascending targets for gap encoding. The client
+  rebuilds navigation acceleration, never visibility connections; elevation is
+  not transmitted.
 - The contour bake takes each entry's flight plane, clearance distance, and elevation threshold from the caller (the game derives them and the server passes them in at startup) and forwards them unchanged; engine navigation code must not reach back into game constants for them.
 - Frame and gameplay geometry uses meters (one meter per engine unit); UV is only the normalized template representation. For navigation contours, union in UV, convert to centered local meters with the template's anisotropic footprint, apply clearance and simplification there, then map back to UV for storage; a scalar offset in UV makes the margin in meters depend on the footprint.
 - Nav polygons in the cell frame wind clockwise, because placing a template mirrors Y; the template's own UV-space contour winds counter-clockwise. Derive orientation-dependent tests such as vertex convexity from measured winding rather than assuming the counter-clockwise convention the placement hulls carry.

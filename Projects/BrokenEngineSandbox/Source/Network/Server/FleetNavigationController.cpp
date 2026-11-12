@@ -20,13 +20,13 @@ namespace game
 // unbuilt cell where the recording had a built one.
 static bool FlagshipReachesEdge(const Frame& rFlagshipFrame, ShipLocator flagship, const engine::CellStaticData& rStaticData, int64_t iDirection)
 {
-	if (!rStaticData.bNavigationDataBuilt)
+	if (!(rStaticData.flags & engine::CellStaticDataFlags::kNavigationDataBuilt))
 	{
 		// Heap: BuildCellNavigationData grows the per-graph navigationData vector and each graph's vertex, polygon, and visibility-edge vectors, and
 		// this path runs on the main thread inside the armed main loop
 		ScopedSuppressAllocationTracking suppress;
 		engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-		rStaticData.bNavigationDataBuilt = true;
+		rStaticData.flags.Set(engine::CellStaticDataFlags::kNavigationDataBuilt);
 	}
 
 	XMVECTOR vecPosition = ShipPosition(rFlagshipFrame.interpolate, flagship);

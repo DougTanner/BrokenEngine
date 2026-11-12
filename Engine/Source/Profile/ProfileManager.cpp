@@ -20,6 +20,7 @@ constexpr std::chrono::seconds kProfileVisibilityInterval = 2s;
 #if defined(BT_CLIENT)
 // kbProfilingDump mode: one CSV sample of every timer/counter per interval, written for offline analysis.
 constexpr std::chrono::seconds kProfileDumpInterval = 1s;
+constexpr double kfGpuAnomalyMultiplier = 1.9;
 #endif // BT_CLIENT
 
 ProfileManager::ProfileManager()
@@ -98,6 +99,7 @@ void ProfileManager::Create()
 		};
 
 		CHECK_VK(vkCreateQueryPool(gpDeviceManager->mVkDevice, &vkQueryPoolCreateInfo, nullptr, &mVkQueryPool));
+		mGpuSubmissions.resize(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
 		VkName(VK_OBJECT_TYPE_QUERY_POOL, mVkQueryPool, "Timestamp");
 
 		// Queries must be reset before first use; no submitted work references this fresh pool yet.
@@ -118,6 +120,9 @@ void ProfileManager::Destroy()
 
 		mVkQueryPool = VK_NULL_HANDLE;
 		mGpuShadowSample = {};
+		mGpuSubmissions.clear();
+		mGpuDiagnosticHistories = {};
+		mLatestGpuSample = {};
 
 		// mpDumpLog deliberately not reset: Destroy() also runs on swapchain-tier recreates (resize, settings), and the dump file must span the whole session. The unique_ptr closes it at ProfileManager destruction.
 #endif // BT_CLIENT
@@ -359,7 +364,24 @@ void ProfileManager::GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBu
 	}
 }
 
-void ProfileManager::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample)
+void ProfileManager::GpuSubmitted(int64_t iCommandBuffer, bool bWorld)
+{
+	if constexpr (kbProfiling)
+	{
+		if (mVkQueryPool == VK_NULL_HANDLE)
+		{
+			return;
+		}
+		mGpuSubmissions.at(iCommandBuffer) = GpuSubmission {
+			.iSequence = ++miGpuSubmissionSequence,
+			.bWorld = bWorld,
+			.expectedInterval = mExpectedRenderedFrameInterval,
+			.submitTime = std::chrono::steady_clock::now(),
+		};
+	}
+}
+
+void ProfileManager::GpuRead(int64_t iCommandBuffer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -368,8 +390,14 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers
 			return;
 		}
 
-		// Read query results without blocking - skip if not ready to prevent hangs at low framerates
-		for (int64_t i = eStart; i < eEnd; ++i)
+		GpuDiagnosticSample sample {.submission = mGpuSubmissions.at(iCommandBuffer), .iFramebuffer = iCommandBuffer};
+		mGpuSubmissions.at(iCommandBuffer) = {};
+		if (sample.submission.iSequence == 0)
+		{
+			return;
+		}
+		int64_t iStart = sample.submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
+		for (int64_t i = iStart; i < kGpuTimerCount; ++i)
 		{
 			GpuTimers eGpuTimer = static_cast<GpuTimers>(i);
 			uint64_t puiResults[2] {};
@@ -383,13 +411,104 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers
 
 			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1'000.0f);
 			mpGpuTimers[eGpuTimer].smoothedMicroseconds = iCurrentMicroseconds;
+			sample.microseconds[i] = iCurrentMicroseconds;
 
-			if (bLatchShadowSample && eGpuTimer == kGpuTimerShadow)
+			if (sample.submission.bWorld && eGpuTimer == kGpuTimerShadow)
 			{
 				++mGpuShadowSample.iSequence;
 				mGpuShadowSample.iCurrentMicroseconds = iCurrentMicroseconds;
 			}
 		}
+		if constexpr (kbProfilingFrameSpike)
+		{
+			if (sample.submission.expectedInterval == 0ns || mExpectedRenderedFrameInterval == 0ns)
+			{
+				return;
+			}
+			double fExpectedMicroseconds = std::chrono::duration<double, std::micro>(sample.submission.expectedInterval).count();
+			std::optional<int64_t> optionalRootMicroseconds = sample.RootMicroseconds();
+			bool bAnomaly = optionalRootMicroseconds && static_cast<double>(*optionalRootMicroseconds) > kfGpuAnomalyMultiplier * fExpectedMicroseconds;
+			for (int64_t i = iStart; i < kGpuTimerCount; ++i)
+			{
+				if (!sample.microseconds[i])
+				{
+					continue;
+				}
+				common::Smoothed<int64_t>& rHistory = mGpuDiagnosticHistories[i];
+				double fCurrent = static_cast<double>(*sample.microseconds[i]);
+				if (rHistory.miCount == common::Smoothed<int64_t>::kiCapacity)
+				{
+					double fAverage = static_cast<double>(rHistory.Average());
+					bAnomaly |= fCurrent > kfGpuAnomalyMultiplier * fAverage && fCurrent - fAverage >= 0.25 * fExpectedMicroseconds;
+				}
+				rHistory = *sample.microseconds[i];
+			}
+			mLatestGpuSample = sample;
+			if (bAnomaly)
+			{
+				LogGpuSample(sample, "GPU anomaly");
+			}
+		}
+	}
+}
+
+std::optional<int64_t> ProfileManager::GpuDiagnosticSample::RootMicroseconds() const
+{
+	int64_t iTotal = 0;
+	for (GpuTimers eRoot : {kGpuTimerGlobal, kGpuTimerMain, kGpuTimerImage, kGpuTimerUiRender})
+	{
+		if (!submission.bWorld && eRoot != kGpuTimerUiRender)
+		{
+			continue;
+		}
+		if (!microseconds[eRoot])
+		{
+			return std::nullopt;
+		}
+		iTotal += *microseconds[eRoot];
+	}
+	return iTotal;
+}
+
+void ProfileManager::LogGpuSample(const GpuDiagnosticSample& rSample, std::string_view pcContext)
+{
+	float fAgeMilliseconds = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - rSample.submission.submitTime).count();
+	double fExpectedMilliseconds = std::chrono::duration<double, std::milli>(rSample.submission.expectedInterval).count();
+	LOG(kGraphics, kWarning, "{}: submission={} framebuffer={} mode={} age={}ms expected={}ms threshold={}ms", pcContext, rSample.submission.iSequence, rSample.iFramebuffer, rSample.submission.bWorld ? "world" : "UI", common::Wb(fAgeMilliseconds, 3), common::Wb(static_cast<float>(fExpectedMilliseconds), 3), common::Wb(static_cast<float>(kfGpuAnomalyMultiplier * fExpectedMilliseconds), 3));
+	std::optional<int64_t> optionalRootMicroseconds = rSample.RootMicroseconds();
+	if (optionalRootMicroseconds)
+	{
+		LOG(kGraphics, kWarning, "  Measured GPU regions: {}us", *optionalRootMicroseconds);
+	}
+	else
+	{
+		LOG(kGraphics, kWarning, "  Measured GPU regions: unavailable (missing root)");
+	}
+	int64_t iStart = rSample.submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
+	for (int64_t i = iStart; i < kGpuTimerCount; ++i)
+	{
+		if (rSample.microseconds[i])
+		{
+			LOG(kGraphics, kWarning, "  {}: {}us", kpGpuTimerNames[i], *rSample.microseconds[i]);
+		}
+		else
+		{
+			LOG(kGraphics, kWarning, "  {}: unavailable", kpGpuTimerNames[i]);
+		}
+	}
+	LOG(kGraphics, kWarning, "  Child rows overlap roots; do not add them. Excludes uninstrumented upload/acquire work and queue/presentation waiting. Delayed readback is not same-frame CPU attribution.");
+}
+
+void ProfileManager::LogLatestGpuSample()
+{
+	if constexpr (kbProfilingFrameSpike)
+	{
+		if (mLatestGpuSample.submission.iSequence == 0)
+		{
+			LOG(kGraphics, kWarning, "  Older GPU context: unavailable (no eligible completed sample)");
+			return;
+		}
+		LogGpuSample(mLatestGpuSample, "Older completed GPU context");
 	}
 }
 
@@ -459,12 +578,6 @@ void ProfileManager::LogTimers()
 		LOG(kDefault, kDebug, "");
 
 #if defined(BT_CLIENT)
-		int64_t iCommandBufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
-		for (int64_t i = 0; i < iCommandBufferCount; ++i)
-		{
-			GpuRead(i, kGpuTimerGlobal, kGpuTimerCount, false);
-		}
-
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
 			GpuTimer& rGpuTimer = mpGpuTimers[i];
@@ -564,6 +677,12 @@ void ProfileManager::SetDiagnosticFocus(bool bHasFocus)
 		mRenderedFrameIntervals = common::Smoothed<int64_t, 256> {};
 		mNormalReconciliationTickNanoseconds = common::Smoothed<double> {};
 		mExpectedRenderedFrameInterval = 0ns;
+		mGpuDiagnosticHistories = {};
+		mLatestGpuSample = {};
+		for (GpuSubmission& rSubmission : mGpuSubmissions)
+		{
+			rSubmission.expectedInterval = 0ns;
+		}
 		mDiagnosticFlags.Set(DiagnosticFlags::kFocused, bHasFocus);
 		mDiagnosticFlags.Set(DiagnosticFlags::kDiscardNextInterval);
 	}
@@ -845,13 +964,14 @@ static void LogReconciliationDiagnostics(const ReconciliationDiagnostics& rDetai
 	}
 }
 
-ScopedSlowOperation::ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics)
+ScopedSlowOperation::ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics, const AcquisitionDiagnostics* pAcquisitionDiagnostics)
 {
 	if constexpr (kbProfilingFrameSpike)
 	{
 		meCategory = eCategory;
 		mpcOperation = pcOperation;
 		mpReconciliationDiagnostics = pReconciliationDiagnostics;
+		mpAcquisitionDiagnostics = pAcquisitionDiagnostics;
 		mExpectedRenderedFrameInterval = gpProfileManager->mExpectedRenderedFrameInterval;
 		if (mExpectedRenderedFrameInterval != 0ns)
 		{
@@ -886,6 +1006,43 @@ ScopedSlowOperation::~ScopedSlowOperation()
 					float fElapsedMilliseconds = std::chrono::duration<float, std::milli>(elapsed).count();
 					float fExpectedMilliseconds = std::chrono::duration<float, std::milli>(mExpectedRenderedFrameInterval).count();
 					common::Log(meCategory, "{} took {}ms > {}ms", mpcOperation, common::Wb(fElapsedMilliseconds, 1), common::Wb(fExpectedMilliseconds, 1));
+					if (mpAcquisitionDiagnostics != nullptr)
+					{
+						const AcquisitionDiagnostics& rDetails = *mpAcquisitionDiagnostics;
+						common::Log(meCategory, "  Acquisition invocation={} graphicsFrame={} incomingFramebuffer={} total={}ns (includes setup and other scope work)", rDetails.uiSequence, rDetails.iFrameCounter, rDetails.iIncomingFramebuffer, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count());
+						if (!rDetails.bFenceWaitRequired)
+						{
+							common::Log(meCategory, "  Prior acquisition fence wait: skipped");
+						}
+						else if (rDetails.optionalFenceNanoseconds)
+						{
+							common::Log(meCategory, "  Prior acquisition fence wait: {}ns", *rDetails.optionalFenceNanoseconds);
+						}
+						else
+						{
+							common::Log(meCategory, "  Prior acquisition fence wait: unavailable (call did not return)");
+						}
+						if (rDetails.optionalAcquireNanoseconds)
+						{
+							common::Log(meCategory, "  vkAcquireNextImageKHR: {}ns VkResult={}", *rDetails.optionalAcquireNanoseconds, static_cast<int32_t>(*rDetails.optionalResult));
+						}
+						else
+						{
+							common::Log(meCategory, "  vkAcquireNextImageKHR: unavailable (call did not return)");
+						}
+						if (rDetails.optionalImageIndex)
+						{
+							common::Log(meCategory, "  Returned image index: {}", *rDetails.optionalImageIndex);
+						}
+						else
+						{
+							common::Log(meCategory, "  Returned image index: unavailable");
+						}
+					}
+					if (meCategory == kGraphics)
+					{
+						gpProfileManager->LogLatestGpuSample();
+					}
 					if (mpReconciliationDiagnostics != nullptr)
 					{
 						LogReconciliationDiagnostics(*mpReconciliationDiagnostics, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed), gpProfileManager->mNormalReconciliationTickNanoseconds);

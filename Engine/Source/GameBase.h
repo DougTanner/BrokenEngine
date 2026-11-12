@@ -70,6 +70,10 @@ struct Cell
 	CellStaticData staticData;
 
 #if defined(BT_SERVER)
+	// Main-thread prepared network body, reused across subscriptions until this Cell's lifetime/reset ends.
+	std::vector<uint8_t> encodedStaticData;
+	int64_t iStaticDataDecodedSize = 0;
+
 	// Both never null on a server cell: the cell allocates pNext itself, and every path that creates a cell sets pCurrent.
 	std::unique_ptr<game::Frame> pCurrent;
 	std::unique_ptr<game::Frame> pNext = std::make_unique<game::Frame>();
@@ -259,6 +263,7 @@ public:
 
 	// Creates the cell's frame storage and static data on demand; the game supplies the frame's contents.
 	void CreateCellAtCoordinate(GridCoord coordinate);
+	game::Frame& CreateCellFrame(Cell& rCell, GridCoord coordinate);
 
 #if defined(BT_SERVER)
 	// True while replay playback owns the simulation, i.e. a reader is live or staged for a later tick.
@@ -332,9 +337,6 @@ protected:
 	std::optional<std::chrono::steady_clock::time_point> mOptionalMinimizedThrottleLast;
 #endif // BT_CLIENT
 
-private:
-
-	game::Frame& CreateCellFrame(Cell& rCell, GridCoord coordinate);
 };
 
 } // namespace engine

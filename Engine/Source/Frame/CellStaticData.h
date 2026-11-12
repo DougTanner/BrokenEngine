@@ -21,6 +21,13 @@ struct IslandRenderQuery
 	int64_t iHeightmapHeight = 0;
 };
 
+enum class CellStaticDataFlags : uint8_t
+{
+	kNavigationDataBuilt = 1ui32 << 0,
+	// Empty island lists are prepared without allocating a grid.
+	kTerrainPrepared = 1ui32 << 1,
+};
+
 struct CellStaticData
 {
 	GridCoord coordinate {};
@@ -36,22 +43,18 @@ struct CellStaticData
 	// A completed navigation build can have no vertices (degenerate or underwater contours), so emptiness cannot
 	// signal an unbuilt cell. BuildCellNavigationData on the server and Read on the client set this flag; a cell a save
 	// reload creates starts with it clear. This flag is outside the CRC and save format.
-	mutable bool bNavigationDataBuilt = false;
+	mutable common::Flags<CellStaticDataFlags> flags;
 
-	// Derived from islands + per-template heightmaps. Built lazily on the per-coord
-	// frame-tick thread (both client and server build their own bit-identical copy from
-	// the same deterministic placements), refreshed when the network resends staticData,
-	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
-	// through the const CellStaticData& it gets from ActiveFrameReference. Sized
-	// kiElevationGridDimension^2 when populated.
+	// Derived from placements and resident heightmaps, outside persistence and CRC. Live clients prepare it
+	// before publication; server and menu ticks fill it through ActiveFrameReference's const static data.
 	mutable std::vector<float> elevationGrid;
 
 	// Client-only queries for GlobalElevation (ProjectToBaseHeight), index-parallel to islands.
-	// RunFrameTick caches each placement's inverse rotation and template footprint, heightmap pointer and dimensions
-	// alongside elevationGrid, avoiding per-island hash lookups and trigonometry. Placement edits clear the cache;
-	// the next tick rebuilds an empty cache. It is derived from placements and shared templates and never serialized.
+	// Prepared alongside elevationGrid, avoiding per-island hash lookups and trigonometry. Menu placement edits
+	// clear the cache for the next synchronous tick. Derived from shared templates and never serialized.
 	mutable std::vector<IslandRenderQuery> islandRenderQueries;
 
+	// Network-only compact geometry and server-built visibility; Read rebuilds navigation acceleration.
 	void Write(std::ostream& rStream) const;
 	void Read(std::istream& rStream);
 

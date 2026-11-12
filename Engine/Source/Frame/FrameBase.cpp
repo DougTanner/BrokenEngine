@@ -5,6 +5,9 @@
 #include "Frame/NavBuild.h"
 
 #include "Frame/Frame.h"
+#if defined(BT_CLIENT)
+#include "Game.h"
+#endif
 
 namespace engine
 {
@@ -285,19 +288,21 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	// per-coord dispatch thread (naturally parallel across coords) on the first tick after
 	// a coord is created or reloaded from save. Client receives prebuilt navigationData over the
 	// wire and never enters this branch (server-only NavContour).
-	if (!rStaticData.bNavigationDataBuilt)
+	if (!(rStaticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
 	{
 		ScopedSuppressAllocationTracking suppress;
 		BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-		rStaticData.bNavigationDataBuilt = true;
+		rStaticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 	}
 #endif
 
-	// Per-cell elevation grid (purely derived from islands + shared heightmaps). Both client
-	// and server build their own bit-identical copy here — same deterministic placements, same
-	// shared heightmaps, /fp:strict math — so it stays out of the CRC and is never serialized.
-	// Builds before any sim phase below so every CellElevationSampler::Sample/CellNormal caller this tick
-	// sees a populated grid.
+	// Live client cells arrive prepared; menu and server cells retain synchronous terrain setup.
+#if defined(BT_CLIENT)
+	bool bSynchronousTerrain = static_cast<bool>(game::gpGame->mGameFlags & GameFlags::kMainMenu);
+	ASSERT(bSynchronousTerrain || (rStaticData.flags & CellStaticDataFlags::kTerrainPrepared));
+	if (bSynchronousTerrain)
+	{
+#endif
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
@@ -311,17 +316,14 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	}
 
 #if defined(BT_CLIENT)
-	// Render-only cache: per-placement flattened query (inverse-rotation sin/cos + template footprint /
-	// heightmap pointer / dims) for GlobalElevation (ProjectToBaseHeight). Built here alongside
-	// the elevation grid — placement rotation and template are static for the cell's life — so the render
-	// path does zero hash lookups and zero libm trig per call. The server never calls GlobalElevation, so
-	// skip it there.
 	if (rStaticData.islandRenderQueries.empty() && !rStaticData.islands.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
 		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
 		rStaticData.BuildRenderPlacementCache(*gpIslandTerrain);
 		RecordPhase(Phase::kRenderPlacementCacheBuild, buildStartTime);
+	}
+	rStaticData.flags.Set(CellStaticDataFlags::kTerrainPrepared);
 	}
 	RecordPhase(Phase::kCellSetup, phaseStartTime);
 #endif

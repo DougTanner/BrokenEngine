@@ -206,10 +206,7 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 	}
 	++miFrameCounter;
 
-	if (gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iCommandBuffer).mFlags & CommandBufferFlags::kExecuted)
-	{
-		gpProfileManager->GpuRead(iCommandBuffer, kGpuTimerGlobal, kGpuTimerCount, true);
-	}
+	gpProfileManager->GpuRead(iCommandBuffer);
 
 	gpProfileManager->CpuStart(kCpuTimerRenderGlobal);
 	RenderFrameGlobal(iCommandBuffer, currentTime);
@@ -230,6 +227,7 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	gpCommandBufferManager->SubmitMainCommandBuffer(iCommandBuffer);
 
 	gpCommandBufferManager->SubmitUiCommandBuffer(iCommandBuffer);
+	gpProfileManager->GpuSubmitted(iCommandBuffer, true);
 
 	PresentAcquire(iCommandBuffer);
 }
@@ -238,11 +236,7 @@ void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
 {
 	WaitFramebuffer(iCommandBuffer);
 
-	// Only the UI range: the Global and Main timers keep their last values while no world pass is submitted.
-	if (gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iCommandBuffer).mFlags & CommandBufferFlags::kExecuted)
-	{
-		gpProfileManager->GpuRead(iCommandBuffer, kGpuTimerUiRender, kGpuTimerCount, false);
-	}
+	gpProfileManager->GpuRead(iCommandBuffer);
 
 	// No Global submission stops the timer PresentAcquire started.
 	gpProfileManager->CpuStop(kCpuTimerAcquireToGlobal, {CpuStopFlags::kSmoothNow, CpuStopFlags::kCrossThread});
@@ -250,6 +244,7 @@ void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
 	gpImGuiManager->Prepare(iCommandBuffer);
 
 	gpCommandBufferManager->SubmitUiOnlyCommandBuffer(iCommandBuffer);
+	gpProfileManager->GpuSubmitted(iCommandBuffer, false);
 
 	PresentAcquire(iCommandBuffer);
 }

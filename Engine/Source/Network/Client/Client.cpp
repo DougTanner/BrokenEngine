@@ -461,8 +461,8 @@ void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
 	}
 
 	ReceivedCoordFullState fullState {};
+	fullState.identity = {.coordinate = coord, .iSlot = iSlotIndex, .iEpoch = iEpoch, .iLoadGeneration = message.uiLoadGeneration};
 	fullState.iTick = iTick;
-	fullState.coordinate = coord;
 	fullState.pFrame = std::move(pFrame);
 
 	// Heap: received full states vector grows on new cell data
@@ -517,11 +517,21 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 
 	ScopedSuppressAllocationTracking suppress;
 
-	std::string staticBytes(reinterpret_cast<const char*>(message.staticData.puiData), message.staticData.iSize);
+	std::string staticBytes;
+	if (message.uiDecodedSize != 0)
+	{
+		staticBytes.resize(static_cast<size_t>(message.uiDecodedSize));
+		int64_t iDecodedSize = LZ4_decompress_safe(reinterpret_cast<const char*>(message.staticData.puiData), staticBytes.data(), message.staticData.iSize, static_cast<int>(message.uiDecodedSize));
+		ASSERT(std::cmp_equal(iDecodedSize, message.uiDecodedSize));
+	}
+	else
+	{
+		staticBytes.assign(reinterpret_cast<const char*>(message.staticData.puiData), message.staticData.iSize);
+	}
 	std::istringstream staticStream(std::move(staticBytes), std::ios::binary);
 
 	ReceivedStaticData received {};
-	received.coordinate = coord;
+	received.identity = {.coordinate = coord, .iSlot = iSlotIndex, .iEpoch = iEpoch, .iLoadGeneration = message.uiLoadGeneration};
 	received.staticData.Read(staticStream);
 
 	// Heap: received static data vector grows on new subscription
@@ -579,6 +589,7 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 		ScopedSuppressAllocationTracking suppress;
 
 		ReceivedCoordUpdate update {};
+		update.identity = {.coordinate = mSubscriptions.mCoordinateSlots.at(rMessage.uiSlotIndex).coordinate, .iSlot = rMessage.uiSlotIndex, .iEpoch = rMessage.uiEpoch, .iLoadGeneration = rMessage.uiLoadGeneration};
 		update.iTick = rMessage.iTick;
 		update.uiSharedCrc = static_cast<common::crc_t>(rMessage.uiSharedCrc);
 

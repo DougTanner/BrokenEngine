@@ -841,12 +841,13 @@ struct ServerCoordStaticDataMessage
 {
 	static constexpr PacketType keType = PacketType::kServerCoordinateStaticData;
 	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
-	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t);
+	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(uint32_t) + sizeof(int32_t);
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
 	GridCoord coord {};
+	uint32_t uiDecodedSize = 0; // Zero selects raw compact bytes; positive selects an LZ4 block.
 	PacketPayload staticData {};
 
 	template <typename TVISITOR>
@@ -857,6 +858,7 @@ struct ServerCoordStaticDataMessage
 		rVisitor.Field(rMessage.uiSlotIndex);
 		rVisitor.Field(rMessage.uiEpoch);
 		rVisitor.Field(rMessage.coord);
+		rVisitor.Field(rMessage.uiDecodedSize);
 		rVisitor.Field(rMessage.staticData.iSize);
 		rVisitor.Payload(rMessage.staticData);
 	}

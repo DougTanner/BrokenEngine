@@ -354,6 +354,8 @@ void Replay::ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rP
 		game::gpGame->CreateCellAtCoordinate(coordinate);
 	}
 	engine::Cell& rCell = game::gpGame->mCells.at(coordinate);
+	rCell.encodedStaticData.clear();
+	rCell.iStaticDataDecodedSize = 0;
 	rCell.pCurrent = std::move(rPendingReader.pSavedStart);
 	engine::TransferViaStream(*rCell.pCurrent, *rCell.pNext);
 	game::gpGame->mFrameInputs.insert_or_assign(coordinate, std::move(rPendingReader.initialInput));

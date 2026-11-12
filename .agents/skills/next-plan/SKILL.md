@@ -304,7 +304,7 @@ and the rest of the resolved Plan and card stays in the snapshot for the
 reviews and is not presented. Deliver that presentation per the `### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
-without an approval question; on Claude Code, OpenCode, and every other host as
+without an approval question; on Claude Code and every other host as
 rendered message text whose approval question is the last thing in the
 message, after which the user's next message is the decision. An approval
 accepts the recommendation for every decision it leaves unanswered, except a

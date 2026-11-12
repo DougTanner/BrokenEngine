@@ -10,7 +10,7 @@ coordinates derived from them, which during a camera jump also keep the
 confirmed cells under the camera's previous cell loaded area, the harness
 viewer pin, subscription and clock state, generic full-state and delta
 adoption, received-update buffering and confirmation, ordered receive
-draining, ACK/flush, and resets.
+draining, ACK/flush, resets, and live terrain preparation.
 `ClientSessionBase`, which the game client session inherits, holds the runtime
 and the desync core and owns static-data application, owned-entity event
 application, `Reconcile`, and the resync, disconnect, and server-load session
@@ -32,9 +32,10 @@ each owned-entity state into `mReceivedOwnedEntityEvents`, which `Client::Poll`
 entry and a load notification clear, so events received before a load in the
 same poll are discarded; `ClientSessionBase::ApplyOwnedEntityEvents` hands them
 to the game before the game's raw packets are processed. After both,
-`ClientSessionRuntime` drains static data, full states, then deltas, adopting
-generic state while `ClientSessionBase` applies static data and the game session
-hydrates gameplay. A delta at or below its coord's confirmed tick is skipped,
+`ClientSessionRuntime` drains static data, full states, then deltas into durable
+main-owned staging. Terrain preparation and the matching initial frame gate
+publication; the game session hydrates gameplay on main at publication.
+A delta at or below its coord's confirmed tick is skipped,
 and buffering is keyed by tick, so a repeat of an already buffered tick keeps
 the first arrival.
 
@@ -64,7 +65,32 @@ the first arrival.
 - Static data requires matching coord identity and exact epoch on `kWaitingFullState`, and a live record plus a newer retained epoch on `kUnsubscribed` or `kUnsubscribing`. A coord mismatch drops silently because full state owns ghost unsubscribe. Static data buffers without slot mutation. The payload carries no cell shape; every consumer reads the one constant `kCellDirections` table ([Frame](../../Frame/AGENTS.md)).
 - `kWaitingFullState` accepts deltas without advancing the ACK floor; only `kActive` tracks received ticks. A gap beyond `kiNetworkBufferSize` disconnects.
 - Active-slot resync full state commits only on matching coord and epoch, resets the ACK floor, and buffers the new frame; mismatched active state, and `kUnsubscribing` state whose coord has no live record, is dropped. Resync is server full-state replacement; reconciliation is client rollback/replay ([Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md)).
-- A non-reject subscribe-accept slot outside the client pool immediately unsubscribes so the server slot cannot leak. Full-state activation in `Client::ServerCoordinateFullState` and runtime adoption/game hydration must complete in the same frame because `Client::Poll` clears receive buffers at its next entry; skipping adoption loses the frame after activating the slot.
+- A non-reject subscribe-accept slot outside the client pool immediately
+  unsubscribes so the server slot cannot leak. Transport activation and ACK
+  commitment stay at acceptance. Transfer every accepted static/full/delta
+  record into durable main-owned staging in that poll, carrying its coordinate,
+  assigned slot, epoch and load generation before `Client::Poll` clears its
+  buffers. Delayed publication must preserve accepted updates or initiate the
+  existing bounded-overflow resync.
+
+## Live Terrain Preparation
+
+Main owns generation, residency requests, pending frames and published cells.
+One async task exclusively owns a complete static-data record and builds its
+elevation and render queries using immutable resident terrain inputs and a
+`ThreadLocal` floating-point environment. Main polls readiness without waiting
+and publishes only current terrain paired with its initial frame. Publish ready
+results before computing active membership so simulation and render selection
+see the same published cells. Authoritative publication also requires received
+navigation. Data received during local preparation waits for the result before
+comparing defined placement bits; matching placements reuse terrain with authoritative
+navigation.
+
+Invalidation clears staging, never an unfinished future. Retain obsolete work
+until ready, including across resets and offline/menu polling; start no second
+task while it remains outstanding. Runtime destruction finishes the task before
+terrain templates and packed heightmaps die. Pending cells never enter active,
+render or reconciliation state. Empty terrain has explicit readiness.
 
 ## Transport Timing Inputs
 

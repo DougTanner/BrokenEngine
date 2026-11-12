@@ -3,8 +3,6 @@
 On Claude, one external review covers the run for tooling friction, context
 efficiency, and content a subagent could have consumed instead. Codex runs no
 live lens and leaves all three concerns to `/next-plan-review` after landing.
-OpenCode has no supported live or retrospective transcript source, so no live
-lens runs and the checkpoint records that limitation explicitly.
 [The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference owns how.
 
 ## Dispatch
@@ -14,7 +12,7 @@ On Claude, main dispatches one fresh `reviewer` subagent for
 only run-specific input, and that reviewer resolves and measures its own run
 evidence per that package's
 [`references/worker.md`](../../next-plan-checkpoint-review/references/worker.md).
-A Codex or OpenCode main dispatches nothing.
+A Codex main dispatches nothing.
 
 ## Measurement states
 
@@ -29,7 +27,6 @@ main's recorded handoff line.
 | `breachRowsTruncated: true` envelope | `skipped (breach-rows-truncated)` | `Context-efficiency follow-ups: blocked (breach-rows-truncated), then any isolation-lens Plan path(s)` |
 | transcript unresolvable, unreadable, or `transcript.not-found` | `none (BLOCKED handoff)` — the reviewer returns `BLOCKED` for the whole review and carries no summary block | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
 | Codex main session | none — no reviewer is dispatched and no lens runs | `none (codex)` on both lines |
-| OpenCode main session | none — OpenCode transcript review is unsupported, so no reviewer is dispatched and no lens runs | `unsupported (opencode)` on both lines |
 
 A `pass` envelope means the measurement completed with no rows at or over
 threshold. An untruncated `needs-review` envelope runs the reviewer's

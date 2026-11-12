@@ -148,6 +148,14 @@ the engine calls by name.
 
 ## Buffered State
 
+- The server `Cell` owns the cached static network body outside Frame, CRC,
+  save, and replay state. Prepare it on the main thread after navigation is
+  built, retaining LZ4 only when smaller than the raw compact body. Static
+  inputs stay immutable for that Cell lifetime; retirement or replacement
+  releases the cache. Replay activation follows its
+  [reset contract](../../File/AGENTS.md#replay-streams). Every send rebuilds
+  its recipient envelope and copies the body into an independently owned ENet
+  packet, so pending delivery never borrows cache storage.
 - Buffer exactly one delta entry per supplied coordinate per tick in monotonically increasing order; resend lookup depends on contiguous tick offsets. With `kbDesynchronizationDebugFrames` enabled, also buffer the separate full-frame diagnostic ring. Clear both rings across save-load tick resets, and prune from the coordinates actually supplied to `BufferFrame`, not from simulation membership, so a replay coordinate published before it joins the dispatch set keeps its buffer.
 - When an active slot's coordinate delta ring restarts after a gap, send the
   current authoritative full state before any delta or resend and hold both

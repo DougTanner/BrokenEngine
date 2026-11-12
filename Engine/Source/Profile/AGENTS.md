@@ -52,6 +52,24 @@ the slow-operation diagnostics.
 - Each command buffer resets one contiguous timer range. Insert a timer into the range recorded by that command buffer and keep the enum and name table aligned.
 - Timestamp endpoints use bottom-of-pipe ordering so adjacent regions measure completed preceding work.
 
+`Graphics` registers each framebuffer's submission coverage with
+`GpuSubmitted`; `GpuRead` consumes it once after that framebuffer's fence wait,
+before reuse. Coverage belongs to the source submission, not the next frame's
+world visibility. Unavailable results remain absent from raw diagnostics and
+never advance their histories or the shadow sample; `LogTimers` only prints
+cached timers and never consumes queries.
+
+Under `kbProfilingFrameSpike`, GPU anomaly comparisons use fresh raw results,
+the source submission's expected interval, and prior eligible per-region
+history. Focus transitions clear GPU diagnostic histories and cached context
+and invalidate pending submissions' diagnostic eligibility; query-pool teardown
+clears submission coverage and GPU diagnostic state.
+Measured totals add only non-overlapping roots; child regions overlap them.
+They exclude uninstrumented uploads and acquisition, queue waiting, and
+presentation waiting. Graphics slow-operation warnings attach the latest
+eligible completed sample as older context with its submission identity and
+age, never as same-frame CPU attribution.
+
 ## Presentation and Dumps
 
 - `TickVisibilityCadence` is the single synchronized visibility decision for CPU timers, CPU counters, and GPU rows. UI views hide sustained zero rows; raw agent queries include them.

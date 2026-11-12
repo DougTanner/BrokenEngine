@@ -202,16 +202,36 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData, ENetPacketFreeCallback pFreeCallback)
+ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, Cell& rCell, ENetPacketFreeCallback pFreeCallback)
 {
 	LOG(kNetwork, kDebug, "Server::SendCoordStaticData Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlot, coordinate.iQ, coordinate.iR);
 
-	// Serialize static data into the reusable scratch (server main thread only - single-writer contract)
-	ScopedSuppressAllocationTracking suppress;
-	// Heap: scratch grows until steady state
-	mSendScratch.clear();
-	mFrameStreamBuffer.mpTarget = &mSendScratch;
-	rStaticData.Write(mFrameStream);
+	if (rCell.encodedStaticData.empty())
+	{
+		// Heap: serialization/compression scratch and the Cell's retained network body grow on preparation.
+		ScopedSuppressAllocationTracking suppress;
+		mSendScratch.clear();
+		mFrameStreamBuffer.mpTarget = &mSendScratch;
+		rCell.staticData.Write(mFrameStream);
+		int64_t iRawSize = std::ssize(mSendScratch);
+		ASSERT(iRawSize <= INT32_MAX - NetworkMessages::ServerCoordStaticDataMessage::kiFixedSize);
+		int64_t iCompressedSize = 0;
+		if (iRawSize <= LZ4_MAX_INPUT_SIZE)
+		{
+			iCompressedSize = CompressToBuffer(std::span<const char>(mSendScratch.data(), mSendScratch.size()));
+		}
+		if (iCompressedSize > 0 && iCompressedSize < iRawSize)
+		{
+			rCell.encodedStaticData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
+			rCell.iStaticDataDecodedSize = iRawSize;
+		}
+		else
+		{
+			const uint8_t* puiRawData = reinterpret_cast<const uint8_t*>(mSendScratch.data());
+			rCell.encodedStaticData.assign(puiRawData, puiRawData + iRawSize);
+			rCell.iStaticDataDecodedSize = 0;
+		}
+	}
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -222,7 +242,8 @@ ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnectio
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
 		.uiEpoch = rClient.slots.at(iSlot).ack.uiEpoch,
 		.coord = coordinate,
-		.staticData = {.puiData = reinterpret_cast<const uint8_t*>(mSendScratch.data()), .iSize = static_cast<int32_t>(mSendScratch.size())},
+		.uiDecodedSize = static_cast<uint32_t>(rCell.iStaticDataDecodedSize),
+		.staticData = {.puiData = rCell.encodedStaticData.data(), .iSize = static_cast<int32_t>(rCell.encodedStaticData.size())},
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
 

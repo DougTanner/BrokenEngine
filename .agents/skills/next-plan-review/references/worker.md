@@ -5,14 +5,8 @@ step owns.
 
 ## Steps
 
-1. Read the source client, if supplied, before resolving or invoking any transcript
-   helper. When it is OpenCode, return the `BLOCKED` unsupported handoff that
-   [`../SKILL.md`](../SKILL.md) `## Handoff` defines. This branch applies even
-   when Claude or Codex hosts the review: the source session, not the reviewing
-   host, determines transcript support. Do not invoke the finder, infer a store,
-   or claim any concern was reviewed. Done when the unsupported handoff is
-   complete, or the source client is Claude, Codex, or unspecified and execution
-   continues through the existing finder.
+1. Read the source client, if supplied, before resolving or invoking any
+   transcript helper. Done when the source client is fixed or unspecified.
 2. Resolve the repository root, then run the finder exactly once as
    `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Find-AgentSessionTranscript.ps1 -RepositoryRoot '<absolute repository root>' -Commit <requested commit>`
    where `<requested commit>` is the requested commit-ish (default `HEAD`),

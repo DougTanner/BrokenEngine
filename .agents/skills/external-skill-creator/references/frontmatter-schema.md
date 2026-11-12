@@ -2,10 +2,7 @@
 
 This is the repository authoring contract for Claude-facing `SKILL.md`
 frontmatter and optional Codex `agents/openai.yaml`, not any client's full
-parser specification. OpenCode discovers these packages, but its skill loader
-reads neither `allowed-tools` nor `disable-model-invocation`; the OpenCode
-enforcement surface is in [`client-compatibility.md`](client-compatibility.md)
-`## OpenCode`. The allowlist, YAML
+parser specification. The allowlist, YAML
 forms, lengths, package layout, and field relationships below are repository
 restrictions. Client invocation controls remain independent.
 

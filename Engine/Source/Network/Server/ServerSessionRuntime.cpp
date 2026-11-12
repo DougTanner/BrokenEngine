@@ -129,13 +129,13 @@ void ServerSessionRuntime::PreparePausedSubscriptions()
 			continue;
 		}
 		engine::CellStaticData& rStaticData = it->second.staticData;
-		if (!rStaticData.bNavigationDataBuilt)
+		if (!(rStaticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
 		{
 			// Heap: BuildCellNavigationData grows the per-graph navigationData vector and each graph's vertex, polygon, and visibility-edge vectors, and
 			// this path runs on the main thread inside the armed main loop
 			ScopedSuppressAllocationTracking suppress;
 			engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-			rStaticData.bNavigationDataBuilt = true;
+			rStaticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 		}
 	}
 }
@@ -238,7 +238,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 		}
 
 		auto it = game::gpGame->mCells.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCells.end() || !it->second.staticData.bNavigationDataBuilt)
+		if (it == game::gpGame->mCells.end() || !(it->second.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
 		{
 			++i;
 			continue;
@@ -258,7 +258,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 		});
 		if (!bClientBeingServed)
 		{
-			rSubscription.pStaticDataPacket = mpServer->mBufferedFrames.SendCoordinateStaticData(*pClient, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData, &OnStaticDataPacketFreed);
+			rSubscription.pStaticDataPacket = mpServer->mBufferedFrames.SendCoordinateStaticData(*pClient, rSubscription.iSlot, rSubscription.coordinate, it->second, &OnStaticDataPacketFreed);
 			if (rSubscription.pStaticDataPacket == nullptr)
 			{
 				rPendingSubscriptions.erase(rPendingSubscriptions.begin() + i);

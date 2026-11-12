@@ -27,8 +27,7 @@ context, and returns a handoff of changed files, triggers, and residuals.
 
 The main session reads this skill, then dispatches exactly one `implementer`
 with a self-contained brief and no inherited conversation context — fresh on
-Claude, `fork_turns: "none"` on Codex, or an OpenCode `task` with
-`subagent_type: implementer` and no `task_id`, per the authoritative default in
+Claude or `fork_turns: "none"` on Codex, per the authoritative default in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Delegated execution context`.
 That worker performs both implementation and its same-context assumption audit.

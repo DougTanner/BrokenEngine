@@ -73,11 +73,6 @@ shared `Residuals` row names a missing transcript or unverifiable fact, using
 `Changed files` and `Build required` are `none` because this retrospective
 changes no file.
 
-When the source client is OpenCode, return `BLOCKED` before transcript discovery,
-with `Transcript provenance: unsupported (opencode)` as a `Decisive checks` row
-and the unsupported transcript source as the sole residual. This is not a
-review verdict; set `Timeline`, `Root cause`, and `Assessment` to `none`.
-
 Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
 only when it is clean, and `BLOCKED` when required evidence is missing.
 Main presents the retrospective, decides each returned finding, and owns every

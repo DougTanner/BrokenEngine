@@ -68,7 +68,6 @@ resumes the work.
    | --- | --- | --- | --- |
    | `claude/` | Git Bash | `.claude/claude-worktree.sh --reattach-worktree '<path>'` | The wrapper adds `--resume`; pick this conversation. |
    | `codex/` | PowerShell 7 | `.\.codex\codex-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
-   | `opencode/` | PowerShell 7 | `pwsh -NoProfile -File .opencode/opencode-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
 
 7. End the turn. Done when its final message names what stopped, step 5's
    landing outcome, uncommitted files, open builds or checks, pending questions,
@@ -81,7 +80,7 @@ resumes the work.
   committing, and worktree removal wait for the resumed session, apart from
   what a `/finalize-changes` worker left running in step 2 completes.
 - Keep the resume state in `Temp/eod-resume.md`: `Temp/` is gitignored and
-  survives reattach, and the Codex and OpenCode wrappers start a new
+  survives reattach, and the Codex wrapper starts a new
   conversation, which the final message alone would not reach.
 - Write the final message under
   [`change-workflow.md`](../../references/change-workflow.md)

@@ -3,8 +3,7 @@
 ## Delegated execution context
 
 Delegation uses a fresh, isolated context by default: Codex uses
-`fork_turns: "none"`; Claude receives a fresh prompt; OpenCode calls `task`
-with the table's `subagent_type` and omits `task_id`. A positive Codex turn
+`fork_turns: "none"`; Claude receives a fresh prompt. A positive Codex turn
 fork is allowed only when exact authoritative conversation text cannot be
 safely summarized, and the prompt states why.
 

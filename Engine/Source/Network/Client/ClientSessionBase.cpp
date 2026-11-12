@@ -48,28 +48,16 @@ void ClientSessionBase::Reconcile()
 
 void ClientSessionBase::ApplyReceivedStaticData()
 {
-	// Heap: try_emplace may insert new Cell, NavData vectors moved into staticData
-	ScopedSuppressAllocationTracking suppress;
-
-	std::vector<ReceivedStaticData>& rStaticDataList = mpRuntime->mpClient->mReceivedStaticData;
-	for (ReceivedStaticData& rReceived : rStaticDataList)
+	for (ReceivedStaticData& rReceived : mpRuntime->mpClient->mReceivedStaticData)
 	{
-		Cell& rCell = game::gpGame->mCells.try_emplace(rReceived.coordinate).first->second;
-		rCell.staticData = std::move(rReceived.staticData);
-		rCell.staticData.coordinate = rReceived.coordinate;
-
-		// Subscription-driven island texture loading. AcquireTextureSlot is idempotent; duplicate
-		// CRCs across placements short-circuit on the hot path. Slot mint + chunk-load request
-		// happens here so the data is in-flight before UpdateActiveIslands references the slot.
-		for (const IslandPlacement& rPlacement : rCell.staticData.islands)
-		{
-			gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
-		}
+		mpRuntime->StageStaticData(std::move(rReceived));
 	}
+	mpRuntime->mpClient->mReceivedStaticData.clear();
 }
 
 void ClientSessionBase::ResetCoordinateStatesForResynchronization()
 {
+	mpRuntime->ResetPendingFrames();
 	for ([[maybe_unused]] auto& [rCoordinate, rCell] : game::gpGame->mCells)
 	{
 		rCell.ResetClientState();

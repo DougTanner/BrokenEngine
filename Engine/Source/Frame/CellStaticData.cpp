@@ -5,6 +5,40 @@
 namespace engine
 {
 
+static void WriteCompactInteger(std::ostream& rStream, int64_t iValue)
+{
+	ASSERT(iValue >= 0 && iValue <= INT32_MAX);
+	uint32_t uiValue = static_cast<uint32_t>(iValue);
+	do
+	{
+		uint8_t uiByte = static_cast<uint8_t>(uiValue & 0x7Fui32);
+		uiValue >>= 7;
+		if (uiValue != 0)
+		{
+			uiByte |= 0x80ui32;
+		}
+		common::Write(rStream, uiByte);
+	}
+	while (uiValue != 0);
+}
+
+static int64_t ReadCompactInteger(std::istream& rStream)
+{
+	uint32_t uiValue = 0;
+	int64_t iShift = 0;
+	uint8_t uiByte = 0;
+	do
+	{
+		uiByte = 0;
+		common::Read(rStream, uiByte);
+		ASSERT(iShift != 28 || uiByte <= 0x07ui32);
+		uiValue |= static_cast<uint32_t>(uiByte & 0x7Fui32) << iShift;
+		iShift += 7;
+	}
+	while ((uiByte & 0x80ui32) != 0);
+	return uiValue;
+}
+
 void CellStaticData::Write(std::ostream& rStream) const
 {
 	common::Write(rStream, static_cast<int32_t>(std::ssize(islands)));
@@ -17,7 +51,39 @@ void CellStaticData::Write(std::ostream& rStream) const
 	common::Write(rStream, static_cast<int32_t>(std::ssize(navigationData)));
 	for (const NavData& rNavData : navigationData)
 	{
-		rNavData.Write(rStream);
+		common::Write(rStream, static_cast<int32_t>(std::ssize(rNavData.vertices)));
+		for (const XMFLOAT2& rVertex : rNavData.vertices)
+		{
+			common::Write(rStream, rVertex);
+		}
+		common::Write(rStream, static_cast<int32_t>(std::ssize(rNavData.polygonOffsets)));
+		int64_t iPreviousOffset = 0;
+		for (int32_t iOffset : rNavData.polygonOffsets)
+		{
+			WriteCompactInteger(rStream, iOffset - iPreviousOffset);
+			iPreviousOffset = iOffset;
+		}
+		int64_t iEdgeCount = std::ssize(rNavData.visibilityEdgeA);
+		ASSERT(iEdgeCount == std::ssize(rNavData.visibilityEdgeB));
+		common::Write(rStream, static_cast<int32_t>(iEdgeCount));
+		int64_t iEdge = 0;
+		for (int64_t iSource = 0; iSource < std::ssize(rNavData.vertices); ++iSource)
+		{
+			int64_t iStart = iEdge;
+			while (iEdge < iEdgeCount && rNavData.visibilityEdgeA.at(iEdge) == iSource)
+			{
+				++iEdge;
+			}
+			WriteCompactInteger(rStream, iEdge - iStart);
+			int64_t iPreviousTarget = 0;
+			for (int64_t i = iStart; i < iEdge; ++i)
+			{
+				int64_t iTarget = rNavData.visibilityEdgeB.at(i);
+				WriteCompactInteger(rStream, iTarget - iPreviousTarget);
+				iPreviousTarget = iTarget;
+			}
+		}
+		ASSERT(iEdge == iEdgeCount);
 	}
 }
 
@@ -37,11 +103,43 @@ void CellStaticData::Read(std::istream& rStream)
 	navigationData.resize(iGraphCount);
 	for (NavData& rNavData : navigationData)
 	{
-		rNavData.Read(rStream);
+		int32_t iVertexCount = 0;
+		common::Read(rStream, iVertexCount);
+		rNavData.vertices.resize(iVertexCount);
+		for (XMFLOAT2& rVertex : rNavData.vertices)
+		{
+			common::Read(rStream, rVertex);
+		}
+		int32_t iPolygonCount = 0;
+		common::Read(rStream, iPolygonCount);
+		rNavData.polygonOffsets.resize(iPolygonCount);
+		int64_t iOffset = 0;
+		for (int32_t& riOffset : rNavData.polygonOffsets)
+		{
+			iOffset += ReadCompactInteger(rStream);
+			riOffset = static_cast<int32_t>(iOffset);
+		}
+		int32_t iEdgeCount = 0;
+		common::Read(rStream, iEdgeCount);
+		rNavData.visibilityEdgeA.resize(iEdgeCount);
+		rNavData.visibilityEdgeB.resize(iEdgeCount);
+		int64_t iEdge = 0;
+		for (int64_t iSource = 0; iSource < iVertexCount; ++iSource)
+		{
+			int64_t iSourceEdgeCount = ReadCompactInteger(rStream);
+			int64_t iTarget = 0;
+			for (int64_t i = 0; i < iSourceEdgeCount; ++i)
+			{
+				iTarget += ReadCompactInteger(rStream);
+				rNavData.visibilityEdgeA.at(iEdge) = static_cast<int32_t>(iSource);
+				rNavData.visibilityEdgeB.at(iEdge) = static_cast<int32_t>(iTarget);
+				++iEdge;
+			}
+		}
+		BuildNavigationAcceleration(rNavData);
 	}
-	// Wire-received navigationData is authoritative (client never rebuilds — server-only NavContour), so mark it
-	// built regardless of vertex count.
-	bNavigationDataBuilt = true;
+	// Server visibility is authoritative; an empty completed graph must still be marked built.
+	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 }
 
 void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const

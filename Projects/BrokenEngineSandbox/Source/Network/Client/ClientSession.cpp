@@ -171,8 +171,8 @@ void ClientSession::OnConnectionAccepted()
 		Camera& rCamera = static_cast<Camera&>(*engine::gpCamera);
 		rCamera.StorePose(true);
 		gpGame->mGameFlags.Set(engine::GameFlags::kMainMenu, false);
-		gpGame->CreateNewFrame();
 		gpGame->ResetSession();
+		gpGame->CreateNewFrame();
 		rCamera.ApplyPose(false);
 		gpGame->meUiState = engine::UiState::kNone;
 	}

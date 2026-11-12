@@ -99,7 +99,7 @@ if ($Target -ceq 'ModelViewer') {
 }
 
 # WorktreeCli serializes the target inside this private worktree, so there is no cross-session
-# contention here. A nonzero exit hard-fails session start (new session or reattach); the message
+# contention here. A nonzero exit hard-fails fresh-session setup; the message
 # names the local build, not the shared-executable wrap-up-sessions guidance, which does not apply
 # to a private compile.
 $solution = Join-Path $Worktree 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'

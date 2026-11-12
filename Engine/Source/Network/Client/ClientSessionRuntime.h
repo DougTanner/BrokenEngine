@@ -83,6 +83,9 @@ public:
 	void ClearSubscriptionState();
 
 	void ComputeActiveSet();
+	void StageLocalCell(GridCoord coordinate);
+	void StageStaticData(ReceivedStaticData received);
+	void ResetPendingFrames();
 	void PinClientGridCoordinate(GridCoord coordinate);
 	StandardMenuState_t GetStandardMenuState() const;
 
@@ -115,6 +118,32 @@ public:
 	int64_t miVisibleNeighborCount = 0;
 
 private:
+
+	struct PendingCell
+	{
+		uint64_t uiPreparation = 0;
+		ReceivedCellIdentity identity;
+		std::optional<CellStaticData> optionalStaticData;
+		std::optional<CellStaticData> optionalAuthoritativeStaticData;
+		std::unique_ptr<game::Frame> pLocalFrame;
+		std::optional<ReceivedCoordFullState> optionalFullState;
+		std::unordered_map<int64_t, ReceivedCoordUpdate> updates;
+		bool bTerrainReady = false;
+	};
+
+	bool IsCurrentIdentity(const ReceivedCellIdentity& rIdentity) const;
+	bool HoldsSlotOrRequest(GridCoord coordinate) const;
+	PendingCell& PendingForIdentity(const ReceivedCellIdentity& rIdentity);
+	void PollTerrainPreparation();
+	void StartTerrainPreparation();
+	void PublishPreparedCells();
+	void AdoptFullState(ReceivedCoordFullState& rFullState);
+	void ResolveAuthoritativeTerrain(PendingCell& rPending);
+	std::unordered_map<GridCoord, PendingCell> mPendingCells;
+	std::future<CellStaticData> mTerrainPreparation;
+	GridCoord mPreparingCoordinate {};
+	uint64_t muiNextPreparation = 0;
+	uint64_t muiPreparingIdentity = 0;
 
 	void ResetForConnect();
 	void ResetForServerLoad();

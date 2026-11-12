@@ -530,14 +530,33 @@ VkSwapchainKHR SwapchainManager::ReleaseHandleForRecreation()
 
 void SwapchainManager::AcquireNextImage()
 {
-	ScopedSlowOperation scopedSlowOperation(kGraphics, "Swapchain image acquisition");
+	AcquisitionDiagnostics acquisitionDiagnostics {};
+	if constexpr (kbProfilingFrameSpike)
+	{
+		static uint64_t suiAcquisitionSequence = 0;
+		acquisitionDiagnostics.uiSequence = ++suiAcquisitionSequence;
+		acquisitionDiagnostics.iFrameCounter = gpGraphics->miFrameCounter;
+		acquisitionDiagnostics.iIncomingFramebuffer = miFramebufferIndex;
+		acquisitionDiagnostics.bFenceWaitRequired = mCurrentImageAvailableVkFence != VK_NULL_HANDLE;
+	}
+	ScopedSlowOperation scopedSlowOperation(kGraphics, "Swapchain image acquisition", nullptr, kbProfilingFrameSpike ? &acquisitionDiagnostics : nullptr);
 	ScopedCpuProfile scopedCpuProfile(kCpuTimerAcquireImage);
+	std::chrono::steady_clock::time_point callStart;
 
 	if (mCurrentImageAvailableVkFence != VK_NULL_HANDLE)
 	{
 		// Make sure previous image has been fully acquired before proceeding
 		ScopedCpuProfile scopedCpuProfileFence(kCpuTimerAcquireImageFence);
-		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mCurrentImageAvailableVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
+		if constexpr (kbProfilingFrameSpike)
+		{
+			callStart = std::chrono::steady_clock::now();
+		}
+		VkResult vkFenceResult = vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mCurrentImageAvailableVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count());
+		if constexpr (kbProfilingFrameSpike)
+		{
+			acquisitionDiagnostics.optionalFenceNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - callStart).count();
+		}
+		CHECK_VK(vkFenceResult);
 		mCurrentImageAvailableVkFence = VK_NULL_HANDLE;
 	}
 
@@ -545,7 +564,20 @@ void SwapchainManager::AcquireNextImage()
 	CHECK_VK(vkResetFences(gpDeviceManager->mVkDevice, 1, &mCurrentImageAvailableVkFence));
 	mImageAvailableVkSemaphore = GetNextImageAvailableSemaphore();
 	uint32_t uiFramebufferIndex = 0xFFFFFFFF;
+	if constexpr (kbProfilingFrameSpike)
+	{
+		callStart = std::chrono::steady_clock::now();
+	}
 	VkResult vkResult = vkAcquireNextImageKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, UINT64_MAX, mImageAvailableVkSemaphore, mCurrentImageAvailableVkFence, &uiFramebufferIndex);
+	if constexpr (kbProfilingFrameSpike)
+	{
+		acquisitionDiagnostics.optionalAcquireNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - callStart).count();
+		acquisitionDiagnostics.optionalResult = vkResult;
+		if (vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR)
+		{
+			acquisitionDiagnostics.optionalImageIndex = uiFramebufferIndex;
+		}
+	}
 	if (vkResult == VK_SUCCESS)
 	{
 		miFramebufferIndex = uiFramebufferIndex;

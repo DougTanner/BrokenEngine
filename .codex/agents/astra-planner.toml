@@ -1,0 +1,5 @@
+name = "astra-planner"
+description = "Plans and design for the planner role."
+developer_instructions = "Follow repository instructions for Fable-assigned work. Never dispatch another agent; return delegated work to the caller. Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`."
+model = "gpt-6-astra"
+model_reasoning_effort = "high"

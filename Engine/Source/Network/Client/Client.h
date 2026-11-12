@@ -20,9 +20,20 @@ namespace engine
 
 class ClientSessionRuntime;
 
+struct ReceivedCellIdentity
+{
+	GridCoord coordinate {};
+	int64_t iSlot = -1;
+	int64_t iEpoch = -1;
+	int64_t iLoadGeneration = -1;
+
+	bool operator==(const ReceivedCellIdentity&) const = default;
+};
+
 // Per-coordinate received update (single coordinate, not multi-coordinate)
 struct ReceivedCoordUpdate
 {
+	ReceivedCellIdentity identity;
 	int64_t iTick = 0;
 	common::crc_t uiSharedCrc = 0;
 	// Heap: ENet packet data, variable per frame
@@ -31,15 +42,15 @@ struct ReceivedCoordUpdate
 
 struct ReceivedCoordFullState
 {
+	ReceivedCellIdentity identity;
 	int64_t iTick = 0;
-	GridCoord coordinate {};
 	std::unique_ptr<game::Frame> pFrame;
 };
 
 // Per-coordinate received static data (sent once per subscription)
 struct ReceivedStaticData
 {
-	GridCoord coordinate {};
+	ReceivedCellIdentity identity;
 	CellStaticData staticData;
 };
 

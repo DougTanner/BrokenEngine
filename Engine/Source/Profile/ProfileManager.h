@@ -375,7 +375,9 @@ public:
 
 	void GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer);
 	void GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer);
-	void GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample);
+	void GpuSubmitted(int64_t iCommandBuffer, bool bWorld);
+	void GpuRead(int64_t iCommandBuffer);
+	void LogLatestGpuSample();
 
 	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
 
@@ -484,6 +486,26 @@ protected:
 	common::Flags<DiagnosticFlags> mDiagnosticFlags {DiagnosticFlags::kFocused};
 
 	VkQueryPool mVkQueryPool = VK_NULL_HANDLE;
+	struct GpuSubmission
+	{
+		int64_t iSequence = 0;
+		bool bWorld = false;
+		std::chrono::nanoseconds expectedInterval = 0ns;
+		std::chrono::steady_clock::time_point submitTime {};
+	};
+	struct GpuDiagnosticSample
+	{
+		GpuSubmission submission;
+		int64_t iFramebuffer = 0;
+		std::array<std::optional<int64_t>, kGpuTimerCount> microseconds {};
+
+		std::optional<int64_t> RootMicroseconds() const;
+	};
+	void LogGpuSample(const GpuDiagnosticSample& rSample, std::string_view pcContext);
+	std::vector<GpuSubmission> mGpuSubmissions;
+	int64_t miGpuSubmissionSequence = 0;
+	std::array<common::Smoothed<int64_t>, kGpuTimerCount> mGpuDiagnosticHistories {};
+	GpuDiagnosticSample mLatestGpuSample {};
 
 	std::unique_ptr<common::DiagnosticLog> mpDumpLog;
 	std::chrono::steady_clock::time_point mDumpStartTime = std::chrono::steady_clock::time_point();
@@ -543,11 +565,23 @@ private:
 };
 
 #if defined(BT_CLIENT)
+struct AcquisitionDiagnostics
+{
+	uint64_t uiSequence = 0;
+	int64_t iFrameCounter = 0;
+	int64_t iIncomingFramebuffer = 0;
+	bool bFenceWaitRequired = false;
+	std::optional<int64_t> optionalFenceNanoseconds;
+	std::optional<int64_t> optionalAcquireNanoseconds;
+	std::optional<VkResult> optionalResult;
+	std::optional<uint32_t> optionalImageIndex;
+};
+
 class [[nodiscard]] ScopedSlowOperation
 {
 public:
 
-	ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics = nullptr);
+	ScopedSlowOperation(common::LogCategory eCategory, const char* pcOperation, const ReconciliationDiagnostics* pReconciliationDiagnostics = nullptr, const AcquisitionDiagnostics* pAcquisitionDiagnostics = nullptr);
 	~ScopedSlowOperation();
 	ScopedSlowOperation(const ScopedSlowOperation&) = delete;
 	ScopedSlowOperation& operator=(const ScopedSlowOperation&) = delete;
@@ -557,6 +591,7 @@ private:
 	common::LogCategory meCategory = kDefault;
 	const char* mpcOperation = nullptr;
 	const ReconciliationDiagnostics* mpReconciliationDiagnostics = nullptr;
+	const AcquisitionDiagnostics* mpAcquisitionDiagnostics = nullptr;
 	std::chrono::nanoseconds mExpectedRenderedFrameInterval = 0ns;
 	std::chrono::steady_clock::time_point mStartTime = std::chrono::steady_clock::time_point();
 };

@@ -25,6 +25,23 @@ constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
 IslandTerrain::IslandTerrain()
 : common::Singleton<IslandTerrain>(gpIslandTerrain, this)
 {
+	for (int64_t j = 0; j < kiElevationGridDimension; ++j)
+	{
+		auto& [rFirst, rEnd] = mElevationRowSpans.at(j);
+		rFirst = kiElevationGridDimension;
+		rEnd = kiElevationGridDimension;
+		float fTexelY = kfCellOriginY + (static_cast<float>(j) + 0.5f) * kfGridPitchY;
+		for (int64_t i = 0; i < kiElevationGridDimension; ++i)
+		{
+			float fTexelX = kfCellOriginX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
+			if (common::IsInsideHex(XMVectorSet(fTexelX, fTexelY, 0.0f, 1.0f), kCellDirections, -kfCellLandMarginMeters))
+			{
+				rFirst = std::min(rFirst, i);
+				rEnd = i + 1;
+			}
+		}
+	}
+
 	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->mpPackChunks->mLazyChunkMap;
 	for (const auto& [rCrc, rLazyChunk] : rChunkMap)
 	{
@@ -378,7 +395,7 @@ float IslandTerrain::CellElevation(const CellStaticData& rStaticData, const XMFL
 // whose center lies past the hexagon grown by kfCellLandMarginMeters keeps the sea floor: hulls beyond that margin are
 // not listed here, and a footprint rectangle can extend past its placement's hull, so land there would depend on which
 // neighbours list the island.
-static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
+static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, const std::array<std::pair<int64_t, int64_t>, kiElevationGridDimension>& rRowSpans, std::vector<float>& rOutGrid)
 {
 	float fFootprintX = rTemplate.fQuadFootprintX;
 	float fFootprintY = rTemplate.fQuadFootprintY;
@@ -419,16 +436,14 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 	{
 		float fTexelY = kfCellOriginY + (static_cast<float>(j) + 0.5f) * kfGridPitchY;
 		float fDeltaY = fTexelY - rPlacement.f2WorldPosition.y;
-		for (int64_t i = iMinimumGridX; i <= iMaximumGridX; ++i)
+		int64_t iFirst = std::max(iMinimumGridX, rRowSpans.at(j).first);
+		int64_t iEnd = std::min(iMaximumGridX + 1, rRowSpans.at(j).second);
+		for (int64_t i = iFirst; i < iEnd; ++i)
 		{
 			float fTexelX = kfCellOriginX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
 			float fDeltaX = fTexelX - rPlacement.f2WorldPosition.x;
 			float fSample = 0.0f;
 			if (!SamplePlacementHeightmap<true, true>(fDeltaX, fDeltaY, fCosine, fSine, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.puiHeightmapHalf, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fInverseFootprintX, fInverseFootprintY, fHeightmapMaximumU, fHeightmapMaximumV, fSample))
-			{
-				continue;
-			}
-			if (!common::IsInsideHex(XMVectorSet(fTexelX, fTexelY, 0.0f, 1.0f), kCellDirections, -kfCellLandMarginMeters))
 			{
 				continue;
 			}
@@ -446,7 +461,7 @@ void XM_CALLCONV IslandTerrain::BuildElevationGrid(const std::vector<IslandPlace
 
 	for (const IslandPlacement& rPlacement : rPlacements)
 	{
-		BlendPlacementIntoGrid(rPlacement, mIslands.at(rPlacement.islandCrc), rOutGrid);
+		BlendPlacementIntoGrid(rPlacement, mIslands.at(rPlacement.islandCrc), mElevationRowSpans, rOutGrid);
 	}
 }
 

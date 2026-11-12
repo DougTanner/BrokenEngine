@@ -4,6 +4,11 @@
 
 ## Server
 
+- Coordinate static delivery uses the [compact cell codec](../../Engine/Source/Frame/AGENTS.md#terrain-and-navigation)
+  and [server-owned cached body](../../Engine/Source/Network/Server/AGENTS.md#buffered-state).
+  `NetworkMessages::ServerCoordStaticDataMessage` owns raw/LZ4 framing. The
+  client rejects stale load, slot, coord, and epoch envelopes before
+  decompression or static-data decoding.
 - Multi-threaded Frame Tick update, spread over cores via `common::gpMultithreading->Dispatch` (`GameBase::BuildAndDispatchFrameTicks`)
 - Each Tick is simulated exactly once: previous Frame Tick(`sharedCrc`) + StatusChanges → new Frame Tick(`sharedCrc`)
 - When a Tick is ready, send its StatusChanges + `sharedCrc` to the client (one unreliable packet per active subscription slot)

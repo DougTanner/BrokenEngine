@@ -40,7 +40,7 @@ function Test-AgentWorktreeAncestor([string] $RepositoryRoot, [string] $Ancestor
 	if ($LASTEXITCODE -ne 0) { throw "Commit '$Ancestor' is not an ancestor of $Description '$Descendant'." }
 }
 
-function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
+function Get-AgentWorktreePrimaryCheckout([string] $RepositoryRoot) {
 	$root = Get-AgentCanonicalPath $RepositoryRoot
 	$top = Get-AgentWorktreeGitValue $root @('rev-parse', '--show-toplevel') 'repository top-level'
 	$top = Get-AgentCanonicalPath $top
@@ -50,11 +50,17 @@ function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
 	$common = Get-AgentWorktreeGitValue $root @('rev-parse', '--path-format=absolute', '--git-common-dir') 'Git common directory'
 	$common = Get-AgentCanonicalPath $common
 	if (-not $common.Equals((Get-AgentCanonicalPath $git.FullName), [StringComparison]::OrdinalIgnoreCase)) { throw "RepositoryRoot does not own its Git common directory: '$root'." }
+	return [pscustomobject]@{ Root = $root; CommonDirectory = $common }
+}
+
+function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
+	$primary = Get-AgentWorktreePrimaryCheckout $RepositoryRoot
+	$root = $primary.Root
 	$branch = Get-AgentWorktreeGitValue $root @('branch', '--show-current') 'primary branch'
 	$head = Get-AgentWorktreeGitValue $root @('rev-parse', 'HEAD') 'primary HEAD'
 	if ($head -cnotmatch '^[0-9a-f]{40}$') { throw "Primary HEAD is malformed: '$head'." }
 	Test-AgentWorktreeNoGitOperation $root
-	return [pscustomobject]@{ Root = $root; CommonDirectory = $common; Branch = $branch; Head = $head }
+	return [pscustomobject]@{ Root = $root; CommonDirectory = $primary.CommonDirectory; Branch = $branch; Head = $head }
 }
 
 # Session identity is entirely Git-derived: the branch names the session, the Git common directory
@@ -78,11 +84,11 @@ function Get-AgentWorktreeSessionContext {
 		# lands onto its recorded parent, not whatever the primary checkout has checked out right now.
 		$sidecarPath = Join-Path $top 'Temp\session-sidecar.json'
 		if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) {
-			throw "Session sidecar '$sidecarPath' is missing. Start or reattach this worktree through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1', which write it."
+			throw "Session sidecar '$sidecarPath' is missing. Restore the recorded landing target in this file before running session workflow operations."
 		}
 		$sidecar = $null
 		try { $sidecar = [IO.File]::ReadAllText($sidecarPath) | ConvertFrom-Json -Depth 4 -ErrorAction Stop }
-		catch { throw "Session sidecar '$sidecarPath' is invalid: $($_.Exception.Message). Recreate it by reattaching through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1'." }
+		catch { throw "Session sidecar '$sidecarPath' is invalid: $($_.Exception.Message). Restore the recorded landing target in this file before running session workflow operations." }
 		# Every post-parse failure funnels into one diagnostic: reject a null or non-object parse result
 		# before touching properties, and compare property names case-sensitively so a wrong-case field
 		# never passes. The name check runs before any property access, so StrictMode cannot throw a raw
@@ -95,7 +101,7 @@ function Get-AgentWorktreeSessionContext {
 				$sidecar.targetBranch -is [string] -and -not [string]::IsNullOrWhiteSpace($sidecar.targetBranch)
 		}
 		if (-not $valid) {
-			throw "Session sidecar '$sidecarPath' is invalid: it must contain one JSON object with exactly schemaVersion 'broken-engine-session-sidecar/v1' and a non-empty string targetBranch. Recreate it by reattaching through '.claude/claude-worktree.sh', '.codex/codex-worktree.ps1', or '.opencode/opencode-worktree.ps1'."
+			throw "Session sidecar '$sidecarPath' is invalid: it must contain one JSON object with exactly schemaVersion 'broken-engine-session-sidecar/v1' and a non-empty string targetBranch. Restore the recorded landing target in this file before running session workflow operations."
 		}
 		$sidecar.targetBranch
 	}
@@ -148,9 +154,8 @@ function Get-AgentWorktreeSessionContext {
 	}
 }
 
-# One copy of a rare, risky Git sequence, shared by the wrapper's reattach path and the mid-session
-# repair script. It is outcome-neutral: 'ancestor' means the resolved fork point is still on the
-# primary tip's history, which the wrapper treats as success and the repair script as a blocker.
+# Explicit fork-point repair: 'ancestor' means the resolved fork point is still on the primary
+# tip's history, which the repair script treats as a blocker.
 # --fork-point can succeed with no output, so the plain merge-base fallback runs before the guard and
 # --is-ancestor never receives an unset value. Local work is saved before replay and restored with
 # its index afterward; the uniquely named stash remains available even after successful recovery.
@@ -211,4 +216,4 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 	return [pscustomobject]@{ Outcome = 'rebased'; ForkPoint = $baseline; Baseline = $PrimaryTip }
 }
 
-Export-ModuleMember -Function Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint
+Export-ModuleMember -Function Get-AgentWorktreePrimaryCheckout, Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint
