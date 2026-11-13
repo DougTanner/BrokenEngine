@@ -16,8 +16,8 @@ itself.
 ## When to use
 
 - Any request to build, rebuild, compile, or check for compile/link errors in
-  ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, ServerMonitor, or a game project
-  under `Projects/` (client or server).
+  ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, ServerMonitor,
+  or a game project under `Projects/` (client or server).
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
   link-error check.
@@ -38,12 +38,12 @@ Consumes the task-brief fields in
 skill-specific inputs:
 
 - the targets and configurations to build, and any selective `.cpp` file list.
-  Agents build DataPacker, WorktreeCli, AgentHarness, and ServerMonitor in Release only, and
-  the build script refuses any other configuration for them. Agent tooling
-  runs only the Release executables, since each Debug build is named
-  `<Project>.Debug.exe`. Those Debug configurations are for humans debugging
-  the tools, and DataPacker's Debug export is very slow. ThirdParty builds run
-  only in the primary checkout, per
+  Agents build DataPacker, WorktreeCli, AgentHarness, and ServerMonitor in
+  Release only, and the build script refuses any other configuration for them.
+  Agent tooling runs only the Release executables, since each Debug build is
+  named `<Project>.Debug.exe`. Those Debug configurations are for humans
+  debugging the tools, and DataPacker's Debug export is very slow. ThirdParty
+  builds run only in the primary checkout, per
   [`ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`](../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md)
   `## Consumer Provisioning`: from any other checkout `-Target ThirdParty` is
   blocked, so never request it from a session worktree;
@@ -85,18 +85,21 @@ Return the shared handoff form in
 the execution and result discipline in
 [`references/worker.md`](references/worker.md).
 
-- `Decisive checks` — one row per build: target, configuration, the game for a
-  client or server build, `status`, `exitCode`, `failureKind`, and, for a
-  failing build with a `severity: error` diagnostic, the first one's `code` and
-  `file`.
+- `Decisive checks` — one success row, whether or not any build fails: the
+  count of successful builds, then each one as
+  `target|configuration[|game for a client or server build]`, with no per-build
+  status fields.
+- `Decisive checks` — one row per failing build: target, configuration, the
+  game for a client or server build, `status`, `exitCode`, `failureKind`, and,
+  with a `severity: error` diagnostic, the first one's `code` and `file`.
 - `Decisive checks` — for a game build, one row naming the game and the
   envelope's `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory`
   switch values.
 - `Decisive checks` — for a `-ClangTidy` build, one row naming whether analysis
   executed, the de-duplicated warning count, and the `clang-diagnostic-error`
   parse-error count with the first unparsable file.
-- `Evidence` — one row per build carrying its `retainedLog.path`, plus one row
-  for this dispatch's envelope file as path plus `##` selector.
+- `Evidence` — one row for this dispatch's envelope file as path plus `##`
+  selector; that file holds each build's envelope block and its `retainedLog`.
 - `Residuals` — one row per failed or skipped required build, counting
   `complete: false` as a failure; `none` when absent.
 
@@ -110,13 +113,14 @@ files are ignored `Temp/` output.
 
 When an execution-card acceptance check has its assigned dispatch run this
 skill inside that dispatch's own task, as `## Purpose` routes, the decisive
-field is the per-build `Decisive checks` row above. That dispatch adds one row
-per build under its own shared `Decisive checks` — whether the expected
-observation was met, that run's `Status`, and the build's per-build row — plus
-one row summarizing the resulting working-tree state, never pasting
-`git status --porcelain` output inline. It writes every build's complete
-handoff, not only past the character cap, to one gitignored `Temp/` file with
-one `## Run <n>` heading per build, by the overflow rule in
+field is the build's entry in the success row above, or its failing-build row.
+That dispatch adds one row per build under its own shared `Decisive checks` —
+whether the expected observation was met, that run's `Status`, and the build's
+success-row entry or failing-build row — plus one row summarizing the resulting
+working-tree state, never pasting `git status --porcelain` output inline. It
+writes every build's complete handoff, not only past the character cap, to one
+gitignored `Temp/` file with one `## Run <n>` heading per build, by the overflow
+rule in
 [`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`;
 that handoff counts as that build's complete `/compile` handoff for landing. A
 running skill whose own `## Handoff` declares a field for the run's result puts

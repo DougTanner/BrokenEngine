@@ -4,8 +4,8 @@ Server-only statistics aggregation and the separate Server Monitor channel.
 
 ## Ownership and Cadence
 
-- `Main.cpp` owns the host after the game and NetworkManager, and stops and joins
-  it before those objects or the profile and file managers are destroyed.
+- `Main.cpp` owns the host after the game and NetworkManager, and stops and
+  joins it before those objects or the profile and file managers are destroyed.
 - The main thread aggregates statistics on every update with the existing
   profiling configuration gates, preserving raw `query_profile` rows even
   without a monitor. Every eighth update while authenticated, it captures

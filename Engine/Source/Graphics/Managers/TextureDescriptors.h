@@ -25,7 +25,7 @@ public:
 	class [[nodiscard]] ScopedBindlessWriteEpoch
 	{
 	public:
-		// iFramebuffer names the only framebuffer whose sets are writable (RenderGlobal, once that framebuffer's fence
+		// iFramebuffer names the only framebuffer whose sets are writable (Graphics::UpdateFrameResidency, once that framebuffer's fence
 		// has signaled), or kiAllFramebuffers in a drained context.
 		ScopedBindlessWriteEpoch(TextureDescriptors& rTextureDescriptors, int64_t iFramebuffer);
 		ScopedBindlessWriteEpoch(const ScopedBindlessWriteEpoch&) = delete;

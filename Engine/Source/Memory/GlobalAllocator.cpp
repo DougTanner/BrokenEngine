@@ -2,10 +2,6 @@
 
 #include "CrashReport.h"
 
-constinit std::atomic<int64_t> giAllocationsThisFrame = 0;
-
-constinit std::atomic<bool> gbAllocationTrackingReady = false;
-
 static void TrackAllocation()
 {
 	if constexpr (kbProfiling)
@@ -285,7 +281,7 @@ struct MemoryInitializer
 			int64_t iPeakCommittedMebibytes = statistics.committed.peak / (1'024 * 1'024);
 
 			// May log during static destruction: Log.cpp initializes via init_seg(lib), so it is destroyed after this default-phase object.
-			LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB, arenas: {} (after reserve: {}), arena reserve: {} MiB", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, statistics.arena_count.total, iArenaCountAfterReserve, iArenaReserveMebibytes);
+			LOG(kDefault, kInfo, "Mimalloc page-committed peak: {} MiB, peak committed: {} MiB, arenas: {} (after reserve: {}), arena reserve: {} MiB", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, statistics.arena_count.total, iArenaCountAfterReserve, iArenaReserveMebibytes);
 
 			// More arenas than after the reserve means the reserve failed or was undersized.
 			if (statistics.arena_count.total > iArenaCountAfterReserve)

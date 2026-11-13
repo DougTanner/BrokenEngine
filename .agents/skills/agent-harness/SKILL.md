@@ -72,18 +72,17 @@ Evaluate each criterion as `PASS`, `FAIL`, or `BLOCKED` from exact
 command/query/scene/UI/screenshot/log evidence, and treat a setup limitation as
 a blocked check. Give each observed criterion failure and process-check failure
 a stable `HARNESS-F-###` ID and report it exactly once as a `Required` row in
-the shared `Findings` field. Process-check findings can come from launch, a poll, a
-transport-failure check, or release entry; record the role, report path,
-exception headline, exit code, and retained evidence path in that finding.
-Do not repeat those values in criterion rows, `Evidence`, or `Residuals`.
-Criterion rows cite the finding ID instead. `FAIL` the criterion that was live
-when a process-check failure was observed. A criterion whose endpoint crashed
-before it could be exercised is `BLOCKED` and may cite that same process
-finding; do not silently retry it. A process finding observed outside any
-criterion, such as at release entry, still fails the run.
-Do not diagnose or edit a failure in this role; return reproducing commands and
-evidence to the main agent for the `/resolve-findings` decision and
-affected-check retest.
+the shared `Findings` field. Process-check findings can come from launch, a
+poll, a transport-failure check, or release entry; record the role, report path,
+exception headline, exit code, and retained evidence path in that finding. Do
+not repeat those values in criterion rows, `Evidence`, or `Residuals`. Criterion
+rows cite the finding ID instead. `FAIL` the criterion that was live when a
+process-check failure was observed. A criterion whose endpoint crashed before it
+could be exercised is `BLOCKED` and may cite that same process finding; do not
+silently retry it. A process finding observed outside any criterion, such as at
+release entry, still fails the run. Do not diagnose or edit a failure in this
+role; return reproducing commands and evidence to the main agent for the
+`/resolve-findings` decision and affected-check retest.
 
 Captures stay on disk. Retain the `screenshot` result `{path, width, height}` as
 evidence; an exception row cites the `Decisive checks` row or report selector

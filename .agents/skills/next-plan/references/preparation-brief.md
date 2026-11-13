@@ -88,7 +88,8 @@ stages in landing order, each with:
 The entry then lists every live Plan whose metadata `dependsOn` names the
 claimed Plan, then asks "This is about N files across M stages. Do stage 1 now
 and save stages 2 to M as new plans?", recommending yes when the total is over
-about 30 hand-edited files or about 1,500 added lines and no otherwise.
+about 30 hand-edited files or about 1,500 added lines and no otherwise. A no
+follows [the `/next-plan` steps](../SKILL.md#steps) step 8.
 
 Work forming one stage over that limit instead gets an entry stating its rough
 counts and that no cut point exists, with exactly two options: proceed now

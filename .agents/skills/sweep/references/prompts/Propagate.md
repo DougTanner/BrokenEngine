@@ -1,8 +1,11 @@
-You are the PROPAGATE step of a sweep run by `.agents/skills/sweep/SKILL.md`, for batch `{{BATCH}}`.
-Repository root (session worktree): {{ROOT}}
-Sweep Plan: {{PLAN}}
+You are the PROPAGATE step of a sweep run by `.agents/skills/sweep/SKILL.md`,
+for batch `{{BATCH}}`. Repository root (session worktree): {{ROOT}} Sweep Plan:
+{{PLAN}}
 
-Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{PLAN}}` section `## Sweep rules` when `## Find rules` defers to it. The batch's per-unit FIX agents left these `cross-file` findings unapplied, collected in `{{CROSSFILE}}`; read that file.
+Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{PLAN}}`
+section `## Sweep rules` when `## Find rules` defers to it. The batch's per-unit
+FIX agents left these `cross-file` findings unapplied, collected in
+`{{CROSSFILE}}`; read that file.
 
 For each finding: confirm it against the code and the rules `## Find rules`
 names; apply it if it is a real violation and its fix stays within

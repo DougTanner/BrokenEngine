@@ -380,8 +380,8 @@ inline std::istream& CollectionRead(std::istream& rStream, STRUCT& rCurrent, TUP
 
 #if defined(BT_CLIENT)
 // BeginRender capacity spans all active coordinates; Accessor returns a const collection reference from FrameInterpolate.
-template <typename ACCESSOR>
-int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
+template <typename ACCESSOR, typename INTERPOLATE_MAP>
+int64_t AccumulateRenderCapacity(const INTERPOLATE_MAP& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
 {
 	int64_t iTotalCapacity = 0;
 	for (const GridCoord& rCoord : rActiveCoords)
@@ -397,8 +397,8 @@ int64_t AccumulateRenderCapacity(const std::unordered_map<GridCoord, game::Frame
 
 // Erases entries from a render state map whose IDs are no longer present in any active collection.
 // Accessor returns the collection's idToIndexMap from a FrameInterpolate reference.
-template <typename MAP_TYPE, typename ACCESSOR>
-void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
+template <typename MAP_TYPE, typename ACCESSOR, typename INTERPOLATE_MAP>
+void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const INTERPOLATE_MAP& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
 {
 	// Heap: unordered_map erase for stale render state entries
 	ScopedSuppressAllocationTracking suppress;

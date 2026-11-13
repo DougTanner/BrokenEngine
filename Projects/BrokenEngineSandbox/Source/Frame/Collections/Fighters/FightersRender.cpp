@@ -81,6 +81,34 @@ void FightersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, c
 	}
 }
 
+void FightersInterpolate::RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
+{
+	std::array<bool, kiPipelineCount> bPresent {};
+	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+	{
+		auto it = rRenderInterpolates.find(rCoordinate);
+		if (it == rRenderInterpolates.end())
+		{
+			continue;
+		}
+
+		// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
+		const FightersPostRender& rPostRender = *gpGame->RenderFrame(rCoordinate).postRender.pFighters;
+		for (int64_t i = 0; i < it->second.pFighters->iCount; ++i)
+		{
+			bPresent[std::to_underlying(rPostRender.pController[i])] = true;
+		}
+	}
+
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
+	{
+		if (bPresent[i])
+		{
+			engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs[i]);
+		}
+	}
+}
+
 // Draws the rows whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for every row.
 static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const FightersPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
 {

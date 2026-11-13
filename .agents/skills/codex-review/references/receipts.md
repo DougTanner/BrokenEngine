@@ -19,15 +19,15 @@ an unused prompt path, the existing file is left untouched;
 `prompt.diff-too-large` — the evidence passed the 4 MB budget, so split the
 review into smaller authorized scopes and never truncate the evidence;
 `prompt.inventory-truncated` — name every untracked path or narrow the baseline
-until the evidence is complete; `prompt.untracked-path-unknown` — a named path is
-not an untracked file, which includes a gitignored path such as one under
-`Temp/`; `prompt.head-untracked-conflict` — a commit-valued head has no untracked
-side; `prompt.assigned-skill-unknown` — `-AssignedSkill` names no skill file, so
-fix the name or pass `-AdHocRole`; `prompt.execution-card-required` — a
-`plan-audit` scope carries no `execution card` marker;
-`prompt.execution-card-incomplete` — that scope's execution card leaves the
-named field(s) unfilled or carries none of them, so fill each one in
-`-ScopeFile` and re-run.
+until the evidence is complete; `prompt.untracked-path-unknown` — a named path
+is not an untracked file, which includes a gitignored path such as one under
+`Temp/`; `prompt.head-untracked-conflict` — a commit-valued head has no
+untracked side; `prompt.assigned-skill-unknown` — `-AssignedSkill` names no
+skill file, so fix the name or pass `-AdHocRole`;
+`prompt.execution-card-required` — a `plan-audit` scope carries no
+`execution card` marker; `prompt.execution-card-incomplete` — that scope's
+execution card leaves the named field(s) unfilled or carries none of them, so
+fill each one in `-ScopeFile` and re-run.
 
 ## Error exit codes
 

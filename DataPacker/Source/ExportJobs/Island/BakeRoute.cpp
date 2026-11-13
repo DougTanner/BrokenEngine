@@ -98,11 +98,11 @@ static std::string SplitFingerprint(const RouteSubdivision& rRoute)
 // metadata matches the content fingerprints of Island.json / the archetype and the route identity.
 // The post-Gaea split is checked separately
 // by AreLeavesDirty so a split-only change never trips this.
-static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::string& rExpectedFingerprint)
+static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, const IslandBakeContext& rContext, const RouteSubdivision& rRoute, std::string_view expectedFingerprint)
 {
-	if (std::ranges::any_of(kpcIntermediateFiles, [&rIntermediatesDirectory](const char* const& pcFile)
+	if (std::ranges::any_of(kpcIntermediateFiles, [&rIntermediatesDirectory](std::string_view file)
 	{
-		return !std::filesystem::exists(rIntermediatesDirectory / pcFile);
+		return !std::filesystem::exists(rIntermediatesDirectory / file);
 	}))
 	{
 		return true;
@@ -120,7 +120,7 @@ static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory,
 	try
 	{
 		nlohmann::json metadata = nlohmann::json::parse(ReadTextFile(versionFile));
-		nlohmann::json expected = nlohmann::json::parse(rExpectedFingerprint);
+		nlohmann::json expected = nlohmann::json::parse(expectedFingerprint);
 		metadata.at("archetype") = expected.at("archetype");
 		return metadata != expected
 		 || GetArchetypeIdentity(rIntermediatesDirectory / kpcPatchedArchetypeFile)

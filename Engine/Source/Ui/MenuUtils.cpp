@@ -69,9 +69,7 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 #if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
-		char pcValue[64];
-		std::snprintf(pcValue, sizeof(pcValue), format.data(), pWrapper->mfCurrent);
-		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(label.data()), pcValue);
+		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(label.data()), format.data(), static_cast<double>(pWrapper->mfCurrent));
 	}
 #endif
 	return bChanged;
@@ -164,10 +162,8 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper)
 #if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
-		char pcValue[64];
-		std::snprintf(pcValue, sizeof(pcValue), "%.0f%%", pWrapper->mfCurrent * 100.0f);
-		gpAgentUiRegistry->RecordItemValue(uiMinusId, pcValue);
-		gpAgentUiRegistry->RecordItemValue(uiPlusId, pcValue);
+		gpAgentUiRegistry->RecordItemValue(uiMinusId, "%.0f%%", static_cast<double>(pWrapper->mfCurrent * 100.0f));
+		gpAgentUiRegistry->RecordItemValue(uiPlusId, "%.0f%%", static_cast<double>(pWrapper->mfCurrent * 100.0f));
 	}
 #endif
 	ImGui::PopID();
@@ -298,11 +294,11 @@ float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels)
 	return fWidth + ImGui::GetStyle().FramePadding.x * 4.0f;
 }
 
-void MenuHeading(const char* pcLabel, float fHeadingScale)
+void MenuHeading(std::string_view label, float fHeadingScale)
 {
 	{
 		ScopedMenuFont headingFont(kfMenuUiScale * fHeadingScale);
-		ImGui::TextUnformatted(pcLabel);
+		ImGui::TextUnformatted(label.data(), label.data() + label.size());
 	}
 	ImGui::Dummy(ImVec2(0.0f, kfHeadingGapPixels * engine::UiScale()));
 }

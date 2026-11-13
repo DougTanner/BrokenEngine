@@ -17,11 +17,11 @@ allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion]
 
 ## Purpose
 
-Answer one question before the Plan review step: is there a materially
-different way to do this? Main dispatches one to three blind `researcher` workers
-on fixed axes, compares their candidates against the drafted approach, and
-reports that the original stands or puts every returned candidate to the user,
-who picks at most one option or combination.
+Answer one question before the Plan review step: is there a materially different
+way to do this? Main dispatches one to three blind `researcher` workers on fixed
+axes, compares their candidates against the drafted approach, and reports that
+the original stands or puts every returned candidate to the user, who picks at
+most one option or combination.
 
 ## When to use
 
@@ -32,8 +32,9 @@ who picks at most one option or combination.
   `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
 - From a `/next-plan` claim, after the preparation `implementer` verifies the
   Plan and before the Plan review reviewers, whenever that same trigger fires.
-- Not for a new Collection, manager, or subsystem API: `/external-design-interface`
-  already produces three designs and replaces this skill for that case.
+- Not for a new Collection, manager, or subsystem API:
+  `/external-design-interface` already produces three designs and replaces this
+  skill for that case.
 - Not from a saved but unclaimed Plan; such a Plan gets this step when it is
   claimed.
 

@@ -2,24 +2,22 @@
 
 #if defined(BT_CLIENT)
 #include "Data/Texture.h"
-#include "Profile/ProfileRows.h"
-#include "Ui/WrapperBase.h"
-#include "Ui/LightingWrappers.h"
-#include "Ui/SmokeWrappers.h"
-#include "Graphics/Managers/ParticleManager.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Frame/Collections/SmokeTrails/SmokeTrails.h"
 #include "Frame/Collections/WindRadials/WindRadials.h"
-#endif // BT_CLIENT
+#include "Graphics/Managers/ParticleManager.h"
+#include "Ui/WrapperBase.h"
+
+#include "Profile/ProfileRows.h"
+#include "Ui/LightingWrappers.h"
+#include "Ui/SmokeWrappers.h"
 
 namespace engine
 {
 
 template struct Collection<ExplosionsInterpolate>;
 template struct Collection<ExplosionsPostRender>;
-
-#if defined(BT_CLIENT)
 
 constexpr std::chrono::duration<float> kWindDepositDuration = std::chrono::duration<float>(0.3f);
 
@@ -48,11 +46,8 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 	});
 }
 
-#endif // BT_CLIENT
-
 void ExplosionsInterpolate::Register()
 {
-#if defined(BT_CLIENT)
 	if (siExplosionPointLightTypeIndex != kiInvalidControllerType)
 	{
 		return;
@@ -161,12 +156,7 @@ void ExplosionsInterpolate::Register()
 		.pTimes = {std::chrono::duration<float>(0.0f), kWindDepositDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});
-#endif // BT_CLIENT
 }
-
-#if defined(BT_CLIENT)
-
-#endif // BT_CLIENT
 
 void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
@@ -186,9 +176,8 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 
 		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
 
-#if defined(BT_CLIENT)
 		// Release expired trails (cleanup happens every frame, not just at explosion expiration).
-		// Cleanup uses unmultiplied pTrailTimes so it fires in lockstep with the shared explosion-entry
+		// Cleanup uses unmultiplied pTrailTimes so it fires in lockstep with the explosion-entry
 		// destruction below — applying the client-only Duration multiplier here would let the entry be
 		// destroyed first, and the compaction fold would then release its trails before they end.
 		for (int64_t j = 0; j < iTrailCount; ++j)
@@ -199,7 +188,6 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 				ReleaseIndexableElementAndClearHandle(rFrame, rInterpolate.pTrails[j][i]);
 			}
 		}
-#endif // BT_CLIENT
 
 		if (!(rPostRender.pLifecycleFlags[i] & LifecycleFlags::kDying))
 		{
@@ -222,46 +210,6 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 	}
 }
 
-bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) const
-{
-	common::ScopedLogDifferenceContext context("ExplosionsInterpolate");
-	bool bEqual = true;
-	bEqual &= Collection::LogDifferences(rOther);
-
-	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
-	{
-		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
-		bEqual &= common::LogDifference<"pStartTimes">(i, pStartTimes[i].time_since_epoch().count(), rOther.pStartTimes[i].time_since_epoch().count());
-		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
-		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
-		bEqual &= common::LogDifference<"pfTimePercents">(i, pfTimePercents[i], rOther.pfTimePercents[i]);
-		bEqual &= common::LogDifference<"piTrailCounts">(i, piTrailCounts[i], rOther.piTrailCounts[i]);
-
-		for (int64_t j = 0; j < piTrailCounts[i]; ++j)
-		{
-			bEqual &= common::LogDifference<"pTrailTimes">(i, pTrailTimes[j][i], rOther.pTrailTimes[j][i]);
-		}
-	}
-
-	return bEqual;
-}
-
-bool ExplosionsPostRender::LogDifferences(const ExplosionsPostRender& rOther) const
-{
-	common::ScopedLogDifferenceContext context("ExplosionsPostRender");
-	bool bEqual = true;
-	bEqual &= Collection::LogDifferences(rOther);
-
-	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
-	{
-		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
-	}
-
-	return bEqual;
-}
-
-#if defined(BT_CLIENT)
+} // namespace engine
 
 #endif // BT_CLIENT
-
-} // namespace engine

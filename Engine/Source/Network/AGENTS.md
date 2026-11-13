@@ -1,25 +1,45 @@
 # Engine Network - Transport and Protocol Infrastructure
 
-Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, and hostile-input enforcement. Game packet payloads and reconciliation policy belong to game Network, and flow and timing detail to Network architecture; both are linked under `## See Also`.
+Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors,
+and hostile-input enforcement. Game packet payloads and reconciliation policy
+belong to game Network, and flow and timing detail to Network architecture; both
+are linked under `## See Also`.
 
 ## Transport Contracts
 
-- Use `NetworkManager` channel helpers for control and per-coordinate reliable/unreliable channels. All sends go through `SendPacket`; a client game request goes through `ClientSessionRuntime::SendGameRequest`, which writes the game-defined message through `NetworkMessages::Write`, and engine packets use `NetworkMessages` layouts, except the debug-control requests, which `Client::SendSimplePacket` sends.
-- Each coordinate slot has independent ACK floor, bitfield, and epoch state (epoch is the reuse counter). Epoch mismatch drops stale traffic after slot reuse; unsubscribe carries the observed epoch, so a stale request cannot free a reused slot while the server still ACKs the no-op.
-- Load generation identifies the server's current debugging-load world across connection bootstrap and load-scoped subscription traffic. Both receivers compare it with their own before applying the slot epoch or mutating transport/game state; a mismatch logs a Network warning and returns. Epoch stays the reuse counter within one load generation. Wire and reset behavior: [Network architecture](../../../Documents/Architecture/Network.md#debug-load-generation).
-- Engine packet types remain below `kGamePacketStart`; game packets are forwarded opaquely.
+- Use `NetworkManager` channel helpers for control and per-coordinate
+  reliable/unreliable channels. All sends go through `SendPacket`; a client game
+  request goes through `ClientSessionRuntime::SendGameRequest`, which writes the
+  game-defined message through `NetworkMessages::Write`, and engine packets use
+  `NetworkMessages` layouts, except the debug-control requests, which
+  `Client::SendSimplePacket` sends.
+- Each coordinate slot has independent ACK floor, bitfield, and epoch state
+  (epoch is the reuse counter). Epoch mismatch drops stale traffic after slot
+  reuse; unsubscribe carries the observed epoch, so a stale request cannot free
+  a reused slot while the server still ACKs the no-op.
+- Load generation identifies the server's current debugging-load world across
+  connection bootstrap and load-scoped subscription traffic. Both receivers
+  compare it with their own before applying the slot epoch or mutating
+  transport/game state; a mismatch logs a Network warning and returns. Epoch
+  stays the reuse counter within one load generation. Wire and reset behavior:
+  [Network architecture](../../../Documents/Architecture/Network.md#debug-load-generation).
+- Engine packet types remain below `kGamePacketStart`; game packets are
+  forwarded opaquely.
 - Every incompatible wire change increments `engine::kiProtocolVersion`: a game
-  `StatusChange` payload (any `StatusChangeData` arm's `Fields()`) layout change is bumped by its
-  game codec owner; an engine packet layout change, an added engine packet type,
-  or a change to what an engine packet's contract row requires of its payload
-  content (such as a payload header the server parses and rejects when it does
-  not match) is bumped here, because inserting a type before `kGamePacketStart`
-  shifts every game packet identifier, and a client of another build would send
-  payloads the server rejects as corrupt. Engine Network owns the shared version and the Hello
-  rejection gate the handshake applies (`Server/AGENTS.md`). `Frame::kiVersion`
-  is a separate deterministic-Frame/save/replay compatibility gate, not a
-  substitute for the protocol-version bump.
-- Cursor primitives are unchecked. A reader of client data validates exact fixed layouts or gates every variable-length read with `BoundedCursor` before passing its cursor to a primitive.
+  `StatusChange` payload (any `StatusChangeData` arm's `Fields()`) layout change
+  is bumped by its game codec owner; an engine packet layout change, an added
+  engine packet type, or a change to what an engine packet's contract row
+  requires of its payload content (such as a payload header the server parses
+  and rejects when it does not match) is bumped here, because inserting a type
+  before `kGamePacketStart` shifts every game packet identifier, and a client of
+  another build would send payloads the server rejects as corrupt. Engine
+  Network owns the shared version and the Hello rejection gate the handshake
+  applies (`Server/AGENTS.md`). `Frame::kiVersion` is a separate
+  deterministic-Frame/save/replay compatibility gate, not a substitute for the
+  protocol-version bump.
+- Cursor primitives are unchecked. A reader of client data validates exact fixed
+  layouts or gates every variable-length read with `BoundedCursor` before
+  passing its cursor to a primitive.
 - A client-to-server packet is admitted only through its contract row, which
   owns size bounds, per-tick caps, handshake/debug gating, and violation
   reporting
@@ -35,31 +55,64 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   where only one side sets the checksum exchanges no datagram, so the connection
   times out in ENet before Hello can report anything; builds that both set it
   but differ in `kiProtocolVersion` still reach the Hello rejection.
-- Client and server builds must agree on the `kbDesynchronizationDebugFrames` value.
-- ENet service, discovery polling, sends, and simulation queues are main-thread-only. Their workbuffer and state have no locking by design.
+- Client and server builds must agree on the `kbDesynchronizationDebugFrames`
+  value.
+- ENet service, discovery polling, sends, and simulation queues are
+  main-thread-only. Their workbuffer and state have no locking by design.
 
 ## Corrupt Input Policy
 
-- A structurally valid packet rejected for protocol state or timing — stale or reordered traffic, epoch or slot reuse, subscription state, pre-handshake arrival, a rate limit, a protocol/version mismatch, or an ordinary resync — is not corruption and keeps its own outcome.
-- The server validates every client-to-server record before adopting it: a record whose layout, size, count, or value is invalid — a non-finite value, one outside its expected range, or a broken index or topology relationship — is corrupt, and the server rejects it under the bad-value rule ([C++ conventions](../../../.agents/references/cpp-conventions.md)).
-- Server-to-client data travels under the ENet datagram checksum (`## Transport Contracts`), which drops a datagram damaged in transit before dispatch, so the client trusts what its server sends: client code adds no new value or structural checks on server data.
-- Readers signal corruption one way: they throw `std::ios_base::failure` where they detect it rather than returning a sentinel or repairing the value ([C++ conventions](../../../.agents/references/cpp-conventions.md)), and the policy lives at the dispatch catches — the one exception being the server's ack-stream cross-check, which records its own violation locally.
-- The two directions answer that signal asymmetrically. Corrupt data from its own server is fatal to the client: the dispatch `ASSERT`s, so the process ends through crash reporting. Corrupt data from a client is hostile but survivable to the server: its catches drop the packet before any mutation and count one violation through `RecordContractViolation` (`Server/AGENTS.md`), so no client can end the host.
+- A structurally valid packet rejected for protocol state or timing — stale or
+  reordered traffic, epoch or slot reuse, subscription state, pre-handshake
+  arrival, a rate limit, a protocol/version mismatch, or an ordinary resync — is
+  not corruption and keeps its own outcome.
+- The server validates every client-to-server record before adopting it: a
+  record whose layout, size, count, or value is invalid — a non-finite value,
+  one outside its expected range, or a broken index or topology relationship —
+  is corrupt, and the server rejects it under the bad-value rule
+  ([C++ conventions](../../../.agents/references/cpp-conventions.md)).
+- Server-to-client data travels under the ENet datagram checksum
+  (`## Transport Contracts`), which drops a datagram damaged in transit before
+  dispatch, so the client trusts what its server sends: client code adds no new
+  value or structural checks on server data.
+- Readers signal corruption one way: they throw `std::ios_base::failure` where
+  they detect it rather than returning a sentinel or repairing the value
+  ([C++ conventions](../../../.agents/references/cpp-conventions.md)), and the
+  policy lives at the dispatch catches — the one exception being the server's
+  ack-stream cross-check, which records its own violation locally.
+- The two directions answer that signal asymmetrically. Corrupt data from its
+  own server is fatal to the client: the dispatch `ASSERT`s, so the process ends
+  through crash reporting. Corrupt data from a client is hostile but survivable
+  to the server: its catches drop the packet before any mutation and count one
+  violation through `RecordContractViolation` (`Server/AGENTS.md`), so no client
+  can end the host.
 
 ## Timing and Polling
 
-- Rendering smoothness takes priority over command round-trip latency: client simulation and presentation intentionally retain buffered committed ticks, so tuning must preserve smooth pacing rather than introduce stalls or bursts.
-- Both peers drain transient poll outputs each poll, and a server update polls more than once, so a queue left unconsumed across a poll is lost or reapplied rather than carried to the end of the update. Resync requests persist until broadcast servicing, including the paused/zero-tick path; a new-subscription request persists across servicing passes until it leaves the queue (`Server/AGENTS.md`).
-- Network simulation injects deterministic one-way delay and burst loss above ENet. Reliable packets may be delayed but never deliberately dropped, and each channel preserves FIFO release order.
-- Wire serialization is little-endian x64. Network buffer capacity is tick-rate-independent; jitter safety is wall-clock time.
+- Rendering smoothness takes priority over command round-trip latency: client
+  simulation and presentation intentionally retain buffered committed ticks, so
+  tuning must preserve smooth pacing rather than introduce stalls or bursts.
+- Both peers drain transient poll outputs each poll, and a server update polls
+  more than once, so a queue left unconsumed across a poll is lost or reapplied
+  rather than carried to the end of the update. Resync requests persist until
+  broadcast servicing, including the paused/zero-tick path; a new-subscription
+  request persists across servicing passes until it leaves the queue
+  (`Server/AGENTS.md`).
+- Network simulation injects deterministic one-way delay and burst loss above
+  ENet. Reliable packets may be delayed but never deliberately dropped, and each
+  channel preserves FIFO release order.
+- Wire serialization is little-endian x64. Network buffer capacity is
+  tick-rate-independent; jitter safety is wall-clock time.
 
 ## Ownership
 
 - The Server Monitor TCP channel is a separate, non-ENet protocol owned by
   `../Server/AGENTS.md` `## Monitor Channel`.
 
-- `NetworkManager` owns ENet lifetime, channel math, and the allocation-suppressed send path.
-- `NetworkProtocol` owns shared packet identifiers, compatibility constants, slot identity, ACK structures, and client-to-server contract rows.
+- `NetworkManager` owns ENet lifetime, channel math, and the
+  allocation-suppressed send path.
+- `NetworkProtocol` owns shared packet identifiers, compatibility constants,
+  slot identity, ACK structures, and client-to-server contract rows.
 - `NetworkDiscoveryResponder` (server) and `NetworkDiscoveryScanner` (client)
   own LAN discovery — a second, self-contained wire protocol that does not use
   ENet: raw non-blocking UDP on `kiDiscoveryPort` (`kiDefaultPort + 1`),
@@ -69,9 +122,17 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   default game port. The scanner pings loopback before broadcasting to the LAN
   so a same-machine server always wins the race, and `--loopback-only` stays
   symmetric — responder bound to loopback, scanner skipping the broadcast.
-- `NetworkMessages` owns engine packet field order, sizes, and paired encode/decode; evolve an engine packet through its shared layout rather than mirroring fields in client/server leaves. Numeric `OwnedEntityState` values are serialized, so each `kpOwnedEntityStateDescriptors` row index equals its value; append a state and its row before `kCount`.
-- `ChatText` owns `IsValidChatText`, the one chat-text rule both sides apply: `Client::SendChat` sends only text that passes it, and the server rejects text that fails it as corrupt before relaying ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)).
-- Client and server leaves own the side-specific transport peers, receive buffers, contracts, slots, and packet handling.
+- `NetworkMessages` owns engine packet field order, sizes, and paired
+  encode/decode; evolve an engine packet through its shared layout rather than
+  mirroring fields in client/server leaves. Numeric `OwnedEntityState` values
+  are serialized, so each `kpOwnedEntityStateDescriptors` row index equals its
+  value; append a state and its row before `kCount`.
+- `ChatText` owns `IsValidChatText`, the one chat-text rule both sides apply:
+  `Client::SendChat` sends only text that passes it, and the server rejects text
+  that fails it as corrupt before relaying
+  ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)).
+- Client and server leaves own the side-specific transport peers, receive
+  buffers, contracts, slots, and packet handling.
 - `ClientSessionRuntime` and `ServerSessionRuntime` own transport, pacing, and
   phase order. The non-virtual `ClientSessionBase` and `ServerSessionBase`,
   which the game sessions inherit, hold the runtimes and own the reusable
@@ -99,7 +160,10 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   preserving input order within each type; published server tick inputs use that
   sequence because clients apply the wire order, so changing it can alter
   index-sensitive state and the CRC.
-- `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer handling and per-cell publication assembly. They name `game::StatusChange`, whole game Frames, and the game functions and members listed in `Server/AGENTS.md`, which they call directly by name, never game entity types.
+- `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer
+  handling and per-cell publication assembly. They name `game::StatusChange`,
+  whole game Frames, and the game functions and members listed in
+  `Server/AGENTS.md`, which they call directly by name, never game entity types.
 - A status-change batch is all-or-nothing: the server publishes every batch
   whole, growing past `kiMaximumStatusChangesPerCell` with a debug break, and
   the client decodes the batch it receives without checks under the

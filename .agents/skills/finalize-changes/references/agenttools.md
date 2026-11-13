@@ -2,15 +2,16 @@
 
 Load only when the landing-commit/landed diff changes a non-Markdown path under
 `Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or changes
-`Common/Sha256Hasher.h`, which the tools compile by path. This is the
-exhaustive authoritative shared-artifact trigger; ordinary Git changes, Markdown in
-those trees, landing-commit build outputs, data reads, locks, and claims do not qualify.
+`Common/Sha256Hasher.h`, which the tools compile by path. This is the exhaustive
+authoritative shared-artifact trigger; ordinary Git changes, Markdown in those
+trees, landing-commit build outputs, data reads, locks, and claims do not
+qualify.
 
-These trigger paths are shared tool infrastructure: every linked worktree consumes
-the same authoritative binaries. When a change to them could break another live worktree —
-a changed CLI contract, a changed lock or claim format, or a behavior other
-sessions depend on mid-run — pause and warn the user before landing. When it
-cannot affect another live worktree, continue without a pause.
+These trigger paths are shared tool infrastructure: every linked worktree
+consumes the same authoritative binaries. When a change to them could break
+another live worktree — a changed CLI contract, a changed lock or claim format,
+or a behavior other sessions depend on mid-run — pause and warn the user before
+landing. When it cannot affect another live worktree, continue without a pause.
 
 Before the landing summary, run `../scripts/Wait-AgentToolsQuiescence.ps1`
 with the durable session owner, using the canonical invocation in
@@ -22,17 +23,18 @@ Invalid exclusion-ledger state requires authority and is never bypassed.
 The summary states that landing replaces the authoritative AgentTools binaries
 consumed by every linked worktree and names changed CLI contracts. After
 landing, rebuild both tools from the landed commit with the Release candidate
-commands in [`/compile` worker Steps](../../compile/references/worker.md#steps) and promote only with
-`../scripts/Invoke-AgentToolsPromotion.ps1`, passing the freshly built pair via
-`-WorktreeCliCandidate` and `-AgentHarnessCandidate`; it backs up the previous
-pair and rolls back on failure. Promotion failure never rewinds the landed Git change:
-report whether the previous pair was restored, a verified pair remains,
-a retryable idle wait applies, or rollback failed with its named backup.
+commands in [`/compile` worker Steps](../../compile/references/worker.md#steps)
+and promote only with `../scripts/Invoke-AgentToolsPromotion.ps1`, passing the
+freshly built pair via `-WorktreeCliCandidate` and `-AgentHarnessCandidate`; it
+backs up the previous pair and rolls back on failure. Promotion failure never
+rewinds the landed Git change: report whether the previous pair was restored, a
+verified pair remains, a retryable idle wait applies, or rollback failed with
+its named backup.
 
-Wrapper bootstrap is the only in-place shared-Output build path. It runs at
-wrapper start under its global mutex, incrementally rebuilds WorktreeCli,
-AgentHarness, and ThirdParty, and best-effort prebuilds DataPacker and
-ModelViewer Release for worktree seeds; it also runs on demand with
-`-SharedDataOnly`, which builds only the DataPacker prebuild and refreshes
-Shared data. Routine builds
-consume immutable primary outputs and never promote or copy tools.
+Wrapper bootstrap is the only in-place shared-Output build path. It runs in
+session setup at each worktree creation or `/reset-worktree` under its global
+mutex, incrementally rebuilds WorktreeCli, AgentHarness, and ThirdParty, and
+best-effort prebuilds DataPacker and ModelViewer Release for worktree seeds; it
+also runs on demand with `-SharedDataOnly`, which builds only the DataPacker
+prebuild and refreshes Shared data. Routine builds consume immutable primary
+outputs and never promote or copy tools.

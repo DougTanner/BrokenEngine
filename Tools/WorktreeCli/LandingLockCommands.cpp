@@ -237,9 +237,10 @@ static int64_t HandleRelease(const Locator& rLocator, const nlohmann::json& rMet
 		return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 	}
 
-	if (::DeleteFileW(ExtendedLengthPath(rLocator.path).c_str()) == FALSE)
+	std::error_code error;
+	if (!std::filesystem::remove(ExtendedLengthPath(rLocator.path), error))
 	{
-		FailWindows("release lock");
+		Fail("release lock failed (Windows error " + std::to_string(error.value()) + ")");
 		return kiExitFailure;
 	}
 	return kiExitOk;

@@ -2,11 +2,11 @@
 
 ## Ownership
 
-This standalone Windows program displays statistics, the Map tab, and the Profile
-tab from a local or remote server. It compiles standard and Windows headers and
-`Common/ServerMonitorProtocol.h` by path; it compiles no engine or game code.
-The channel contract belongs to `../../Engine/Source/Server/AGENTS.md`
-`## Monitor Channel`.
+This standalone Windows program displays statistics, the Map tab, and the
+Profile tab from a local or remote server. It compiles standard and Windows
+headers and `Common/ServerMonitorProtocol.h` by path; it compiles no engine or
+game code. The channel contract belongs to
+`../../Engine/Source/Server/AGENTS.md` `## Monitor Channel`.
 
 ## Connection and Threading
 
@@ -15,13 +15,14 @@ The optional first command-line argument is the server host; the default is
 `%APPDATA%\ServerMonitor\ServerMonitorSecret.txt`; a missing file gives an empty
 key. Secret trimming and the authentication response are shared Common helpers.
 
-The UI thread owns networking, the received model, and painting. Its single
-50 ms timer uses nonblocking sockets and retries disconnected connections every
-2 seconds. Authentication retains one 32-byte response and its sent-byte offset:
-positive sends advance it, would-block preserves it, and connection state changes
-to connected only after all bytes have been accepted. Disconnect clears the model
-and pending response before reconnecting. Each snapshot replaces the model and
-invalidates the window. Server records are trusted under the root trust policy.
+The UI thread owns networking, the received model, and painting. Its single 50
+ms timer uses nonblocking sockets and retries disconnected connections every 2
+seconds. Authentication retains one 32-byte response and its sent-byte offset:
+positive sends advance it, would-block preserves it, and connection state
+changes to connected only after all bytes have been accepted. Disconnect clears
+the model and pending response before reconnecting. Each snapshot replaces the
+model and invalidates the window. Server records are trusted under the root
+trust policy.
 
 ## Presentation
 
@@ -32,7 +33,8 @@ button 80 by 28 with margin 10, Consolas height 28, statistics line height 36,
 profile line height 32, and 4 pixels between profile sections. The map draws
 flat-top hexes at monitor-local axial centre offsets with North upward. Bounds
 come from active cells with one cell of padding; the monitor formats coordinate
-labels from the received cell records. Copy concatenates the profile section text.
+labels from the received cell records. Copy concatenates the profile section
+text.
 
 ## Build
 

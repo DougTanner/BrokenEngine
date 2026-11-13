@@ -62,11 +62,11 @@ struct WorldSizedTexelArea
 
 // The footprint is the framing's straight-down frustum at the reference angle, so field of view and projection never
 // move it.
-inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroomMultiplier, float fTexelFraming, float fTextureWidth, float fTextureHeight, float fAspect, FXMVECTOR vecCameraPosition)
+inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fExtraArea, float fTexelFraming, float fTextureWidth, float fTextureHeight, float fAspect, FXMVECTOR vecCameraPosition)
 {
 	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(CameraBase::kfFramingFieldOfView));
-	float fWorldTexelX = (2.0f * fHeadroomMultiplier * fAspect * fTangentHalfFieldOfView / fTextureWidth) * fTexelFraming;
-	float fWorldTexelY = (2.0f * fHeadroomMultiplier * fTangentHalfFieldOfView / fTextureHeight) * fTexelFraming;
+	float fWorldTexelX = (2.0f * fExtraArea * fAspect * fTangentHalfFieldOfView / fTextureWidth) * fTexelFraming;
+	float fWorldTexelY = (2.0f * fExtraArea * fTangentHalfFieldOfView / fTextureHeight) * fTexelFraming;
 	float fFullWidth = fTextureWidth * fWorldTexelX;
 	float fFullHeight = fTextureHeight * fWorldTexelY;
 	XMFLOAT4A f4CameraPosition {};
@@ -85,7 +85,7 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 	};
 }
 
-// Retained world rectangles (shadow and lighting history, and the held visible area) are expressed in the camera
+// Retained world rectangles (shadow and lighting history, and the held object-shadow area) are expressed in the camera
 // cell's frame, so they follow the camera when it changes cell. The whole-cell shift applies at any step distance, so
 // GPU history stays usable wherever the camera's view still overlaps it.
 struct RetainedAreaBasis
@@ -108,12 +108,23 @@ inline void ShiftArea(XMFLOAT4& rf4Area, XMFLOAT2 f2Offset)
 	rf4Area.w += f2Offset.y;
 }
 
-// Areas are x = left, y = top (max-Y), z = right, w = bottom (min-Y). No margin: the held area must still cover the
-// whole live visible area.
-inline bool IsVisibleAreaInsideHeldArea(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4HeldArea)
+// Areas are x = left, y = top (max-Y), z = right, w = bottom (min-Y).
+inline XMFLOAT4 ScaleAreaAboutCenter(const XMFLOAT4& rf4Area, float fScale)
 {
-	return rf4VisibleArea.x >= rf4HeldArea.x && rf4VisibleArea.z <= rf4HeldArea.z && rf4VisibleArea.y <= rf4HeldArea.y
-	    && rf4VisibleArea.w >= rf4HeldArea.w;
+	float fCenterX = 0.5f * (rf4Area.x + rf4Area.z);
+	float fCenterY = 0.5f * (rf4Area.y + rf4Area.w);
+	float fHalfWidth = 0.5f * (rf4Area.z - rf4Area.x) * fScale;
+	float fHalfHeight = 0.5f * (rf4Area.y - rf4Area.w) * fScale;
+	return {fCenterX - fHalfWidth, fCenterY + fHalfHeight, fCenterX + fHalfWidth, fCenterY - fHalfHeight};
+}
+
+// A teleport: the visible area's center lies outside the area a retained texture was last written for. Only a teleport
+// forces an early refresh; a view edge that pans past the retained area samples outside it until the next scheduled one.
+inline bool IsVisibleCenterOutsideArea(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4RetainedArea)
+{
+	float fCenterX = 0.5f * (rf4VisibleArea.x + rf4VisibleArea.z);
+	float fCenterY = 0.5f * (rf4VisibleArea.y + rf4VisibleArea.w);
+	return fCenterX < rf4RetainedArea.x || fCenterX > rf4RetainedArea.z || fCenterY > rf4RetainedArea.y || fCenterY < rf4RetainedArea.w;
 }
 
 struct TemporalAreaLatch
@@ -153,10 +164,10 @@ struct TemporalAreaLatch
 
 // What the last published frame actually sent, for the read-only presentation_continuity_probe agent command; nothing
 // in rendering reads it back. Every field is written on the client main loop thread inside RenderFrameGlobal, each by
-// its own owner: GlobalUniforms.cpp writes shadow, LightingUniforms.cpp writes pLighting, SmokeUniforms.cpp writes
-// smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, the water lattices, and —
-// because it is populated last — iPublishedFrames, so the counter advances only for a frame whose whole snapshot is
-// complete.
+// its own owner: GlobalUniforms.cpp writes shadow and f4ObjectShadowArea, LightingUniforms.cpp writes pLighting,
+// SmokeUniforms.cpp writes smoke, and WaterUniforms.cpp writes the camera basis, the water origins, fNoiseFrequency, the
+// water lattices, and — because it is populated last — iPublishedFrames, so the counter advances only for a frame whose
+// whole snapshot is complete.
 struct RetainedAreaReport
 {
 	XMFLOAT4 f4CurrentArea {};
@@ -180,6 +191,7 @@ struct PresentationContinuitySnapshot
 	XMFLOAT2 f2ReducedNoiseOrigin {};
 	float fNoiseFrequency = 0.0f;
 	RetainedAreaReport shadow {};
+	XMFLOAT4 f4ObjectShadowArea {};
 	RetainedAreaReport pLighting[shaders::kiLightingLayers] {}; // Per lighting layer
 	RetainedAreaReport smoke {};
 	LatticeReport pWaterNormalLattices[std::extent_v<decltype(shaders::GlobalLayout::pWaterNormalPatchLattices)>] {}; // In GlobalLayout order
@@ -209,6 +221,12 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime);
 
 inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame
+
+// Forces the next object-shadow refresh whenever the blurred texture is undefined or stale.
+inline bool gbObjectShadowsReset = true;
+// Whether the object-shadow raster and blur run this frame. Global decides it; Main's
+// WriteModelPipelineIndirectBuffers reads it to zero the ModelShadow draws on a skipped frame.
+inline bool gbObjectShadowsRefreshFrame = false;
 
 // Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
 inline bool gbLightingTemporalReset = false;

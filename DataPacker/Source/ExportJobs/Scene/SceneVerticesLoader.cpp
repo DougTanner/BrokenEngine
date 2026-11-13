@@ -8,10 +8,10 @@
 // count differs from iComponentCount or uiVertexCount, or when reading iComponentCount values of T for each
 // of uiVertexCount vertices would leave the accessor's buffer view or buffer.
 template <typename T>
-static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName, size_t uiVertexCount, int64_t iComponentCount)
+static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, std::string_view attributeName, size_t uiVertexCount, int64_t iComponentCount)
 {
 	static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
-	auto it = rPrimitive.attributes.find(pcAttributeName);
+	auto it = rPrimitive.attributes.find(std::string(attributeName));
 	if (it == rPrimitive.attributes.end())
 	{
 		return {nullptr, 0};
@@ -20,11 +20,11 @@ static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPr
 	const tinygltf::Accessor& rAccessor = rModel.accessors.at(it->second);
 	if (tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type)) != iComponentCount)
 	{
-		throw std::runtime_error(std::format("{} accessor type {} does not have {} components", pcAttributeName, rAccessor.type, iComponentCount));
+		throw std::runtime_error(std::format("{} accessor type {} does not have {} components", attributeName, rAccessor.type, iComponentCount));
 	}
 	if (rAccessor.count != uiVertexCount)
 	{
-		throw std::runtime_error(std::format("{} accessor count {} differs from the vertex count {}", pcAttributeName, rAccessor.count, uiVertexCount));
+		throw std::runtime_error(std::format("{} accessor count {} differs from the vertex count {}", attributeName, rAccessor.count, uiVertexCount));
 	}
 	if constexpr (std::is_same_v<T, float>)
 	{
@@ -39,15 +39,15 @@ static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPr
 	int64_t iByteStride = rAccessor.ByteStride(rBufferView);
 	if (iByteStride == -1)
 	{
-		throw std::runtime_error(std::format("{} accessor has an invalid byte stride", pcAttributeName));
+		throw std::runtime_error(std::format("{} accessor has an invalid byte stride", attributeName));
 	}
-	RequireSourceExtent(rModel.buffers.at(rBufferView.buffer).data.size(), rBufferView.byteOffset, rBufferView.byteLength, pcAttributeName);
+	RequireSourceExtent(rModel.buffers.at(rBufferView.buffer).data.size(), rBufferView.byteOffset, rBufferView.byteLength, attributeName);
 	uintmax_t uiAccessorBytes = 0;
 	if (uiVertexCount != 0)
 	{
-		uiAccessorBytes = AddSourceBytes(MultiplySourceBytes(uiVertexCount - 1, static_cast<size_t>(iByteStride), pcAttributeName), static_cast<uintmax_t>(iComponentCount * static_cast<int64_t>(sizeof(T))), pcAttributeName);
+		uiAccessorBytes = AddSourceBytes(MultiplySourceBytes(uiVertexCount - 1, static_cast<size_t>(iByteStride), attributeName), static_cast<uintmax_t>(iComponentCount * static_cast<int64_t>(sizeof(T))), attributeName);
 	}
-	RequireSourceExtent(rBufferView.byteLength, rAccessor.byteOffset, uiAccessorBytes, pcAttributeName);
+	RequireSourceExtent(rBufferView.byteLength, rAccessor.byteOffset, uiAccessorBytes, attributeName);
 
 	const T* pData = reinterpret_cast<const T*>(&(rModel.buffers.at(rBufferView.buffer).data.at(rAccessor.byteOffset + rBufferView.byteOffset)));
 	return {pData, iByteStride / static_cast<int64_t>(sizeof(T))};
@@ -147,7 +147,7 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 	// Joints are read as uint16_t; the runtime skinning path requires that component type
 	auto [puiJoints, iJointsStride] = FindAttribute<uint16_t>(rPrimitive, rModel, "JOINTS_0", rPositionAccessor.count, 4);
 
-	uint32_t uiVertexStart = static_cast<uint32_t>(rVertices.size());
+	int64_t iVertexStart = std::ssize(rVertices);
 
 	// The inverse transpose keeps a normal perpendicular to its surface under non-uniform scale or shear. A singular
 	// matrix inverts to non-finite elements, so the packed NORMAL check below rejects a primitive under a flattening node
@@ -265,18 +265,18 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 	}
 
 	// Generate a byte-identity dedup remap over the raw vertices (NULL indices => identity 0..count-1
-	// sequence), append the unique vertices to the shared scene-wide buffer at uiVertexStart, then
+	// sequence), append the unique vertices to the shared scene-wide buffer at iVertexStart, then
 	// translate each original-vertex slot to its final scene index for AppendIndices.
 	std::vector<uint32_t> remap(rPositionAccessor.count);
 	int64_t iUniqueCount = static_cast<int64_t>(meshopt_generateVertexRemap(remap.data(), nullptr, rPositionAccessor.count, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex)));
 
-	rVertices.resize(static_cast<size_t>(uiVertexStart + iUniqueCount));
-	meshopt_remapVertexBuffer(rVertices.data() + uiVertexStart, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex), remap.data());
+	rVertices.resize(static_cast<size_t>(iVertexStart + iUniqueCount));
+	meshopt_remapVertexBuffer(rVertices.data() + iVertexStart, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex), remap.data());
 
 	rIndexRemap.resize(rPositionAccessor.count);
 	for (int64_t j = 0; j < static_cast<int64_t>(rPositionAccessor.count); ++j)
 	{
-		rIndexRemap.at(j) = uiVertexStart + remap.at(j);
+		rIndexRemap.at(j) = iVertexStart + remap.at(j);
 	}
 
 	LOG(kDefault, kVerbose, "  Vertices: {} -> {} (deduplicated {})", rPositionAccessor.count, iUniqueCount, static_cast<int64_t>(rPositionAccessor.count) - iUniqueCount);

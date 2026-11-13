@@ -43,8 +43,8 @@ step.
 
 ## Rules
 
-- Each researcher reads and searches the repository only: it writes no file, runs
-  no build, and dispatches no worker.
+- Each researcher reads and searches the repository only: it writes no file,
+  runs no build, and dispatches no worker.
 - Each researcher returns once. There is no second round, so it decides from the
   brief and the repository rather than asking main for more.
 - Each researcher works blind, from its own brief alone, and never sees another

@@ -34,12 +34,13 @@ Claude override.
 When the friction was observed in a different session than the one recording it
 — the shape a `/next-plan-review`-driven follow-up takes — main supplies that
 observing session's identity fields in place of the current session's, including
-its landed commit or branch, labelled as the observing session's per the
-provenance block in `/create-follow-up-plans`, which owns how the recording
-session's own landing ref is stated.
+its landed commit hash, labelled as the observing session's per the provenance
+block in `/create-follow-up-plans`, which owns how the recording session's own
+landing ref is stated.
 
 ## What never enters a Plan
 
 Never record a transcript file path or transcript text; reference the session by
 client, worktree/branch UUID, on Claude the conversation session ID, and, for an
-earlier observing session, its landed commit or branch only.
+earlier observing session, its landed commit hash, never its branch, as the
+review ref.

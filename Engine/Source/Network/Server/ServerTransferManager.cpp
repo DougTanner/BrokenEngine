@@ -146,7 +146,7 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 				DEBUG_BREAK();
 			}
 
-			game::ApplySpawnStatusChange(rDestinationFrame, rTransfer, rCoord);
+			game::ApplySpawnStatusChange(rDestinationFrame, rTransfer);
 		}
 	}
 }

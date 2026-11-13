@@ -35,29 +35,30 @@ The `locator` returns one row per claim under each of `Sources`,
 Each `Sources` row is one line on this form:
 
 ```text
-<claim ID> — <official source identity and version/revision/tag/commit; exact section/symbol/citation; optional official immutable link | none — exact unavailable evidence>
+<claim ID> — <official source identity and version/revision/tag/commit; exact section/symbol/citation; shortest decisive quotation or faithful rule statement, or for an undecided claim the closest relevant one; optional official immutable link> | <none — exact unavailable evidence>
 ```
 
 Each `Decisive checks` row is one line on this form:
 
 ```text
-<claim ID> — applicability: <path:line and target/version/extensions/features/flags | none — exact missing configuration>; rule: <short evidence that settles the question on its own | none — exact missing primary evidence>
+<claim ID> — applicability: <path:line and target/version/extensions/features/flags | none — exact missing configuration>
 ```
 
 Each `Per-proposition verdicts` row is one line on this form:
 
 ```text
-<claim ID> — VERIFIED | REFUTED | UNRESOLVED — <exact proposition> — <direct implication for dependent item, without deciding it>
+<claim ID> — VERIFIED | REFUTED | UNRESOLVED — <exact proposition> — <direct implication for dependent item, without deciding it>[ — missing: <exact primary evidence a found source leaves undecided, UNRESOLVED only>]
 ```
 
 Complete the report with the remaining shared handoff lines
 (`../../references/subagent-handoff.md`, `## Handoffs`); this read-only
-workflow never changes a tracked file and never requires a build, and each
-unresolved claim with its exact missing evidence belongs in `Residuals`.
-Preserve exact citations in each `Sources` and `Decisive checks` row, inline
-or in the over-cap file; do not replace a row's evidence with a summary. Main
-presents the evidence and decides every dependent finding, item, or plan
-choice from the returned verdicts.
+workflow never changes a tracked file and never requires a build, and
+`Residuals` names each unresolved claim by the claim ID of its `UNRESOLVED`
+`Per-proposition verdicts` row instead of restating its evidence. Preserve
+external source citations and their decisive quotations once, in each `Sources`
+row, inline or in the over-cap file; do not replace a row's evidence with a
+summary. Main presents the evidence and decides every dependent finding, item,
+or plan choice from the returned verdicts.
 
 ## References
 

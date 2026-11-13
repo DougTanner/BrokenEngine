@@ -7,8 +7,8 @@ logic inseparable from internal engine types.
 1. State the capability in one sentence and inspect `ThirdParty/` and
    `ThirdParty/Prebuilts/` for an existing dependency.
 2. Identify at most three plausible commercial-friendly options. Treat every
-   external fact as a separate stable-ID external-claim request for a delegated `locator`
-   running `/verify-external-claims`:
+   external fact as a separate stable-ID external-claim request for a delegated
+   `locator` running `/verify-external-claims`:
 
    ```text
    Claim ID: EGP-EXT-###
@@ -31,8 +31,8 @@ logic inseparable from internal engine types.
    build/project/filter wiring, namespace/header isolation, adapter boundary,
    swapped call sites, exposed invariants, and acceptance checks. A library
    choice normally changes the work; never report it as "nothing to implement."
-5. If the user chooses custom work, return the exact considered-library rejection
-   rationale and continue with applicable checklist decisions.
+5. If the user chooses custom work, return the exact considered-library
+   rejection rationale and continue with applicable checklist decisions.
 
 A library or design pivot always returns to the manager for incorporation and a
 fresh `/plan-audit`; it never changes the supplied plan text in place.

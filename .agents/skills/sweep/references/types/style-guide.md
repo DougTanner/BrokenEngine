@@ -87,4 +87,5 @@ Regressions found in earlier sweeps:
 
 ## Deferred fixes
 
-Record: `Documents/Investigations/ChangeWorkflow/StyleGuideSweepDeferredFixes.md`
+Record:
+`Documents/Investigations/ChangeWorkflow/StyleGuideSweepDeferredFixes.md`

@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 # DataPacker and ModelViewer are not symlinked, so each worktree owns its own Output. Rather than
-# compile the Target from scratch at session start, seed the worktree Output by copying the primary
+# compile the Target from scratch at session setup, seed the worktree Output by copying the primary
 # bootstrap prebuild (Bootstrap-AgentTools.ps1) when a stamp proves the primary exe was built from the
 # exact trees this clean worktree holds. ModelViewer also needs Shared data, because its prebuild
 # compiles the primary's generated data headers and embeds the primary data path. The copy runs

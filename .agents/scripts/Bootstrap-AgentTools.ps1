@@ -76,7 +76,7 @@ try {
 		if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) { throw "Bootstrap solution is missing: '$solution'." }
 	}
 	# DataPacker and ModelViewer are intentionally kept out of the hard-fail existence check above: their
-	# prebuilds are best-effort, so a missing solution warns and skips rather than failing session start.
+	# prebuilds are best-effort, so a missing solution warns and skips rather than failing the bootstrap run.
 	# Each tree list holds every tracked tree its target's build reads, in stamp order; Build-WorktreeTarget.ps1 keeps
 	# the same lists.
 	$dataPackerSolution = Join-Path $root 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
@@ -92,7 +92,7 @@ try {
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable, [string[]] $ExtraArguments = @()) {
-		# Blank line so each build's MSBuild output reads as its own block in the session start transcript.
+		# Blank line so each build's MSBuild output reads as its own block in the bootstrap run's transcript.
 		Write-Host ''
 		# A link in place fails while another session runs $Executable, so the original is renamed aside
 		# (running processes keep it) and a copy takes its name. The copy keeps the original
@@ -173,7 +173,7 @@ try {
 		if (-not $held) { throw "Timed out after $WaitSeconds seconds waiting for the AgentTools bootstrap mutex. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
 
 		# -SharedDataOnly refreshes Shared data mid-session, so it skips the shared AgentTools and ThirdParty
-		# builds, which only a wrapper session start or explicit primary maintenance runs in place.
+		# builds, which only worktree creation, /reset-worktree, or explicit primary maintenance runs in place.
 		if (-not $SharedDataOnly) {
 			Invoke-BootstrapBuild $worktreeCliSolution 'Release' $worktreeCli
 			Invoke-BootstrapBuild $agentHarnessSolution 'Release' $agentHarness
@@ -201,7 +201,7 @@ try {
 			$stampThirdPartyTree = $null
 			try { $stampThirdPartyTree = @([IO.File]::ReadAllLines($dataPackerStampPath))[2] } catch { }
 			if ($stampThirdPartyTree -cne $dataPackerPreSnapshot.Trees[2]) {
-				Write-Warning "Primary ThirdParty changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. A wrapper session start is needed to rebuild ThirdParty and refresh the data."
+				Write-Warning "Primary ThirdParty changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. Worktree creation, /reset-worktree, or explicit primary maintenance (a full Bootstrap-AgentTools.ps1 run without -SharedDataOnly) is needed to rebuild ThirdParty and refresh the data."
 				$dataPackerPreSnapshot = $null
 			}
 		}
@@ -218,9 +218,9 @@ try {
 		# Refresh the primary's generated data that Shared-mode worktrees consume. Gated on the prebuild's
 		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from
 		# committed sources. Deliberately outside the best-effort prebuild routine: a run failure must
-		# abort session start rather than be swallowed by its warn-only catch. This can block for a long
+		# abort the bootstrap run rather than be swallowed by its warn-only catch. This can block for a long
 		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex or on a rare full island bake -
-		# while this bootstrap mutex is held, timing out peer session starts; that cost is accepted. A peer
+		# while this bootstrap mutex is held, timing out peer bootstrap runs; that cost is accepted. A peer
 		# whose own $WaitSeconds bootstrap-mutex deadline expires during that refresh fails with the existing
 		# mutex-timeout error, which is the expected outcome there rather than a defect.
 		$refreshedDataDirectories = [Collections.Generic.List[string]]::new()
@@ -228,7 +228,7 @@ try {
 		$gameProjects = @()
 		if ($dataPackerPrebuiltClean) {
 			# Only game projects whose client project is committed at HEAD are refreshed, so a project still
-			# uncommitted in the primary can never fail session start.
+			# uncommitted in the primary can never fail the bootstrap run.
 			$discoveredProjects = @(Get-AgentGameProjects $root)
 			$committedProjectFiles = @(Invoke-AgentGit (@('-C', $root, 'ls-tree', '--name-only', 'HEAD', '--') + @($discoveredProjects | ForEach-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" })))
 			$gameProjects = @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })

@@ -92,9 +92,9 @@ public:
 // Main-menu, pause, and modal callers clamp the width to their minimum-width pixel constant multiplied by UiScale().
 float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels);
 
-// One menu/panel heading: pushes the heading font (kfMenuUiScale * fHeadingScale), emits pcLabel, then a
+// One menu/panel heading: pushes the heading font (kfMenuUiScale * fHeadingScale), emits label, then a
 // standard kfHeadingGapPixels * UiScale() gap below it. Screens override the scale when their hierarchy requires it.
-void MenuHeading(const char* pcLabel, float fHeadingScale = kfMenuHeadingScale);
+void MenuHeading(std::string_view label, float fHeadingScale = kfMenuHeadingScale);
 
 // Full-screen dim behind pause-style overlays (background draw list, behind all windows)
 void DrawFullScreenDim();

@@ -8,4 +8,6 @@ subtask: false
 Run the `/next-plan` skill workflow for the user's request and arguments:
 
 - User request: $ARGUMENTS
-- Execute the next-plan skill workflow (.agents/skills/next-plan/SKILL.md) exactly as it defines, with no workflow changes and no argument reinterpretation.
+- Execute the next-plan skill workflow (.agents/skills/next-plan/SKILL.md)
+  exactly as it defines, with no workflow changes and no argument
+  reinterpretation.

@@ -84,7 +84,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <ConformanceMode>false</ConformanceMode>
+      <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -222,7 +222,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionController.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionId.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionMemory.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
@@ -360,9 +359,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\Replay.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\ServerSaveLoad.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsSpawn.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsUpdate.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\PushersUpdate.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp" />
@@ -417,21 +413,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
-    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\Blasters.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp" />

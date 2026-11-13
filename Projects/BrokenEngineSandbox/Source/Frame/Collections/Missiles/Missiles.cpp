@@ -66,11 +66,9 @@ constexpr float kfDeltaRotationLimitRandom = 2.0f;
 static int64_t siExhaustAreaLightTypeIndex = 0xFF;
 
 static int64_t siSmokeTrailTypeIndex = 0xFF;
-#endif // BT_CLIENT
 
 static int64_t siMissileExplosionTypeIndex = 0xFF;
 
-#if defined(BT_CLIENT)
 void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition)
 {
 	if (!(uiSmokeTrail.uuid.iValue != 0))
@@ -198,7 +196,6 @@ void MissilesInterpolate::Register()
 		.iColor = 0xFFFFFFFF,
 		.fWidth = kfTrailWidth,
 	});
-#endif // BT_CLIENT
 
 	engine::ExplosionsInterpolate::RegisterType(siMissileExplosionTypeIndex,
 	{
@@ -224,18 +221,21 @@ void MissilesInterpolate::Register()
 		.pParticleIntensityDecayScale = &gMissileExplosionParticleIntensityDecay,
 		.pParticleIntensityPowerScale = &gMissileExplosionParticleIntensityPower,
 	});
+#endif // BT_CLIENT
 }
 
+#if defined(BT_CLIENT)
 static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
 {
 	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f};
 	for (int64_t j = 0; float fSizeMultiplier : kpfSizeMultipliers)
 	{
+		common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
 		float fScaledPercent = fPercent * fSizeMultiplier;
 		XMVECTOR vecExplosionPosition = vecPosition;
 		if (j > 0)
 		{
-			vecExplosionPosition = common::RandomPositionJitter<0.2f>(vecPosition, rFrame.postRender.randomEngine);
+			vecExplosionPosition = common::RandomPositionJitter<0.2f>(vecPosition, randomEngine);
 		}
 
 		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
@@ -245,17 +245,18 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 				.vecDirection = vecDirection,
 				.flags = {engine::ExplosionFlags::kYellow},
 				.lifecycleFlags = {engine::LifecycleFlags::kDying},
-				.iTrailCount = static_cast<int64_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(rFrame.postRender.randomEngine)),
+				.iTrailCount = static_cast<int64_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(randomEngine)),
 				.fTrailAngle = flags & kDirectional ? XM_PI : XM_2PI,
 				.iParticleCount = static_cast<int64_t>(2.0f * fScaledPercent * kfExplosionParticleCount),
 				.fParticleAngle = flags & kDirectional ? XM_PI : XM_2PI,
 				.fSizePercent = 0.5f + 2.0f * fScaledPercent,
 				.fSmokePercent = flags & kDirectional ? fScaledPercent : 0.5f * fScaledPercent,
 				.fTimePercent = fScaledPercent,
-			});
+			}, randomEngine);
 		++j;
 	}
 }
+#endif // BT_CLIENT
 
 void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
@@ -423,9 +424,9 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	// Remove sound when exploding (missile engine sound stops, replaced by explosion sound)
 #if defined(BT_CLIENT)
 	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
-#endif
 
 	SpawnMissileExplosion(rFrame, rStaticData.coordinate, 1.0f, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pVecExplosionDirections[i], rCurrentPostRender.pFlags[i]);
+#endif
 
 	// Register area damage for the AreaDamage phase, tagged with the side that fired the missile
 	engine::AreaDamage::Add(

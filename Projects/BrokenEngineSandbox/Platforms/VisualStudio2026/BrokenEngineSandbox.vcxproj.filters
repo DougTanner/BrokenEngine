@@ -1503,58 +1503,7 @@
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenSoundEffects.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\SoundWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\MapWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GameSettings.cpp">
@@ -1563,22 +1512,13 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettings.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.cpp">

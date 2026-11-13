@@ -1,6 +1,11 @@
 # Projects/BrokenEngineSandbox/Data/Shaders - Game Shader Layout Wrapper
 
-Project-level extension point for the engine's shader layout system. The sole file, `ShaderLayouts.h`, is the per-project wrapper nearly every shader includes; it currently just forwards to the engine's `ShaderLayoutsBase.h` and adds nothing game-specific yet. Game-only shader constants, or struct additions written once in a form both C++ and GLSL compile, go after the include, so engine definitions are in scope.
+Project-level extension point for the engine's shader layout system. The sole
+file, `ShaderLayouts.h`, is the per-project wrapper nearly every shader
+includes; it currently just forwards to the engine's `ShaderLayoutsBase.h` and
+adds nothing game-specific yet. Game-only shader constants, or struct additions
+written once in a form both C++ and GLSL compile, go after the include, so
+engine definitions are in scope.
 
 ## Why this indirection exists
 
@@ -16,8 +21,12 @@ seam lets the game inject layout extensions without forking engine shaders.
 
 ## Invariants
 
-- `BT_ENGINE` guards C++-only syntax: defined only during C++ compilation, not GLSL. C++-only constructs (`#pragma once`, `constexpr`) sit inside `#if defined(BT_ENGINE)`; GLSL-only syntax goes in `#else`. Anything added to this wrapper must observe the same split.
+- `BT_ENGINE` guards C++-only syntax: defined only during C++ compilation, not
+  GLSL. C++-only constructs (`#pragma once`, `constexpr`) sit inside
+  `#if defined(BT_ENGINE)`; GLSL-only syntax goes in `#else`. Anything added to
+  this wrapper must observe the same split.
 
 ## See Also
 
-- `../../../../Engine/Data/Shaders/AGENTS.md` - Engine shader system, shared GLSL includes, and all shader-family sources
+- `../../../../Engine/Data/Shaders/AGENTS.md` - Engine shader system, shared
+  GLSL includes, and all shader-family sources

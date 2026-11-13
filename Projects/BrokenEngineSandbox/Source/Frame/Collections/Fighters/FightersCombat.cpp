@@ -23,17 +23,15 @@ static thread_local int64_t siCollisionLayerIndex = 0;
 // The most the heading may differ from the horizontal offset to a target for the beam to fire.
 constexpr float kfFighterBeamAimAngle = 0.1f;
 
+#if defined(BT_CLIENT)
 // Shared type indices (defined in Fighters.cpp, set during Register())
 extern int64_t giFighterExplosionTypeIndex;
-#if defined(BT_CLIENT)
 extern int64_t giFighterHitFlashControllerTypeIndex;
 extern int64_t giFighterBeamImpactControllerTypeIndex;
 extern int64_t giFighterBeamAreaLightTypeIndex;
-#endif
 
 // Defined in Fighters.cpp.
 void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
-#if defined(BT_CLIENT)
 void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier);
 #endif
 
@@ -55,10 +53,10 @@ void XM_CALLCONV FightersPostRender::BeginExplosion(Frame& rFrame, [[maybe_unuse
 
 #if defined(BT_CLIENT)
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], gFighterDeathVolume.mfCurrent, gFighterDeathPitchMinimum.mfCurrent, gFighterDeathPitchRandom.mfCurrent);
-#endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 	SpawnFighterExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
+#endif
 }
 
 // Hits the kept attack target when it qualifies, else the nearest enemy ship whose nearest flight plane is the shooter's

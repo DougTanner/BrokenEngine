@@ -20,8 +20,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      not supplied, so omit the parameter and let the derived default apply.
      Pass the same explicitly supplied values to the build invocation.
    - Append `-Project <Name>` only as step 3's game selection directs.
-   - For a requested ModelViewer build, append `-Target ModelViewer`; its context
-     resolves BrokenEngineSandbox as data owner even with several game projects.
+   - For a requested ModelViewer build, append `-Target ModelViewer`; its
+     context resolves BrokenEngineSandbox as data owner even with several game
+     projects.
    - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
      requests DevEnvDir itself for every game build.
 
@@ -91,8 +92,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      `-Target ThirdParty` is the typed block `thirdparty.worktree-not-primary`.
      Missing source or library links are provisioning failures and a routine
      `/compile` never rebuilds ThirdParty itself. Wrapper bootstrap does
-     incremental-rebuild ThirdParty at every session start (see Bootstrap
-     AgentTools), so a routine `/compile` normally finds it already current.
+     incremental-rebuild ThirdParty at each worktree creation or
+     `/reset-worktree` (see Bootstrap AgentTools), so a routine `/compile`
+     normally finds it already current.
    - Build the Release-only targets that [`../SKILL.md`](../SKILL.md)
      `## Inputs` names in Release. WorktreeCli still supplies the normal
      worktree-local target serialization.
@@ -124,8 +126,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
    clang-tidy run. Done when each such reference has been read, or stays
    unloaded because its authorization does not exist.
 
-7. Compose one bundled-script invocation per target. Done when the script's exact
-   arguments are chosen without any shell variable, composed MSBuild `/p:`
+7. Compose one bundled-script invocation per target. Done when the script's
+   exact arguments are chosen without any shell variable, composed MSBuild `/p:`
    switch, or state carried between shell calls.
 
    - Each call is independently valid in a fresh shell because it re-derives
@@ -155,14 +157,13 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
    - `-Target` — `ThirdParty`, `DataPacker`, `Client`, `Server`, `ModelViewer`,
      `WorktreeCli`, `AgentHarness`, or `ServerMonitor`.
    - `-Configuration` — `Debug`, `Profile`, or `Release`; required for
-     ThirdParty, Client, Server, and ModelViewer (Debug/Release only). Omit it for
-     the Release-only targets
-     [`../SKILL.md`](../SKILL.md) `## Inputs` names; an explicit non-Release
-     value on those targets is a typed block.
+     ThirdParty, Client, Server, and ModelViewer (Debug/Release only). Omit it
+     for the Release-only targets [`../SKILL.md`](../SKILL.md) `## Inputs`
+     names; an explicit non-Release value on those targets is a typed block.
    - `-Files` — selective compile, Client/Server/ModelViewer only; see step 8.
-   - `-AllowGaeaExport`, `-ForbidExpensiveExport` — Client/Server/ModelViewer only;
-     [runtime-data-mode.md](runtime-data-mode.md) `## Local generation` owns
-     when each applies.
+   - `-AllowGaeaExport`, `-ForbidExpensiveExport` — Client/Server/ModelViewer
+     only; [runtime-data-mode.md](runtime-data-mode.md) `## Local generation`
+     owns when each applies.
    - `-Project` — the game project per step 3; ModelViewer permits only
      BrokenEngineSandbox and selects it automatically when omitted.
    - `-Prefast` — Client/Server Release only; see
@@ -284,8 +285,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
       onward.
     - A value the parameter contract rejects at binding time — an unlisted
       `-Target` or `-Configuration` value, or an unknown parameter — fails
-      before the script runs, so PowerShell's own parameter error goes to stderr with a
-      nonzero exit and stdout stays empty; fix the invocation rather than
+      before the script runs, so PowerShell's own parameter error goes to stderr
+      with a nonzero exit and stdout stays empty; fix the invocation rather than
       looking for a typed `code`.
 
 11. Parse and report only the structured result described above after every
@@ -322,26 +323,26 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
   `git diff`/`git ls-files` commands, no hand-resolved repository root, primary
   checkout, or baseline, and no inline `vswhere`/`DevEnvDir` discovery. A
   blocked result is a stop, not a cue to redo its work by hand.
-- Worktree session start seeds the worktree's DataPacker and ModelViewer
-  Release Output by verified copy from the primary bootstrap prebuilds, and
-  otherwise builds each locally, so `DataPacker.exe` and `ModelViewer.exe` are
-  already present at session start. The seed conditions and local-build
-  fallbacks are in `.agents/scripts/Build-WorktreeTarget.ps1`. A session that
-  changes either target's sources performs a full local rebuild on its first
-  build of that target.
-  Bootstrap also refreshes primary Shared data per game
+- Session setup at each worktree creation or `/reset-worktree` seeds the
+  worktree's DataPacker and ModelViewer Release Output by verified copy from the
+  primary bootstrap prebuilds, and otherwise builds each locally, so
+  `DataPacker.exe` and `ModelViewer.exe` are already present when the session
+  begins. The seed conditions and local-build fallbacks are in
+  `.agents/scripts/Build-WorktreeTarget.ps1`. A session that changes either
+  target's sources performs a full local rebuild on its first build of that
+  target. Bootstrap also refreshes primary Shared data per game
   ([Wrapper bootstrap Shared-data refresh](runtime-data-mode.md#wrapper-bootstrap-shared-data-refresh)),
-  and a nonzero DataPacker exit fails session start. DataPacker's
+  and a nonzero DataPacker exit fails session setup. DataPacker's
   `"BrokenEngineDataPacker"` mutex and the AgentTools bootstrap mutex are the
   two PC-global build coordination points; add no others (the seed copies reuse
-  the bootstrap mutex for their prebuilds). They now nest: bootstrap holds its own
-  mutex while that refresh waits for `"BrokenEngineDataPacker"`, and that wait
-  is deliberately unbounded, so a peer DataPacker run or a rare island bake can
-  block session start long enough to time other session starts out.
+  the bootstrap mutex for their prebuilds). They now nest: bootstrap holds its
+  own mutex while that refresh waits for `"BrokenEngineDataPacker"`, and that
+  wait is deliberately unbounded, so a peer DataPacker run or a rare island bake
+  can block session setup long enough to time other bootstrap runs out.
 - DataPacker's mutex coordinates across worktrees and its shared chunks live
   under `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<Project>`; do not add
   another PC-global DataPacker lock or a checkout-local cache copy (the
-  session-start seed copies the built `DataPacker.exe` once into the worktree's
+  session-setup seed copies the built `DataPacker.exe` once into the worktree's
   own Output — a verified artifact seed, not a shared chunk cache). Gaea raw and
   split intermediates use the single mutable
   `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<Project>\Gaea\Islands` cache;
@@ -351,7 +352,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
   immutable ThirdParty, WorktreeCli, and AgentHarness Output directories are the
   only exceptions to worktree-local build artifacts.
 - Keep existing build serialization and the gated AgentTools promotion path; do
-  not share mutable build output between checkouts (the session-start DataPacker
+  not share mutable build output between checkouts (the session-setup DataPacker
   and ModelViewer seeds are one-time verified copies the worktree then owns and
   may rebuild over, not shared output).
 - The AgentTools targets build into a session-local `OutDir` because the default
@@ -369,16 +370,16 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
   process still holds the executable; report them rather than diagnosing unless
   asked.
 - Builds do not run DataPacker, Gaea, or texture export; the Local generation
-  build ([runtime-data-mode.md](runtime-data-mode.md) `## Local generation`)
-  and the wrapper bootstrap's primary run are the only exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
-  `RunCodeAnalysis=false`; `-Prefast` and `-ClangTidy` are the only exceptions,
-  and `-ClangTidy` keeps the rule-set path off. `RunCodeAnalysis=false` still
-  leaves cl `/analyze` running with the compiler's default rules on every
-  Release build whose project sets `EnablePREfast` (client, server,
-  DataPacker), where any diagnostic fails the build under warnings-as-errors;
-  only the rule-set path that reports the C26xxx codes needs `-Prefast`. The
-  clang-tidy reason and both analysis paths (the "Microsoft code analysis"
-  bullet) are in
+  build ([runtime-data-mode.md](runtime-data-mode.md) `## Local generation`) and
+  the wrapper bootstrap's primary run are the only exceptions. Every invocation
+  passes `EnableClangTidyCodeAnalysis=false` and `RunCodeAnalysis=false`;
+  `-Prefast` and `-ClangTidy` are the only exceptions, and `-ClangTidy` keeps
+  the rule-set path off. `RunCodeAnalysis=false` still leaves cl `/analyze`
+  running with the compiler's default rules on every Release build whose project
+  sets `EnablePREfast` (client, server, DataPacker), where any diagnostic fails
+  the build under warnings-as-errors; only the rule-set path that reports the
+  C26xxx codes needs `-Prefast`. The clang-tidy reason and both analysis paths
+  (the "Microsoft code analysis" bullet) are in
   `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
   `## Build Configuration`.
 - A `builder` executing this skill runs the build itself and never dispatches

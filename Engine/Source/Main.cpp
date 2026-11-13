@@ -298,8 +298,8 @@ static int64_t MainThread(HINSTANCE hinstance)
 	auto pFlightPlanes = std::make_unique<FlightPlanes>();
 	auto pIslandTerrainResidency = std::make_unique<IslandTerrainResidency>();
 
-	// Wait for islands to load and initialize heightmaps before Graphics ctor. Terrain mesh CPU
-	// slices are reclaimed immediately afterward; Graphics records its stable empty arena at boot.
+	// Wait for islands to load and initialize heightmaps before Graphics ctor. Graphics records its
+	// stable empty arena at boot.
 	gpProfileManager->BootStart(kBootTimerWaitForIslands);
 	if (HandleEagerLoadCompletion() != 0)
 	{

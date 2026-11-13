@@ -44,8 +44,8 @@ float MoonAmount(float fSunAngle)
 	return ComputeNightEnvelope(fSunAngle, gSunMoonMoonriseStart.mfCurrent, gSunMoonMoonriseEnd.mfCurrent, gSunMoonMoonsetStart.mfCurrent, gSunMoonMoonsetEnd.mfCurrent);
 }
 
-// Sun/Moon direction + tilt: stores the normalized sky direction in f4SunMoonNormal and returns it so the
-// shadow-stretch translation (which also needs it) can be folded CPU-side without re-reading write-only memory.
+// Sun/Moon direction + tilt: stores the normalized sky direction in f4SunMoonNormal and returns it so
+// PopulateShadowStretch can set the object-shadow away-from-light sign without re-reading write-only memory.
 static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
 {
 	// Sun/Moon direction: night reverses across the sky from sunset back to sunrise
@@ -133,18 +133,15 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	}
 
 	// Sun: piecewise lerp goes naturally to (0,0,0) at midnight; no moon-floor clamp here.
-	// Per-target sun intensity sliders scale at shader read sites, not here.
 	XMStoreFloat4(&rGlobalLayout.f4SunColor, vecSunMoon);
 
-	// Moon: floor color modulated by the moonrise/moonset envelope. Per-target moon intensity
-	// sliders scale at shader read sites, not here.
-	// Moon color follows its own rise/set schedule, independent of the shadow night gate.
+	// Moon: floor color modulated by the moonrise/moonset envelope, following its own rise/set
+	// schedule independent of the shadow night gate.
 	float fMoonAmount = MoonAmount(fSunAngle);
 	XMVECTOR vecMoon = XMVectorScale(vecMoonFloor, fMoonAmount);
 	XMStoreFloat4(&rGlobalLayout.f4MoonColor, vecMoon);
 
-	// Per-target sun/moon intensities. Terrain, Water, and Objects capture these values as locals and fold them into precomputed products;
-	// Smoke remains a raw multiplier.
+	// Per-target sun/moon intensities. Every target captures these values as locals and folds them into precomputed products.
 	float fSunIntensityTerrain = gSunMoonSunIntensityTerrain.mfCurrent;
 	float fMoonIntensityTerrain = gSunMoonMoonIntensityTerrain.mfCurrent;
 	float fSunIntensityWater = gSunMoonSunIntensityWater.mfCurrent;
@@ -153,8 +150,6 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	float fMoonIntensitySmoke = gSunMoonMoonIntensitySmoke.mfCurrent;
 	float fSunIntensityObjects = gSunMoonSunIntensityObjects.mfCurrent;
 	float fMoonIntensityObjects = gSunMoonMoonIntensityObjects.mfCurrent;
-	rGlobalLayout.fSunIntensitySmoke    = fSunIntensitySmoke;
-	rGlobalLayout.fMoonIntensitySmoke   = fMoonIntensitySmoke;
 
 	float fAmbientMultiplier = std::lerp(gSunMoonNightAmbientMultiplier.mfCurrent, gSunMoonDayAmbientMultiplier.mfCurrent, fDayPercent);
 	vecAmbient = XMVectorSetW(XMVectorScale(vecAmbient, fAmbientMultiplier), 1.0f);
@@ -240,8 +235,7 @@ static void PopulateSunAndLighting(shaders::GlobalLayout& rGlobalLayout, float f
 
 	float fLightingTimeOfDayMultiplier = rfDayPercent * gLightingDayFinalMultiplier.mfCurrent + (1.0f - rfDayPercent) * gLightingNightFinalMultiplier.mfCurrent;
 	rGlobalLayout.fLightingTimeOfDayMultiplier = fLightingTimeOfDayMultiplier;
-	// Smoke lighting multiplier folded with time-of-day (AddSmoke/BlendSmokePrecomputed): both inputs are known
-	// here (fSmokeLightingMultiplier source from RenderSmokeGlobal earlier this frame, time-of-day just above).
+	// Smoke lighting multiplier folded with the time-of-day multiplier just above (AddSmoke/BlendSmokePrecomputed).
 	rGlobalLayout.fSmokeLightingCombinedMultiplier = fLightingTimeOfDayMultiplier * gSmokeLightingMultiplier.mfCurrent;
 	rGlobalLayout.fLightingWaterSkyboxOne = std::lerp(gLightingWaterSkyboxOne.mfCurrent + (1.0f - rfDayPercent) * 1.5f * gLightingWaterSkyboxOne.mfCurrent, gLightingWaterSkyboxOneNight.mfCurrent, MoonAmount(fSunAngle));
 	// Skybox normal soften blends a sunrise/sunset (low-sun) value toward a noon value by the noon feather (1 at solar noon, 0 toward both horizons / night).
@@ -296,11 +290,11 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	// Shadow texels use a coverage-safe framing reference: outward zoom expands it immediately, inward zoom contracts it at the existing
 	// rate, and it never falls below live framing times the coverage ratio. Derive texel size from that coverage-safe framing's analytic
 	// reference-angle frustum, not the snapped render area, so the grid is bit-stable for a settled footprint and integer-texel XY pan does not
-	// shimmer. textureWidth / kfShadowHeadroomMultiplier pixels span that frustum; the headroom covers the live area throughout zoom transitions.
-	// Use the actual clamped extent for device-independent coverage and center the computed shadow area on the tilted footprint, snapped to the
-	// texel grid.
+	// shimmer. textureWidth / gExtraArea pixels span that frustum; the texture is sized by the same factor, so the extra area changes coverage
+	// past the footprint, not texel size. Use the actual clamped extent for device-independent coverage and center the computed shadow area on
+	// the tilted footprint, snapped to the texel grid.
 	XMVECTOR vecFootprintCenter = XMVectorAdd(engine::gpCamera->mVecPosition, XMVectorSet(0.0f, engine::gpCamera->mfTexelCenterOffsetNorth, 0.0f, 0.0f));
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelFraming, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(gExtraArea.mfCurrent, engine::gpCamera->mfShadowTexelFraming, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
 
 	// The shadow chain's current and previous world areas advance together on a refresh and are both held on a skip,
 	// so consumers keep sampling the texture through the area it was written with. A recreate makes the previous
@@ -314,11 +308,11 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	ShiftArea(sTemporalAreaLatch.f4CurrentArea, f2Shift);
 	ShiftArea(sTemporalAreaLatch.f4PreviousArea, f2Shift);
 
-	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety). Shadow phase 1
-	// against lighting's phase 0 keeps the two refreshes off the same frame whenever their cadences share a factor.
+	// Refresh on schedule, or early on a teleport. Shadow phase 1 against lighting's phase 0 keeps the two refreshes off
+	// the same frame whenever their cadences share a factor.
 	bool bShadowRefreshFrame = gbShadowTemporalReset || !sTemporalAreaLatch.bInitialized
 	                        || (gpGraphics->miFrameCounter + 1) % gShadowUpdateCadence.Get<int64_t>() == 0
-	                        || !IsVisibleAreaInsideHeldArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
+	                        || IsVisibleCenterOutsideArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
 	if (bShadowRefreshFrame)
 	{
 		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.mfCurrent, rGlobalLayout.f4ShadowAreaPrevious);
@@ -351,6 +345,39 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	rfWorldTexelX = area.fWorldTexelX;
 	rfFullWidth = area.fFullWidth;
 	rf4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
+}
+
+static void PopulateObjectShadowsArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout)
+{
+	// The object-shadow raster and both blur passes share one refresh; between refreshes consumers sample the blurred
+	// texture through the area it was rasterized for, the visible area scaled about its center by gExtraArea. The held
+	// area is in the camera cell's frame; follow a camera cell change before it is compared or published.
+	static XMFLOAT4 sf4HeldArea {};
+	static RetainedAreaBasis sRetainedAreaBasis {};
+	ShiftArea(sf4HeldArea, sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate));
+
+	// Refresh on schedule, on a forced reset, or early on a teleport. Phase 2 against terrain shadow's phase 1 keeps their
+	// scheduled refreshes off the same frame whenever the two cadences share a factor above 1.
+	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
+	gbObjectShadowsRefreshFrame = gbObjectShadowsReset || (gpGraphics->miFrameCounter + 2) % gObjectShadowCadence.Get<int64_t>() == 0
+	                           || IsVisibleCenterOutsideArea(rf4VisibleArea, sf4HeldArea);
+	gbObjectShadowsReset = false;
+	if (gbObjectShadowsRefreshFrame)
+	{
+		sf4HeldArea = ScaleAreaAboutCenter(rf4VisibleArea, gExtraArea.mfCurrent);
+	}
+	rGlobalLayout.f4ObjectShadowsArea = sf4HeldArea;
+	gPresentationContinuity.f4ObjectShadowArea = sf4HeldArea;
+
+	// Main's recorded blur dispatches read these counts; a skip zeroes Z. As with the terrain chain, write them every
+	// frame and only iCommandBuffer's slot.
+	VkExtent3D vkObjectShadowsBlurExtent = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D;
+	int64_t iGroupsX = TileCount(vkObjectShadowsBlurExtent.width);
+	int64_t iGroupsY = TileCount(vkObjectShadowsBlurExtent.height);
+	int64_t iGroupsZ = gbObjectShadowsRefreshFrame ? 1 : 0;
+	Pipeline* pPipelines = gpPipelineManager->mpPipelines;
+	pPipelines[kPipelineObjectShadowsBlurH].WriteIndirectComputeBuffer(iCommandBuffer, iGroupsX, iGroupsY, iGroupsZ);
+	pPipelines[kPipelineObjectShadowsBlurV].WriteIndirectComputeBuffer(iCommandBuffer, iGroupsX, iGroupsY, iGroupsZ);
 }
 
 static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, const XMFLOAT4& rf4ShadowArea, float fSunAngle, float fWorldTexelX, float fFullWidth, float fShadowElevationTextureSizeWidth, float fShadowTextureSizeWidth, float& rfShadowSunAngle)
@@ -399,8 +426,8 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	VkExtent3D vkShadowTextureExtent = gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D;
 	float fShadowTextureSizeWidth = static_cast<float>(vkShadowTextureExtent.width);
 	float fShadowTextureSizeHeight = static_cast<float>(vkShadowTextureExtent.height);
-	// 1.5x-wide elevation texture: read the created extent so the headroom factor has a single owner at the
-	// allocation site (RenderTargetTextures::CreateShadowTextures), like the shadow extent read just above.
+	// 1.5x-wide elevation texture: read the created extent so the width factor and the extra area have a single owner
+	// at the allocation site (RenderTargetTextures::CreateShadowTextures), like the shadow extent read just above.
 	float fShadowElevationTextureSizeWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mInfo.vkExtent3D.width);
 
 	float fShadowNoon = std::pow(fDayPercent, gShadowFeatherPower.mfCurrent);
@@ -493,6 +520,7 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	float fFullWidth = 0.0f;
 	XMFLOAT4 f4ShadowArea {};
 	PopulateShadowArea(iCommandBuffer, rGlobalLayout, fShadowTextureSizeWidth, fShadowTextureSizeHeight, fWorldTexelX, fFullWidth, f4ShadowArea);
+	PopulateObjectShadowsArea(iCommandBuffer, rGlobalLayout);
 
 	float fShadowSunAngle = 0.0f;
 	PopulateShadowSunExtension(rGlobalLayout, f4ShadowArea, fSunAngle, fWorldTexelX, fFullWidth, fShadowElevationTextureSizeWidth, fShadowTextureSizeWidth, fShadowSunAngle);

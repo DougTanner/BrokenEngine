@@ -57,7 +57,6 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 	rGlobalLayout.fSmokeColorMin = gSmokeColorMinimum.mfCurrent;
 	rGlobalLayout.fSmokeColorMultiplier = gSmokeColorMultiplier.mfCurrent;
-	rGlobalLayout.fSmokeLightingMultiplier = gSmokeLightingMultiplier.mfCurrent;
 	rGlobalLayout.fSmokeIntensityFalloff = gSmokeIntensityFalloff.mfCurrent;
 	rGlobalLayout.fSmokeWindNoiseScale = gSmokeWindNoiseScale.mfCurrent;
 	rGlobalLayout.fSmokeNoiseQuantity = gSmokeNoiseQuantity.mfCurrent;
@@ -81,11 +80,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	// World-area follows the visible area each frame: aspect inherits from the framebuffer,
 	// size grows with camera zoom-out. gSmokeSimulationArea acts as a margin multiplier.
 	const XMFLOAT4& rf4Visible = engine::gpCamera->mf4RenderVisibleArea;
-	float fCenterX = 0.5f * (rf4Visible.x + rf4Visible.z);
-	float fCenterY = 0.5f * (rf4Visible.y + rf4Visible.w);
-	float fHalfWidth = 0.5f * (rf4Visible.z - rf4Visible.x) * gSmokeSimulationArea.mfCurrent;
-	float fHalfHeight = 0.5f * (rf4Visible.y - rf4Visible.w) * gSmokeSimulationArea.mfCurrent;
-	XMFLOAT4 f4CurrentSmokeArea {fCenterX - fHalfWidth, fCenterY + fHalfHeight, fCenterX + fHalfWidth, fCenterY - fHalfHeight};
+	XMFLOAT4 f4CurrentSmokeArea = ScaleAreaAboutCenter(rf4Visible, gSmokeSimulationArea.mfCurrent);
 
 	// Curl offset scale (SmokeCurlOffset): the finer pass-B input texel in meters over the signed area extents, zero
 	// when both curl strengths are zero so the shader's uniform early-out skips the curl noise reads. Every exit
@@ -200,8 +195,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	gpPipelineManager->mpPipelines[kPipelineSmokeClearB].WriteIndirectBuffer(iCommandBuffer, 0);
 
 	// Planes refresh on the cadence's multiples, the rule lighting's layers follow: with the stagger on, one plane per
-	// such frame in turn; with it off, every plane. A plane also refreshes early once the camera leaves its held area so
-	// no unsimulated edge comes into view.
+	// such frame in turn; with it off, every plane. A plane also refreshes early on a teleport.
 	bool bSmokeLayerStagger = gSmokeLayerStagger.Get<bool>();
 	int64_t iSmokeUpdateCadence = gSmokeUpdateCadence.Get<int64_t>();
 	bool bScheduledFrame = gpGraphics->miFrameCounter % iSmokeUpdateCadence == 0;
@@ -209,7 +203,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	for (int64_t i = 0; i < iPlaneCount; ++i)
 	{
 		bool bScheduled = bScheduledFrame && (!bSmokeLayerStagger || i == iScheduledPlane);
-		if (gbGameplayPaused || (!bScheduled && IsVisibleAreaInsideHeldArea(rf4Visible, spf4PreviousSmokeAreas[i])))
+		if (gbGameplayPaused || (!bScheduled && !IsVisibleCenterOutsideArea(rf4Visible, spf4PreviousSmokeAreas[i])))
 		{
 			// Skip: the plane's remap reduces to the identity over its held area (for plane 0, wind's too), and its
 			// next refresh remaps held -> current.

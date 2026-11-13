@@ -307,14 +307,14 @@ void CommandBufferRecordMain::RecordObjectShadows(VkCommandBuffer vkCommandBuffe
 
 void CommandBufferRecordMain::RecordObjectShadowsBlur(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
 {
+	// Global writes both group counts every frame, Z = 0 on a frame that skips the object-shadow refresh. The transitions
+	// still run and keep the blurred texture's contents, which consumers sample until the next refresh.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadowsBlur);
-	int64_t iObjectShadowsBlurWidth = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.width;
-	int64_t iObjectShadowsBlurHeight = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.height;
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurH].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(iObjectShadowsBlurWidth), TileCount(iObjectShadowsBlurHeight));
+	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurH].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurV].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(iObjectShadowsBlurWidth), TileCount(iObjectShadowsBlurHeight));
+	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurV].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kShaderReadOnly);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadowsBlur);

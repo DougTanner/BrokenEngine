@@ -142,12 +142,12 @@ static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::
 	rootPreimage.append_range(payload);
 	auto AppendArtifactDigest = [&rootPreimage](ReplayArtifactKind eKind, uint64_t uiCoordinateKey, int64_t iActivationTick)
 	{
-		engine::FileContentDigest digest;
+		std::array<uint8_t, 32> digest {};
 		if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(eKind, uiCoordinateKey, iActivationTick), digest))
 		{
 			return false;
 		}
-		rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(digest.sha256.data()), reinterpret_cast<const std::byte*>(digest.sha256.data() + digest.sha256.size()));
+		rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(digest.data()), reinterpret_cast<const std::byte*>(digest.data() + digest.size()));
 		return true;
 	};
 	if (!AppendArtifactDigest(ReplayArtifactKind::kGrid, 0, -1) || !AppendArtifactDigest(ReplayArtifactKind::kMeta, 0, -1))
@@ -354,8 +354,6 @@ void Replay::ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rP
 		game::gpGame->CreateCellAtCoordinate(coordinate);
 	}
 	engine::Cell& rCell = game::gpGame->mCells.at(coordinate);
-	rCell.encodedStaticData.clear();
-	rCell.iStaticDataDecodedSize = 0;
 	rCell.pCurrent = std::move(rPendingReader.pSavedStart);
 	engine::TransferViaStream(*rCell.pCurrent, *rCell.pNext);
 	game::gpGame->mFrameInputs.insert_or_assign(coordinate, std::move(rPendingReader.initialInput));

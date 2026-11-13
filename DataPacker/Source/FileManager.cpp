@@ -48,9 +48,10 @@ static std::string TrimLine(std::string value)
 	return value;
 }
 
-static std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, const wchar_t* pcArguments)
+static std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, std::wstring_view arguments)
 {
-	std::wstring parameters = L" -C \"" + rRoot.native() + L"\" " + pcArguments;
+	std::wstring parameters = L" -C \"" + rRoot.native() + L"\" ";
+	parameters.append(arguments);
 	std::optional<common::ExecutableResult> optionalResult = common::RunExecutable(rGit, parameters);
 	if (!optionalResult)
 	{

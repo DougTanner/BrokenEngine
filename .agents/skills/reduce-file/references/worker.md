@@ -73,10 +73,11 @@ live in [`../SKILL.md`](../SKILL.md).
     handoff past the shared character cap, only the per-`.cpp` selected
     project-member path and each changed header's consuming targets move with
     the overflow, on the shared form's terms, and the rows stay executable
-    without rediscovery wherever that detail sits. Return each runtime-observable
-    acceptance criterion as a runtime request naming setup, action, observation,
-    and required evidence. Main schedules `/compile` and runtime verification at
-    their owning stages. Done when those requests are complete, or none apply.
+    without rediscovery wherever that detail sits. Return each
+    runtime-observable acceptance criterion as a runtime request naming setup,
+    action, observation, and required evidence. Main schedules `/compile` and
+    runtime verification at their owning stages. Done when those requests are
+    complete, or none apply.
 11. Remeasure every changed and new C++ file and record each resulting size.
     Done when each has a recorded fresh measurement.
 12. Run focused static checks. Done when they have run.

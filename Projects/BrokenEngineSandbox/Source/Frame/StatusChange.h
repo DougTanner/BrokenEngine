@@ -1,7 +1,6 @@
 #pragma once
 
 // Direct includes, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
-#include "Frame/Collections/Explosions/Explosions.h"
 #include "Network/NetworkProtocol.h" // ClientGuid
 
 #include "Frame/Collections/Battleships/Battleships.h"
@@ -25,7 +24,6 @@ enum class StatusChangeType : uint8_t
 	kSpawnBattleship,
 	kSpawnBlaster,
 	kSpawnMissile,
-	kSpawnExplosion,
 	kTransferFighter,
 	kTransferOmni,
 	kTransferBattleship,
@@ -48,7 +46,7 @@ inline constexpr bool IsKnownStatusChangeType(StatusChangeType eType)
 
 inline constexpr bool IsSpawnType(StatusChangeType eType)
 {
-	return eType >= StatusChangeType::kSpawnFighter && eType <= StatusChangeType::kSpawnExplosion;
+	return eType >= StatusChangeType::kSpawnFighter && eType <= StatusChangeType::kSpawnMissile;
 }
 
 inline constexpr bool IsTransferType(StatusChangeType eType)
@@ -62,7 +60,7 @@ inline constexpr bool IsPostDispatchType(StatusChangeType eType)
 	return eType >= StatusChangeType::kSpawnFighter && eType <= StatusChangeType::kTransferMissile;
 }
 
-static_assert(std::to_underlying(StatusChangeType::kSpawnExplosion) == std::to_underlying(StatusChangeType::kSpawnFighter) + 5 && std::to_underlying(StatusChangeType::kTransferFighter) == std::to_underlying(StatusChangeType::kSpawnExplosion) + 1 && std::to_underlying(StatusChangeType::kTransferMissile) == std::to_underlying(StatusChangeType::kTransferFighter) + 4, "IsSpawnType, IsTransferType, and IsPostDispatchType assume kSpawnFighter..kSpawnExplosion and kTransferFighter..kTransferMissile stay contiguous and adjacent; inserting an enumerator inside them breaks the range checks.");
+static_assert(std::to_underlying(StatusChangeType::kSpawnMissile) == std::to_underlying(StatusChangeType::kSpawnFighter) + 4 && std::to_underlying(StatusChangeType::kTransferFighter) == std::to_underlying(StatusChangeType::kSpawnMissile) + 1 && std::to_underlying(StatusChangeType::kTransferMissile) == std::to_underlying(StatusChangeType::kTransferFighter) + 4, "IsSpawnType, IsTransferType, and IsPostDispatchType assume kSpawnFighter..kSpawnMissile and kTransferFighter..kTransferMissile stay contiguous and adjacent; inserting an enumerator inside them breaks the range checks.");
 
 inline const char* StatusChangeTypeName(StatusChangeType eType)
 {
@@ -73,7 +71,6 @@ inline const char* StatusChangeTypeName(StatusChangeType eType)
 		case StatusChangeType::kSpawnBattleship:     return "SpawnBattleship";
 		case StatusChangeType::kSpawnBlaster:        return "SpawnBlaster";
 		case StatusChangeType::kSpawnMissile:        return "SpawnMissile";
-		case StatusChangeType::kSpawnExplosion:      return "SpawnExplosion";
 		case StatusChangeType::kTransferFighter:     return "TransferFighter";
 		case StatusChangeType::kTransferOmni:        return "TransferOmni";
 		case StatusChangeType::kTransferBattleship:  return "TransferBattleship";
@@ -133,7 +130,6 @@ using StatusChangeData = std::variant<
 	BattleshipsPostRender::SpawnInfo,
 	BlastersPostRender::SpawnInfo,
 	MissilesPostRender::SpawnInfo,
-	engine::ExplosionsPostRender::SpawnInfo,
 	DestroyShipData,
 	UpdateShipData,
 	UpdateFleetData>;
@@ -183,14 +179,7 @@ struct SpawnTraits<MissilesPostRender::SpawnInfo>
 	static constexpr StatusChangeType kTransfer = StatusChangeType::kTransferMissile;
 };
 
-template <>
-struct SpawnTraits<engine::ExplosionsPostRender::SpawnInfo>
-{
-	using Collection = engine::ExplosionsPostRender;
-	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnExplosion;
-};
-
-static_assert(std::is_trivially_copyable_v<FightersPostRender::SpawnInfo> && std::is_trivially_copyable_v<OmnisPostRender::SpawnInfo> && std::is_trivially_copyable_v<BattleshipsPostRender::SpawnInfo> && std::is_trivially_copyable_v<BlastersPostRender::SpawnInfo> && std::is_trivially_copyable_v<MissilesPostRender::SpawnInfo> && std::is_trivially_copyable_v<engine::ExplosionsPostRender::SpawnInfo>, "Every SpawnInfo is a status-change payload the replay difference stream writes as a raw image.");
+static_assert(std::is_trivially_copyable_v<FightersPostRender::SpawnInfo> && std::is_trivially_copyable_v<OmnisPostRender::SpawnInfo> && std::is_trivially_copyable_v<BattleshipsPostRender::SpawnInfo> && std::is_trivially_copyable_v<BlastersPostRender::SpawnInfo> && std::is_trivially_copyable_v<MissilesPostRender::SpawnInfo>, "Every SpawnInfo is a status-change payload the replay difference stream writes as a raw image.");
 
 inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 {
@@ -206,7 +195,6 @@ inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 		case StatusChangeType::kTransferBlaster:    return BlastersPostRender::SpawnInfo {};
 		case StatusChangeType::kSpawnMissile:
 		case StatusChangeType::kTransferMissile:    return MissilesPostRender::SpawnInfo {};
-		case StatusChangeType::kSpawnExplosion:     return engine::ExplosionsPostRender::SpawnInfo {};
 		case StatusChangeType::kDestroyShip:        return DestroyShipData {};
 		case StatusChangeType::kUpdateShip:         return UpdateShipData {};
 		case StatusChangeType::kUpdateFleet:        return UpdateFleetData {};
@@ -246,14 +234,14 @@ bool IsOwnedEntityTransfer(const StatusChange& rChange);
 engine::GlobalId OwnedSpawnGlobalId(const StatusChange& rChange);
 engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange);
 
-// Adoptability check the replay stream reader and the harness apply: client hydration looks the Blaster and Explosion
-// types up with a checked index, a ship controller or ship type outside its enumerators selects no collection, and a
-// ship spawn's target flight plane, its stored flight plane other than kuiNoFlightPlane, or an UpdateShipData target
-// flight plane other than kuiKeepTargetFlightPlane, must be one its ship type allows.
+// Adoptability check the replay stream reader and the harness apply: client hydration looks the Blaster type up with a
+// checked index, a ship controller or ship type outside its enumerators selects no collection, and a ship spawn's
+// target flight plane, its stored flight plane other than kuiNoFlightPlane, or an UpdateShipData target flight plane
+// other than kuiKeepTargetFlightPlane, must be one its ship type allows; a Fighter or Battleship spawn's fire time must
+// pass its type's PostRead range test.
 bool IsAdoptableStatusChange(const StatusChange& rChange);
 
 // The one application point of the post-tick batch: server harvest, replay playback, and the client post-tick loop.
-// coordinate is the cell rFrame belongs to; an explosion takes it and rFrame's tick time.
-void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange, engine::GridCoord coordinate);
+void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange);
 
 } // namespace game

@@ -25,7 +25,6 @@ template <typename OWNER, typename MEMBER> struct MemberOwner<MEMBER OWNER::*>
 	using Type = OWNER;
 };
 
-using ExplosionsFrameColumns = FrameColumnList<FRAME_COLUMN(ExplosionsInterpolate, puiTypeIndices), FRAME_COLUMN(ExplosionsInterpolate, pStartTimes), FRAME_COLUMN(ExplosionsInterpolate, pVecPositions), FRAME_COLUMN(ExplosionsInterpolate, pVecDirections), FRAME_COLUMN(ExplosionsInterpolate, pfTimePercents), FRAME_COLUMN(ExplosionsInterpolate, piTrailCounts), FRAME_COLUMN(ExplosionsInterpolate, pTrailTimes), FRAME_COLUMN(ExplosionsPostRender, pLifecycleFlags)>;
 using PushersFrameColumns = FrameColumnList<FRAME_COLUMN(PushersInterpolate, pVecPositions), FRAME_COLUMN(PushersInterpolate, pfRadii), FRAME_COLUMN(PushersInterpolate, pfIntensities), FRAME_COLUMN(PushersInterpolate, pfPowers), FRAME_COLUMN(PushersInterpolate, pFlags), FRAME_COLUMN(PushersPostRender, pIds), FRAME_COLUMN(PushersPostRender, pLifecycleFlags)>;
 
 template <typename... FIRST, typename... SECOND, typename... THIRD, typename... FOURTH>
@@ -53,13 +52,6 @@ consteval bool ContainsRefusedFrameValues(FrameColumnList<COLUMNS...>)
 // its specialization names it for edit_frame.
 template <typename INTERPOLATE>
 struct FrameCollection;
-
-template <>
-struct FrameCollection<ExplosionsInterpolate>
-{
-	static constexpr std::string_view kName = "explosions";
-	using Columns = ExplosionsFrameColumns;
-};
 
 template <>
 struct FrameCollection<PushersInterpolate>
@@ -211,7 +203,7 @@ void ReadElement(const nlohmann::json& rWrites, std::string_view name, ELEMENT& 
 
 // IS_COLUMN selects row iIndex of a collection column; otherwise COLUMN is a frame value and iIndex is unused.
 template <bool IS_COLUMN, typename COLUMN, typename INTERPOLATE, typename POST_RENDER>
-void WriteMember(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, int64_t iIndex, const nlohmann::json& rWrites)
+void WriteMember([[maybe_unused]] INTERPOLATE& rInterpolate, [[maybe_unused]] POST_RENDER& rPostRender, int64_t iIndex, const nlohmann::json& rWrites)
 {
 	static constexpr std::string_view kName = COLUMN::kName;
 	if constexpr (!IS_COLUMN && IsRefusedFrameValue(kName))

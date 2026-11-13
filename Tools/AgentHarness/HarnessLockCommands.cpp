@@ -229,9 +229,9 @@ int64_t RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues)
 	}
 	if (verb == L"release")
 	{
-		if (::DeleteFileW(ExtendedLengthPath(optionalLocator->path).c_str()) == FALSE)
+		if (!std::filesystem::remove(ExtendedLengthPath(optionalLocator->path), error))
 		{
-			FailWindows("release lock");
+			Fail("release lock failed (Windows error " + std::to_string(error.value()) + ")");
 			return kiExitFailure;
 		}
 		return kiExitOk;

@@ -167,7 +167,6 @@ void ForEachInterpolateUpdate(TypeList<TS...>, game::FrameInterpolate& __restric
 {
 	([&]
 	{
-		static_assert(requires { TS::Update(rCurrent, rPreviousFrame, rArguments...); });
 		TS::Update(rCurrent, rPreviousFrame, rArguments...);
 	}(), ...);
 }
@@ -192,6 +191,18 @@ void ForEachBeginRender(TypeList<TS...>, int64_t iCommandBuffer, const std::unor
 		if constexpr (requires { TS::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords); })
 		{
 			TS::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
+		}
+	}(), ...);
+}
+
+template<typename... TS>
+void ForEachRequestTextures(TypeList<TS...>, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
+{
+	([&]
+	{
+		if constexpr (requires { TS::RequestTextures(rRenderInterpolates, rActiveCoordinates); })
+		{
+			TS::RequestTextures(rRenderInterpolates, rActiveCoordinates);
 		}
 	}(), ...);
 }

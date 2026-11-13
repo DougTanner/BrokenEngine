@@ -215,11 +215,7 @@ ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnectio
 		rCell.staticData.Write(mFrameStream);
 		int64_t iRawSize = std::ssize(mSendScratch);
 		ASSERT(iRawSize <= INT32_MAX - NetworkMessages::ServerCoordStaticDataMessage::kiFixedSize);
-		int64_t iCompressedSize = 0;
-		if (iRawSize <= LZ4_MAX_INPUT_SIZE)
-		{
-			iCompressedSize = CompressToBuffer(std::span<const char>(mSendScratch.data(), mSendScratch.size()));
-		}
+		int64_t iCompressedSize = CompressToBuffer(std::span<const char>(mSendScratch.data(), mSendScratch.size()));
 		if (iCompressedSize > 0 && iCompressedSize < iRawSize)
 		{
 			rCell.encodedStaticData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);

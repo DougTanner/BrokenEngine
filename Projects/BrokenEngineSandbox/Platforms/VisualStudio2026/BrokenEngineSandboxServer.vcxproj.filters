@@ -103,9 +103,6 @@
     <Filter Include="Game\Frame\Collections\Blasters">
       <UniqueIdentifier>{e5f6a7b8-9012-cdef-0123-456789abcdef}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\Frame\Collections\Explosions">
-      <UniqueIdentifier>{c3d4e5f6-a7b8-9013-cdef-012345678901}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\Frame\Collections\Pushers">
       <UniqueIdentifier>{a7b8c9d0-e1f2-3457-0123-456789012345}</UniqueIdentifier>
     </Filter>
@@ -567,9 +564,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h">
-      <Filter>Engine\Frame\Collections\Explosions</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h">
       <Filter>Engine\Frame\Collections\Pushers</Filter>
     </ClInclude>
@@ -887,15 +881,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.cpp">
-      <Filter>Engine\Frame\Collections\Explosions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsSpawn.cpp">
-      <Filter>Engine\Frame\Collections\Explosions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsUpdate.cpp">
-      <Filter>Engine\Frame\Collections\Explosions</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
@@ -906,56 +891,11 @@
       <Filter>Engine\Frame\Collections\Pushers</Filter>
     </ClCompile>
 
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp">
-      <Filter>Engine\Ui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp">
       <Filter>Engine\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp">
-      <Filter>Game\Ui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp">
-      <Filter>Game\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
       <Filter>Engine\Frame</Filter>

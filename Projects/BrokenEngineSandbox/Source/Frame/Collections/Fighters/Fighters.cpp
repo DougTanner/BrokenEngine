@@ -44,9 +44,9 @@ constexpr float kfFighterExplosionPositionJitter = kfFighterRadius * 0.375f;
 constexpr float kfFighterExplosionDirectionJitter = 0.5f;
 constexpr int64_t kiFighterExplosionTrailCount = 5;
 
+#if defined(BT_CLIENT)
 // Shared type indices (accessible from FightersCombat.cpp via extern)
 int64_t giFighterExplosionTypeIndex = 0xFF;
-#if defined(BT_CLIENT)
 static int64_t siFighterHitFlashTypeIndex = 0xFF;
 int64_t giFighterHitFlashControllerTypeIndex = 0xFF;
 static int64_t siFighterBeamImpactTypeIndex = 0xFF;
@@ -77,6 +77,7 @@ constexpr float kfFighterBeamStartOffset = 1.0f;
 
 void FightersInterpolate::Register()
 {
+#if defined(BT_CLIENT)
 	engine::ExplosionsInterpolate::RegisterType(giFighterExplosionTypeIndex,
 	{
 		.iBaseParticleCount = kiFighterExplosionBaseParticleCount,
@@ -103,7 +104,6 @@ void FightersInterpolate::Register()
 		.pParticleIntensityPowerScale = &gFighterExplosionParticleIntensityPower,
 	});
 
-#if defined(BT_CLIENT)
 	RegisterFighterHitFlashEffect();
 	RegisterFighterBeamImpactEffect();
 
@@ -207,12 +207,12 @@ static void RegisterFighterHitFlashEffect()
 		.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
 	});
 }
-#endif // BT_CLIENT
 
 void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent)
 {
-	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfFighterExplosionPositionJitter>(vecPosition, rFrame.postRender.randomEngine);
-	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfFighterExplosionDirectionJitter>(vecDirection, rFrame.postRender.randomEngine);
+	common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
+	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfFighterExplosionPositionJitter>(vecPosition, randomEngine);
+	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfFighterExplosionDirectionJitter>(vecDirection, randomEngine);
 
 	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 	{
@@ -228,10 +228,9 @@ void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCo
 		.fSizePercent = fPercent * kfFighterExplosionSizeStart + (1.0f - fPercent) * kfFighterExplosionSizeEnd,
 		.fSmokePercent = fPercent * kfFighterExplosionSmoke,
 		.fTimePercent = fPercent,
-	});
+	}, randomEngine);
 }
 
-#if defined(BT_CLIENT)
 // Fighter models, one per ShipController (defined in FightersRender.cpp)
 extern const common::crc_t kFighterFleetModel;
 extern const common::crc_t kFighterRandomModel;
@@ -296,6 +295,12 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		}
 
 		vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * fDeltaRotation);
+		// PostRender Update ramps the rate to exactly 0 inside the capture angle, so the last of the turn is a percent rotation toward the
+		// previous tick's wanted heading, one tick behind PostRender's angle test.
+		if (fDeltaRotation == 0.0f && !(rPreviousPostRender.pFlags[i] & ShipFlags::kNoAiDirection))
+		{
+			vecDirection = CaptureHeading(vecDirection, rPreviousPostRender.pVecAiDirections[i], deltaTime, kFighterMovement);
+		}
 
 		// The -1.0f sentinel means not exploding and must remain unchanged.
 		if (destroyedTime > std::chrono::duration<float>::zero())
@@ -424,9 +429,11 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		{
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kFighterDestroyExplosionInterval;
 
+#if defined(BT_CLIENT)
 			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kFighterDestroyTime;
 			XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 			SpawnFighterExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
+#endif
 		}
 	}
 }
@@ -608,7 +615,6 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 		CountdownPendingOrders(iPendingFleetWantedCoordinateTicks);
 		float fPositionCorrectionX = 0.0f;
-		bool bAligning = false;
 
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
@@ -631,17 +637,14 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				{
 					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
-				bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
-				if (bAligning)
+				bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
+				fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+				HeadingMovementConstants movement = kFighterMovement;
+				if (tactic.fMaximumSpeed != 0.0f)
 				{
-					float fDirectionAiCrossZ = XMVectorGetZ(XMVector3Cross(vecDirection, vecAiDirection));
-					fDeltaRotation = fDirectionAiCrossZ > 0.0f ? kfFighterMaxTurnRate : -kfFighterMaxTurnRate;
+					movement.fMaximumSpeed = tactic.fMaximumSpeed;
 				}
-				else
-				{
-					SteerHeadingTowards(vecPosition, vecDirection, XMVectorAdd(vecPosition, vecAiDirection), true, kfFighterChaseTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
-				}
-				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kFighterMovement, vecVelocity);
+				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, movement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 			else
@@ -654,9 +657,16 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				else
 				{
 					// No enemy in the cell: return to an island, which also clears kFlee.
-					tactic.vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, false, XMVectorZero(), flags, tactic.bHasDestination);
+					tactic.vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
 				}
-				SteerHeadingTowards(vecPosition, vecDirection, tactic.vecDestination, tactic.bHasDestination, kfFighterChaseTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
+				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
+				flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
+				fDeltaRotation = 0.0f;
+				if (tactic.bHasDestination)
+				{
+					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+				}
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kFighterMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
@@ -680,7 +690,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 
-		fDeltaRotation = common::ClampMagnitude(fDeltaRotation, kfFighterMaxTurnRate);
+		// Navigation and terrain bounce share one acceleration-limited step per tick.
+		fDeltaRotation = RampHeadingTurnRate(rPreviousInterpolate.pfDeltaRotations[i], fDeltaRotation, deltaTime, kFighterMovement);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);

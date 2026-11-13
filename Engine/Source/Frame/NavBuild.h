@@ -55,9 +55,6 @@ struct NavData
 	std::vector<int64_t> adjacencyNeighbors;    // CSR payload: neighbor vertex indices (visibility + polygon)
 	XMFLOAT2 f2GridMinimum {};                  // global vertex AABB min (grid origin)
 	XMFLOAT2 f2GridMaximum {};                  // global vertex AABB max
-
-	void Write(std::ostream& rStream) const;
-	void Read(std::istream& rStream);
 };
 
 void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);

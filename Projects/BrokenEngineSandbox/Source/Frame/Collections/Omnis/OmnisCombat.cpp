@@ -275,7 +275,7 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 	}
 }
 
-void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, engine::GridCoord emitterCoordinate)
+void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
 {
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
@@ -289,12 +289,14 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 
 		rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 
+#if defined(BT_CLIENT)
 		float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kDestroyTime;
 
-		XMVECTOR vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), common::Random<XM_2PI>(rFrame.postRender.randomEngine));
+		common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
+		XMVECTOR vecDirection = common::RotateDirectionAboutZ(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), common::Random<XM_2PI>(randomEngine));
 
-		XMVECTOR vecJitteredPosition = common::RandomPositionJitter<1.0f>(rCurrentInterpolate.pVecPositions[i], rFrame.postRender.randomEngine);
-		XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<0.5f>(vecDirection, rFrame.postRender.randomEngine);
+		XMVECTOR vecJitteredPosition = common::RandomPositionJitter<1.0f>(rCurrentInterpolate.pVecPositions[i], randomEngine);
+		XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<0.5f>(vecDirection, randomEngine);
 
 		float fAdjustedPercent = (std::pow((1.0f - fPercent) + 1.0f, kfDeathRadialPower) - 1.0f) * kfExplosionsRadius;
 		vecJitteredPosition = XMVectorMultiplyAdd(vecJitteredDirection, XMVectorReplicate(fAdjustedPercent), vecJitteredPosition);
@@ -313,7 +315,8 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 			.fSizePercent = fPercent * kfExplosionSizeStart + (1.0f - fPercent) * kfExplosionSizeEnd,
 			.fSmokePercent = fPercent * kfExplosionSmoke,
 			.fTimePercent = fPercent,
-		});
+		}, randomEngine);
+#endif
 	}
 }
 

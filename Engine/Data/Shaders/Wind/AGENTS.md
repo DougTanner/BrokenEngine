@@ -1,31 +1,46 @@
 # Wind Shaders - Sparse Velocity Simulation
 
-Wind is a client-only 2D world-space velocity field that ping-pongs between two textures and drives Smoke (`../Smoke/AGENTS.md`). Objects deposit directional or radial velocity; active tiles spread once per frame through hierarchical indirect dispatch.
+Wind is a client-only 2D world-space velocity field that ping-pongs between two
+textures and drives Smoke (`../Smoke/AGENTS.md`). Objects deposit directional or
+radial velocity; active tiles spread once per frame through hierarchical
+indirect dispatch.
 
 Wind is purely visual. Its step is scaled by wall-clock delta time
-([Render pause policy](../../../Source/Graphics/Render/AGENTS.md#precision-and-history)), never by the fixed
-simulation tick, so the field must never feed back into deterministic frame
-state. Each positive-time step traces backward along the current velocity to find where the
-flow came from (semi-Lagrangian advection), with that backward step clamped to
-three texels; then adds a swirl from noise sampled by world position so the
-pattern stays anchored as the camera moves, a simplified vorticity-confinement
-push sideways to the flow (it keeps swirls from smearing away), diffusion
-against the four neighbors, and a frame-rate-independent decay. Every behavior
-constant in the kernel is a Low/High pair blended by the field's own magnitude —
-weak wind stays laminar (smooth), strong wind turns turbulent (churning). Add a
-new behavior constant as a pair, or that split stops working for its term. The
-blend weight is `WindMagnitudeFactor` (`../ShaderFunctions.h`), set by the Wind
-Threshold Low/High sliders, and smoke pass B uses the same weight to blend its
-curl strength Low/High, so retuning the thresholds also changes smoke swirl.
+([Render pause policy](../../../Source/Graphics/Render/AGENTS.md#precision-and-history)),
+never by the fixed simulation tick, so the field must never feed back into
+deterministic frame state. Each positive-time step traces backward along the
+current velocity to find where the flow came from (semi-Lagrangian advection),
+with that backward step clamped to three texels; then adds a swirl from noise
+sampled by world position so the pattern stays anchored as the camera moves, a
+simplified vorticity-confinement push sideways to the flow (it keeps swirls from
+smearing away), diffusion against the four neighbors, and a
+frame-rate-independent decay. Every behavior constant in the kernel is a
+Low/High pair blended by the field's own magnitude — weak wind stays laminar
+(smooth), strong wind turns turbulent (churning). Add a new behavior constant as
+a pair, or that split stops working for its term. The blend weight is
+`WindMagnitudeFactor` (`../ShaderFunctions.h`), set by the Wind Threshold
+Low/High sliders, and smoke pass B uses the same weight to blend its curl
+strength Low/High, so retuning the thresholds also changes smoke swirl.
 
 ## Sparse Dispatch Invariants
 
-- Each texture has matching occupancy storage. Each spread variant reads the other texture's occupancy, while dilation writes the active list for its own output variant. Crossing those indices produces stale dispatch coverage.
+- Each texture has matching occupancy storage. Each spread variant reads the
+  other texture's occupancy, while dilation writes the active list for its own
+  output variant. Crossing those indices produces stale dispatch coverage.
 - A zero-time spread copies the exact source texel without filtering or field
   evolution, returning zero outside the source image. It still rebuilds output
   occupancy, preserving the retained field through ping-pong copies.
-- Camera movement and zoom require world-position remapping. Dilation remaps tile centers into the previous grid, and both spread variants remap samples through the previous area.
-- Occupancy is rebuilt from nonzero output, so decay must reach exact zero. Residual values prevent active tiles from retiring and turn sparse work into persistent work.
-- Stored velocity is world-oriented with +Y north. Every conversion between world velocity and texture UV flips Y, including advection and radial deposits.
+- Camera movement and zoom require world-position remapping. Dilation remaps
+  tile centers into the previous grid, and both spread variants remap samples
+  through the previous area.
+- Occupancy is rebuilt from nonzero output, so decay must reach exact zero.
+  Residual values prevent active tiles from retiring and turn sparse work into
+  persistent work.
+- Stored velocity is world-oriented with +Y north. Every conversion between
+  world velocity and texture UV flips Y, including advection and radial
+  deposits.
 
-Smoke populates its per-plane current and previous area arrays before wind reads plane 0's slot of each. Record-once command buffers submit both ping-pong variants; runtime texture selection, occupancy, and GPU-written active lists determine which work executes.
+Smoke populates its per-plane current and previous area arrays before wind reads
+plane 0's slot of each. Record-once command buffers submit both ping-pong
+variants; runtime texture selection, occupancy, and GPU-written active lists
+determine which work executes.

@@ -54,27 +54,17 @@ inline std::string_view FormatSuffixed(std::span<char> buffer, int64_t iValue, s
 } // namespace common
 
 template<>
-struct std::formatter<std::string> : std::formatter<std::string_view>
-{
-	template<typename CONTEXT>
-	typename CONTEXT::iterator format(const std::string& rString, CONTEXT& rContext) const
-	{
-		return std::formatter<std::string_view>::format(rString, rContext);
-	}
-};
-
-template<>
 struct std::formatter<std::wstring> : std::formatter<std::string_view>
 {
 	template<typename CONTEXT>
-	typename CONTEXT::iterator format(const std::wstring& rString, CONTEXT& rContext) const
+	typename CONTEXT::iterator format(std::wstring_view string, CONTEXT& rContext) const
 	{
 		// UTF-8-converts into the workbuffer (no heap allocation), so the calling thread needs a live ThreadLocal. The
 		// ASSERT's _Analysis_assume_ is load-bearing — without it /analyze flags C6011 (null deref) as an error in the
 		// Release code-analysis build.
 		ASSERT(common::gpThreadLocal != nullptr);
 		common::ScopedWorkbufferArena arena = common::gpThreadLocal->mWorkbuffer.Push();
-		arena.mBuffer.Append(rString);
+		arena.mBuffer.Append(string);
 		return std::formatter<std::string_view>::format(arena.mBuffer.View(), rContext);
 	}
 };

@@ -7,21 +7,20 @@ Client-only (`BT_CLIENT`) ENet peer, `ClientSessionRuntime`, and
 state, and receive buffers. The runtime owns connection and GUID persistence,
 discovery, the client active set and its visible-neighbor cache, the desired
 coordinates derived from them, which during a camera jump also keep the
-confirmed cells under the camera's previous cell loaded area, the harness
-viewer pin, subscription and clock state, generic full-state and delta
-adoption, received-update buffering and confirmation, ordered receive
-draining, ACK/flush, resets, and live terrain preparation.
-`ClientSessionBase`, which the game client session inherits, holds the runtime
-and the desync core and owns static-data application, owned-entity event
-application, `Reconcile`, and the resync, disconnect, and server-load session
-resets. Like `GameBase::ResetSession`, the server-load reset discards the
-camera tracking caches and clears smoke and particles, so no previous-world
-view carries into the new one. This directory also owns replay and desync machinery and the client
-crash-report upload. The game client
-session (the game project's own `Source/Network/Client/AGENTS.md`) owns the
-reconciler, each owned-entity event's gameplay effect, gameplay hydration and
-smoke continuity, UI, and gameplay policy. Collection hydration rules are in
-the game collection detail (the game project's own
+confirmed cells under the camera's previous cell loaded area, the harness viewer
+pin, subscription and clock state, generic full-state and delta adoption,
+received-update buffering and confirmation, ordered receive draining, ACK/flush,
+resets, and live terrain preparation. `ClientSessionBase`, which the game client
+session inherits, holds the runtime and the desync core and owns static-data
+application, owned-entity event application, `Reconcile`, and the resync,
+disconnect, and server-load session resets. Like `GameBase::ResetSession`, the
+server-load reset discards the camera tracking caches and clears smoke and
+particles, so no previous-world view carries into the new one. This directory
+also owns replay and desync machinery and the client crash-report upload. The
+game client session (the game project's own `Source/Network/Client/AGENTS.md`)
+owns the reconciler, each owned-entity event's gameplay effect, gameplay
+hydration and smoke continuity, UI, and gameplay policy. Collection hydration
+rules are in the game collection detail (the game project's own
 `Source/Frame/Collections/AGENTS.md`).
 
 ## Receive Paths
@@ -41,10 +40,24 @@ the first arrival.
 
 ## Subscription Receive Invariants
 
-`ClientSubscriptions` (`ClientSubscriptions.h`) centralizes full-state, coord-update, and subscribe-accept decisions in `ClassifyFullState`, `ClassifyCoordinateUpdate`, and `ClassifySubscribeAccept`; static data applies the same checks inline.
+`ClientSubscriptions` (`ClientSubscriptions.h`) centralizes full-state,
+coord-update, and subscribe-accept decisions in `ClassifyFullState`,
+`ClassifyCoordinateUpdate`, and `ClassifySubscribeAccept`; static data applies
+the same checks inline.
 
-- Seed the current load generation from the first accepted connection response. Load notification processing commits the newest generation and resets the old world before normal subscription updates run. Incoming load-scoped subscription traffic with any other generation logs a Network warning and returns before slot, epoch, cancellation, ACK, timing, receive-buffer, or game-state mutation ([Network architecture](../../../../Documents/Architecture/Network.md#debug-load-generation)).
-- Exact epoch checks apply only after the server assigns an epoch. Slot clearing retains the last assigned epoch for the connection lifetime; a `kUnsubscribed` slot admits subscribe accepts, and a `kUnsubscribed` or `kUnsubscribing` slot admits out-of-order full/static state for a coord with a live subscribe request, only when their epoch is wrap-aware newer than the retained one. This prevents retired traffic from reactivating a slot.
+- Seed the current load generation from the first accepted connection response.
+  Load notification processing commits the newest generation and resets the old
+  world before normal subscription updates run. Incoming load-scoped
+  subscription traffic with any other generation logs a Network warning and
+  returns before slot, epoch, cancellation, ACK, timing, receive-buffer, or
+  game-state mutation
+  ([Network architecture](../../../../Documents/Architecture/Network.md#debug-load-generation)).
+- Exact epoch checks apply only after the server assigns an epoch. Slot clearing
+  retains the last assigned epoch for the connection lifetime; a `kUnsubscribed`
+  slot admits subscribe accepts, and a `kUnsubscribed` or `kUnsubscribing` slot
+  admits out-of-order full/static state for a coord with a live subscribe
+  request, only when their epoch is wrap-aware newer than the retained one. This
+  prevents retired traffic from reactivating a slot.
 - The client never picks a slot index for a subscribe: the client adopts the
   slot the server's accept or full state names. Record shape and consumption
   order are on `SubscribeRequests` (`ClientSubscriptions.h`), relying on the
@@ -61,10 +74,25 @@ the first arrival.
   instead of committed, and it is dropped on `kUnsubscribing`. A same-coord
   active slot may heal its epoch on a legitimate re-subscribe. Load reset clears
   every record.
-- Timeouts: a live record unanswered for `kSubscriptionTransitionTimeout` logs one warning and keeps waiting; it is never cancelled or resent. A `kWaitingFullState` slot has no client timeout ([Server Buffered State](../Server/AGENTS.md#buffered-state)). Only a `kUnsubscribing` slot is freed after the same timeout without its ACK.
-- Static data requires matching coord identity and exact epoch on `kWaitingFullState`, and a live record plus a newer retained epoch on `kUnsubscribed` or `kUnsubscribing`. A coord mismatch drops silently because full state owns ghost unsubscribe. Static data buffers without slot mutation. The payload carries no cell shape; every consumer reads the one constant `kCellDirections` table ([Frame](../../Frame/AGENTS.md)).
-- `kWaitingFullState` accepts deltas without advancing the ACK floor; only `kActive` tracks received ticks. A gap beyond `kiNetworkBufferSize` disconnects.
-- Active-slot resync full state commits only on matching coord and epoch, resets the ACK floor, and buffers the new frame; mismatched active state, and `kUnsubscribing` state whose coord has no live record, is dropped. Resync is server full-state replacement; reconciliation is client rollback/replay ([Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md)).
+- Timeouts: a live record unanswered for `kSubscriptionTransitionTimeout` logs
+  one warning and keeps waiting; it is never cancelled or resent. A
+  `kWaitingFullState` slot has no client timeout
+  ([Server Buffered State](../Server/AGENTS.md#buffered-state)). Only a
+  `kUnsubscribing` slot is freed after the same timeout without its ACK.
+- Static data requires matching coord identity and exact epoch on
+  `kWaitingFullState`, and a live record plus a newer retained epoch on
+  `kUnsubscribed` or `kUnsubscribing`. A coord mismatch drops silently because
+  full state owns ghost unsubscribe. Static data buffers without slot mutation.
+  The payload carries no cell shape; every consumer reads the one constant
+  `kCellDirections` table ([Frame](../../Frame/AGENTS.md)).
+- `kWaitingFullState` accepts deltas without advancing the ACK floor; only
+  `kActive` tracks received ticks. A gap beyond `kiNetworkBufferSize`
+  disconnects.
+- Active-slot resync full state commits only on matching coord and epoch, resets
+  the ACK floor, and buffers the new frame; mismatched active state, and
+  `kUnsubscribing` state whose coord has no live record, is dropped. Resync is
+  server full-state replacement; reconciliation is client rollback/replay
+  ([Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md)).
 - A non-reject subscribe-accept slot outside the client pool immediately
   unsubscribes so the server slot cannot leak. Transport activation and ACK
   commitment stay at acceptance. Transfer every accepted static/full/delta
@@ -82,9 +110,12 @@ elevation and render queries using immutable resident terrain inputs and a
 and publishes only current terrain paired with its initial frame. Publish ready
 results before computing active membership so simulation and render selection
 see the same published cells. Authoritative publication also requires received
-navigation. Data received during local preparation waits for the result before
-comparing defined placement bits; matching placements reuse terrain with authoritative
-navigation.
+navigation. A pending cell created where a prepared cell already exists reuses
+that cell's terrain; any other takes its placements from `GenerateIslandChain`
+when it is created. Received static data contributes only its navigation, a new
+subscription identity at the same coordinate keeps the cell's terrain, and a
+finished result goes to its coordinate's pending cell unless that cell is
+already ready.
 
 Invalidation clears staging, never an unfinished future. Retain obsolete work
 until ready, including across resets and offline/menu polling; start no second
@@ -108,10 +139,21 @@ are in [Network](../../../../Documents/Architecture/Network.md).
 
 ## Reconciliation Replay Chain
 
-This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coord parallel dispatch, profiling merge, and first-in-slot-order unresolved mismatch selection. Each worker writes only its coord. The game supplies payloads, transfer materialization, and reconciliation/desync policy; see [Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md).
+This directory owns CRC fast-path, rollback/ring orchestration, replay,
+per-coord parallel dispatch, profiling merge, and first-in-slot-order unresolved
+mismatch selection. Each worker writes only its coord. The game supplies
+payloads, transfer materialization, and reconciliation/desync policy; see
+[Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md).
 
-- `ReconcileReplayTick.cpp` applies the post-tick batch (spawn and transfer `StatusChange`s) after each replay tick in server Destroy/Spawn order and recomputes CRC after that batch; this ordering is required for the broadcast CRC ([server detail](../Server/AGENTS.md)).
-- `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types because their payloads are game-defined while their machinery is engine-owned; both stay out of `Engine.h`, and consumers include them directly, matching the exception in the [server detail](../Server/AGENTS.md). `ClientSessionBase.h` includes `ClientDesyncCore.h`.
+- `ReconcileReplayTick.cpp` applies the post-tick batch (spawn and transfer
+  `StatusChange`s) after each replay tick in server Destroy/Spawn order and
+  recomputes CRC after that batch; this ordering is required for the broadcast
+  CRC ([server detail](../Server/AGENTS.md)).
+- `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types
+  because their payloads are game-defined while their machinery is engine-owned;
+  both stay out of `Engine.h`, and consumers include them directly, matching the
+  exception in the [server detail](../Server/AGENTS.md). `ClientSessionBase.h`
+  includes `ClientDesyncCore.h`.
 
 ## Other
 
@@ -122,6 +164,16 @@ This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coor
   these. `ClientSessionBase` holds the core, polls it each drain, and hands it
   the desync record `Reconcile` gets back from the game reconciler; the
   reconcile dispatch fills that record (`ReconcileDispatchResult::desync`).
-- Outside `Client::Poll`, `kConnectionAccepted` holds only while the peer is both connected and accepted: every path that clears `kConnected` clears it too, so a caller that needs an accepted connection tests it alone.
-- `GameBase::SetClientGridCoordinate()` is the single write path for the client's cell: on the client it invalidates the runtime's visible-neighbor cache and ignores every write while the harness viewer pin is set.
-- Network fast-forward skips the simulated delay and flushes pending packets. Load reset purges affected coord channels and preserves the control channel ([`ClientSessionRuntime::ResetForServerLoad`](ClientSessionRuntime.cpp)); an unsubscribed slot's older delayed packets are left to the epoch checks, because the server may reuse the slot before its unsubscribe ACK arrives. A delayed reliable rejection is delivered before ENet disconnect teardown ([`Client::Poll`](Client.cpp)).
+- Outside `Client::Poll`, `kConnectionAccepted` holds only while the peer is
+  both connected and accepted: every path that clears `kConnected` clears it
+  too, so a caller that needs an accepted connection tests it alone.
+- `GameBase::SetClientGridCoordinate()` is the single write path for the
+  client's cell: on the client it invalidates the runtime's visible-neighbor
+  cache and ignores every write while the harness viewer pin is set.
+- Network fast-forward skips the simulated delay and flushes pending packets.
+  Load reset purges affected coord channels and preserves the control channel
+  ([`ClientSessionRuntime::ResetForServerLoad`](ClientSessionRuntime.cpp)); an
+  unsubscribed slot's older delayed packets are left to the epoch checks,
+  because the server may reuse the slot before its unsubscribe ACK arrives. A
+  delayed reliable rejection is delivered before ENet disconnect teardown
+  ([`Client::Poll`](Client.cpp)).

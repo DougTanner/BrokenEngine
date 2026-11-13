@@ -33,6 +33,7 @@ void RenderShadowSection(TweaksScreen& rScreen)
 	rScreen.WrapperSeparatorText("Object Shadows");
 	rScreen.WrapperSlider("Object Shadows Render Multiplier", gObjectShadowsRenderMultiplier, iSection);
 	rScreen.WrapperSlider("Object Shadows Blur Multiplier", gObjectShadowsBlurMultiplier, iSection);
+	rScreen.WrapperSlider("Object Shadow Cadence", gObjectShadowCadence, iSection);
 	rScreen.WrapperSlider("Object Shadows Noon", gObjectShadowsNoon, iSection);
 	rScreen.WrapperSlider("Object Shadows Sunset", gObjectShadowsSunset, iSection);
 	rScreen.WrapperSlider("Object Shadows Sunset Stretch", gObjectShadowsSunsetStretch, iSection);

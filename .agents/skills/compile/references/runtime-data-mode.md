@@ -2,7 +2,8 @@
 
 ## Mode selection
 
-Every worktree game build uses one data mode and one authoritative directory for both client and server of its game project, `Projects\<Name>` below:
+Every worktree game build uses one data mode and one authoritative directory for
+both client and server of its game project, `Projects\<Name>` below:
 
 - Shared: its Data directory is the primary checkout's
   `Projects\<Name>\Platforms\VisualStudio2026\Output\Data`; this mode consumes
@@ -88,81 +89,98 @@ still decide the mode.
 
 ## Repository-root detection and mode derivation
 
-The game projects detect the authoritative repository-root Git marker. A linked worktree has a `.git` file and defaults `RunDataPacker=false`; the primary checkout has a `.git` directory and preserves ordinary Local Visual Studio behavior by defaulting true. An explicit Local `RunDataPacker=true` permits deliberate worktree generation; Shared rejects true.
+The game projects detect the authoritative repository-root Git marker. A linked
+worktree has a `.git` file and defaults `RunDataPacker=false`; the primary
+checkout has a `.git` directory and preserves ordinary Local Visual Studio
+behavior by defaulting true. An explicit Local `RunDataPacker=true` permits
+deliberate worktree generation; Shared rejects true.
 
-The resolved context's `changedPaths` is the changed-path set measured from the session baseline. Its `dataBuildMode` and `dataBuildModeReason` are the mode decision `## Mode selection` states, measured from the data stamp, and the build uses that mode.
+The resolved context's `changedPaths` is the changed-path set measured from the
+session baseline. Its `dataBuildMode` and `dataBuildModeReason` are the mode
+decision `## Mode selection` states, measured from the data stamp, and the build
+uses that mode.
 
 ## Build invocation and derived properties
 
-The build invocation derives the mode, both directories, and the four `DataBuildMode`/`RunDataPacker`/`GameDataDirectory`/`GeneratedDataIncludeRoot` properties itself, for every client/server solution, project, and selective compile alike; no agent command composes them, and no invocation form overrides the mode.
+The build invocation derives the mode, both directories, and the four
+`DataBuildMode`/`RunDataPacker`/`GameDataDirectory`/`GeneratedDataIncludeRoot`
+properties itself, for every client/server solution, project, and selective
+compile alike; no agent command composes them, and no invocation form overrides
+the mode.
 
-ModelViewer uses this same resolution and generation flow with BrokenEngineSandbox
-as data owner, including selective builds. Its project generates an ignored
-`Build/ModelViewerDataRoot.h` from the resolved directory. The invocation also
-writes `Projects/ModelViewer/Platforms/VisualStudio2026/Build/ResolvedData.props`.
+ModelViewer uses this same resolution and generation flow with
+BrokenEngineSandbox as data owner, including selective builds. Its project
+generates an ignored `Build/ModelViewerDataRoot.h` from the resolved directory.
+The invocation also writes
+`Projects/ModelViewer/Platforms/VisualStudio2026/Build/ResolvedData.props`.
 Project import and packing behavior is documented in
 [ModelViewer build and data ownership](../../../../Projects/ModelViewer/AGENTS.md#build-and-data-ownership).
-The viewer's identity never
-changes pack names or export inputs. Viewer builds do not write sandbox harness
-Shared-data records.
+The viewer's identity never changes pack names or export inputs. Viewer builds
+do not write sandbox harness Shared-data records.
 
-Every Local game build sets `RunDataPacker=true`; every other build is `false`. A Local game build also needs `DevEnvDir` for the game project's nested DataPacker build. The invocation resolves `DevEnvDir` for every game build, so an unresolvable `DevEnvDir` blocks every game build, Shared included, under `context.unresolved` naming `dev-env-dir.unresolved`; only a Local game build passes it, so it cannot leak into a Shared one.
+Every Local game build sets `RunDataPacker=true`; every other build is `false`.
+A Local game build also needs `DevEnvDir` for the game project's nested
+DataPacker build. The invocation resolves `DevEnvDir` for every game build, so
+an unresolvable `DevEnvDir` blocks every game build, Shared included, under
+`context.unresolved` naming `dev-env-dir.unresolved`; only a Local game build
+passes it, so it cannot leak into a Shared one.
 
 ## Generated Data directory inventory
 
 A correctly generated Data directory holds 23 files: `Data.h`, `DataTypes.h`,
 and one nonempty header, manifest, and pack for each of `Audio`, `Scene`,
 `Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not validate
-the selected sandbox Data directory's inventory or contents, so a malformed, partial,
-or stale directory is not detected as such — it surfaces only as an ordinary
-compile or runtime failure. One exception covers Shared data provenance: the
-`/agent-harness` claim and launch scripts compare a Shared directory with the
-listing in its build's record. Every successful game build that is not a
-selective `-Files` compile, in either data mode and including the generation
-build, writes that
-record as `SharedDataRecord.<Target>.<Configuration>.txt` beside its
-executables: a format marker, the `GameDataDirectory` it passed to MSBuild,
-and, for a Shared build only, the listing of that directory — each file's
-relative path, size, and last-write time. The `/agent-harness` claim reads its
-data directory from that record; `/agent-harness` worker steps 7 and 21 own the
-refusal codes and their routing.
+the selected sandbox Data directory's inventory or contents, so a malformed,
+partial, or stale directory is not detected as such — it surfaces only as an
+ordinary compile or runtime failure. One exception covers Shared data
+provenance: the `/agent-harness` claim and launch scripts compare a Shared
+directory with the listing in its build's record. Every successful game build
+that is not a selective `-Files` compile, in either data mode and including the
+generation build, writes that record as
+`SharedDataRecord.<Target>.<Configuration>.txt` beside its executables: a format
+marker, the `GameDataDirectory` it passed to MSBuild, and, for a Shared build
+only, the listing of that directory — each file's relative path, size, and
+last-write time. The `/agent-harness` claim reads its data directory from that
+record; `/agent-harness` worker steps 7 and 21 own the refusal codes and their
+routing.
 
 ModelViewer's precompile target requires this inventory to exist and reports the
-exact missing path before compiling. Pack contents still pass through the engine's
-ordinary runtime validation.
+exact missing path before compiling. Pack contents still pass through the
+engine's ordinary runtime validation.
 
 ## Wrapper bootstrap Shared-data refresh
 
-The wrapper bootstrap refreshes Shared data on a best-effort basis: at session
-start it runs the primary's DataPacker over the primary checkout's current
-asset inputs, which are not checked against HEAD, once per game project whose
-client `.vcxproj` is committed at the primary `HEAD`, into that game's primary
-`Output\Data`, and it skips the runs when the DataPacker prebuild was not
-stamped. When a game's primary `Output\Data` is missing, DataPacker generates
-it automatically. That first export is a full Engine/Data re-export into an
-empty per-game DataPacker cache and can take hours while the bootstrap mutex
-is held, so peer session starts can time out. A peer session starting
-mid-session can move primary Data under this session, and a regenerated header
-can force a recompile here.
+The wrapper bootstrap refreshes Shared data on a best-effort basis: in session
+setup at each worktree creation or `/reset-worktree` it runs the primary's
+DataPacker over the primary checkout's current asset inputs, which are not
+checked against HEAD, once per game project whose client `.vcxproj` is
+committed at the primary `HEAD`, into that game's primary `Output\Data`, and it
+skips the runs when the DataPacker prebuild was not stamped. When a game's
+primary `Output\Data` is missing, DataPacker generates it automatically. That
+first export is a full Engine/Data re-export into an empty per-game DataPacker
+cache and can take hours while the bootstrap mutex is held, so peer bootstrap
+runs can time out. A peer worktree creation or `/reset-worktree` mid-session
+can move primary Data under this session, and a regenerated header can force a
+recompile here.
 
 The same refresh also runs on demand, from the session worktree root, as
 `pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary checkout>' -SharedDataOnly`.
 It skips the AgentTools and ThirdParty builds and the ModelViewer prebuild,
-keeps the DataPacker prebuild, the bootstrap mutex, and the
-DataPacker prebuild stamp and data stamp rules, and skips the DataPacker prebuild
-and the refresh, with a warning naming a wrapper session start, when primary
-ThirdParty changed since the last prebuild or the DataPacker prebuild stamp is
-missing or unreadable. Every skip exits 0, so its
-`Refreshed primary data at` line is the only sign the refresh ran. It runs this
-worktree's copies of the bootstrap scripts against the primary checkout, so a
-session runs it without asking the user unless this worktree's own committed
-or uncommitted changes, measured from its merge base with primary main, touch
-`.agents/scripts/`; then it asks the user first. One run can outlast a tool-call timeout, up to
+keeps the DataPacker prebuild, the bootstrap mutex, and the DataPacker prebuild
+stamp and data stamp rules, and skips the DataPacker prebuild and the refresh,
+with a warning naming worktree creation, `/reset-worktree`, or explicit primary
+maintenance (a full run without `-SharedDataOnly`), when primary ThirdParty
+changed since the last prebuild or the DataPacker prebuild stamp is missing or
+unreadable. Every skip exits 0, so its `Refreshed primary data at` line is the
+only sign the refresh ran. It runs this worktree's copies of the bootstrap
+scripts against the primary checkout, so a session runs it without asking the
+user unless this worktree's own committed or uncommitted changes, measured from
+its merge base with primary main, touch `.agents/scripts/`; then it asks the
+user first. One run can outlast a tool-call timeout, up to
 `-WaitSeconds` for the bootstrap mutex, then the DataPacker prebuild and the
-export, so it runs where a tool-call timeout cannot
-kill it, for example with the host's background-execution parameter such as
-`run_in_background`; a killed shell
-stops the export midway and leaves the primary data unstamped.
+export, so it runs where a tool-call timeout cannot kill it, for example with
+the host's background-execution parameter such as `run_in_background`; a killed
+shell stops the export midway and leaves the primary data unstamped.
 
 Each game's refresh also writes the data stamp (`## Mode selection`). Before
 its export it deletes the stamp, aborting the
@@ -180,7 +198,8 @@ outside the bootstrap, such as a Visual Studio build in the primary checkout,
 rewrites Shared data without updating the stamp; the next refresh stamps it
 again.
 
-Ordinary Shared work otherwise remains unchanged: primary Data, no `RunDataPacker`, and no materialization or export.
+Ordinary Shared work otherwise remains unchanged: primary Data, no
+`RunDataPacker`, and no materialization or export.
 
 ## Local generation
 
@@ -207,17 +226,19 @@ into its own Local Data directory.
 Local generation forbids Gaea unless `-AllowGaeaExport` is passed: the
 invocation scopes `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` around the whole
 generation build and restores the caller's prior environment exactly.
-`-AllowGaeaExport` sets `BT_DATAPACKER_ALLOW_GAEA_EXPORT=1` for that build and restores its prior value in `finally`; it omits the default negative guard while preserving any caller-provided forbid guard. Only an explicit user-approved plan
-or acceptance criterion requiring an island re-bake authorizes it; the
-automatic rule never omits the guard, and changed island inputs, DataPacker
-code, fingerprints, or cache state alone never authorize a Gaea run. A
-generation build that fails reporting
+`-AllowGaeaExport` sets `BT_DATAPACKER_ALLOW_GAEA_EXPORT=1` for that build and
+restores its prior value in `finally`; it omits the default negative guard while
+preserving any caller-provided forbid guard. Only an explicit user-approved plan
+or acceptance criterion requiring an island re-bake authorizes it; the automatic
+rule never omits the guard, and changed island inputs, DataPacker code,
+fingerprints, or cache state alone never authorize a Gaea run. A generation
+build that fails reporting
 `Gaea.Swarm export blocked by BT_DATAPACKER_FORBID_GAEA_EXPORT=1` means this
-worktree's island inputs differ from the shared Gaea bake. When the worktree
-is behind primary main, rebase onto it; a change to this worktree's own island
+worktree's island inputs differ from the shared Gaea bake. When the worktree is
+behind primary main, rebase onto it; a change to this worktree's own island
 inputs exports only through `-AllowGaeaExport` under that authorization.
-Otherwise report the failure, and never pass `-AllowGaeaExport` or retry
-without that authorization. `-ForbidExpensiveExport` additionally scopes
+Otherwise report the failure, and never pass `-AllowGaeaExport` or retry without
+that authorization. `-ForbidExpensiveExport` additionally scopes
 `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` around the same generation build and
 restores the caller's prior environment exactly; `DataPacker/Source/AGENTS.md`
 owns when that guard is wanted, in its `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT`
@@ -226,4 +247,5 @@ independent meaning; never clear either caller-provided guard.
 `-AllowGaeaExport` and `-ForbidExpensiveExport` take effect on a Local game
 build and have no effect on a Shared one, where no export runs.
 
-Never copy worktree DataPacker/data source changes into the primary checkout to test them.
+Never copy worktree DataPacker/data source changes into the primary checkout to
+test them.

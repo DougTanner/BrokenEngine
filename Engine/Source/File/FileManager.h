@@ -17,12 +17,6 @@ enum class FileFlags : uint64_t
 };
 using FileFlags_t = common::Flags<FileFlags>;
 
-struct FileContentDigest
-{
-	int64_t iByteCount = 0;
-	std::array<uint8_t, 32> sha256 {};
-};
-
 // Eager chunk (loaded at boot)
 struct EagerChunk
 {
@@ -42,16 +36,6 @@ enum class ChunkState : uint32_t
 	kReady = 5,
 };
 
-// Completion state for one asynchronously reloaded sub-range of a lazy chunk. The range metadata and state are
-// owned by LazyChunk so a completion never depends on a caller-owned object surviving the loading thread.
-enum class ChunkRangeReloadState : uint32_t
-{
-	kIdle = 0,
-	kPending = 1,
-	kReady = 2,
-	kFailed = 3,
-};
-
 // Movable atomic wrapper (std::atomic deletes copy/move, breaking aggregate types in containers)
 struct MovableAtomicChunkState
 {
@@ -69,38 +53,16 @@ struct MovableAtomicChunkState
 
 };
 
-struct MovableAtomicChunkRangeReloadState
-{
-	std::atomic<ChunkRangeReloadState> value = ChunkRangeReloadState::kIdle;
-
-	MovableAtomicChunkRangeReloadState() = default;
-	MovableAtomicChunkRangeReloadState(const MovableAtomicChunkRangeReloadState& rOther)
-		: value(rOther.value.load(std::memory_order_relaxed))
-	{
-	}
-	MovableAtomicChunkRangeReloadState(MovableAtomicChunkRangeReloadState&& rOther) noexcept
-		: value(rOther.value.load(std::memory_order_relaxed))
-	{
-	}
-	MovableAtomicChunkRangeReloadState& operator=(const MovableAtomicChunkRangeReloadState&) = delete;
-	MovableAtomicChunkRangeReloadState& operator=(MovableAtomicChunkRangeReloadState&&) = delete;
-
-};
-
 struct LazyChunk
 {
 	common::ChunkLocation location;                   // Manifest entry for pack offset, size, path CRC, and content CRC
 	MovableAtomicChunkState eState;
 	common::ChunkHeader header {};
 
-	std::byte* pData = nullptr;                       // Points into the pre-allocated lazy pool (null until assigned)
+	// Owning buffer of iDataSize bytes, allocated by a loader thread's whole-chunk load; null before it. Texture
+	// adoption frees it on the main thread before the kReady store; island and audio buffers live for the process.
+	common::AlignedUniquePtr<std::byte> pData;
 	int64_t iDataSize = 0;
-
-	// One asynchronous recommit/reload range. Its offset and length are written before the pending release-store
-	// and remain stable until the consumer resets a ready or failed terminal state.
-	int64_t iRangeReloadOffset = 0;
-	int64_t iRangeReloadLength = 0;
-	MovableAtomicChunkRangeReloadState eRangeReloadState;
 
 	// GPU upload results (written by upload thread, read by main thread)
 	VkImage vkUploadImage = VK_NULL_HANDLE;
@@ -115,19 +77,10 @@ enum class LoadPriority : uint32_t
 	kRealtime = 3,
 };
 
-enum class LoadRequestKind : uint32_t
-{
-	kWholeChunk,
-	kRangeReload,
-};
-
 struct LoadRequest
 {
 	common::crc_t crc = 0;
 	LoadPriority ePriority = LoadPriority::kLow;
-	LoadRequestKind eKind = LoadRequestKind::kWholeChunk;
-	int64_t iOffset = 0;
-	int64_t iLength = 0;
 
 	bool operator<(const LoadRequest& rOther) const
 	{
@@ -139,6 +92,12 @@ struct MemoryStats
 {
 	int64_t iBytes = 0;
 	int64_t iCount = 0;
+
+	// Lazy chunk buffer counters, filled only by PackChunks::GetLazyStatistics: peak requested bytes, and live and
+	// peak mimalloc arena footprint.
+	int64_t iPeakBytes = 0;
+	int64_t iFootprintBytes = 0;
+	int64_t iPeakFootprintBytes = 0;
 };
 
 class PackChunks;
@@ -197,7 +156,7 @@ public:
 	std::fstream OpenFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	void RemoveFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	[[nodiscard]] bool ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 32>& rOut);
-	[[nodiscard]] bool ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FileContentDigest& rOut);
+	[[nodiscard]] bool ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut);
 
 	// Writes through "<rFilename>.tmp"; a stream or rename failure leaves the destination intact and attempts temporary-file cleanup.
 	template <typename FN>
@@ -217,9 +176,8 @@ public:
 	std::filesystem::path mAppDataDirectory;
 	std::filesystem::path mTempDirectory;
 
-	// Packed-asset chunk engine. Owns the eager buffers, lazy maps, loading threads, and VirtualAlloc pool; the
-	// callers reach it through mpPackChunks. The out-of-line destructor destroys the unique_ptr where PackChunks
-	// is complete; consumers that access its members include PackChunks.h.
+	// The out-of-line destructor destroys the unique_ptr where PackChunks is complete; consumers that access its
+	// members include PackChunks.h.
 	std::unique_ptr<PackChunks> mpPackChunks;
 };
 

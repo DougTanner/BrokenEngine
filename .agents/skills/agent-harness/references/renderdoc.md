@@ -1,45 +1,76 @@
 # RenderDoc Capture
 
-Read this reference only for a GPU frame-capture or capture-analysis scenario — an agent needs the action tree, bound pipeline state, or a render-target dump that a `screenshot` cannot supply. It owns the launch script's `-RenderDoc` switch, the `renderdoc_capture` command, and the headless `rdc_*` analysis scripts. Ordinary runs never pass `-RenderDoc`.
+Read this reference only for a GPU frame-capture or capture-analysis scenario —
+an agent needs the action tree, bound pipeline state, or a render-target dump
+that a `screenshot` cannot supply. It owns the launch script's `-RenderDoc`
+switch, the `renderdoc_capture` command, and the headless `rdc_*` analysis
+scripts. Ordinary runs never pass `-RenderDoc`.
 
-Caveat — capture runs drop Vulkan validation. With `renderdoc.dll` loaded (which `--renderdoc` forces), `InstanceManager` omits `VK_LAYER_KHRONOS_validation` because RenderDoc does not ship it; this is existing behavior. Never combine a validation-dependent acceptance criterion with a capture run. Run validation checks on a plain launch and capture checks on a separate `--renderdoc` launch.
+Caveat — capture runs drop Vulkan validation. With `renderdoc.dll` loaded (which
+`--renderdoc` forces), `InstanceManager` omits `VK_LAYER_KHRONOS_validation`
+because RenderDoc does not ship it; this is existing behavior. Never combine a
+validation-dependent acceptance criterion with a capture run. Run validation
+checks on a plain launch and capture checks on a separate `--renderdoc` launch.
 
 ## Prerequisites
 
-- RenderDoc installed and its Vulkan implicit layer registered under `HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers` (verified against RenderDoc v1.44, which bundles Python 3.6).
-- Installer builds ship no `pymodules`/`renderdoc.pyd` (verified on v1.44), so a standalone interpreter cannot replay captures. `qrenderdoc --python` is the analysis vehicle; the standalone fallback below applies only to installs that do ship `pymodules`.
-- A client built with `kbRenderDoc = true` (the compile gate). Runtime activation still requires `--renderdoc`.
+- RenderDoc installed and its Vulkan implicit layer registered under
+  `HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers` (verified against RenderDoc
+  v1.44, which bundles Python 3.6).
+- Installer builds ship no `pymodules`/`renderdoc.pyd` (verified on v1.44), so a
+  standalone interpreter cannot replay captures. `qrenderdoc --python` is the
+  analysis vehicle; the standalone fallback below applies only to installs that
+  do ship `pymodules`.
+- A client built with `kbRenderDoc = true` (the compile gate). Runtime
+  activation still requires `--renderdoc`.
 
 ## Launch, capture, analyze
 
-Launch with the [`launch.md`](launch.md) recipe and the selected project's launch values, adding the launch script's `-RenderDoc` switch, which passes `--renderdoc`, to the client call only. Confirm the API attached with `get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero `renderDocHmodule` and a nonzero `RenderDoc API` pointer.
+Launch with the [`launch.md`](launch.md) recipe and the selected project's
+launch values, adding the launch script's `-RenderDoc` switch, which passes
+`--renderdoc`, to the client call only. Confirm the API attached with
+`get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero
+`renderDocHmodule` and a nonzero `RenderDoc API` pointer.
 
-Capture with `renderdoc_capture` (schema in the [command reference](command-reference.md#client-commands)). Size `--timeout-ms` for the drain-count progress bound, not wall-clock. The default agent client is minimized, so the command restores it without activation, captures, and re-minimizes.
+Capture with `renderdoc_capture` (schema in the
+[command reference](command-reference.md#client-commands)). Size `--timeout-ms`
+for the drain-count progress bound, not wall-clock. The default agent client is
+minimized, so the command restores it without activation, captures, and
+re-minimizes.
 
 ```powershell
 '{"cmd":"renderdoc_capture","params":{"frames":1}}' |
 	& '<absolute AgentHarness path>' --owner '<owner token>' --port 27101 --timeout-ms 120000 -
 ```
 
-The result `paths` are absolute `.rdc` files (RenderDoc's template writes `%TEMP%\RenderDoc\agent_frameNNN.rdc`). Use the returned paths verbatim; never guess them. `Test-Path` each and sanity-check its size before analysis.
+The result `paths` are absolute `.rdc` files (RenderDoc's template writes
+`%TEMP%\RenderDoc\agent_frameNNN.rdc`). Use the returned paths verbatim; never
+guess them. `Test-Path` each and sanity-check its size before analysis.
 
-Analyze with the `rdc_*` scripts through `qrenderdoc --python`. Each script raises `SystemExit` after successful analysis or an escaping failure, so qrenderdoc skips its post-script main-window startup. Hidden launch and output polling alone do not prevent that startup. qrenderdoc's stdout is not reliably capturable, so the `--out` file remains the analysis-completion contract; its process exit code does not carry the Python exit status.
+Analyze with the `rdc_*` scripts through `qrenderdoc --python`. Each script
+raises `SystemExit` after successful analysis or an escaping failure, so
+qrenderdoc skips its post-script main-window startup. Hidden launch and output
+polling alone do not prevent that startup. qrenderdoc's stdout is not reliably
+capturable, so the `--out` file remains the analysis-completion contract; its
+process exit code does not carry the Python exit status.
 
-Before each background launch, recheck the current `%APPDATA%\qrenderdoc\UI.config` and
-`analytics.json` read-only, recording their parse results, hashes,
-`Analytics_TotalOptOut`, `Analytics_ManualCheck`, analytics schema/date and local
-year/month. With analytics enabled (`Analytics_TotalOptOut=false`), v1.44 leaves no
-pending prompt when analytics schema 1 has a nonzero `Date.Year` and `Date.Month` matching
-the local year/month; a missing or uninitialized database selects the first-time prompt,
-while a different month/year selects report submission, where `Analytics_ManualCheck`
-controls the confirmation. `Analytics_ManualCheck=false` does not suppress the first-time
-prompt. Settle any different state against the installed version's source before launch,
-without changing configuration. This prerequisite covers the independent
-`Analytics::Prompt` call before Python execution; the scripts cannot suppress arbitrary
-pre-script initialization UI. See the [v1.44 analytics
-source](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/Interface/Analytics.cpp)
-and [startup
-ordering](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/qrenderdoc.cpp).
+Before each background launch, recheck the current
+`%APPDATA%\qrenderdoc\UI.config` and `analytics.json` read-only, recording their
+parse results, hashes, `Analytics_TotalOptOut`, `Analytics_ManualCheck`,
+analytics schema/date and local year/month. With analytics enabled
+(`Analytics_TotalOptOut=false`), v1.44 leaves no pending prompt when analytics
+schema 1 has a nonzero `Date.Year` and `Date.Month` matching the local
+year/month; a missing or uninitialized database selects the first-time prompt,
+while a different month/year selects report submission, where
+`Analytics_ManualCheck` controls the confirmation. `Analytics_ManualCheck=false`
+does not suppress the first-time prompt. Settle any different state against the
+installed version's source before launch, without changing configuration. This
+prerequisite covers the independent `Analytics::Prompt` call before Python
+execution; the scripts cannot suppress arbitrary pre-script initialization UI.
+See the
+[v1.44 analytics source](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/Interface/Analytics.cpp)
+and
+[startup ordering](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/qrenderdoc.cpp).
 
 The embedded interpreter has two quirks the launch must work around:
 
@@ -51,7 +82,10 @@ The embedded interpreter has two quirks the launch must work around:
   `sys.argv` is absent (standalone runs still use the normal `sys.argv` path).
   Because `shlex` is POSIX-mode, it treats `\` as an escape; single-quote each
   Windows path inside `RDC_ARGS` so backslashes survive.
-- No `__file__`. The scripts fall back to the *working directory* to add themselves to `sys.path` (so `import rdc_common` resolves), so qrenderdoc must be launched with `-WorkingDirectory` set to the scripts directory; otherwise the import fails before any argument is read.
+- No `__file__`. The scripts fall back to the *working directory* to add
+  themselves to `sys.path` (so `import rdc_common` resolves), so qrenderdoc must
+  be launched with `-WorkingDirectory` set to the scripts directory; otherwise
+  the import fails before any argument is read.
 
 Write the following **temporary-script contents** to
 `<absolute adopted worktree>\Temp\renderdoc-rdc-summary.ps1`, then run that file
@@ -86,19 +120,29 @@ Get-Content -LiteralPath $Out
 pwsh -NoProfile -File '<absolute adopted worktree>\Temp\renderdoc-rdc-summary.ps1'
 ```
 
-Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs `"'<absolute .rdc path>'
---event N --out '<absolute output path>'"`, and `rdc_texture.py` needs `"'<absolute .rdc
-path>' --event N --out '<absolute output path>'"` (add `--target K` or `--depth` as
-needed). For `rdc_texture.py` the `--out` PNG is the completion file, so poll for the PNG
-rather than a `.txt`. Launch one qrenderdoc per script and wait for its exit or complete
-the bounded cleanup before the next, so the previous replay releases the capture.
+Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs
+`"'<absolute .rdc path>' --event N --out '<absolute output path>'"`, and
+`rdc_texture.py` needs
+`"'<absolute .rdc path>' --event N --out '<absolute output path>'"` (add
+`--target K` or `--depth` as needed). For `rdc_texture.py` the `--out` PNG is
+the completion file, so poll for the PNG rather than a `.txt`. Launch one
+qrenderdoc per script and wait for its exit or complete the bounded cleanup
+before the next, so the previous replay releases the capture.
 
 ## Scripts
 
-All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py` (dual-mode loader; Python 3.6 syntax). Each reports a one-line reason where possible and raises a nonzero `SystemExit` on analysis failure; standalone Python preserves that status, while embedded qrenderdoc recognizes the exception type only.
+All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py`
+(dual-mode loader; Python 3.6 syntax). Each reports a one-line reason where
+possible and raises a nonzero `SystemExit` on analysis failure; standalone
+Python preserves that status, while embedded qrenderdoc recognizes the exception
+type only.
 
-- `rdc_summary.py <rdc> [--out FILE]` — recursive action tree (eventId, kind, name, draw/dispatch params) with a per-kind totals footer. Default out `<capture>.summary.txt`. Start here to find a draw's eventId.
-- `rdc_pipeline.py <rdc> --event N [--out FILE]` — pipeline state at event `N`: bound shaders, viewport/scissor, depth/blend, color/depth targets with format + dimensions, vertex/index bindings. Default out `<capture>.pipeline_evN.txt`.
+- `rdc_summary.py <rdc> [--out FILE]` — recursive action tree (eventId, kind,
+  name, draw/dispatch params) with a per-kind totals footer. Default out
+  `<capture>.summary.txt`. Start here to find a draw's eventId.
+- `rdc_pipeline.py <rdc> --event N [--out FILE]` — pipeline state at event `N`:
+  bound shaders, viewport/scissor, depth/blend, color/depth targets with format +
+  dimensions, vertex/index bindings. Default out `<capture>.pipeline_evN.txt`.
 - `rdc_texture.py <rdc> --event N [--target K | --depth] [--out PNG]` — saves
   one bound color target (`--target K`, default 0) or the depth target
   (`--depth`) as PNG. Here the `--out` PNG is the completion file (its absolute
@@ -110,6 +154,12 @@ All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py` (d
 
 ## Fallbacks and raw export
 
-- `RENDERDOC_PATH` overrides install discovery for both the PowerShell launch above and the scripts' standalone path.
-- Standalone interpreter — on an install that ships `pymodules` with an interpreter matching the bundled `python3X.dll`, the scripts run directly (`python rdc_summary.py <capture> --out <file>`) without qrenderdoc. On installer builds without `pymodules` that path exits 2 and names `qrenderdoc --python`.
-- `renderdoccmd convert` — for a raw structured dump outside these scripts: `renderdoccmd convert --input <capture.rdc> --output <capture.xml>`.
+- `RENDERDOC_PATH` overrides install discovery for both the PowerShell launch
+  above and the scripts' standalone path.
+- Standalone interpreter — on an install that ships `pymodules` with an
+  interpreter matching the bundled `python3X.dll`, the scripts run directly
+  (`python rdc_summary.py <capture> --out <file>`) without qrenderdoc. On
+  installer builds without `pymodules` that path exits 2 and names
+  `qrenderdoc --python`.
+- `renderdoccmd convert` — for a raw structured dump outside these scripts:
+  `renderdoccmd convert --input <capture.rdc> --output <capture.xml>`.

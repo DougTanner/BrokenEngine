@@ -48,12 +48,13 @@ Changes (15 files)
 
    - DecalsType struct: uiCrc (texture), fSizeX/fSizeY (world-space
      dimensions), fAlpha
-   - DecalsInterpolate: Collection<DecalsInterpolate, CollectionFlags::kIdToIndex>
-     with TypeRegistry<DecalsType>.  SOA members: puiTypeIndices (uint8_t*),
-     pfRotations (float*), pfAlpha (float*), pVecPositions (XMVECTOR*).
-     SyncData struct with vecPosition, uiTypeIndex, fRotation, fAlpha.
-     Static methods: Register, AllocateAndCopy, Sync, Update,
-     GraphicsResources, BeginRender, Render, EndRender
+   - DecalsInterpolate:
+     Collection<DecalsInterpolate, CollectionFlags::kIdToIndex> with
+     TypeRegistry<DecalsType>.  SOA members: puiTypeIndices (uint8_t*),
+     pfRotations (float*), pfAlpha (float*), pVecPositions (XMVECTOR*). SyncData
+     struct with vecPosition, uiTypeIndex, fRotation, fAlpha. Static methods:
+     Register, AllocateAndCopy, Sync, Update, GraphicsResources, BeginRender,
+     Render, EndRender
    - DecalsPostRender: Collection<DecalsPostRender> with pIds and
      pLifecycleFlags members (Engine/Source/Frame/Collections/AGENTS.md,
      Core Contract).
@@ -157,12 +158,12 @@ Changes (15 files)
     between the terrain and water draws (the old 703/705 line
     anchors are stale):
 
-      gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerDecals);
-      for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineDecals])
-      {
-          pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
-      }
-      gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerDecals);
+      gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer,
+      kGpuTimerDecals); for (const auto& [rCrc, pPipeline] :
+      gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineDecals])
+      { pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer); }
+      gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer,
+      kGpuTimerDecals);
 
 11. Engine/Source/Frame/FrameBase.h
     - Add #include for Decals/Decals.h in the BT_CLIENT include block

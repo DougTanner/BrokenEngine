@@ -13,12 +13,34 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
   current code unit: network input, grid saves, and replays as the trust-policy
   bullet in root `AGENTS.md` `## Key Patterns` directs, every other file read,
   and OS/third-party API results.
-- Never fix a bad value automatically: when a check finds a value read from a network packet or a file non-finite, out of range, or otherwise invalid, reject the input — drop the packet or fail the load — and never clamp, substitute, or normalize the value. Reject through the owning boundary's failure path (`Common/AGENTS.md` `## Shared Data Contracts`).
-- No useless ASSERTs: an ASSERT that throws one line before the code would crash anyway adds false safety — remove it; prefer making the condition impossible in calling code. `/repo-code-review` lists the preferred fixes in order, from best to last resort.
-- Log levels: `kVerbose` — per-frame / high-frequency. `kDebug` — one-time (startup, connect). `kInfo` — state transitions, important one-shots (default threshold). `kWarning` — investigate (timeouts, desync); may spam. `kError` — failures; always logged. Runtime-threshold and compile-floor mechanics: `Common/Log/AGENTS.md`.
-- Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`). The class inherits `common::Singleton<T>` (`Common/Singleton.h`) publicly as its last base and registers its global through that base's constructor per the `Common/Singleton.h` header comment; no other code writes a global registered this way.
-- DirectX Math storage: declare stored 3- and 4-component vectors and matrices with the aligned types (`XMFLOAT3A`, `XMFLOAT4A`, `XMFLOAT3X4A`, `XMFLOAT4X4A`), except layouts fixed elsewhere: GPU/shader-mirrored structs, serialized formats (`.pack`, wire, save, replay), and packed or Structure-of-Arrays arrays where 16-byte padding changes the size. `XMFLOAT2` stays unaligned: its aligned load gains nothing and doubles its size. Aligned load/store calls are style-guide rule 44.
-- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals / offsets W=0.0; color alpha defaults 1.0 (opaque)
+- Never fix a bad value automatically: when a check finds a value read from a
+  network packet or a file non-finite, out of range, or otherwise invalid,
+  reject the input — drop the packet or fail the load — and never clamp,
+  substitute, or normalize the value. Reject through the owning boundary's
+  failure path (`Common/AGENTS.md` `## Shared Data Contracts`).
+- No useless ASSERTs: an ASSERT that throws one line before the code would crash
+  anyway adds false safety — remove it; prefer making the condition impossible
+  in calling code. `/repo-code-review` lists the preferred fixes in order, from
+  best to last resort.
+- Log levels: `kVerbose` — per-frame / high-frequency. `kDebug` — one-time
+  (startup, connect). `kInfo` — state transitions, important one-shots (default
+  threshold). `kWarning` — investigate (timeouts, desync); may spam. `kError` —
+  failures; always logged. Runtime-threshold and compile-floor mechanics:
+  `Common/Log/AGENTS.md`.
+- Managers: Singletons via `gp*` globals (`gpGraphics`, `gpAudioManager`). The
+  class inherits `common::Singleton<T>` (`Common/Singleton.h`) publicly as its
+  last base and registers its global through that base's constructor per the
+  `Common/Singleton.h` header comment; no other code writes a global registered
+  this way.
+- DirectX Math storage: declare stored 3- and 4-component vectors and matrices
+  with the aligned types (`XMFLOAT3A`, `XMFLOAT4A`, `XMFLOAT3X4A`,
+  `XMFLOAT4X4A`), except layouts fixed elsewhere: GPU/shader-mirrored structs,
+  serialized formats (`.pack`, wire, save, replay), and packed or
+  Structure-of-Arrays arrays where 16-byte padding changes the size. `XMFLOAT2`
+  stays unaligned: its aligned load gains nothing and doubles its size. Aligned
+  load/store calls are style-guide rule 44.
+- XMVECTOR W invariant: Positions W=1.0; directions / velocities / normals /
+  offsets W=0.0; color alpha defaults 1.0 (opaque)
 - Unit vectors stay unit: a caller never renormalizes a unit vector by hand.
   Every operation that changes a unit-length heading, direction, or normal
   (rotation, reflection, blend, or matrix transform) goes through a direction
@@ -62,10 +84,27 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
   `Base`; for example, `ProfileManagerBase` became `engine::ProfileManager`
   when `game::ProfileManager` was removed. A class's own members use `this`;
   per-instance data bases such as `FrameInterpolateBase` are passed normally.
-- Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of local `std::vector`/`std::string`.
-- Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`
-- LOG formatting: logging in allocation-tracked Game/Engine code must remain allocation-free; accepted formatters and wrappers: `Common/AGENTS.md` `## Logging and Threading Usage`
-- Standard library / external headers: PCH-backed `#include`s go in `Common/ExternalHeaders.h`; PCH-less AgentTools use `Tools/ToolCommon/ToolCliCommon.h`. Rules and exceptions: `Common/AGENTS.md` and `Tools/ToolCommon/AGENTS.md`
-- Flags over booleans, derived members: Use `common::Flags<EnumType>` or a raw integer bit mask instead of multiple `bool` members or parameters; put a new bit in an existing `Flags` member when one fits, serialized formats included. Compute a `bool` or other member value other members already determine instead of storing it; a stored copy, such as a Structure-of-Arrays cache, needs a comment stating its hot-path reason.
-- Identity keys: key pending or transient state by what it concerns (global ID, cell coordinate, the awaited object), usually in a map; never by list position or UI element.
-- Multithreading: Use `common::gpMultithreading->Dispatch()` or `common::PersistentWorker` for data-parallel work.
+- Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of
+  local `std::vector`/`std::string`.
+- Allocation tracking: Heap allocations in the main loop trigger
+  `DEBUG_BREAK()`. When unavoidable, wrap with
+  `ScopedSuppressAllocationTracking` + `// Heap:` comment. See
+  `Engine/Source/Memory/AGENTS.md`
+- LOG formatting: logging in allocation-tracked Game/Engine code must remain
+  allocation-free; accepted formatters and wrappers: `Common/AGENTS.md`
+  `## Logging and Threading Usage`
+- Standard library / external headers: PCH-backed `#include`s go in
+  `Common/ExternalHeaders.h`; PCH-less AgentTools use
+  `Tools/ToolCommon/ToolCliCommon.h`. Rules and exceptions: `Common/AGENTS.md`
+  and `Tools/ToolCommon/AGENTS.md`
+- Flags over booleans, derived members: Use `common::Flags<EnumType>` or a raw
+  integer bit mask instead of multiple `bool` members or parameters; put a new
+  bit in an existing `Flags` member when one fits, serialized formats included.
+  Compute a `bool` or other member value other members already determine instead
+  of storing it; a stored copy, such as a Structure-of-Arrays cache, needs a
+  comment stating its hot-path reason.
+- Identity keys: key pending or transient state by what it concerns (global ID,
+  cell coordinate, the awaited object), usually in a map; never by list position
+  or UI element.
+- Multithreading: Use `common::gpMultithreading->Dispatch()` or
+  `common::PersistentWorker` for data-parallel work.

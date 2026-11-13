@@ -24,7 +24,7 @@ back on.
 - Stopping the VM's billing, re-admitting RDP and SSH after the user's public
   IPv4 changed, or turning the VM back on after a budget stop: `## Operations`.
 - Later operations on the VM, which
-  `Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` adds here.
+  `Documents/Features/Network/DeployAndRunHostedServer.md` adds here.
 
 ## Inputs
 
@@ -296,10 +296,11 @@ az deployment sub <what-if|create> --name <instance>-server --location eastus --
   `az vm list-skus`, `az provider show`, `az vm list-usage`, `az bicep build`,
   and `az deployment sub what-if`. The one exception is step 5's
   `az provider register`, which runs only after its own explicit user yes.
-- Deploy only onto a subscription where `az group exists -n <instance>-server-rg`
-  returns `false`. The skill has no redeploy, update, repair, resize, or
-  teardown path; recovery from a partial deployment is the user-directed
-  `az group delete -n <instance>-server-rg` after their explicit yes.
+- Deploy only onto a subscription where
+  `az group exists -n <instance>-server-rg` returns `false`. The skill has no
+  redeploy, update, repair, resize, or teardown path; recovery from a partial
+  deployment is the user-directed `az group delete -n <instance>-server-rg`
+  after their explicit yes.
 - Pass the admin password only through `BROKENENGINE_ADMIN_PASSWORD` and the
   project's parameters file; keep it off every command line and out of the
   conversation.

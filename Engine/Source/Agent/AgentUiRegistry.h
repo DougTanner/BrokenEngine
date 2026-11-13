@@ -5,6 +5,17 @@
 namespace engine
 {
 
+// Bounded copy into a fixed char buffer: at most capacity minus one characters, always null-terminated.
+inline void CopyStringParameter(std::span<char> destination, std::string_view source)
+{
+	int64_t i = 0;
+	for (; i < static_cast<int64_t>(destination.size()) - 1 && i < static_cast<int64_t>(source.size()); ++i)
+	{
+		destination[i] = source[i];
+	}
+	destination[i] = '\0';
+}
+
 // One completed-frame ImGui widget record. Filled during ImGui::NewFrame..Render into the write table, then made
 // readable after ImGui::Render() by Swap().
 struct AgentUiItem
@@ -47,11 +58,12 @@ public:
 	AgentUiRegistry& operator=(const AgentUiRegistry&) = delete;
 
 	// Write-table fill (called from the imgui hooks during ImGui::NewFrame..Render).
-	void HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, const char* pcWindow, bool bDisabled, bool bVisible);
+	void HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, std::string_view window, bool bDisabled, bool bVisible);
 	void HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int64_t iStatusFlags);
 
-	// Attach menu-control metadata to an item already submitted in the current write table.
-	void RecordItemValue(ImGuiID uiIdentifier, const char* pcValue);
+	// Attach menu-control metadata to an item already submitted in the current write table. pcFormat is a printf format
+	// that consumes one double; the formatted result becomes the item's value text.
+	void RecordItemValue(ImGuiID uiIdentifier, const char* pcFormat, double fValue);
 	void RecordItemChecked(ImGuiID uiIdentifier, bool bChecked);
 
 	// Publish the write table as the read table and snapshot the window list. Call after ImGui::Render().
@@ -62,7 +74,7 @@ public:
 	// pcWindow, when non-null, restricts matching to items in that window.
 	static constexpr int64_t kiNotFound = -1;
 	static constexpr int64_t kiAmbiguous = -2;
-	int64_t ResolveLabel(const char* pcLabel, const char* pcWindow) const;
+	int64_t ResolveLabel(std::string_view label, const char* pcWindow) const;
 
 	static constexpr int64_t kiMaxItems = 1'024;
 	static constexpr int64_t kiMaxWindows = 64;

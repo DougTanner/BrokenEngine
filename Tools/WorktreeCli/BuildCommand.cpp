@@ -197,7 +197,11 @@ private:
 		{
 			line.remove_suffix(1);
 		}
-		if (line.empty() || std::ssize(line) > kiMaxDiagnosticLineLength || (!line.contains("error") && !line.contains("warning")))
+		if (line.empty() || std::ssize(line) > kiMaxDiagnosticLineLength)
+		{
+			return;
+		}
+		if (!line.contains("error") && !line.contains("warning"))
 		{
 			return;
 		}
@@ -422,9 +426,9 @@ static bool HasRequiredProperty(const std::vector<std::wstring>& rArguments, std
 	std::wstring shortDashPrefix = ToLowerInvariant(L"-p:" + std::wstring(propertyName) + L"=");
 	std::wstring longSlashPrefix = ToLowerInvariant(L"/property:" + std::wstring(propertyName) + L"=");
 	std::wstring longDashPrefix = ToLowerInvariant(L"-property:" + std::wstring(propertyName) + L"=");
-	return std::ranges::any_of(rArguments, [&shortSlashPrefix, &shortDashPrefix, &longSlashPrefix, &longDashPrefix](const std::wstring& rArgument)
+	return std::ranges::any_of(rArguments, [&shortSlashPrefix, &shortDashPrefix, &longSlashPrefix, &longDashPrefix](std::wstring_view argument)
 	{
-		std::wstring lower = ToLowerInvariant(rArgument);
+		std::wstring lower = ToLowerInvariant(std::wstring(argument));
 		return lower.starts_with(shortSlashPrefix) || lower.starts_with(shortDashPrefix) || lower.starts_with(longSlashPrefix) || lower.starts_with(longDashPrefix);
 	});
 }
@@ -579,14 +583,12 @@ static bool InvalidateSelectedObjects(const std::filesystem::path& rMsBuild, con
 			return false;
 		}
 		std::filesystem::path extendedObjectPath = ExtendedLengthPath(it->second.object);
-		if (::DeleteFileW(extendedObjectPath.c_str()) == FALSE)
+		std::error_code error;
+		std::filesystem::remove(extendedObjectPath, error);
+		if (error)
 		{
-			int64_t iError = ::GetLastError();
-			if (iError != ERROR_FILE_NOT_FOUND && iError != ERROR_PATH_NOT_FOUND)
-			{
-				FailBuild("delete selected object failed (Windows error " + std::to_string(iError) + ")");
-				return false;
-			}
+			FailBuild("delete selected object failed (Windows error " + std::to_string(error.value()) + ")");
+			return false;
 		}
 		std::wcerr << L"WorktreeCli: invalidated " << it->second.object.native() << L'\n';
 		rInvalidatedObjects.push_back(WideToUtf8(it->second.object.native()));

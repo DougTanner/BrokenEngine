@@ -1,22 +1,41 @@
 # Graphics - Vulkan Rendering System
 
-Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation, frame sequencing, recreation, world-area projection, and capture; Managers (`Managers/AGENTS.md`) own shared Vulkan resource and synchronization contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
+Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide
+creation, frame sequencing, recreation, world-area projection, and capture;
+Managers (`Managers/AGENTS.md`) own shared Vulkan resource and synchronization
+contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
 
 ## Frame and Resource Lifecycle
 
-- Frames submit Global, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
-- A world-hidden frame, one the game's map overlay fully covers (`GameBase::Render`), waits only its own fence and submits only ImGui.
-  It runs no descriptor churn, other-framebuffer publication, or retired-resource destruction, so that pending work waits for the next world frame, and it does not advance `miFrameCounter` (the island LRU clock and the lighting, terrain-shadow, and smoke cadence clock).
-  On the frame the world hides, `GameBase::Render` clears the retained camera-relative effects so they restart clean when the world returns.
-- Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
+- Frames submit Global, Main, and ImGui work before present. The frame boundary
+  is between Main submission and the next acquire.
+- A world-hidden frame, one the game's map overlay fully covers
+  (`GameBase::Render`), waits only its own fence and skips only the world draw:
+  Global and Main population and submission.
+  It still runs the game's world-hidden step
+  (`game::FrameInterpolate::UpdateWorldHidden`, no GPU write; its contents are
+  in `../../../Documents/Architecture/FrameUpdatePipeline.md`), the
+  active-island update, and the residency step `RenderGlobal` runs
+  (`Graphics::UpdateFrameResidency`: descriptor churn, other-framebuffer
+  publication, retired-resource destruction) and advances `miFrameCounter` (the
+  island LRU clock and the lighting, terrain-shadow, object-shadow, and smoke
+  cadence clock), so streaming proceeds behind the map instead of waiting for
+  the world.
+  On the frame the world hides, `GameBase::Render` clears the retained
+  camera-relative effects so they restart clean when the world returns.
+- Global and Main command buffers are recorded once and rebuilt only by the
+  recreation pipeline. Per-frame variation belongs in host-visible buffers,
+  descriptors, and indirect commands; resources discovered within existing
+  capacity must not depend on a re-record.
 - Model depth ordering and the HDR clear color are runtime host policy in
   `Graphics`, initialized from the host's `kbDrawModelsOverWorld` and
   `game::kVkHdrClearColor` defaults. Change either only on the owning
   main thread and request at least command-buffer recreation; complete that
   recreation before publishing or submitting a frame for the new policy. Never
   mutate the policy concurrently with command-buffer recording.
-- `RenderGlobal` waits only its own framebuffer fence, then pre-scans
-  descriptor churn. When island eviction, lazy adoption, or restoration is
+- Each frame waits only its own framebuffer fence, then the residency step
+  (`Graphics::UpdateFrameResidency`) pre-scans descriptor churn. When island
+  eviction, lazy adoption, or restoration is
   pending, or that framebuffer has unapplied descriptor publications, it opens
   the bindless write epoch (a time window in which bindless descriptor writes
   are safe) for that framebuffer alone, performs those mutations, ends the
@@ -24,11 +43,22 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   completion that races the scan waits for the next frame. Descriptor writes
   reach only framebuffers whose fence has signaled; only drained contexts (the
   texture waits, and `Graphics::Create` over a surviving texture manager) write
-  every framebuffer's sets. Every frame `RenderGlobal` also publishes to, and
-  marks waited, each other framebuffer whose fence already reads signaled,
+  every framebuffer's sets. Every frame the residency step also publishes to,
+  and marks waited, each other framebuffer whose fence already reads signaled,
   without blocking.
-- Staging buffers, evicted images, and evicted mesh ranges that recorded work or descriptors may still use are retired, not destroyed. Every frame, outside the churn gate, each waited framebuffer leaves every retirement entry, and after that frame's publications an entry no framebuffer holds is destroyed; `Graphics::Destroy` destroys every entry after its device drain, at every tier.
-- The acquire command buffer, prepended to Global, carries queue-family acquire barriers, recorded uploads, and lighting blurs, and its work precedes any descriptor or indirect record exposing the result. It is single-publication work: clear prior publication before the churn scan, end it at most once per frame after the last recording, and let only fresh recording republish it. An idle frame must not replay prior barriers.
+- Staging buffers, evicted images, and evicted mesh ranges that recorded work or
+  descriptors may still use are retired, not destroyed. Every frame, outside the
+  churn gate, each waited framebuffer leaves every retirement entry, and after
+  that frame's publications an entry no framebuffer holds is destroyed;
+  `Graphics::Destroy` destroys every entry after its device drain, at every
+  tier.
+- The acquire command buffer, prepended to Global or, on a world-hidden frame,
+  submitted alone before ImGui, carries queue-family acquire barriers, recorded
+  uploads, and lighting blurs, and its work precedes any descriptor or indirect
+  record exposing the result. It is single-publication work: clear prior
+  publication before the churn scan, end it at most once per frame after the
+  last recording, and let only fresh recording republish it. An idle frame must
+  not replay prior barriers.
 - `CheckVkFailed` handles every failed `CHECK_VK` result: out-of-date and
   suboptimal swapchain results escalate to the swapchain tier, surface loss to
   the surface tier, and `VK_ERROR_DEVICE_LOST` throws `std::system_error` with
@@ -50,7 +80,12 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   For a surviving tier, `Graphics::Create` rebuilds flagged texture and buffer
   resources and, at the sampler tier and above, the texture manager's samplers;
   destroy flags stay set across both swapchain deferrals.
-- `Graphics::Create` constructs the texture manager before the pipeline manager, which that constructor requires, but runs the boot-texture initialization only after the pipeline manager exists, so no texture adoption its waits drive can reach the lighting blur without the blur pipelines. A lighting-blur tunable change requests pipeline-tier recreation, whose `Create` reblurs every ready lighting texture once the pipeline manager exists.
+- `Graphics::Create` constructs the texture manager before the pipeline manager,
+  which that constructor requires, but runs the boot-texture initialization only
+  after the pipeline manager exists, so no texture adoption its waits drive can
+  reach the lighting blur without the blur pipelines. A lighting-blur tunable
+  change requests pipeline-tier recreation, whose `Create` reblurs every ready
+  lighting texture once the pipeline manager exists.
 - A zero-area swapchain extent defers swapchain-tier recreation. The render loop
   skips submission, retries creation at sim-tick cadence, and acquires again
   only after recreation succeeds; surface-loss recovery remains a full recreate.
@@ -65,7 +100,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   Skip the first partial interval after renderer creation or a render-timer
   reset; skipped render iterations supply no samples. Reset the delta validity
   marker together with the timer so a resumed interval cannot span the gap.
-- Every source in this subtree is whole-file `BT_CLIENT`-guarded and client-project-only. Shared simulation code that touches client graphics state needs its own `BT_CLIENT` guard.
+- Every source in this subtree is whole-file `BT_CLIENT`-guarded and
+  client-project-only. Shared simulation code that touches client graphics state
+  needs its own `BT_CLIENT` guard.
 
 ## World and Camera Contracts
 
@@ -92,19 +129,27 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   the initial position and Direct targets on the lowest flight plane. Tracked
   and extrapolated targets retain their full height through the chase, raising
   the look-at and eye together without changing tilt or framing.
-- Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the render clock's per-frame advance the caller passes separately, so it stops whenever on-screen game time stops, and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
-- Long-distance target changes use a bounded smoothstep jump that may
-  re-anchor from the current position; normal tracking tightens with framing.
-  During a jump the cell loaded area sits at the destination, and the previous
-  cell loaded area (`mf4PreviousCellLoadedArea`), copied as the jump starts,
-  holds the departure through any re-anchor or retarget until the jump ends.
-  Until the first tracked target after a session reset or a server load
+- Camera position, easing, shake, and visual timers advance from the sim-scaled
+  render delta the caller passes to `CameraBase::Update` (wall delta multiplied
+  by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances
+  from the render clock's per-frame advance the caller passes separately, so it
+  stops whenever on-screen game time stops, and pauses in the main menu. Debug
+  free-camera motion is main-menu-only and drives the pose directly, ignoring
+  the pulled target.
+- Long-distance target changes use a bounded smoothstep jump that may re-anchor
+  from the current position; normal tracking tightens with framing. During a
+  jump the cell loaded area sits at the destination, and the previous cell
+  loaded area (`mf4PreviousCellLoadedArea`), copied as the jump starts, holds
+  the departure through any re-anchor or retarget until the jump ends. Until the
+  first tracked target after a session reset or a server load
   (`DiscardTrackingCaches`) the position holds, and that target sets it
-  directly, with no jump. Mouse-wheel input updates a persisted, clamped
-  framing target, with framing and velocity re-anchored while scrolling so
-  repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid
-  boundary.
-  A host may override the rendered framing with its own eased target and release it back to the world framing; the wheel is ignored while an override is active. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
+  directly, with no jump. Mouse-wheel input updates a persisted, clamped framing
+  target, with framing and velocity re-anchored while scrolling so repeated
+  input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. A
+  host may override the rendered framing with its own eased target and release
+  it back to the world framing; the wheel is ignored while an override is
+  active. Damage-driven shake decays here; after the update,
+  `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame
@@ -112,7 +157,9 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   cached camera position by the cell-centre offset (`CellCenterOffset`). A new
   cached position must join that shift or it will describe a place in the
   previous cell.
-- Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
+- Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic
+  buckets so quad size remains stable across adjacent frames; terrain, water,
+  shadow, and lighting areas must preserve this shared grid contract.
 - The zoom value is the framing (`mfCameraFraming`): the eye distance from the
   look-at along the view axis that would show the current view at
   `kfFramingFieldOfView`, so every field of view and projection shows the same
@@ -139,17 +186,22 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   expand immediately with outward zoom and contract at their existing rates
   inward. The references never fall below rendered framing times
   `mfTexelCoverageRatio`, the maximum raw-footprint width or height divided by
-  the corresponding reference-angle framing dimension. This preserves
-  raw-frustum coverage and settled on-screen density along the limiting axis.
-  With the rendered framing above the gameplay
-  ceiling both track it without contracting, so a return from a host-set far
-  zoom does not leave the texel grids coarse. Lighting
-  temporal history rejects newly exposed texels when their reprojected UV falls
-  outside the previous footprint, so outward zoom follows the
-  configured lighting refresh cadence unless crop safety requires an earlier
-  refresh; recreation still re-seeds history from current data only. Shadow uses
-  the same per-texel rejection and follows the terrain shadow update cadence
-  unless crop safety requires an earlier refresh.
+  the corresponding reference-angle framing dimension. This preserves settled
+  on-screen density along the limiting axis. The Tweaks-only, unsaved
+  `gExtraArea` scales the shadow, object-shadow, and lighting areas and their
+  textures together, so texel size does not depend on it. At 1.0 a settled
+  shadow or lighting area spans the raw footprint along the limiting axis; a
+  value above 1.0 adds margin that helps keep the raw frustum inside through
+  zoom transitions, and a value below 1.0 leaves the view's edges outside the
+  area. With the rendered framing above the gameplay ceiling both references
+  track it without contracting, so a return from a host-set far zoom does not
+  leave the texel grids coarse. Lighting temporal history rejects newly exposed
+  texels when their reprojected UV falls outside the previous footprint, so
+  outward zoom follows the configured lighting refresh cadence unless a
+  teleport forces an earlier refresh (`Render/AGENTS.md`
+  `## Ordering and Publication`); recreation still re-seeds history from current
+  data only. Shadow uses the same per-texel rejection and follows the terrain
+  shadow update cadence unless a teleport forces an earlier refresh.
 - Terrain rendering uses boot-fixed island templates, a stable 128 MiB mesh
   arena, and a per-framebuffer placement arena derived from the active-cell
   subscription slots plus one local unconfirmed cell and the
@@ -164,15 +216,17 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   through the acquire command buffer, and an evicted template's subranges are
   retired, so a pending frame's stale indirect record never draws from a
   reused range. Residency never replaces the mesh-buffer handle or re-records.
-  Arena teardown invalidates every suballocation, while File-owned
-  asynchronous range state survives.
+  Arena teardown invalidates every suballocation.
 - The renderer draws every listed copy of an island that crosses cells, with no
   deduplication: copies share a template, texture slot, and rotation, the
   elevation prepasses' MAX blend leaves the height unchanged, and the depth test
   rejects a later copy at equal depth. Each cell's render offset can part copies
   by millimetres, so a fragment may shade twice, writing the same color to
   rounding.
-- The island least-recently-used grace period counts rendered frames, not sim ticks or wall time. Both the frame counter and each template's last-used stamp advance only inside the render path, so a frame that skips rendering ages nothing and cannot evict an island early.
+- The island least-recently-used grace period counts rendered frames, not sim
+  ticks or wall time. Both the frame counter and each template's last-used stamp
+  advance only inside the render path, on world and world-hidden frames alike,
+  so a deferred-swapchain skip ages nothing and cannot evict an island early.
 - Render-target sizes derive from a fixed 3840-pixel reference width, not the
   live window. Smoke simulation resolution scales against that reference, and
   the water vertex grid anchors to a fixed 3840x2160: Gerstner wave frequencies
@@ -183,17 +237,25 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   device allows) so the 1.5x-wide derived elevation texture still fits; raising
   shadow quality or adding a wider derived variant without that cap fails image
   creation only on lower-limit devices.
-- Terrain collision belongs to shared Frame island terrain (`../Frame/AGENTS.md`), not this client renderer.
+- Terrain collision belongs to shared Frame island terrain
+  (`../Frame/AGENTS.md`), not this client renderer.
 
 ## Assets and Capture
 
-- Animation data aliases eagerly loaded pack memory and therefore cannot outlive `FileManager`. Validate all pack-derived ranges and indices before constructing aliases; temporary transforms use the workbuffer.
-- DirectXMath matrices are uploaded without an extra transpose. Animation nodes remain parent-before-child, enabling a single forward world-transform pass.
-- Screenshot and render-target capture run after the ImGui submission is enqueued and before present. The fence signal must already be pending before readback waits, or capture deadlocks. Requests enter through `Graphics` mailboxes; asynchronous encoders own separate thread-local state.
+- Animation data aliases eagerly loaded pack memory and therefore cannot outlive
+  `FileManager`. Validate all pack-derived ranges and indices before
+  constructing aliases; temporary transforms use the workbuffer.
+- DirectXMath matrices are uploaded without an extra transpose. Animation nodes
+  remain parent-before-child, enabling a single forward world-transform pass.
+- Screenshot and render-target capture run after the ImGui submission is
+  enqueued and before present. The fence signal must already be pending before
+  readback waits, or capture deadlocks. Requests enter through `Graphics`
+  mailboxes; asynchronous encoders own separate thread-local state.
 
 ## See Also
 
-- Managers (`Managers/AGENTS.md`) - Cross-manager lifecycle, synchronization, and resources
+- Managers (`Managers/AGENTS.md`) - Cross-manager lifecycle, synchronization,
+  and resources
 - Objects (`Objects/AGENTS.md`) - Vulkan object ownership
 - Render (`Render/AGENTS.md`) - Per-frame buffer publication and pass ordering
 - Debug (`Debug/AGENTS.md`) - Debug rendering

@@ -51,13 +51,13 @@ static bool IsLowerHex(std::string_view text, int64_t iLength)
 }
 
 
-static bool ReadRequiredString(const nlohmann::json& rValue, const char* pcField, std::string& rResult)
+static bool ReadRequiredString(const nlohmann::json& rValue, std::string_view field, std::string& rResult)
 {
-	if (!rValue.is_object() || !rValue.contains(pcField) || !rValue[pcField].is_string())
+	if (!rValue.is_object() || !rValue.contains(field) || !rValue[field].is_string())
 	{
 		return false;
 	}
-	rResult = rValue[pcField].get<std::string>();
+	rResult = rValue[field].get<std::string>();
 	return !rResult.empty();
 }
 
@@ -261,7 +261,8 @@ static bool HealClaims(const std::filesystem::path& rRoot, std::wstring_view rep
 		{
 			bRemove = true;
 		}
-		if (bRemove && ::DeleteFileW(ExtendedLengthPath(it->path()).c_str()) != FALSE)
+		std::error_code removeError;
+		if (bRemove && std::filesystem::remove(ExtendedLengthPath(it->path()), removeError))
 		{
 			rHealed.push_back(WideToUtf8(it->path().filename().wstring()));
 		}
@@ -415,7 +416,11 @@ static bool FindSessionClaim(const std::filesystem::path& rRoot, std::wstring_vi
 		}
 		Claim claim;
 		std::wstring path;
-		if (!ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, repository, path) || !ClaimIsLive(claim))
+		if (!ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, repository, path))
+		{
+			continue;
+		}
+		if (!ClaimIsLive(claim))
 		{
 			continue;
 		}
@@ -655,7 +660,11 @@ static int64_t RunList(const Arguments& rArguments)
 static int64_t RunClaimNext(const Arguments& rArguments)
 {
 	std::wstring repository; std::filesystem::path worktree;
-	if (!ResolveContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty() || rArguments.branch.empty() || rArguments.primaryWorktree.empty())
+	if (!ResolveContext(rArguments, repository, worktree))
+	{
+		return Failure("invalid-context");
+	}
+	if (rArguments.owner.empty() || rArguments.session.empty() || rArguments.branch.empty() || rArguments.primaryWorktree.empty())
 	{
 		return Failure("invalid-context");
 	}
@@ -804,7 +813,11 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 static int64_t RunClaimStatus(const Arguments& rArguments)
 {
 	std::wstring repository; std::filesystem::path worktree;
-	if (!ResolveWorktreeContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty())
+	if (!ResolveWorktreeContext(rArguments, repository, worktree))
+	{
+		return Failure("invalid-context");
+	}
+	if (rArguments.owner.empty() || rArguments.session.empty())
 	{
 		return Failure("invalid-context");
 	}
@@ -854,7 +867,11 @@ static int64_t RunClaimStatus(const Arguments& rArguments)
 static int64_t RunUnclaim(const Arguments& rArguments)
 {
 	std::wstring repository; std::filesystem::path worktree;
-	if (!ResolveWorktreeContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty())
+	if (!ResolveWorktreeContext(rArguments, repository, worktree))
+	{
+		return Failure("invalid-context");
+	}
+	if (rArguments.owner.empty() || rArguments.session.empty())
 	{
 		return Failure("invalid-context");
 	}
@@ -887,7 +904,8 @@ static int64_t RunUnclaim(const Arguments& rArguments)
 		PrintResult({{"status", "ok"}, {"code", "already-absent"}}, 2);
 		return kiExitOk;
 	}
-	if (::DeleteFileW(ExtendedLengthPath(claim.path).c_str()) == FALSE)
+	std::error_code error;
+	if (!std::filesystem::remove(ExtendedLengthPath(claim.path), error))
 	{
 		return Failure("delete-failed");
 	}
@@ -931,7 +949,11 @@ static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArgume
 		return Failure("authorization-required");
 	}
 	std::wstring repository; std::filesystem::path worktree;
-	if (!ResolveWorktreeContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty())
+	if (!ResolveWorktreeContext(rArguments, repository, worktree))
+	{
+		return Failure("invalid-context");
+	}
+	if (rArguments.owner.empty() || rArguments.session.empty())
 	{
 		return Failure("invalid-context");
 	}
@@ -1031,7 +1053,8 @@ static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArgume
 	if (bTargetPresent)
 	{
 		// The target is deleted last, so a failed child rewrite leaves the target Plan file in place.
-		if (::DeleteFileW(ExtendedLengthPath(targetDiskPath).c_str()) == FALSE)
+		std::error_code removeError;
+		if (!std::filesystem::remove(ExtendedLengthPath(targetDiskPath), removeError))
 		{
 			return Failure("delete-failed");
 		}

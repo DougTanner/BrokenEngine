@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "Frame/Collections/Collection.h"
 #include "Frame/FrameUtils.h"
 #include "Frame/GridCoord.h"
@@ -17,11 +19,8 @@ namespace engine
 struct CellStaticData;
 class Wrapper;
 
-#if defined(BT_CLIENT)
 struct SmokeTrailsInterpolate;
 using smoke_trails_t = Id<SmokeTrailsInterpolate>;
-
-#endif
 
 inline constexpr int64_t kiMaxExplosionTrails = 8;
 inline constexpr int64_t kiInvalidTrailType = 255;
@@ -33,8 +32,7 @@ enum class ExplosionFlags : uint8_t
 };
 using ExplosionFlags_t = common::Flags<ExplosionFlags>;
 
-// Engine effect controllers. ExplosionsInterpolate::Register sets them on the client, before the game registers any
-// ExplosionType; on the server they stay invalid, so every ExplosionType there defaults to no effect.
+// Engine effect controllers. ExplosionsInterpolate::Register sets them before the game registers any ExplosionType.
 inline int64_t giExplosionPrimaryLightControllerTypeIndex = kiInvalidControllerType;
 inline int64_t giExplosionSecondaryLightControllerTypeIndex = kiInvalidControllerType;
 inline int64_t giExplosionPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
@@ -109,50 +107,12 @@ struct ExplosionType
 struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	public TypeRegistry<ExplosionType>
 {
-	static constexpr int64_t kiVersion = 3;
-
 	// Register default explosion effect types (called from ForEachRegister)
 	static void Register();
 
-	// Spawn caps the trail count at the fixed trail slots; reject any other count as a corrupt stream, since trail loops index those slots by it.
-	// Start times, time percents, and trail times must lie in the ranges Spawn produces, so Destroy's nanosecond expiry
-	// arithmetic cannot overflow. Each float test is one range test so NaN and both infinities fail it too.
-	static void PostRead(const ExplosionsInterpolate& rCurrent)
-	{
-		static constexpr SimulationTime kLatestStartTime = TickToSimulationTime(TimeStep::kiMaximumSavedTick);
-		for (int64_t i = 0; i < rCurrent.iCount; ++i)
-		{
-			if (rCurrent.piTrailCounts[i] < 0 || rCurrent.piTrailCounts[i] > kiMaxExplosionTrails)
-			{
-				throw std::ios_base::failure("ExplosionsInterpolate piTrailCounts");
-			}
-			if (rCurrent.pStartTimes[i] < SimulationTime() || rCurrent.pStartTimes[i] > kLatestStartTime)
-			{
-				throw std::ios_base::failure("ExplosionsInterpolate pStartTimes");
-			}
-			if (!(rCurrent.pfTimePercents[i] >= 0.0f && rCurrent.pfTimePercents[i] <= 1.0f))
-			{
-				throw std::ios_base::failure("ExplosionsInterpolate pfTimePercents");
-			}
-
-			const ExplosionType& rType = sTypes.at(static_cast<size_t>(rCurrent.puiTypeIndices[i]));
-			float fMaximumTrailTime = (rType.trailTimeMinimum + rType.trailTimeRandom).count();
-			for (int64_t j = 0; j < rCurrent.piTrailCounts[i]; ++j)
-			{
-				float fTrailTime = rCurrent.pTrailTimes[j][i].count();
-				if (!(fTrailTime >= 0.0f && fTrailTime <= fMaximumTrailTime))
-				{
-					throw std::ios_base::failure("ExplosionsInterpolate pTrailTimes");
-				}
-			}
-		}
-	}
-
-#if defined(BT_CLIENT)
 	static inline int64_t siTotalCount = 0;
 
 	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;
-#endif // BT_CLIENT
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
@@ -165,59 +125,28 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 
 	// Trail state (8 separate arrays - pTrails[j] is array of all explosions' j-th trail)
 	int32_t* __restrict piTrailCounts = nullptr;
-#if defined(BT_CLIENT)
 	smoke_trails_t* pTrails[kiMaxExplosionTrails] = {};
-#endif
 	std::chrono::duration<float>* pTrailTimes[kiMaxExplosionTrails] = {};
-#if defined(BT_CLIENT)
 	float* pfTrailIntensities[kiMaxExplosionTrails] = {};
 	XMVECTOR* pVecTrailStartPositions[kiMaxExplosionTrails] = {};
 	XMVECTOR* pVecTrailEndPositions[kiMaxExplosionTrails] = {};
-#endif
 
-	auto SharedMembers(this auto&& rSelf)
-	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pTrailTimes);
-	}
-#if defined(BT_CLIENT)
-	auto ClientMembers(this auto&& rSelf)
-	{
-		return std::tie(rSelf.pTrails, rSelf.pfTrailIntensities, rSelf.pVecTrailStartPositions, rSelf.pVecTrailEndPositions);
-	}
-#endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
 	{
-#if defined(BT_CLIENT)
-		return std::tuple_cat(rSelf.SharedMembers(), rSelf.ClientMembers());
-#else
-		return rSelf.SharedMembers();
-#endif
+		return std::tie(rSelf.puiTypeIndices, rSelf.pStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pTrailTimes, rSelf.pTrails, rSelf.pfTrailIntensities, rSelf.pVecTrailStartPositions, rSelf.pVecTrailEndPositions);
 	}
-	auto PersistentMembers([[maybe_unused]] this auto&& rSelf)
+	auto PersistentMembers(this auto&& rSelf)
 	{
-#if defined(BT_CLIENT)
 		return std::tie(rSelf.pTrails);
-#else
-		return std::tie();
-#endif
 	}
-	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)
+	auto OwnedHandles(this auto&& rSelf)
 	{
-#if defined(BT_CLIENT)
 		return std::tie(rSelf.pTrails);
-#else
-		return std::tie();
-#endif
 	}
-
-	bool LogDifferences(const ExplosionsInterpolate& rOther) const;
 };
 
 struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 {
-	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 2;
-
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
@@ -227,8 +156,6 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 	{
 		return std::tie(rSelf.pLifecycleFlags);
 	}
-
-	bool LogDifferences(const ExplosionsPostRender& rOther) const;
 
 	struct SpawnInfo
 	{
@@ -244,19 +171,15 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fSizePercent = 1.0f;
 		float fSmokePercent = 1.0f;
 		float fTimePercent = 1.0f;
-
-		// Status-change payload members. The coordinate and start time come from the cell the spawn is applied to.
-		static constexpr FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, lifecycleFlags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> Fields()
-		{
-			return {};
-		}
 	};
 
 	// coordinate is the cell rSpawnInformation.vecPosition is local to.
-	static bool Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, const SpawnInfo& rSpawnInformation);
+	static bool Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, const SpawnInfo& rSpawnInformation, common::RandomEngine& rRandomEngine);
 };
 
 extern template struct Collection<ExplosionsInterpolate>;
 extern template struct Collection<ExplosionsPostRender>;
 
 } // namespace engine
+
+#endif // BT_CLIENT

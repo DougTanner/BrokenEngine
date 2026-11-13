@@ -81,7 +81,8 @@ Guard::~Guard()
 	{
 		mHandleFile.Reset();
 		// Best effort: a waiter that reopened the guard first keeps it alive and deletes it on its own release.
-		::DeleteFileW(mPath.c_str());
+		std::error_code error;
+		std::filesystem::remove(mPath, error);
 	}
 }
 
@@ -319,7 +320,8 @@ bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view conte
 	{
 		return true;
 	}
-	::DeleteFileW(temporaryPath.c_str());
+	std::error_code error;
+	std::filesystem::remove(temporaryPath, error);
 	return false;
 }
 
@@ -355,9 +357,9 @@ std::optional<int64_t> JsonInt64(const nlohmann::json& rValue)
 bool ValidateMetadataEnvelope(const nlohmann::json& rMetadata, const Locator& rLocator, int64_t iExpectedSchemaVersion)
 {
 	const char* const pFields[] = {"owner", "session", "worktree", "claimedAt", "heartbeatAt"};
-	if (!std::ranges::all_of(pFields, [&rMetadata](const char* const& rpField)
+	if (!std::ranges::all_of(pFields, [&rMetadata](std::string_view field)
 	{
-		return rMetadata.contains(rpField) && rMetadata[rpField].is_string() && !rMetadata[rpField].get<std::string>().empty();
+		return rMetadata.contains(field) && rMetadata[field].is_string() && !rMetadata[field].get<std::string>().empty();
 	}))
 	{
 		return false;

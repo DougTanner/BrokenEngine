@@ -26,6 +26,7 @@ struct GlobalLayout
 
 	vec2 f2CameraPosition INIT;
 	vec4 f4VisibleArea INIT;
+	vec4 f4ObjectShadowsArea INIT; // The area the object-shadow textures were last rasterized for, the visible area scaled by the extra area; held between refreshes
 	vec4 f4PatchInverseBasis INIT; // Column-major mat2 inverse of the axial cell basis: camera-cell position to cell steps (MakePatchTriangle)
 	float fPatchWeightThreshold INIT; // MakePatchTriangle's weight threshold, its subtracted term capped just below the largest normalized cube
 	vec4 f4ShadowArea INIT;
@@ -37,11 +38,6 @@ struct GlobalLayout
 	vec4 f4SunColor INIT;
 	vec4 f4MoonColor INIT;
 	vec4 f4AmbientColor INIT;
-
-	// Per-target sun/moon intensity multipliers (applied at shader read sites). Terrain/Water/Objects are
-	// pre-folded CPU-side into the precomputed products below, so only Smoke remains as a raw multiplier.
-	float fSunIntensitySmoke INIT;
-	float fMoonIntensitySmoke INIT;
 
 	// Precomputed day-cycle products (CPU-folded uniform-only terms; GlobalUniforms.cpp
 	// PopulateDayCycleColors / PopulateSunMoonDirection / PopulateShadowParameters). Every operand is
@@ -62,7 +58,7 @@ struct GlobalLayout
 	float fWaterSunWeight INIT;       // Rec.601 luma of fSunIntensityWater*f4SunColor (Water.frag effective-shadow blend)
 	float fWaterMoonWeight INIT;      // Rec.601 luma of fMoonIntensityWater*f4MoonColor (Water.frag effective-shadow blend)
 	float fWaterShadowWeightSumInverse INIT; // 1 / max(fWaterSunWeight + fWaterMoonWeight, 0.001)
-	float fSmokeLightingCombinedMultiplier INIT; // fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier (AddSmoke/BlendSmokePrecomputed)
+	float fSmokeLightingCombinedMultiplier INIT; // gSmokeLightingMultiplier * fLightingTimeOfDayMultiplier (AddSmoke/BlendSmokePrecomputed)
 
 	// Model.frag uses separate direct BRDF and IBL specular products. IBL stays linear in fPbrSun
 	// because its Rec.709 luminance uses the unscaled sun/moon color. w unused.
@@ -80,7 +76,6 @@ struct GlobalLayout
 	float pfSmokeStepCounts[kiMaxFlightPlanes] INIT; // Per flight plane: frames since its previous smoke refresh; scales spread offsets and edge decay
 	float fSmokeColorMin INIT;
 	float fSmokeColorMultiplier INIT;
-	float fSmokeLightingMultiplier INIT;
 	float fSmokeIntensityFalloff INIT;
 	float fSmokeWindNoiseScale INIT;
 	float pfSmokeWindNoiseQuantities[kiMaxFlightPlanes] INIT; // CPU-resolved bottom/top blend over normalized plane index; a single plane uses bottom

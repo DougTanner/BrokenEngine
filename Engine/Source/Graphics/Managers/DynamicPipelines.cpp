@@ -74,7 +74,13 @@ void DynamicPipelines::UpdateModelPipelineDescriptors(common::crc_t crc, int64_t
 void DynamicPipelines::WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount)
 {
 	mpModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
-	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
+	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->WriteIndirectBuffer(iCommandBuffer, gbObjectShadowsRefreshFrame ? iCount : 0);
+}
+
+void DynamicPipelines::RequestModelPipelineTextures(common::crc_t crc)
+{
+	mpModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->RequestTextures();
+	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->RequestTextures();
 }
 
 void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)

@@ -28,9 +28,8 @@ struct AudioChunkReadEntry
 #endif // BT_CLIENT
 
 // The packed-asset chunk engine, owned by FileManager via std::unique_ptr.
-// Holds the eager pack buffers, the lazy chunk maps + atomic eState machine, the private background loader,
-// and the single-VirtualAlloc lazy memory pool. Not a *Manager: no gp* global, not
-// aggregated into Engine.h.
+// Holds the eager pack buffers, the lazy chunk maps + atomic eState machine, and the private background loader.
+// Not a *Manager: no gp* global, not aggregated into Engine.h.
 class PackChunks
 {
 public:
@@ -51,24 +50,16 @@ public:
 	void CancelChunkRead(ChunkReadRequest& rRequest);
 #endif // BT_CLIENT
 
-	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk pool pointers and sizes are
-	// fixed at construction and are not touched. The caller owns exclusion for the chunks it resets — full recovery
-	// through WaitForLoadersIdle plus the upload-thread wait, island eviction through RenderGlobal's drained
+	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk buffers and sizes are not
+	// touched. The caller owns exclusion for the chunks it resets — full recovery
+	// through WaitForLoadersIdle plus the upload-thread wait, island eviction through Graphics::UpdateFrameResidency's drained
 	// descriptor window, which excludes Vulkan descriptor/image use and is not a loader drain.
 	void ResetTextureChunkStates();
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
 
-	// Reclaim a dead sub-range of a resident lazy chunk's decompressed pool memory. Decommits only the
-	// page-aligned interior of [iOffset, iOffset + iLength); the boundary partial-pages (which may share
-	// bytes with the neighbouring payload) stay committed. Other chunks and the chunk's pData pointer
-	// are unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
-	// only (boot / device-loss recovery / transfer-complete texture adoption) — the range must have no concurrent reader.
-	void DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
-	// MEM_COMMITs every intersecting page and re-reads [iOffset, iOffset + iLength)
-	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
-	// Returns true on success; false on soft-fail (MEM_COMMIT failure). On false the
-	// caller must NOT read the range — the interior may be decommitted or hold partial data.
-	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex);
+	// The only allocation (loader thread) and free (main thread) of a lazy chunk buffer, so the counters stay exact.
+	void AllocateLazyChunkBuffer(LazyChunk& rLazyChunk);
+	void FreeLazyChunkBuffer(LazyChunk& rLazyChunk);
 
 	MemoryStats GetEagerStatistics() const;
 	MemoryStats GetLazyStatistics() const;
@@ -78,7 +69,6 @@ private:
 	friend class PackChunkLoader;
 
 	void LoadPackFiles();
-	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength);
 	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
 #if defined(BT_CLIENT)
@@ -134,16 +124,6 @@ private:
 	// Persistent pack file handles for lazy loading (opened with FILE_FLAG_NO_BUFFERING)
 	HANDLE mpHandleLazyPackFile[data::kDataTypeCount] {};
 
-	// Per-loading-thread sector-aligned read buffers (one per thread, indexed by thread index; reused across that
-	// thread's chunk reads). Size is shared — identical for every thread.
-	std::byte* mpReadBuffers[PackChunkLoader::kiLoadingThreadCount] {};
-	int64_t miReadBufferSize = 0;
-	int64_t miPageSize = 0; // VM page granularity for lazy-chunk sub-range decommit/recommit
-
-	// Stable reservation for all lazy chunk data; destination pages are committed before loading.
-	std::byte* mpLazyPool = nullptr;
-	int64_t miLazyPoolSize = 0;
-
 	// Per-loading-thread scratch buffers for compressed chunks (LZ4 or zlib; one per thread, indexed by thread index).
 	// Each sized at boot to the largest compressed chunk on disk; reused per chunk. Size is shared.
 	std::byte* mpDecompressScratches[PackChunkLoader::kiLoadingThreadCount] {};
@@ -154,6 +134,17 @@ private:
 
 	// FILE_FLAG_NO_BUFFERING alignment: a multiple of both supported logical sector sizes (512, 4096) and the physical-sector alignment Microsoft recommends.
 	static constexpr int64_t kiSectorAlignment = 4'096;
+
+	// Per-loading-thread sector-aligned read buffers (one sub-read + sector padding each, indexed by thread index;
+	// reused across that thread's chunk reads). The row size is a sector multiple, so every row is sector-aligned.
+	static constexpr int64_t kiReadBufferSize = common::RoundUp(kiSubReadSize + kiSectorAlignment, kiSectorAlignment);
+	alignas(kiSectorAlignment) std::byte mpReadBuffers[PackChunkLoader::kiLoadingThreadCount][kiReadBufferSize] {};
+
+	// Live and peak lazy chunk buffer bytes: requested (iDataSize) and mimalloc arena footprint. Statistics only.
+	std::atomic<int64_t> miLazyBufferBytes = 0;
+	std::atomic<int64_t> miPeakLazyBufferBytes = 0;
+	std::atomic<int64_t> miLazyBufferFootprint = 0;
+	std::atomic<int64_t> miPeakLazyBufferFootprint = 0;
 
 public:
 	PackChunkLoader mLoader;

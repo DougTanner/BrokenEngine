@@ -142,6 +142,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			throw std::ios_base::failure("client grid coord absent from cells");
 		}
 
+		game::ValidateSaveState(rStagedGrid.saveState, rStagedGrid.cells, rStagedGrid.iNextGlobalId);
 	}
 	catch (const std::exception& rException)
 	{

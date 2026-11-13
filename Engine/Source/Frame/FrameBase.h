@@ -5,9 +5,7 @@
 #if defined(BT_CLIENT)
 #include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/Billboards/Billboards.h"
-#endif
 #include "Frame/Collections/Explosions/Explosions.h"
-#if defined(BT_CLIENT)
 #include "Frame/Collections/HexShields/HexShields.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
@@ -120,9 +118,7 @@ struct FrameInterpolateBase
 #if defined(BT_CLIENT)
 	AreaLightsInterpolate areaLights {};
 	BillboardsInterpolate billboards {};
-#endif
 	ExplosionsInterpolate explosions {};
-#if defined(BT_CLIENT)
 	HexShieldsInterpolate hexShields {};
 	PointLightsInterpolate pointLights {};
 	PuffsInterpolate puffs {};
@@ -145,19 +141,19 @@ struct FrameInterpolateBase
 #if defined(BT_CLIENT)
 		return std::tie(rSelf.areaLights, rSelf.billboards, rSelf.explosions, rSelf.hexShields, rSelf.pointLights, rSelf.puffs, rSelf.pushers, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails);
 #else
-		return std::tie(rSelf.explosions, rSelf.pushers);
+		return std::tie(rSelf.pushers);
 #endif
 	}
 
 #if defined(BT_CLIENT)
 	static constexpr int64_t kiCollectionCount = 11;
 #else
-	static constexpr int64_t kiCollectionCount = 2;
+	static constexpr int64_t kiCollectionCount = 1;
 #endif
 
 	auto ServerCollections(this auto&& rSelf)
 	{
-		return std::tie(rSelf.explosions, rSelf.pushers);
+		return std::tie(rSelf.pushers);
 	}
 
 	// Visibility bounds (X = East/West, Y = North/South)
@@ -222,9 +218,7 @@ struct FramePostRenderBase
 #if defined(BT_CLIENT)
 	AreaLightsPostRender areaLights {};
 	BillboardsPostRender billboards {};
-#endif
 	ExplosionsPostRender explosions {};
-#if defined(BT_CLIENT)
 	HexShieldsPostRender hexShields {};
 	PointLightsPostRender pointLights {};
 	PuffsPostRender puffs {};
@@ -253,19 +247,19 @@ struct FramePostRenderBase
 #if defined(BT_CLIENT)
 		return std::tie(rSelf.areaLights, rSelf.billboards, rSelf.explosions, rSelf.hexShields, rSelf.pointLights, rSelf.puffs, rSelf.pushers, rSelf.sounds, rSelf.smokeTrails, rSelf.windRadials, rSelf.windTrails);
 #else
-		return std::tie(rSelf.explosions, rSelf.pushers);
+		return std::tie(rSelf.pushers);
 #endif
 	}
 
 #if defined(BT_CLIENT)
 	static constexpr int64_t kiCollectionCount = 11;
 #else
-	static constexpr int64_t kiCollectionCount = 2;
+	static constexpr int64_t kiCollectionCount = 1;
 #endif
 
 	auto ServerCollections(this auto&& rSelf)
 	{
-		return std::tie(rSelf.explosions, rSelf.pushers);
+		return std::tie(rSelf.pushers);
 	}
 
 	// The frame-wide values Write and Read serialize, in stream order; ServerRead skips the kbClientOnlyValue ones.

@@ -89,7 +89,9 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	static inline int64_t siAreaLightTypeIndex = 0xFF;
 	static inline int64_t siBlasterTypeIndex = 0xFF;
+#if defined(BT_CLIENT)
 	static inline int64_t siExplosionTypeIndex = 0xFF;
+#endif
 	static inline int64_t siImpactPuffControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siImpactPointLightControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siHexShieldTypeIndex = 0xFF;
@@ -190,6 +192,8 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	}
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
+	// Requests the textures of each controller's model pipeline that has a row in an active cell.
+	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);

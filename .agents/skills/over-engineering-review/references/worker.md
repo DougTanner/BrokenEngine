@@ -33,7 +33,9 @@ The finder pass runs steps 1-3; the validator pass runs steps 4-8.
    ```
 
    Then return the finder handoff in `../SKILL.md` `## Handoff`, recording each
-   root-cause design suggestion. Done when it is the final answer.
+   root-cause design suggestion that the `AGENTS.md` and
+   `Documents/C++StyleGuide.txt` drop reason in `### Drop reasons` would not
+   drop if it were a candidate. Done when it is the final answer.
 4. Read the candidate rows at the `Removal candidates` input's path plus
    selector, in the step 3 form, and confirm they, the inventory output file,
    and the authorization source are in hand. Done when all three are, or the

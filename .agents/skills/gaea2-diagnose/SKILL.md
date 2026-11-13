@@ -18,7 +18,10 @@ disable-model-invocation: true
 
 ## Purpose
 
-The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing additional data"); the real Newtonsoft exception is in a log. Find the right log, decode the exception, cross-reference the shipping samples for the valid value, and tell the user what to change.
+The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing
+additional data"); the real Newtonsoft exception is in a log. Find the right
+log, decode the exception, cross-reference the shipping samples for the valid
+value, and tell the user what to change.
 
 ## When to use
 
@@ -26,27 +29,52 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
   "Swarm failed to load".
 - A node loads as deactivated (dashed border).
 - Behavior is unexpected after a `/gaea2-save` round-trip.
-- This skill diagnoses; it does not edit the .terrain. Apply fixes via `Temp/<basename>.md` + `/gaea2-save` (step 6 below); structural graph changes chain to `/gaea2-modify`.
-- Runtime crashes in the Gaea binary itself go to QuadSpinner support, not this skill.
+- This skill diagnoses; it does not edit the .terrain. Apply fixes via
+  `Temp/<basename>.md` + `/gaea2-save` (step 6 below); structural graph changes
+  chain to `/gaea2-modify`.
+- Runtime crashes in the Gaea binary itself go to QuadSpinner support, not this
+  skill.
 
 ## Steps
 
-1. Set up the Python dispatch. Every Python script below runs through the shared wrapper, which resolves the interpreter itself (via the shared `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. From the session worktree root, each call takes the form below. Done when this dispatch form is the one every later script call uses.
+1. Set up the Python dispatch. Every Python script below runs through the shared
+   wrapper, which resolves the interpreter itself (via the shared
+   `.agents/scripts/Detect-Python.ps1` probe) and reports it as data. From the
+   session worktree root, each call takes the form below. Done when this
+   dispatch form is the one every later script call uses.
 
    ```powershell
    pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script <script.py> -Arguments '<arg>','<arg>'"
    ```
 
-   - Never run that probe and parse its `OK`/`MISSING`/`STALE` line yourself, and never call a script with a bare `python` or a captured interpreter path.
-   - Use `-Command`, not `-File`: under `-File` an `-Arguments` list of more than one value collapses into a single token.
-   - The wrapper runs the script from the repository root whatever the current directory is, and passes the child's stderr through to yours — append your shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash) when you only want the JSON.
-   - It prints one JSON object, `schemaVersion` `broken-engine-gaea2-python/v1`, carrying `interpreter`, `pythonVersion`, the child's `exitCode`, its `stdout` and `stderr` (each capped at 8192 characters, with `truncated` set when cut), plus `status`, `code`, `message`:
+   - Never run that probe and parse its `OK`/`MISSING`/`STALE` line yourself,
+     and never call a script with a bare `python` or a captured interpreter
+     path.
+   - Use `-Command`, not `-File`: under `-File` an `-Arguments` list of more
+     than one value collapses into a single token.
+   - The wrapper runs the script from the repository root whatever the current
+     directory is, and passes the child's stderr through to yours — append your
+     shell's stderr redirect (`2>$null` in PowerShell, `2>/dev/null` in Bash)
+     when you only want the JSON.
+   - It prints one JSON object, `schemaVersion` `broken-engine-gaea2-python/v1`,
+     carrying `interpreter`, `pythonVersion`, the child's `exitCode`, its
+     `stdout` and `stderr` (each capped at 8192 characters, with `truncated` set
+     when cut), plus `status`, `code`, `message`:
      - `ok` (exit 0) — read the script's output from `stdout`.
-     - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+ interpreter, and nothing ran. Do not install anything: report to the user that Python is missing or too old, quoting `message`/`probeLine`, and — for `python.missing` — the `installCommand` the envelope carries as the suggested command for them to run (`installCommand` is null for a stale interpreter, which the user resolves by upgrading). Stop until they say it's installed.
-     - `python.script-failed` (exit 1) — the script ran and failed; its own code is in `exitCode` and its diagnostics in `stderr`.
-     - `script.not-found`, `probe.not-found`, `python.probe-failed`, `internal.error` (exit 1) — the dispatch itself failed; report `message`.
+     - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+
+       interpreter, and nothing ran. Do not install anything: report to the user
+       that Python is missing or too old, quoting `message`/`probeLine`, and —
+       for `python.missing` — the `installCommand` the envelope carries as the
+       suggested command for them to run (`installCommand` is null for a stale
+       interpreter, which the user resolves by upgrading). Stop until they say
+       it's installed.
+     - `python.script-failed` (exit 1) — the script ran and failed; its own code
+       is in `exitCode` and its diagnostics in `stderr`.
+     - `script.not-found`, `probe.not-found`, `python.probe-failed`,
+       `internal.error` (exit 1) — the dispatch itself failed; report `message`.
 
-2. Pick the log stream by how Gaea was invoked. Done when one log stream and its reader are chosen.
+2. Pick the log stream by how Gaea was invoked. Done when one log stream and its
+   reader are chosen.
 
    | Source of error | Log | How to read |
    |---|---|---|
@@ -56,18 +84,25 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
    | Caller pasted a specific log path | that path | `decode_gaea_err.py --log <path>` |
    | Caller pasted a base64 `ERR` payload | inline | `decode_gaea_err.py --blob <text>` |
 
-3. Decode the log. For the QuadSpinner log streams, dispatch the decoder through the step 1 wrapper. Done when one decoded ERR is in hand.
+3. Decode the log. For the QuadSpinner log streams, dispatch the decoder through
+   the step 1 wrapper. Done when one decoded ERR is in hand.
 
    ```powershell
    pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script decode_gaea_err.py -Arguments '--latest'"
    ```
 
-   - The decoder's output arrives in the envelope's `stdout` field: each ERR with its timestamp, trimmed to the exception line by default.
-   - Add `'--full'` to `-Arguments` only when the stack trace would actually help — Newtonsoft stack traces are noisy and the first two lines almost always name the problem.
-   - If `--latest` reports no ERR lines, the error may have come from an earlier session — list `*.txt` in the log dir by mtime and try the previous one.
-   - A DataPacker-invoked failure is a Swarm failure like any other: decode it with `--latest-swarm`.
+   - The decoder's output arrives in the envelope's `stdout` field: each ERR
+     with its timestamp, trimmed to the exception line by default.
+   - Add `'--full'` to `-Arguments` only when the stack trace would actually
+     help — Newtonsoft stack traces are noisy and the first two lines almost
+     always name the problem.
+   - If `--latest` reports no ERR lines, the error may have come from an earlier
+     session — list `*.txt` in the log dir by mtime and try the previous one.
+   - A DataPacker-invoked failure is a Swarm failure like any other: decode it
+     with `--latest-swarm`.
 
-4. Parse the exception. The decoded first line follows a predictable pattern. Done when all three of the extracted items below are in hand.
+4. Parse the exception. The decoded first line follows a predictable pattern.
+   Done when all three of the extracted items below are in hand.
 
    ```
    Newtonsoft.Json.JsonSerializationException:
@@ -82,7 +117,10 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
    - Type — the .NET enum/class that rejected the value
    - Value — what was written that Gaea didn't accept
 
-5. Find the valid value via shipping samples. Use `inspect_samples.py`, dispatched through the same wrapper, to ask three kinds of questions (its answer is in the envelope's `stdout`). Done when the valid value or shape is known.
+5. Find the valid value via shipping samples. Use `inspect_samples.py`,
+   dispatched through the same wrapper, to ask three kinds of questions (its
+   answer is in the envelope's `stdout`). Done when the valid value or shape is
+   known.
 
    ```powershell
    # What values does this enum actually accept?
@@ -95,7 +133,8 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
    pwsh -NoProfile -Command "& '.agents/skills/gaea2-shared/scripts/Invoke-Gaea2Python.ps1' -Script inspect_samples.py -Arguments '--ports','Combine'"
    ```
 
-   Other useful queries when the error is less specific — same command, different `-Arguments`:
+   Other useful queries when the error is less specific — same command,
+   different `-Arguments`:
 
    ```
    # Where does this property name appear and with what values?
@@ -105,20 +144,42 @@ The Gaea 2 UI reports failures with a vague modal ("File is corrupt or missing a
    -Arguments '--list-types'
    ```
 
-6. Apply the fix and re-save. Once you know the valid value, edit `Temp/<basename>.md` and re-run `/gaea2-save`. Then have the user retry the load in Gaea 2. If a second error appears, repeat from step 3 — Gaea fails fast on the first error, so subsequent issues only surface after the first is fixed. Done when the load succeeds in Gaea 2, or a second error has sent you back to step 3.
+6. Apply the fix and re-save. Once you know the valid value, edit
+   `Temp/<basename>.md` and re-run `/gaea2-save`. Then have the user retry the
+   load in Gaea 2. If a second error appears, repeat from step 3 — Gaea fails
+   fast on the first error, so subsequent issues only surface after the first is
+   fixed. Done when the load succeeds in Gaea 2, or a second error has sent you
+   back to step 3.
 
-7. Promote the finding. If the discovered constraint is durable (a stable enum value, a required field, a node-deactivation rule), add a one-liner to `../gaea2-shared/references/node-conventions.md` under the matching section — that's where future invocations look first, so a fix that escapes into docs avoids the next round-trip. Done when a durable constraint has been recorded there, or the constraint is not durable.
+7. Promote the finding. If the discovered constraint is durable (a stable enum
+   value, a required field, a node-deactivation rule), add a one-liner to
+   `../gaea2-shared/references/node-conventions.md` under the matching section —
+   that's where future invocations look first, so a fix that escapes into docs
+   avoids the next round-trip. Done when a durable constraint has been recorded
+   there, or the constraint is not durable.
 
 ## Rules
 
-- Suspected Gaea-version drift: dispatch the bundled `check_gaea_version.py` through the step 1 wrapper (`-Script check_gaea_version.py`, no arguments); `/gaea2-load` also runs it on every load.
-- Use the bundled [`decode_gaea_err.py`](../gaea2-shared/scripts/decode_gaea_err.py) for `ERR` payloads; its module documentation owns the payload format and truncation handling. Never hand-roll a decoder inline.
-- The shipping examples under `C:\Program Files\QuadSpinner\Gaea 2\Examples\` are the reliable reference. Trust them over UI labels and over documentation — the Gaea UI library browser shows "Sandy", "Rocky", "Colorful", but the JSON enum the serializer expects is `Sand` / (absent for Rocky) / `Color`. Discrepancies like this recur.
+- Suspected Gaea-version drift: dispatch the bundled `check_gaea_version.py`
+  through the step 1 wrapper (`-Script check_gaea_version.py`, no arguments);
+  `/gaea2-load` also runs it on every load.
+- Use the bundled
+  [`decode_gaea_err.py`](../gaea2-shared/scripts/decode_gaea_err.py) for `ERR`
+  payloads; its module documentation owns the payload format and truncation
+  handling. Never hand-roll a decoder inline.
+- The shipping examples under `C:\Program Files\QuadSpinner\Gaea 2\Examples\`
+  are the reliable reference. Trust them over UI labels and over documentation —
+  the Gaea UI library browser shows "Sandy", "Rocky", "Colorful", but the JSON
+  enum the serializer expects is `Sand` / (absent for Rocky) / `Color`.
+  Discrepancies like this recur.
 
 ### Confusable locations
 
-- `%APPDATA%\QuadSpinner\Gaea\Logs\` (without `2.0\`) is Gaea 1's log path. Different format, irrelevant to Gaea 2 errors.
-- If `2.0\Logs\` does not exist, Gaea 2 was never opened on this machine; if `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<Project>\` does not exist, no build has been attempted via the DataPacker pipeline.
+- `%APPDATA%\QuadSpinner\Gaea\Logs\` (without `2.0\`) is Gaea 1's log path.
+  Different format, irrelevant to Gaea 2 errors.
+- If `2.0\Logs\` does not exist, Gaea 2 was never opened on this machine; if
+  `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<Project>\` does not exist, no
+  build has been attempted via the DataPacker pipeline.
 
 ### Common error patterns
 
@@ -132,7 +193,8 @@ UI / compressed-log errors (decoded form):
 | No ERR line at all, but a node loads dashed/deactivated | Id < 100, missing `Version: 2`, required input port not wired, or graph-rejected enum | See `../gaea2-shared/references/node-conventions.md` |
 | ERR mentions `CompositeFailure` / a Swarm log | Build-time evaluation error, not a load error | Re-run with `--latest-swarm` |
 
-Headless / DataPacker-invoked Swarm errors (from the same `*-SWARM.txt` logs; the exit code comes from DataPacker's own bake failure):
+Headless / DataPacker-invoked Swarm errors (from the same `*-SWARM.txt` logs;
+the exit code comes from DataPacker's own bake failure):
 
 | Message | Likely cause | What this means |
 |---|---|---|

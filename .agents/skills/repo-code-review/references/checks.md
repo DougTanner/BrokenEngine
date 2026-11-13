@@ -8,12 +8,12 @@ the checks below say what to compare and what to flag.
 
 Apply every bullet of the conventions reference to the changed lines it reaches
 in PCH-backed code (Engine, game Projects, DataPacker, Common), and in `Tools/`
-C++ as well for a bullet
-that names the AgentTools. Report each violation as a hard flag, without the
-reachable-failure test above and regardless of the style exclusion under
-[Completeness and duplication](#completeness-and-duplication), except that the
-Workbuffer bullet is flagged only on the allocation-tracked Engine/Game paths
-that [Allocation-tracked paths and logging](#allocation-tracked-paths-and-logging)
+C++ as well for a bullet that names the AgentTools. Report each violation as a
+hard flag, without the reachable-failure test above and regardless of the style
+exclusion under [Completeness and duplication](#completeness-and-duplication),
+except that the Workbuffer bullet is flagged only on the allocation-tracked
+Engine/Game paths that
+[Allocation-tracked paths and logging](#allocation-tracked-paths-and-logging)
 covers.
 
 - [General logic and ownership](#general-logic-and-ownership)
@@ -66,17 +66,19 @@ the owning subsystem's established failure channel; there is no universal
 "never throw" or "catch everything" policy.
 
 - Network variable payload handlers parse into bounded local state before
-  applying destination state. `Client::Receive` (`/Engine/Source/Network/Client/Client.cpp`)
-  drops and logs one corrupt inbound packet; `Server::Receive` (`/Engine/Source/Network/Server/Server.cpp`)
-  additionally records the contract violation. Keep their handshake, budget,
-  and packet-specific policies distinct.
+  applying destination state. `Client::Receive`
+  (`/Engine/Source/Network/Client/Client.cpp`) drops and logs one corrupt
+  inbound packet; `Server::Receive` (`/Engine/Source/Network/Server/Server.cpp`)
+  additionally records the contract violation. Keep their handshake, budget, and
+  packet-specific policies distinct.
 - Invalid persisted grid data follows
   `engine::ReadGridSave` (`/Engine/Source/File/GridSave.cpp`):
   clear partial grid/fleet state, log, and return `false`; apply the global-ID
   counter only after the complete read succeeds.
 - Corrupt boot-required eager animation data follows
-  `LoadAnimationDataFromEagerChunks` (`/Engine/Source/Graphics/AnimationData.cpp`):
-  log the asset identity at `kError` and rethrow to the boot crash-report path.
+  `LoadAnimationDataFromEagerChunks`
+  (`/Engine/Source/Graphics/AnimationData.cpp`): log the asset identity at
+  `kError` and rethrow to the boot crash-report path.
 - For asynchronous per-chunk failures, trace the owning worker's published
   completion and waiter/progress contract before accepting any return, throw,
   or skip path. Runtime `.pack` chunk data halts on corruption
@@ -108,8 +110,8 @@ convention, whose preferred fixes are these, in order from best to last resort:
 - If the next operation fails immediately at the same location, the assertion
   is useless; require removal or make the invariant impossible at its source.
 - If the condition is externally reachable, require the trust boundary's
-  existing failure channel, selected from the subsystem policy above rather
-  than a blanket return or throw rule. Preserve progress and waiter notification.
+  existing failure channel, selected from the subsystem policy above rather than
+  a blanket return or throw rule. Preserve progress and waiter notification.
 - If failure would otherwise silently corrupt state, output, or determinism,
   the assertion may carry real diagnostic value.
 
@@ -125,8 +127,8 @@ user's decision under rule 75.
 ### Collections, persistence, and identity
 
 When a `Collection<T>` gains, loses, reorders, or changes a `* __restrict`
-column, load the authoritative
-`add-collection-member` (`../../add-collection-member/references/worker.md`) skill and verify its
+column, load the authoritative `add-collection-member`
+(`../../add-collection-member/references/worker.md`) skill and verify its
 complete live-variant checklist. Do not substitute a copied checklist here.
 Treat unresolved CRC membership, tuple order/subset, versioning, unconditional
 persistence, creation initialization, transfer, hydration, or identity behavior

@@ -70,14 +70,14 @@ accepted value at that tick; paused simulation applies it when ticks resume.
 Do not change singleton state while parallel cell ticks are reading it.
 
 Store the effective height in shared deterministic frame state, with its
-ordinary serialization, CRC, difference logging, and snapshot treatment.
-Frame input records the transition so reconciliation and replay use the
-historically correct value. The server seeds newly activated cells from the
-current accepted value; late joins, resubscriptions, and cell transfers must
-not restore the fixed default or revert an accepted setting.
-Render consumers use the height belonging to the displayed frame. Start a
-new session at the fixed default; do not add a separate user-settings persistence format.
-Saved simulation state and replay restore the recorded height.
+ordinary serialization, CRC, difference logging, and snapshot treatment. Frame
+input records the transition so reconciliation and replay use the historically
+correct value. The server seeds newly activated cells from the current accepted
+value; late joins, resubscriptions, and cell transfers must not restore the
+fixed default or revert an accepted setting. Render consumers use the height
+belonging to the displayed frame. Start a new session at the fixed default; do
+not add a separate user-settings persistence format. Saved simulation state and
+replay restore the recorded height.
 
 There is no generic simulation-value Tweaks bridge in the inspected code:
 `ServerSession::BuildAdvancingFrameInputs` currently processes owned-entity

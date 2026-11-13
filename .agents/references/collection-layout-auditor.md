@@ -1,8 +1,8 @@
 # Collection-Layout Auditor
 
-`.agents/scripts/Invoke-CollectionLayoutCheck.ps1` owns the mechanical sweeps over SOA
-collection headers. It audits only: it never writes, generates, or repairs
-header text. Never reconstruct these operations inline.
+`.agents/scripts/Invoke-CollectionLayoutCheck.ps1` owns the mechanical sweeps
+over SOA collection headers. It audits only: it never writes, generates, or
+repairs header text. Never reconstruct these operations inline.
 
 ## Sweeps
 

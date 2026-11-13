@@ -1,11 +1,20 @@
 # Puffs - Controlled Smoke Sprites
 
-Client-only stationary smoke puffs are fire-and-forget controlled quads. Consumers register puff types and controllers; this collection has no owner-driven sync path.
+Client-only stationary smoke puffs are fire-and-forget controlled quads.
+Consumers register puff types and controllers; this collection has no
+owner-driven sync path.
 
 ## Invariants
 
-- Puff lifetime and animation live in Interpolate; the paired PostRender collection holds only the standard lifecycle column, maintains phase compatibility, and expires controlled rows.
-- Area and intensity wrappers are read during every controller update, so wrapper changes affect existing puffs. Rotation is not wrapper-scaled.
-- `PersistentMembers()` copies type/controller/start-time metadata between frames, while animated values are derived again and position is carried forward unchanged.
-- A future start time holds the puff at its first keyframe, supporting delayed secondary effects.
-- Rendered puffs are culled, weighted between the flight planes bracketing their height, and projected to each weighted plane before depositing smoke.
+- Puff lifetime and animation live in Interpolate; the paired PostRender
+  collection holds only the standard lifecycle column, maintains phase
+  compatibility, and expires controlled rows.
+- Area and intensity wrappers are read during every controller update, so
+  wrapper changes affect existing puffs. Rotation is not wrapper-scaled.
+- `PersistentMembers()` copies type/controller/start-time metadata between
+  frames, while animated values are derived again and position is carried
+  forward unchanged.
+- A future start time holds the puff at its first keyframe, supporting delayed
+  secondary effects.
+- Rendered puffs are culled, weighted between the flight planes bracketing their
+  height, and projected to each weighted plane before depositing smoke.

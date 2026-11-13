@@ -88,7 +88,12 @@ void NetworkDiscoveryScanner::Poll()
 
 bool NetworkDiscoveryScanner::IsScanning()
 {
-	if (!(mFlags & DiscoveryScannerFlags::kStarted) || (mFlags & DiscoveryScannerFlags::kFound))
+	if (!(mFlags & DiscoveryScannerFlags::kStarted))
+	{
+		return false;
+	}
+
+	if (mFlags & DiscoveryScannerFlags::kFound)
 	{
 		return false;
 	}

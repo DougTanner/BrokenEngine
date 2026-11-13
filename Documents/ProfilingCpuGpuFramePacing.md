@@ -10,13 +10,14 @@ ignored `Temp/` are not required or guaranteed to exist in a fresh worktree.
 
 Give the next session the symptom, reproduction controls, source/build hashes,
 current process identities, measurement QPC bounds/frequency, artifact root,
-largest exact present intervals, settled causes, and remaining unknowns. Separate
-successful capture, successful diagnosis, and verified performance improvement.
+largest exact present intervals, settled causes, and remaining unknowns.
+Separate successful capture, successful diagnosis, and verified performance
+improvement.
 
-All game claims, launches, driving, state queries, screenshots, logs, and releases
-go through `/agent-harness`. Read that skill's current workflow; this document
-does not replace its ownership or persisted-state preservation contract. Obtain
-matching `/compile` receipts for `BrokenEngineSandbox` and
+All game claims, launches, driving, state queries, screenshots, logs, and
+releases go through `/agent-harness`. Read that skill's current workflow; this
+document does not replace its ownership or persisted-state preservation
+contract. Obtain matching `/compile` receipts for `BrokenEngineSandbox` and
 `BrokenEngineSandboxServer`, `Profile|x64`, for the sources being measured. Save
 both EXE/PDB pairs before another build overwrites them. A build with diagnostic
 probes and a build with a production fix are distinct experiments.
@@ -32,7 +33,8 @@ Preserve initial persisted-state presence, bytes and hashes before any writers;
 retain changed runtime output, then restore originals only after final writers
 stop. Release the viewer pin, exact owned game PIDs and harness claim. Keep full
 startup through measurement-end logs, not just the selected window: startup
-recovery, recreation, and process-lifetime logging budgets affect interpretation.
+recovery, recreation, and process-lifetime logging budgets affect
+interpretation.
 
 Enumerate every persisted-state writer and its actual redirected path, including
 `GameSettings.bin` (language/font scale), beyond graphics/client-state backups.
@@ -42,11 +44,11 @@ not recreate a fresh font atlas. Use a fresh process for an atlas baseline.
 ## 1. Establish the application presentation baseline
 
 Record fullscreen geometry, native resolution/refresh, focus/visibility, driver
-and GPU, user-confirmed G-SYNC/VSync settings, network simulation (the successful
-case used default disabled/zero), scene and workload identity, and any FPS cap.
-Use the same controls between runs. Do not introduce a guessed cap to hide a
-cadence problem. Focus loss invalidates the controlled window; record it rather
-than recovering focus silently during measurement.
+and GPU, user-confirmed G-SYNC/VSync settings, network simulation (the
+successful case used default disabled/zero), scene and workload identity, and
+any FPS cap. Use the same controls between runs. Do not introduce a guessed cap
+to hide a cadence problem. Focus loss invalidates the controlled window; record
+it rather than recovering focus silently during measurement.
 
 Discover installed tools once and retain their versions/help. These discovery
 commands do not trace or launch the game:
@@ -71,9 +73,9 @@ Get-Item $Pwsh,$Wpr,$Xperf,$Tracerpt,$PresentMon,$Llvm |
 ```
 
 The working capture used ADK WPT 10.0.26100.7705 and PresentMon 2.6.0 on
-2026-10-19; these are provenance, not required latest versions. Confirm installed
-flags and the profile's actual providers before reuse. Do not hardcode a
-versioned WindowsApps PowerShell path or a previous run's PID.
+2026-10-19; these are provenance, not required latest versions. Confirm
+installed flags and the profile's actual providers before reuse. Do not hardcode
+a versioned WindowsApps PowerShell path or a previous run's PID.
 
 For a standalone 60-second baseline, set `$GamePid` from the current harness
 process receipt and `$RunRoot` to a fresh artifact directory. `$PID` is a
@@ -93,14 +95,15 @@ if ($LASTEXITCODE -ne 0) { throw 'PresentMon failed; retain its output' }
 ```
 
 Retain every raw row. Group by current PID/swapchain, sort raw `QPCTime`, and
-compute consecutive differences: `gap_ms = (q[i]-q[i-1])*1000/frequency`.
-The first row has no captured predecessor. Report median, p95/p99 with the
-quantile convention, maxima, threshold counts, and exact endpoints. Define
-whether a boundary-straddling interval belongs to its ending present or is
-excluded. API duration, application inter-present interval, queued presentation,
-flip and physical scanout are different observations. A low `Present` API time
-can coexist with delayed issuance. Disabled display/GPU tracking cannot measure
-panel scanout. See the [PresentMon project](https://github.com/GameTechDev/PresentMon).
+compute consecutive differences: `gap_ms = (q[i]-q[i-1])*1000/frequency`. The
+first row has no captured predecessor. Report median, p95/p99 with the quantile
+convention, maxima, threshold counts, and exact endpoints. Define whether a
+boundary-straddling interval belongs to its ending present or is excluded. API
+duration, application inter-present interval, queued presentation, flip and
+physical scanout are different observations. A low `Present` API time can
+coexist with delayed issuance. Disabled display/GPU tracking cannot measure
+panel scanout. See the
+[PresentMon project](https://github.com/GameTechDev/PresentMon).
 
 ## 2. Split CPU phases before expanding instrumentation
 
@@ -108,8 +111,8 @@ Use deferred steady-clock nanosecond endpoints around the actual operations:
 main-loop reset, render entry/return, current fence status/wait, conditional
 all-framebuffer drain, mutation, worker publication/entry/callback return,
 present/future join, tail image acquire, next-loop input and network drain.
-Record owner TID, sequence, framebuffer slot, actual native result, and lifecycle
-identity. Keep normal synchronization and call order unchanged. An
+Record owner TID, sequence, framebuffer slot, actual native result, and
+lifecycle identity. Keep normal synchronization and call order unchanged. An
 `Acquire to global` timer can start on main and stop on a worker; its recorded
 thread is not automatically the main thread.
 
@@ -136,13 +139,14 @@ that threshold on completed emitter paths while budget remains; exceptions can
 escape before emission. Join successful acquire only to the actual following
 same-thread matching-slot render in its lifecycle, not the just-presented frame.
 
-Legacy completion history was filtered at 8 ms, retained only 64 entries, eligible
-for 250 ms, printed at most 24 rows, and dumped at least 500 ms apart. Main/worker
-logs also had 500 ms rate limiting. Later probes allowed 256 spikes and 64 dumps;
-earlier runs had smaller budgets. Recheck compiled gates and footer predicates:
-a stale `dump_cap` comparison at 16 falsely declared exhaustion although the
-actual gate was 64 and later dumps existed. No explicit cap does not mean full
-history. Missing samples mean unretained work, not zero work.
+Legacy completion history was filtered at 8 ms, retained only 64 entries,
+eligible for 250 ms, printed at most 24 rows, and dumped at least 500 ms apart.
+Main/worker logs also had 500 ms rate limiting. Later probes allowed 256 spikes
+and 64 dumps; earlier runs had smaller budgets. Recheck compiled gates and
+footer predicates: a stale `dump_cap` comparison at 16 falsely declared
+exhaustion although the actual gate was 64 and later dumps existed. No explicit
+cap does not mean full history. Missing samples mean unretained work, not zero
+work.
 
 Bracket diagnostic formatting/output separately: each owner records
 `emit_begin_ns` plus the previous actual emission's begin/end. The current end
@@ -159,20 +163,23 @@ alignment. Native submit/wait CPU elapsed is not GPU execution time.
 ## 3. Reproduce streaming with lifecycle proof
 
 Use existing `/agent-harness` `set_client_grid_coord` with `coord:[q,r]` to pin
-the observed initial viewer cell before measurement, switch to a distinct target,
-then return. The camera keeps tracking the owned entity and does not move to the
-target cell. The controlled log runs used 20 seconds per phase (60 total), two timed setters
-and zero timed queries. Record actual dispatch and acknowledgement UTC/QPC
-brackets, not nominal 20/40-second boundaries. Choose duration with the
-existing 300-render-frame eviction grace and references in mind: elapsed wall
-time or setter acknowledgement does not prove eviction/subscription completion.
-Release the pin through the harness after measurement.
+the observed initial viewer cell before measurement, switch to a distinct
+target, then return. The camera keeps tracking the owned entity and does not
+move to the target cell. The controlled log runs used 20 seconds per phase (60
+total), two timed setters and zero timed queries. Record actual dispatch and
+acknowledgement UTC/QPC brackets, not nominal 20/40-second boundaries. Choose
+duration with the existing 300-render-frame eviction grace and references in
+mind: elapsed wall time or setter acknowledgement does not prove
+eviction/subscription completion. Release the pin through the harness after
+measurement.
 
 A setter acknowledgement proves only the local pin. Before timing, verify server
 admission and client subscribed cells/cell states against the current owned
 fleet. Historical coordinates may now be rejected as the fleet moves; repeating
-the old coordinate/timing sequence then measures a different scene. Origin is exempt from the adjacency check; verify actual admission because slot
-allocation can still fail. Also verify live ownership, camera and scene controls. Keep setup queries outside the measured window.
+the old coordinate/timing sequence then measures a different scene. Origin is
+exempt from the adjacency check; verify actual admission because slot allocation
+can still fail. Also verify live ownership, camera and scene controls. Keep
+setup queries outside the measured window.
 
 Prove the resource chain from records, not camera motion:
 
@@ -196,12 +203,13 @@ transfers/fallbacks, evictions, restorations, mesh uploads, indirect clears and
 reblur; CPU promotion alone is not a GPU mutation.
 
 The diagnostic contracts were 256 drain rows, 256 sweeps per site, 256 adoption
-summaries per context, 1024 shared adoption details, 1024 shared residency details,
-and 1024 upload rows. These budgets survive graphics/upload-manager recreation;
-they have no reset command. Track observed/emitted/suppressed and final cap rows.
-After exhaustion, matching summary counts cannot recover missing CRC identities.
-Every family has its own emission chain. Exact timer/probe presence must be
-verified in the measured source/build rather than assumed from this document.
+summaries per context, 1024 shared adoption details, 1024 shared residency
+details, and 1024 upload rows. These budgets survive graphics/upload-manager
+recreation; they have no reset command. Track observed/emitted/suppressed and
+final cap rows. After exhaustion, matching summary counts cannot recover missing
+CRC identities. Every family has its own emission chain. Exact timer/probe
+presence must be verified in the measured source/build rather than assumed from
+this document.
 
 For streaming/settled cohorts, retain final submit, fence, adoption and mutation
 endpoints separately; the latest relevant local completion defines settling.
@@ -220,18 +228,20 @@ ReadyThread and stacks, DxgKrnl queue/present events, context rundown and the
 explicit hardware scheduling log collector. Built-in `GPU.Light` on this machine
 omitted that dedicated scheduler keyword; CPU-only profiles cannot reconstruct
 GPU chronology. Verify the resolved installed profile rather than guessing from
-the word Light. See [GPUView](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-gpuview).
+the word Light. See
+[GPUView](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-gpuview).
 
 The successful experiment used one continuous 30-second recording: 10 seconds
-stationary, 10 outward, 10 return, after the recording receipt. Derive PresentMon
-offline from this ETL; do not add a simultaneous live PresentMon consumer.
+stationary, 10 outward, 10 return, after the recording receipt. Derive
+PresentMon offline from this ETL; do not add a simultaneous live PresentMon
+consumer.
 
 Kernel/profile collection required an elevated trace controller. The ordinary
 token's actual WPR start failed with `0xc5585011`; Performance Log Users
 membership alone was insufficient here. Obtain the user's normal Windows UAC
 approval for the controller; keep the game/harness ordinary-token. Do not change
-policy, seek a bypass, or elevate the game. Discover `$Pwsh` as above if launching
-an elevated shell; never reuse the old WindowsApps version path.
+policy, seek a bypass, or elevate the game. Discover `$Pwsh` as above if
+launching an elevated shell; never reuse the old WindowsApps version path.
 
 Only the controller invokes WPR. Use a fresh absent `$RunRoot` and unique
 `$Instance` for every attempt. The following are the working native commands,
@@ -265,8 +275,8 @@ try {
 
 `-instancename` is last on every named control command. Never use global
 cancel/stop, `xperf -d`, or GPUView `log.cmd` as recovery. Preserve any native
-failure; stop only a successfully started instance owned by this controller.
-See [WPR commands](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/wpr-command-line-options).
+failure; stop only a successfully started instance owned by this controller. See
+[WPR commands](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/wpr-command-line-options).
 
 For coordination with a separate runtime worker, implement this small receipt
 protocol in the capture controller or perform its steps manually with the same
@@ -296,9 +306,11 @@ before/prestart/after inventory; a snapshot is not a lock against other tools.
 Do not infer conflict from broad name regexes: `wPr` inside
 `DefenderApiLoggerLowPriv` caused a false rejection. Nor does any existing
 `NT Kernel Logger` prove incompatibility with an instance-qualified system
-collector. Native named start decides compatibility; it never authorizes stopping
-foreign sessions. See Microsoft's [instance naming explanation](https://devblogs.microsoft.com/performance-diagnostics/controlling-the-event-session-name-with-the-instance-name/)
-and [StartTrace system logger rules](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-starttracew).
+collector. Native named start decides compatibility; it never authorizes
+stopping foreign sessions. See Microsoft's
+[instance naming explanation](https://devblogs.microsoft.com/performance-diagnostics/controlling-the-event-session-name-with-the-instance-name/)
+and
+[StartTrace system logger rules](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-starttracew).
 
 ## 5. Export, validate clocks, and reconstruct CPU states
 
@@ -319,14 +331,15 @@ $Etl = Join-Path $RunRoot 'hitch.etl'
 
 Require zero event/buffer loss, usable presents, and actual CPU/GPU event-family
 coverage before precise attribution. A tracerpt schema warning needs per-family
-inspection of `EventData` versus `ProcessingErrorData`, not blanket acceptance or
-rejection. Keep original ETL and raw XML for undecoded payloads and arrays.
+inspection of `EventData` versus `ProcessingErrorData`, not blanket acceptance
+or rejection. Keep original ETL and raw XML for undecoded payloads and arrays.
 
 Read the ETL clock mode and frequency from retained header/summary. Verify
 PerfCounter before treating `TimeCreated/@RawTime` as QPC. Match at least two
-same-PID present-start events to exact PresentMon QPC values. Do not guess epochs
-or treat xperf's rounded trace-relative microseconds as absolute QPC. Retain UTC
-and `Stopwatch.GetTimestamp()/Frequency` brackets at capture and phase boundaries.
+same-PID present-start events to exact PresentMon QPC values. Do not guess
+epochs or treat xperf's rounded trace-relative microseconds as absolute QPC.
+Retain UTC and `Stopwatch.GetTimestamp()/Frequency` brackets at capture and
+phase boundaries.
 
 For multi-GB XML, use `.NET XmlReader` streaming: advance to each `Event`, read
 one outer XML element, parse its namespace-aware System/EventData, emit compact
@@ -365,9 +378,9 @@ equality. The successful analysis used a preceding stack within 50 microseconds;
 the first three decisive stacks preceded switch-out by about 5 microseconds.
 Do not silently assign a stack to switch-outs lacking a usable match.
 
-Symbolize against the retained matching EXE/PDB, with ETW image-load/rundown base
-and source version/hash. Address minus actual loaded module base is the RVA;
-ASLR means an old base is invalid. The working LLVM invocation was:
+Symbolize against the retained matching EXE/PDB, with ETW image-load/rundown
+base and source version/hash. Address minus actual loaded module base is the
+RVA; ASLR means an old base is invalid. The working LLVM invocation was:
 
 ```powershell
 # Fill from the current image/rundown and selected application stack addresses.
@@ -395,11 +408,11 @@ Compute `RVA = captured_address - loaded_base`, then disassembly address =
 preferred base + RVA. With the installed VS `dumpbin`, use `/disasm` and a
 bounded `/range:start,end` around that address; align decoding before the call.
 Treat a caller stack address as a return address: identify the immediately
-preceding call, trace its indirect target through the PDB-named function pointer,
-and check arguments and instruction length. Keep hashes and native output.
-For example, RVA `0x2b181e` mapped to `0x1402b181e`; `call rax` at `0x1402b181c`
-loaded `vkQueueSubmit`. This settled the observed 36.476 ms block as submit,
-not the following `vkWaitForFences`, whose return RVA was `0x2b1885`.
+preceding call, trace its indirect target through the PDB-named function
+pointer, and check arguments and instruction length. Keep hashes and native
+output. For example, RVA `0x2b181e` mapped to `0x1402b181e`; `call rax` at
+`0x1402b181c` loaded `vkQueueSubmit`. This settled the observed 36.476 ms block
+as submit, not the following `vkWaitForFences`, whose return RVA was `0x2b1885`.
 
 ## 6. Reconstruct GPU ownership and actual execution
 
@@ -427,17 +440,18 @@ packet or a short CPU submit is not proof of GPU execution. See Microsoft's
 Assign queue roles by joining native submission marker brackets to QueuePacket
 events on the actual submitting TID; retain all candidates and require a unique
 match before naming a packet. Join completion by the observed context/sequence/
-packet identity, or hardware queue/progress fence for 450/451. Use this adapter's
-NodeMetadata to identify 3D/COPY nodes: a Vulkan transfer-family index does not
-identify a WDDM copy node. The first-batch asynchronous uploads actually ran on a
-3D node. Queued-to-complete latency includes preceding work and synchronization;
-even a completion near CPU readiness does not isolate that upload's GPU cost.
+packet identity, or hardware queue/progress fence for 450/451. Use this
+adapter's NodeMetadata to identify 3D/COPY nodes: a Vulkan transfer-family index
+does not identify a WDDM copy node. The first-batch asynchronous uploads
+actually ran on a 3D node. Queued-to-complete latency includes preceding work
+and synchronization; even a completion near CPU readiness does not isolate that
+upload's GPU cost.
 
 For HAGS SchedulingLog payloads, the working decoder checked hex byte length
-against `SchedulingLogSize` and divisibility by 32. Each little-endian entry used
-GPU timestamp UInt64 at offset 0, operation UInt32 at 8, context UInt64 at 16,
-and state UInt32 at 24. Only operation 0 (context state change) occurred here;
-do not decode other operations as that union member. For each owning log:
+against `SchedulingLogSize` and divisibility by 32. Each little-endian entry
+used GPU timestamp UInt64 at offset 0, operation UInt32 at 8, context UInt64 at
+16, and state UInt32 at 24. Only operation 0 (context state change) occurred
+here; do not decode other operations as that union member. For each owning log:
 
 ```text
 QPC = CpuTimestamp0 + (GPU - GpuTimestamp0)
@@ -458,14 +472,16 @@ coverage rather than inferring copy-engine idleness from unrelated contexts.
 Never sum mirrored queue roots or unrelated/nested scopes. No precision bound
 for the driver's calibration was established.
 
-The [entry layout](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_scheduling_log_entry),
+The
+[entry layout](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_scheduling_log_entry),
 [context state change](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_scheduling_log_context_state_change)
-and [state meanings](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ne-d3dkmddi-_dxgk_scheduling_log_context_state)
-define RUNNING as executing and IDLE as no pending work on that context.
-These states do not name a Vulkan command buffer, resource CRC, or frame
-generation. Correlate CPU waits, owned execution, queued progress and next
-present independently. If the driver/profile lacks decodable scheduling data,
-return GPU attribution unresolved rather than inventing a reconstruction.
+and
+[state meanings](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ne-d3dkmddi-_dxgk_scheduling_log_context_state)
+define RUNNING as executing and IDLE as no pending work on that context. These
+states do not name a Vulkan command buffer, resource CRC, or frame generation.
+Correlate CPU waits, owned execution, queued progress and next present
+independently. If the driver/profile lacks decodable scheduling data, return GPU
+attribution unresolved rather than inventing a reconstruction.
 
 ## Optional separate experiment: PCIe counters
 
@@ -492,8 +508,9 @@ finally: nvmlShutdown(); retain init/handle/query/shutdown codes and process exi
 ```
 
 The width exports above have the same `nvmlDevice` prefix and `(device, &value)`
-arguments. Check handle acquisition before querying; preserve failures as missing
-readings. Query current generation/width under load, alongside maximum capability.
+arguments. Check handle acquisition before querying; preserve failures as
+missing readings. Query current generation/width under load, alongside maximum
+capability.
 [NVML](https://docs.nvidia.com/deploy/nvml-api/latest/api/group__nvmlDeviceQueries.html)
 reports KB/s over a 20 ms driver window; the KB base and precise internal window
 endpoints are unspecified. RX/TX are serial observations, not a joint sample.
@@ -504,8 +521,9 @@ and was not a matched A/B test. Retain per-query latency, actual spacing and
 missing windows; a deadline checked between samples cannot interrupt a native
 call. Buffer output rather than printing every sample. Sparse GPU-wide samples
 cannot attribute game traffic, integrate unseen transfers, or establish bus
-saturation or its absence. Successful measurement also does not establish runtime
-health, a universal stutter cause, a driver-reset cause, or fix performance.
+saturation or its absence. Successful measurement also does not establish
+runtime health, a universal stutter cause, a driver-reset cause, or fix
+performance.
 
 If sampling runs in a separate helper process, retain its actual numeric exit
 code in a terminal receipt before the launching shell loses the process handle,
@@ -517,14 +535,15 @@ boundary, so retain that uncertainty when comparing active and settled samples.
 
 ## 7. Preserve the evidence and state the limits
 
-Keep original ETL, raw XML, tool versions/help/profile, trace stats and warnings,
-all receipts/inventories, current PID/TID/process-start identities, both matching
-EXE/PDB pairs, source hashes/revisions, settings, full logs, phase anchors and
-focus checks. Hash retained artifacts with `Get-FileHash -Algorithm SHA256`.
-Compact outputs should retain exact gap endpoints, per-thread state segments,
-stack associations/RVAs/source lines, per-family schema counts/examples, GPU
-handle maps, calibration pairs, context intervals, and nearby queue/present/flip
-chronology. Derived summaries never replace the raw trace.
+Keep original ETL, raw XML, tool versions/help/profile, trace stats and
+warnings, all receipts/inventories, current PID/TID/process-start identities,
+both matching EXE/PDB pairs, source hashes/revisions, settings, full logs, phase
+anchors and focus checks. Hash retained artifacts with
+`Get-FileHash -Algorithm SHA256`. Compact outputs should retain exact gap
+endpoints, per-thread state segments, stack associations/RVAs/source lines,
+per-family schema counts/examples, GPU handle maps, calibration pairs, context
+intervals, and nearby queue/present/flip chronology. Derived summaries never
+replace the raw trace.
 
 Accept a causal explanation only when independently timed evidence agrees.
 Do not claim every hitch has one cause, resource upload overlap proves a
@@ -553,13 +572,13 @@ receipt-bound harness launch; copying EXEs into current Output is not a launch
 override.
 
 Record diagnostic asymmetry and actual texture events: old sampled upload stacks
-do not establish WantCreate versus WantUpdates, update rectangles or exact glyphs.
-On the instrumented side, retain status, rectangle, image/descriptor identity,
-generation and event bounds. Match event-associated waits and present gaps,
-rather than average FPS or a worst interval from an unmatched historical scene.
-Restart for independent fresh-glyph repetitions; typing cached glyphs again is
-not a repeat of atlas growth. Keep forced-growth triggers disabled equally and
-screenshots outside measurement.
+do not establish WantCreate versus WantUpdates, update rectangles or exact
+glyphs. On the instrumented side, retain status, rectangle, image/descriptor
+identity, generation and event bounds. Match event-associated waits and present
+gaps, rather than average FPS or a worst interval from an unmatched historical
+scene. Restart for independent fresh-glyph repetitions; typing cached glyphs
+again is not a repeat of atlas growth. Keep forced-growth triggers disabled
+equally and screenshots outside measurement.
 
 The later matched-after attempt captured two real WantUpdates but its old
 initial/return cell was rejected. Its valid trace and readable UI therefore
@@ -568,21 +587,22 @@ and input procedures are preparation, not evidence of a successful comparison.
 
 ## Worked example: the ImGui queue stall, 2026-10-19
 
-The elevated GPUView.Light capture succeeded: a 30.0194908-second runtime driver,
-2159 offline PresentMon rows (2138 in the measured window), zero event/buffer
-loss, PerfCounter at 10 MHz, and two exact raw DXGI/PresentMon QPC matches. The
-ETL covered a slightly wider interval than the runtime driver. Those checks
-settled clock alignment and coverage before causal analysis.
+The elevated GPUView.Light capture succeeded: a 30.0194908-second runtime
+driver, 2159 offline PresentMon rows (2138 in the measured window), zero
+event/buffer loss, PerfCounter at 10 MHz, and two exact raw DXGI/PresentMon QPC
+matches. The ETL covered a slightly wider interval than the runtime driver.
+Those checks settled clock alignment and coverage before causal analysis.
 
 The worst application interval was 29.4364 ms. Main ran for 0.5855 ms, was ready
 for 0.2206 ms, and waited for 28.6303 ms. Four clipped waits totaling 28.3002 ms
-(96.14% of the interval) had matched switch stacks resolving through the retained
-EXE/PDB to `ImGui_ImplVulkan_UpdateTexture:965`, at `vkQueueWaitIdle(v->Queue)`.
-The chain continued through RenderDrawData, ImGuiManager::Submit and the main
-render path. Independently, the owned node-0 client GPU context was RUNNING for
-27.584 ms, with earlier queued work completing near the gap's end. The main
-producer was draining a busy graphics queue in the ImGui texture update path;
-sustained CPU execution or runnable scheduling delay did not explain this gap.
+(96.14% of the interval) had matched switch stacks resolving through the
+retained EXE/PDB to `ImGui_ImplVulkan_UpdateTexture:965`, at
+`vkQueueWaitIdle(v->Queue)`. The chain continued through RenderDrawData,
+ImGuiManager::Submit and the main render path. Independently, the owned node-0
+client GPU context was RUNNING for 27.584 ms, with earlier queued work
+completing near the gap's end. The main producer was draining a busy graphics
+queue in the ImGui texture update path; sustained CPU execution or runnable
+scheduling delay did not explain this gap.
 
 The source branch handled both WantCreate and WantUpdates. Font-atlas activity
 was likely from source evidence, but texture/status/update rectangle and actual
@@ -594,6 +614,6 @@ session; runtime performance verification was still pending when this account
 was written, so this is a successful diagnosis, not a claim of a verified fix.
 
 Optional historical evidence was in ignored `Temp/NvidiaFramePacing/` files
-`etw-cpu-diagnosis.md`, `etw-gpu-diagnosis.md` and `etw-run2-handoff.md`, with the
-original trace and retained binaries beside them. These are provenance only;
+`etw-cpu-diagnosis.md`, `etw-gpu-diagnosis.md` and `etw-run2-handoff.md`, with
+the original trace and retained binaries beside them. These are provenance only;
 future sessions must produce fresh artifacts using the contracts above.

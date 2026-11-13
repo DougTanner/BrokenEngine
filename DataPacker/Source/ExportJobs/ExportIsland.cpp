@@ -637,9 +637,9 @@ std::string ExportIsland::GetTextureFingerprint() const
 bool ExportIsland::AreTextureOutputsPresent() const
 {
 	static constexpr const char* kpcOutputs[] = {kpcIslandAmbientOcclusion, kpcIslandColor, kpcIslandMasks, kpcIslandNormals};
-	return std::ranges::all_of(kpcOutputs, [this](const char* const& pcOutput)
+	return std::ranges::all_of(kpcOutputs, [this](std::string_view output)
 	{
-		return std::filesystem::is_regular_file(mInputPath / pcOutput);
+		return std::filesystem::is_regular_file(mInputPath / output);
 	});
 }
 

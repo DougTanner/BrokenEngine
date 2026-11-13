@@ -140,9 +140,9 @@ percent.
    - End by flagging each fix whose change is large (more than 100 changed
      lines or more than 5 files) and whose gain is small (its targeted item
      improved by less than 5 percent) or unmeasured.
-7. Continue the Change Workflow with its Verify the acceptance table and
-   Verify and land steps, where `/finalize-changes` still requires the user's
-   landing confirmation. Done when `/finalize-changes` has returned or the user has
+7. Continue the Change Workflow with its Verify the acceptance table and Verify
+   and land steps, where `/finalize-changes` still requires the user's landing
+   confirmation. Done when `/finalize-changes` has returned or the user has
    declined landing.
 
 ### vcperf calls

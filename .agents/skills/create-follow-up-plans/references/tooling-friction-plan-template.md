@@ -28,37 +28,44 @@ ref whose tree actually contains this Plan:
 - Observed in an earlier session: <omit this line entirely when the session
   recording this Plan is the session that observed the friction. Otherwise
   state that the fields above are the observing session's, and give that
-  session's landed commit or branch — required on Codex, whose transcript
-  discovery needs the commit window around it.>
+  session's landed commit hash, never its branch, which worktree reuse moves
+  past the landing — required on Codex, whose transcript discovery needs the
+  commit window around it.>
 - Landing ref: <a ref whose tree contains this Plan; never assume the session
   branch above contains it. When the observing session records and lands the
-  Plan itself: the session branch above, whose tip is that session's final
-  commit and which survives exactly as long as the worktree recorded above.
-  When a later session records it: that later session's landing commit hash or
-  session branch, because the branch above was landed before this Plan
-  existed.>
-  Fallback once the recorded ref is gone:
-  `git log --follow --diff-filter=A --format=%H -- <this plan path>`, but a periodic
-  Plan-history squash can make it return an unrelated aggregate commit, so
-  review its result only when the commit is attributable to one session alone
-  (its diff limited to that session's files); never review an aggregate or
-  multi-session squash commit.
+  Plan itself: the session branch above, which survives exactly as long as the
+  worktree recorded above. When a later session records it: that later
+  session's landing commit hash or session branch, because the branch above was
+  landed before this Plan existed.>
+  The review ref the invoker passes to /next-plan-review has two cases. When
+  the `Observed in an earlier session` line is present, it is that line's
+  landed commit hash, with no lookup. When that line is absent, the recording
+  session is the observing session, and worktree reuse moves its branch past
+  its landing, so the invoker never reviews the ref itself: it resolves the ref
+  to the commit that added this Plan with
+  `git log --follow --diff-filter=A -n 1 --format=%H <ref> -- <this plan path>`
+  and passes that commit. When the recorded ref is gone or that command prints
+  nothing (a later session moved this Plan), it runs the same command with
+  `<ref>` omitted. A periodic Plan-history squash can make either command
+  return an unrelated aggregate commit, and a landing that also deletes a
+  similar file can make it return another session's commit, so review the
+  result only when the commit is attributable to the observing session recorded
+  above alone (its diff limited to that session's files); never review an
+  aggregate or multi-session squash commit.
 - Run the review before /cleanup-worktrees removes the worktree recorded above:
   Codex transcript discovery requires the producing worktree to remain
   registered, and Claude review requires the exact conversation session ID
   above.
 
 ## Design
-First root-cause the friction from the current tree and this Plan's `## Context`.
-Only when the transcript is genuinely needed, in a new session run
-`/next-plan-review <review ref>` in bounded friction mode — the commit or branch
-on the `Observed in an earlier session` line when that line is present, otherwise
-the landing ref — supplying the recorded client and, on Claude, the recorded
-conversation session ID; a Codex review supplies the client and that review ref
-only. Then make the smallest fix inside the
-`## In scope` boundary below. If
-root-causing shows the fix lies outside that boundary, surface it for
-re-planning instead of expanding scope.
+First root-cause the friction from the current tree and this Plan's
+`## Context`. Only when the transcript is genuinely needed, in a new session run
+`/next-plan-review <review ref>` in bounded friction mode, with the review ref
+the provenance block above defines, supplying the recorded client and, on
+Claude, the recorded conversation session ID; a Codex review supplies the
+client and that review ref only. Then make the smallest fix inside the
+`## In scope` boundary below. If root-causing shows the fix lies outside that
+boundary, surface it for re-planning instead of expanding scope.
 
 ## Critical files
 - <each concrete SKILL.md and/or script file involved — these files are the

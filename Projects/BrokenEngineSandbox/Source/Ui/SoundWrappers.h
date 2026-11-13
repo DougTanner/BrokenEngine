@@ -7,37 +7,40 @@
 namespace game
 {
 
-extern engine::Wrapper gOmniBlasterVolume;
-extern engine::Wrapper gOmniBlasterPitchMinimum;
-extern engine::Wrapper gOmniBlasterPitchRandom;
+// Volume defaults are the tuned per-channel mix; adjust each one via the Sound Tweaks tab.
+// Pitch defaults are real (pitch=0 would be silent-DC, not zero-volume).
 
-extern engine::Wrapper gFighterBlasterVolume;
-extern engine::Wrapper gFighterBlasterPitchMinimum;
-extern engine::Wrapper gFighterBlasterPitchRandom;
+inline engine::Wrapper gOmniBlasterVolume(0.1f, 0.0f, 0.2f);
+inline engine::Wrapper gOmniBlasterPitchMinimum(0.75f, 0.5f, 1.5f);
+inline engine::Wrapper gOmniBlasterPitchRandom(0.5f, 0.0f, 1.0f);
+
+inline engine::Wrapper gFighterBlasterVolume(0.1f, 0.0f, 0.2f);
+inline engine::Wrapper gFighterBlasterPitchMinimum(1.5f, 0.5f, 2.0f);
+inline engine::Wrapper gFighterBlasterPitchRandom(1.0f, 0.0f, 1.5f);
 
 // Blasters - Terrain impact
-extern engine::Wrapper gTerrainImpactVolume;
+inline engine::Wrapper gTerrainImpactVolume(0.075f, 0.0f, 0.2f);
 
-extern engine::Wrapper gMissileLaunchVolume;
-extern engine::Wrapper gMissileLoopVolume;
-extern engine::Wrapper gMissilePitchMin;
-extern engine::Wrapper gMissilePitchRandom;
+inline engine::Wrapper gMissileLaunchVolume(0.05f, 0.0f, 0.2f);
+inline engine::Wrapper gMissileLoopVolume(0.04f, 0.0f, 0.2f);
+inline engine::Wrapper gMissilePitchMin(1.0f, 0.5f, 1.5f);
+inline engine::Wrapper gMissilePitchRandom(1.0f, 0.0f, 1.0f);
 
-extern engine::Wrapper gExplosionVolume;
+inline engine::Wrapper gExplosionVolume(0.075f, 0.0f, 0.2f);
 
 // Omnis - Shield
-extern engine::Wrapper gShieldHitVolumeBase;
-extern engine::Wrapper gShieldHitVolumeScale;
-extern engine::Wrapper gShieldDownVolume;
+inline engine::Wrapper gShieldHitVolumeBase(0.05f, 0.0f, 0.2f);
+inline engine::Wrapper gShieldHitVolumeScale(0.0f, 0.0f, 0.2f);
+inline engine::Wrapper gShieldDownVolume(0.0f, 0.0f, 0.2f);
 
 // Omnis - Armor
-extern engine::Wrapper gArmorHitVolumeBase;
-extern engine::Wrapper gArmorHitVolumeScale;
+inline engine::Wrapper gArmorHitVolumeBase(0.0f, 0.0f, 0.2f);
+inline engine::Wrapper gArmorHitVolumeScale(0.0f, 0.0f, 0.2f);
 
-extern engine::Wrapper gFighterDeathVolume;
-extern engine::Wrapper gFighterDeathPitchMinimum;
-extern engine::Wrapper gFighterDeathPitchRandom;
-extern engine::Wrapper gFighterHitVolume;
+inline engine::Wrapper gFighterDeathVolume(0.1f, 0.0f, 0.2f);
+inline engine::Wrapper gFighterDeathPitchMinimum(0.75f, 0.5f, 1.5f);
+inline engine::Wrapper gFighterDeathPitchRandom(0.5f, 0.0f, 1.0f);
+inline engine::Wrapper gFighterHitVolume(0.075f, 0.0f, 0.2f);
 
 } // namespace game
 

@@ -32,17 +32,12 @@ inline constexpr float kfFighterRadius = 1.5f;
 inline constexpr float kfFighterAcceleration = 12.0f;
 inline constexpr float kfFighterDrag = 0.25f;
 inline constexpr float kfFighterMaxSpeed = 45.0f;
-inline constexpr float kfFighterMaxTurnRate = 8.0f;
 
 inline constexpr float kfFighterClimbRate = kfFighterMaxSpeed * kfShipClimbSpeedFraction;
 inline constexpr int64_t kiFighterHighestFlightPlane = 1;
 static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
 inline constexpr float kfFighterClimbTilt = 0.35f;
-
-inline constexpr float kfFighterSteeringSmoothing = 0.064f;
-inline constexpr float kfFighterSteeringDecay = 6.0f;
-inline constexpr float kfFighterChaseTurnRate = 64.0f;
 
 inline constexpr HeadingMovementConstants kFighterMovement
 {
@@ -52,6 +47,10 @@ inline constexpr HeadingMovementConstants kFighterMovement
 	.fDrag = kfFighterDrag,
 	.fMaximumSpeed = kfFighterMaxSpeed,
 	.fVelocityToDirection = 4.0f,
+	.fMaxTurnRate = 3.0f,
+	.fTurnAcceleration = 12.0f,
+	.fCaptureAngle = XM_PI / 60.0f,
+	.fCaptureRate = 4.0f,
 };
 
 inline constexpr float kfFighterPusherIntensity = 36.0f;
@@ -165,6 +164,8 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	static void GraphicsResources();
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
+	// Requests the textures of each controller's model pipeline that has a row in an active cell.
+	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
@@ -176,14 +177,26 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 {
 	static constexpr int64_t kiVersion = 11;
 
-	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, every simulation write and
-	// ship spawn stores a horizontal unit AI direction, no controller writes a target flight plane the type disallows, and
-	// only a fleet spawn writes a client GUID or a global ID.
+	// Simulation keeps the beam countdown finite and at most kFighterBeamCooldown; the floor is only finite because a
+	// fighter with no target counts down without a clamp. Written as one range test so NaN and both infinities fail it too.
+	static bool IsBeamFireTimeInRange(float fTime)
+	{
+		return fTime >= -std::numeric_limits<float>::max() && fTime <= kFighterBeamCooldown.count();
+	}
+
+	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, a NaN or +inf
+	// beam countdown never fires and one above the cooldown delays the shot past it, an unknown controller selects no
+	// script, no navigation-delay admission accepts an out-of-range delay, every simulation write and ship spawn stores
+	// a horizontal unit AI direction, no controller writes a target flight plane the type disallows, and only a fleet
+	// spawn writes a client GUID or a global ID.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
+			if (!IsBeamFireTimeInRange(rCurrent.pNextBeamFireTimes[i].count()))
+			{
+				throw std::ios_base::failure("FightersPostRender pNextBeamFireTimes");
+			}
 			if (!std::isfinite(rCurrent.pfHealths[i]))
 			{
 				throw std::ios_base::failure("FightersPostRender pfHealths");

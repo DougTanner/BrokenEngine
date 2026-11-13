@@ -52,14 +52,15 @@ inputs, the interview question format, and the handoff form live in
 - The manager owns incorporation and approval validity. A design or library
   pivot additionally requires a fresh `/plan-audit` before this skill re-enters.
 - Do not manufacture optional improvements, future extensibility, or routine
-  confirmation questions. Stop when every meaningful branch is evidence-resolved,
-  user-resolved, or returned as a named pivot. The plan's own declaration that a
-  branch is decided resolves nothing; such a branch counts as evidence-resolved
-  only when independent repository evidence settles it, and as user-resolved only
-  through the required inputs in [`../SKILL.md`](../SKILL.md), per
+  confirmation questions. Stop when every meaningful branch is
+  evidence-resolved, user-resolved, or returned as a named pivot. The plan's own
+  declaration that a branch is decided resolves nothing; such a branch counts as
+  evidence-resolved only when independent repository evidence settles it, and as
+  user-resolved only through the required inputs in
+  [`../SKILL.md`](../SKILL.md), per
   [`../../../references/authority-order.md`](../../../references/authority-order.md).
-  If no meaningful decision
-  survives, return a no-delta handoff without asking the user anything.
+  If no meaningful decision survives, return a no-delta handoff without asking
+  the user anything.
 
 ### Decision Checklist
 
@@ -111,5 +112,5 @@ Internally verify, without a routine final question:
   world-coordinate magnitude;
 - roles and acceptance checks match the Tier-3 triggers.
 
-Surface only a concrete meaningful decision established by current evidence. Feed
-it through the same two-or-three-choice interaction contract.
+Surface only a concrete meaningful decision established by current evidence.
+Feed it through the same two-or-three-choice interaction contract.

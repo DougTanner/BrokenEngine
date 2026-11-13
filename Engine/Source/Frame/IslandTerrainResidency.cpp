@@ -11,8 +11,6 @@ namespace engine
 
 struct MeshRange
 {
-	int64_t iOffset = 0;
-	int64_t iLength = 0;
 	int64_t iIndexSize = 0;
 	int64_t iVertexSize = 0;
 };
@@ -20,18 +18,9 @@ struct MeshRange
 static MeshRange GetMeshRange(const IslandTemplate& rTemplate)
 {
 	MeshRange range {};
-	range.iOffset = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight) * static_cast<int64_t>(sizeof(uint16_t));
 	range.iVertexSize = static_cast<int64_t>(rTemplate.iMeshVertexCount) * 2 * static_cast<int64_t>(sizeof(float));
 	range.iIndexSize = static_cast<int64_t>(rTemplate.iMeshIndexCount) * static_cast<int64_t>(sizeof(uint32_t));
-	range.iLength = range.iVertexSize + range.iIndexSize;
 	return range;
-}
-
-static void ReleaseMeshCpuRange(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const MeshRange& rRange)
-{
-	gpFileManager->mpPackChunks->DecommitChunkRange(uiIslandCrc, rRange.iOffset, rRange.iLength);
-	rTemplate.bMeshCpuDecommitted = true;
-	gpFileManager->mpPackChunks->mLoader.ResetChunkRangeReloadState(uiIslandCrc, rRange.iOffset, rRange.iLength);
 }
 
 // A distinct transfer queue uploads elevation on the upload thread; a transfer queue aliasing graphics records it at restoration.
@@ -42,7 +31,12 @@ static bool IsElevationUploadedByTransferQueue()
 
 static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate)
 {
-	if (rTemplate.bGpuResident || rTemplate.iTextureSlot < 0)
+	if (rTemplate.bGpuResident)
+	{
+		return false;
+	}
+
+	if (rTemplate.iTextureSlot < 0)
 	{
 		return false;
 	}
@@ -126,13 +120,11 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
 	{
-		MeshRange range = GetMeshRange(rTemplate);
-		gpFileManager->mpPackChunks->mLoader.RequestChunkRangeReload(uiIslandCrc, range.iOffset, range.iLength, LoadPriority::kRealtime);
-		rTemplate.eMeshResidency = IslandMeshResidency::kAsyncPending;
+		rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
 	}
 
-	// Hot path still starts a mesh reload when a device recreation or earlier full teardown made
-	// the mesh nonresident; texture residency itself remains unchanged.
+	// A nonresident mesh is marked kCpuReady above even when the texture slot is already resident, so
+	// RestorationSweep uploads it after a device recreation or full teardown.
 	if (rTemplate.iTextureSlot >= 0 && rTemplate.bGpuResident)
 	{
 		return rTemplate.iTextureSlot;
@@ -198,17 +190,13 @@ bool IslandTerrainResidency::IsRestorationPending(common::crc_t uiIslandCrc, con
 		return true;
 	}
 
-	MeshRange range = GetMeshRange(rTemplate);
 	switch (rTemplate.eMeshResidency)
 	{
-		case IslandMeshResidency::kAsyncPending:
-			return gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(uiIslandCrc, range.iOffset, range.iLength) != ChunkRangeReloadState::kPending;
 		case IslandMeshResidency::kCpuReady:
 			return rTemplate.bGpuResident;
 		case IslandMeshResidency::kArenaBlocked:
 			return rTemplate.bGpuResident && (gpIslands->miMeshArenaCapacityGeneration != rTemplate.iMeshArenaBlockedGeneration || (HasArenaEvictionCandidate(uiIslandCrc) && !gpIslands->HasRetiredMeshRanges()));
 		case IslandMeshResidency::kNonresident:
-		case IslandMeshResidency::kFailed:
 		case IslandMeshResidency::kResident:
 			return false;
 	}
@@ -236,8 +224,8 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	}
 
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
-	// The 4 chunk-backed channels (color/normals/AO/masks). Elevation is template-owned (no chunk
-	// CRC) and is evicted separately below, via the template's own image rather than the chunk pool.
+	// The 4 chunk-backed channels (color/normals/AO/masks); elevation is template-owned with no chunk CRC and is
+	// evicted separately below.
 	common::crc_t pEvictCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
@@ -260,7 +248,6 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	}
 	gpTextureManager->RetireImage(rTemplate.elevationTexture);
 
-	MeshRange range = GetMeshRange(rTemplate);
 	switch (rTemplate.eMeshResidency)
 	{
 		case IslandMeshResidency::kResident:
@@ -275,20 +262,14 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 			break;
 		case IslandMeshResidency::kCpuReady:
 		case IslandMeshResidency::kArenaBlocked:
-			ReleaseMeshCpuRange(uiIslandCrc, rTemplate, range);
 			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
-		case IslandMeshResidency::kFailed:
-			ReleaseMeshCpuRange(uiIslandCrc, rTemplate, range);
-			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
-			break;
-		case IslandMeshResidency::kAsyncPending:
 		case IslandMeshResidency::kNonresident:
 			break;
 	}
 
 	{
-		// Heap: free-list growth runs inside RenderGlobal (EvictionSweep).
+		// Heap: free-list growth runs inside Graphics::UpdateFrameResidency (EvictionSweep).
 		ScopedSuppressAllocationTracking suppress;
 		mFreeTextureSlots.push_back(iSlot);
 	}
@@ -332,7 +313,7 @@ void IslandTerrainResidency::RestorationSweep()
 		{
 			if (!IsElevationUploadedByTransferQueue())
 			{
-				// Heap: the recorded create allocates its staging buffer inside RenderGlobal.
+				// Heap: the recorded create allocates its staging buffer inside Graphics::UpdateFrameResidency.
 				ScopedSuppressAllocationTracking suppress;
 				gpTextureManager->RetireStagingBuffer(rTemplate.elevationTexture.RecordCreate(gpTextureManager->EnsureAcquireCommandBufferBegun(), rTemplate.elevationTexture.mInfo, [&rTemplate](std::span<std::byte> data, int64_t iPosition)
 				{
@@ -351,38 +332,6 @@ void IslandTerrainResidency::RestorationSweep()
 	for (auto& [rCrc, rTemplate] : rIslands)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
-		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
-		{
-			ChunkRangeReloadState eRangeState = gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.iOffset, range.iLength);
-			if (eRangeState == ChunkRangeReloadState::kPending)
-			{
-				continue;
-			}
-			if (eRangeState == ChunkRangeReloadState::kFailed)
-			{
-				LOG(kGraphics, kError, "Island mesh async reload failed: crc={}", rCrc);
-				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				if (rTemplate.iTextureSlot < 0)
-				{
-					rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
-				}
-				else
-				{
-					rTemplate.eMeshResidency = IslandMeshResidency::kFailed;
-				}
-				continue;
-			}
-			ASSERT(eRangeState == ChunkRangeReloadState::kReady);
-			rTemplate.bMeshCpuDecommitted = false;
-			rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
-			if (rTemplate.iTextureSlot < 0)
-			{
-				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
-				continue;
-			}
-		}
-
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kArenaBlocked)
 		{
 			if (rTemplate.iTextureSlot < 0)
@@ -447,13 +396,12 @@ void IslandTerrainResidency::RestorationSweep()
 		ASSERT(rTemplate.iMeshVertexCount > 0);
 		ASSERT(rTemplate.iMeshIndexCount > 0);
 		{
-			// Heap: the recorded upload allocates its staging buffer inside RenderGlobal's residency sweep.
+			// Heap: the recorded upload allocates its staging buffer inside Graphics::UpdateFrameResidency's residency sweep.
 			ScopedSuppressAllocationTracking suppress;
 			gpTextureManager->RetireStagingBuffer(gpIslands->UploadMesh(gpTextureManager->EnsureAcquireCommandBufferBegun(), rTemplate.iMeshIndexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.puiMeshIndices), static_cast<size_t>(range.iIndexSize)), rTemplate.iMeshVertexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.pfMeshPositions), static_cast<size_t>(range.iVertexSize))));
 		}
-		// The staging buffer holds the copied mesh, so the CPU range is released now; UpdateActiveIslands publishes the
-		// arena range from the next frame, after the acquire command buffer holding the copy was submitted.
-		ReleaseMeshCpuRange(rCrc, rTemplate, range);
+		// UpdateActiveIslands publishes the arena range from the next frame, after the acquire command buffer holding
+		// the copy was submitted.
 		rTemplate.iMeshArenaBlockedGeneration = 0;
 		rTemplate.eMeshResidency = IslandMeshResidency::kResident;
 		LOG(kGraphics, kDebug, "Restored island mesh: crc={} vertices={} indices={}", rCrc, rTemplate.iMeshVertexCount, rTemplate.iMeshIndexCount);
@@ -489,21 +437,6 @@ void IslandTerrainResidency::ResetTextureSlots()
 {
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
-		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
-		{
-			MeshRange range = GetMeshRange(rTemplate);
-			if (gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.iOffset, range.iLength) == ChunkRangeReloadState::kFailed)
-			{
-				// Teardown can run after the File-owned async request failed but before RestorationSweep
-				// promoted this template state. Consume that destroyed-lifecycle failure so re-mint can retry.
-				ReleaseMeshCpuRange(rCrc, rTemplate, range);
-				rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
-			}
-		}
-		else if (rTemplate.eMeshResidency == IslandMeshResidency::kFailed)
-		{
-			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
-		}
 		rTemplate.iTextureSlot = -1;
 		rTemplate.bGpuResident = false;
 		rTemplate.iReferenceCount = 0;

@@ -1,32 +1,43 @@
 # Network Architecture
 
-**IMPORTANT**: Every Frame must be independent from all others, except for generating/consuming StatusChange events.
+**IMPORTANT**: Every Frame must be independent from all others, except for
+generating/consuming StatusChange events.
 
 ## Server
 
-- Coordinate static delivery uses the [compact cell codec](../../Engine/Source/Frame/AGENTS.md#terrain-and-navigation)
-  and [server-owned cached body](../../Engine/Source/Network/Server/AGENTS.md#buffered-state).
+- Coordinate static delivery uses the
+  [compact cell codec](../../Engine/Source/Frame/AGENTS.md#terrain-and-navigation)
+  and
+  [server-owned cached body](../../Engine/Source/Network/Server/AGENTS.md#buffered-state).
   `NetworkMessages::ServerCoordStaticDataMessage` owns raw/LZ4 framing. The
   client rejects stale load, slot, coord, and epoch envelopes before
   decompression or static-data decoding.
-- Multi-threaded Frame Tick update, spread over cores via `common::gpMultithreading->Dispatch` (`GameBase::BuildAndDispatchFrameTicks`)
-- Each Tick is simulated exactly once: previous Frame Tick(`sharedCrc`) + StatusChanges → new Frame Tick(`sharedCrc`)
-- When a Tick is ready, send its StatusChanges + `sharedCrc` to the client (one unreliable packet per active subscription slot)
-  - Client confirms ASAP via an ACK stream carrying, per-slot, `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single trailing 8-byte client timestamp the server echoes back to drive pipeline RTT. The bitfield covers `kiNetworkBufferSize` ticks above the floor
-  - **Epoch**: `AckState.uiEpoch` guards against ghost ACKs reactivating a slot that has been reassigned to a different coord. An ACK whose epoch doesn't match the current slot epoch is dropped
+- Multi-threaded Frame Tick update, spread over cores via
+  `common::gpMultithreading->Dispatch` (`GameBase::BuildAndDispatchFrameTicks`)
+- Each Tick is simulated exactly once: previous Frame Tick(`sharedCrc`) +
+  StatusChanges → new Frame Tick(`sharedCrc`)
+- When a Tick is ready, send its StatusChanges + `sharedCrc` to the client (one
+  unreliable packet per active subscription slot)
+  - Client confirms ASAP via an ACK stream carrying, per-slot,
+    `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single
+    trailing 8-byte client timestamp the server echoes back to drive pipeline
+    RTT. The bitfield covers `kiNetworkBufferSize` ticks above the floor
+  - **Epoch**: `AckState.uiEpoch` guards against ghost ACKs reactivating a slot
+    that has been reassigned to a different coord. An ACK whose epoch doesn't
+    match the current slot epoch is dropped
 - After per-cell dispatch, the live post-tick transfer tail harvests requests,
   validates destination formation and liveness, adds the spawns decided outside
-  the tick that are queued for that tick, sorts the batch by type,
-  materializes it into destination frame state, recomputes each changed
-  destination's `sharedCrc`, and then swaps/publishes the frames. Replay
-  transfer publication follows the same post-dispatch ordering: a batch
-  harvested at event tick `E`, its spawns included, is recorded at `E` in the
-  replay difference stream's post-dispatch channel, and playback loads that
-  exact tick, applies the recorded batch, recomputes the destination CRC, and
-  publishes after dispatch at `E`. The destination may therefore be publication-only at `E` and
-  enter the simulation dispatch set at `E + 1`; its update still uses the
-  existing `GridUpdateData`/per-slot route, with no wire-format,
-  client-starvation, or subscription rule change.
+  the tick that are queued for that tick, sorts the batch by type, materializes
+  it into destination frame state, recomputes each changed destination's
+  `sharedCrc`, and then swaps/publishes the frames. Replay transfer publication
+  follows the same post-dispatch ordering: a batch harvested at event tick `E`,
+  its spawns included, is recorded at `E` in the replay difference stream's
+  post-dispatch channel, and playback loads that exact tick, applies the
+  recorded batch, recomputes the destination CRC, and publishes after dispatch
+  at `E`. The destination may therefore be publication-only at `E` and enter the
+  simulation dispatch set at `E + 1`; its update still uses the existing
+  `GridUpdateData`/per-slot route, with no wire-format, client-starvation, or
+  subscription rule change.
 - An active subscription can outlive a coordinate's buffered delta stream. After
   a returned coordinate has been transferred into current state and buffered for
   tick `E`, but before that slot serializes its delta, the server recognizes a
@@ -46,12 +57,12 @@
   it. The existing accepted bounded backward rebaseline also clears the
   full-state hold. Client ACKs continue periodically while deltas are held, so
   release does not depend on resumed delta traffic. The accepted ACK that
-  releases the hold also triggers the hold-release burst: before the next
-  update is sent, the server resends once, as `kServerCoordinateResend` packets
-  on the slot's unreliable coordinate channel, every tick above the accepted
-  floor through the latest buffered tick that the coordinate ring still holds,
-  stopping at `kiNetworkBufferSize` (128) ticks above the floor. Ordinary resends
-  recover any of those ticks that are lost. This recovery keeps the slot
+  releases the hold also triggers the hold-release burst: before the next update
+  is sent, the server resends once, as `kServerCoordinateResend` packets on the
+  slot's unreliable coordinate channel, every tick above the accepted floor
+  through the latest buffered tick that the coordinate ring still holds,
+  stopping at `kiNetworkBufferSize` (128) ticks above the floor. Ordinary
+  resends recover any of those ticks that are lost. This recovery keeps the slot
   coordinate, epoch, packet formats, and the client's 128-tick gap rule
   unchanged.
 - **Resend**: per client, scan each slot's ACK bitfield for unset bits above the
@@ -69,7 +80,12 @@
   ring buffer of compressed frame deltas; an unacked tick keeps getting retried
   until it either arrives or is evicted from that ring buffer (logged as
   `Evicted frame`), at which point the client can only recover via full state
-- **Chat relay**: `Server::ClientChat` re-encodes each accepted `kClientChat` text as one `kServerChat` (sender `iClientId` plus text) and sends it on the reliable channel to every handshaken client, sender included. Validation and the rate limit are in the `kClientChat` contract row below. Chat runs inside network poll and touches no Frame, `FrameInput`, CRC, save, or replay state; a client that connects later receives no earlier message
+- **Chat relay**: `Server::ClientChat` re-encodes each accepted `kClientChat`
+  text as one `kServerChat` (sender `iClientId` plus text) and sends it on the
+  reliable channel to every handshaken client, sender included. Validation and
+  the rate limit are in the `kClientChat` contract row below. Chat runs inside
+  network poll and touches no Frame, `FrameInput`, CRC, save, or replay state; a
+  client that connects later receives no earlier message
 
 ## Debug Load Generation
 
@@ -84,9 +100,22 @@
   asserts before increment, notification, or reset-state mutation, with no
   wraparound path. Slot epochs, ACK packets, Frame/save/replay versions, and CRC
   contents are unchanged.
-- The first accepted connection response seeds the client's committed generation, including for a client joining after an earlier load. A repeated accepted Hello reports the same current server generation but leaves the already accepted client's slots, game frames, and subscription policy unchanged.
-- After accepting a load notification, the client commits the newest notified generation and resets the old world before its normal subscription update sends replacement requests. The server rejects a subscribe request whose generation is not current before coordinate lookup, slot allocation, acceptance, or publication.
-- The client logs a Network warning and drops any subscribe accept, coordinate static/full state, update, or resend whose generation is not its committed generation. The check runs before slot, epoch, cancellation, ACK, timing, receive-buffer, subscription, or game-state mutation. Load reset discards all delayed coordinate traffic for the reset slots; ordinary same-generation setup and resend recovery remain unchanged.
+- The first accepted connection response seeds the client's committed
+  generation, including for a client joining after an earlier load. A repeated
+  accepted Hello reports the same current server generation but leaves the
+  already accepted client's slots, game frames, and subscription policy
+  unchanged.
+- After accepting a load notification, the client commits the newest notified
+  generation and resets the old world before its normal subscription update
+  sends replacement requests. The server rejects a subscribe request whose
+  generation is not current before coordinate lookup, slot allocation,
+  acceptance, or publication.
+- The client logs a Network warning and drops any subscribe accept, coordinate
+  static/full state, update, or resend whose generation is not its committed
+  generation. The check runs before slot, epoch, cancellation, ACK, timing,
+  receive-buffer, subscription, or game-state mutation. Load reset discards all
+  delayed coordinate traffic for the reset slots; ordinary same-generation setup
+  and resend recovery remain unchanged.
 
 ## Client Global
 
@@ -107,7 +136,8 @@
   the server's packet carrying a StatusChange for tick N always arrives before
   the client has simulated tick N, so StatusChanges fold in on the first
   simulation of that tick and reconcile never has to replay
-	- Network simulation states with simulated packet loss will sometimes cause genuine re-simulations of Ticks
+	- Network simulation states with simulated packet loss will sometimes cause
+	  genuine re-simulations of Ticks
 - **`miCurrentTargetBehind`**: pure jitter buffer, computed as
   `ceil((3 * measuredJitterUs + kiJitterSafetyMicroseconds) / scaledTickWallTime)`,
   where the divisor is the wall duration one sim tick occupies at the current
@@ -133,9 +163,9 @@
   higher-jitter sample has aged out of the average). The streak is measured in
   sim ticks, not `EvaluateClock` calls, so the wait does not shrink at high
   frame rates. Any call where computed ≥ current resets that streak, as does any
-  sim-tick discontinuity — a backward or forward clock snap (a step of at least
-  `kiClockSnapThreshold`), or an interval with no clock at all (no
-  `latestServerTick` or no `kActive` slot)
+  sim-tick discontinuity — a backward tick step, a forward step of at least
+  `kiClockSnapThreshold` such as a clock snap, or an interval with no clock at
+  all (no `latestServerTick` or no `kActive` slot)
 - **Hard ceiling**: `GameBase::ClientUpdate` computes the ceiling directly from
   the public `ClientSessionRuntime::EstimatedLatestServerTick()` and
   `miCurrentTargetBehind` clock state, then clamps `miTickCounter` so it can
@@ -163,30 +193,66 @@
   aggressive-correction threshold); negative error means sim is behind the
   target and needs to catch up. Small errors are corrected gradually by nudging
   the tick accumulator ≤ 0.5 tick/frame (`4 * tickNs / 8` at the |error| ≥ 4
-  aggressive rate; `< 4/64` tick when `|error| < 4`). Extreme errors (≥
-  `kiClockSnapThreshold` = 28, `NetworkProtocol.h`) hard-snap `miTickCounter` to
-  `estimatedLatestServerTick - miCurrentTargetBehind` (the bare servo target,
-  slack below the ceiling) and clear the accumulator — this covers first-packet
-  initialization (sim = 0, target = ~1356 → snap fires) and long-stall recovery.
-  The snap no longer discards `miLatestServerTick`, so the directly computed
-  ceiling stays `>= 0` and remains active across a snap and any following loss
-  burst
+  aggressive rate; `< 4/64` tick when `|error| < 4`). Extreme negative errors
+  (≤ `-kiClockSnapThreshold`, `NetworkProtocol.h`) hard-snap `miTickCounter`
+  forward to `estimatedLatestServerTick - miCurrentTargetBehind` (the bare servo
+  target, slack below the ceiling) and clear the accumulator — this covers
+  first-packet initialization (sim = 0, target = ~1356 → snap fires) and
+  long-stall recovery. The snap never moves the tick backward: a sim ahead of
+  the target by any amount, such as after a time-scale increase raises
+  `miCurrentTargetBehind` or while the estimate eases back after a gap, is held
+  by the ceiling and the gradual correction until the server catches up,
+  because a backward snap would drop the tick below ring frames already
+  simulated and rendered. The snap keeps `miLatestServerTick`, and the ceiling
+  clamps whenever a server-tick estimate exists, even when the computed ceiling
+  is negative, so it remains active across a snap and any following loss burst
 
 ## Client per Frame
 
-- Ring buffer of Ticks, saving old Ticks + their `sharedCrc`, plus a separate buffer of received server updates (StatusChanges + `sharedCrc`) awaiting validation
-- **Fast-path drop (CRC match)**: walk the ring oldest-first; for each Tick with a matching server `sharedCrc`, advance `iConfirmedTick` past it and drop it from the ring (always keep at least the most recent). Validated server updates are consumed from their buffer in the same pass
-- **`iHighWaterValidatedTick`**: once a Tick's `sharedCrc` has matched the server, it is never re-simulated — even if a later rollback's target would reach back past it. Enforced in `ReconcileReplay.cpp`
-- **Mismatch path (rollback + replay)**: when the oldest un-confirmed Tick's `sharedCrc` disagrees with the server's:
-  1. Rollback — by default to the tick *before* the mismatch (**shrunk rollback**), not all the way to `iConfirmedTick`, to minimize re-sim cost. Full rollback to `iConfirmedTick` is used instead when any of the following hold (see `ReconcileReplay.cpp` rollback-base selection):
-     - `iLowestUnresolvedMismatch <= iConfirmedTick + 1` — the mismatch sits immediately above the confirmed floor, so no intermediate speculative frame exists to shrink to
-     - An `optionalPendingFullState` is due at or before `iTargetTick` — matching-tick injection or authoritative gap adoption requires the confirmed rollback base. A future pending state remains queued and does not disable shrunk rollback for current work
-     - No speculative snapshot exists in the ring at `iShrunkTick` (pruned or never captured)
-     - Shrunk rollback was attempted but desynced at its very first replay tick — interpreted as the speculative starting state being bad. The two-tier fallback clears desync state, resets replay, and retries from `iConfirmedTick`
-     - Note: the `Replayed: true` field in `Reconcile post-replay` log lines means "rollback-and-replay pipeline ran" (non-fast-path), *not* "full rollback was used" — the `ShrunkRollback:` field distinguishes shrunk vs full rollback
-  2. Replay each buffered server update tick-by-tick. `RunFrameTick` completes first; spawn and transfer StatusChanges are then applied in the post-tick tail, removed from the replay input, and any frame changed by them has its `sharedCrc` recomputed before CRC validation against the server's `sharedCrc`. Matching ticks advance `iConfirmedTick` in the same pass
-  3. If a replayed Tick still CRC-fails *with* its StatusChanges applied, that is a genuine desync → escalate to resync/disconnect
-  4. This is strictly better than "re-simulate forward with empty inputs": buffered server updates carry StatusChanges that must be folded in, otherwise every subsequent Tick would immediately mismatch again and thrash reconciliation every frame until the buffer drains
+- Ring buffer of Ticks, saving old Ticks + their `sharedCrc`, plus a separate
+  buffer of received server updates (StatusChanges + `sharedCrc`) awaiting
+  validation
+- **Fast-path drop (CRC match)**: walk the ring oldest-first; for each Tick with
+  a matching server `sharedCrc`, advance `iConfirmedTick` past it and drop it
+  from the ring (always keep at least the most recent). Validated server updates
+  are consumed from their buffer in the same pass
+- **`iHighWaterValidatedTick`**: once a Tick's `sharedCrc` has matched the
+  server, it is never re-simulated — even if a later rollback's target would
+  reach back past it. Enforced in `ReconcileReplay.cpp`
+- **Mismatch path (rollback + replay)**: when the oldest un-confirmed Tick's
+  `sharedCrc` disagrees with the server's:
+  1. Rollback — by default to the tick *before* the mismatch (**shrunk
+     rollback**), not all the way to `iConfirmedTick`, to minimize re-sim cost.
+     Full rollback to `iConfirmedTick` is used instead when any of the following
+     hold (see `ReconcileReplay.cpp` rollback-base selection):
+     - `iLowestUnresolvedMismatch <= iConfirmedTick + 1` — the mismatch sits
+       immediately above the confirmed floor, so no intermediate speculative
+       frame exists to shrink to
+     - An `optionalPendingFullState` is due at or before `iTargetTick` —
+       matching-tick injection or authoritative gap adoption requires the
+       confirmed rollback base. A future pending state remains queued and does
+       not disable shrunk rollback for current work
+     - No speculative snapshot exists in the ring at `iShrunkTick` (pruned or
+       never captured)
+     - Shrunk rollback was attempted but desynced at its very first replay tick
+       — interpreted as the speculative starting state being bad. The two-tier
+       fallback clears desync state, resets replay, and retries from
+       `iConfirmedTick`
+     - Note: the `Replayed: true` field in `Reconcile post-replay` log lines
+       means "rollback-and-replay pipeline ran" (non-fast-path), *not* "full
+       rollback was used" — the `ShrunkRollback:` field distinguishes shrunk vs
+       full rollback
+  2. Replay each buffered server update tick-by-tick. `RunFrameTick` completes
+     first; spawn and transfer StatusChanges are then applied in the post-tick
+     tail, removed from the replay input, and any frame changed by them has its
+     `sharedCrc` recomputed before CRC validation against the server's
+     `sharedCrc`. Matching ticks advance `iConfirmedTick` in the same pass
+  3. If a replayed Tick still CRC-fails *with* its StatusChanges applied, that
+     is a genuine desync → escalate to resync/disconnect
+  4. This is strictly better than "re-simulate forward with empty inputs":
+     buffered server updates carry StatusChanges that must be folded in,
+     otherwise every subsequent Tick would immediately mismatch again and thrash
+     reconciliation every frame until the buffer drains
 - **Per-frame replay bound**: replay per call runs to `iMaximumConsecutive` (the
   validated replay range, capped at `iTargetTick`); `ReconcileCatchUpCoord` then
   unconditionally forward-sims the remainder up to `iTargetTick` in the same
@@ -204,10 +270,27 @@
   confirmed offset zero, confirmed/high-water/last-full-state ticks reset to its
   tick, obsolete updates through that tick erased, and normal catch-up
   continuing from it. States already behind confirmed are discarded as stale
-- **`kRecalculated` frame flag**: set on each re-simulated tick (at or before the pre-reconcile ring tail) and cleared on first-time ticks, so that tick's PostRender audio and GPU-particle spawning are suppressed instead of repeated; replay CRC validation and catch-up clear it before render
-- **Visual error offset smoothing**: after a full replay, the flagship owned entity's pre/post position delta is accumulated into the camera's visual-error offset (`CameraBase::AddVisualErrorOffset`) so the correction is spread over several render frames instead of snapping
-- **Forward sim**: from the most recent Tick remaining, simulate empty-input ticks until the ring tail is less than one Tick behind the target time (`miTickCounter`, advanced by `TickRealtime()` before Reconcile runs). Forward-sim advances through ticks with pending server updates, folding their StatusChanges into the speculative state; the next frame's CRC fast path promotes matching updates without replay.
-- **Render**: the frame `kiRenderBehindTicks` behind the ring tail (`GameBase::RenderFrame`) is used as the base Frame; the render clock's sub-tick offset into that frame (`GameBase::AdvanceRenderClock`) is passed as `fDeltaTime` to each collection's `game::FrameInterpolate::Update(...)` (`GameBase::UpdateRenderInterpolation`), which does per-collection sub-tick smoothing (positions, orientations, animation state) rather than a single global velocity extrapolation
+- **`kRecalculated` frame flag**: set on each re-simulated tick (at or before
+  the pre-reconcile ring tail) and cleared on first-time ticks, so that tick's
+  PostRender audio and GPU-particle spawning are suppressed instead of repeated;
+  replay CRC validation and catch-up clear it before render
+- **Visual error offset smoothing**: after a full replay, the flagship owned
+  entity's pre/post position delta is accumulated into the camera's visual-error
+  offset (`CameraBase::AddVisualErrorOffset`) so the correction is spread over
+  several render frames instead of snapping
+- **Forward sim**: from the most recent Tick remaining, simulate empty-input
+  ticks until the ring tail is less than one Tick behind the target time
+  (`miTickCounter`, advanced by `TickRealtime()` before Reconcile runs).
+  Forward-sim advances through ticks with pending server updates, folding their
+  StatusChanges into the speculative state; the next frame's CRC fast path
+  promotes matching updates without replay.
+- **Render**: the frame `kiRenderBehindTicks` behind the ring tail
+  (`GameBase::RenderFrame`) is used as the base Frame; the render clock's
+  sub-tick offset into that frame (`GameBase::AdvanceRenderClock`) is passed as
+  `fDeltaTime` to each collection's `game::FrameInterpolate::Update(...)`
+  (`GameBase::UpdateRenderInterpolation`), which does per-collection sub-tick
+  smoothing (positions, orientations, animation state) rather than a single
+  global velocity extrapolation
 
 ## Client → Server Contract
 
@@ -248,44 +331,56 @@ sizes are the full packet including the type byte.
   (pre-Hello ack race, below); (5) per-type per-tick cap → drop, violation only
   if `bOverCapCountsViolation`. Game-range types skip gates 3–5 at `Receive`
   (kept opaque) and take the same three checks at the deferred drain.
-- **Per-update reset**: `Server::Poll` zeroes each client's `iTickPacketCount`/`iTickByteCount` and `puiTickTypeCounts`, but only in `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same window, so one budget window ≈ one tick window even though an update polls twice. `puiTickTypeCounts` is one 256-entry array shared by both dispatch points — engine and game type bytes are disjoint ranges, so sharing is coherent.
+- **Per-update reset**: `Server::Poll` zeroes each client's
+  `iTickPacketCount`/`iTickByteCount` and `puiTickTypeCounts`, but only in
+  `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same
+  window, so one budget window ≈ one tick window even though an update polls
+  twice. `puiTickTypeCounts` is one 256-entry array shared by both dispatch
+  points — engine and game type bytes are disjoint ranges, so sharing is
+  coherent.
 - **Violation policy** (`Server::RecordContractViolation`): each violation is
-  one of two kinds with its own count, and the counts never feed each
-  other. **Corrupt data** — a sentinel row, a size outside the contract, a
-  dispatch catch, a deferred-packet handler throw, or the ack-stream cross-check —
+  one of two kinds with its own count, and the counts never feed each other.
+  **Corrupt data** — a sentinel row, a size outside the contract, a dispatch
+  catch, a deferred-packet handler throw, or the ack-stream cross-check —
   increments a **lifetime** count (never reset) that disconnects at
   `kiCorruptViolationDisconnectCount = 4`. A datagram damaged in transit never
-  reaches this count, because ENet's datagram checksum drops it before
-  dispatch. **Too fast** — a gate-2 packet or byte budget crossing, a
-  violation-counted per-type cap, or a repeat crash report on one connection —
-  increments a count that loses one strike per `kRateViolationDecayInterval`,
-  applied when the next too-fast strike is recorded, and disconnects at
+  reaches this count, because ENet's datagram checksum drops it before dispatch.
+  **Too fast** — a gate-2 packet or byte budget crossing, a violation-counted
+  per-type cap, or a repeat crash report on one connection — increments a count
+  that loses one strike per `kRateViolationDecayInterval`, applied when the next
+  too-fast strike is recorded, and disconnects at
   `kiRateViolationDisconnectCount`, so a sustained flood outside a stall window
   reaches it within about that many updates (at 1:1, in seconds, that count
-  divided by `kiTickRate`). Each kind logs
-  `kWarning` lines naming it (`Kind: corrupt` or `Kind: rate`), with no
-  per-packet spam: one `First` line each time its count reaches 1 (for the
-  too-fast count, again after it decays to zero) and one `Disconnecting` line at
-  its limit. At either limit the server calls `enet_peer_disconnect` and keeps
-  the client record; the client's remaining queued packets drop uncounted, and
-  after the deferred drain `Server::RemoveDisconnectedClients` removes every
-  record whose peer is no longer connected, each through `RemoveClient`, which
-  notifies the game client manager synchronously (so fleet state persists). An
-  ENet DISCONNECT event that arrives before that sweep removes the record
-  through the same `RemoveClient`; a later one is a safe no-op. Legitimate
-  clients produce zero corrupt-data strikes, and their automatic traffic zero
-  too-fast strikes at every allowed timescale. The honest
-  sources of too-fast strikes: a person sending more chat messages than the
-  `kClientChat` per-type cap, or on a Debug server pressing one debug key more
-  times than its per-type cap, with the sends reaching the server within one
-  update window (`TimeStep::SimulationToWall(kTickNanoseconds)`, longest in slow
-  motion, or bunched by a server stall). Each dispatch
-  `try/catch` records a corrupt-data violation (engine `Server::Receive` as
-  `"corrupt payload"`, the deferred drain
+  divided by `kiTickRate`). Each kind logs `kWarning` lines naming it
+  (`Kind: corrupt` or `Kind: rate`), with no per-packet spam: one `First` line
+  each time its count reaches 1 (for the too-fast count, again after it decays
+  to zero) and one `Disconnecting` line at its limit. At either limit the server
+  calls `enet_peer_disconnect` and keeps the client record; the client's
+  remaining queued packets drop uncounted, and after the deferred drain
+  `Server::RemoveDisconnectedClients` removes every record whose peer is no
+  longer connected, each through `RemoveClient`, which notifies the game client
+  manager synchronously (so fleet state persists). An ENet DISCONNECT event that
+  arrives before that sweep removes the record through the same `RemoveClient`;
+  a later one is a safe no-op. Legitimate clients produce zero corrupt-data
+  strikes, and their automatic traffic zero too-fast strikes at every allowed
+  timescale. The honest sources of too-fast strikes: a person sending more chat
+  messages than the `kClientChat` per-type cap, or on a Debug server pressing
+  one debug key more times than its per-type cap, with the sends reaching the
+  server within one update window
+  (`TimeStep::SimulationToWall(kTickNanoseconds)`, longest in slow motion, or
+  bunched by a server stall). Each dispatch `try/catch` records a corrupt-data
+  violation (engine `Server::Receive` as `"corrupt payload"`, the deferred drain
   `ServerSessionBase::DispatchDeferredClientPackets` as
   `"deferred packet handler threw"`).
-- **Pre-handshake silent drop**: `Client::SendAcknowledgement` streams legitimately arrive before Hello completes, so a handshake-gated packet seen pre-handshake is dropped **without** counting a violation.
-- **Tick-rate-locked client ack cadence**: `Client::SendAcknowledgement` sends at most one ack per sim-tick interval (derived from `engine::kiTickRate`, not a hardcoded Hz), so ack packet rate is independent of render framerate; the 256-packet budget then only ever trips on hostile floods (a multi-second server-poll stall can still deliver many wall-seconds of tick-rate acks in one poll, which the budget tolerates).
+- **Pre-handshake silent drop**: `Client::SendAcknowledgement` streams
+  legitimately arrive before Hello completes, so a handshake-gated packet seen
+  pre-handshake is dropped **without** counting a violation.
+- **Tick-rate-locked client ack cadence**: `Client::SendAcknowledgement` sends
+  at most one ack per sim-tick interval (derived from `engine::kiTickRate`, not
+  a hardcoded Hz), so ack packet rate is independent of render framerate; the
+  256-packet budget then only ever trips on hostile floods (a multi-second
+  server-poll stall can still deliver many wall-seconds of tick-rate acks in one
+  poll, which the budget tolerates).
 - **`kbDebugInput` gate**: the seven debug-control engine packets (save, load,
   reset, replay record, replay playback, pause, timespeed) contract-resolve to
   the sentinel at gate 3 on a server built with `kbDebugInput == false` → a
@@ -331,37 +426,36 @@ sizes are the full packet including the type byte.
 
 Server→client types and unknown type bytes resolve to the sentinel (not
 client-sendable). The current wire-protocol version is `kiProtocolVersion`.
-Version 47 added a squadron byte to each FleetSync member; version 43 made the
-`kServerCoordinateStaticData` count one navigation graph per game `kNavigationGraphs` entry
-(clearance tier and flight plane) instead of one per flight plane; version 42
-added the missile cooldown `nextMissileFireTime` to the Battleship `SpawnInfo`
-`Fields()`; version 41 removed the
-client update-owned-entity request, so every later game packet type moved down
-one value, and dropped the weapon-mode fields from the `UpdateShip` payload and
-the Omni `SpawnInfo` `Fields()`; version 40 replaced the beam cooldown
+Version 49 removed the `kSpawnExplosion` status change and its
+`ExplosionsPostRender::SpawnInfo` payload, so every later `StatusChangeType`
+value moved down one; version 47 added a squadron byte to each FleetSync member;
+version 43 made the `kServerCoordinateStaticData` count one navigation graph per
+game `kNavigationGraphs` entry (clearance tier and flight plane) instead of one
+per flight plane; version 42 added the missile cooldown `nextMissileFireTime` to
+the Battleship `SpawnInfo` `Fields()`; version 41 removed the client
+update-owned-entity request, so every later game packet type moved down one
+value, and dropped the weapon-mode fields from the `UpdateShip` payload and the
+Omni `SpawnInfo` `Fields()`; version 40 replaced the beam cooldown
 `nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()` with the missile
 tube slot `uiNextMissileTube`; version 39 replaced the two Battleship blaster
 cooldowns in the Battleship `SpawnInfo` `Fields()` with the one beam cooldown
-`nextBeamFireTime`; version 38 made every
-cell a flat-top hexagon: each `GridCoord` on the wire carries axial
-coordinates (`iQ`, `iR`), every cell-local position is local to its hexagon,
-and a `kClientSubscribe` coord must lie within grid distance 1 of an
-authorized coord; version 37 added the
-replay playback byte to the accepted `kServerConnectionResponse` and to
-`kServerLoadNotification`; version 36 dropped
-`bIsFlagship` and `flagshipGlobalId` from the `UpdateFleetData` `Fields()`
-list and removed `kClientRespawnInFleetRequest` and
-`kClientDeleteFleetRequest`, shifting the later `GamePacketType` values;
-version 35 made the `kClientCrashReport` payload a crash report whose header,
-including its crash-report version line, the server parses and rejects as
-corrupt when it does not match; version 34 added `uiFlightPlane` to the
-Fighters, Omnis, and Battleships `SpawnInfo` `Fields()` lists (commit
-`a1b4bbb91`); version 33 made the `kServerCoordinateStaticData` payload carry
-one navigation graph per flight
-plane (an `int32_t` plane count, then each plane's `NavData`); version 32 added
-`uiTargetFlightPlane` to the `UpdateShipData` `Fields()` list; version 31
-dropped the three wind-trail fields from the `BlastersPostRender::SpawnInfo`
-`Fields()` list; version 30 split the
+`nextBeamFireTime`; version 38 made every cell a flat-top hexagon: each
+`GridCoord` on the wire carries axial coordinates (`iQ`, `iR`), every cell-local
+position is local to its hexagon, and a `kClientSubscribe` coord must lie within
+grid distance 1 of an authorized coord; version 37 added the replay playback
+byte to the accepted `kServerConnectionResponse` and to
+`kServerLoadNotification`; version 36 dropped `bIsFlagship` and
+`flagshipGlobalId` from the `UpdateFleetData` `Fields()` list and removed
+`kClientRespawnInFleetRequest` and `kClientDeleteFleetRequest`, shifting the
+later `GamePacketType` values; version 35 made the `kClientCrashReport` payload
+a crash report whose header, including its crash-report version line, the server
+parses and rejects as corrupt when it does not match; version 34 added
+`uiFlightPlane` to the Fighters, Omnis, and Battleships `SpawnInfo` `Fields()`
+lists (commit `a1b4bbb91`); version 33 made the `kServerCoordinateStaticData`
+payload carry one navigation graph per flight plane (an `int32_t` plane count,
+then each plane's `NavData`); version 32 added `uiTargetFlightPlane` to the
+`UpdateShipData` `Fields()` list; version 31 dropped the three wind-trail fields
+from the `BlastersPostRender::SpawnInfo` `Fields()` list; version 30 split the
 ship collections into Fighters, Omnis, and Battleships: it replaced the
 `StatusChangeType` tag set with per-type ship spawn and transfer tags and the
 `kDestroyShip`, `kUpdateShip`, and `kUpdateFleet` tick-input tags addressed by
@@ -369,23 +463,21 @@ ship type and uuid, gave every ship `SpawnInfo` its controller, orders, and
 fleet fields, and added a ship-type byte to `kClientSpawnIntoFleetRequest` and
 to each FleetSync member; version 29 dropped `flags` from the
 `BlastersPostRender::SpawnInfo` `Fields()` list and added `lifecycleFlags` to
-the `ExplosionsPostRender::SpawnInfo` one; version 28 let one
-cell's per-tick status-change batch exceed `kiMaximumStatusChangesPerCell`: the
-server sends it whole and the client's decode scratch grows to fit; version 27
-replaced the `StatusChangeType` tag set with spawn, transfer, and tick-input
-tags and made each spawn and transfer payload its collection's `SpawnInfo`
-`Fields()` list; version 26 moved the owned-entity state notification and the
-seven debug-control requests to engine packet types and folded the assign
-notification into each `Spawned` and `ChangedCell` state; version 25 removed the frame clock from full-state frames
-and made `ExplosionsInterpolate::pStartTimes` 64-bit integer nanoseconds;
-version 24
-dropped the per-frame main-menu flags from every full-state frame; version 23
-inserted the engine `kClientChat` and `kServerChat` types before
-`kGamePacketStart`; each
-FleetSync member carries a member flags byte whose `kIsDead` bit marks a dead
-member; the FleetSync flagship names a fleet member by its global ID, not its
-list position; omni and
-spaceship transfer payloads carry the arrival grace their source sets. Protocol 16 is one
+the `ExplosionsPostRender::SpawnInfo` one; version 28 let one cell's per-tick
+status-change batch exceed `kiMaximumStatusChangesPerCell`: the server sends it
+whole and the client's decode scratch grows to fit; version 27 replaced the
+`StatusChangeType` tag set with spawn, transfer, and tick-input tags and made
+each spawn and transfer payload its collection's `SpawnInfo` `Fields()` list;
+version 26 moved the owned-entity state notification and the seven debug-control
+requests to engine packet types and folded the assign notification into each
+`Spawned` and `ChangedCell` state; version 25 removed the frame clock from
+full-state frames and made `ExplosionsInterpolate::pStartTimes` 64-bit integer
+nanoseconds; version 24 dropped the per-frame main-menu flags from every
+full-state frame; version 23 inserted the engine `kClientChat` and `kServerChat`
+types before `kGamePacketStart`; each FleetSync member carries a member flags
+byte whose `kIsDead` bit marks a dead member; the FleetSync flagship names a
+fleet member by its global ID, not its list position; omni and spaceship
+transfer payloads carry the arrival grace their source sets. Protocol 16 is one
 deliberate generation break taken with cell-local geometry: `kiProtocolVersion`
 bumps together with the navigation-data version
 (`Engine/Source/Frame/NavBuild.h`), the `Frame::kiVersion` base term, and
@@ -396,19 +488,29 @@ navigation blob, and connection is rejected by those gates; no compatibility
 path reads the previous generation. The separate `FrameInput::kiVersion` gates
 replay-input compatibility; `Frame::kiVersion` is the Hello gate for
 deterministic-Frame/save/replay compatibility. Neither replaces the protocol
-gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The two fleet
-request packets that name a fleet address it by its stable `FleetGuid` rather
-than a vector index; `kClientUnsubscribe` carries a slot index plus
+gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The
+two fleet request packets that name a fleet address it by its stable `FleetGuid`
+rather than a vector index; `kClientUnsubscribe` carries a slot index plus
 epoch, and Hello carries an 8-byte integrity token derived from the ordered
 Islands then Model manifest `ChunkLocation` tables. The gate runs pre-sim and
 server-authoritative — no deterministic simulation/shared-CRC exposure; the
 client ack throttle is send-timing only (acks are not CRC'd).
 
-The desync diagnostic cooldown is handler-local and uses `steady_clock`, so pause and timescale do not affect it. The existing eight-per-update contract caps and violation/disconnect policy still run first. `kbDesynchronizationDebugFrames` only removes full-frame buffering, serving, requesting, and client stalling when disabled; packet bytes, enums, protocol version, deterministic/CRC state, and the delta resend ring are unchanged.
+The desync diagnostic cooldown is handler-local and uses `steady_clock`, so
+pause and timescale do not affect it. The existing eight-per-update contract
+caps and violation/disconnect policy still run first.
+`kbDesynchronizationDebugFrames` only removes full-frame buffering, serving,
+requesting, and client stalling when disabled; packet bytes, enums, protocol
+version, deterministic/CRC state, and the delta resend ring are unchanged.
 
 ## Session Ownership and Phase Order
 
-`game::ClientSession` and `game::ServerSession` inherit the non-virtual engine session bases `engine::ClientSessionBase` and `engine::ServerSessionBase`, which hold the engine runtimes and call game functions by name through `game::gpClientSession`/`game::gpServerSession`. The engine names the game Frame/status/game packet types, the frame version, and the frame codec directly; no virtual function or runtime type erasure is involved.
+`game::ClientSession` and `game::ServerSession` inherit the non-virtual engine
+session bases `engine::ClientSessionBase` and `engine::ServerSessionBase`, which
+hold the engine runtimes and call game functions by name through
+`game::gpClientSession`/`game::gpServerSession`. The engine names the game
+Frame/status/game packet types, the frame version, and the frame codec directly;
+no virtual function or runtime type erasure is involved.
 
 - `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock
   state, transport polling, load reset, generic received full-state/delta
@@ -429,9 +531,13 @@ The desync diagnostic cooldown is handler-local and uses `steady_clock`, so paus
   sends the engine-owned `kServerTimespeedUpdate` synchronously, carrying the
   server's current time ratio. Tick publication workbuffer-backed views are
   consumed synchronously by the runtime before the owning outer arena exits.
-- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive drains, ACK/flush, buffering, resend, and persistent queue drains are runtime-only operations surfaced through the session bases or game session only where gameplay managers require typed data.
+- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive
+  drains, ACK/flush, buffering, resend, and persistent queue drains are
+  runtime-only operations surfaced through the session bases or game session
+  only where gameplay managers require typed data.
 
 ## See Also
 
-- [Game Reconciliation](GameReconciliation.md) — detailed reconciliation pipeline walkthrough
+- [Game Reconciliation](GameReconciliation.md) — detailed reconciliation
+  pipeline walkthrough
 - [Frame Update Pipeline](FrameUpdatePipeline.md) — per-frame phase ordering

@@ -1,6 +1,12 @@
 # BrokenEngineSandbox Agent Harness
 
-Project-specific launch configuration, verification routes, durable caveats, and command schemas for driving BrokenEngineSandbox through the [`/agent-harness` skill](../../../.agents/skills/agent-harness/SKILL.md). The skill owns provisioning, claiming, ownership, request/response transport, lifecycle, release, the shared launch and replay recipes, and the engine-owned command schemas. The focused references below own the project details; read only the route needed by the scenario.
+Project-specific launch configuration, verification routes, durable caveats, and
+command schemas for driving BrokenEngineSandbox through the
+[`/agent-harness` skill](../../../.agents/skills/agent-harness/SKILL.md). The
+skill owns provisioning, claiming, ownership, request/response transport,
+lifecycle, release, the shared launch and replay recipes, and the engine-owned
+command schemas. The focused references below own the project details; read only
+the route needed by the scenario.
 
 ## Common convention
 
@@ -47,7 +53,10 @@ $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
 ```
 
-The claim and launch scripts, through `Get-AgentHarnessLaunchConfiguration`, and the `/agent-harness` release-only recovery map these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
+The claim and launch scripts, through `Get-AgentHarnessLaunchConfiguration`, and
+the `/agent-harness` release-only recovery map these Debug names to the
+requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe`
+for Release; do not edit this hub for another build.
 
 ## Launch values
 
@@ -65,7 +74,15 @@ machine-readable launch configuration above.
 
 ## Focused references
 
-- [Launch](AgentHarness/launch.md) — the project's client persisted state and launch caveats; the shared [launch recipe](../../../.agents/skills/agent-harness/references/launch.md) owns executable startup, process identity, readiness, and fresh client state.
-- [Verification](AgentHarness/verification.md) — common setup, chosen-omni placement, and durable caveat routing.
-- [Replay](AgentHarness/replay.md) — transfer capture, persistent GUID/cell crossing, and the project's replay control recipes; the shared [replay reference](../../../.agents/skills/agent-harness/references/replay.md) owns determinism acceptance and manifest integrity.
-- [Cross-cell](AgentHarness/cross-cell.md) — client subscription movement and full-state adoption.
+- [Launch](AgentHarness/launch.md) — the project's client persisted state and
+  launch caveats; the shared
+  [launch recipe](../../../.agents/skills/agent-harness/references/launch.md)
+  owns executable startup, process identity, readiness, and fresh client state.
+- [Verification](AgentHarness/verification.md) — common setup, chosen-omni
+  placement, and durable caveat routing.
+- [Replay](AgentHarness/replay.md) — transfer capture, persistent GUID/cell
+  crossing, and the project's replay control recipes; the shared
+  [replay reference](../../../.agents/skills/agent-harness/references/replay.md)
+  owns determinism acceptance and manifest integrity.
+- [Cross-cell](AgentHarness/cross-cell.md) — client subscription movement and
+  full-state adoption.

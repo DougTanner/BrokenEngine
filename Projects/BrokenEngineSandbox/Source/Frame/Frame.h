@@ -44,6 +44,9 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
+	// Runs on a world-hidden frame instead of the render walk: requests the textures of the model pipelines present and
+	// advances the wrecks, writing no GPU buffer.
+	static void UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 #endif
 

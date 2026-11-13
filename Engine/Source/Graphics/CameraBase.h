@@ -85,13 +85,6 @@ public:
 	// any framing (the texels coarsen with zoom instead of cropping coverage), so this is purely the gameplay limit on
 	// how far the camera can pull back.
 	static constexpr float kfFramingMaximum = 600.0f;
-	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
-	// than the wanted on-screen pixel size. Because their texel-framing references never fall below live framing times
-	// mfTexelCoverageRatio, this margin keeps the raw live-frustum footprints inside their textures throughout zoom
-	// transitions. Once the footprint settles, the raw live-frustum window matches the wanted pixel size along the axis
-	// that sets mfTexelCoverageRatio, regardless of this value.
-	static constexpr float kfShadowHeadroomMultiplier = 1.5f;
-	static constexpr float kfLightingHeadroomMultiplier = 1.5f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
 	// zoom range either way. WHEEL_DELTA (120) * kfFramingPerWheelTick (0.1) = 12 units per click.
 	static constexpr float kfCameraFramingInitial = kfCameraFramingDefault + 48.0f;

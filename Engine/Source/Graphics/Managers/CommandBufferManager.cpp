@@ -204,6 +204,25 @@ void CommandBufferManager::SubmitUiOnlyCommandBuffer(int64_t iFramebufferIndex)
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 	CHECK_VK(vkResetFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence));
 
+	// With no Global submission to prepend it to, the acquire command buffer goes alone. The ImGui submission's fence signal
+	// covers it in submission order, so the next fence wait still guards its reuse.
+	if (gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers)
+	{
+		VkSubmitInfo vkSubmitInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.pNext = nullptr,
+			.waitSemaphoreCount = 0,
+			.pWaitSemaphores = nullptr,
+			.pWaitDstStageMask = nullptr,
+			.commandBufferCount = 1,
+			.pCommandBuffers = &gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex),
+			.signalSemaphoreCount = 0,
+			.pSignalSemaphores = nullptr,
+		};
+		CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, VK_NULL_HANDLE));
+	}
+
 	gpImGuiManager->Submit(iFramebufferIndex, false);
 }
 

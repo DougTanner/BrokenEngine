@@ -32,22 +32,27 @@ intent with declared invariants; approved Tier-3 triggers (see
 hypothesis; and relevant prior findings, residuals, and focus areas.
 
 Whenever a session baseline exists, the complete changed-artifact list is the
-`entries` rows and their `class` values from the read-only inventory: `pwsh
--NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot
-'<absolute repository toplevel>' -Baseline <full 40-character SHA>` (add `-Head
-<commit>` for a committed head). It writes no file and prints one
+`entries` rows and their `class` values from the read-only inventory, which the
+caller hands the reviewer as a file: create `Temp/` if absent, in a call of its
+own, then run
+`pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -OutputPath Temp/adversarial-review-inventory.json`
+(add `-Head <commit>` for a committed head). The file holds one
 `broken-engine-session-change-inventory/v1` object with `entries`, `counts`, and
-`triggers`. The run is usable only when `status` is `pass` and `truncated` is
-false; otherwise the complete changed-artifact list is unavailable, so return
-`BLOCKED`. An untracked file appears only when the caller supplies it
-with `-IncludeUntracked '<comma-separated paths>'`, and `counts.unlistedUntracked`
-reports how many untracked files the run did not list. Never enumerate the
-changed artifacts inline.
+`triggers`; the run itself prints only one summary line naming its status, code,
+and message. Pass that path to the reviewer only after this run printed that
+line naming status `pass`; otherwise, or with no summary line, do not dispatch
+and report the complete changed-artifact list unavailable. The reviewer reads
+`status` and `truncated` from the file and returns `BLOCKED` unless they are
+`pass` and false. An untracked file appears only when the caller supplies it
+with `-IncludeUntracked '<comma-separated paths>'`, and
+`counts.unlistedUntracked` reports how many untracked files the run did not
+list. Never enumerate the changed artifacts inline.
 
 For a direct user request about a supplied diff, treat the supplied intent,
-declared invariants, and behavioral or contract statements expressed by the diff as
-the authorized hypotheses. If no briefing exists, reconstruct these inputs from
-conversation history. Do not turn either case into an open-ended repository audit.
+declared invariants, and behavioral or contract statements expressed by the diff
+as the authorized hypotheses. If no briefing exists, reconstruct these inputs
+from conversation history. Do not turn either case into an open-ended repository
+audit.
 
 ## Handoff
 

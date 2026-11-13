@@ -2,8 +2,9 @@
 
 Server-only game networking. `ServerSession` inherits
 `engine::ServerSessionBase`, which holds the owned-entity registry, the
-engine-owned transfer and broadcast managers, and `engine::ServerSessionRuntime`,
-the owner of host/discovery/pacing and the fixed poll/tick/paused phase order
+engine-owned transfer and broadcast managers, and
+`engine::ServerSessionRuntime`, the owner of host/discovery/pacing and the fixed
+poll/tick/paused phase order
 (`../../../../../Engine/Source/Network/Server/AGENTS.md`). `ServerSession` owns
 the client and fleet managers and supplies the game payloads and policy queues
 the engine managers work on; the game functions the engine calls by name mutate
@@ -11,42 +12,92 @@ game state around the deterministic Frame tick.
 
 ## State Ownership
 
-- The engine session base rebuilds the `engine::OwnedEntityRegistry` from the Frame ownership layers and reports each entity whose row is gone from every cell to `OnOwnedEntityDied`, which the game leaves empty. Game code uses those per-client global ID and coordinate records, not the engine-authoritative `authorizedCoordinates`, for owned-entity lookup.
-- Fleets are keyed by persistent `ClientGuid` so they survive disconnect: disconnect clears that GUID's client id and that client's queued fleet requests, never the fleet, and its ships keep running. `DetectFleetMemberDeaths` is the one member death pass, for connected and offline owners alike: after each tick it marks a live member dead when its recorded cell is no longer active or no longer holds its row.
-- Fleet RNG is seeded once, serialized with fleet state, and consumes exactly two 64-bit draws per generated fleet identifier.
-- Fleet serialization supplies the game half of an engine grid save through the four entry points the engine reader requires (`../../../../../Engine/Source/File/AGENTS.md`) — write the fleet payload into the save stream, read it into an isolated staged value the engine carries uninspected, adopt that value into the live fleet manager, and reset fleet state for a fresh game.
-- Fleets are permanent: no request deletes one, so a fleet's position within its client's list never shifts. Requests and queued work still carry the generated fleet identifier and resolve it at consumption.
-- A fleet member is identified by the global ID minted when the member is added, unique across every owner's fleets, which every spawn of it keeps; stored member references — the flagship, a queued spawn, and client focus — carry that ID, never a list position.
-- Each client's owned-entity records are in global-ID order; because each member's ID is minted when it is added, that order is the members' add order.
+- The engine session base rebuilds the `engine::OwnedEntityRegistry` from the
+  Frame ownership layers and reports each entity whose row is gone from every
+  cell to `OnOwnedEntityDied`, which the game leaves empty. Game code uses those
+  per-client global ID and coordinate records, not the engine-authoritative
+  `authorizedCoordinates`, for owned-entity lookup.
+- Fleets are keyed by persistent `ClientGuid` so they survive disconnect:
+  disconnect clears that GUID's client id and that client's queued fleet
+  requests, never the fleet, and its ships keep running.
+  `DetectFleetMemberDeaths` is the one member death pass, for connected and
+  offline owners alike: after each tick it marks a live member dead when its
+  recorded cell is no longer active or no longer holds its row.
+- Fleet RNG is seeded once, serialized with fleet state, and consumes exactly
+  two 64-bit draws per generated fleet identifier.
+- Fleet serialization supplies the game half of an engine grid save through
+  the five entry points the engine reader requires
+  (`../../../../../Engine/Source/File/AGENTS.md`) — write the fleet payload
+  into the save stream, read it into an isolated staged value the engine
+  carries uninspected, validate the staged cells' ship-row global IDs against
+  that value and each other, adopt that value into the live fleet manager, and
+  reset fleet state for a fresh game.
+- Fleets are permanent: no request deletes one, so a fleet's position within its
+  client's list never shifts. Requests and queued work still carry the generated
+  fleet identifier and resolve it at consumption.
+- A fleet member is identified by the global ID minted when the member is added,
+  unique across every owner's fleets, which every spawn of it keeps; stored
+  member references — the flagship, a queued spawn, and client focus — carry
+  that ID, never a list position.
+- Each client's owned-entity records are in global-ID order; because each
+  member's ID is minted when it is added, that order is the members' add order.
 - A fleet member keeps one squadron for life, named by `FleetMember::uiSquadron`
   (`../../Fleet.h`). A squadron has no create or delete step: only the destroy
   request removes a member, ordinary death keeps the member's squadron, and a
   remaining squadron keeps its number when a lower one empties. The member list
   stays in add order, because focus and the respawn timer pass read that order,
   and the squadron number travels through fleet sync, the grid save, and replay
-  fleet records. Squadron choice and the fleet size limit: `FindOpenFleetSquadron`
-  in `../../Fleet.h`.
-- Every member, the fleet's Battleship included, is added dead with an expired countdown, so its first spawn and every respawn take the same path. A member retained after ordinary death respawns automatically when its type's countdown ends — zero for a Fighter, `kRespawnDelay` for an Omni or Battleship — and the countdown drains whether or not its owner is connected.
-- The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound harness rig slot and its clearing semantics; teardown detaches it before destroying the runtime.
+  fleet records. Squadron choice and the fleet size limit:
+  `FindOpenFleetSquadron` in `../../Fleet.h`.
+- Every member, the fleet's Battleship included, is added dead with an expired
+  countdown, so its first spawn and every respawn take the same path. A member
+  retained after ordinary death respawns automatically when its type's countdown
+  ends — zero for a Fighter, `kRespawnDelay` for an Omni or Battleship — and the
+  countdown drains whether or not its owner is connected.
+- The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound
+  harness rig slot and its clearing semantics; teardown detaches it before
+  destroying the runtime.
 
 ## Timing and Paused Availability
 
-- Poll transport and LAN discovery run before simulation work on every update, including while paused: a zero-tick update still builds navigation data for pending subscriptions and services and flushes the resync and new-subscription full-state queues, so a newly connected client receives initial state without a simulation tick.
-- An update polls more than once and `AfterNetworkPoll` runs at every poll, so each handler must empty the request queue it processes; a request left queued is applied a second time later in the same update. `BeforeNetworkPoll` clears only queues whose requests are meant to expire unprocessed.
+- Poll transport and LAN discovery run before simulation work on every update,
+  including while paused: a zero-tick update still builds navigation data for
+  pending subscriptions and services and flushes the resync and new-subscription
+  full-state queues, so a newly connected client receives initial state without
+  a simulation tick.
+- An update polls more than once and `AfterNetworkPoll` runs at every poll, so
+  each handler must empty the request queue it processes; a request left queued
+  is applied a second time later in the same update. `BeforeNetworkPoll` clears
+  only queues whose requests are meant to expire unprocessed.
 
 ## Deterministic Tick Contracts
 
-- The engine owns the active set, which keeps every coordinate holding at least one fleet-controlled ship, because those rows are the owned entities (`Frame::OwnedEntityCount`). Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
-- Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
-- A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
-- A spawned fleet ship row is born owned by its owner's GUID carried in the spawn the per-tick fleet step queues; its first tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
-- An Omni or Battleship spawns at the first clear candidate `FindFleetSpawnPoint` returns, with no random draw: the
-  search is a pure function of the candidates, the origin's committed frame, and the pass's taken points, so replay
-  playback reaches the recording's spawn-or-wait decision, as the fleet checksum (`../../Save/AGENTS.md`) requires.
-  With none clear the member stays dead and is retried on the next tick. `ServerClientManager.cpp` owns the candidate
-  set, the clearance, and the blocked-episode logging. A Fighter launches in its fleet Battleship's cell from a packed bay
-  of that row's model, yawed by its heading, inheriting velocity and stored plane. A wholly refused batch leaves
-  `mNextFighterLaunchTicks` unchanged and retries next tick; every load reset clears it.
+- The engine owns the active set, which keeps every coordinate holding at least
+  one fleet-controlled ship, because those rows are the owned entities
+  (`Frame::OwnedEntityCount`). Retention after the departing-Frame handoff, and
+  generation activation, belong to the
+  [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
+- Normal update prepares tick inputs; replay uses coordinates with live readers
+  and consumes its recorded `FrameInput` order exactly, without sorting it
+  again.
+- A replay transfer recorded in the post-dispatch channel at event tick `E` is
+  applied and published after dispatch at `E`; the newly activated destination
+  first dispatches at `E + 1`.
+- A spawned fleet ship row is born owned by its owner's GUID carried in the
+  spawn the per-tick fleet step queues; its first tick's owned-entity rebuild
+  registers it and reports it `Spawned`, and no pairing pass runs. That GUID is
+  the persistent ownership key.
+- An Omni or Battleship spawns at the first clear candidate
+  `FindFleetSpawnPoint` returns, with no random draw: the search is a pure
+  function of the candidates, the origin's committed frame, and the pass's taken
+  points, so replay playback reaches the recording's spawn-or-wait decision, as
+  the fleet checksum (`../../Save/AGENTS.md`) requires. With none clear the
+  member stays dead and is retried on the next tick. `ServerClientManager.cpp`
+  owns the candidate set, the clearance, and the blocked-episode logging. A
+  Fighter launches in its fleet Battleship's cell from a packed bay of that
+  row's model, yawed by its heading, inheriting velocity and stored plane. A
+  wholly refused batch leaves `mNextFighterLaunchTicks` unchanged and retries
+  next tick; every load reset clears it.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
   advancing updates, drains destroy-member requests into the first advancing
@@ -61,20 +112,20 @@ game state around the deterministic Frame tick.
   spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
   walk owners in GUID order, because each fleet's direction draw consumes the
   one fleet RNG and each fleet spawn search keeps clear of the points earlier
-  spawns of its pass took, so replay playback must walk the recording's order. In normal play the
-  engine's `PrepareTick` runs it after the tick's frame inputs exist and before
-  the agent status-change drain and the broadcast snapshot, so the `StatusChange`s
-  the fleet timers write into the frame input when a flagship picks a new cell
-  enter that tick's broadcast and recorded input, and each spawn queued on the
-  engine transfer manager joins that tick's post-tick batch. On a later tick of
-  a multi-tick update, `ComputeActiveSet` can erase a cell whose frame input
-  survives until the next `BuildFrameInputs`; the step still reads a frame
-  input's cell with `mCells.at` unchecked because it reaches frame inputs only
-  through a live member's cell, which holds that member's owned row (or, for a
-  just-queued spawn, is the origin or its flagship's cell) and so stays active.
-  Replay playback reruns the step on every dispatching tick with every
-  bookkeeping effect but no frame change and no queued spawn, because playback
-  takes every frame change from the recording.
+  spawns of its pass took, so replay playback must walk the recording's order.
+  In normal play the engine's `PrepareTick` runs it after the tick's frame
+  inputs exist and before the agent status-change drain and the broadcast
+  snapshot, so the `StatusChange`s the fleet timers write into the frame input
+  when a flagship picks a new cell enter that tick's broadcast and recorded
+  input, and each spawn queued on the engine transfer manager joins that tick's
+  post-tick batch. On a later tick of a multi-tick update, `ComputeActiveSet`
+  can erase a cell whose frame input survives until the next `BuildFrameInputs`;
+  the step still reads a frame input's cell with `mCells.at` unchecked because
+  it reaches frame inputs only through a live member's cell, which holds that
+  member's owned row (or, for a just-queued spawn, is the origin or its
+  flagship's cell) and so stays active. Replay playback reruns the step on every
+  dispatching tick with every bookkeeping effect but no frame change and no
+  queued spawn, because playback takes every frame change from the recording.
 - A flagship's pick of a new cell makes its one direction draw, then asks
   `NavQueryEdgeReachable` whether the flagship reaches an open stretch of that
   shared edge, on its own navigation graph from its committed position. A
@@ -86,7 +137,11 @@ game state around the deterministic Frame tick.
   cannot race `RunFrameTick`. Only this pick checks an edge: a harness
   `UpdateFleet` order across a sealed edge routes around it by A*, because a
   navigation graph has no cell boundary.
-- Agent-injected `StatusChange`s remain queued until the first normal tick at or after the entry's target tick whose coordinate is active and has a committed current Frame: a destroy or update entry then enters that tick's input at `PrepareTick`, and a spawn entry joins that tick's post-tick batch at its harvest. Consumed changes then follow the engine-owned status-change ordering.
+- Agent-injected `StatusChange`s remain queued until the first normal tick at or
+  after the entry's target tick whose coordinate is active and has a committed
+  current Frame: a destroy or update entry then enters that tick's input at
+  `PrepareTick`, and a spawn entry joins that tick's post-tick batch at its
+  harvest. Consumed changes then follow the engine-owned status-change ordering.
 - Transfer validation, deterministic ordering, destination materialization and
   CRC recompute, and publication assembly are engine-owned
   ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication)).
@@ -96,9 +151,23 @@ game state around the deterministic Frame tick.
 
 ## Trust and Lifecycle Boundaries
 
-- Engine `Server` owns packet admission and violation accounting, and the engine session base drains admitted packets and records handler throws; this layer supplies game contracts and handles each admitted game packet in `HandleGamePacket`. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
-- While the server plays a replay, `HandleGamePacket` refuses every game request before dispatch with a warning, because playback takes every simulation change from the recording and a request sent before the client learned of playback still arrives. A refusal for timing is not corrupt data, so it records no contract violation.
-- Connect-time new-client processing begins only after the engine accepts `ClientHello` and marks the handshake complete, and runs after the owned-entity rebuild has registered the client's surviving owned entities. Notify the fleet manager even when the client has no owned entities: it makes the GUID's first fleet, with that fleet's Battleship, when the GUID has none, and a persistent fleet whose members are all dead still needs synchronization on reconnect.
+- Engine `Server` owns packet admission and violation accounting, and the engine
+  session base drains admitted packets and records handler throws; this layer
+  supplies game contracts and handles each admitted game packet in
+  `HandleGamePacket`. Side-specific bounds validate navigation timing, fleet
+  sizes, and save/replay fleet data without partially applying a request.
+- While the server plays a replay, `HandleGamePacket` refuses every game request
+  before dispatch with a warning, because playback takes every simulation change
+  from the recording and a request sent before the client learned of playback
+  still arrives. A refusal for timing is not corrupt data, so it records no
+  contract violation.
+- Connect-time new-client processing begins only after the engine accepts
+  `ClientHello` and marks the handshake complete, and runs after the
+  owned-entity rebuild has registered the client's surviving owned entities.
+  Notify the fleet manager even when the client has no owned entities: it makes
+  the GUID's first fleet, with that fleet's Battleship, when the GUID has none,
+  and a persistent fleet whose members are all dead still needs synchronization
+  on reconnect.
 - During replay playback the fleet manager skips only that first-fleet creation,
   since playback takes every fleet from the recording; it still maps the client
   and sends its fleet sync. When playback ends by abort, load, or reset, the

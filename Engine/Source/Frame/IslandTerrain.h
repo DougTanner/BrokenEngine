@@ -17,10 +17,8 @@ struct CellStaticData;
 enum class IslandMeshResidency : uint8_t
 {
 	kNonresident,
-	kAsyncPending,
 	kCpuReady,
 	kArenaBlocked,
-	kFailed,
 	kResident,
 };
 #endif
@@ -91,8 +89,8 @@ struct IslandTemplate
 	bool bGpuResident = false;
 
 	// Gaea Mesher-baked terrain mesh in island-local meters (XY centered). CPU pointers slice into
-	// the kIsland chunk payload after the heightmap halfs (set by WaitForElevationMaps). The
-	// persistent arena is addressed through these virtual allocations; Z is not stored because
+	// the kIsland chunk payload after the heightmap halfs (set by WaitForElevationMaps); the chunk stays
+	// resident, so they stay valid for the process. The persistent arena is addressed through these virtual allocations; Z is not stored because
 	// Terrain.vert re-derives it from the elevation sampler.
 	const float* pfMeshPositions = nullptr;   // interleaved XY pairs (2 floats per vertex)
 	const uint32_t* puiMeshIndices = nullptr;
@@ -102,8 +100,6 @@ struct IslandTemplate
 	int64_t iMeshVertexOffset = 0;
 	IslandMeshResidency eMeshResidency = IslandMeshResidency::kNonresident;
 	int64_t iMeshArenaBlockedGeneration = 0;
-	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
-	bool bMeshCpuDecommitted = false;
 
 	// Resident RGBA8 top-down map picture, row 0 at template-local +Y; slices the kIsland chunk payload after the
 	// mesh indices and the picture's two int32 dimensions.

@@ -1,12 +1,21 @@
 # `DataPacker/Source`
 
-Asset preprocessing tool that converts raw textures, models, shaders, and audio into optimized binary formats for runtime loading.
+Asset preprocessing tool that converts raw textures, models, shaders, and audio
+into optimized binary formats for runtime loading.
 
-The vcxproj provisions ThirdParty before linking and requires the prebuilt configuration library. Linked worktrees consume validated stable primary submodule trees and prebuilt Output; failures never trigger a nested ThirdParty build.
+The vcxproj provisions ThirdParty before linking and requires the prebuilt
+configuration library. Linked worktrees consume validated stable primary
+submodule trees and prebuilt Output; failures never trigger a nested ThirdParty
+build.
 
 ## Architecture
 
-`Main.cpp` orchestrates legacy-intermediate migration, Scene and Island pre-export (including explicitly authorized Gaea baking), IBL cubemap convolution, the remaining asset exports, generated headers, and ThirdParty attribution collection. Every asset type and each IBL cubemap pre-pass runs even after an earlier failure, and each type's job failures become one structured aggregate diagnostic.
+`Main.cpp` orchestrates legacy-intermediate migration, Scene and Island
+pre-export (including explicitly authorized Gaea baking), IBL cubemap
+convolution, the remaining asset exports, generated headers, and ThirdParty
+attribution collection. Every asset type and each IBL cubemap pre-pass runs even
+after an earlier failure, and each type's job failures become one structured
+aggregate diagnostic.
 
 Scene ingestion, including direct exchange-format decoding, belongs to
 the asynchronous scene job.
@@ -40,9 +49,20 @@ each reader's established failure path: export jobs fail through their
 aggregate, legacy migration skips malformed candidates. Versioned format or
 payload changes follow the owning detail documentation.
 
-The Gaea bake is separate from `ExportJob`: version-specific archetype handling stays in `ExportJobs/Island/GaeaArchetype.{h,cpp}`, while route orchestration, region processing, and shoreline subdivision remain version-agnostic. Each route patches a temporary archetype inside the shared cache; source `.terrain` files are never changed. `ExportJobs/Island/AGENTS.md` owns the cache location, and `ExportJobs/AGENTS.md` owns chunk rules and island chunk consumption.
+The Gaea bake is separate from `ExportJob`: version-specific archetype handling
+stays in `ExportJobs/Island/GaeaArchetype.{h,cpp}`, while route orchestration,
+region processing, and shoreline subdivision remain version-agnostic. Each route
+patches a temporary archetype inside the shared cache; source `.terrain` files
+are never changed. `ExportJobs/Island/AGENTS.md` owns the cache location, and
+`ExportJobs/AGENTS.md` owns chunk rules and island chunk consumption.
 
-Island elevation is meters-absolute: archetype Sea level and `Island.json` elevation scale place the beach at engine Z 0, and DataPacker validates the resulting sea floor against `common::kfSeaBottomMeters`. Auto-crop removes only deepest-water pixels, retaining the landmass plus shallow-water coastline halo. The runtime applies no per-island height or water-depth multiplier, and export applies the one island scale (`ExportJobs/Island/AGENTS.md` `## Island Outputs`).
+Island elevation is meters-absolute: archetype Sea level and `Island.json`
+elevation scale place the beach at engine Z 0, and DataPacker validates the
+resulting sea floor against `common::kfSeaBottomMeters`. Auto-crop removes only
+deepest-water pixels, retaining the landmass plus shallow-water coastline halo.
+The runtime applies no per-island height or water-depth multiplier, and export
+applies the one island scale (`ExportJobs/Island/AGENTS.md`
+`## Island Outputs`).
 
 The named Win32 single-instance mutex makes a second process wait for the first.
 Under a debugger, top-level exceptions remain unwrapped so they break at the
@@ -66,7 +86,11 @@ output changes.
 Set `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` for verification runs that must
 stop before expensive export work; `ExportJobs/AGENTS.md` owns where the guard
 stops each job. `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` independently blocks only
-immediately before a Gaea process launch. Gaea authoring additionally requires `BT_DATAPACKER_ALLOW_GAEA_EXPORT=1`; absence of a forbid guard grants no authoring permission. Caller-provided forbid guards remain stronger vetoes. Normal island publication and packing use the portable inputs described in `ExportJobs/Island/AGENTS.md`.
+immediately before a Gaea process launch. Gaea authoring additionally requires
+`BT_DATAPACKER_ALLOW_GAEA_EXPORT=1`; absence of a forbid guard grants no
+authoring permission. Caller-provided forbid guards remain stronger vetoes.
+Normal island publication and packing use the portable inputs described in
+`ExportJobs/Island/AGENTS.md`.
 
 `FileManager` (`gpFileManager`) owns input/output/cache paths, ThirdParty
 resolution, CLI parsing, and worktree output copy-on-write. An eligible linked
@@ -98,11 +122,23 @@ fingerprint metadata so unchanged snapshots avoid rehashing. Its entries are
 written sorted by path, so rewriting unchanged content produces byte-identical
 output.
 
-When a DataPacker change alters only fingerprint or cache-metadata formats, not exported bytes, do not verify by letting the format mismatch trigger a full re-export: the existing chunks, packs, and Gaea caches are known-good. Instead write every new-format fingerprint and cache-metadata file by hand from the current known-good inputs and caches, then verify with a warm-cache run, which exports nothing and finishes sub-second.
+When a DataPacker change alters only fingerprint or cache-metadata formats, not
+exported bytes, do not verify by letting the format mismatch trigger a full
+re-export: the existing chunks, packs, and Gaea caches are known-good. Instead
+write every new-format fingerprint and cache-metadata file by hand from the
+current known-good inputs and caches, then verify with a warm-cache run, which
+exports nothing and finishes sub-second.
 
-CLI accepts zero arguments or exactly three paths: engine data, project data, and output. Zero arguments packs every game project that follows `Projects/AGENTS.md` `## Standard Project Layout` into its own `Projects/<Name>/Platforms/VisualStudio2026/Output/Data`, with the repository root derived from the executable layout, and exits non-zero when any project's run fails. `--materialize-data <engine-data> <project-data> <output-data>` is the exact-arity data-only copy-on-write entry point.
+CLI accepts zero arguments or exactly three paths: engine data, project data,
+and output. Zero arguments packs every game project that follows
+`Projects/AGENTS.md` `## Standard Project Layout` into its own
+`Projects/<Name>/Platforms/VisualStudio2026/Output/Data`, with the repository
+root derived from the executable layout, and exits non-zero when any project's
+run fails. `--materialize-data <engine-data> <project-data> <output-data>` is
+the exact-arity data-only copy-on-write entry point.
 
-Tools builds have no allocation tracker, so the engine LOG float-format-spec restriction does not apply here. `Pch.h` log categories default to `kVerbose`.
+Tools builds have no allocation tracker, so the engine LOG float-format-spec
+restriction does not apply here. `Pch.h` log categories default to `kVerbose`.
 
 ## Design Patterns
 
@@ -144,8 +180,14 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   discards that type's temporary manifest and pack and fails the type; an
   already-published manifest then stays beside an unreplaced or missing pack
   until the next run re-dirties the type and republishes it.
-- Reproducibility: Chunk ordering and direct base BC encoding are machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes assume one authoritative bake host; island chunk heights, which `BeachPass` computes with `std::sin` and `std::pow`, also assume one authoritative host.
+- Reproducibility: Chunk ordering and direct base BC encoding are
+  machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes
+  assume one authoritative bake host; island chunk heights, which `BeachPass`
+  computes with `std::sin` and `std::pow`, also assume one authoritative host.
 
 ## Output Structure
 
-Each asset type produces a `.manifest`, `.pack`, and generated CRC header. Manifest entries keep the path CRC separate from a content CRC computed over the exact emitted chunk bytes. DataPacker also generates `DataTypes.h`, aggregate `Data.h`, and the sibling `Attribution/` tree.
+Each asset type produces a `.manifest`, `.pack`, and generated CRC header.
+Manifest entries keep the path CRC separate from a content CRC computed over the
+exact emitted chunk bytes. DataPacker also generates `DataTypes.h`, aggregate
+`Data.h`, and the sibling `Attribution/` tree.

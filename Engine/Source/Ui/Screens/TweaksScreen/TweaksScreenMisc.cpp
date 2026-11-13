@@ -15,6 +15,7 @@ void RenderMiscellaneousSection(TweaksScreen& rScreen)
 
 	rScreen.WrapperSeparatorText("Misc");
 	rScreen.WrapperSlider("Misc Debug Texture Linear Range", gMiscDebugTextureLinearRange, iSection);
+	rScreen.WrapperSlider("Extra Area", gExtraArea, iSection);
 
 	WrapperToggle("Orthographic Projection", &gOrthographicProjection);
 	ImGui::BeginDisabled(gOrthographicProjection.Get<bool>());

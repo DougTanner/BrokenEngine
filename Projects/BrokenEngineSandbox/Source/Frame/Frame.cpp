@@ -102,7 +102,7 @@ static void ValidateFlyingMissiles(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 172i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 181i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -586,6 +586,12 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 {
 	engine::ForEachEndRender(GameInterpolateTypes {}, iCommandBuffer);
+}
+
+void FrameInterpolate::UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
+{
+	engine::ForEachRequestTextures(GameInterpolateTypes {}, rRenderInterpolates, rActiveCoordinates);
+	BattleshipsInterpolate::UpdateWrecks(rRenderInterpolates, rActiveCoordinates);
 }
 
 void FrameInterpolate::DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)

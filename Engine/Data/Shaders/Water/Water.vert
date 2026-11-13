@@ -31,7 +31,6 @@ layout (location = 0) in vec2 f2InTexcoord;
 // Output
 layout (location = 0) out vec2 f2OutInitialPosition;
 layout (location = 1) out vec3 f3OutPosition;
-layout (location = 2) out vec2 f2OutTexcoord;
 layout (location = 3) out vec3 f3OutNormal;
 
 void main()
@@ -48,7 +47,6 @@ void main()
 	{
 		f3OutPosition = vec3(f2WorldPosition, 0.0f);
 		f3OutNormal = vec3(0.0f, 0.0f, 1.0f);
-		f2OutTexcoord = WorldToVisibleArea(f3OutPosition, globalLayout.f4VisibleArea);
 		gl_Position = Transform(vec4(f3OutPosition, 1.0f), mainLayout.f4x4ViewProjection);
 		return;
 	}
@@ -68,8 +66,6 @@ void main()
 	f3OutNormal = f3WaveNormal; // pre-blended toward (0,0,1) in compute via fWaterWaveNormalBlend
 
 	f3OutPosition.xy += vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
-
-	f2OutTexcoord = WorldToVisibleArea(f3OutPosition, globalLayout.f4VisibleArea);
 
 	if (fTerrainElevation >= -globalLayout.fWaterTerrainHeight)
 	{

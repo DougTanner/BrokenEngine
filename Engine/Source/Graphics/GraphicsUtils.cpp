@@ -133,7 +133,7 @@ void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT
 float MinLightingDepositSize()
 {
 	// At settled camera heights, eight constant-density lighting texels prevent sub-texel light flicker.
-	// Lighting-area and texture headroom factors cancel, so texel world size uses the base DetailTextureSize.
+	// Lighting-area and texture extra-area factors cancel, so texel world size uses the base DetailTextureSize.
 	// Ceil inflates the floor by a sub-texel amount.
 	auto [iLightingTextureX, iLightingTextureY] = TextureManager::DetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
 	float fTexelSizeX = std::ceil(engine::gpCamera->mf4RenderVisibleArea.z - engine::gpCamera->mf4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);

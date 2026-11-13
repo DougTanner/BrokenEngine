@@ -102,17 +102,15 @@ Changes (11 files)
 7. Engine/Source/Frame/Collections/Flipbooks/FlipbooksRender.cpp  [NEW]
    - GraphicsResources(): CreateDynamicBuffer + CreatePipelineFlipbooks
    - BeginRender(): AccumulateRenderCapacity, ResizeDynamicBufferIfNeeded
-   - Render(): For each flipbook instance:
-       a. Visibility cull via IsPointVisible
-       b. Compute elapsed seconds = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(iTick) - pStartTimes[i])
-       c. Compute frame index = (startFrameOffset + floor(elapsed * frameRate))
-          % frameCount
-       d. Compute UV rect from frame index, columns, rows:
-          uvOffset.x = (frameIndex % columns) / columns
-          uvOffset.y = (frameIndex / columns) / rows
-          uvSize = (1/columns, 1/rows)
-       e. Fill FlipbookLayout: projected position, size, texture index via
-          CrcToIndex, alpha, rotation, UV rect
+   - Render(): For each flipbook instance: a. Visibility cull via IsPointVisible
+     b. Compute elapsed seconds =
+     common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(iTick) -
+     pStartTimes[i]) c. Compute frame index = (startFrameOffset + floor(elapsed *
+     frameRate)) % frameCount d. Compute UV rect from frame index, columns,
+     rows: uvOffset.x = (frameIndex % columns) / columns uvOffset.y =
+     (frameIndex / columns) / rows uvSize = (1/columns, 1/rows) e. Fill
+     FlipbookLayout: projected position, size, texture index via CrcToIndex,
+     alpha, rotation, UV rect
    - EndRender(): SetCount profile counters, WriteIndirectBuffer
 
 8. Engine/Source/Graphics/Managers/DynamicPipelines.h

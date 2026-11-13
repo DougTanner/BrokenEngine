@@ -1,13 +1,23 @@
 # SmokeTrails - Owner-Driven Smoke Ribbons
 
-Client-only smoke trails are owner-driven flight-plane ribbons deposited into the screen-space smoke simulation. Explosions and game collections own their types and lifetimes.
+Client-only smoke trails are owner-driven flight-plane ribbons deposited into
+the screen-space smoke simulation. Explosions and game collections own their
+types and lifetimes.
 
 ## Invariants
 
-- Smoothed tail positions persist across frame copies. Full-state reception patches them from the previous ring frame so reconciliation does not visibly reset trails.
-- Rendering divides deposit quantity by the current segment length. Do not strengthen this implementation fact into a general frame-rate or speed-independence guarantee.
-- New trails briefly suppress length until movement establishes a segment. Trail identity is client-local and never crosses a cell boundary, so an owner that transfers always starts a fresh trail and takes that suppression again.
-- A trail is weighted between the flight planes bracketing its current height. Both ribbon endpoints project to each weighted plane; width remains perpendicular to the segment on that plane.
+- Smoothed tail positions persist across frame copies. Full-state reception
+  patches them from the previous ring frame so reconciliation does not visibly
+  reset trails.
+- Rendering divides deposit quantity by the current segment length. Do not
+  strengthen this implementation fact into a general frame-rate or
+  speed-independence guarantee.
+- New trails briefly suppress length until movement establishes a segment. Trail
+  identity is client-local and never crosses a cell boundary, so an owner that
+  transfers always starts a fresh trail and takes that suppression again.
+- A trail is weighted between the flight planes bracketing its current height.
+  Both ribbon endpoints project to each weighted plane; width remains
+  perpendicular to the segment on that plane.
 - The smoothed tail position column overloads its W component: W == 0 marks a
   slot with no smoothed history yet, so that update copies the owner's position
   instead of easing toward it and W becomes 1 with it. This is a deliberate
@@ -15,4 +25,6 @@ Client-only smoke trails are owner-driven flight-plane ribbons deposited into th
   as a real coordinate and do not clear it on a live trail "for safety" — that
   trail's smoothed position then snaps and visibly pops. The smoothing rate is a
   fixed constant in `SmokeTrailsUpdate.cpp`, not a `gSmokeTrails*` tweak value.
-- Rendering draws per-quad jitter from an unseeded file-scope random engine. That is render-only client state: it never reaches the simulation or the CRC, so it is not a determinism bug and must not be made deterministic.
+- Rendering draws per-quad jitter from an unseeded file-scope random engine.
+  That is render-only client state: it never reaches the simulation or the CRC,
+  so it is not a determinism bug and must not be made deterministic.

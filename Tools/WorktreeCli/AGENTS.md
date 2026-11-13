@@ -1,10 +1,16 @@
 # WorktreeCli
 
-Standalone Windows console application for repository coordination. It owns serialized MSBuild invocation, landing leases, and the Git-backed `Documents/Plans` scheduler. It never connects to a game endpoint or owns the AgentHarness lock.
+Standalone Windows console application for repository coordination. It owns
+serialized MSBuild invocation, landing leases, and the Git-backed
+`Documents/Plans` scheduler. It never connects to a game endpoint or owns the
+AgentHarness lock.
 
 ## Executable and Commands
 
-Use `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` through the provisioned primary Output link. Routine linked-worktree workflows never build or modify that output; source changes use the `/compile` [candidate/promotion path](../../.agents/skills/compile/references/worker.md).
+Use `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe`
+through the provisioned primary Output link. Routine linked-worktree workflows
+never build or modify that output; source changes use the `/compile`
+[candidate/promotion path](../../.agents/skills/compile/references/worker.md).
 
 - `lock token|claim|status|refresh|recover|release` operates on landing locks
   identified by `--repo`. A lease is time-limited lock ownership that expires on
@@ -50,14 +56,26 @@ Use `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` throug
   markers of direct dependency children, delete the target Plan file, and report
   every changed path; `reject` additionally requires
   `--user-authorized-rejection`.
-- `build` prints one `broken-engine-build-result/v1` JSON object to stdout; human progress goes to stderr. It retains the combined MSBuild stream in the invoking worktree's ignored `Temp\AgentBuildLogs\` path and parses structured diagnostics from that same stream.
-- Exit code `0` is success, `2` is a state conflict or negative result, and `1` is usage, transport, or OS failure. A build whose MSBuild step succeeded but whose retained log came out incomplete still exits `1`, with `retainedLog.complete` false.
+- `build` prints one `broken-engine-build-result/v1` JSON object to stdout;
+  human progress goes to stderr. It retains the combined MSBuild stream in the
+  invoking worktree's ignored `Temp\AgentBuildLogs\` path and parses structured
+  diagnostics from that same stream.
+- Exit code `0` is success, `2` is a state conflict or negative result, and `1`
+  is usage, transport, or OS failure. A build whose MSBuild step succeeded but
+  whose retained log came out incomplete still exits `1`, with
+  `retainedLog.complete` false.
 
 `BROKEN_ENGINE_MSBUILD_PATH` pins discovery and fails when invalid.
 
 ## Coordination State
 
-Landing locks and scheduler claims live under `%LOCALAPPDATA%\BrokenEngineLocks`; scheduler claims are keyed by Git common directory. Marker shape, selection, exclusion, stale edges, and claim lifetime are the [Plans scheduler rules](../../Documents/Plans/AGENTS.md#git-backed-scheduler); a document whose marker is absent or unparsable reports `invalid-metadata` naming the path.
+Landing locks and scheduler claims live under
+`%LOCALAPPDATA%\BrokenEngineLocks`; scheduler claims are keyed by Git common
+directory. Marker shape, selection, exclusion, stale edges, and claim lifetime
+are the
+[Plans scheduler rules](../../Documents/Plans/AGENTS.md#git-backed-scheduler); a
+document whose marker is absent or unparsable reports `invalid-metadata` naming
+the path.
 
 A claim records the Plan path, its owner, session, worktree, and branch, and its
 claim and expiry timestamps. It stores no baseline commit, digest, or lifecycle
@@ -67,25 +85,29 @@ wrong claim filename, expired, bound to a worktree path that no longer resolves,
 or bound to a Plan that is absent or invalid at the primary tip, the rule that
 lets landing delete its own claim best-effort and heal a missed delete later.
 
-Scheduler and claim paths require successful repository and Plan hash derivation; if either is unavailable, the command returns the existing `local-app-data-unavailable` error and never uses a fallback path. Healing remains per-record, so a later Plan-path hash failure can leave legitimate deletions already made for earlier records.
+Scheduler and claim paths require successful repository and Plan hash
+derivation; if either is unavailable, the command returns the existing
+`local-app-data-unavailable` error and never uses a fallback path. Healing
+remains per-record, so a later Plan-path hash failure can leave legitimate
+deletions already made for earlier records.
 
 Enumeration skips unreadable, schema-invalid, and expired claim records instead
 of failing on them; for claim-record read/validation, only a directory-scan
 error aborts the operation. Recovery removes only the diagnosed `.lock` file.
 Every scheduler change runs under the scheduler guard — a lock only one
 scheduler change holds at a time — and waits up to `kiSchedulerGuardWaitSeconds`
-for it: contention alone reports `busy` as a state conflict, while an unusable lock file
-or its storage reports `guard-unavailable` as an OS failure. Before rewriting
-Plan files or deleting the target Plan, scheduler changes stop with a state
-conflict when an existing non-guidance child's dependency relation is unknown,
-when a known direct child carries invalid metadata, or when the target file
-exists untracked; known unrelated invalid Plans, guidance, and tracked missing
-files do not block. `complete` and `reject` write each child marker directly and
-delete the target last, and a later write or delete failure is an OS-failure
-error (`rewrite-failed`, `delete-failed`) that can leave earlier child rewrites
-in place and the failed child empty or partly written in the session worktree;
-restore the session's changed Plan files with Git, then rerun. Never broadly
-delete coordination state.
+for it: contention alone reports `busy` as a state conflict, while an unusable
+lock file or its storage reports `guard-unavailable` as an OS failure. Before
+rewriting Plan files or deleting the target Plan, scheduler changes stop with a
+state conflict when an existing non-guidance child's dependency relation is
+unknown, when a known direct child carries invalid metadata, or when the target
+file exists untracked; known unrelated invalid Plans, guidance, and tracked
+missing files do not block. `complete` and `reject` write each child marker
+directly and delete the target last, and a later write or delete failure is an
+OS-failure error (`rewrite-failed`, `delete-failed`) that can leave earlier
+child rewrites in place and the failed child empty or partly written in the
+session worktree; restore the session's changed Plan files with Git, then rerun.
+Never broadly delete coordination state.
 
 ## Project Ownership
 
@@ -94,7 +116,7 @@ Keep source membership synchronized between `WorktreeCli.vcxproj` and
 and is compiled into both tools. Transient operation claims around shared-tool
 consumption use `.agents/scripts/WorktreeCliSessionExclusion.psm1`; bootstrap
 incremental-rebuilds the WorktreeCli, AgentHarness, and ThirdParty primary
-outputs at every session start, and best-effort prebuilds DataPacker Release so
-new worktrees seed it by verified copy. When that prebuild is stamped, bootstrap
-then runs it to re-export the primary game data; that run is not best-effort,
-and a nonzero exit fails session start.
+outputs at each worktree creation or `/reset-worktree`, and best-effort
+prebuilds DataPacker Release so new worktrees seed it by verified copy. When
+that prebuild is stamped, bootstrap then runs it to re-export the primary game
+data; that run is not best-effort, and a nonzero exit fails session setup.

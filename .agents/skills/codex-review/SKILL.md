@@ -24,9 +24,10 @@ entering this session.
 
 Only when the user explicitly asks, in the current session, to run a named
 review or audit skill or a `/plan-alternatives` researcher on Codex. The Change
-Workflow never routes here: the [change-workflow.md](../../references/change-workflow.md) role table
-runs its normal delegated subagents, and this package is retained so the route
-can be re-enabled later.
+Workflow never routes here: the
+[change-workflow.md](../../references/change-workflow.md) role table runs its
+normal delegated subagents, and this package is retained so the route can be
+re-enabled later.
 
 A `/codex-review` invocation of an assigned review skill constitutes the
 delegated-`reviewer` execution context; it is not an "inline run" in the
@@ -185,7 +186,8 @@ single `-NoRetry` re-dispatch; `## Rules` `### Fallback` owns the
 ## Rules
 
 - The calling manager session decides each finding under the
-  [change-workflow.md](../../references/change-workflow.md) rule for review findings.
+  [change-workflow.md](../../references/change-workflow.md) rule for review
+  findings.
 - Never edit code; findings-only conduct is
   [../../references/subagent-reporting.md](../../references/subagent-reporting.md)
   `## Delegated execution context`.

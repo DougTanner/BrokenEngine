@@ -11,14 +11,30 @@ decision. Add public headers to `Common.h`, the single Common aggregation header
 included by `Pch.h`. The PCH-less AgentTools also compile `Sha256Hasher.h` by
 path. ServerMonitor compiles `ServerMonitorProtocol.h` by path.
 
-Focused implementation contracts live in Log (`Log/AGENTS.md`), Math (`Math/AGENTS.md`), and Threading (`Threading/AGENTS.md`). This hub owns only their cross-codebase usage rules.
+Focused implementation contracts live in Log (`Log/AGENTS.md`), Math
+(`Math/AGENTS.md`), and Threading (`Threading/AGENTS.md`). This hub owns only
+their cross-codebase usage rules.
 
 ## Shared Data Contracts
 
-- `DataFile.h` defines `.pack` chunk headers, alignment, payload-offset helpers, texture-size metadata, and shared elevation thresholds. `DataHeader::kiVersion` incorporates `sizeof(ChunkHeader)`; payload sizes are also folded into owning export-job versions where applicable. Same-size layout or semantic changes still require the explicit version bump named by the nearby layout assertion.
-- Payload structs whose raw object representation is written into a chunk declare every alignment gap as an explicit zero-initialized pad member. A compiler-inserted gap holds indeterminate bytes that copies carry into the emitted chunk, so exports from identical inputs produce differing bytes and differing content CRCs; the accompanying offset `static_assert` locks the layout the pad establishes.
-- `ModelMetadata.h` implements the authored `.model.json` sidecar format that ExportJobs owns (`../DataPacker/Source/ExportJobs/AGENTS.md` `## Model Alignment`); change the reader and that contract together.
-- Manifest integrity keeps asset-path identity separate from the CRC of the exact emitted chunk bytes. Changes to layout or digest semantics require regeneration of local packed data.
+- `DataFile.h` defines `.pack` chunk headers, alignment, payload-offset helpers,
+  texture-size metadata, and shared elevation thresholds.
+  `DataHeader::kiVersion` incorporates `sizeof(ChunkHeader)`; payload sizes are
+  also folded into owning export-job versions where applicable. Same-size layout
+  or semantic changes still require the explicit version bump named by the
+  nearby layout assertion.
+- Payload structs whose raw object representation is written into a chunk
+  declare every alignment gap as an explicit zero-initialized pad member. A
+  compiler-inserted gap holds indeterminate bytes that copies carry into the
+  emitted chunk, so exports from identical inputs produce differing bytes and
+  differing content CRCs; the accompanying offset `static_assert` locks the
+  layout the pad establishes.
+- `ModelMetadata.h` implements the authored `.model.json` sidecar format that
+  ExportJobs owns (`../DataPacker/Source/ExportJobs/AGENTS.md`
+  `## Model Alignment`); change the reader and that contract together.
+- Manifest integrity keeps asset-path identity separate from the CRC of the
+  exact emitted chunk bytes. Changes to layout or digest semantics require
+  regeneration of local packed data.
 - `Serialization.h` is the binary `Read`/`Write` surface, including `XMVECTOR`
   round-tripping through `XMFLOAT4`. Never hand-roll equivalent casts. A reader
   of an untrusted source validates counts with the provided count/capacity
@@ -31,9 +47,14 @@ Focused implementation contracts live in Log (`Log/AGENTS.md`), Math (`Math/AGEN
   field with a fixed structural maximum must also be bounded against the
   matching `DataFile.h` `kiMax*` constant — otherwise a header count that fits
   the stream still overruns a fixed-size destination buffer.
-- `Crc.h` owns the repository's non-standard 64-bit CRC family and compile-time string helpers. Preserve its exact semantics wherever values feed deterministic state, manifests, or protocol identity.
-- `Flags<EnumType>` is the serializable and CRC-hashable bitfield wrapper for unsigned enum types.
-- Texture sizing uses `SizeInBytes` for one mip and `ComputeImageByteSize` for a complete mip chain. Do not duplicate the format/extent math in producers or consumers.
+- `Crc.h` owns the repository's non-standard 64-bit CRC family and compile-time
+  string helpers. Preserve its exact semantics wherever values feed
+  deterministic state, manifests, or protocol identity.
+- `Flags<EnumType>` is the serializable and CRC-hashable bitfield wrapper for
+  unsigned enum types.
+- Texture sizing uses `SizeInBytes` for one mip and `ComputeImageByteSize` for a
+  complete mip chain. Do not duplicate the format/extent math in producers or
+  consumers.
 
 ## Allocation-Free Scratch
 
@@ -59,15 +80,27 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
 
 ## Determinism and Math
 
-- Simulation and CRC-fed math uses the deterministic helpers in Math (`Math/AGENTS.md`), including the sanctioned RNG and transcendental replacements. Render-only paths may use non-deterministic library math.
-- DirectXMath stays SSE4-only; AVX/AVX2 is rejected in `ExternalHeaders.h`. Every engine-managed thread configures MXCSR through `ThreadLocal`.
-- `Determinism.h` owns exact IEEE equality for DirectXMath storage/vector types. Byte-identity diagnostics use byte comparison instead.
-- `ValidateVector<IS_POSITION>` checks finite lanes and the repository W invariant at collection boundaries. Position W is `1.0f`; direction, velocity, normal, and offset W is `0.0f`.
+- Simulation and CRC-fed math uses the deterministic helpers in Math
+  (`Math/AGENTS.md`), including the sanctioned RNG and transcendental
+  replacements. Render-only paths may use non-deterministic library math.
+- DirectXMath stays SSE4-only; AVX/AVX2 is rejected in `ExternalHeaders.h`.
+  Every engine-managed thread configures MXCSR through `ThreadLocal`.
+- `Determinism.h` owns exact IEEE equality for DirectXMath storage/vector types.
+  Byte-identity diagnostics use byte comparison instead.
+- `ValidateVector<IS_POSITION>` checks finite lanes and the repository W
+  invariant at collection boundaries. Position W is `1.0f`; direction, velocity,
+  normal, and offset W is `0.0f`.
 
 ## Logging and Threading Usage
 
-- `LOG(category, level, format, ...)` is compile-time and runtime filtered. Allocation-tracked call sites must stay allocation-free; use the Common formatters/workbuffer wrappers rather than temporary strings. New formatters for Common-visible types belong in `Log/LogFormatters.h`; higher-layer formatters stay with their owning hub.
-- `kTemp` is reserved for transient diagnostics. Durable messages use the owning category and the root log-level meanings. Temporary code, including `kTemp` logs, never lands, so never review or style-check it beyond removing it.
+- `LOG(category, level, format, ...)` is compile-time and runtime filtered.
+  Allocation-tracked call sites must stay allocation-free; use the Common
+  formatters/workbuffer wrappers rather than temporary strings. New formatters
+  for Common-visible types belong in `Log/LogFormatters.h`; higher-layer
+  formatters stay with their owning hub.
+- `kTemp` is reserved for transient diagnostics. Durable messages use the owning
+  category and the root log-level meanings. Temporary code, including `kTemp`
+  logs, never lands, so never review or style-check it beyond removing it.
 - Use `gpMultithreading->Dispatch()` for bounded data-parallel work. For a
   long-lived single worker, follow the scheduling and lifecycle constraints in
   `Threading/AGENTS.md`. A pool dispatch is non-reentrant. Temporary allocations
@@ -75,7 +108,10 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
 
 ## Headers, Validation, and Platform
 
-- PCH-backed standard-library and third-party consumption headers belong in `ExternalHeaders.h`, gated by the applicable build defines. The PCH-less AgentTools use `Tools/ToolCommon/ToolCliCommon.h`; third-party implementation units keep upstream implementation includes in `ThirdParty/Prebuilts/Source/`.
+- PCH-backed standard-library and third-party consumption headers belong in
+  `ExternalHeaders.h`, gated by the applicable build defines. The PCH-less
+  AgentTools use `Tools/ToolCommon/ToolCliCommon.h`; third-party implementation
+  units keep upstream implementation includes in `ThirdParty/Prebuilts/Source/`.
 - Use `ASSERT`, `CHECK_HRESULT`, and `VERIFY_SUCCESS`; standard `assert` is
   deliberately unavailable. `DEBUG_BREAK()` always logs one `kWarning` naming
   its call site, so a break stays visible with no debugger attached, and breaks
@@ -96,12 +132,19 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
   that commits pages inside one address-space reservation taken on first use, so
   its base address never moves and growth past the reservation asserts), and the
   `StringUtils.h` / `FileUtils.h` helpers. `Common.h` is the full index.
-- `ThreadLocal` installs per-thread exception handlers and process-wide handlers through one-time initialization. Stack walking is serialized through the shared DbgHelp mutex; do not call DbgHelp independently. `ScopedExpectedThrows` suppresses designed C++-throw diagnostics, not the handling of Windows structured exceptions — crashes such as access violations.
-- `WindowsUtils.h` is the shared Win32 wrapper surface. Prefer its error, file-time, processor-topology, and child-process helpers and its `ScopedHandle` `HANDLE` owner over parallel wrappers.
+- `ThreadLocal` installs per-thread exception handlers and process-wide handlers
+  through one-time initialization. Stack walking is serialized through the
+  shared DbgHelp mutex; do not call DbgHelp independently.
+  `ScopedExpectedThrows` suppresses designed C++-throw diagnostics, not the
+  handling of Windows structured exceptions — crashes such as access violations.
+- `WindowsUtils.h` is the shared Win32 wrapper surface. Prefer its error,
+  file-time, processor-topology, and child-process helpers and its
+  `ScopedHandle` `HANDLE` owner over parallel wrappers.
 
 ## See Also
 
 - `Log/AGENTS.md` - filtering, buffers, formatting, and difference diagnostics
 - `Math/AGENTS.md` - deterministic algorithms, RNG, and convex hulls
 - `Threading/AGENTS.md` - pool, persistent-worker, and thread-local lifecycle
-- Engine Memory (`../Engine/Source/Memory/AGENTS.md`) - allocator override and tracked-loop policy
+- Engine Memory (`../Engine/Source/Memory/AGENTS.md`) - allocator override and
+  tracked-loop policy

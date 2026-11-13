@@ -27,8 +27,8 @@ diff, before main asks the confirmation.
    and `landing.submodules` rows, recording exact path, owner/persistence
    contract, evidence, and `unchanged`, `intentionally persisted`, `restored`,
    or non-passing `residual` outcome. A reviewed path reported dirty whose
-   working-tree bytes match the reviewed `-Head` tree is the expected state of an
-   uncommitted candidate and classifies as `intentionally persisted`.
+   working-tree bytes match the reviewed `-Head` tree is the expected state of
+   an uncommitted candidate and classifies as `intentionally persisted`.
 
 The run writes only the named result file and emits one summary line on stdout.
 `-Landing` requires a commit-valued `-Head` and excludes the other modes.

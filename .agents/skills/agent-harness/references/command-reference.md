@@ -1,20 +1,42 @@
 # Agent Harness Command Reference
 
-Engine-owned commands, identical for every game project: the shared commands both endpoints accept, and the client and server commands the engine dispatches. The selected project's hub, `Projects/<Project>/Documents/AgentHarness.md`, routes that project's own command schemas.
+Engine-owned commands, identical for every game project: the shared commands
+both endpoints accept, and the client and server commands the engine dispatches.
+The selected project's hub, `Projects/<Project>/Documents/AgentHarness.md`,
+routes that project's own command schemas.
 
-Every field below belongs under request `params`; every returned field belongs under response `result`. Sending a side-specific command to the other executable still returns `unknown command`. The six shared commands below do not capture or drive desktop windows.
+Every field below belongs under request `params`; every returned field belongs
+under response `result`. Sending a side-specific command to the other executable
+still returns `unknown command`. The six shared commands below do not capture or
+drive desktop windows.
 
-A project may take over an engine client or server command: its handler runs before the engine's, validates its own parameters, calls the engine command, and then appends its own fields. Its added parameters and fields are documented in its own command files, beside a link to the engine entry here.
+A project may take over an engine client or server command: its handler runs
+before the engine's, validates its own parameters, calls the engine command, and
+then appends its own fields. Its added parameters and fields are documented in
+its own command files, beside a link to the engine entry here.
 
-Positions in any command's result are cell-local: a `local` array is meters from the center of the cell, and a `coord` array beside it names that cell whenever a report's rows span cells. A project command may name its pair differently (the selected project's command files). No command reports absolute world meters; derive them from the pair when they are wanted.
+Positions in any command's result are cell-local: a `local` array is meters from
+the center of the cell, and a `coord` array beside it names that cell whenever a
+report's rows span cells. A project command may name its pair differently (the
+selected project's command files). No command reports absolute world meters;
+derive them from the pair when they are wanted.
 
-The Server Monitor is a separate Windows program showing the server monitor channel; use the [server-monitor recipe](server-monitor.md#server-monitor-window-capture-and-click) when that window must be observed or clicked.
+The Server Monitor is a separate Windows program showing the server monitor
+channel; use the
+[server-monitor recipe](server-monitor.md#server-monitor-window-capture-and-click)
+when that window must be observed or clicked.
 
 ## Shared commands
 
-- `ping`: no params. Returns `{"build":"server"|"client","tick":int}`; tick is `-1` before game creation.
+- `ping`: no params. Returns `{"build":"server"|"client","tick":int}`; tick is
+  `-1` before game creation.
 - `quit`: no params. Requests clean shutdown; server autosaves. Returns `{}`.
-- `get_logs`: `{"count"?:64,"pattern"?:"ECMAScript regex","category"?:"Default|Temp|Audio|Graphics|Loading|NavData|Network|Input|Replay"}`. Pattern scans the whole selected wrapping ring (512 cross-category lines when category is omitted; 128 lines for one category), then returns the last `count` matching lines chronologically as `{"lines":[...]}`. Matching is case-sensitive; use character classes rather than `(?i)`.
+- `get_logs`:
+  `{"count"?:64,"pattern"?:"ECMAScript regex","category"?:"Default|Temp|Audio|Graphics|Loading|NavData|Network|Input|Replay"}`.
+  Pattern scans the whole selected wrapping ring (512 cross-category lines when
+  category is omitted; 128 lines for one category), then returns the last
+  `count` matching lines chronologically as `{"lines":[...]}`. Matching is
+  case-sensitive; use character classes rather than `(?i)`.
 - `set_log_level`:
   `{"level":"Verbose|Debug|Info|Warning|Error","category"?:name}`. Returns one
   effective level or a category map. Each category has a compile-time floor, set
@@ -27,45 +49,44 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   lines lowers that category's floor through a temporary verification edit
   ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md)
   `#### Step 5 — Run targeted pre-review checks`).
-- `cell_coordinate_probe`: `{"coord":[q,r],"navigation"?:{"graphs":[g0,g1],"points":[[x0,y0],[x1,y1]]}}`.
-  Both endpoints accept the coord-only form. Unknown top-level keys or a
-  missing `coord` fail with
+- `cell_coordinate_probe`:
+  `{"coord":[q,r],"navigation"?:{"graphs":[g0,g1],"points":[[x0,y0],[x1,y1]]}}`.
+  Both endpoints accept the coord-only form. Unknown top-level keys or a missing
+  `coord` fail with
   `cell_coordinate_probe accepts only 'coord' and optional 'navigation'`. Any
   pair of integers in the signed-int32 range is valid — the cell needs no
-  subscription, no loaded frame, and no adjacency — while a non-array `coord`
-  or an array of any other size fails with `'coord' must be a [q,r] array`, a
+  subscription, no loaded frame, and no adjacency — while a non-array `coord` or
+  an array of any other size fails with `'coord' must be a [q,r] array`, a
   non-integer value with `'coord' must be an array of 2 integers`, and an
   integer outside that range with
-  `'coord' values must fit in a signed 32-bit integer`. Its one
-  precondition is loaded island templates; without them it fails with
+  `'coord' values must fit in a signed 32-bit integer`. Its one precondition is
+  loaded island templates; without them it fails with
   `cell_coordinate_probe requires loaded island templates`. Read-only: it
-  generates throwaway static data for the requested cell, reports it, and
-  frees it, changing no live cell, tick, or
-  subscription. Returns
+  generates throwaway static data for the requested cell, reports it, and frees
+  it, changing no live cell, tick, or subscription. Returns
   `{"coord":[q,r],"area":{"width":float,"height":float},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64,"liveCrc"?:uint64},"islands":[{"crc":uint64,"x":float,"y":float,"rotation":float,"footprint":[x,y],"peak":float},...],"elevation":{"crc":uint64}}`,
   where `area` is the cell hexagon's bounding rectangle, twice `kfCellHalfWidth`
-  by twice `kfCellHalfHeight`.
-  Run the same coordinate on the client and on the server and require
-  `placements.crc` and `elevation.crc` to match between them; the two endpoints
-  generate the cell independently from the same coordinate. `islands` holds one
-  row per generated placement in list order, placements centred in the cell
-  first: `crc` is the island's, `x` and `y` are centered cell-local meters that
-  may lie outside the cell for an island that crosses into it, `rotation` is
-  radians with no normalized range, and `footprint` and `peak` are its
-  template's scaled meters.
-  `placements.liveCrc` is present only when that endpoint's `mCells` holds the
-  coordinate: it folds the live cell's list the way `crc` folds the generated
-  one, so it witnesses what a load or a static-data transfer left in the cell.
-  In a `kbDebugInput` build the main-menu origin cell instead holds the single
-  island `BuildMenuIslandPlacement` picks, so there it need not match `crc`.
-  Optional `navigation` is server-only; the client rejects it with
-  `cell_coordinate_probe 'navigation' is server-only`. Its object requires
-  exactly `graphs` and `points`. `graphs` is a nonempty array of valid integer
-  indices into the production cell navigation data, repeats allowed; `points`
-  is an array of finite float XY pairs in centered cell-local meters and may be
-  empty for contour discovery. Malformed requests return ordinary command
-  errors. Graph indices carry no ship-type or flight-plane mapping.
-  Only navigation requests build the production navigation graphs. They append
+  by twice `kfCellHalfHeight`. Run the same coordinate on the client and on the
+  server and require `placements.crc` and `elevation.crc` to match between them;
+  the two endpoints generate the cell independently from the same coordinate.
+  `islands` holds one row per generated placement in list order, placements
+  centred in the cell first: `crc` is the island's, `x` and `y` are centered
+  cell-local meters that may lie outside the cell for an island that crosses
+  into it, `rotation` is radians with no normalized range, and `footprint` and
+  `peak` are its template's scaled meters. `placements.liveCrc` is present only
+  when that endpoint's `mCells` holds the coordinate: it folds the live cell's
+  list the way `crc` folds the generated one, so it witnesses what a load or a
+  static-data transfer left in the cell. In a `kbDebugInput` build the main-menu
+  origin cell instead holds the single island `BuildMenuIslandPlacement` picks,
+  so there it need not match `crc`. Optional `navigation` is server-only; the
+  client rejects it with `cell_coordinate_probe 'navigation' is server-only`.
+  Its object requires exactly `graphs` and `points`. `graphs` is a nonempty
+  array of valid integer indices into the production cell navigation data,
+  repeats allowed; `points` is an array of finite float XY pairs in centered
+  cell-local meters and may be empty for contour discovery. Malformed requests
+  return ordinary command errors. Graph indices carry no ship-type or
+  flight-plane mapping. Only navigation requests build the production navigation
+  graphs. They append
   `"navigation":{"graphs":[{"index":g0,"vertices":[[x,y],...],"polygonOffsets":[offset,...],"reachableEdges":[bool,...]},...],"samples":[{"xy":[x0,y0],"elevation":float,"blocked":[true,false]},...]}`
   to the existing result. Graphs and samples preserve request order, and each
   sample's `blocked` array follows the requested graph order. Offsets are
@@ -104,7 +125,11 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   `Network` `Debug` level, `Server::Receive dropped corrupt packet`. For example
   `{"bytes":[0]}` sends a server-only packet type, which the server counts as
   one corrupt-data violation with reason `not client-sendable`.
-- `desync_probe`: packet mode `{"desyncReports"?:0..8,"debugFrameRequests"?:0..8}` or mutually exclusive recovery mode `{"triggerRecovery":true}`. Requires an accepted connected client and in-game current state. Returns `{"tick","coord":[q,r],"desyncDebugFrames","stalled","desyncReports","debugFrameRequests","triggerRecovery"}`.
+- `desync_probe`: packet mode
+  `{"desyncReports"?:0..8,"debugFrameRequests"?:0..8}` or mutually exclusive
+  recovery mode `{"triggerRecovery":true}`. Requires an accepted connected
+  client and in-game current state. Returns
+  `{"tick","coord":[q,r],"desyncDebugFrames","stalled","desyncReports","debugFrameRequests","triggerRecovery"}`.
 - `set_client_grid_coord`: `{"coord":[q,r]}`. The object accepts only `coord`,
   an array of exactly two integers anywhere in the signed-int32 range; only an
   integer that does not fit in `int32` is rejected. Moves the client's grid cell
@@ -122,9 +147,18 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   clears it. The pin is never persisted. The server remains the subscription
   authority — a cell other than origin whose `GridDistance` from every
   authorized cell exceeds 1 is accepted locally and rejected on the wire.
-- `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[q,r]}`. The viewer stays in that cell until the next game writer, such as an owned-entity event, moves it.
-- `screenshot`: `{"path"?,"maxWidth"?,"format"?:"jpg"|"png","quality"?}`; `maxWidth` defaults to `ScreenshotRequest::iMaxWidth` and `quality` to `ScreenshotRequest::iQuality`.
-  A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
+- `release_client_grid_coord`: no params (only an empty object is accepted).
+  Requires a running game. Clears the `set_client_grid_coord` pin and returns
+  the current `{"clientGridCoord":[q,r]}`. The viewer stays in that cell until
+  the next game writer, such as an owned-entity event, moves it.
+- `screenshot`: `{"path"?,"maxWidth"?,"format"?:"jpg"|"png","quality"?}`;
+  `maxWidth` defaults to `ScreenshotRequest::iMaxWidth` and `quality` to
+  `ScreenshotRequest::iQuality`. A `quality` outside `1..100` is a parameter
+  error. A `maxWidth` value `<= 0` disables downscaling and preserves native
+  framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>`
+  using the process temp directory. Returns `{"path","width","height"}` — the
+  saved file and its pixel dimensions, never image bytes. Requires
+  `kbScreenshots`.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
   `{"paths":[absolute .rdc paths]}`. Requires a client launched with
@@ -137,10 +171,18 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   wall-clock, so set `--timeout-ms` at least as large as the expected wall-clock
   capture time. See
   [RenderDoc capture](renderdoc.md).
-- `resize`: `{"width","height"}` within `320x180..16384x16384`; rounds each to 8, then returns OS-applied `{"width","height"}`. Rejects while minimized and never changes persisted/fullscreen state.
-- `fullscreen`: `{"on":bool}`. Toggles borderless fullscreen/windowed without persisting. Windowed restore uses launch extent, not a later resize. Returns `{"fullscreen","width","height"}`. Rejects while minimized.
-- `window_state`: `{"minimized":bool}`. Minimize uses normal minimize; restore does not activate and waits for settled swapchain. Returns `{"minimized","width"?,"height"?}`.
-- `audio_resume`: no params. Resumes client audio; an agent client boots with audio suspended, so send this before any scenario that must observe audio. Completes synchronously with the normal envelope; repeating it is accepted.
+- `resize`: `{"width","height"}` within `320x180..16384x16384`; rounds each to
+  8, then returns OS-applied `{"width","height"}`. Rejects while minimized and
+  never changes persisted/fullscreen state.
+- `fullscreen`: `{"on":bool}`. Toggles borderless fullscreen/windowed without
+  persisting. Windowed restore uses launch extent, not a later resize. Returns
+  `{"fullscreen","width","height"}`. Rejects while minimized.
+- `window_state`: `{"minimized":bool}`. Minimize uses normal minimize; restore
+  does not activate and waits for settled swapchain. Returns
+  `{"minimized","width"?,"height"?}`.
+- `audio_resume`: no params. Resumes client audio; an agent client boots with
+  audio suspended, so send this before any scenario that must observe audio.
+  Completes synchronously with the normal envelope; repeating it is accepted.
 - `audio_streaming_harness_rig`: Debug-only music streaming controls and
   snapshot, exact schema
   `{"action":"inspect"|"play"|"clear"|"suspend"|"resume"|"clear_history"|"hold_read"|"release_read"|"stall_loaders"|"release_loaders"|"stop_publication"|"resume_publication"|"load_chunk"}`
@@ -193,14 +235,13 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   `cancelAcknowledged` is true when the cancelled entry was freed at that point;
   `existing_queued` for a whole-chunk load queued from the main thread; and
   `existing_complete` for a finished whole-chunk or range load.
-- `dump_render_target`:
-  `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list
-  valid names. `Combine` and `LightingHistory` take `index` =
+- `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`.
+  Unknown names list valid names. `Combine` and `LightingHistory` take `index` =
   lighting layer * 3 + color (0-5), and `AmbientCombine` and `AmbientHistory`
-  the lighting layer (0-1); `Lighting`, `Spread`, and `SpreadOnly` are the
-  one scratch chain the refreshing layer reuses, so `Lighting` reads blank on
-  a frame with no lighting refresh. Single-channel output normalizes to grayscale PNG;
-  four-byte RGBA writes direct PNG; float formats require raw `.bin`. The
+  the lighting layer (0-1); `Lighting`, `Spread`, and `SpreadOnly` are the one
+  scratch chain the refreshing layer reuses, so `Lighting` reads blank on a
+  frame with no lighting refresh. Single-channel output normalizes to grayscale
+  PNG; four-byte RGBA writes direct PNG; float formats require raw `.bin`. The
   default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires
   `kbScreenshots`.
 - `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
@@ -243,7 +284,11 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   and `F1`–`F24`. Returns `{"ok":true}`. While the client is not rendering
   (minimized or swapchain recreate deferred), only the RawInput overlay takes
   effect; `key` sends no ImGui event.
-- `type_text`: `{"text":string}`. Types the UTF-8 text into the active ImGui text field through ImGui character input, then presses and releases Enter on its own frames. An empty string only presses Enter. A missing, non-string, or longer-than-256-byte `text` fails with `type_text requires string 'text'`. Returns `{"ok":true}`.
+- `type_text`: `{"text":string}`. Types the UTF-8 text into the active ImGui
+  text field through ImGui character input, then presses and releases Enter on
+  its own frames. An empty string only presses Enter. A missing, non-string, or
+  longer-than-256-byte `text` fails with `type_text requires string 'text'`.
+  Returns `{"ok":true}`.
 - `wheel`: `{"notches"?:1}`. Adds mouse-wheel notches for camera zoom only: no
   coordinates, buttons, or ImGui event, so it never scrolls an ImGui window.
   `notches` is an integer in `-17895697..17895697` whose running total with
@@ -257,17 +302,16 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   while the F3 Tweaks overlay is shown), `gameFlags`, `tick`, `clientGridCoord`,
   `subscribedCoords`,
   `cellStates[{coord,confirmedTick,confirmedOffset,highWaterValidatedTick,lastFullStateTick,snapshotHead,snapshotCount,lastRenderedTick,serverUpdateCount,lastReplayConfirmedTick,lastReplayServerUpdateCount,stuckFrameCount,pendingFullStateTick:int|null,firstServerUpdateTick:int|null,lastServerUpdateTick:int|null,tailTick}]`,
-  and `islands[{coord,local,rotation,footprint?}]`.
-  `camera.basisCoord` is the cell the camera's own values are local to: `eye`
-  and `visibleArea` are in that cell's meters, while each row's `local` is in
-  its own `coord` cell, so compare them only after adding the center offset of
-  the axial delta `[dq,dr] = coord - basisCoord`, which is
-  `[dq * 779.42, dq * 450 + dr * 900]` meters. An island's `local` is its placement
-  center in its cell's meters. `cellStates` has one row per `subscribedCoords`
-  entry, whether or not the cell has a snapshot, and reports that cell's
-  reconciliation state: `confirmedTick` is -1 until the cell adopts a full
-  state, and again after a resync reset, and `tailTick` is the newest snapshot
-  tick, or -1 with no snapshot.
+  and `islands[{coord,local,rotation,footprint?}]`. `camera.basisCoord` is the
+  cell the camera's own values are local to: `eye` and `visibleArea` are in that
+  cell's meters, while each row's `local` is in its own `coord` cell, so compare
+  them only after adding the center offset of the axial delta
+  `[dq,dr] = coord - basisCoord`, which is `[dq * 779.42, dq * 450 + dr * 900]`
+  meters. An island's `local` is its placement center in its cell's meters.
+  `cellStates` has one row per `subscribedCoords` entry, whether or not the cell
+  has a snapshot, and reports that cell's reconciliation state: `confirmedTick`
+  is -1 until the cell adopts a full state, and again after a resync reset, and
+  `tailTick` is the newest snapshot tick, or -1 with no snapshot.
 - `query_profile`: no params (only an empty object is accepted). Client-only
   profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for
   every timer row, including zeros, frame-coherent
@@ -282,19 +326,20 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   while `targetBehindTicks` is the positive stored value, and all three read
   zero until a client session publishes a clock correction. `fps` is the frame
   count the profile overlay's fps header prints (renders in the last second),
-  sampled at the moment of the query.
-  Also returns `cpuTimers[{index,name,displayUs,displayAllocations,threads,visible}]`
-  for every CPU timer in index order, including hidden zero rows. `index`,
-  `displayUs`, `displayAllocations`, and `threads` are integers; `name` preserves
-  its exact table text, including indentation, and `visible` is boolean. The
-  display values are the stored smoothed microseconds and allocation counts
-  used by the CPU overlay; visibility is the formatter's stored decision and
-  may remain unchanged while another screen is selected. Timer fields and names
-  are copied under the CPU timer mutex at query time. `cpuTimerText` is a string
-  copied from the CPU timer area's explicit retained character span, preserving
-  whitespace and empty contents exactly. It is empty after the area is cleared.
-  The text reflects the most recent publication to that area; it and the structured
-  timer fields have distinct cadences and need not describe the same frame.
+  sampled at the moment of the query. Also returns
+  `cpuTimers[{index,name,displayUs,displayAllocations,threads,visible}]` for
+  every CPU timer in index order, including hidden zero rows. `index`,
+  `displayUs`, `displayAllocations`, and `threads` are integers; `name`
+  preserves its exact table text, including indentation, and `visible` is
+  boolean. The display values are the stored smoothed microseconds and
+  allocation counts used by the CPU overlay; visibility is the formatter's
+  stored decision and may remain unchanged while another screen is selected.
+  Timer fields and names are copied under the CPU timer mutex at query time.
+  `cpuTimerText` is a string copied from the CPU timer area's explicit retained
+  character span, preserving whitespace and empty contents exactly. It is empty
+  after the area is cleared. The text reflects the most recent publication to
+  that area; it and the structured timer fields have distinct cadences and need
+  not describe the same frame.
 - `presentation_continuity_probe`: no params (only an empty object is accepted).
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns
@@ -302,7 +347,9 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   plus a `shadow` and `smoke` object and a `lighting` array of one such object
   per lighting layer, layer 0 first, each shaped
   `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w]}`;
-  `smoke` reports flight plane 0's area pair, the pair wind reads. Take
+  `smoke` reports flight plane 0's area pair, the pair wind reads. A top-level
+  `objectShadowArea` `[x,y,z,w]` holds the area the object-shadow textures were
+  last drawn for, which consumers sample through between refreshes. Take
   every sample with the client restored (`window_state {"minimized":false}`): a
   minimized client defers swapchain recreation, publishes no frame, and leaves
   the whole snapshot standing still. `publishedFrames` counts publications, so
@@ -311,10 +358,10 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   camera's cell-local position in the top-level `basisCoord`;
   `reducedNoiseOrigin` is a unitless reduced phase value rather than a position,
   and `noiseFrequency` is the multiplier the noise reduction applies to the
-  absolute camera position before reducing modulo 10. Each
-  `currentArea`/`previousArea` is a cell-local rectangle in the top-level
-  `basisCoord`, in the shared component order `x`=left, `y`=top, `z`=right,
-  `w`=bottom. A `lattices` object holds
+  absolute camera position before reducing modulo 10. Each `currentArea`,
+  `previousArea`, and `objectShadowArea` is a cell-local rectangle in the
+  top-level `basisCoord`, in the shared component order `x`=left, `y`=top,
+  `z`=right, `w`=bottom. A `lattices` object holds
   one randomized patch blending lattice per blended texture read, keyed
   `waterNormalOneOctaveOne`, `waterNormalTwoOctaveOne`,
   `waterNormalThreeOctaveOne`, `waterColorNoiseOne`, `waterColorNoiseTwo`,
@@ -325,22 +372,30 @@ The Server Monitor is a separate Windows program showing the server monitor chan
 
 ### Client command behavior
 
-Client input/capture commands can defer across frames. The single channel remains occupied until the response; size timeout accordingly and never overlap calls.
+Client input/capture commands can defer across frames. The single channel
+remains occupied until the response; size timeout accordingly and never overlap
+calls.
 
-Capture commands temporarily restore a minimized client without activation, wait for extent settlement, capture, then re-minimize. An already-visible client fails if swapchain recreation is deferred. `resize`/`fullscreen` reject minimized state; restore first. `click`, `set_slider`, and `type_text` fail while the client is not rendering (minimized or swapchain recreate deferred); restore first. After resize/fullscreen/restore, call `describe_ui` or `screenshot` to remeasure.
+Capture commands temporarily restore a minimized client without activation, wait
+for extent settlement, capture, then re-minimize. An already-visible client
+fails if swapchain recreation is deferred. `resize`/`fullscreen` reject
+minimized state; restore first. `click`, `set_slider`, and `type_text` fail
+while the client is not rendering (minimized or swapchain recreate deferred);
+restore first. After resize/fullscreen/restore, call `describe_ui` or
+`screenshot` to remeasure.
 
 The harness drives ImGui UI only by item activation: `click` and `set_slider`
-activate the item behind a labeled `describe_ui` entry by its ImGui ID unless
-it is disabled, and no command sends an ImGui mouse position, button, or wheel
-event. On an agent client ImGui does not clip items, so an item
-outside the viewport or its window's visible area — a slid-away
-panel's buttons, a row scrolled out of view — is listed with
-`visible:false` and activates like a visible one; only items
-inside a fully clipped child window are skipped. Side effects: offscreen labels
-take part in label resolution, so a label unique on screen can become
-ambiguous, and `window` narrows the match; offscreen widgets also run their
-full behavior and draw code. Mouse-only widgets (curve-editor control points, ImPlot plot
-interactions) and hover effects, such as hover-opened panels, cannot be driven.
+activate the item behind a labeled `describe_ui` entry by its ImGui ID unless it
+is disabled, and no command sends an ImGui mouse position, button, or wheel
+event. On an agent client ImGui does not clip items, so an item outside the
+viewport or its window's visible area — a slid-away panel's buttons, a row
+scrolled out of view — is listed with `visible:false` and activates like a
+visible one; only items inside a fully clipped child window are skipped. Side
+effects: offscreen labels take part in label resolution, so a label unique on
+screen can become ambiguous, and `window` narrows the match; offscreen widgets
+also run their full behavior and draw code. Mouse-only widgets (curve-editor
+control points, ImPlot plot interactions) and hover effects, such as
+hover-opened panels, cannot be driven.
 
 Command results never prove on-screen visibility: a rendered-appearance
 criterion needs a screenshot showing the target, and no generic command reveals
@@ -369,8 +424,14 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   update interval (`TimeStep::SimulationToWall(kTickNanoseconds)`), which at 1/1
   is shorter than one AgentHarness call, so a wait between the two commands, or
   a faster timescale, lets extra ticks run.
-- `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
-- `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Every loaded cell is saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns `{"file"}`.
+- `timescale`: `{"faster":bool}`. Steps the shared timescale and returns
+  `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}`
+  there changes nothing and still succeeds.
+- `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also
+  `load`'s) is an appdata-relative bare filename; empty names, NUL, separators,
+  `..`, `:`, and Windows device basenames are rejected. Every loaded cell is
+  saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns
+  `{"file"}`.
 - `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`
   must be Boolean when present; invalid parameters fail before loading or
   resetting and do not change pause state. Missing/corrupt/truncated data resets
@@ -380,7 +441,8 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   pauses after a successful load or completed fresh fallback, before frame
   inputs can be constructed. Returns
   `{"file","resetToFresh":bool,"paused":bool}`.
-- `reset`: no params. Resets the server to a fresh game, game-owned server state included. Returns `{}`.
+- `reset`: no params. Resets the server to a fresh game, game-owned server state
+  included. Returns `{}`.
 - `create_cell`: `{"coord":[q,r]}`; `coord` is the only key. Creates a fresh
   cell at a coordinate that has none, sets its frame value `uiPinned` to 1, and
   returns `{"coord":[q,r]}`. A pinned cell stays in `status.activeCoords` across
@@ -396,7 +458,10 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   (`create_cell is refused while recording, during playback, or with a
   replay_record or replay_play transition pending`), and on a coordinate that
   already has a cell (`coord already has a cell; pin it with edit_frame`).
-- `replay_record`: `{"start":bool}`. Schedules or cancels an idempotent recording transition and returns `{"pending":bool}`. Poll `status.recording` for the effective transition. `{"start":true}` fails while playback is active or pending. Requires `kbDebugInput`.
+- `replay_record`: `{"start":bool}`. Schedules or cancels an idempotent
+  recording transition and returns `{"pending":bool}`. Poll `status.recording`
+  for the effective transition. `{"start":true}` fails while playback is active
+  or pending. Requires `kbDebugInput`.
 - `replay_play`: no params. Starts playback or cancels active playback and
   returns `{"pending":true}`. Fails while recording is active or a record start
   or stop is pending. Poll `status.replaying`. Per-tick checks call
@@ -428,22 +493,26 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   are not historical timing evidence. `writerInputCount` is the total
   normal-writer update ticks since a successful recording start; terminal
   flushes do not increment it. Requires `kbDebugInput`.
-- `replay_drop_retained_end_frame`: `{"coord":[q,r]}`. During recording, removes the retained terminal frame from that coordinate's most recently terminalized generation: the last generation when it is terminal, otherwise the generation immediately before the open last generation. Returns `{"coord":[q,r],"dropped":true}`. Requires `kbDebugInput`.
+- `replay_drop_retained_end_frame`: `{"coord":[q,r]}`. During recording, removes
+  the retained terminal frame from that coordinate's most recently terminalized
+  generation: the last generation when it is terminal, otherwise the generation
+  immediately before the open last generation. Returns
+  `{"coord":[q,r],"dropped":true}`. Requires `kbDebugInput`.
 - `replay_inject_persistence_failure`:
   `{"stage":"invalidation"|"grid"|"transfer_capture"|"coordinate_writer"|"fullframes_record"|"metadata"|"inventory"|"final_manifest","coord"?:[q,r]}`.
   `coordinate_writer` and `fullframes_record` require `coord`; every other stage
   rejects it. `invalidation` and `grid` require inactive recording; every other
   stage requires active recording. `transfer_capture` invalidates recording when
   the next accepted post-tick batch (transfers and spawns) reaches replay
-  capture, before a writer is created or changed; the live batch still proceeds. `coordinate_writer` and
-  `fullframes_record` resolve their target when armed: they select the open last
-  generation when present, otherwise the most recently terminalized generation
-  with retained state. A later generation append cannot redirect either failure.
-  After the selected writer saves, `fullframes_record` atomically truncates its
-  nonempty `.fullframes` file by one byte before final artifact hashing; a
-  mutation I/O failure deletes that writer's complete sibling set and prevents
-  manifest publication. `inventory` is consumed immediately before final
-  artifact hashing and manifest publication. Returns
+  capture, before a writer is created or changed; the live batch still proceeds.
+  `coordinate_writer` and `fullframes_record` resolve their target when armed:
+  they select the open last generation when present, otherwise the most recently
+  terminalized generation with retained state. A later generation append cannot
+  redirect either failure. After the selected writer saves, `fullframes_record`
+  atomically truncates its nonempty `.fullframes` file by one byte before final
+  artifact hashing; a mutation I/O failure deletes that writer's complete
+  sibling set and prevents manifest publication. `inventory` is consumed
+  immediately before final artifact hashing and manifest publication. Returns
   `{"stage","coord"?:[q,r],"armed":true}`; the response does not expose a
   generation selector. Requires `kbDebugInput`.
 - `query_profile`: server-only CPU profile query. `params` must be `{}`; any
@@ -463,9 +532,14 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   records. The client `query_profile` remains `{}`-only; its response is the
   client entry under `## Client commands`.
 
-Every server `[q,r]` axial grid-coordinate parameter (`coord`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used.
+Every server `[q,r]` axial grid-coordinate parameter (`coord`) must hold two
+JSON integer literals, with no fraction or exponent, within the signed 32-bit
+range; any other component, including a whole-valued `1.0` or `1e0`, fails the
+command before that coordinate is looked up or used.
 
-Pause/timescale persist on an empty server. They reset only when the last connected client disconnects. A client may join a paused server and render frozen state, but spawning still needs an unpaused tick.
+Pause/timescale persist on an empty server. They reset only when the last
+connected client disconnects. A client may join a paused server and render
+frozen state, but spawning still needs an unpaused tick.
 
 ## Durable caveats
 
@@ -482,7 +556,8 @@ Pause/timescale persist on an empty server. They reset only when the last connec
   cohorts. The build configuration each side requires is stated in
   [`../SKILL.md`](../SKILL.md) `## Inputs`.
 - Engine command handlers live under `Engine/Source/Agent`: the shared ones in
-  `AgentCommandsShared.cpp`, the client ones in `AgentCommandsClientGeneric.cpp`,
-  the server ones in `AgentCommandsServerGeneric.cpp`, and focused command
-  modules under `Commands/`. A project's own handlers and its take-overs live
-  under the selected project's `Source/Agent`.
+  `AgentCommandsShared.cpp`, the client ones in
+  `AgentCommandsClientGeneric.cpp`, the server ones in
+  `AgentCommandsServerGeneric.cpp`, and focused command modules under
+  `Commands/`. A project's own handlers and its take-overs live under the
+  selected project's `Source/Agent`.

@@ -1,31 +1,70 @@
 # Audio - XAudio2 Presentation
 
-Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManager` is exposed as `gpAudioManager`; static voices own spatial one-shots and persistent sounds, while streaming voices own music playback and crossfades.
+Client-only 3D and streaming audio through DirectXTK `AudioEngine`.
+`AudioManager` is exposed as `gpAudioManager`; static voices own spatial
+one-shots and persistent sounds, while streaming voices own music playback and
+crossfades.
 
 ## Runtime Contracts
 
-- The mastering graph is pinned to `kiMasteringSampleRate` to match DataPacker audio. Preserve that rate through device resets; Windows may convert only at the final shared-mode output.
-- Construct one stable `AudioEngine` and attach voice subsystems to it once. Static and streaming voices retain its raw pointer, so recover a silent or lost device by resetting the existing engine rather than replacing it.
-- Treat the default-endpoint query, graph reset, and XAudio2 results as trust boundaries. A missing device leaves a usable silent engine; recovery must clear stale source voices before normal playback resumes.
-- Packed audio metadata is a trust boundary: every path that hands a wave format and byte range to XAudio2 calls `AssertValidPackedAudio` (`AudioUtility.h`) first, including any new voice-creation path.
-- `AudioManager::Update` runs post-render on the main thread and owns XAudio2 pumping, streaming-range request and poll calls, and in-order buffer submission. XAudio2 buffer callbacks publish only atomic completion. AudioEngine reset/error notifications are delivered on the caller thread. File-side behavior follows the [packed-assets contract](../File/AGENTS.md#packed-assets).
-- Each streaming voice reads ahead through three fixed 16 KiB slots. Preserve its request and submit order when a later range completes first, and retry a full File result pool without advancing the slot, cursor, or destination.
-- Keep the current stream and newest fade eligible to request data, cancel older fades' pending reads before demotion, and cancel every pending streaming read before clearing or destroying its voice or resetting the audio graph.
-- Suspend stops XAudio2 processing before clearing voices. Teardown distinguishes voices already destroyed by device loss from voices still owned by the engine.
-- The [Agent audio harness rig](../Agent/AGENTS.md) may inspect streaming state, stop the current voice's new reads, and stop playlist transitions only in client Debug builds; production state remains private elsewhere.
+- The mastering graph is pinned to `kiMasteringSampleRate` to match DataPacker
+  audio. Preserve that rate through device resets; Windows may convert only at
+  the final shared-mode output.
+- Construct one stable `AudioEngine` and attach voice subsystems to it once.
+  Static and streaming voices retain its raw pointer, so recover a silent or
+  lost device by resetting the existing engine rather than replacing it.
+- Treat the default-endpoint query, graph reset, and XAudio2 results as trust
+  boundaries. A missing device leaves a usable silent engine; recovery must
+  clear stale source voices before normal playback resumes.
+- Packed audio metadata is a trust boundary: every path that hands a wave format
+  and byte range to XAudio2 calls `AssertValidPackedAudio` (`AudioUtility.h`)
+  first, including any new voice-creation path.
+- `AudioManager::Update` runs post-render on the main thread and owns XAudio2
+  pumping, streaming-range request and poll calls, and in-order buffer
+  submission. XAudio2 buffer callbacks publish only atomic completion.
+  AudioEngine reset/error notifications are delivered on the caller thread.
+  File-side behavior follows the
+  [packed-assets contract](../File/AGENTS.md#packed-assets).
+- Each streaming voice reads ahead through three fixed 16 KiB slots. Preserve
+  its request and submit order when a later range completes first, and retry a
+  full File result pool without advancing the slot, cursor, or destination.
+- Keep the current stream and newest fade eligible to request data, cancel older
+  fades' pending reads before demotion, and cancel every pending streaming read
+  before clearing or destroying its voice or resetting the audio graph.
+- Suspend stops XAudio2 processing before clearing voices. Teardown
+  distinguishes voices already destroyed by device loss from voices still owned
+  by the engine.
+- The [Agent audio harness rig](../Agent/AGENTS.md) may inspect streaming state,
+  stop the current voice's new reads, and stop playlist transitions only in
+  client Debug builds; production state remains private elsewhere.
 
 ## Simulation Boundary
 
-- Audio is presentation-only. One-shot emission and persistent-voice lifecycle skip reconciliation replay and never enter deterministic Frame state or CRCs.
-- Fades and crossfades use wall-clock time. Pitch variation uses a time-seeded audio-only random stream.
-- Static voice capacity is scarce: prioritize by audible attenuation, cull inaudible one-shots, and use hysteresis plus fades for persistent voice eviction and reacquisition. Apply final 3D mix before playback and route near-unity pitch ratios through `SnapFrequencyRatio` to avoid unnecessary resampling.
-- Distance to the full emitter position from a listener above the look-at, at 1.1 times the highest flight plane's height, drives manual fade while the camera look-at drives pan and Doppler; each emitter is flattened to the look-at's height for pan. Keep these listener roles separate when changing spatialization.
-- An emitter position arrives local to its own cell, paired with that cell's coordinate, and is converted once into the listener's cell (`StaticVoices.cpp`); spatialization works only in that listener frame.
+- Audio is presentation-only. One-shot emission and persistent-voice lifecycle
+  skip reconciliation replay and never enter deterministic Frame state or CRCs.
+- Fades and crossfades use wall-clock time. Pitch variation uses a time-seeded
+  audio-only random stream.
+- Static voice capacity is scarce: prioritize by audible attenuation, cull
+  inaudible one-shots, and use hysteresis plus fades for persistent voice
+  eviction and reacquisition. Apply final 3D mix before playback and route
+  near-unity pitch ratios through `SnapFrequencyRatio` to avoid unnecessary
+  resampling.
+- Distance to the full emitter position from a listener above the look-at, at
+  1.1 times the highest flight plane's height, drives manual fade while the
+  camera look-at drives pan and Doppler; each emitter is flattened to the
+  look-at's height for pan. Keep these listener roles separate when changing
+  spatialization.
+- An emitter position arrives local to its own cell, paired with that cell's
+  coordinate, and is converted once into the listener's cell
+  (`StaticVoices.cpp`); spatialization works only in that listener frame.
 
 ## Asset and Thread Ownership
 
-- Static sounds use resident chunks; music streams random-access ranges from lazy chunks without loading the full track.
-- Source data and the mastering graph share the `kiMasteringSampleRate` contract with DataPacker audio repair (`../../../DataPacker/Source/ExportJobs/AGENTS.md`).
+- Static sounds use resident chunks; music streams random-access ranges from
+  lazy chunks without loading the full track.
+- Source data and the mastering graph share the `kiMasteringSampleRate` contract
+  with DataPacker audio repair
+  (`../../../DataPacker/Source/ExportJobs/AGENTS.md`).
 - Audio calls follow the parent main-loop allocation and affinity rules.
 
 ## See Also

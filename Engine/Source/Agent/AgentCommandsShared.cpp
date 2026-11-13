@@ -58,18 +58,18 @@ static common::LogCategory ParseLogCategory(std::string_view name)
 	throw std::runtime_error("unknown log category");
 }
 
-// Collects up to iCount log lines from rBuffer into rLines. When bPattern, the whole buffer is scanned and the
+// Collects up to iCount log lines from rpcLines into rLines. When bPattern, the whole buffer is scanned and the
 // regex is applied per line before the count limit, so the last iCount *matching* lines are returned (chronological).
-template <typename BUFFER>
-static void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern, const std::regex& rPattern, nlohmann::json& rLines)
+template <int64_t LINE_COUNT>
+static void CollectLogLines(const char (&rpcLines)[LINE_COUNT][common::kiLogBufferSize], const std::atomic<int64_t>& riWritePosition, int64_t iCount, bool bPattern, const std::regex& rPattern, nlohmann::json& rLines)
 {
 	_Analysis_assume_(iCount >= 0);
-	const char* pcLines[BUFFER::kiLineCount] {};
-	int64_t iScan = bPattern ? BUFFER::kiLineCount : iCount;
-	int64_t iFilled = rBuffer.Tail(pcLines, iScan);
-	_Analysis_assume_(iFilled >= 0 && iFilled <= BUFFER::kiLineCount);
+	const char* pcLines[LINE_COUNT] {};
+	int64_t iScan = bPattern ? LINE_COUNT : iCount;
+	int64_t iFilled = common::LogTail(rpcLines, riWritePosition, pcLines, iScan);
+	_Analysis_assume_(iFilled >= 0 && iFilled <= LINE_COUNT);
 
-	const char* pcMatching[BUFFER::kiLineCount] {};
+	const char* pcMatching[LINE_COUNT] {};
 	int64_t iMatchCount = 0;
 	for (int64_t i = 0; i < iFilled; ++i)
 	{
@@ -81,7 +81,7 @@ static void CollectLogLines(const BUFFER& rBuffer, int64_t iCount, bool bPattern
 	}
 
 	int64_t iStart = std::max<int64_t>(0, iMatchCount - iCount);
-	_Analysis_assume_(iStart >= 0 && iStart <= iMatchCount && iMatchCount <= BUFFER::kiLineCount);
+	_Analysis_assume_(iStart >= 0 && iStart <= iMatchCount && iMatchCount <= LINE_COUNT);
 	for (int64_t i = iStart; i < iMatchCount; ++i)
 	{
 		_Analysis_assume_(pcMatching[i] != nullptr);
@@ -136,12 +136,13 @@ static void CommandGetLogs(const nlohmann::json& rParameters, nlohmann::json& rR
 	if (rParameters.contains("category"))
 	{
 		common::LogCategory eCategory = ParseLogCategory(rParameters.at("category").get<std::string>());
-		CollectLogLines(common::gpLogRingBuffers[static_cast<int64_t>(eCategory)], iCount, bPattern, pattern, lines);
+		int64_t iCategory = static_cast<int64_t>(eCategory);
+		CollectLogLines(common::gpcLogRingLines[iCategory], common::gpiLogRingWritePositions[iCategory], iCount, bPattern, pattern, lines);
 	}
 	else
 	{
-		// The wrapping cross-category ring — always the most recent lines. gLogGlobalBuffer freezes after its capacity and feeds the crash dump, so it is unsuitable for a live tail.
-		CollectLogLines(common::gLogAgentBuffer, iCount, bPattern, pattern, lines);
+		// The wrapping cross-category ring always holds the most recent lines; the crash-dump global buffer freezes after its capacity, so it is unsuitable for a live tail.
+		CollectLogLines(common::gpcLogAgentLines, common::giLogAgentWritePosition, iCount, bPattern, pattern, lines);
 	}
 
 	rResult["lines"] = std::move(lines);

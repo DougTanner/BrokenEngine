@@ -73,4 +73,6 @@ evidence needed to cover it is unavailable.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. The dispatched reviewer's steps and rules.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. The dispatched reviewer's steps and
+  rules.

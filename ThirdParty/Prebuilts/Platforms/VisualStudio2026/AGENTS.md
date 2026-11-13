@@ -2,11 +2,19 @@
 
 ## Overview
 
-Solution and project that compile shared third-party library source into a single static library (`ThirdParty.<Config>.lib`) linked by the client, server, and DataPacker. Centralizing here avoids duplicating shared external compilation units across projects and guarantees one consistent flag set for code we do not modify. The executable-owned mimalloc exception is defined under Source Organization. `Output/` and `Build/` hold build artifacts, not committed binaries.
+Solution and project that compile shared third-party library source into a
+single static library (`ThirdParty.<Config>.lib`) linked by the client, server,
+and DataPacker. Centralizing here avoids duplicating shared external
+compilation units across projects and guarantees one consistent flag set for
+code we do not modify. The executable-owned mimalloc exception is defined under
+Source Organization. `Output/` and `Build/` hold build artifacts, not committed
+binaries.
 
 ## Build Configuration
 
-- Output: Static library, per-configuration `TargetName` (`ThirdParty.Debug`, `ThirdParty.Profile`, `ThirdParty.Release`) in `Output/`; intermediates in `Build/<Config>/`
+- Output: Static library, per-configuration `TargetName` (`ThirdParty.Debug`,
+  `ThirdParty.Profile`, `ThirdParty.Release`) in `Output/`; intermediates in
+  `Build/<Config>/`
 - Configurations: Debug, Profile, Release (x64 only)
 - Compiler: C++23, `/fp:strict` (deterministic math, matching Engine/Game),
   static CRT (`/MTd` Debug, `/MT` otherwise — matches the executables), `/GL` in
@@ -25,14 +33,15 @@ Supported wrapper scripts link stable primary submodule trees and primary
 `Output/` into linked worktrees. Consumer PreBuildEvents provision and require
 `Output/ThirdParty.$(Configuration).lib`; they never build ThirdParty. Primary
 Debug, Profile, and Release libraries must remain nonempty while worktrees are
-active. Wrapper session start (`.agents/scripts/Bootstrap-AgentTools.ps1`)
-incremental-rebuilds all three primary configurations so they track primary
-HEAD; beyond that, rebuild only as explicit primary maintenance.
+active. Worktree creation or `/reset-worktree` runs
+`.agents/scripts/Bootstrap-AgentTools.ps1`, which incremental-rebuilds all
+three primary configurations so they track primary HEAD; beyond that, rebuild
+only as explicit primary maintenance.
 
 Moving mimalloc compilation to the consumers requires no worktree ThirdParty
 rebuild. Before landing that migration and the first primary rebuild removes the
-archived wrapper, coordinate migration of active shared-library readers to direct
-wrapper compilation. Do not retain an obsolete allocator archive member.
+archived wrapper, coordinate migration of active shared-library readers to
+direct wrapper compilation. Do not retain an obsolete allocator archive member.
 
 ## Source Organization
 
@@ -58,6 +67,12 @@ contrib units retain the project default.
 
 When adding a new library:
 
-1. Place a wrapper under `Source/Engine/` or `Source/DataPacker/` (or reference the upstream file directly) and register it in both `ThirdParty.vcxproj` and `ThirdParty.vcxproj.filters`.
-2. Add any new include path to `AdditionalIncludeDirectories` in all three configurations — there is no shared `.props` sheet.
-3. If the wrapper filename matches a unit in the other source root (both roots have a `DirectXTK.cpp` and an stb wrapper), set `<ObjectFileName>$(IntDir)Engine\</ObjectFileName>` on the Engine unit — the flat `IntDir` otherwise produces colliding `.obj` names.
+1. Place a wrapper under `Source/Engine/` or `Source/DataPacker/` (or reference
+   the upstream file directly) and register it in both `ThirdParty.vcxproj` and
+   `ThirdParty.vcxproj.filters`.
+2. Add any new include path to `AdditionalIncludeDirectories` in all three
+   configurations — there is no shared `.props` sheet.
+3. If the wrapper filename matches a unit in the other source root (both roots
+   have a `DirectXTK.cpp` and an stb wrapper), set
+   `<ObjectFileName>$(IntDir)Engine\</ObjectFileName>` on the Engine unit — the
+   flat `IntDir` otherwise produces colliding `.obj` names.

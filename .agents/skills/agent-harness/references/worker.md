@@ -68,10 +68,11 @@ and the handoff this run returns.
 
    - It takes the game project from `-Project`, the project step 3 named, and
      the data directory from that project's build records, which `/compile`
-     writes ([`runtime-data-mode.md`](../../compile/references/runtime-data-mode.md)
+     writes
+     ([`runtime-data-mode.md`](../../compile/references/runtime-data-mode.md)
      `## Generated Data directory inventory`), so no data path is passed. It
-     requires that project's server and client executables (reading
-     their names and `Output` directory from the project's root
+     requires that project's server and client executables (reading their names
+     and `Output` directory from the project's root
      `## Machine-readable launch configuration`, not from the human `launch.md`
      recipe) unless you pass `-ServerOnly` to declare a server-only session,
      which narrows that existence check to the server executable.
@@ -778,9 +779,9 @@ case.
       listener PIDs and stop it by exact PID under step 14's rule.
 
 46. Release through step 39 with the record's `owner`, no
-    `-ServerPid`/`-ClientPid`, and no `-ProcessCheckStatePath`, then classify the
-    result per step 42 without its log search. Done when the release result is
-    reported as a `Decisive checks` row.
+    `-ServerPid`/`-ClientPid`, and no `-ProcessCheckStatePath`, then classify
+    the result per step 42 without its log search. Done when the release result
+    is reported as a `Decisive checks` row.
 
     - Step 45 already confirmed every validated PID gone, listening or not.
     - The stopped run's process-check state path lives only in its scratch

@@ -52,9 +52,10 @@ For each affected project pair:
 
 2. Take a `resolved` record's ownership and logical filter as given. On a
    `conditional` record, answer only its one named question from scoped
-   authority (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`)
-   and take the rest of the record as given; re-derive nothing by hand. In fix
-   mode, require each intended item once and forbidden/stale old-name items zero
+   authority
+   (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`) and
+   take the rest of the record as given; re-derive nothing by hand. In fix mode,
+   require each intended item once and forbidden/stale old-name items zero
    times.
 
    In fix mode, an `Engine/**` or `Common/**` path that gains membership — an

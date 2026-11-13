@@ -43,7 +43,9 @@ fast-forward would touch one of them. The held-claim run targets the held Plan,
 so a claim no longer live at the primary tip ends in `none-available`, in
 `claim.plan-moved` when the fast-forward renamed the held Plan, or in a fresh
 claim on that same Plan while it is still eligible, never in a claim on a
-different Plan.
+different Plan. A refusal of the held-claim run before Plan validation runs
+carries the held claim the early lookup found, with `state: existing`, and its
+`message` ends by saying that claim remains held.
 
 Otherwise, before it validates and claims, the claim script brings the session
 branch up to the primary tip by fast-forward only when the session is behind,
@@ -186,7 +188,8 @@ one thing to do next, drawn from these six values:
   On the `completion.plan-cited` completion result, follow that code's row in
   [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes).
 - `stop-report-to-user` — the run stops here; report the result and let the user
-  decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint.
+  decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps)
+  step 9 checkpoint.
 - `checkpoint-followup-gate` — the claim was released by a deferral, or no claim
   was held; run [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint
   once, then follow the row for a released or absent claim in

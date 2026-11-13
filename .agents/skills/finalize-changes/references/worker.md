@@ -19,16 +19,14 @@ that exactly one explicit user confirmation authorizes changing primary, and the
 exact mechanics in [`scripts.md`](scripts.md).
 
 Immediately after the affirmative confirmation the caller claims the landing
-lock once through
-`../scripts/Invoke-FinalizeLockClaim.ps1`, with the landing lease duration
-`scripts.md` states, and passes that owner token to
-`../scripts/Invoke-FinalizeLanding.ps1` as `-OwnerToken`, which continues under that
-same lease through the advance. This supplied-token route keeps the raw
+lock once through `../scripts/Invoke-FinalizeLockClaim.ps1`, with the landing
+lease duration `scripts.md` states, and passes that owner token to
+`../scripts/Invoke-FinalizeLanding.ps1` as `-OwnerToken`, which continues under
+that same lease through the advance. This supplied-token route keeps the raw
 `$SessionLabel`; when `-OwnerToken` is omitted, landing uses
 `$SessionLabel/landing`, adopts a live retained claim only when that exact
-session and the same canonical worktree match, and otherwise mints its own
-token through WorktreeCli `lock token` before claiming under the derived
-identity.
+session and the same canonical worktree match, and otherwise mints its own token
+through WorktreeCli `lock token` before claiming under the derived identity.
 
 Ownership rule: a lease is a same-actor continuation when its recorded session
 and worktree match the current landing identity; an omitted-token invocation may
@@ -84,7 +82,8 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      owns the typed-artifact rules.
    - Fill the landing receipt's `acceptanceSkeleton` rows with evidence from the
      handoffs they name, and the `Executable Plan check` row from the
-     `plan validate` run [`landing-acceptance-table.md`](landing-acceptance-table.md)
+     `plan validate` run
+     [`landing-acceptance-table.md`](landing-acceptance-table.md)
      `## Executable Plan check` requires, then add the remaining rows per
      [`landing-acceptance-table.md`](landing-acceptance-table.md)
      `## Acceptance table`.
@@ -176,26 +175,28 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 10. Invoke landing with that owner token.
     - That invocation passes `-ApprovalReviewResultFile` naming the receipt that
       main's run of the step-6 line wrote; the receipt gate in
-      [`scripts.md`](scripts.md#approval-review-receipt) owns when landing blocks
-      on it, and step 14 disposes of such a block like any other blocked landing.
+      [`scripts.md`](scripts.md#approval-review-receipt) owns when landing
+      blocks on it, and step 14 disposes of such a block like any other blocked
+      landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
       deleted best-effort.
     - Done when landing has returned its result.
 11. Read the advance and cleanup landing performed.
     - Landing advances primary by compare-and-swap with rollback, resets and
       verifies both checkouts, and releases the lock.
-    - Done when that result reports the advance or the rollback that replaced it,
-      both checkouts verified, and the lock released.
+    - Done when that result reports the advance or the rollback that replaced
+      it, both checkouts verified, and the lock released.
 12. Read what landing proved it added to the landed commit.
     - An exit-0 landing already proves the landed commit is the reviewed source
-      commit, or its clean patch-identical rebase, plus exactly the three generated
-      metrics-history files
+      commit, or its clean patch-identical rebase, plus exactly the three
+      generated metrics-history files
       ([`scripts.md`](scripts.md#primary-movement-check) owns the generator and
       the output names) and nothing else;
       [`scripts.md`](scripts.md#landing-and-recovery) owns the guard behind that
       proof.
     - Return the message of a run blocked with `history.overlay-invalid`;
-      [`scripts.md`](scripts.md#landing-and-recovery) owns what that code proves.
+      [`scripts.md`](scripts.md#landing-and-recovery) owns what that code
+      proves.
     - Done when the exit-0 result is recorded as that proof, or the blocked
       message has been returned.
 13. Record the machine-local claim deletion.
@@ -213,8 +214,9 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
       recovery dispatch, for focused re-review and a refreshed confirmation per
       `SKILL.md` `### Landing confirmation`.
     - Done when the reported disposition has been acted on.
-15. Retain the session branch and worktree; only `/cleanup-worktrees` or explicit
-    user direction removes them. Done when this worker has removed neither.
+15. Retain the session branch and worktree; only `/cleanup-worktrees` or
+    explicit user direction removes them. Done when this worker has removed
+    neither.
 
 `/session-audit` runs only on explicit user request.
 
@@ -229,51 +231,49 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 
 ## Recovery
 
-- Postconfirmation `rebase.conflicted`: the landing script has aborted the rebase,
-  restored the approved session commit, and released its normal postconfirmation
-  landing lease. The original landing arguments, candidate, baseline, expected
-  tips, verification evidence, SmartGit receipt, summary, and confirmation are
-  invalid; a landing override (`SKILL.md` `### Landing confirmation`) still
-  stands. Only after abort, restoration, and lease release are proven, return
-  that result as a handoff for the recovery dispatch; that worker restarts
-  preconfirmation reconciliation: it re-resolves the current session and
-  primary tips, and a fresh candidate
-  baseline; performs the ordinary linear rebase and hunk resolution under the
-  `Recovery` section, recreates and prepares a new candidate, reruns the
-  affected reviews and the acceptance table, and produces a fresh summary and
-  launch line — main reopens SmartGit from that line — for fresh user
-  confirmation unless a landing override stands. If any abort, restoration, or
-  release is unproven, retain the existing blocker and lease state and stop; do
-  not begin recovery or expose a user wait. No primary change is attempted
-  until the fresh review and any fresh confirmation complete. Never reuse the
-  original approved landing arguments.
+- Postconfirmation `rebase.conflicted`: the landing script has aborted the
+  rebase, restored the approved session commit, and released its normal
+  postconfirmation landing lease. The original landing arguments, candidate,
+  baseline, expected tips, verification evidence, SmartGit receipt, summary, and
+  confirmation are invalid; a landing override (`SKILL.md`
+  `### Landing confirmation`) still stands. Only after abort, restoration, and
+  lease release are proven, return that result as a handoff for the recovery
+  dispatch; that worker restarts preconfirmation reconciliation: it re-resolves
+  the current session and primary tips, and a fresh candidate baseline; performs
+  the ordinary linear rebase and hunk resolution under the `Recovery` section,
+  recreates and prepares a new candidate, reruns the affected reviews and the
+  acceptance table, and produces a fresh summary and launch line — main reopens
+  SmartGit from that line — for fresh user confirmation unless a landing
+  override stands. If any abort, restoration, or release is unproven, retain the
+  existing blocker and lease state and stop; do not begin recovery or expose a
+  user wait. No primary change is attempted until the fresh review and any fresh
+  confirmation complete. Never reuse the original approved landing arguments.
 - Preconfirmation reconciliation conflict: resolve under the approved
   invariants, then re-review the affected regions and re-ask the confirmation
-  unless a landing override stands.
-  Resolve hunk by hunk, tracing each side's intent to its originating commit or
-  Plan before choosing, and preserve both intents where they are compatible.
-  Keep the resolution to behavior one side already had; never invent new
-  behavior in a resolution.
-  A conflict on a path that the primary-movement result triggering this
-  reconciliation lists in `changes.exportOutputPaths`
+  unless a landing override stands. Resolve hunk by hunk, tracing each side's
+  intent to its originating commit or Plan before choosing, and preserve both
+  intents where they are compatible. Keep the resolution to behavior one side
+  already had; never invent new behavior in a resolution. A conflict on a path
+  that the primary-movement result triggering this reconciliation lists in
+  `changes.exportOutputPaths`
   ([`scripts.md#primary-movement-check`](scripts.md#primary-movement-check))
   resolves to the primary tip's bytes, except that a modify/delete conflict
   where the session deleted the path keeps the session's deletion; that
-  resolution counts as a meaning change, and the returned meaning-change handoff's `Build required` names the
-  client and server builds of each game that result's `rebuildProjects` lists.
-  Any other binary conflict, island textures included, aborts the rebase to
-  return a blocker, as does every binary conflict of a reconciliation with no
-  triggering result, such as the restart after `rebase.conflicted`.
-  Abort the rebase only to return a blocker when the approved decisions do not
-  determine a valid resolution; otherwise resolve rather than abort.
+  resolution counts as a meaning change, and the returned meaning-change
+  handoff's `Build required` names the client and server builds of each game
+  that result's `rebuildProjects` lists. Any other binary conflict, island
+  textures included, aborts the rebase to return a blocker, as does every binary
+  conflict of a reconciliation with no triggering result, such as the restart
+  after `rebase.conflicted`. Abort the rebase only to return a blocker when the
+  approved decisions do not determine a valid resolution; otherwise resolve
+  rather than abort.
 - Process died after primary advanced: re-invoke
   `../scripts/Invoke-FinalizeLanding.ps1` with the original approved arguments.
-  [`scripts.md`](scripts.md) owns the rules by which recovery matches the
-  landed commit.
-  If the primary ref advanced before its checkout reset, recovery recognizes the
-  ref/tree mismatch, acquires or adopts the landing lease, resets and verifies the
-  primary checkout, then continues ordinary recovery; initial non-recovery sanity
-  remains strict. Then delete the claim.
+  [`scripts.md`](scripts.md) owns the rules by which recovery matches the landed
+  commit. If the primary ref advanced before its checkout reset, recovery
+  recognizes the ref/tree mismatch, acquires or adopts the landing lease, resets
+  and verifies the primary checkout, then continues ordinary recovery; initial
+  non-recovery sanity remains strict. Then delete the claim.
 - The movement check blocked with `primary.path-overlap` (foreign primary
   movement touched a session-owned path): this preparation worker recovers it
   in the same dispatch, with no manager or user authorization. It runs the
@@ -329,5 +329,5 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 When the landing-commit/landed diff contains a non-Markdown path under
 `Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or
 `Common/Sha256Hasher.h`, load `agenttools.md` for shared-artifact idle waiting,
-disclosure, promotion, and bootstrap coordination. This is the sole AgentTools trigger;
-non-triggering routes do not load it.
+disclosure, promotion, and bootstrap coordination. This is the sole AgentTools
+trigger; non-triggering routes do not load it.

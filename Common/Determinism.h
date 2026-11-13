@@ -42,16 +42,11 @@ void ConfigureThreadFloatingPoint();
 // fixed error and skips the stack walk. Called by ThreadLocal ctor.
 void SetupExceptionHandling();
 
-// DbgHelp (dbghelp.dll) is documented single-threaded per process — every stack-walk driver must serialize on
-// this mutex. Acquired try_to_lock by FilteredStackWalker::ShowCallstack (StackWalker.h); recursive so a fault
-// inside DbgHelp during a walk re-enters instead of deadlocking.
-extern std::recursive_mutex gDbgHelpMutex;
-
 // Expected-throw region depth for this thread. While nonzero, the vectored exception handler treats C++ throws
 // (0xE06D7363) as an expected, designed error path — it skips the stack walk / DEBUG_BREAK() and lets the throw
 // propagate to its catch. Other exception codes (access violation, heap corruption, etc.) are unaffected: they
 // still get the full callstack even inside such a region. Increment/decrement only via ScopedExpectedThrows.
-extern thread_local int64_t giExpectedThrowDepth;
+inline constinit thread_local int64_t giExpectedThrowDepth = 0;
 
 // Scope-bound expected-throw guard for this thread; deleted copy/move operations keep each depth increment paired with one decrement.
 struct [[nodiscard]] ScopedExpectedThrows

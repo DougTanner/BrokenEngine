@@ -21,7 +21,6 @@ ServerCellStats GetServerCellStatistics(const Frame& rFrame)
 	{
 		.iTick = rFrame.interpolate.iTick,
 		.durationCurrentTime = std::chrono::duration<float>(common::NanosecondsToFloatSeconds<float>(engine::TickToSimulationTime(rFrame.interpolate.iTick).time_since_epoch())),
-		.iExplosions = rFrame.interpolate.explosions.iCount,
 	};
 	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kFighters)] = rFrame.interpolate.pFighters->iCount;
 	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kOmnis)] = rFrame.interpolate.pOmnis->iCount;

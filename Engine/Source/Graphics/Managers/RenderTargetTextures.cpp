@@ -3,6 +3,7 @@
 #include "RenderTargetTextures.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/MiscWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "TextureManager.h"
 
@@ -97,8 +98,8 @@ void RenderTargetTextures::CreateWaterFoamTextures()
 
 void RenderTargetTextures::CreateShadowTextures()
 {
-	// Fixed-world-size shadow texels: pre-size the texture to cover the visible area at the reference eye
-	// height so the texel scale is constant across zoom (no pop/shimmer); closer zoom uses a centered
+	// Fixed-world-size shadow texels: size the texture by gExtraArea, which PopulateShadowArea divides back out, so
+	// the texel scale is constant across zoom and extra area (no pop/shimmer); closer zoom uses a centered
 	// sub-window, farther crops. Clamp AFTER the multiply (DetailTextureSize clamps pre-multiply); cap the
 	// width at (limit/3)*2 so the 1.5x-wide elevation texture still fits maxImageDimension2D. Force the
 	// width even (below) so the 1.5x elevation width stays integer; dispatch ceil-divides so no block multiple.
@@ -110,9 +111,9 @@ void RenderTargetTextures::CreateShadowTextures()
 
 	auto [iBaseX, iBaseY] = TextureManager::DetailTextureSize(gShadowRenderMultiplier.mfCurrent);
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
-	int64_t iShadowTextureX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::CameraBase::kfShadowHeadroomMultiplier)), (iLimit / 3) * 2);
+	int64_t iShadowTextureX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * gExtraArea.mfCurrent)), (iLimit / 3) * 2);
 	iShadowTextureX &= ~1i64;
-	int64_t iShadowTextureY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::CameraBase::kfShadowHeadroomMultiplier)), iLimit);
+	int64_t iShadowTextureY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * gExtraArea.mfCurrent)), iLimit);
 	LOG(kGraphics, kDebug, "iShadowTexture: {} x {}", iShadowTextureX, iShadowTextureY);
 	mShadowElevationTexture.Create(
 	{
@@ -371,7 +372,9 @@ void RenderTargetTextures::ClearWindTextures()
 
 void RenderTargetTextures::CreateObjectShadowsTextures()
 {
-	auto [iObjectShadowsRenderTextureX, iObjectShadowsRenderTextureY] = TextureManager::DetailTextureSize(gObjectShadowsRenderMultiplier.mfCurrent);
+	gbObjectShadowsReset = true;
+
+	auto [iObjectShadowsRenderTextureX, iObjectShadowsRenderTextureY] = TextureManager::ExtraAreaDetailTextureSize(gObjectShadowsRenderMultiplier.mfCurrent);
 	mObjectShadowsTexture.Create(
 	{
 		.textureFlags = {TextureFlags::kRenderPass},
@@ -392,7 +395,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkRenderPassDestinationStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 	});
 
-	auto [iObjectShadowsBlurTextureX, iObjectShadowsBlurTextureY] = TextureManager::DetailTextureSize(gObjectShadowsBlurMultiplier.mfCurrent);
+	auto [iObjectShadowsBlurTextureX, iObjectShadowsBlurTextureY] = TextureManager::ExtraAreaDetailTextureSize(gObjectShadowsBlurMultiplier.mfCurrent);
 	mObjectShadowsBlurTexture.Create(
 	{
 		.textureFlags = {},

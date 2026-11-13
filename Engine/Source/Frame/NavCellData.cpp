@@ -349,7 +349,7 @@ static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector
 	BuildNavigationAcceleration(rNavigationData);
 
 	// Empty cells must retain the cleared derived state produced by BuildNavigationAcceleration,
-	// matching NavData::Read on the client.
+	// matching CellStaticData::Read on the client.
 	if (!rNavigationData.vertices.empty())
 	{
 		BuildCellVisibilityGraph(rNavigationData);
@@ -435,67 +435,6 @@ void BuildNavigationAcceleration(NavData& rNavigationData)
 
 	BuildNavigationEdgeGrid(rNavigationData);
 	BuildNavigationAdjacency(rNavigationData);
-}
-
-void NavData::Write(std::ostream& rStream) const
-{
-	common::Write(rStream, static_cast<int32_t>(std::ssize(vertices)));
-	for (const XMFLOAT2& rVertex : vertices)
-	{
-		common::Write(rStream, rVertex);
-	}
-
-	common::Write(rStream, static_cast<int32_t>(std::ssize(polygonOffsets)));
-	for (int32_t iOffset : polygonOffsets)
-	{
-		common::Write(rStream, iOffset);
-	}
-
-	common::Write(rStream, static_cast<int32_t>(std::ssize(visibilityEdgeA)));
-	for (int32_t iEdge : visibilityEdgeA)
-	{
-		common::Write(rStream, iEdge);
-	}
-	for (int32_t iEdge : visibilityEdgeB)
-	{
-		common::Write(rStream, iEdge);
-	}
-}
-
-void NavData::Read(std::istream& rStream)
-{
-	int32_t iVertexCount = 0;
-	common::Read(rStream, iVertexCount);
-	vertices.resize(iVertexCount);
-	for (XMFLOAT2& rVertex : vertices)
-	{
-		common::Read(rStream, rVertex);
-	}
-
-	int32_t iPolygonCount = 0;
-	common::Read(rStream, iPolygonCount);
-	polygonOffsets.resize(iPolygonCount);
-	for (int32_t& riOffset : polygonOffsets)
-	{
-		common::Read(rStream, riOffset);
-	}
-
-	int32_t iEdgeCount = 0;
-	common::Read(rStream, iEdgeCount);
-	visibilityEdgeA.resize(iEdgeCount);
-	visibilityEdgeB.resize(iEdgeCount);
-	for (int32_t& riEdge : visibilityEdgeA)
-	{
-		common::Read(rStream, riEdge);
-	}
-	for (int32_t& riEdge : visibilityEdgeB)
-	{
-		common::Read(rStream, riEdge);
-	}
-
-	// Derived broad-phase data is not serialized; rebuild it from the vertices just read so the client
-	// matches the server's BuildCellNavigationData result.
-	BuildNavigationAcceleration(*this);
 }
 
 } // namespace engine

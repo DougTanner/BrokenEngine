@@ -10,10 +10,10 @@ allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, Skill, AskUser
 
 ## Purpose
 
-WorktreeCli alone validates metadata, selects, claims, prepares final state, and releases
-claims; `Documents/Features` is never scheduler input. The whole Change Workflow in
-[change-workflow.md](../../references/change-workflow.md) owns the cross-skill stage order, and
-`/finalize-changes` the landing confirmation.
+WorktreeCli alone validates metadata, selects, claims, prepares final state, and
+releases claims; `Documents/Features` is never scheduler input. The whole Change
+Workflow in [change-workflow.md](../../references/change-workflow.md) owns the
+cross-skill stage order, and `/finalize-changes` the landing confirmation.
 
 ## When to use
 
@@ -42,15 +42,13 @@ The `argument-hint` value selects the Plan:
    maintenance through `/compile`.
 2. Only when a decision needs the queue — a tier-constrained request, or the
    user asks to see the queue — see it before selecting:
-`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
+   `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
    It is read-only and reports a bounded point-in-time projection — widen with
    `-Top <n>` only when a decision needs more. For a tier-constrained request,
-   read its result through
-   [claim-results.md](references/claim-results.md) `## Reading the queue listing`.
-   A bare or plain named-Plan
-   invocation skips this step, because step 3 selects and reports every stop
-   itself. Done when this file's `## Inputs` resolves exactly
-   one Plan or blocks.
+   read its result through [claim-results.md](references/claim-results.md)
+   `## Reading the queue listing`. A bare or plain named-Plan invocation skips
+   this step, because step 3 selects and reports every stop itself. Done when
+   this file's `## Inputs` resolves exactly one Plan or blocks.
 3. Claim that selection as its own shell call, in the root AGENTS.md canonical
    invocation form — bare:
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1`
@@ -131,11 +129,11 @@ The `argument-hint` value selects the Plan:
    arrived and a pick other than the drafted plan is redrafted or routed to
    rejection.
 5. Run the Plan review step in
-   [change-workflow.md](../../references/change-workflow.md), after preparation and alternatives and
-   before the final claim refresh. Tier 3 retains the additional route in
-   [tier3-workflow.md](references/tier3-workflow.md). Done when every required review has
-   completed and accepted findings are resolved, or a missing mandatory
-   reviewer is reported as a blocker.
+   [change-workflow.md](../../references/change-workflow.md), after preparation
+   and alternatives and before the final claim refresh. Tier 3 retains the
+   additional route in [tier3-workflow.md](references/tier3-workflow.md). Done
+   when every required review has completed and accepted findings are resolved,
+   or a missing mandatory reviewer is reported as a blocker.
 6. Unless step 10 already ran (the changes-requested row in
    `### Post-checkpoint outcomes`), invoke step 3's claim script idempotently
    with `-Plan '<claimed Plan path>'`, never bare, immediately before the final
@@ -158,9 +156,14 @@ The `argument-hint` value selects the Plan:
    paragraph of `## Session baseline and the sync object`, which sets the
    session baseline.
 
-   When any row of that `researcher`'s handoff reports a touch, return to step 4, rerun the affected Plan
-   review checks in step 5, and repeat this final refresh before approval;
-   reuse review evidence whose inputs did not change.
+   When any row of that `researcher`'s handoff reports a touch, return to step
+   4, rerun the affected Plan review checks in step 5, and repeat this final
+   refresh before approval; reuse review evidence whose inputs did not change.
+
+   Until step 8 starts, main repeats this final refresh for a primary advance
+   it learns of after it, and the two paragraphs above apply to that refresh's
+   sync range; once step 8 starts, main leaves the advance to
+   `/finalize-changes`, which reconciles it at landing.
 
    Done when the claim result reports the held claim and either this step has
    no sync range or no row reports a touch.
@@ -184,7 +187,16 @@ The `argument-hint` value selects the Plan:
    snapshot's `## In scope` itself. Main assigns each change the user approved
    after the plan to exactly one row, adding one slice when none fits, and
    passes `none` for those changes to every other row. `Slices: none`
-   dispatches no implementer. Done when its own acceptance checks pass.
+   dispatches no implementer. When step 4's split question is answered no,
+   including one accepted as its recommendation, no stage of the claimed Plan
+   lands mid-run while the claim stays held: main runs the stages in the order
+   the stage-split entry lists them, dispatching a stage's `Slices` rows only
+   after the previous stage's acceptance checks pass; each stage but the last
+   completes without landing, through its own acceptance checks and the Change
+   Workflow Verify the acceptance table step in change-workflow.md, and step
+   10's one claim exit and one `/finalize-changes` landing carry every stage.
+   Done when the last stage's acceptance checks pass; a change kept as one
+   stage is its own last stage.
 9. Run the checkpoint exactly once, however the run ends: after step 8's
    acceptance checks, before step 10 when that step applies, and before
    `/finalize-changes` prepares the
@@ -192,8 +204,8 @@ The `argument-hint` value selects the Plan:
    the same squash with no landing-commit join.
 
    Main never performs the review itself; it dispatches it per
-   [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when both
-   follow-up lines are recorded per
+   [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when
+   both follow-up lines are recorded per
    [run-checkpoint.md](references/run-checkpoint.md) `## Measurement states` and
    `## Follow-up routing`.
 10. Only after implementation is accepted and verified, or after the user
@@ -204,10 +216,10 @@ The `argument-hint` value selects the Plan:
    user-authorized rejection.
 
    What that result reports and changes is in
-   [claim-results.md](references/claim-results.md) `## Claim-exit result fields`.
-   Main passes that result verbatim into every `/finalize-changes` brief the run
-   dispatches, after acceptance, after rejection, and after changes are
-   requested at the landing confirmation.
+   [claim-results.md](references/claim-results.md)
+   `## Claim-exit result fields`. Main passes that result verbatim into every
+   `/finalize-changes` brief the run dispatches, after acceptance, after
+   rejection, and after changes are requested at the landing confirmation.
 
    Done when the success result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
@@ -254,12 +266,13 @@ per-statement enumeration of unaffected results.
   carries role assignments, not the split. One row per disjoint implementation
   slice: the snapshot items it owns, named by section and label or bullet,
   never by their text, and its allowed file scope; one row when the work has
-  no disjoint split, and `none` for an empty realized change. Refinements
-  accepted from Plan review or grill rounds are written into the preparation
-  snapshot;
-  every dispatch that changes the snapshot's scope, such as that write-in or a
-  redraft, names `Slices` in its `Return:`, in addition to its assigned skill's
-  handoff, and returns the field again.
+  no disjoint split, and `none` for an empty realized change; when the
+  stage-split entry lists several stages, at least one row per stage the card
+  keeps in scope, each naming its stage. Refinements accepted from Plan review
+  or grill rounds are written into the preparation snapshot; every dispatch
+  that changes the snapshot's scope, such as that write-in or a redraft, names
+  `Slices` in its `Return:`, in addition to its assigned skill's handoff, and
+  returns the field again.
 - `Candidate zero` — the drafted mechanism as the `Mechanism` through
   `Pays off when` rows exactly as
   [`../plan-alternatives/SKILL.md`](../plan-alternatives/SKILL.md)
@@ -293,26 +306,25 @@ Plan review step.
 
 Preparation and claim do not require approval. Before implementation that no
 earlier user choice approved (below), present only the execution card's
-`### What does this plan do?` and
-`### Why this is good for the codebase` sections, plus a
-`### Plan review changes` section listing each change the Plan review step
-made to the approach being approved, or `none`, plus a
+`### What does this plan do?` and `### Why this is good for the codebase`
+sections, plus a `### Plan review changes` section listing each change the Plan
+review step made to the approach being approved, or `none`, plus a
 `### User decisions needed` section when any decision is unresolved, listing
 each one with its options, trade-offs, and a recommendation; the alternatives
 the `/plan-alternatives` presentation already showed are not presented again,
-and the rest of the resolved Plan and card stays in the snapshot for the
-reviews and is not presented. Deliver that presentation per the `### User Interaction` rules in
+and the rest of the resolved Plan and card stays in the snapshot for the reviews
+and is not presented. Deliver that presentation per the `### User Interaction`
+rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
-without an approval question; on Claude Code and every other host as
-rendered message text whose approval question is the last thing in the
-message, after which the user's next message is the decision. An approval
-accepts the recommendation for every decision it leaves unanswered, except a
-recommendation to reject the Plan, which still needs an explicit answer. A
-different approach the user chooses at approval returns the
-run to preparation and Plan review. Every user choice in the run that neither
-rejects the Plan, refuses approval, nor defers it from step 4's size entry —
-the `/plan-alternatives` pick, an
+without an approval question; on Claude Code and every other host as rendered
+message text whose approval question is the last thing in the message, after
+which the user's next message is the decision. An approval accepts the
+recommendation for every decision it leaves unanswered, except a recommendation
+to reject the Plan, which still needs an explicit answer. A different approach
+the user chooses at approval returns the run to preparation and Plan review.
+Every user choice in the run that neither rejects the Plan, refuses approval,
+nor defers it from step 4's size entry — the `/plan-alternatives` pick, an
 `/external-grill-plan` answer, a choice at approval, or a change request at the
 `/finalize-changes` landing confirmation — approves implementation, and the run
 goes to implementation unless an existing or new question for the user remains
@@ -324,29 +336,28 @@ presentation differs from the execution card, main dispatches, before step 8,
 one fresh preparation `implementer` whose continuation capsule
 ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Continuation capsule`) carries the snapshot step 8 cites as the approved
-plan with its `##` selectors, and the user's approval
-answers; that worker updates the card's affected fields to the approved scope,
-and the dispatch always names `Slices` in its `Return:`, whether or not the
-update changes the snapshot's scope, so step 8 dispatches from that handoff's
-`Slices`. Main does not read or edit the card or the snapshot for this update.
-A yes to step 4's split question, including one accepted as its
-recommendation, is the user's direction to defer stages 2 to M. The
-preparation `implementer` that records the yes — that approval-update worker,
-or the preparation `implementer` of the Tier-3 grill round that carries the
-yes — also marks each card acceptance check and citation rewrite of stages 2
-to M deferred to its stage's Plan, never deleting it, and names those stages
-in the card's `Out of scope`. After the handoff that records the yes and
-before step 8, and never earlier, because `/create-follow-up-plans` rejects
-in-scope work, main sends stages 2 to M, as leftovers the user chose to defer,
-through the Change Workflow Verify the acceptance table step's Leftovers rule,
-with a brief citing as evidence the claimed Plan path and the snapshot path
-with its `## Unresolved decisions`, `## Execution card`, `## Decisions`, and
-`## Design` selectors, citing the claimed Plan's matching section for either
-of the last two the snapshot lacks, and stating that each stage Plan restates
-in its own words the decisions and design its stage needs, and that the
-dispatch also performs the citation rewrites the card marks deferred to each
-stage, renaming each such pending claim in its citing Plan to that stage
-Plan's file name.
+plan with its `##` selectors, and the user's approval answers; that worker
+updates the card's affected fields to the approved scope, and the dispatch
+always names `Slices` in its `Return:`, whether or not the update changes the
+snapshot's scope, so step 8 dispatches from that handoff's `Slices`. Main does
+not read or edit the card or the snapshot for this update. A yes to step 4's
+split question, including one accepted as its recommendation, is the user's
+direction to defer stages 2 to M. The preparation `implementer` that records the
+yes — that approval-update worker, or the preparation `implementer` of the
+Tier-3 grill round that carries the yes — also marks each card acceptance check
+and citation rewrite of stages 2 to M deferred to its stage's Plan, never
+deleting it, and names those stages in the card's `Out of scope`. After the
+handoff that records the yes and before step 8, and never earlier, because
+`/create-follow-up-plans` rejects in-scope work, main sends stages 2 to M, as
+leftovers the user chose to defer, through the Change Workflow Verify the
+acceptance table step's Leftovers rule, with a brief citing as evidence the
+claimed Plan path and the snapshot path with its `## Unresolved decisions`,
+`## Execution card`, `## Decisions`, and `## Design` selectors, citing the
+claimed Plan's matching section for either of the last two the snapshot lacks,
+and stating that each stage Plan restates in its own words the decisions and
+design its stage needs, and that the dispatch also performs the citation
+rewrites the card marks deferred to each stage, renaming each such pending claim
+in its citing Plan to that stage Plan's file name.
 
 ### IMPORTANT: Session-complete marker
 

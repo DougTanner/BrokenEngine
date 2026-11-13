@@ -139,7 +139,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	{
 		if (game::IsPostDispatchType(rStatusChange.eType))
 		{
-			game::ApplySpawnStatusChange(*pNext, rStatusChange, rWork.coord);
+			game::ApplySpawnStatusChange(*pNext, rStatusChange);
 			++iTransferCount;
 
 			if (game::IsOwnedEntityTransfer(rStatusChange))

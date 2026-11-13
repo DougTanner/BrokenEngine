@@ -5,7 +5,7 @@ namespace common
 
 // Shared base for the crash-path stack walkers: owns the emission gate, the DbgHelp error emit, and the
 // process-wide DbgHelp serialization (dbghelp.dll is documented single-threaded per process — see
-// gDbgHelpMutex in Determinism.h). Leaf classes implement only the Emit sink.
+// sDbgHelpMutex in Determinism.cpp). Leaf classes implement only the Emit sink.
 class FilteredStackWalker : public StackWalker
 {
 public:
@@ -14,18 +14,8 @@ public:
 	{
 	}
 
-	// Each driver serializes on gDbgHelpMutex; a contended try_to_lock skips the walk, and recursive locking permits a same-thread nested attempt.
-	BOOL ShowCallstack()
-	{
-		std::unique_lock<std::recursive_mutex> uniqueLock(gDbgHelpMutex, std::try_to_lock);
-		if (!uniqueLock.owns_lock())
-		{
-			Emit("<callstack skipped - DbgHelp busy>");
-			return FALSE;
-		}
-
-		return StackWalker::ShowCallstack();
-	}
+	// A contended try_to_lock skips the walk; recursive locking permits a same-thread nested attempt.
+	BOOL ShowCallstack();
 
 protected:
 

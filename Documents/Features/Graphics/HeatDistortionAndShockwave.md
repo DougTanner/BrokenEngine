@@ -83,10 +83,11 @@ Changes (12 files)
      #version 460
      #include "ShaderLayouts.h"
 
-     layout (set = 0, binding = 0) uniform globalUniform { GlobalLayout globalLayout; };
-     layout (set = 1, binding = 0) uniform mainUniform { MainLayout mainLayout; };
-     layout (set = 1, binding = 1) readonly buffer distortionBuffer { DistortionSourceLayout pSources[]; };
-     layout (set = 1, binding = 2) uniform sampler2D sceneSampler;
+     layout (set = 0, binding = 0) uniform globalUniform { GlobalLayout
+     globalLayout; }; layout (set = 1, binding = 0) uniform mainUniform {
+     MainLayout mainLayout; }; layout (set = 1, binding = 1) readonly buffer
+     distortionBuffer { DistortionSourceLayout pSources[]; }; layout (set = 1,
+     binding = 2) uniform sampler2D sceneSampler;
 
      layout (location = 0) in flat int iInInstanceIndex;
      layout (location = 1) in vec2 f2InTexcoord;
@@ -237,28 +238,35 @@ Changes (12 files)
    kGpuTimerImage (line 754), insert the distortion pass:
 
      // Copy the resolved scene to the distortion source texture
-     gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture.TransitionImageLayout(vkCommandBuffer, kShaderReadOnly, kTransferDst);
-     // Record blit from swapchain resolve target to distortion copy
-     VkImageBlit blitRegion
-     {
-         .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-         .srcOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}},
-         .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-         .dstOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}},
-     };
-     Texture::RecordImageCopy(vkCommandBuffer, gpSwapchainManager->GetResolveImage(iFramebuffer), gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture, blitRegion);
-     gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture.TransitionImageLayout(vkCommandBuffer, kTransferDst, kShaderReadOnly);
+     gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture.TransitionImageLayout(vkCommandBuffer,
+     kShaderReadOnly, kTransferDst); // Record blit from swapchain resolve
+     target to distortion copy VkImageBlit blitRegion { .srcSubresource =
+     {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .srcOffsets = {{0, 0, 0},
+     {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width),
+     static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}},
+     .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, .dstOffsets = {{0,
+     0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width),
+     static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}}, };
+     Texture::RecordImageCopy(vkCommandBuffer,
+     gpSwapchainManager->GetResolveImage(iFramebuffer),
+     gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture,
+     blitRegion);
+     gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture.TransitionImageLayout(vkCommandBuffer,
+     kTransferDst, kShaderReadOnly);
 
      // Distortion pass: warp scene with heat and shockwave effects
-     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerDistortion);
-     {
-         RenderPassFlags_t distortionFlags {};
-         distortionFlags.Set(RenderPassFlags::kClear);
-         Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, distortionFlags, VK_SUBPASS_CONTENTS_INLINE);
-     }
-     pPipelines[kPipelineDistortion].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0);
-     vkCmdEndRenderPass(vkCommandBuffer);
-     gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerDistortion);
+     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer,
+     kGpuTimerDistortion); { RenderPassFlags_t distortionFlags {};
+     distortionFlags.Set(RenderPassFlags::kClear);
+     Texture::RecordBeginRenderPass(vkCommandBuffer,
+     gpSwapchainManager->mVkRenderPass,
+     gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer,
+     gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, distortionFlags,
+     VK_SUBPASS_CONTENTS_INLINE); }
+     pPipelines[kPipelineDistortion].RecordDraw(iCommandBuffer, vkCommandBuffer,
+     1, 0); vkCmdEndRenderPass(vkCommandBuffer);
+     gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer,
+     kGpuTimerDistortion);
 
    The swapchain image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT
    for the blit. If it doesn't already, add it in
@@ -274,19 +282,16 @@ Changes (12 files)
    collections across all active coordinates:
 
      // Distortion sources from active explosions
-     shaders::DistortionSourceLayout* pDistortionSources = reinterpret_cast<shaders::DistortionSourceLayout*>(gpBufferManager->mDistortionStorageBuffers.at(iCommandBuffer).mpMappedMemory);
-     int32_t iDistortionCount = 0;
-     float fCurrentTime = rFrameInterpolate.interpolate.fRenderTime;
-     for (const GridCoord& rCoord : rActiveCoords)
-     {
-         auto it = rRenderInterpolates.find(rCoord);
-         if (it == rRenderInterpolates.end()) continue;
-         const ExplosionsInterpolate& rExplosions = it->second.interpolate.mExplosions;
-         for (int64_t i = 0; i < rExplosions.miCount && iDistortionCount < shaders::kiMaxDistortionSources; ++i)
-         {
-             float fAge = fCurrentTime - common::NanosecondsToFloatSeconds<float>(rExplosions.pStartTimes[i].time_since_epoch());
-             float fMaxAge = 3.0f * rExplosions.pfTimePercents[i];
-             if (fAge > fMaxAge) continue;
+     shaders::DistortionSourceLayout* pDistortionSources =
+     reinterpret_cast<shaders::DistortionSourceLayout*>(gpBufferManager->mDistortionStorageBuffers.at(iCommandBuffer).mpMappedMemory);
+     int32_t iDistortionCount = 0; float fCurrentTime =
+     rFrameInterpolate.interpolate.fRenderTime; for (const GridCoord& rCoord :
+     rActiveCoords) { auto it = rRenderInterpolates.find(rCoord); if (it ==
+     rRenderInterpolates.end()) continue; const ExplosionsInterpolate&
+     rExplosions = it->second.interpolate.mExplosions; for (int64_t i = 0; i
+     < rExplosions.miCount && iDistortionCount < shaders::kiMaxDistortionSources; ++i) { float fAge = fCurrentTime - common::NanosecondsToFloatSeconds<float>(rExplosions.pStartTimes[i].time_since_epoch());
+     float fMaxAge = 3.0f * rExplosions.pfTimePercents[i]; if (fAge > fMaxAge)
+     continue;
 
              // Project world position to screen space
              XMVECTOR vecClip = XMVector4Transform(rExplosions.pVecPositions[i], XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatProjection));
@@ -308,38 +313,29 @@ Changes (12 files)
      }
      rMainLayout.iDistortionSourceCount = iDistortionCount;
 
-10. Engine/Source/Ui/WrapperBase.h / WrapperBase.cpp
-    Add Wrapper globals for distortion tuning.
+10. Engine/Source/Ui/WrapperBase.h
+    Add Wrapper globals for distortion tuning as inline definitions.
 
     In WrapperBase.h after the Pbr - Emissive section (line 256):
       // Distortion
-      extern Wrapper gDistortionHeatStrength;
-      extern Wrapper gDistortionHeatSpeed;
-      extern Wrapper gDistortionHeatScale;
-      extern Wrapper gDistortionShockwaveStrength;
-      extern Wrapper gDistortionShockwaveSpeed;
-      extern Wrapper gDistortionShockwaveWidth;
-      extern Wrapper gDistortionShockwaveFalloff;
+      inline Wrapper gDistortionHeatStrength(0.003f, 0.0f, 0.02f);
+      inline Wrapper gDistortionHeatSpeed(8.0f, 1.0f, 30.0f);
+      inline Wrapper gDistortionHeatScale(80.0f, 10.0f, 300.0f);
+      inline Wrapper gDistortionShockwaveStrength(0.03f, 0.0f, 0.15f);
+      inline Wrapper gDistortionShockwaveSpeed(0.5f, 0.1f, 2.0f);
+      inline Wrapper gDistortionShockwaveWidth(0.03f, 0.005f, 0.1f);
+      inline Wrapper gDistortionShockwaveFalloff(2.0f, 0.5f, 5.0f);
 
-    In WrapperBase.cpp, define them:
-      // Distortion
-      Wrapper gDistortionHeatStrength(0.003f, 0.0f, 0.02f);
-      Wrapper gDistortionHeatSpeed(8.0f, 1.0f, 30.0f);
-      Wrapper gDistortionHeatScale(80.0f, 10.0f, 300.0f);
-      Wrapper gDistortionShockwaveStrength(0.03f, 0.0f, 0.15f);
-      Wrapper gDistortionShockwaveSpeed(0.5f, 0.1f, 2.0f);
-      Wrapper gDistortionShockwaveWidth(0.03f, 0.005f, 0.1f);
-      Wrapper gDistortionShockwaveFalloff(2.0f, 0.5f, 5.0f);
-
-    Populate them in MainUniforms.cpp alongside the distortion
-    source population:
-      rMainLayout.fDistortionHeatStrength = gDistortionHeatStrength.mfCurrent;
-      rMainLayout.fDistortionHeatSpeed = gDistortionHeatSpeed.mfCurrent;
-      rMainLayout.fDistortionHeatScale = gDistortionHeatScale.mfCurrent;
-      rMainLayout.fDistortionShockwaveStrength = gDistortionShockwaveStrength.mfCurrent;
-      rMainLayout.fDistortionShockwaveSpeed = gDistortionShockwaveSpeed.mfCurrent;
-      rMainLayout.fDistortionShockwaveWidth = gDistortionShockwaveWidth.mfCurrent;
-      rMainLayout.fDistortionShockwaveFalloff = gDistortionShockwaveFalloff.mfCurrent;
+    Populate them in MainUniforms.cpp alongside the distortion source
+    population: rMainLayout.fDistortionHeatStrength =
+    gDistortionHeatStrength.mfCurrent; rMainLayout.fDistortionHeatSpeed =
+    gDistortionHeatSpeed.mfCurrent; rMainLayout.fDistortionHeatScale =
+    gDistortionHeatScale.mfCurrent; rMainLayout.fDistortionShockwaveStrength =
+    gDistortionShockwaveStrength.mfCurrent;
+    rMainLayout.fDistortionShockwaveSpeed = gDistortionShockwaveSpeed.mfCurrent;
+    rMainLayout.fDistortionShockwaveWidth = gDistortionShockwaveWidth.mfCurrent;
+    rMainLayout.fDistortionShockwaveFalloff =
+    gDistortionShockwaveFalloff.mfCurrent;
 
 11. Engine/Source/Ui/Screens/TweaksScreen/TweaksSliderMap.cpp
     and Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenPbr.cpp

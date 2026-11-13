@@ -23,38 +23,6 @@ static std::filesystem::path PathFromParameter(const nlohmann::json& rValue)
 	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
 }
 
-static int64_t FrameCountParameter(const nlohmann::json& rParameters, std::string_view command, const char* pcParameter, int64_t iDefault, int64_t iMax)
-{
-	if (!rParameters.contains(pcParameter))
-	{
-		return iDefault;
-	}
-
-	const nlohmann::json& rFrames = rParameters.at(pcParameter);
-	std::string integerError = std::string(command) + " '" + pcParameter + "' must be an integer";
-	if (!rFrames.is_number_integer())
-	{
-		throw std::runtime_error(integerError);
-	}
-
-	if (rFrames.is_number_unsigned())
-	{
-		uint64_t uiFrames = rFrames.get<uint64_t>();
-		if (uiFrames > static_cast<uint64_t>(iMax))
-		{
-			throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
-		}
-		return static_cast<int64_t>(uiFrames);
-	}
-
-	int64_t iFrames = rFrames.get<int64_t>();
-	if (iFrames < 0 || iFrames > iMax)
-	{
-		throw std::runtime_error(integerError + " in [0," + std::to_string(iMax) + "]");
-	}
-	return static_cast<int64_t>(iFrames);
-}
-
 enum class CaptureCommandPhase : uint8_t
 {
 	kAwaitRestore,
@@ -539,7 +507,12 @@ static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json&
 		// extent equality with !mbSwapchainRecreateDeferred, so it can't report a false success while a recreate is
 		// still deferred (the style flips a frame before the swapchain finishes). Then report the applied state.
 		bool bNowFullscreen = (GetWindowLongPtr(engine::gpGraphics->mHwnd, GWL_STYLE) & WS_POPUP) != 0;
-		if (bNowFullscreen != bOn || !engine::gpGraphics->ExtentSettled())
+		if (bNowFullscreen != bOn)
+		{
+			return std::nullopt;
+		}
+
+		if (!engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
 		}
@@ -605,7 +578,12 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 	ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 	engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 	{
-		if (IsIconic(engine::gpGraphics->mHwnd) != FALSE || !engine::gpGraphics->ExtentSettled())
+		if (IsIconic(engine::gpGraphics->mHwnd) != FALSE)
+		{
+			return std::nullopt;
+		}
+
+		if (!engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
 		}
@@ -801,17 +779,6 @@ static int64_t ParseVirtualKey(std::string_view name)
 	throw std::runtime_error("unknown key");
 }
 
-// Fill a bounded char buffer from a string param (.get<std::string>() throws on non-string).
-static void CopyStringParameter(std::span<char> destination, std::string_view source)
-{
-	int64_t i = 0;
-	for (; i < static_cast<int64_t>(destination.size()) - 1 && i < static_cast<int64_t>(source.size()); ++i)
-	{
-		destination[i] = source[i];
-	}
-	destination[i] = '\0';
-}
-
 // Shared label-target parse for click / set_slider.
 static void FillLabelTarget(const nlohmann::json& rParameters, engine::AgentScript& rScript)
 {
@@ -929,7 +896,34 @@ static void CommandKey(const nlohmann::json& rParameters, [[maybe_unused]] nlohm
 	script.eKind = engine::AgentScriptKind::kKey;
 	script.iVirtualKey = ParseVirtualKey(rParameters.at("key").get<std::string>());
 	// The key script adds a press advance before the hold and a finish advance after it.
-	script.iHoldFrames = FrameCountParameter(rParameters, "key", "holdFrames", 1, engine::AgentCommandServer::kiDeferredTimeoutDrains - 2);
+	static constexpr int64_t kiMaxHoldFrames = engine::AgentCommandServer::kiDeferredTimeoutDrains - 2;
+	script.iHoldFrames = 1;
+	if (rParameters.contains("holdFrames"))
+	{
+		const nlohmann::json& rFrames = rParameters.at("holdFrames");
+		if (!rFrames.is_number_integer())
+		{
+			throw std::runtime_error("key 'holdFrames' must be an integer");
+		}
+		if (rFrames.is_number_unsigned())
+		{
+			uint64_t uiFrames = rFrames.get<uint64_t>();
+			if (uiFrames > static_cast<uint64_t>(kiMaxHoldFrames))
+			{
+				throw std::runtime_error("key 'holdFrames' must be an integer in [0," + std::to_string(kiMaxHoldFrames) + "]");
+			}
+			script.iHoldFrames = static_cast<int64_t>(uiFrames);
+		}
+		else
+		{
+			int64_t iFrames = rFrames.get<int64_t>();
+			if (iFrames < 0 || iFrames > kiMaxHoldFrames)
+			{
+				throw std::runtime_error("key 'holdFrames' must be an integer in [0," + std::to_string(kiMaxHoldFrames) + "]");
+			}
+			script.iHoldFrames = iFrames;
+		}
+	}
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 

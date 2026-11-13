@@ -176,6 +176,14 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
+		if (RadioRow("Object Shadows Blur Level", &gObjectShadowsBlurLevel, gObjectShadowsBlurLevel.mfCurrent, {{"Low", 0.0f}, {"High", 1.0f}}))
+		{
+			ApplyObjectShadowsBlurLevel();
+		}
+		ColumnSlider("Object Shadow Cadence", &gObjectShadowCadence, "%.0f");
+
+		ImGui::Separator();
+
 		WrapperToggle("Lighting", &gLightingEnabled);
 		ImGui::BeginDisabled(!gLightingEnabled.Get<bool>());
 		if (RadioRow("Lighting", &gLightingLevel, gLightingLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))

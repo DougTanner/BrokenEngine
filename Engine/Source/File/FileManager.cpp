@@ -230,27 +230,11 @@ bool FileManager::ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 
 	return true;
 }
 
-bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FileContentDigest& rOut)
+bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut)
 {
 	std::filesystem::path filePath = GetFilePath(rFlags, rFilename);
-	DWORD uiAttributes = ::GetFileAttributesW(filePath.c_str());
-	if (uiAttributes == INVALID_FILE_ATTRIBUTES || (uiAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
-	{
-		return false;
-	}
-
-	FileHandle file(::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
+	FileHandle file(::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
 	if (file.mHandleFile == INVALID_HANDLE_VALUE)
-	{
-		return false;
-	}
-
-	BY_HANDLE_FILE_INFORMATION information {};
-	if (::GetFileInformationByHandle(file.mHandleFile, &information) == FALSE)
-	{
-		return false;
-	}
-	if ((information.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
 	{
 		return false;
 	}
@@ -258,7 +242,6 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	common::Sha256Hasher hasher;
 	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1'024);
 	std::span<std::byte> buffer(bufferAllocation.mpData, 64 * 1'024);
-	int64_t iByteCount = 0;
 	for (;;)
 	{
 		DWORD uiBytesRead = 0;
@@ -269,15 +252,14 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 		int64_t iBytesRead = static_cast<int64_t>(uiBytesRead);
 		ASSERT(iBytesRead <= std::ssize(buffer));
 		hasher.Update(buffer.first(static_cast<size_t>(iBytesRead)));
-		iByteCount += iBytesRead;
 		if (iBytesRead == 0)
 		{
 			break;
 		}
 	}
 
-	FileContentDigest digest {.iByteCount = iByteCount};
-	if (!hasher.Finish(digest.sha256))
+	std::array<uint8_t, 32> digest {};
+	if (!hasher.Finish(digest))
 	{
 		return false;
 	}

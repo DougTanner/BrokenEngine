@@ -24,14 +24,14 @@ public:
 	// textures) until RestorationSweep detects per-texture adoption and patches the slot to real.
 	int64_t AcquireTextureSlot(common::crc_t uiIslandCrc);
 
-	// LRU eviction sweeps. Both must run inside RenderGlobal's framebuffer-local bindless write epoch,
+	// LRU eviction sweeps. Both must run inside Graphics::UpdateFrameResidency's framebuffer-local bindless write epoch,
 	// bracketing TextureManager::ProcessPendingTextures; RestorationSweep records its uploads into the
 	// acquire command buffer that call names.
 	void EvictionSweep();
 	void RestorationSweep();
 
 	// Cheap pre-scans: true iff EvictionSweep / RestorationSweep would actually retire or patch GPU
-	// resources this frame. RenderGlobal uses these to open its write epoch only on churn frames
+	// resources this frame. Graphics::UpdateFrameResidency uses these to open its write epoch only on churn frames
 	// (the guard conditions mirror the in-sweep skip logic exactly).
 	bool AnyEvictionPending() const;
 	bool AnyRestorationPending() const;
@@ -72,7 +72,7 @@ private:
 
 	// Slots reclaimed by EvictionSweep (full teardown sets the template's iTextureSlot = -1). Popped
 	// first by AcquireTextureSlot before bumping miNextTextureSlot, so a long browse / churn session
-	// reuses indices instead of marching toward the kiMaxIslands ceiling. Main-thread-only (RenderGlobal
+	// reuses indices instead of marching toward the kiMaxIslands ceiling. Main-thread-only (Graphics::UpdateFrameResidency
 	// eviction and UpdateActiveIslands mint run on the same thread). Cleared in ResetTextureSlots.
 	std::vector<int64_t> mFreeTextureSlots;
 };

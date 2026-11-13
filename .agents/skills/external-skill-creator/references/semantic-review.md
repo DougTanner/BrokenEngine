@@ -25,8 +25,8 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
 4. Classify the target result. `INVALID`/1 is a mechanical Critical finding;
    `SETUP_ERROR`/2, an unrecognized result class, or a result/exit mismatch is
    `BLOCKED`.
-5. Review semantic behavior from `SKILL.md`, directly referenced resources, and a
-   present Codex companion file. Classify each compatibility conclusion as
+5. Review semantic behavior from `SKILL.md`, directly referenced resources, and
+   a present Codex companion file. Classify each compatibility conclusion as
    structural acceptance, loader acceptance, documented behavior, or observed
    runtime behavior. Done when each surface has a verdict and every
    compatibility claim names the evidence class that supports it. When the
@@ -40,13 +40,14 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
    merely to explain `/next-plan` is the nearby non-invocation. Check that the
    description, body, and client policy agree. Record each concrete case and its
    reasoning under shared `Decisive checks` and `Evidence`, applying the shared
-   [`Handoffs`](../../../references/subagent-handoff.md#handoffs) retention rule.
-   Report contradictions as evidence-backed findings. If intended trigger intent
-   cannot be resolved, follow the public [`Handoff`](../SKILL.md#handoff) rule.
-   Classify these cases as static semantic evidence under [`Rules`](#rules). Run
-   the Focused Host Checks only when [`validation.md`](validation.md)
-   `## Focused Host Checks` requires them.
-6. Collect inbound references by running `pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
+   [`Handoffs`](../../../references/subagent-handoff.md#handoffs) retention
+   rule. Report contradictions as evidence-backed findings. If intended trigger
+   intent cannot be resolved, follow the public [`Handoff`](../SKILL.md#handoff)
+   rule. Classify these cases as static semantic evidence under
+   [`Rules`](#rules). Run the Focused Host Checks only when
+   [`validation.md`](validation.md) `## Focused Host Checks` requires them.
+6. Collect inbound references by running
+   `pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Find-SkillInboundReferences.ps1 -SkillName <name>`,
    which sweeps the documented root set and returns capped `{path, line, text}`
    records with per-root hit counts; never reconstruct that sweep inline.
    Complete a `truncated` result with targeted searches of the roots whose
@@ -89,14 +90,15 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
 - Recommended: keep instructions imperative, general, and concise; include an
   example for a non-trivial required output format.
 - Recommended: plain wording — apply the one-term-per-concept and plain-words
-  rules in root `AGENTS.md` `## Directives`, and name concrete actions instead of
-  abstract noun-stacks unless the stack is an established term or code
-  identifier. Report a reintroduced synonym for an established term as a finding.
+  rules in root `AGENTS.md` `## Directives`, and name concrete actions instead
+  of abstract noun-stacks unless the stack is an established term or code
+  identifier. Report a reintroduced synonym for an established term as a
+  finding.
 - Recommended: phrase each rule positively as the action to take; keep a
-  prohibition only where the requirement cannot be stated positively, and pair it
-  with what to do instead.
-- Recommended: end each workflow step on a checkable done-condition, so the agent
-  can tell done from not-done.
+  prohibition only where the requirement cannot be stated positively, and pair
+  it with what to do instead.
+- Recommended: end each workflow step on a checkable done-condition, so the
+  agent can tell done from not-done.
 - Do not promote ordinary quality advice to Critical unless discovery or
   invocation is concretely incorrect, or the finding is the step 6
   run-as-evidence check.

@@ -1,14 +1,29 @@
 # AddressSanitizer and Fuzzing
 
-Revisit When: before any build is offered to players whose clients the host does not control (a public or open multiplayer release), or when a memory-corruption bug — a crash far from its cause, a torn collection, a heap error inside mimalloc — resists ordinary diagnosis.
+Revisit When: before any build is offered to players whose clients the host does
+not control (a public or open multiplayer release), or when a memory-corruption
+bug — a crash far from its cause, a torn collection, a heap error inside
+mimalloc — resists ordinary diagnosis.
 
 ## Context
 
-- **AddressSanitizer (ASan)** — MSVC `/fsanitize=address`. The compiler instruments every load and store against shadow memory, and the runtime surrounds each heap allocation with poisoned bytes, so an out-of-bounds access, use-after-free, or double free stops the process at the faulting line instead of corrupting memory silently. Roughly a 2x slowdown and more memory.
-- **Fuzzer** — libFuzzer, which MSVC supports through `/fsanitize=fuzzer`. It calls one entry point, `LLVMFuzzerTestOneInput(const uint8_t*, size_t)`, millions of times with byte buffers mutated toward new code coverage. libFuzzer supplies its own `main`, so each fuzz target is its own executable.
-- **Why they pair.** A fuzzer only notices a crash; most memory bugs do not crash. ASan turns every silent overrun the fuzzer reaches into a stop with a stack trace. ASan alone only sees bugs the existing harness scenarios happen to reach.
+- **AddressSanitizer (ASan)** — MSVC `/fsanitize=address`. The compiler
+  instruments every load and store against shadow memory, and the runtime
+  surrounds each heap allocation with poisoned bytes, so an out-of-bounds
+  access, use-after-free, or double free stops the process at the faulting line
+  instead of corrupting memory silently. Roughly a 2x slowdown and more memory.
+- **Fuzzer** — libFuzzer, which MSVC supports through `/fsanitize=fuzzer`. It
+  calls one entry point, `LLVMFuzzerTestOneInput(const uint8_t*, size_t)`,
+  millions of times with byte buffers mutated toward new code coverage.
+  libFuzzer supplies its own `main`, so each fuzz target is its own executable.
+- **Why they pair.** A fuzzer only notices a crash; most memory bugs do not
+  crash. ASan turns every silent overrun the fuzzer reaches into a stop with a
+  stack trace. ASan alone only sees bugs the existing harness scenarios happen
+  to reach.
 
-No sanitizer configuration exists today: nothing in the tree outside `ThirdParty/` sets `EnableASAN` or `/fsanitize`, or calls `ASAN_POISON_MEMORY_REGION`.
+No sanitizer configuration exists today: nothing in the tree outside
+`ThirdParty/` sets `EnableASAN` or `/fsanitize`, or calls
+`ASAN_POISON_MEMORY_REGION`.
 
 ## Obstacles
 
@@ -17,21 +32,31 @@ No sanitizer configuration exists today: nothing in the tree outside `ThirdParty
   `operator new`/`delete` with mimalloc, `<mimalloc-override.h>` in
   `Common/ExternalHeaders.h` replaces the C `malloc` family (including
   `_aligned_malloc`, which `common::MakeAligned` uses), and
-  `Engine/Source/Memory/Mimalloc.cpp` reserves each executable's startup arena at
-  process init. ASan only guards allocations made through the CRT allocator it
-  intercepts. The existing `ENABLE_CRT_DEBUG_HEAP` switch already routes all of
-  these to the CRT and compiles out every mimalloc call (including the
+  `Engine/Source/Memory/Mimalloc.cpp` reserves each executable's startup arena
+  at process init. ASan only guards allocations made through the CRT allocator
+  it intercepts. The existing `ENABLE_CRT_DEBUG_HEAP` switch already routes all
+  of these to the CRT and compiles out every mimalloc call (including the
   statistics in `ServerMonitorHost::Update`, whose main-thread allocation
-  suppression lives in `Engine/Source/Main.cpp`); the ASan
-  configuration reuses that routing. Check: whether its CRT debug-heap pieces
-  (`_CRTDBG_MAP_ALLOC`, `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with
-  ASan; if not, the ASan configuration selects the same CRT operators without
-  them. The ASan executable builds also drop the `Mimalloc.cpp` unit so the
-  arena reserve never runs.
-- **Sub-allocators hide interior bounds.** ASan sees only the outer edges of a block:
-  - A collection's SoA storage is one `common::MakeAligned` block that `AllocateAndAssign` (`Engine/Source/Frame/Collections/CollectionMemory.h`) carves into member arrays, each start rounded up to 64 bytes. A read past one member's capacity lands in the padding or the next member, and rows in `[iCount, iCapacity)` are allocated, so neither is reported.
-  - The thread-local `common::Workbuffer` (`Common/Workbuffer.h`) is a stack sub-allocator over a `StableVector` `VirtualAlloc` reservation (`Common/StableVector.h`), not a heap block, so ASan sees nothing inside it, including use after `Pop`.
-  - Closing both needs manual poisoning under `__SANITIZE_ADDRESS__` only: `ASAN_POISON_MEMORY_REGION` over inter-member padding (and optionally the unused rows past `iCount`), and over Workbuffer ranges on `Pop`, unpoisoned again on push.
+  suppression lives in `Engine/Source/Main.cpp`); the ASan configuration reuses
+  that routing. Check: whether its CRT debug-heap pieces (`_CRTDBG_MAP_ALLOC`,
+  `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with ASan; if not, the ASan
+  configuration selects the same CRT operators without them. The ASan executable
+  builds also drop the `Mimalloc.cpp` unit so the arena reserve never runs.
+- **Sub-allocators hide interior bounds.** ASan sees only the outer edges of a
+  block:
+  - A collection's SoA storage is one `common::MakeAligned` block that
+    `AllocateAndAssign` (`Engine/Source/Frame/Collections/CollectionMemory.h`)
+    carves into member arrays, each start rounded up to 64 bytes. A read past
+    one member's capacity lands in the padding or the next member, and rows in
+    `[iCount, iCapacity)` are allocated, so neither is reported.
+  - The thread-local `common::Workbuffer` (`Common/Workbuffer.h`) is a stack
+    sub-allocator over a `StableVector` `VirtualAlloc` reservation
+    (`Common/StableVector.h`), not a heap block, so ASan sees nothing inside it,
+    including use after `Pop`.
+  - Closing both needs manual poisoning under `__SANITIZE_ADDRESS__` only:
+    `ASAN_POISON_MEMORY_REGION` over inter-member padding (and optionally the
+    unused rows past `iCount`), and over Workbuffer ranges on `Pop`, unpoisoned
+    again on push.
 - **ThirdParty prebuilts and STL annotations.** `ThirdParty.<Config>.lib` is
   built by `ThirdParty/Prebuilts/Platforms/VisualStudio2026/ThirdParty.vcxproj`
   without ASan. Linking instrumented and uninstrumented objects fails with an
@@ -51,26 +76,52 @@ No sanitizer configuration exists today: nothing in the tree outside `ThirdParty
   must accept the ASan configuration. `Engine/Source/EngineSwitches.h` and, for
   `kbAutoConnect`, `Projects/BrokenEngineSandbox/Source/Pch.h` select their
   compile-time switches through `#if BT_DEBUG` / `#elif BT_PROFILE` /
-  `#elif BT_RELEASE` chains with no `#else`, so the ASan configuration must define one of those macros; that
-  choice sets `kbDebugInput` and so which game packet types the network fuzz
-  target can reach.
-- **Platform.** Windows x64 only, like every existing configuration. Check: the ASan runtime DLL must be found by a harness-launched process.
-- **Timing.** At about 2x slowdown the fixed-tick server can fall behind, and the per-tick rate budgets in `Server::Receive` and harness timeouts can fire. Timing-sensitive scenarios do not gate an ASan run.
-- **Determinism.** Expected unaffected: instrumentation adds shadow checks around memory accesses, not arithmetic, and `/fp:strict` already holds results equal across differently optimized binaries (`Documents/FloatingPointDeterminism.txt`). The CRT allocator does change addresses, which would expose any address-dependent ordering. Check it, do not assume it: the replay determinism check passes on the ASan server, and a session between an ASan server and a normal client shows no CRC mismatch.
+  `#elif BT_RELEASE` chains with no `#else`, so the ASan configuration must
+  define one of those macros; that choice sets `kbDebugInput` and so which game
+  packet types the network fuzz target can reach.
+- **Platform.** Windows x64 only, like every existing configuration. Check: the
+  ASan runtime DLL must be found by a harness-launched process.
+- **Timing.** At about 2x slowdown the fixed-tick server can fall behind, and
+  the per-tick rate budgets in `Server::Receive` and harness timeouts can fire.
+  Timing-sensitive scenarios do not gate an ASan run.
+- **Determinism.** Expected unaffected: instrumentation adds shadow checks
+  around memory accesses, not arithmetic, and `/fp:strict` already holds results
+  equal across differently optimized binaries
+  (`Documents/FloatingPointDeterminism.txt`). The CRT allocator does change
+  addresses, which would expose any address-dependent ordering. Check it, do not
+  assume it: the replay determinism check passes on the ASan server, and a
+  session between an ASan server and a normal client shows no CRC mismatch.
 
 ## Phases
 
-1. **Server ASan.** An ASan configuration of `BrokenEngineSandboxServer` plus ThirdParty, run through the existing `/agent-harness` scenarios. The server is headless, so this is the simplest first step and covers the untrusted-input code under real traffic. Add the collection and Workbuffer poisoning here.
-2. **Client ASan.** The same configuration for `BrokenEngineSandbox`. GPU memory, VMA's sub-allocated mapped memory, and the uninstrumented Vulkan loader and driver DLLs are invisible to ASan; triage reports raised inside driver code before treating them as engine bugs.
-3. **Fuzz targets.** Separate `BT_SERVER` fuzz executables built with `/fsanitize=address /fsanitize=fuzzer`, ranked below. `/update-vcxproj` owns their project membership.
+1. **Server ASan.** An ASan configuration of `BrokenEngineSandboxServer` plus
+   ThirdParty, run through the existing `/agent-harness` scenarios. The server
+   is headless, so this is the simplest first step and covers the
+   untrusted-input code under real traffic. Add the collection and Workbuffer
+   poisoning here.
+2. **Client ASan.** The same configuration for `BrokenEngineSandbox`. GPU
+   memory, VMA's sub-allocated mapped memory, and the uninstrumented Vulkan
+   loader and driver DLLs are invisible to ASan; triage reports raised inside
+   driver code before treating them as engine bugs.
+3. **Fuzz targets.** Separate `BT_SERVER` fuzz executables built with
+   `/fsanitize=address /fsanitize=fuzzer`, ranked below. `/update-vcxproj` owns
+   their project membership.
 
 ## Fuzz Focus Areas
 
-Ranked by trust policy (root `AGENTS.md` `## Key Patterns`): the server fully validates client-to-server records and grid saves, so those readers are where hostile bytes arrive.
+Ranked by trust policy (root `AGENTS.md` `## Key Patterns`): the server fully
+validates client-to-server records and grid saves, so those readers are where
+hostile bytes arrive.
 
 ### 1. Client-to-server network records (intensive)
 
-- **Message decoders (no seam).** `engine::NetworkMessages::Read(std::span<const uint8_t>, TMESSAGE&)` in `Engine/Source/Network/NetworkMessages.h` decodes from a byte span alone. One target switches on the first byte across `ClientAckStreamMessage`, `ClientDesyncReportMessage`, `ClientDebugFrameRequestMessage`, `ClientHelloMessage`, `ClientSubscribeMessage`, `ClientUnsubscribeMessage`, and `ClientResyncRequestMessage`.
+- **Message decoders (no seam).**
+  `engine::NetworkMessages::Read(std::span<const uint8_t>, TMESSAGE&)` in
+  `Engine/Source/Network/NetworkMessages.h` decodes from a byte span alone. One
+  target switches on the first byte across `ClientAckStreamMessage`,
+  `ClientDesyncReportMessage`, `ClientDebugFrameRequestMessage`,
+  `ClientHelloMessage`, `ClientSubscribeMessage`, `ClientUnsubscribeMessage`,
+  and `ClientResyncRequestMessage`.
 - **Engine dispatch.** `Server::Receive(std::span<const uint8_t>, ENetPeer*)`
   (`Engine/Source/Network/Server/Server.cpp`) is private and takes bytes, and
   reaches the handlers past the decoders: `ClientAcknowledgementStream` into
@@ -84,8 +135,8 @@ Ranked by trust policy (root `AGENTS.md` `## Key Patterns`): the server fully va
   simply rate-dropped.
 - **Game packets.** Game-range types queue into `Server::mDeferredClientPackets`
   and are decoded by `ServerSession::HandleGamePacket`
-  (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp`), which
-  `ServerSessionBase::DispatchDeferredClientPackets`
+  (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp`),
+  which `ServerSessionBase::DispatchDeferredClientPackets`
   (`Engine/Source/Network/Server/ServerSessionBase.cpp`) calls after
   `Server::AdmitGamePacket` checks `GetGamePacketContract`. The handlers read
   with raw cursor reads (`engine::ReadInt64`, `engine::ReadFloat`,
@@ -99,7 +150,9 @@ Ranked by trust policy (root `AGENTS.md` `## Key Patterns`): the server fully va
   `Engine/Source/Network/NetworkProtocol.h` returns the non-sendable sentinel
   for them), but exclude their handlers from this target: they do file I/O or
   whole-state replacement rather than parsing.
-- Not worth a target: `NetworkDiscoveryResponder::Poll` reads only a fixed-size magic value. ENet's own protocol parsing is ThirdParty, covered by ASan only (Phase 1, instrumented ThirdParty).
+- Not worth a target: `NetworkDiscoveryResponder::Poll` reads only a fixed-size
+  magic value. ENet's own protocol parsing is ThirdParty, covered by ASan only
+  (Phase 1, instrumented ThirdParty).
 
 ### 2. Grid save reading
 
@@ -124,8 +177,13 @@ libFuzzer's memory limits must sit above the reader's legitimate peak.
 
 ### 3. Lower priority
 
-- **Replay streams and the agent command channel** — exempt developer tools (`Engine/Source/File/AGENTS.md` `## Replay Streams`, `Engine/Source/Agent/AGENTS.md` `## Architecture`); their checks may stay but no new ones are required.
-- **Server-to-client data** — the client trusts it under the ENet datagram checksum and `ASSERT`s on corruption (`Engine/Source/Network/AGENTS.md` `## Corrupt Input Policy`).
+- **Replay streams and the agent command channel** — exempt developer tools
+  (`Engine/Source/File/AGENTS.md` `## Replay Streams`,
+  `Engine/Source/Agent/AGENTS.md` `## Architecture`); their checks may stay but
+  no new ones are required.
+- **Server-to-client data** — the client trusts it under the ENet datagram
+  checksum and `ASSERT`s on corruption (`Engine/Source/Network/AGENTS.md`
+  `## Corrupt Input Policy`).
 - **Pack files** — produced offline by DataPacker and trusted at runtime.
 
 Phase 1 and 2 ASan runs still cover these passively.
@@ -143,11 +201,23 @@ not as a unit test.
 
 ## Acceptance Criteria
 
-- An ASan configuration builds the server and client with `/fsanitize=address`, the CRT allocator in place of mimalloc, and ThirdParty under the same configuration, with no `annotate_vector`/`annotate_string` link mismatch. Debug, Profile, and Release builds are unchanged.
-- `/compile`, primary ThirdParty provisioning, and `/agent-harness` accept the configuration, and `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` and `ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md` document it.
-- Collection inter-member padding and popped Workbuffer ranges are poisoned in ASan builds only; a one-off manual out-of-bounds probe into each is reported.
-- The standard harness scenarios run on the ASan server with no ASan report, or every report is fixed or recorded as a follow-up Plan; the replay determinism check passes on the ASan server.
-- One fuzz target each for the network message decoders, `Server::Receive`, game packet decoding, and `ReadGridSave` runs without a live ENet connection, seeded from real sessions and saves, for an agreed run budget with no crash, ASan report, or leak.
+- An ASan configuration builds the server and client with `/fsanitize=address`,
+  the CRT allocator in place of mimalloc, and ThirdParty under the same
+  configuration, with no `annotate_vector`/`annotate_string` link mismatch.
+  Debug, Profile, and Release builds are unchanged.
+- `/compile`, primary ThirdParty provisioning, and `/agent-harness` accept the
+  configuration, and
+  `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` and
+  `ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md` document it.
+- Collection inter-member padding and popped Workbuffer ranges are poisoned in
+  ASan builds only; a one-off manual out-of-bounds probe into each is reported.
+- The standard harness scenarios run on the ASan server with no ASan report, or
+  every report is fixed or recorded as a follow-up Plan; the replay determinism
+  check passes on the ASan server.
+- One fuzz target each for the network message decoders, `Server::Receive`, game
+  packet decoding, and `ReadGridSave` runs without a live ENet connection,
+  seeded from real sessions and saves, for an agreed run budget with no crash,
+  ASan report, or leak.
 
 ## Out of scope
 

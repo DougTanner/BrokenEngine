@@ -1,6 +1,8 @@
 # Structural Erosion Deep Dive
 
-What the structural-erosion line on the code-quality history chart measures, what drives its up and down periods, and whether controlling it deserves emphasis. Findings only; the recommendation waits for the user's decision.
+What the structural-erosion line on the code-quality history chart measures,
+what drives its up and down periods, and whether controlling it deserves
+emphasis. Findings only; the recommendation waits for the user's decision.
 
 Evidence base: the history table
 `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`
@@ -14,19 +16,40 @@ measures every row from 1139 on. Commit `1e9e821d` (**not reachable from
 
 ## Computation
 
-- Function unit: a tree-sitter `function_definition` with a body. A nested definition is its own unit, and a lambda belongs to its enclosing unit (`MetricContract.md` `## Output`).
-- Mass of a unit: `CC * sqrt(SLOC)`, built per function in `Analyze-CodeQualityMetrics.py` (the `funcs` rows).
-- `structuralErosion = H / D`, where the numerator H is the summed mass of units with CC above 10 and the denominator D is the summed mass of all units (`metrics()`). `aggregate()` sums file numerators and denominators for areas. A row stores the whole supported corpus, not only `Engine/Source`.
-- With `L = D - H`, the mass of units at CC 10 or less, `E = H / (H + L)`. Each corpus metric here splits a move into an H effect and an L effect, averaging the two orders of applying each change (a two-factor Shapley split, which sums exactly to the move). H is attributed per function from `highComplexityFunctions`. L is attributed per file from `files` rows (file denominator minus file numerator), because a Snapshot lists no per-function rows at CC 10 or less.
-- Granularity: one function entering H moves E by about `mass * (1 - E) / D`. At the current `D ≈ 69,800` and `E ≈ 0.57`, a typical CC-11, 30-SLOC function crossing the threshold moves E by about +0.0004. The largest single function, mass 1,696, moved it by +0.011.
+- Function unit: a tree-sitter `function_definition` with a body. A nested
+  definition is its own unit, and a lambda belongs to its enclosing unit
+  (`MetricContract.md` `## Output`).
+- Mass of a unit: `CC * sqrt(SLOC)`, built per function in
+  `Analyze-CodeQualityMetrics.py` (the `funcs` rows).
+- `structuralErosion = H / D`, where the numerator H is the summed mass of units
+  with CC above 10 and the denominator D is the summed mass of all units
+  (`metrics()`). `aggregate()` sums file numerators and denominators for areas.
+  A row stores the whole supported corpus, not only `Engine/Source`.
+- With `L = D - H`, the mass of units at CC 10 or less, `E = H / (H + L)`. Each
+  corpus metric here splits a move into an H effect and an L effect, averaging
+  the two orders of applying each change (a two-factor Shapley split, which sums
+  exactly to the move). H is attributed per function from
+  `highComplexityFunctions`. L is attributed per file from `files` rows (file
+  denominator minus file numerator), because a Snapshot lists no per-function
+  rows at CC 10 or less.
+- Granularity: one function entering H moves E by about `mass * (1 - E) / D`. At
+  the current `D ≈ 69,800` and `E ≈ 0.57`, a typical CC-11, 30-SLOC function
+  crossing the threshold moves E by about +0.0004. The largest single function,
+  mass 1,696, moved it by +0.011.
 
 ## Periods (rows 0-1168)
 
-Segmentation rule: a zigzag over `structuralErosion`. A period ends at the running extreme once the series reverses by at least the threshold: 0.02 for the archive rows and 0.005 from row 646 on, where moves are smaller. Dates are committer dates.
+Segmentation rule: a zigzag over `structuralErosion`. A period ends at the
+running extreme once the series reverses by at least the threshold: 0.02 for the
+archive rows and 0.005 from row 646 on, where moves are smaller. Dates are
+committer dates.
 
 ### Archive rows 0-645: unattributable here
 
-Archive SHAs resolve only in offline archives of the old repositories (`history/README.md`), and which analyzer measured these rows cannot be checked from this repository. These periods are characterized from table values and `supported`/`parsed` only, and are **not attributable here**.
+Archive SHAs resolve only in offline archives of the old repositories
+(`history/README.md`), and which analyzer measured these rows cannot be checked
+from this repository. These periods are characterized from table values and
+`supported`/`parsed` only, and are **not attributable here**.
 
 | Rows | Dates | Erosion | Verbosity | supported / parsed |
 | --- | --- | --- | --- | --- |
@@ -45,7 +68,13 @@ Archive SHAs resolve only in offline archives of the old repositories (`history/
 | 404-562 | 2026-07-01 .. 2026-07-29 | 0.4658 -> 0.5602 (+0.0944) | 0.0379 -> 0.0378 | 456/455 -> 507/507 |
 | 562-645 | 2026-07-29 .. 2026-08-10 | 0.5602 -> 0.5579 (-0.0023) | 0.0378 -> 0.0384 | 507/507 -> 513/513 |
 
-The series' extremes are archive rows: the maximum 0.6974 at row 17 (`e648aa64`) and the minimum 0.4658 at row 404 (`e10c809e`). The largest single steps are all archive rows (`supported` change in parentheses): 241 `a33c5e4f` -0.0608 (+8 files), 197 `e6aeef62` -0.0499 (+74), 195 `d96df900` -0.0423 (+1), 211 `25708b4f` -0.0378 (+9), 395 `cc8fcbc4` -0.0341 (0), 186 `d6dd9798` +0.0281 (+2). Rows 0-503 carry parse omissions (`parsed < supported` in 504 rows), and no row from 504 on does.
+The series' extremes are archive rows: the maximum 0.6974 at row 17 (`e648aa64`)
+and the minimum 0.4658 at row 404 (`e10c809e`). The largest single steps are all
+archive rows (`supported` change in parentheses): 241 `a33c5e4f` -0.0608 (+8
+files), 197 `e6aeef62` -0.0499 (+74), 195 `d96df900` -0.0423 (+1), 211
+`25708b4f` -0.0378 (+9), 395 `cc8fcbc4` -0.0341 (0), 186 `d6dd9798` +0.0281
+(+2). Rows 0-503 carry parse omissions (`parsed < supported` in 504 rows), and
+no row from 504 on does.
 
 ### Rows 646-1168
 
@@ -61,11 +90,18 @@ The series' extremes are archive rows: the maximum 0.6974 at row 17 (`e648aa64`)
 
 ## Attribution from row 646 on
 
-Every SHA in this section is reachable from `main` unless it is marked **not reachable from `main`**. Rows 1141-1159 name commits since squashed into `3c3cfce5` (row 1160). The objects for those commits still exist in this repository, so their Snapshots reproduce only while the objects survive. Every period endpoint below is reachable from `main`. In the tables:
+Every SHA in this section is reachable from `main` unless it is marked **not
+reachable from `main`**. Rows 1141-1159 name commits since squashed into
+`3c3cfce5` (row 1160). The objects for those commits still exist in this
+repository, so their Snapshots reproduce only while the objects survive. Every
+period endpoint below is reachable from `main`. In the tables:
 
 - "H / L effect" is the share of the period's erosion move.
-- A function's share is its mass change as a share of the period's net H change (dH). Churn makes individual shares exceed 100% in sum.
-- The agent group means paths under `Engine/Source/Agent/`, `Projects/BrokenEngineSandbox/Source/Agent/`, and `Tools/AgentHarness/`. It includes the harness fixture commands, renamed to harness rigs in P6.
+- A function's share is its mass change as a share of the period's net H change
+  (dH). Churn makes individual shares exceed 100% in sum.
+- The agent group means paths under `Engine/Source/Agent/`,
+  `Projects/BrokenEngineSandbox/Source/Agent/`, and `Tools/AgentHarness/`. It
+  includes the harness fixture commands, renamed to harness rigs in P6.
 
 | Period | dE | H effect | L effect | dH | dL | Main drivers (share of dH) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -93,25 +129,46 @@ P5 sub-periods:
 
 - **(a) Threshold crossing — minor contributor, not the cause of the periods.**
   - One crossing moves E by about +0.0004.
-  - In P5, functions entering H at CC 11-12 whose name already existed in the file (candidate crossings) sum to +679 of +9,422 (7%).
-  - Crossings explain about half of the H rise in the 1077-1078 step, which nearly vanishes above a CC-15 threshold.
-  - Every period of at least 0.005 keeps its sign under thresholds of 15 and 20 and under two threshold-free weightings (see `## Sensitivity`).
-- **(b) Denominator dilution — secondary, mostly a by-product of decomposition.**
-  - The L effect has the same sign as the move in P1 (4%), P2 (41%), P3 (19%), and P4 (43%), and is large only in P2 and P4. There it is mass moving from a decomposed complex function into its new simple helpers in the same file (P2: `Main.cpp` L +379 as `RunExportJobs` left), not independent new code.
-  - In the growth periods, new low-CC code damped the rise: P5 L effect -18%, and -39% at row 941.
+  - In P5, functions entering H at CC 11-12 whose name already existed in the
+    file (candidate crossings) sum to +679 of +9,422 (7%).
+  - Crossings explain about half of the H rise in the 1077-1078 step, which
+    nearly vanishes above a CC-15 threshold.
+  - Every period of at least 0.005 keeps its sign under thresholds of 15 and 20
+    and under two threshold-free weightings (see `## Sensitivity`).
+- **(b) Denominator dilution — secondary, mostly a by-product of
+  decomposition.**
+  - The L effect has the same sign as the move in P1 (4%), P2 (41%), P3 (19%),
+    and P4 (43%), and is large only in P2 and P4. There it is mass moving from a
+    decomposed complex function into its new simple helpers in the same file
+    (P2: `Main.cpp` L +379 as `RunExportJobs` left), not independent new code.
+  - In the growth periods, new low-CC code damped the rise: P5 L effect -18%,
+    and -39% at row 941.
 - **(c) Corpus membership — not an artifact from row 646 on; archive unknown.**
-  - From row 646 on, `parsed == supported` in every row, so no parse omission moves the value.
-  - Files enter and leave (513 -> 557), but they carry real functions. Engine/game moves pair as near-equal added and removed file L (P4: `NetworkSerialization.cpp` +216 / -212).
-  - In the archive, parse omissions in rows 0-503 and jumps such as row 197 (+74 files, -0.0499) cannot be separated here.
-- **(d) Analyzer or measurement differences — ruled out from row 646 on; archive unknown.**
-  - Fresh Snapshots reproduce the stored row's `structuralErosion` and `verbosity` to all 12 digits at 13 of 14 checked rows.
-  - The exception is the root row 646, where the fresh value is 0.557880533969 against 0.557882659401 stored (-2.1e-6), with verbosity 0.03843218075 against 0.038432914146. That is noise-level and does not affect any period.
+  - From row 646 on, `parsed == supported` in every row, so no parse omission
+    moves the value.
+  - Files enter and leave (513 -> 557), but they carry real functions.
+    Engine/game moves pair as near-equal added and removed file L (P4:
+    `NetworkSerialization.cpp` +216 / -212).
+  - In the archive, parse omissions in rows 0-503 and jumps such as row 197 (+74
+    files, -0.0499) cannot be separated here.
+- **(d) Analyzer or measurement differences — ruled out from row 646 on; archive
+  unknown.**
+  - Fresh Snapshots reproduce the stored row's `structuralErosion` and
+    `verbosity` to all 12 digits at 13 of 14 checked rows.
+  - The exception is the root row 646, where the fresh value is 0.557880533969
+    against 0.557882659401 stored (-2.1e-6), with verbosity 0.03843218075
+    against 0.038432914146. That is noise-level and does not affect any period.
   - Which analyzer measured the archive rows cannot be checked.
-- **(e) Genuine growth or decomposition of complex functions — confirmed main driver.**
-  - The H effect is at least 57% of every period's move and over 100% in P5 and P6.
-  - The down periods are decomposition or simplification work: P2, P4's "Decompose ..." commits, and P6's over-engineering pass.
-  - The up periods are new large branchy functions, mostly harness fixture commands, which take 56% of P5's dH.
-  - The series is lumpy because the top 10 functions hold 11% of all mass (19% of H) at row 1164, and the largest alone holds 2%.
+- **(e) Genuine growth or decomposition of complex functions — confirmed main
+  driver.**
+  - The H effect is at least 57% of every period's move and over 100% in P5 and
+    P6.
+  - The down periods are decomposition or simplification work: P2, P4's
+    "Decompose ..." commits, and P6's over-engineering pass.
+  - The up periods are new large branchy functions, mostly harness fixture
+    commands, which take 56% of P5's dH.
+  - The series is lumpy because the top 10 functions hold 11% of all mass (19%
+    of H) at row 1164, and the largest alone holds 2%.
 
 ## Verbosity comparison
 
@@ -124,13 +181,22 @@ Computed from the table over measured rows:
 | Net move / summed absolute steps | 0.063 | 0.19 |
 | Top-5 steps' share of summed absolute steps | 32% | 25% |
 
-- Erosion and verbosity steps barely correlate: 0.11 from row 646 on, 0.21 in the archive.
-- Relative to its own level, erosion moves about as much as verbosity. It reads as random because it is two-directional: decomposition campaigns and harness growth alternate, so only 6% of its movement is net, against 19% for verbosity's steady decline. It is also lumpier, since the largest single functions each carry about 1-2% of all mass.
-- The chart amplifies this. Each series' axis spans its full-history range: erosion 0.4658-0.6974, verbosity 0.0321-0.0856 (the archive's verbosity peak). The row 646-1168 erosion range therefore fills 23% of its full-history data range, while verbosity fills 5.5%.
+- Erosion and verbosity steps barely correlate: 0.11 from row 646 on, 0.21 in
+  the archive.
+- Relative to its own level, erosion moves about as much as verbosity. It reads
+  as random because it is two-directional: decomposition campaigns and harness
+  growth alternate, so only 6% of its movement is net, against 19% for
+  verbosity's steady decline. It is also lumpier, since the largest single
+  functions each carry about 1-2% of all mass.
+- The chart amplifies this. Each series' axis spans its full-history range:
+  erosion 0.4658-0.6974, verbosity 0.0321-0.0856 (the archive's verbosity peak).
+  The row 646-1168 erosion range therefore fills 23% of its full-history data
+  range, while verbosity fills 5.5%.
 
 ## Sensitivity
 
-Scratch computations over the Snapshots in `## Reproduction`. Every variant keeps D and changes only the numerator over the listed functions.
+Scratch computations over the Snapshots in `## Reproduction`. Every variant
+keeps D and changes only the numerator over the listed functions.
 
 | Steps | CC > 10 (current) | CC > 15 | CC > 20 | Ramp, 0 at CC 10 to full mass at CC 20 | `(CC - 10) * sqrt(SLOC)` |
 | --- | --- | --- | --- | --- | --- |
@@ -143,27 +209,44 @@ Scratch computations over the Snapshots in `## Reproduction`. Every variant keep
 | Range / mean over the 13 points from 646 | 0.096 | 0.156 | 0.216 | 0.138 | 0.173 |
 
 - The period shape is not a CC-10 artifact.
-- A different threshold or weighting amplifies the swings rather than smoothing them, so replacing the formula would not make the line calmer.
+- A different threshold or weighting amplifies the swings rather than smoothing
+  them, so replacing the formula would not make the line calmer.
 
 ## Recommendation
 
-**Keep structural erosion advisory as it is now. Do not add emphasis on controlling the corpus ratio.**
+**Keep structural erosion advisory as it is now. Do not add emphasis on
+controlling the corpus ratio.**
 
-- It measures something real: every period traces to named decomposition work or to new large functions.
-- But the ratio is a coarse, lumpy summary of a few dozen functions, and one new harness command moved it by 0.011. Driving the ratio down invites the denominator and helper-proliferation gaming `Remediation.md` already forbids, and gives no guidance a reviewer cannot get directly from the function list.
-- The useful signal is the per-function mass ranking (`highComplexityFunctions`), which already names what to decompose. P4 shows that targeted decomposition moves the line when the work is wanted.
+- It measures something real: every period traces to named decomposition work or
+  to new large functions.
+- But the ratio is a coarse, lumpy summary of a few dozen functions, and one new
+  harness command moved it by 0.011. Driving the ratio down invites the
+  denominator and helper-proliferation gaming `Remediation.md` already forbids,
+  and gives no guidance a reviewer cannot get directly from the function list.
+- The useful signal is the per-function mass ranking
+  (`highComplexityFunctions`), which already names what to decompose. P4 shows
+  that targeted decomposition moves the line when the work is wanted.
 
-Follow-on options for the user's decision. Option 1 is recommended; none is implemented.
+Follow-on options for the user's decision. Option 1 is recommended; none is
+implemented.
 
 1. No change: keep the metric, chart, and guidance as they are.
-2. Chart readability: draw both series on a shared relative scale, or scale the axes to rows 646 on, so equal relative movement looks equal. This changes the history SVG generator and its contract.
-3. Function-level advisory: report the largest new or grown `highComplexityFunctions` entries by mass at review or landing, instead of reading the ratio.
-4. Area split: report the agent group separately. It holds 26% of H at row 1164 and drove 56% of P5's rise, so it masks runtime code trends.
-5. Formula replacement (CC 15/20 threshold or a ramp): not recommended; `## Sensitivity` shows the same periods with larger swings.
+2. Chart readability: draw both series on a shared relative scale, or scale the
+   axes to rows 646 on, so equal relative movement looks equal. This changes the
+   history SVG generator and its contract.
+3. Function-level advisory: report the largest new or grown
+   `highComplexityFunctions` entries by mass at review or landing, instead of
+   reading the ratio.
+4. Area split: report the agent group separately. It holds 26% of H at row 1164
+   and drove 56% of P5's rise, so it masks runtime code trends.
+5. Formula replacement (CC 15/20 threshold or a ramp): not recommended;
+   `## Sensitivity` shows the same periods with larger swings.
 
 ## Reproduction
 
-Run `/code-quality-metrics` Snapshot with `Target Engine/Source`, `Scope Recursive`, and `-Commit <sha>`, using the analyzer at `8b74870d`. Read `current.corpusMetrics.structuralErosion` and `current.highComplexityFunctions`.
+Run `/code-quality-metrics` Snapshot with `Target Engine/Source`,
+`Scope Recursive`, and `-Commit <sha>`, using the analyzer at `8b74870d`. Read
+`current.corpusMetrics.structuralErosion` and `current.highComplexityFunctions`.
 
 | Row | Commit | Value | Numerator (H) | Denominator (D) | supported = parsed |
 | --- | --- | --- | --- | --- | --- |
@@ -182,4 +265,9 @@ Run `/code-quality-metrics` Snapshot with `Target Engine/Source`, `Scope Recursi
 | 1160 | `3c3cfce55b73ef882aa99f3eebe8bc218c04164d` | 0.567714808613 | 39623.319 | 69794.409 | 557 |
 | 1164 | `896405224055125ed9f0a5bb94e944753c3ce925` | 0.567714808613 | 39623.319 | 69794.409 | 557 |
 
-All 14 commits are reachable from `main`. Table-only citations of rows 1141, 1143, 1151, and 1153 name commits **not reachable from `main`**: `59d1a0fb9176547a34af1c06f0c2ee766702a9d2`, `45a7d5b61425cd06895b72c87d18ebedc1f824db`, `9aac806a6a2eb1a14391cdb55370c0e99027c000`, and `998c1b3c62da1bf6133e248c4ac52b269e684d2f`.
+All 14 commits are reachable from `main`. Table-only citations of rows 1141,
+1143, 1151, and 1153 name commits **not reachable from `main`**:
+`59d1a0fb9176547a34af1c06f0c2ee766702a9d2`,
+`45a7d5b61425cd06895b72c87d18ebedc1f824db`,
+`9aac806a6a2eb1a14391cdb55370c0e99027c000`, and
+`998c1b3c62da1bf6133e248c4ac52b269e684d2f`.

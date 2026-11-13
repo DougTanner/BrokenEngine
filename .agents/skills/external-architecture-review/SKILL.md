@@ -14,7 +14,11 @@ allowed-tools: [Read, Grep, Glob, Agent, PowerShell]
 
 ## Purpose
 
-Run a findings-only, multi-perspective review from the main invoking context. This skill owns cross-file shape: dependency structure, module depth, coupling, phase and thread alignment, and inter-module contracts. Hand function complexity, nesting, hot-path allocation, bool-to-flags, and file-size mechanics to `external-refactor-clean`. Exclude security auditing.
+Run a findings-only, multi-perspective review from the main invoking context.
+This skill owns cross-file shape: dependency structure, module depth, coupling,
+phase and thread alignment, and inter-module contracts. Hand function
+complexity, nesting, hot-path allocation, bool-to-flags, and file-size mechanics
+to `external-refactor-clean`. Exclude security auditing.
 
 ## When to use
 
@@ -100,11 +104,11 @@ Require a review scope path. If absent, ask for it.
     verdict.
 14. Apply its verdict: retain `VERIFIED` evidence, remove or correct a `REFUTED`
     dependent finding, and move `UNRESOLVED` claims to residuals rather than
-    presenting them as confirmed recommendations. Done when every request carries
-    an applied verdict.
+    presenting them as confirmed recommendations. Done when every request
+    carries an applied verdict.
 15. Deduplicate by root cause, preserve the strongest evidence, and
-    cross-reference systemic findings without inflating their count. Done when no
-    root cause appears twice.
+    cross-reference systemic findings without inflating their count. Done when
+    no root cause appears twice.
 16. Preserve every prioritized Lens-D recommendation's interface, deletion,
     seam, and locality/leverage evidence and payoff. Done when each of those
     recommendations carries them.
@@ -120,8 +124,8 @@ Require a review scope path. If absent, ask for it.
 - Find exported symbols with no production callers; distinguish test-only
   reachability.
 - Check layer integrity. `Common` must not depend on `Engine` or `Projects`;
-  `Projects` must not reach through documented engine boundaries. Engine reads of
-  game globals or types allowed by applicable authorities are not violations.
+  `Projects` must not reach through documented engine boundaries. Engine reads
+  of game globals or types allowed by applicable authorities are not violations.
 
 ### Lens B — Simulation and Threading
 
@@ -151,8 +155,8 @@ Require a review scope path. If absent, ask for it.
   module earns its keep; complexity that disappears may indicate pass-through,
   but is investigation evidence only.
 - Count adapters only when optional variation or swappability justifies the
-  seam: one adapter is hypothetical, while two current concrete adapters normally
-  demonstrate actual variation. Authority-required trust, platform,
+  seam: one adapter is hypothetical, while two current concrete adapters
+  normally demonstrate actual variation. Authority-required trust, platform,
   build-affinity, ThirdParty, producer/consumer, CPU/GPU, client/server, and
   other invariant contracts are exempt from adapter counting, but still require
   structural-impact and locality/leverage evidence.
@@ -162,9 +166,10 @@ Require a review scope path. If absent, ask for it.
   does this value originate, and what can change it?
 - Recommend collapsing a seam only when that tracing proves a net reduction in
   the sites a reader must know or a writer can change, and the reduction
-  preserves determinism, serialization, trust boundaries, build affinity, CPU/GPU
-  contracts, client/server behavior, and deliberate mirrors. Absent either half,
-  report the tracing as investigation evidence and leave the seam in place.
+  preserves determinism, serialization, trust boundaries, build affinity,
+  CPU/GPU contracts, client/server behavior, and deliberate mirrors. Absent
+  either half, report the tracing as investigation evidence and leave the seam
+  in place.
 - Do not recommend a new seam, adapter, test-only extraction, or testing
   infrastructure solely for testability.
 - Find cosmetic or bypassed abstractions, abandoned sibling patterns,
@@ -172,8 +177,9 @@ Require a review scope path. If absent, ask for it.
   with mismatched contracts.
 - For each scoped function, check whether an existing shared helper in the same
   layer already owns that responsibility: search sibling and shared modules for
-  helpers with overlapping field sets or terms. A re-implemented shared helper is
-  duplication evidence even when clone detection reports no textual clone group.
+  helpers with overlapping field sets or terms. A re-implemented shared helper
+  is duplication evidence even when clone detection reports no textual clone
+  group.
 - Require concrete structural impact plus demonstrated locality and leverage:
   concentrate change, knowledge, or verification and increase capability per
   interface knowledge. Do not infer a defect merely from stylistic difference or
@@ -191,8 +197,9 @@ Require a review scope path. If absent, ask for it.
   measure the inclusive candidate range with
   `pwsh -NoProfile -File .agents/scripts/Measure-Tokens.ps1 -Path <path> -StartLine <first> -EndLine <last>`.
 - For each candidate, name the library, removable paths/ranges, integration and
-  dependency risks, and the license proposition requiring verification. The local
-  license allow list in `ThirdParty/AGENTS.md` remains controlling authority.
+  dependency risks, and the license proposition requiring verification. The
+  local license allow list in `ThirdParty/AGENTS.md` remains controlling
+  authority.
 
 ## Handoff
 

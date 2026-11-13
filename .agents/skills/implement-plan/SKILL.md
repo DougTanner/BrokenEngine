@@ -70,17 +70,18 @@ Each shared `Build required` row names its distinct target and that target's
 configuration/platform inline in every case; when the field would push the
 handoff past the shared character cap, only the per-file attribution — which
 selected project-member `.cpp` belongs to which target, and which targets
-consume a changed header — moves with the overflow below. Each shared `Residuals` row names a contradiction, incomplete item, or
-blocker with evidence, using `none` when absent.
+consume a changed header — moves with the overflow below. Each shared
+`Residuals` row names a contradiction, incomplete item, or blocker with
+evidence, using `none` when absent.
 
 Name each changed file once; past the shared character cap, the overflow file
 cited under `Evidence` follows `../../references/subagent-handoff.md`
-`## Handoffs`. Build requests must be executable without rediscovery wherever the
-per-`.cpp` detail sits, inline or in that cited file: it names the exact target,
-configuration/platform, and selected project-member path, and each changed
-header names every consuming target and configuration/platform. The manager
-dispatches the assigned build/runtime role and routes its concise result or
-later fix work.
+`## Handoffs`. Build requests must be executable without rediscovery wherever
+the per-`.cpp` detail sits, inline or in that cited file: it names the exact
+target, configuration/platform, and selected project-member path, and each
+changed header names every consuming target and configuration/platform. The
+manager dispatches the assigned build/runtime role and routes its concise result
+or later fix work.
 
 ## References
 

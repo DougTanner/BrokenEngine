@@ -70,7 +70,7 @@ void RenderTargetTextures::CreateLightingTextures()
 	// guard so PopulateLightingParameters blends pure-current and re-seeds history next frame (mirror of CreateShadowTextures).
 	gbLightingTemporalReset = true;
 
-	auto [iLightingTextureX, iLightingTextureY] = TextureManager::LightingDetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
+	auto [iLightingTextureX, iLightingTextureY] = TextureManager::ExtraAreaDetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
 	// Create 3 lighting textures without individual render passes
 	TextureInfo lightingTextureInfo
 	{
@@ -190,7 +190,7 @@ void RenderTargetTextures::CreateLightingTextures()
 	{
 		float fInterpolationFraction = (iPassCount > 1) ? static_cast<float>(i) / static_cast<float>(iPassCount - 1) : 0.0f;
 		float fMultiplier = fSpreadMultiplierStart + fInterpolationFraction * (fSpreadMultiplierEnd - fSpreadMultiplierStart);
-		auto [iPassX, iPassY] = TextureManager::LightingDetailTextureSize(fMultiplier);
+		auto [iPassX, iPassY] = TextureManager::ExtraAreaDetailTextureSize(fMultiplier);
 		for (int64_t j = 0; j < 3; ++j)
 		{
 			std::string spreadName = std::format("Spread{}_{}", kpColorNames[j], i);
@@ -327,7 +327,7 @@ void RenderTargetTextures::CreateLightingTextures()
 
 	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the
 	// last-refresh history into these in place; LightingHistoryCopy.comp publishes the result to history.
-	auto [iCombineX, iCombineY] = TextureManager::LightingDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
+	auto [iCombineX, iCombineY] = TextureManager::ExtraAreaDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
 	// TRANSFER_DST: the creation clear below.
 	TextureInfo combineTextureInfo
 	{

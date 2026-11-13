@@ -17,7 +17,6 @@ struct ServerCellStats
 	int64_t iTick = 0;
 	std::chrono::duration<float> durationCurrentTime = std::chrono::duration<float>::zero();
 	std::array<int64_t, std::size(kServerEntityCountNames)> entityCounts {};
-	int64_t iExplosions = 0;
 };
 
 [[nodiscard]] ServerCellStats GetServerCellStatistics(const Frame& rFrame);

@@ -252,7 +252,7 @@ try {
 		# being an ordinary directory, as Bootstrap-AgentTools.ps1 and Provision-WorktreeThirdParty.ps1 do.
 		$rootGit = Get-Item -LiteralPath (Join-Path $script:Root '.git') -Force -ErrorAction SilentlyContinue
 		if ($null -eq $rootGit -or -not $rootGit.PSIsContainer -or ($rootGit.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-			Stop-CompileInvoke 'thirdparty.worktree-not-primary' "ThirdParty builds run in the primary checkout only ('$primary'); this checkout's ThirdParty Output is a link to the primary's shared library. Rebuild ThirdParty as explicit primary maintenance (wrapper bootstrap rebuilds it at session start)."
+			Stop-CompileInvoke 'thirdparty.worktree-not-primary' "ThirdParty builds run in the primary checkout only ('$primary'); this checkout's ThirdParty Output is a link to the primary's shared library. Rebuild ThirdParty as explicit primary maintenance (wrapper bootstrap rebuilds it at worktree creation or /reset-worktree)."
 		}
 	}
 
@@ -374,10 +374,15 @@ try {
 	# directory without restoring the tracked bytes, so presence would report a false restore.
 	$sparseState = Start-CompileChild 'git' @('-C', $script:Root, 'config', '--get', 'core.sparseCheckout') $true
 	if ($sparseState.Stdout.Trim() -ieq 'true') {
-		$restore = Start-CompileChild 'git' @('-C', $script:Root, 'sparse-checkout', 'disable') $true
+		$restore = Invoke-AgentProcess 'git' @('-C', $script:Root, 'sparse-checkout', 'disable') $PSScriptRoot
 		if (-not [string]::IsNullOrWhiteSpace($restore.Stdout)) { Write-CompileDiagnostic $restore.Stdout.Trim() }
+		if (-not [string]::IsNullOrWhiteSpace($restore.Stderr)) { Write-CompileDiagnostic $restore.Stderr.Trim() }
 		if ($restore.ExitCode -ne 0) {
-			Stop-CompileInvoke 'data.sparse-restore-failed' "git sparse-checkout disable exited $($restore.ExitCode) in '$($script:Root)', so the generation build may still be missing sparse-skipped Engine\Data inputs."
+			# git prints its fatal reason first and advice after it; one bounded line keeps the envelope
+			# message a one-line handoff row.
+			$reason = $restore.Stderr -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -First 1
+			$suffix = if ($reason) { $reason = $reason.Trim(); ": $($reason.Substring(0, [Math]::Min(300, $reason.Length)))" } else { '.' }
+			Stop-CompileInvoke 'data.sparse-restore-failed' "git sparse-checkout disable exited $($restore.ExitCode) in '$($script:Root)', so the generation build may still be missing sparse-skipped Engine\Data inputs$suffix"
 		}
 	}
 	$dataPacker = Join-Path $script:Root 'DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe'
@@ -400,7 +405,11 @@ try {
 		$gameDataDirectory) $true
 	if (-not [string]::IsNullOrWhiteSpace($materialize.Stdout)) { Write-CompileDiagnostic $materialize.Stdout.Trim() }
 	if ($materialize.ExitCode -ne 0) {
-		Stop-CompileInvoke 'data-materialize.failed' "DataPacker --materialize-data exited $($materialize.ExitCode) for '$gameDataDirectory'."
+		# DataPacker prints its failure reason last, and only to stdout; one bounded line keeps the
+		# envelope message a one-line handoff row.
+		$reason = $materialize.Stdout -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -Last 1
+		$suffix = if ($reason) { $reason = $reason.Trim(); ": $($reason.Substring(0, [Math]::Min(300, $reason.Length)))" } else { '.' }
+		Stop-CompileInvoke 'data-materialize.failed' "DataPacker --materialize-data exited $($materialize.ExitCode) for '$gameDataDirectory'$suffix"
 	}
 
 	$generationProperties = @($dataProperties) + "/p:DevEnvDir=$($context.devEnvDir)"

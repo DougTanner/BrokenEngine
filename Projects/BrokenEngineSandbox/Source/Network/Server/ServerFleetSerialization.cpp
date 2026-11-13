@@ -299,6 +299,48 @@ void ReadSaveState(std::fstream& rFileStream, int64_t iNextGlobalId, SaveStagedS
 	ReadFleetData(rFileStream, iNextGlobalId, rStagedState.fleets, rStagedState.guidToClientId, rStagedState.randomEngine);
 }
 
+// Trust boundary (save file): fleet member lookups take the first row matching a global ID in Fighters, Omnis,
+// Battleships order and use it as the member's type and owner, so a nonzero row ID must be in range, appear on one row
+// across every cell, and, when it names a member, sit on a row of that member's type and owner.
+void ValidateSaveState(const SaveStagedState& rStagedState, const std::unordered_map<engine::GridCoord, engine::Cell>& rCells, int64_t iNextGlobalId)
+{
+	std::unordered_set<int64_t> rowGlobalIds;
+	for ([[maybe_unused]] const auto& [rCoordinate, rCell] : rCells)
+	{
+		std::array<engine::RegistryOwnershipLayer, std::to_underlying(ShipType::kCount)> layers = Frame::OwnershipLayers(*rCell.pCurrent);
+		for (const auto& [iLayer, rLayer] : std::views::enumerate(std::as_const(layers)))
+		{
+			for (int64_t i = 0; i < rLayer.iCount; ++i)
+			{
+				int64_t iGlobalId = rLayer.pGlobalIds[i].iValue;
+				if (iGlobalId == 0)
+				{
+					continue;
+				}
+				if (iGlobalId < 0 || iGlobalId >= iNextGlobalId)
+				{
+					throw std::ios_base::failure("ship row global ID range");
+				}
+				if (!rowGlobalIds.insert(iGlobalId).second)
+				{
+					throw std::ios_base::failure("duplicate ship row global ID");
+				}
+				for (const auto& [rOwnerGuid, rFleets] : rStagedState.fleets)
+				{
+					for (const Fleet& rFleet : rFleets)
+					{
+						auto memberIt = std::ranges::find(rFleet.members, rLayer.pGlobalIds[i], &FleetMember::globalId);
+						if (memberIt != rFleet.members.end() && (rOwnerGuid != rLayer.pClientGuids[i] || memberIt->eType != static_cast<ShipType>(iLayer)))
+						{
+							throw std::ios_base::failure("ship row fleet member mismatch");
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void AdoptSaveState(SaveStagedState&& rStagedState)
 {
 	ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;

@@ -1,11 +1,12 @@
 ---
 name: implementer
 description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring; driving runtime/harness verification.
-model: fable
+model: opus
 effort: medium
 disallowedTools: Agent
 ---
 
 Follow repository instructions for the assigned implementation role.
 
-Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`.
+Author the returned handoff per the field rules in
+`.agents/references/subagent-handoff.md` `## Handoffs`.

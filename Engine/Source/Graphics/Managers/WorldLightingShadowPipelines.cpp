@@ -201,7 +201,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineObjectShadowsBlurH].Create(
 	{
 		.name = "ObjectShadowsBlurH",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurHcompCrc)},
 		.descriptorInfos =
 		{
@@ -214,7 +214,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineObjectShadowsBlurV].Create(
 	{
 		.name = "ObjectShadowsBlurV",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurVcompCrc)},
 		.descriptorInfos =
 		{

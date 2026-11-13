@@ -80,14 +80,14 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 48;
+inline constexpr int64_t kiProtocolVersion = 49;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiCoordinateSlots = 16; // 7 visible subscriptions + 6 sticky + 3 spare
 inline constexpr int64_t kiMaximumResendFrames = 8;
 inline constexpr int64_t kiFloorStallLogThreshold = 15;
 inline constexpr int64_t kiMaximumBufferedFrames = 256;
-inline constexpr int64_t kiClockSnapThreshold = 28; // |clockError| >= this (ticks) hard-snaps miTickCounter to the servo target; see Network.md
+inline constexpr int64_t kiClockSnapThreshold = 28; // clockError <= -this (ticks, sim behind) hard-snaps miTickCounter forward to the servo target; see Network.md
 // Add 109.375 ms to 3x measured jitter for miCurrentTargetBehind. At 32 Hz this is 3.5 ticks, deliberately
 // off-boundary so zero jitter rounds to four ticks rather than five. mSmoothedJitterMicroseconds measures mean absolute
 // interarrival deviation; the one-way tail half-width is roughly 1.5x that mean, motivating the 3x factor. The safety

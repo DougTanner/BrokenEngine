@@ -84,7 +84,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 				//   so a workbuffer (frame-scoped) can't own them, and the queue grows/shrinks unpredictably
 				ScopedSuppressAllocationTracking suppress;
 
-				mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kWholeChunk});
+				mRequestQueue.push({.crc = crc, .ePriority = ePriority});
 				rLazyChunk.eState.value.store(ChunkState::kLoadRequested, std::memory_order_release);
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 				if constexpr (kbAudioStreamingHarnessRig)
@@ -106,72 +106,6 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 	}
 }
 
-void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, int64_t iOffset, int64_t iLength, LoadPriority ePriority)
-{
-	bool bAdded = false;
-
-	{
-		std::unique_lock lock(mQueueMutex);
-		LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-		ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
-		if (eState != ChunkRangeReloadState::kIdle)
-		{
-			// One LazyChunk owns one active range request. Consumers must reset its terminal state before selecting
-			// another range, which prevents a late consumer from observing or resetting a different reload.
-			ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength);
-			return;
-		}
-
-		ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
-		ASSERT(rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady);
-		rLazyChunk.iRangeReloadOffset = iOffset;
-		rLazyChunk.iRangeReloadLength = iLength;
-		{
-			// Heap: priority_queue insertion may allocate. The request must remain alive until a loading thread pops it.
-			ScopedSuppressAllocationTracking suppress;
-			mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kRangeReload, .iOffset = iOffset, .iLength = iLength});
-		}
-		// The loading thread cannot pop until mQueueMutex unlocks. This release-store publishes the range metadata
-		// together with the queued request, so an acquire state read observes the exact request it polls.
-		rLazyChunk.eRangeReloadState.value.store(ChunkRangeReloadState::kPending, std::memory_order_release);
-		bAdded = true;
-	}
-
-	if (bAdded)
-	{
-		PublishWake();
-	}
-}
-
-ChunkRangeReloadState PackChunkLoader::GetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength) const
-{
-	std::unique_lock lock(mQueueMutex);
-	const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
-	if (eState != ChunkRangeReloadState::kIdle)
-	{
-		ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength);
-	}
-	return eState;
-}
-
-void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength)
-{
-	std::unique_lock lock(mQueueMutex);
-	LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
-	ASSERT(eState != ChunkRangeReloadState::kPending); // A pending range can still be writing into the lazy pool.
-	if (eState == ChunkRangeReloadState::kIdle)
-	{
-		return;
-	}
-	ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength); // A consumer may only reset its own completed request.
-
-	rLazyChunk.iRangeReloadOffset = 0;
-	rLazyChunk.iRangeReloadLength = 0;
-	rLazyChunk.eRangeReloadState.value.store(ChunkRangeReloadState::kIdle, std::memory_order_release);
-}
-
 void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
 {
 	RequestChunkLoad(crcs, LoadPriority::kRealtime);
@@ -188,7 +122,7 @@ void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
 
 void PackChunkLoader::WaitForLoadersIdle()
 {
-	// Drain queued and active whole-chunk and range jobs after they publish terminal states.
+	// Drain queued and active chunk jobs after they publish terminal states.
 	// ClientUpdate joins tick workers before Render; Graphics::Destroy drains on the main thread at or after Render.
 	// This excludes concurrent enqueueing, including tick-worker audio requests from PlayOneShot3d through StaticVoice::LoadXAudio2SourceVoice.
 	// Drain before the all-texture reset: a late kUploading store would escape the reset, and RequestChunkLoad skips
@@ -296,13 +230,6 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		}
 		else
 #endif // BT_CLIENT
-		if (loadRequest.eKind == LoadRequestKind::kRangeReload)
-		{
-			LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.iOffset, loadRequest.iLength, iThreadIndex);
-			rLazyChunk.eRangeReloadState.value.store(bReloaded ? ChunkRangeReloadState::kReady : ChunkRangeReloadState::kFailed, std::memory_order_release);
-		}
-		else
 		{
 			LoadChunk(loadRequest, iThreadIndex);
 		}
@@ -313,7 +240,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			if (!bAudioRead)
 			{
 				const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-				AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingHarnessRigQueueState::kReady, 0, false);
+				AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kReady, 0, false);
 			}
 		}
 #endif
@@ -342,13 +269,13 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 
 	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
 
-	VERIFY_SUCCESS(mrPackChunks.RecommitChunkRange(rRequest.crc, rLazyChunk, 0, rLazyChunk.iDataSize));
+	mrPackChunks.AllocateLazyChunkBuffer(rLazyChunk);
 
 	int64_t iOnDiskSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
 
 	// Compressed chunks read into this thread's scratch and decompress into pData; uncompressed chunks read directly into pData.
 	std::byte* pDecompressScratch = mrPackChunks.mpDecompressScratches[iThreadIndex];
-	std::byte* pReadDestination = bCompressed ? pDecompressScratch : rLazyChunk.pData;
+	std::byte* pReadDestination = bCompressed ? pDecompressScratch : rLazyChunk.pData.get();
 
 	ReadChunkRange(rLazyChunk, 0, iOnDiskSize, pReadDestination, iThreadIndex);
 
@@ -359,20 +286,20 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 		// Texture chunks are LZ4 today; kZlibCompressed stays a legal decode branch.
 		if (rLazyChunk.header.flags & common::ChunkFlags::kLz4Compressed)
 		{
-			// LZ4_decompress_safe bounds writes to the pool-slot capacity and returns bytes produced (< 0 on
+			// LZ4_decompress_safe bounds writes to the chunk buffer's capacity and returns bytes produced (< 0 on
 			// malformed input); it allocates nothing, so it is allocation-tracking safe on the loading thread.
 			// Unlike zlib (self-terminating deflate stream), the LZ4 block format has no end marker: a full
 			// decode requires the EXACT compressed length or it errors on the final-literals parse check. Pass
 			// header.iSize (the exact compressed payload byte count), not iOnDiskSize, which is rounded up to
 			// kiAlignmentBytes and so carries up to 15 trailing pad bytes.
-			int64_t iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
-			// A short or negative decode leaves the pool slot partly filled, and the upload would publish it.
+			int64_t iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData.get()), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
+			// A short or negative decode leaves the chunk buffer partly filled, and the upload would publish it.
 			ASSERT(iLz4Result == rLazyChunk.iDataSize);
 		}
 		else
 		{
 			uLongf uiUncompressedSize = static_cast<uLongf>(rLazyChunk.iDataSize);
-			int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
+			int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData.get()), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
 			ASSERT(iZlibResult == Z_OK && static_cast<int64_t>(uiUncompressedSize) == rLazyChunk.iDataSize);
 		}
 	}

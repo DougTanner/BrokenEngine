@@ -32,12 +32,12 @@ Per-path and per-line-range `bt-token-v1` counts come from
 ## Inputs
 
 Supply these fields on the task brief form in
-[`subagent-reporting.md`](../../references/subagent-reporting.md) `## Task brief`.
-The per-mode invocation sections of [`references/worker.md`](references/worker.md)
-own the exact parameter spellings for `Snapshot`, `Compare`, and
-`BootstrapIdentity`; [`references/HistoryContract.md`](references/HistoryContract.md)
-`## Invocation` owns them for the history modes. Do not restate a command line in
-the brief.
+[`subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Task brief`. The per-mode invocation sections of
+[`references/worker.md`](references/worker.md) own the exact parameter spellings
+for `Snapshot`, `Compare`, and `BootstrapIdentity`;
+[`references/HistoryContract.md`](references/HistoryContract.md) `## Invocation`
+owns them for the history modes. Do not restate a command line in the brief.
 
 - Mode: `Snapshot`, `Compare`, `BootstrapIdentity`, or the history modes
   `Contract` and `Generate` (worker `### Snapshot`, `### Compare`,
@@ -52,9 +52,10 @@ the brief.
 
 ## Handoff
 
-Report the result as advisory evidence. Name the scope, coverage omissions, suppression reasons, and
-comparison cohort before interpreting a delta. Do not turn a metric into a landing gate, person
-score, or automatic refactor instruction.
+Report the result as advisory evidence. Name the scope, coverage omissions,
+suppression reasons, and comparison cohort before interpreting a delta. Do not
+turn a metric into a landing gate, person score, or automatic refactor
+instruction.
 
 ## References
 

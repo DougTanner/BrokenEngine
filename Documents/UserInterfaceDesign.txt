@@ -11,18 +11,19 @@ ThemePalettes) and engine MenuUtils (kpMenuChromes). This contract covers only
 layout: scale, sizing, placement, rhythm, and primitives.
 
 Scope: the player-facing screens — MainMenu, Pause, Graphics, Audio, Game
-Settings, Modal, Chat, and the HUD. TweaksScreen is a developer tool and a sanctioned
-exception, called out where it diverges. Audio is the player-facing name of the
-screen the code still calls Sound.
+Settings, Modal, Chat, and the HUD. TweaksScreen is a developer tool and a
+sanctioned exception, called out where it diverges. Audio is the player-facing
+name of the screen the code still calls Sound.
 
 
 1. Purpose & Scope
 -------------------
 Every pixel the player sees is drawn by ImGui through the engine standard menu
-screens, the engine ChatScreen, and the game HUD under Ui/Screens/, rendered by the engine ImGuiManager. This document governs their
-layout. Text color, panel fills, borders, and button chrome are not layout —
-they live in the per-theme tables and are deliberately excluded so a theme
-edit never touches a screen's geometry.
+screens, the engine ChatScreen, and the game HUD under Ui/Screens/, rendered by
+the engine ImGuiManager. This document governs their layout. Text color, panel
+fills, borders, and button chrome are not layout — they live in the per-theme
+tables and are deliberately excluded so a theme edit never touches a screen's
+geometry.
 
 Files:
   Engine/Source/Ui/Screens/                                (standard player menus)
@@ -108,19 +109,19 @@ They can diagnose a layout, but only the rendered result can validate it.
 
 Files:
   Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (consumer; links here, where the standard is owned)
-  Engine/Source/Ui/MenuUtils.cpp:289  float MenuButtonsWidth(...)  (text-driven width precedent)
+  Engine/Source/Ui/MenuUtils.cpp:285  float MenuButtonsWidth(...)  (text-driven width precedent)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:134  float HudScreen::PanelWidth()
 
 
 4. Shared Layout Constants
 --------------------------
-No inline magic layout literal belongs in a screen .cpp. Every anchor, gap,
-and minimum width is a named k* constant. Engine MenuUtils.h owns player-facing
+No inline magic layout literal belongs in a screen .cpp. Every anchor, gap, and
+minimum width is a named k* constant. Engine MenuUtils.h owns player-facing
 layout-contract defaults, including single-screen MainMenu, Graphics, and Modal
 anchors/extents; only the three HUD-specific fractions stay game-local, and
-per-screen composition values remain local and named in that screen. Shared and local blocks both
-separate DisplaySize fractions (content-independent extents) from 4K-authored
-pixel constants (multiplied by UiScale() at use).
+per-screen composition values remain local and named in that screen. Shared and
+local blocks both separate DisplaySize fractions (content-independent extents)
+from 4K-authored pixel constants (multiplied by UiScale() at use).
 
 Files:
   Engine/Source/Ui/MenuUtils.h:7-31
@@ -216,8 +217,8 @@ Files:
 Menu buttons go through MenuButton (custom chrome: animated fill, border, left
 accent bar). Stock ImGui::Button is reserved for dense HUD micro-buttons,
 TweaksScreen, and the WrapperPlusMinus -/+ step buttons on settings rows
-(Engine/Source/Ui/MenuUtils.cpp — inline value-adjust controls, not menu actions). All buttons
-on one screen share one text-driven width — the max
+(Engine/Source/Ui/MenuUtils.cpp — inline value-adjust controls, not menu
+actions). All buttons on one screen share one text-driven width — the max
 CalcTextSize over that screen's labels, measured under the live font so the
 width is localization-proof — floored, where a floor constant exists, to a
 per-screen minimum. That max-plus-padding measurement is the MenuButtonsWidth
@@ -230,8 +231,8 @@ takes its width from its full label set, so no such change reflows its column.
 A button sits above any list that grows.
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:324  bool MenuButton(...)
-  Engine/Source/Ui/MenuUtils.cpp:289  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
+  Engine/Source/Ui/MenuUtils.cpp:320  bool MenuButton(...)
+  Engine/Source/Ui/MenuUtils.cpp:285  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
   Engine/Source/Ui/MenuUtils.h:29-30  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
   Engine/Source/Ui/Screens/ModalScreen.cpp:49  MenuButton("OK", ...)  (themed button)
 
@@ -248,7 +249,7 @@ local density curve. All gaps are named 4K-pixel constants times UiScale(); no
 screen emits Dummy(DisplaySize.y * <magic fraction>).
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:301  void MenuHeading(const char* pcLabel, float fHeadingScale)
+  Engine/Source/Ui/MenuUtils.cpp:297  void MenuHeading(std::string_view label, float fHeadingScale)
   Engine/Source/Ui/MenuUtils.h:9  kfMenuHeadingScale = 1.6f
   Engine/Source/Ui/MenuUtils.h:27  kfHeadingGapPixels
 
@@ -265,9 +266,9 @@ moving a button.
 A row that draws its own label text (the Graphics sliders, whose label sits left
 of the bar) gives the widget a hidden-label id — "##" plus the same name — so
 ImGui does not draw the name a second time. The registry records that id
-verbatim, so describe_ui reports "##Field of View" while the player
-still sees "Field of View", and a query for the human-readable name
-resolves through ResolveLabel's case-insensitive substring tier. Adding the prefix is itself a
+verbatim, so describe_ui reports "##Field of View" while the player still sees
+"Field of View", and a query for the human-readable name resolves through
+ResolveLabel's case-insensitive substring tier. Adding the prefix is itself a
 deliberate label-set change: it is allowed only where the visible text is
 unchanged and the name still resolves to exactly one widget.
 
@@ -315,8 +316,8 @@ Screen-specific commitments this contract makes, each verified visually:
     its slide position. Only horizontal distance to that strip counts, so a
     mouse above, below, or past the panel toward that edge counts as over it,
     and the target fades only toward the screen center.
-  - HUD: the focused owned-entity weapon action is centered within the right panel's
-    live content area.
+  - HUD: the focused owned-entity weapon action is centered within the right
+    panel's live content area.
   - Pause: the title and uniform-width primary actions float directly over the
     full-screen dim; the transparent layout window has no decorative panel.
   - Audio: centered via the pivot convention (section 5), not the top-left
@@ -339,13 +340,16 @@ Screen-specific commitments this contract makes, each verified visually:
   - Graphics: every slider row reads label first, then bar — the name is drawn
     left of a bar that fills the rest of the column, instead of trailing it.
     Display precision follows behavior: smooth Sun Moon Day and Night Minimum
-    Ambient use four decimals, and whole-frame Shadow Update Cadence, Lighting Update
-    Cadence, and Smoke Update Cadence use no decimals.
+    Ambient use four decimals, and whole-frame Shadow Update Cadence, Object
+    Shadow Cadence, Lighting Update Cadence, and Smoke Update Cadence use no
+    decimals.
   - Graphics: heavy features use Low/Medium/High rows rather than raw detail
     sliders — Terrain Shadows, Lighting, and Smoke Detail (replacing Smoke
     Pixels), all on the right. A Low/Medium/High Water row sits first, followed
     by the Water Foam and Break Repetition toggles; Terrain Shadows follows
-    with its update-cadence slider.
+    with its update-cadence slider. Object shadows come next: a Low/High
+    Object Shadows Blur Level row, the one two-option quality row, and its
+    Object Shadow Cadence slider.
     The Lighting group follows with its toggle, detail row, and
     update-cadence slider; the Smoke group then carries its toggle, detail row,
     area slider, update-cadence slider, and Stagger Smoke Layer Updates toggle
@@ -355,7 +359,7 @@ Screen-specific commitments this contract makes, each verified visually:
     The three option labels repeat verbatim down the column.
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:242  ComputeMouseOpennessTarget (full-height edge strip hover zone)
+  Engine/Source/Ui/MenuUtils.cpp:238  ComputeMouseOpennessTarget (full-height edge strip hover zone)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:120-121  (left/right hover targets)
   Engine/Source/Ui/Screens/AGENTS.md  (consumer; links to this document for layout)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (HUD layout notes)

@@ -7,36 +7,36 @@
 namespace game
 {
 
-extern engine::Wrapper gExplosionPrimaryPuffAreaOne;
-extern engine::Wrapper gExplosionPrimaryPuffAreaTwo;
-extern engine::Wrapper gExplosionPrimaryPuffIntensityOne;
-extern engine::Wrapper gExplosionPrimaryPuffIntensityTwo;
+inline engine::Wrapper gExplosionPrimaryPuffAreaOne(0.2f, 0.02f, 1.0f);
+inline engine::Wrapper gExplosionPrimaryPuffAreaTwo(1.0f, 0.1f, 5.0f);
+inline engine::Wrapper gExplosionPrimaryPuffIntensityOne(2.0f, 0.25f, 12.0f);
+inline engine::Wrapper gExplosionPrimaryPuffIntensityTwo(1.0f, 0.25f, 12.0f);
 
-extern engine::Wrapper gExplosionSecondaryPuffAreaOne;
-extern engine::Wrapper gExplosionSecondaryPuffAreaTwo;
-extern engine::Wrapper gExplosionSecondaryPuffIntensityOne;
-extern engine::Wrapper gExplosionSecondaryPuffIntensityTwo;
+inline engine::Wrapper gExplosionSecondaryPuffAreaOne(0.1f, 0.02f, 1.0f);
+inline engine::Wrapper gExplosionSecondaryPuffAreaTwo(0.5f, 0.06f, 3.0f);
+inline engine::Wrapper gExplosionSecondaryPuffIntensityOne(2.0f, 0.05f, 2.5f);
+inline engine::Wrapper gExplosionSecondaryPuffIntensityTwo(1.0f, 0.05f, 2.5f);
 
-extern engine::Wrapper gExplosionPrimaryTrailIntensity;
-extern engine::Wrapper gExplosionPrimaryTrailLength;
-extern engine::Wrapper gExplosionPrimaryTrailDuration;
+inline engine::Wrapper gExplosionPrimaryTrailIntensity(20.0f, 0.05f, 50.0f);
+inline engine::Wrapper gExplosionPrimaryTrailLength(1.5f, 0.1f, 4.0f);
+inline engine::Wrapper gExplosionPrimaryTrailDuration(3.0f, 0.1f, 4.0f);
 
-extern engine::Wrapper gExplosionSecondaryTrailIntensity;
-extern engine::Wrapper gExplosionSecondaryTrailLength;
-extern engine::Wrapper gExplosionSecondaryTrailDuration;
+inline engine::Wrapper gExplosionSecondaryTrailIntensity(10.0f, 0.05f, 50.0f);
+inline engine::Wrapper gExplosionSecondaryTrailLength(1.0f, 0.1f, 4.0f);
+inline engine::Wrapper gExplosionSecondaryTrailDuration(1.0f, 0.1f, 8.0f);
 
 // Blasters - Terrain puff
-extern engine::Wrapper gBlasterPuffAreaStart;
-extern engine::Wrapper gBlasterPuffAreaEnd;
-extern engine::Wrapper gBlasterPuffIntensityStart;
-extern engine::Wrapper gBlasterPuffIntensityEnd;
+inline engine::Wrapper gBlasterPuffAreaStart(0.25f, 0.03f, 1.25f);
+inline engine::Wrapper gBlasterPuffAreaEnd(1.0f, 0.08f, 3.75f);
+inline engine::Wrapper gBlasterPuffIntensityStart(4.0f, 0.6f, 30.0f);
+inline engine::Wrapper gBlasterPuffIntensityEnd(1.0f, 0.05f, 2.5f);
 
-extern engine::Wrapper gOmniImpactPuffAreaOne;
-extern engine::Wrapper gOmniImpactPuffAreaTwo;
-extern engine::Wrapper gOmniImpactPuffIntensityOne;
-extern engine::Wrapper gOmniImpactPuffIntensityTwo;
+inline engine::Wrapper gOmniImpactPuffAreaOne(0.135f, 0.01f, 0.7f);
+inline engine::Wrapper gOmniImpactPuffAreaTwo(0.45f, 0.05f, 2.25f);
+inline engine::Wrapper gOmniImpactPuffIntensityOne(4.0f, 0.4f, 20.0f);
+inline engine::Wrapper gOmniImpactPuffIntensityTwo(0.0f, 0.0f, 20.0f);
 
-extern engine::Wrapper gMissileTrailIntensity;
+inline engine::Wrapper gMissileTrailIntensity(0.2f, 0.05f, 1.0f);
 
 } // namespace game
 

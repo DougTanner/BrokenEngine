@@ -63,11 +63,11 @@ Changes (8 files)
    Add destruction visual parameters to MainLayout after the hex
    shield section:
 
-     // Destruction
-     float fDestructionEdgeWidth INIT;    // Width of glowing edge band (world units)
-     float fDestructionEdgeIntensity INIT; // Brightness of the edge glow
-     float fDestructionNoiseScale INIT;   // UV scale for procedural noise
-     float fDestructionDarkenPower INIT;  // Power curve for darkening near damage edge
+     // Destruction float fDestructionEdgeWidth INIT;    // Width of glowing
+     edge band (world units) float fDestructionEdgeIntensity INIT; // Brightness
+     of the edge glow float fDestructionNoiseScale INIT;   // UV scale for
+     procedural noise float fDestructionDarkenPower INIT;  // Power curve for
+     darkening near damage edge
 
 2. Engine/Data/Shaders/Model/ModelCommon.h
    Pass fDamageFraction through the vertex stage. Add a new vertex
@@ -149,9 +149,9 @@ Changes (8 files)
    In the ProcessRange lambda, after setting f4ColorAdd, compute
    and write fDamageFraction from the previous frame's health:
 
-     float fMaxHealth = kfSpaceshipHealth;
-     float fHealth = rPreviousPostRender.pfHealths[i];
-     rModelLayout.fDamageFraction = std::clamp(1.0f - (fHealth / fMaxHealth), 0.0f, 1.0f);
+     float fMaxHealth = kfSpaceshipHealth; float fHealth =
+     rPreviousPostRender.pfHealths[i]; rModelLayout.fDamageFraction =
+     std::clamp(1.0f - (fHealth / fMaxHealth), 0.0f, 1.0f);
 
    This requires passing rPreviousPostRender into the lambda.
    In SpaceshipsInterpolate::Render, capture the previous
@@ -181,8 +181,8 @@ Changes (8 files)
    In the render loop, after setting f4ColorAdd, compute
    fDamageFraction from armor:
 
-     float fMaxArmor = kfOmniArmor;
-     rOmniLayout.fDamageFraction = std::clamp(1.0f - (rCurrent.pfArmors[i] / fMaxArmor), 0.0f, 1.0f);
+     float fMaxArmor = kfOmniArmor; rOmniLayout.fDamageFraction =
+     std::clamp(1.0f - (rCurrent.pfArmors[i] / fMaxArmor), 0.0f, 1.0f);
 
    OmnisPostRender fields are not directly available in Render.
    Same approach as spaceships: add a client-only

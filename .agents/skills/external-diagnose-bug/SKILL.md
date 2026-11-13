@@ -42,8 +42,10 @@ Return the shared handoff form in
 extended with these fields:
 
 - `Root cause` — one sentence, with file:line.
-- `Diagnosis evidence` — the inspection, command output, or log lines that
-  prove it.
+- `Diagnosis evidence` — one row each: the existing or `Temp/` path plus
+  selector that holds the proof, in the shared `Evidence` row form, whose
+  one-line description states what it proves; a single command result or log
+  line that fits on one line may stand inline instead.
 - `Reproducing signal` — the exact command or inspection, and its red result.
 - `Hypotheses ruled out` — one row each: the hypothesis, and the check that
   killed it.

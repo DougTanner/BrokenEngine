@@ -46,34 +46,33 @@ Require a self-contained, immutable brief containing:
     regressions only where the late handoff makes them reachable;
   - reconciliation edits or invalidated assumptions — check manual resolutions
     and those assumptions for semantic merge damage, half-applied mirrors, stale
-    symbols, duplicated paths, and incorrect version or compatibility integration;
+    symbols, duplicated paths, and incorrect version or compatibility
+    integration;
   - Tier-3 cross-file integration;
   - contract-significant regions unseen by domain review — trace only their
-    cross-file or contract-significant producer/consumer paths no supplied domain
-    review saw, and spot-check that accepted fixes and resolved residuals exist
-    in the final tree;
+    cross-file or contract-significant producer/consumer paths no supplied
+    domain review saw, and spot-check that accepted fixes and resolved residuals
+    exist in the final tree;
 - completed applicable domain-review handoffs for every changed artifact type,
   plus reconciliation, build, external-API-verification, accepted-fix/retest,
   residual, and focus-area handoffs (`none` is valid for each).
 
-The inventory run is `pwsh -NoProfile -File
-.agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute adopted
-worktree>' -Baseline <full 40-character SHA> -Regions`. It writes no file and
-prints one
-`broken-engine-session-change-inventory/v1` object with `entries` and their
-`class` values, `counts`, `triggers`, and the per-hunk `regions` table. Only
-`status` `pass` is usable; any other status means the inventory is missing for
-the rule below. The implementer reports `truncated` with the brief so a
-shortfall is never presented as a complete inventory. An untracked
-file appears only when the caller supplies it with `-IncludeUntracked
-'<comma-separated paths>'`, and `counts.unlistedUntracked` reports how many
-untracked files the run did not list.
+The inventory run is
+`pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute adopted worktree>' -Baseline <full 40-character SHA> -Regions`.
+It writes no file and prints one `broken-engine-session-change-inventory/v1`
+object with `entries` and their `class` values, `counts`, `triggers`, and the
+per-hunk `regions` table. Only `status` `pass` is usable; any other status means
+the inventory is missing for the rule below. The implementer reports `truncated`
+with the brief so a shortfall is never presented as a complete inventory. An
+untracked file appears only when the caller supplies it with
+`-IncludeUntracked '<comma-separated paths>'`, and `counts.unlistedUntracked`
+reports how many untracked files the run did not list.
 
 Main dispatches one preparation `implementer` to assemble that brief from
 repository state and to map the user-authorized audit scope to the same named
 late, reconciled, or unseen-integration hypotheses; main then dispatches the
-reviewer. Return `BLOCKED` when the checkout, session baseline, attribution, intent, a
-mode decision, or an applicable prerequisite domain review is missing,
+reviewer. Return `BLOCKED` when the checkout, session baseline, attribution,
+intent, a mode decision, or an applicable prerequisite domain review is missing,
 ambiguous, moving, or incomplete. The assigned implementer's assembly from
 repository state is the only allowed source; the auditor never reconstructs
 these inputs from conversation history.

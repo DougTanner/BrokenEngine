@@ -42,6 +42,8 @@ public:
 	int64_t miFocusedFleetIndex = -1;
 	engine::GlobalId mFocusedMemberGlobalId {};
 	engine::GlobalId mPendingFocusMemberGlobalId {};
+	// Set by the agent reveal_ui command; Clear leaves it so a reveal outlasts game reset and server load.
+	bool mbRevealFleetPanel = false;
 };
 
 } // namespace game

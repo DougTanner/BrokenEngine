@@ -32,9 +32,6 @@ struct MaterialNodeInfo
 inline std::vector<MaterialNodeInfo> SourceMaterialNodeInfos(int64_t iSourceMaterialCount)
 {
 	std::vector<MaterialNodeInfo> materialNodeInfos(static_cast<size_t>(iSourceMaterialCount));
-	// std::views::enumerate cannot be used here: MSVC then reports C2872 on iter_move inside std::ranges algorithms, between
-	// the enumerate iterator's friend and the customization point, in any translation unit that includes this header and
-	// calls a std::ranges algorithm.
 	for (int64_t i = 0; MaterialNodeInfo& rMaterialNodeInfo : materialNodeInfos)
 	{
 		rMaterialNodeInfo.iOriginalMaterialIndex = i;

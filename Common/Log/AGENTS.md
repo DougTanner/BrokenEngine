@@ -1,6 +1,8 @@
 # Common Log
 
-Shared logging, formatting, diagnostic-file, and difference-reporting implementation. Call-site level meanings and allocation rules remain at the Common hub.
+Shared logging, formatting, diagnostic-file, and difference-reporting
+implementation. Call-site level meanings and allocation rules remain at the
+Common hub.
 
 ## Contracts
 
@@ -19,8 +21,12 @@ Shared logging, formatting, diagnostic-file, and difference-reporting implementa
   serialized; the crash snapshot ring does not wrap, while the ring that agent
   queries read — one shared ring buffer spanning all categories — does. Keep
   formatting allocation-free before entering either ring.
-- Tick scopes, and scopes that set their indent level directly rather than by nesting, propagate simulation context across worker dispatch. `ScopedLogIndent` is the separate delta-based scope for ordinary nesting.
-- `LogFormatters.h` owns formatters for Common-visible types. Paths, wide strings, vectors, and precision-sensitive floats use workbuffer-backed wrappers; higher-layer types stay with their owning aggregation hub.
+- Tick scopes, and scopes that set their indent level directly rather than by
+  nesting, propagate simulation context across worker dispatch.
+  `ScopedLogIndent` is the separate delta-based scope for ordinary nesting.
+- `LogFormatters.h` owns formatters for Common-visible types. Paths, wide
+  strings, vectors, and precision-sensitive floats use workbuffer-backed
+  wrappers; higher-layer types stay with their owning aggregation hub.
 - `DiagnosticLog` writes explicitly initialized per-file diagnostics with
   allocation tracking suppressed. `LogDifference` compares deterministic state
   under a scoped section label; add structured comparisons there instead of
@@ -29,15 +35,24 @@ Shared logging, formatting, diagnostic-file, and difference-reporting implementa
   replay comparison of two server-side snapshots still carries those labels and
   any summary line emitted beside a comparison must order its operands the same
   way.
-- `EnableLogFile` mirrors emitted lines to a flushed file sink. Treat sink setup as startup/diagnostic work, not a tracked-loop operation.
+- `EnableLogFile` mirrors emitted lines to a flushed file sink. Treat sink setup
+  as startup/diagnostic work, not a tracked-loop operation.
 
 ## Failure and Concurrency Rules
 
-Logging may run during exception handling. Do not introduce recursive logging, heap-dependent crash formatting, or unsynchronized DbgHelp use. The engine's debug-string emission is marked so the vectored exception handler does not re-log it.
+Logging may run during exception handling. Do not introduce recursive logging,
+heap-dependent crash formatting, or unsynchronized DbgHelp use. The engine's
+debug-string emission is marked so the vectored exception handler does not
+re-log it.
 
-`Log.cpp` initializes in the library phase (`init_seg(lib)`), so ordinary static initializers and destructors may log; outside even that window emission continues without the log mutex and without the file sink, with a debugger-only break flagging the call.
+`Log.cpp` initializes in the library phase (`init_seg(lib)`), so ordinary static
+initializers and destructors may log; outside even that window emission
+continues without the log mutex and without the file sink, with a debugger-only
+break flagging the call.
 
-When adding a category, update the enum, names, per-project compile floors (each project's `Pch.h`; the game's in `Engine/Source/EngineSwitches.h`), runtime-level storage, and any agent-facing parsing together.
+When adding a category, update the enum, names, per-project compile floors (each
+project's `Pch.h`; the game's in `Engine/Source/EngineSwitches.h`),
+runtime-level storage, and any agent-facing parsing together.
 
 ## See Also
 

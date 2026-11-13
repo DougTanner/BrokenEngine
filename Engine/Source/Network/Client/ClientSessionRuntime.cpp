@@ -82,14 +82,6 @@ ClientSessionRuntime::~ClientSessionRuntime()
 	}
 }
 
-static bool EqualPlacements(const CellStaticData& rLeft, const CellStaticData& rRight)
-{
-	return std::ranges::equal(rLeft.islands, rRight.islands, [](const IslandPlacement& rA, const IslandPlacement& rB)
-	{
-		return rA.islandCrc == rB.islandCrc && std::bit_cast<uint32_t>(rA.f2WorldPosition.x) == std::bit_cast<uint32_t>(rB.f2WorldPosition.x) && std::bit_cast<uint32_t>(rA.f2WorldPosition.y) == std::bit_cast<uint32_t>(rB.f2WorldPosition.y) && std::bit_cast<uint32_t>(rA.fRotation) == std::bit_cast<uint32_t>(rB.fRotation);
-	});
-}
-
 bool ClientSessionRuntime::IsCurrentIdentity(const ReceivedCellIdentity& rIdentity) const
 {
 	if (mpClient == nullptr)
@@ -118,14 +110,27 @@ bool ClientSessionRuntime::HoldsSlotOrRequest(GridCoord coordinate) const
 
 ClientSessionRuntime::PendingCell& ClientSessionRuntime::PendingForIdentity(const ReceivedCellIdentity& rIdentity)
 {
-	PendingCell& rPending = mPendingCells.try_emplace(rIdentity.coordinate).first->second;
+	auto [it, bInserted] = mPendingCells.try_emplace(rIdentity.coordinate);
+	PendingCell& rPending = it->second;
+	if (bInserted)
+	{
+		auto cellIt = game::gpGame->mCells.find(rIdentity.coordinate);
+		if (cellIt != game::gpGame->mCells.end() && (cellIt->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared))
+		{
+			rPending.bTerrainReady = true;
+		}
+		else
+		{
+			rPending.optionalStaticData.emplace();
+			rPending.optionalStaticData->coordinate = rIdentity.coordinate;
+			GenerateIslandChain(rIdentity.coordinate, rPending.optionalStaticData->islands);
+		}
+	}
 	if (rPending.identity.iSlot >= 0 && rPending.identity != rIdentity)
 	{
-		rPending = {};
-	}
-	if (rPending.uiPreparation == 0)
-	{
-		rPending.uiPreparation = ++muiNextPreparation;
+		rPending.optionalNavigationData.reset();
+		rPending.optionalFullState.reset();
+		rPending.updates.clear();
 	}
 	rPending.identity = rIdentity;
 	return rPending;
@@ -135,79 +140,26 @@ void ClientSessionRuntime::StageLocalCell(GridCoord coordinate)
 {
 	// Heap: pending terrain, frame ownership and procedural placements persist until publication.
 	ScopedSuppressAllocationTracking suppress;
-	PendingCell& rPending = mPendingCells.try_emplace(coordinate).first->second;
-	if (rPending.uiPreparation != 0)
+	if (mPendingCells.contains(coordinate))
 	{
 		return;
 	}
-	rPending.uiPreparation = ++muiNextPreparation;
-	rPending.identity.coordinate = coordinate;
+	PendingCell& rPending = PendingForIdentity(ReceivedCellIdentity {.coordinate = coordinate});
 	Cell localCell;
 	game::gpGame->CreateCellFrame(localCell, coordinate).interpolate.iTick = game::gpGame->miTickCounter;
 	rPending.pLocalFrame = std::move(localCell.ppSnapshots[0]);
-	rPending.optionalStaticData.emplace();
-	rPending.optionalStaticData->coordinate = coordinate;
-	GenerateIslandChain(coordinate, rPending.optionalStaticData->islands);
-}
-
-void ClientSessionRuntime::ResolveAuthoritativeTerrain(PendingCell& rPending)
-{
-	if (!rPending.optionalAuthoritativeStaticData.has_value())
-	{
-		return;
-	}
-	if (rPending.bTerrainReady && EqualPlacements(*rPending.optionalStaticData, *rPending.optionalAuthoritativeStaticData))
-	{
-		rPending.optionalStaticData->navigationData = std::move(rPending.optionalAuthoritativeStaticData->navigationData);
-		rPending.optionalStaticData->flags.Set(CellStaticDataFlags::kNavigationDataBuilt, rPending.optionalAuthoritativeStaticData->flags & CellStaticDataFlags::kNavigationDataBuilt);
-	}
-	else
-	{
-		rPending.optionalStaticData = std::move(rPending.optionalAuthoritativeStaticData);
-		rPending.bTerrainReady = false;
-		rPending.uiPreparation = ++muiNextPreparation;
-	}
-	rPending.optionalAuthoritativeStaticData.reset();
 }
 
 void ClientSessionRuntime::StageStaticData(ReceivedStaticData received)
 {
-	// Heap: retained authoritative records outlive Client's transient poll buffers.
+	// Heap: generated placements and received navigation outlive Client's transient poll buffers.
 	ScopedSuppressAllocationTracking suppress;
 	if (!IsCurrentIdentity(received.identity))
 	{
 		return;
 	}
 	PendingCell& rPending = PendingForIdentity(received.identity);
-	received.staticData.coordinate = received.identity.coordinate;
-	for (const IslandPlacement& rPlacement : received.staticData.islands)
-	{
-		gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
-	}
-	auto it = game::gpGame->mCells.find(received.identity.coordinate);
-	if (it != game::gpGame->mCells.end() && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && EqualPlacements(it->second.staticData, received.staticData))
-	{
-		it->second.staticData.navigationData = std::move(received.staticData.navigationData);
-		it->second.staticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt, received.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt);
-		rPending.bTerrainReady = true;
-		return;
-	}
-	rPending.optionalAuthoritativeStaticData = std::move(received.staticData);
-	if (mTerrainPreparation.valid() && mPreparingCoordinate == received.identity.coordinate && muiPreparingIdentity == rPending.uiPreparation)
-	{
-		return;
-	}
-	if (!rPending.optionalStaticData.has_value())
-	{
-		rPending.optionalStaticData = std::move(rPending.optionalAuthoritativeStaticData);
-		rPending.optionalAuthoritativeStaticData.reset();
-		rPending.bTerrainReady = false;
-		rPending.uiPreparation = ++muiNextPreparation;
-	}
-	else
-	{
-		ResolveAuthoritativeTerrain(rPending);
-	}
+	rPending.optionalNavigationData = std::move(received.staticData.navigationData);
 }
 
 void ClientSessionRuntime::PollTerrainPreparation()
@@ -222,24 +174,12 @@ void ClientSessionRuntime::PollTerrainPreparation()
 	{
 		return;
 	}
-	if (it->second.uiPreparation != muiPreparingIdentity)
+	if (it->second.bTerrainReady)
 	{
 		return;
 	}
-	PendingCell& rPending = it->second;
-	if (rPending.identity.iSlot < 0 && mPreparingCoordinate != game::gpGame->mClientGridCoordinate && !ContainsCoordinate(std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)), mPreparingCoordinate) && !HoldsSlotOrRequest(mPreparingCoordinate))
-	{
-		mPendingCells.erase(it);
-		return;
-	}
-	if (rPending.identity.iSlot >= 0 && !IsCurrentIdentity(rPending.identity))
-	{
-		mPendingCells.erase(it);
-		return;
-	}
-	rPending.optionalStaticData = std::move(prepared);
-	rPending.bTerrainReady = true;
-	ResolveAuthoritativeTerrain(rPending);
+	it->second.optionalStaticData = std::move(prepared);
+	it->second.bTerrainReady = true;
 }
 
 void ClientSessionRuntime::StartTerrainPreparation()
@@ -270,7 +210,6 @@ void ClientSessionRuntime::StartTerrainPreparation()
 		gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
 	}
 	mPreparingCoordinate = it->first;
-	muiPreparingIdentity = rPending.uiPreparation;
 	// Heap: async state and the complete owned terrain record outlive this main-thread call.
 	ScopedSuppressAllocationTracking suppress;
 	mTerrainPreparation = std::async(std::launch::async, common::ThreadLocal::Entry([staticData = std::move(*rPending.optionalStaticData)]() mutable
@@ -302,10 +241,6 @@ void ClientSessionRuntime::PublishPreparedCells()
 		{
 			continue;
 		}
-		if (rPending.optionalAuthoritativeStaticData.has_value())
-		{
-			continue;
-		}
 		bool bAuthoritative = rPending.identity.iSlot >= 0;
 		if (bAuthoritative)
 		{
@@ -323,7 +258,7 @@ void ClientSessionRuntime::PublishPreparedCells()
 			continue;
 		}
 		auto it = game::gpGame->mCells.find(rCoordinate);
-		if (bAuthoritative && !(rPending.optionalStaticData.has_value() ? (rPending.optionalStaticData->flags & CellStaticDataFlags::kNavigationDataBuilt) : it != game::gpGame->mCells.end() && (it->second.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt)))
+		if (bAuthoritative && !rPending.optionalNavigationData.has_value() && (rPending.optionalStaticData.has_value() || it == game::gpGame->mCells.end() || !(it->second.staticData.flags & CellStaticDataFlags::kNavigationDataBuilt)))
 		{
 			continue;
 		}
@@ -332,6 +267,12 @@ void ClientSessionRuntime::PublishPreparedCells()
 		{
 			rCell.staticData = std::move(*rPending.optionalStaticData);
 			rPending.optionalStaticData.reset();
+		}
+		if (rPending.optionalNavigationData.has_value())
+		{
+			rCell.staticData.navigationData = std::move(*rPending.optionalNavigationData);
+			rCell.staticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
+			rPending.optionalNavigationData.reset();
 		}
 		if (bAuthoritative)
 		{
@@ -345,16 +286,8 @@ void ClientSessionRuntime::PublishPreparedCells()
 			rCell.iSnapshotCount = 1;
 			rCell.ppSnapshots[0] = std::move(rPending.pLocalFrame);
 		}
-		common::ScopedWorkbufferArena updateArena = common::gpThreadLocal->mWorkbuffer.Push();
-		for (const auto& [rTick, rUpdate] : rPending.updates)
+		for (auto& [iTick, rUpdate] : rPending.updates)
 		{
-			updateArena.mBuffer.PushBack(rTick);
-		}
-		std::span<int64_t> ticks = updateArena.mBuffer.Span<int64_t>();
-		std::ranges::sort(ticks);
-		for (int64_t iTick : ticks)
-		{
-			ReceivedCoordUpdate& rUpdate = rPending.updates.at(iTick);
 			if (iTick > rCell.iConfirmedTick)
 			{
 				rCell.serverUpdates.try_emplace(iTick, Cell::CoordServerUpdate {.uiSharedCrc = rUpdate.uiSharedCrc, .statusChanges = std::move(rUpdate.statusChanges)});
@@ -670,7 +603,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 			GridCoord coordinate = rUpdate.identity.coordinate;
 			PendingCell& rPending = PendingForIdentity(rUpdate.identity);
 			auto it = game::gpGame->mCells.find(coordinate);
-			Cell* pCell = it != game::gpGame->mCells.end() && rPending.bTerrainReady && !rPending.optionalAuthoritativeStaticData.has_value() && it->second.iConfirmedTick >= 0 ? &it->second : nullptr;
+			Cell* pCell = it != game::gpGame->mCells.end() && it->second.iConfirmedTick >= 0 ? &it->second : nullptr;
 			int64_t iConfirmedTick = pCell != nullptr ? pCell->iConfirmedTick : rPending.optionalFullState.has_value() ? rPending.optionalFullState->iTick : -1;
 			if (rUpdate.iTick <= iConfirmedTick)
 			{
@@ -1003,11 +936,6 @@ void ClientSessionRuntime::ComputeActiveSet()
 			{
 				game::gpGame->CreateCellAtCoordinate(game::gpGame->mClientGridCoordinate);
 			}
-			it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
-			if (it != game::gpGame->mCells.end() && it->second.iSnapshotCount > 0 && (it->second.staticData.flags & CellStaticDataFlags::kTerrainPrepared) && !std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
-			{
-				game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
-			}
 		}
 		if (!std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
 		{
@@ -1131,7 +1059,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 		return 0ns;
 	}
 	// A streak only means something across continuously observed ticks, so any discontinuity restarts it:
-	// a clock snap in either direction, and the tick span skipped while an interval had no clock at all.
+	// a forward clock snap or any backward tick step, and the tick span skipped while an interval had no clock at all.
 	bool bTickDiscontinuity = miLastEvaluateClockTick < 0 || iPreReconcileTick < miLastEvaluateClockTick || iPreReconcileTick - miLastEvaluateClockTick >= kiClockSnapThreshold;
 	miLastEvaluateClockTick = iPreReconcileTick;
 	if (bTickDiscontinuity)
@@ -1204,13 +1132,13 @@ void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 	std::chrono::nanoseconds clockCorrectionNanoseconds = EvaluateClock(iPreReconcileTick);
 	gpProfileManager->SetClockCorrection(miClockOffset, miClockTargetBehind, miClockError);
 
-	if (miLatestServerTick >= 0 && std::abs(miClockError) >= kiClockSnapThreshold)
+	if (miClockError <= -kiClockSnapThreshold)
 	{
-		// Snap tick counter to recover from extreme clock error. Sim runs BEHIND latestServerTick.
-		// Clamp at 0 so a fresh post-load server (latestServerTick < currentTargetBehind)
-		// doesn't drive the client tick negative.
+		// Snap forward only: a sim far behind the servo target jumps to it. A sim ahead is held by the
+		// ceiling and the gradual correction instead, because a backward snap would drop the tick below
+		// ring frames already simulated and rendered.
 		int64_t iEstimatedLatestServerTick = EstimatedLatestServerTick();
-		int64_t iSnapTick = std::max<int64_t>(0, iEstimatedLatestServerTick - miCurrentTargetBehind);
+		int64_t iSnapTick = iEstimatedLatestServerTick - miCurrentTargetBehind;
 		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, iEstimatedLatestServerTick, miCurrentTargetBehind);
 		int64_t iTickCounter = iSnapTick;
 		ASSERT(iTickCounter >= 0);

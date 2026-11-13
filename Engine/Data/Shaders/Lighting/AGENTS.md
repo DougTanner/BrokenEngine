@@ -1,12 +1,27 @@
 # Lighting Shaders - Dynamic Light Deposit and Spread
 
-Dynamic lights follow `deposit -> spread -> combine -> temporal`. Deposit shaders write three EWNS targets (EWNS is defined in the shader hub); visible-light billboards instead render directly into the main framebuffer. Hex shields provide an additional surface-normal depositor from Objects (`../Objects/AGENTS.md`).
+Dynamic lights follow `deposit -> spread -> combine -> temporal`. Deposit
+shaders write three EWNS targets (EWNS is defined in the shader hub);
+visible-light billboards instead render directly into the main framebuffer. Hex
+shields provide an additional surface-normal depositor from Objects
+(`../Objects/AGENTS.md`).
 
 ## Pipeline Contracts
 
-- Readers sample lighting layer k through `pf4LightingAreas[k]`; `f4LightingArea` holds the area of the refreshing layer, `uiLightingRefreshLayer`. The spread's terrain height fade applies only to layer 0; layer 1's plane lies above every island. Which passes the layers share and which targets each keeps is owned by Render (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
-- Area and point deposits fade against the padded lighting-texture boundary, not the visible-area edge. Rotation can move point-light texture coordinates outside `[0,1]`, so that path uses clamped sampling. The deposit render pass clears its attachments through its load operation every frame.
-- Each spread pass carries an accumulation chain for the next pass and emits a separate pre-accumulation snapshot weighted by the combine curve. Combine sums the snapshots; substituting accumulated outputs changes the intended multi-pass weighting.
+- Readers sample lighting layer k through `pf4LightingAreas[k]`;
+  `f4LightingArea` holds the area of the refreshing layer,
+  `uiLightingRefreshLayer`. The spread's terrain height fade applies only to
+  layer 0; layer 1's plane lies above every island. Which passes the layers
+  share and which targets each keeps is owned by Render
+  (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
+- Area and point deposits fade against the padded lighting-texture boundary, not
+  the visible-area edge. Rotation can move point-light texture coordinates
+  outside `[0,1]`, so that path uses clamped sampling. The deposit render pass
+  clears its attachments through its load operation every frame.
+- Each spread pass carries an accumulation chain for the next pass and emits a
+  separate pre-accumulation snapshot weighted by the combine curve. Combine sums
+  the snapshots; substituting accumulated outputs changes the intended
+  multi-pass weighting.
 - Combine normalizes the snapshots, tone maps them into the scene-lighting
   targets, and writes the precomputed ambient target. That target holds
   `0.25 * (E + W + N + S)` of the tone-mapped per-direction values — the average
@@ -19,15 +34,17 @@ Dynamic lights follow `deposit -> spread -> combine -> temporal`. Deposit shader
   combine texture; temporal rejects history whose reprojected coordinate leaves
   `[0, 1]`. Reset uses current data only, then a separate history copy publishes
   the resolved result.
-- Light-type textures are pre-blurred for deposits. Visible sprites continue sampling the original textures.
+- Light-type textures are pre-blurred for deposits. Visible sprites continue
+  sampling the original textures.
 
-The lighting textures are deliberately larger than the visible area by a
-headroom multiplier (spare margin around the visible area —
-`engine::CameraBase::kfLightingHeadroomMultiplier`), so a fast zoom-out still
-finds lit texels while the area catches up. Consumers sample them through the
-border sampler, whose outside-the-texture color is transparent black, so a
-sample past the texture edge reads as no light. Switching that sampler to
-clamp-to-edge — the more common default — would instead smear the outermost lit
-texels across the whole off-texture margin.
+Lighting coverage past the view follows `engine::gExtraArea`
+(`../../../Source/Graphics/AGENTS.md` `## World and Camera Contracts`).
+Consumers sample the lighting textures through the border sampler, whose
+outside-the-texture color is transparent black, so a sample past the texture
+edge reads as no light. Switching that sampler to clamp-to-edge — the more
+common default — would instead smear the outermost lit texels across the whole
+off-texture margin.
 
-The renderer's Graphics documentation (`../../../Source/Graphics/AGENTS.md`) owns the framing texel references, world-sized texels, zoom rescaling, and recreation behavior.
+The renderer's Graphics documentation (`../../../Source/Graphics/AGENTS.md`)
+owns the framing texel references, world-sized texels, zoom rescaling, and
+recreation behavior.

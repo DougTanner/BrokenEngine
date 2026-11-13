@@ -52,6 +52,8 @@ struct ShipTactic
 {
 	XMVECTOR vecDestination = DirectX::XMVectorZero();
 	int64_t iTargetFlightPlane = 0;
+	// 0: the ship type's own maximum speed; only the Fighter escort tactic sets one.
+	float fMaximumSpeed = 0.0f;
 	// False: no destination; a fleet ship then runs the shared fleet navigation instead.
 	bool bHasDestination = false;
 	// True only for an Attack tactic, whose destination is the attacked enemy's position.

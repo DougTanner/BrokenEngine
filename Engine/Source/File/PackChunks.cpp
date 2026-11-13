@@ -40,6 +40,26 @@ static uint64_t NextAudioReadGeneration(uint64_t uiGeneration)
 }
 #endif // BT_CLIENT
 
+// mimalloc x64 arena geometry (ThirdParty/mimalloc/include/mimalloc/types.h): a block over one 32 MiB arena chunk
+// occupies whole chunks, the last one's tail unusable while it lives; a smaller block is counted in 64 KiB slices,
+// which overstates blocks that share a mimalloc page.
+constexpr int64_t kiMimallocArenaSliceSize = 64 * 1'024;
+constexpr int64_t kiMimallocArenaChunkSize = 32 * 1'024 * 1'024;
+
+static int64_t ArenaFootprint(int64_t iBytes)
+{
+	return common::RoundUp(iBytes, iBytes > kiMimallocArenaChunkSize ? kiMimallocArenaChunkSize : kiMimallocArenaSliceSize);
+}
+
+// Raises rPeak to iLive unless another thread already raised it higher.
+static void RaisePeak(std::atomic<int64_t>& rPeak, int64_t iLive)
+{
+	int64_t iPeak = rPeak.load(std::memory_order_relaxed);
+	while (iLive > iPeak && !rPeak.compare_exchange_weak(iPeak, iLive, std::memory_order_relaxed))
+	{
+	}
+}
+
 PackChunks::PackChunks(const std::filesystem::path& rDataDirectory)
 	: mDataDirectory(rDataDirectory)
 	, mLoader(*this)
@@ -77,11 +97,6 @@ PackChunks::~PackChunks()
 		}
 		rHandle = nullptr;
 	}
-	for (std::byte* pReadBuffer : mpReadBuffers)
-	{
-		_aligned_free(pReadBuffer);
-	}
-	VirtualFree(mpLazyPool, 0, MEM_RELEASE);
 	for (std::byte* pDecompressScratch : mpDecompressScratches)
 	{
 		if (pDecompressScratch != nullptr)
@@ -272,7 +287,7 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 			return "model sections outside chunk";
 		}
 	}
-	// iUncompressedSize sizes the lazy pool slot and caps the decoder output for both codecs.
+	// iUncompressedSize sizes the lazy chunk buffer and caps the decoder output for both codecs.
 	if (common::IsCompressed(rChunkHeader.flags))
 	{
 		if (rChunkHeader.iUncompressedSize <= 0)
@@ -354,7 +369,7 @@ void PackChunks::LoadPackFiles()
 
 		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0);
 		// Trust boundary: a failed reopen leaves no handle to read the headers through; reading them would build
-		// the lazy map (and pool layout) from garbage. A required pack is as fatal as a missing manifest.
+		// the lazy map from garbage. A required pack is as fatal as a missing manifest.
 		if (handlePackValidation == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file missing or unreadable");
@@ -415,34 +430,6 @@ void PackChunks::LoadPackFiles()
 	common::crc_t pTableCrcs[] = {LocationTableCrc(data::kDataTypeIslands), LocationTableCrc(data::kDataTypeModel)};
 	mPackIntegrityToken = common::Crc(std::span<const common::crc_t>(pTableCrcs));
 
-	// Reserve stable chunk destinations without heap lock contention during background loading.
-	int64_t iPoolOffset = 0;
-	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
-	{
-		int64_t iAlignedDataSize = common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
-		ASSERT(iPoolOffset <= std::numeric_limits<int64_t>::max() - iAlignedDataSize);
-		iPoolOffset += iAlignedDataSize;
-	}
-	miLazyPoolSize = iPoolOffset;
-	if (miLazyPoolSize > 0)
-	{
-		mpLazyPool = static_cast<std::byte*>(VirtualAlloc(nullptr, miLazyPoolSize, MEM_RESERVE, PAGE_READWRITE));
-		if (mpLazyPool == nullptr)
-		{
-			int64_t iError = GetLastError();
-			LOG(kLoading, kError, "Lazy chunk pool reservation failed: bytes={} error={}", miLazyPoolSize, iError);
-			common::ScopedExpectedThrows scopedExpectedThrows;
-			throw std::runtime_error(std::format("Lazy chunk pool allocation failed: requested {} bytes, Windows error {}.", miLazyPoolSize, iError));
-		}
-
-		iPoolOffset = 0;
-		for (auto& [crc, rLazyChunk] : mLazyChunkMap)
-		{
-			rLazyChunk.pData = mpLazyPool + iPoolOffset;
-			iPoolOffset += common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
-		}
-	}
-
 	// Per-thread decompress scratch (sized to largest compressed chunk on disk; only allocated if any chunks are
 	// compressed). One per loading thread so concurrent decompresses never share a scratch buffer.
 	if (miDecompressScratchSize > 0)
@@ -454,22 +441,6 @@ void PackChunks::LoadPackFiles()
 			{
 				FailMissingRequiredAsset(mDataDirectory, "decompression scratch allocation failed");
 			}
-		}
-	}
-
-	SYSTEM_INFO systemInfo {};
-	GetSystemInfo(&systemInfo);
-	miPageSize = systemInfo.dwPageSize;
-
-	// Allocate per-thread sector-aligned read buffers (one sub-read + sector padding each) so concurrent
-	// loading threads never share a read buffer.
-	miReadBufferSize = common::RoundUp(kiSubReadSize + kiSectorAlignment, kiSectorAlignment);
-	for (std::byte*& rpReadBuffer : mpReadBuffers)
-	{
-		rpReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(kiSectorAlignment)));
-		if (rpReadBuffer == nullptr)
-		{
-			FailMissingRequiredAsset(mDataDirectory, "aligned read-buffer allocation failed");
 		}
 	}
 
@@ -574,11 +545,9 @@ void PackChunks::ResetTextureChunkStates()
 
 void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs)
 {
-	// pData/iDataSize are fixed at construction and never rewritten, so this reset touches only the selected
-	// textures' eState and GPU handles. Callers own exclusion against the loading threads: full recovery drains
-	// them through mLoader.WaitForLoadersIdle and then waits the upload thread, while LRU eviction runs in RenderGlobal's
-	// bindless write epoch (a Vulkan descriptor window, not a loader drain) and targets resident,
-	// non-uploading textures, for which no whole-chunk loader can be in flight.
+	// A kReady texture's buffer was freed at adoption, and an uploading or upload-complete texture keeps its buffer, so
+	// this reset never touches pData. LRU eviction targets resident, non-uploading textures, for which no whole-chunk
+	// loader can be in flight.
 	bool bResetAll = targetCrcs.empty();
 	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
@@ -599,7 +568,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 
 		if (eState == ChunkState::kReady)
 		{
-			// Adoption decommitted the pool pages, so the CPU bytes are gone: need a full reload from disk
+			// Adoption freed the CPU buffer: need a full reload from disk
 			rLazyChunk.eState.value.store(ChunkState::kNotLoaded, std::memory_order_release);
 		}
 		else if (eState == ChunkState::kGpuUploadComplete || eState == ChunkState::kUploading)
@@ -609,7 +578,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 #if defined(BT_CLIENT)
 			// Maintain the pending-adoption counter: kUploading (uncounted) -> kDiskLoaded (counted) arms it;
 			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Only the
-			// whole-pool reset reaches this branch, because per-island eviction requires bGpuResident, so its targets
+			// all-texture reset reaches this branch, because per-island eviction requires bGpuResident, so its targets
 			// are kReady. gpTextureUploadManager outlives the device-loss Graphics recreate, so it is always valid here.
 			if (eState == ChunkState::kUploading)
 			{
@@ -736,7 +705,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 	if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 	{
-		std::memcpy(buffer.data(), rLazyChunk.pData + iOffset, buffer.size());
+		std::memcpy(buffer.data(), rLazyChunk.pData.get() + iOffset, buffer.size());
 		return ChunkReadResult::kReady;
 	}
 
@@ -916,7 +885,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	uint64_t uiAlignedOffset = common::RoundDown(uiLogicalFileOffset, static_cast<uint64_t>(kiSectorAlignment));
 	uint64_t uiPrefix = uiLogicalFileOffset - uiAlignedOffset;
 	uint64_t uiPhysicalSize = common::RoundUp(uiPrefix + uiLength, static_cast<uint64_t>(kiSectorAlignment));
-	ASSERT(uiPhysicalSize <= static_cast<uint64_t>(miReadBufferSize));
+	ASSERT(uiPhysicalSize <= static_cast<uint64_t>(kiReadBufferSize));
 
 	OVERLAPPED overlapped {};
 	overlapped.Offset = static_cast<DWORD>(uiAlignedOffset & 0xffffffff);
@@ -955,61 +924,26 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 
 #endif // BT_CLIENT
 
-void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength)
+void PackChunks::AllocateLazyChunkBuffer(LazyChunk& rLazyChunk)
 {
-	// Reclaim a dead sub-range of a resident lazy chunk. Only the page-aligned interior is decommitted, so the
-	// boundary partial-pages — which may share bytes with the neighbouring payload — stay committed;
-	// a sub-page range (tiny island) decommits nothing. Other chunks are untouched.
-	// Main-thread only, with no concurrent reader of the range.
-	// A failed MEM_DECOMMIT is benign (the pages simply stay committed) so its result is not checked.
-	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
-	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
-	int64_t iRangeEnd = iRangeStart + iLength;
-	int64_t iAlignedStart = common::RoundUp(iRangeStart, miPageSize);
-	int64_t iAlignedEnd = common::RoundDown(iRangeEnd, miPageSize);
-	if (iAlignedEnd > iAlignedStart)
-	{
-		// MEM_RELEASE would discard the pool reservation that RecommitAndReloadChunkRange recommits at this address.
-		VirtualFree(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_DECOMMIT);
-	}
+	// RequestChunkLoad queues only chunks below kDiskLoaded, which hold no buffer.
+	ASSERT(rLazyChunk.pData == nullptr);
+	// Heap: the chunk buffer outlives this load (until texture adoption, or the process for island and audio chunks).
+	// MakeAligned uses the C allocator, which allocation tracking never sees.
+	rLazyChunk.pData = common::MakeAligned<std::byte>(rLazyChunk.iDataSize);
+	ASSERT(rLazyChunk.pData != nullptr);
+
+	RaisePeak(miPeakLazyBufferBytes, miLazyBufferBytes.fetch_add(rLazyChunk.iDataSize, std::memory_order_relaxed) + rLazyChunk.iDataSize);
+	int64_t iFootprint = ArenaFootprint(rLazyChunk.iDataSize);
+	RaisePeak(miPeakLazyBufferFootprint, miLazyBufferFootprint.fetch_add(iFootprint, std::memory_order_relaxed) + iFootprint);
 }
 
-bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex)
+void PackChunks::FreeLazyChunkBuffer(LazyChunk& rLazyChunk)
 {
-	// Commit every page intersecting [iOffset, iOffset + iLength), then re-read that range from the pack.
-	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
-	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
-	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.
-	ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
-	if (!RecommitChunkRange(crc, rLazyChunk, iOffset, iLength))
-	{
-		return false;
-	}
-
-	mLoader.ReadChunkRange(rLazyChunk, iOffset, iLength, rLazyChunk.pData + iOffset, iThreadIndex);
-
-	return true;
-}
-
-bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength)
-{
-	if (iLength == 0)
-	{
-		return true;
-	}
-
-	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
-	int64_t iRangeEnd = iRangeStart + iLength;
-	int64_t iAlignedStart = common::RoundDown(iRangeStart, miPageSize);
-	int64_t iAlignedEnd = common::RoundUp(iRangeEnd, miPageSize);
-	if (VirtualAlloc(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_COMMIT, PAGE_READWRITE) == nullptr)
-	{
-		int64_t iError = GetLastError();
-		LOG(kLoading, kError, "Recommit MEM_COMMIT failed for chunk {}: address={} bytes={} error={}", crc, iAlignedStart, iAlignedEnd - iAlignedStart, iError);
-		DEBUG_BREAK();
-		return false;
-	}
-	return true;
+	ASSERT(rLazyChunk.pData != nullptr);
+	rLazyChunk.pData.reset();
+	miLazyBufferBytes.fetch_sub(rLazyChunk.iDataSize, std::memory_order_relaxed);
+	miLazyBufferFootprint.fetch_sub(ArenaFootprint(rLazyChunk.iDataSize), std::memory_order_relaxed);
 }
 
 MemoryStats PackChunks::GetEagerStatistics() const
@@ -1036,8 +970,7 @@ MemoryStats PackChunks::GetLazyStatistics() const
 	MemoryStats statistics;
 	// No lock: mLazyChunkMap structure is frozen after boot, eState is atomic (acquire), and iDataSize is fixed
 	// at construction. PackChunkLoader::mQueueMutex never guarded these value reads — the lockless writers never take it.
-	// An adopted texture (kReady) has had its pool pages decommitted, so its retained pData/iDataSize describe
-	// the reserved allocation rather than resident bytes; skip it or the readout overstates what is held.
+	// An adopted texture (kReady) has freed its buffer; skip it or the readout overstates what is held.
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
 		ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
@@ -1052,6 +985,9 @@ MemoryStats PackChunks::GetLazyStatistics() const
 			++statistics.iCount;
 		}
 	}
+	statistics.iPeakBytes = miPeakLazyBufferBytes.load(std::memory_order_relaxed);
+	statistics.iFootprintBytes = miLazyBufferFootprint.load(std::memory_order_relaxed);
+	statistics.iPeakFootprintBytes = miPeakLazyBufferFootprint.load(std::memory_order_relaxed);
 	return statistics;
 }
 

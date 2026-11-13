@@ -6,6 +6,7 @@
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/MiscWrappersBase.h"
 
 #include "Profile/ProfileRows.h"
 
@@ -36,18 +37,17 @@ std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier
 	return std::make_tuple(iX, iY);
 }
 
-std::tuple<int64_t, int64_t> TextureManager::LightingDetailTextureSize(float fMultiplier)
+std::tuple<int64_t, int64_t> TextureManager::ExtraAreaDetailTextureSize(float fMultiplier)
 {
-	// Pre-size every lighting deposit/spread/combine texture by CameraBase::kfLightingHeadroomMultiplier so the constant
-	// on-screen-pixel-size texel grid retains coverage margin while its framing reference expands immediately
-	// outward and contracts gradually inward. Centralized so all lighting consumers stay byte-consistent
-	// (deposit quads must land on the same texels the area math snaps to). Clamp AFTER the multiply (DetailTextureSize
-	// clamps pre-multiply); force width even so downstream half-width math stays integer.
+	// Size every lighting deposit/spread/combine texture and both object-shadow textures by gExtraArea, so a larger or
+	// smaller area keeps its texel density. Centralized so all lighting consumers stay byte-consistent (deposit quads
+	// must land on the same texels the area math snaps to). Clamp AFTER the multiply (DetailTextureSize clamps
+	// pre-multiply); force width even so downstream half-width math stays integer.
 	auto [iBaseX, iBaseY] = DetailTextureSize(fMultiplier);
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
-	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::CameraBase::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * gExtraArea.mfCurrent)), iLimit);
 	iX &= ~1i64;
-	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::CameraBase::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * gExtraArea.mfCurrent)), iLimit);
 	return std::make_tuple(iX, iY);
 }
 
@@ -477,7 +477,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 
 	{
 		// Every taken elevation is adopted in this call: teardown subtracts only the untaken list from the counter.
-		// Heap: the taken list is freed here, inside RenderGlobal.
+		// Heap: the taken list is freed here, inside Graphics::UpdateFrameResidency.
 		ScopedSuppressAllocationTracking suppress;
 		for (common::crc_t islandCrc : gpTextureUploadManager->TakeCompletedElevations())
 		{
@@ -529,7 +529,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 
 			{
-				// Heap: the recorded create allocates its staging buffer and retirement entry inside RenderGlobal.
+				// Heap: the recorded create allocates its staging buffer and retirement entry inside Graphics::UpdateFrameResidency.
 				ScopedSuppressAllocationTracking suppress;
 				RetireStagingBuffer(rTexture.RecordCreate(EnsureAcquireCommandBufferBegun(), rTexture.mInfo, [&](std::span<std::byte> data, int64_t iPosition)
 				{
@@ -538,8 +538,8 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			}
 
 			// RecordCreate copied the pixels into staging and no upload thread owns this chunk on the early-out path, so
-			// the pool pages are reclaimable here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
-			gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, 0, rLazyChunk.iDataSize);
+			// the CPU buffer is freed here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
+			gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
 			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc);
 
 			rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
@@ -569,12 +569,10 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 		rTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
 	}
 
-	// Race-free decommit of worker-thread-shared CPU-pool state: reaching kGpuUploadComplete means the
-	// transfer thread (UploadThread) finished this chunk and released ownership, so returning its pages
-	// here (on the main thread) cannot race that thread. pData and iDataSize keep their construction
-	// values and describe the reserved pool range, not resident bytes — a whole reload recommits that
-	// range before writing it, and eState stays the residency authority.
-	gpFileManager->mpPackChunks->DecommitChunkRange(crc, 0, rLazyChunk.iDataSize);
+	// Reaching kGpuUploadComplete means the transfer thread (UploadThread) finished this chunk and released
+	// ownership, so freeing its CPU buffer here (on the main thread) cannot race that thread. The free precedes the
+	// kReady store, so a kReady texture holds no buffer and a later whole reload allocates a new one.
+	gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
 	mTextureDescriptors.UpdateDescriptorsForTexture(crc);
 
 	rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
@@ -615,9 +613,9 @@ void TextureManager::EndAcquireCommandBuffer()
 		return;
 	}
 
-	// CommandBufferManager prepends this acquire buffer. The non-atomic kPendingAcquireBarriers flag and miAcquireFramebufferIndex
-	// are written on Graphics::RenderGlobal's main thread; SubmitGlobalToQueue reads them on mSubmitGlobal. Publication depends on
-	// that worker's Wake/Wait edge.
+	// CommandBufferManager prepends this acquire buffer to Global or, on a world-hidden frame, submits it alone on the main thread.
+	// The non-atomic kPendingAcquireBarriers flag and miAcquireFramebufferIndex are written on the main thread in
+	// Graphics::UpdateFrameResidency; SubmitGlobalToQueue reads them on mSubmitGlobal. Publication depends on that worker's Wake/Wait edge.
 	CHECK_VK(vkEndCommandBuffer(mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex)));
 	mFlags.Set(TextureManagerFlags::kAcquireCommandBufferBegun, false);
 	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers);
@@ -697,7 +695,7 @@ void TextureManager::WaitForTextures(std::span<Texture* const> textures)
 
 void TextureManager::RetireStagingBuffer(std::unique_ptr<StagingBuffer> pStagingBuffer)
 {
-	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	// Heap: the entry persists across frames; retired inside Graphics::UpdateFrameResidency.
 	ScopedSuppressAllocationTracking suppress;
 	mRetiredStagingBuffers.push_back({.pStagingBuffer = std::move(pStagingBuffer), .uiFramebufferMask = AllFramebuffersMask()});
 }
@@ -705,7 +703,7 @@ void TextureManager::RetireStagingBuffer(std::unique_ptr<StagingBuffer> pStaging
 void TextureManager::RetireImage(Texture& rTexture)
 {
 	ASSERT(rTexture.mVkImage != VK_NULL_HANDLE);
-	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	// Heap: the entry persists across frames; retired inside Graphics::UpdateFrameResidency.
 	ScopedSuppressAllocationTracking suppress;
 	mRetiredImages.push_back({.pTexture = std::make_unique<Texture>(std::move(rTexture)), .uiFramebufferMask = AllFramebuffersMask()});
 }

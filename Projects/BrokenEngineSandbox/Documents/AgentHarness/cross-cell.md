@@ -8,8 +8,17 @@ Live recipe for the engine
 [`set_client_grid_coord`](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands).
 Run it in order.
 
-1. `reset` the server, then inject one flagship at the origin: `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni","orders":1}]}` (`orders` `kIsFlagship`). Do not set `fleetWantedCoordinate` — the client auto-follows its own ship, which would make the coordinate evidence ambiguous.
-2. Wait for the assigned owned entity this command requires. The injected flagship is unowned AI; the client's owned entity is the Battleship of the fleet the server makes for it at connect, and again after the `reset`. Poll `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it returns `ok:false` until the server has assigned the spawned owned entity. Do no coordinate work before that.
+1. `reset` the server, then inject one flagship at the origin:
+   `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni","orders":1}]}`
+   (`orders` `kIsFlagship`). Do not set `fleetWantedCoordinate` — the client
+   auto-follows its own ship, which would make the coordinate evidence
+   ambiguous.
+2. Wait for the assigned owned entity this command requires. The injected
+   flagship is unowned AI; the client's owned entity is the Battleship of the
+   fleet the server makes for it at connect, and again after the `reset`. Poll
+   `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it
+   returns `ok:false` until the server has assigned the spawned owned entity. Do
+   no coordinate work before that.
 3. Set the server Network log level to Debug with
    `set_log_level {"category":"Network","level":"Debug"}` so the decisive server
    lines emit past the default `kInfo` runtime threshold. Do not ask the client
@@ -19,8 +28,13 @@ Run it in order.
    configuration. Capture ordered log baselines, server `status`, client
    `describe_scene {"includeUnits":false}`, and both ticks, so later checks can
    identify only appended lines.
-4. Send `set_client_grid_coord {"coord":[0,1]}` and require `ok:true` with `clientGridCoord:[0,1]`.
-5. Decisive subscription evidence is server `status` showing `[0,1]` active plus a newly appended server line `Server::SendCoordFullState Client: <n> Frame: <tick> Slot: <s> Coord: (0,1) AckFloor: <floor>`. `describe_scene.subscribedCoords` lists local frames including the still-unconfirmed own cell, so treat it only as a coordinate-changed signal.
+4. Send `set_client_grid_coord {"coord":[0,1]}` and require `ok:true` with
+   `clientGridCoord:[0,1]`.
+5. Decisive subscription evidence is server `status` showing `[0,1]` active plus
+   a newly appended server line
+   `Server::SendCoordFullState Client: <n> Frame: <tick> Slot: <s> Coord: (0,1) AckFloor: <floor>`.
+   `describe_scene.subscribedCoords` lists local frames including the
+   still-unconfirmed own cell, so treat it only as a coordinate-changed signal.
 6. Prove client-side adoption by polling client
    `describe_scene {"includeUnits":false}` about every 0.5 s, for at most 10 s,
    until its `cellStates` holds a row with `coord:[0,1]` and
@@ -32,5 +46,8 @@ Run it in order.
    matching pair, not any client log line, proves the client adopted that full
    state.
 7. Require the client tick to stay monotonic and never reset across the move.
-8. Capture the clean-log check: no newly appended `LogDifferences CRC Client`, `CONFIRMED DESYNC`, or checksum-mismatch line.
-9. Send `set_client_grid_coord {"coord":[0,0]}`, then `release_client_grid_coord {}`, to restore a normal session: the release clears the pin so the client auto-follows its own ship again.
+8. Capture the clean-log check: no newly appended `LogDifferences CRC Client`,
+   `CONFIRMED DESYNC`, or checksum-mismatch line.
+9. Send `set_client_grid_coord {"coord":[0,0]}`, then
+   `release_client_grid_coord {}`, to restore a normal session: the release
+   clears the pin so the client auto-follows its own ship again.

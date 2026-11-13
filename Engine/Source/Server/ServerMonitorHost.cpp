@@ -23,7 +23,6 @@ static void UpdateStatistics()
 	}
 
 	sTotalEntityCounts.fill(0);
-	int64_t iTotalExplosions = 0;
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
@@ -32,10 +31,7 @@ static void UpdateStatistics()
 		{
 			sTotalEntityCounts[i] += cellStatistics.entityCounts[i];
 		}
-		iTotalExplosions += cellStatistics.iExplosions;
 	}
-
-	gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = iTotalExplosions;
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	mi_stats_t mimallocStatistics = {};
@@ -113,7 +109,6 @@ std::shared_ptr<const ServerMonitorHost::Snapshot> ServerMonitorHost::Capture()
 	{
 		entities += std::format("{}: {}\n", game::kServerEntityCountNames[i], sTotalEntityCounts[i]);
 	}
-	entities += std::format("Explosions: {}\n", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount);
 	pSnapshot->statistics.push_back({.uiColor = RGB(150, 220, 150), .text = std::move(entities)});
 	pSnapshot->profile.push_back({.uiColor = RGB(100, 180, 255), .text = std::format("FPS: {}  Potential: {}\n", iFps, iPotential)});
 	bool bReevaluate = gpProfileManager->TickVisibilityCadence();
@@ -144,7 +139,6 @@ std::shared_ptr<const ServerMonitorHost::Snapshot> ServerMonitorHost::Capture()
 		common::ServerMonitorCell& rCell = Cell(rCoordinate);
 		rCell.uiFlags |= common::kuiServerMonitorCellActive;
 		game::ServerCellStats statistics = game::GetServerCellStatistics(*game::gpGame->mCells.at(rCoordinate).pCurrent);
-		rCell.iEntityCount = statistics.iExplosions;
 		for (int64_t iCount : statistics.entityCounts)
 		{
 			rCell.iEntityCount += iCount;

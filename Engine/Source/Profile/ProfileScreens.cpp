@@ -361,7 +361,13 @@ void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MiB (");
 	rWorkbuffer.Append(lazyStatistics.iCount);
-	rWorkbuffer.Append(")\n");
+	rWorkbuffer.Append("), peak ");
+	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iPeakBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.Append(" MiB\nLazy arena: ");
+	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iFootprintBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.Append(" MiB, peak ");
+	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iPeakFootprintBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.Append(" MiB\n");
 	AppendMemoryStatistics(rWorkbuffer, false);
 	rWorkbuffer.Append("Payload total: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(iTotalBytes) / (1'024.0f * 1'024.0f), 1);

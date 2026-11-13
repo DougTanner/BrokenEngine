@@ -34,9 +34,10 @@ After the manifest routes oversized files to `/reduce-file`, read file counts
 above about 15 or aggregate size above about 80,000 bt-token-v1 as an indication
 that a review split is useful, though not alone a requirement; smaller targets
 may be inspected inline. The main invoking context may dispatch scoped rounds of
-`reviewer` roles according to available capacity, and deduplicates their results.
-Give each dispatched worker an explicit file manifest, authority map, inspection
-rubric, and evidence/report contract, with each file belonging to one worker.
+`reviewer` roles according to available capacity, and deduplicates their
+results. Give each dispatched worker an explicit file manifest, authority map,
+inspection rubric, and evidence/report contract, with each file belonging to one
+worker.
 
 ## Handoff
 

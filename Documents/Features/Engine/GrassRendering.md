@@ -145,11 +145,10 @@ Changes (13 files)
    terrain (kGpuTimerTerrain) and before water (kGpuTimerWater).
    Insert after the kGpuTimerTerrain block, before kGpuTimerWater:
 
-     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerGrass);
-     for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineGrass])
-     {
-         pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
-     }
+     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer,
+     kGpuTimerGrass); for (const auto& [rCrc, pPipeline] :
+     gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineGrass])
+     { pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer); }
      gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerGrass);
 
 9. Engine/Source/Profile/ProfileManagerBase.h

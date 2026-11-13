@@ -121,7 +121,7 @@ void ProfileManager::Destroy()
 		mVkQueryPool = VK_NULL_HANDLE;
 		mGpuShadowSample = {};
 		mGpuSubmissions.clear();
-		mGpuDiagnosticHistories = {};
+		mGpuDiagnosticHistories.fill({});
 		mLatestGpuSample = {};
 
 		// mpDumpLog deliberately not reset: Destroy() also runs on swapchain-tier recreates (resize, settings), and the dump file must span the whole session. The unique_ptr closes it at ProfileManager destruction.
@@ -677,7 +677,7 @@ void ProfileManager::SetDiagnosticFocus(bool bHasFocus)
 		mRenderedFrameIntervals = common::Smoothed<int64_t, 256> {};
 		mNormalReconciliationTickNanoseconds = common::Smoothed<double> {};
 		mExpectedRenderedFrameInterval = 0ns;
-		mGpuDiagnosticHistories = {};
+		mGpuDiagnosticHistories.fill({});
 		mLatestGpuSample = {};
 		for (GpuSubmission& rSubmission : mGpuSubmissions)
 		{

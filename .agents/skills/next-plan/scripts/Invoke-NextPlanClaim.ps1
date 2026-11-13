@@ -2,7 +2,7 @@
 param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
 $result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v10';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
-function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
+function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;if($null -ne $result.claim -and $Status -cne 'pass'){$result.message+=" This session's claim on '$($result.claim.plan)' remains held."};$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
 # are worktree paths a fast-forward could touch.
@@ -76,7 +76,8 @@ try {
  # ordinary flow, which can synchronize before plan claim-next re-reports the held claim or returns the scheduler's stop.
  $heldClaim=$null
  if($null -eq $pattern){try{$claimStatus=Get-NextPlanClaimStatus $context $Plan;if($claimStatus.ExitCode -eq 2 -and [string]$claimStatus.Status.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claimStatus.Status.requestedPlan;heldPlan=[string]$claimStatus.Status.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'};if($claimStatus.ExitCode -eq 0 -and [string]$claimStatus.Status.code -ceq 'claimed'){$heldClaim=$claimStatus.Status}}catch{$heldClaim=$null}}
- if($null -ne $heldClaim -and $context.SessionHead -ceq $context.PrimaryTip){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'};Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
+ if($null -ne $heldClaim){$result.claim=[ordered]@{claimed=$true;plan=[string]$heldClaim.plan;state='existing'}}
+ if($null -ne $heldClaim -and $context.SessionHead -ceq $context.PrimaryTip){Complete-Claim 0 'pass' 'reused' 'Existing Plan claim remains live for this session.' 'prepare'}
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
@@ -97,7 +98,7 @@ try {
    if($incoming.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git diff --name-only could not compare the session head with the primary tip. $($incoming.Stderr.Trim())")}
    $incomingPaths=@(($incoming.Stdout -split "`0")|Where-Object{-not [string]::IsNullOrEmpty($_)})
    $overlap=@($dirty|Where-Object{$incomingPaths -ccontains $_})
-   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "The claim cannot proceed because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched. Report this to the user, who decides how to resolve it, for example by landing that work first." 'stop-report-to-user'}
+   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "The claim cannot proceed because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No new Plan was claimed and the worktree was not touched. Report this to the user, who decides how to resolve it, for example by landing that work first." 'stop-report-to-user'}
   }
   $result.retained=[ordered]@{count=$dirty.Count;truncated=($dirty.Count -gt 10);paths=@($dirty|Select-Object -First 10)}
  }
@@ -112,16 +113,18 @@ try {
    $revList=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'rev-list',"$($context.PrimaryTip)..$($context.SessionHead)") $context.Worktree
    if($revList.ExitCode -ne 0){throw "git rev-list $($context.PrimaryTip)..$($context.SessionHead) failed. $($revList.Stderr.Trim())"}
    $held=@(($revList.Stdout -split "`n")|ForEach-Object{$_.Trim()}|Where-Object{$_.Length -gt 0})
-   Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) holds $($held.Count) commit(s) the primary tip $($context.PrimaryTip) does not ($($held -join ', ')), so the session cannot be fast-forwarded; no Plan was claimed and the session branch was not moved. Report this to the user, who decides how to resolve it. If the primary branch was rewritten under this session, for example by a history squash, those commits are the session's own work stranded off the rewritten history, and the user-authorized recovery is pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1 run from the session worktree root, which replays this session onto the primary tip, followed by a rerun of this command; that repair changes nothing and reports fork-point.not-recoverable when the pre-rewrite fork point is gone, and reports fork-point.repair-refused with the cause in its own message when the worktree is not clean or the replay fails. Otherwise these are ordinary unlanded commits to land." 'stop-report-to-user'
+   Complete-Claim 2 'blocked' 'claim.session-diverged' "Session HEAD $($context.SessionHead) holds $($held.Count) commit(s) the primary tip $($context.PrimaryTip) does not ($($held -join ', ')), so the session cannot be fast-forwarded; no new Plan was claimed and the session branch was not moved. Report this to the user, who decides how to resolve it. If the primary branch was rewritten under this session, for example by a history squash, those commits are the session's own work stranded off the rewritten history, and the user-authorized recovery is pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1 run from the session worktree root, which replays this session onto the primary tip, followed by a rerun of this command; that repair changes nothing and reports fork-point.not-recoverable when the pre-rewrite fork point is gone, and reports fork-point.repair-refused with the cause in its own message when the worktree is not clean or the replay fails. Otherwise these are ordinary unlanded commits to land." 'stop-report-to-user'
   }
   $merge=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'merge','--ff-only',$context.PrimaryTip) $context.Worktree
-  if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail" 'stop-report-to-user'}
+  if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no new Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail" 'stop-report-to-user'}
   $result.sync=[ordered]@{fastForwarded=$true;from=$context.SessionHead;to=$context.PrimaryTip}
  }
+ # plan validate can heal this session's claim and still fail, so from here on only plan claim-next reports it.
+ $result.claim=$null
  $validate=Invoke-NextPlanProcess $context.WorktreeCli @('plan','validate','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
  $validation=ConvertFrom-NextPlanProcessJson $validate 'plan validate'; $projection=[ordered]@{}; foreach($name in @('status','code','message','diagnostics','healedClaims')){if($validation.PSObject.Properties.Name -ccontains $name){$projection[$name]=$validation.$name}}; $result.validation=$projection
- if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.' 'retry-later'}
- if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no Plan was claimed. Tell the user - this is not a Plan metadata problem.' 'stop-report-to-user'}
+ if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no new Plan was claimed. Tell the user and retry later.' 'retry-later'}
+ if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no new Plan was claimed. Tell the user - this is not a Plan metadata problem.' 'stop-report-to-user'}
  if($validate.ExitCode -ne 0){$exit=if($validate.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'plan.validation-failed' 'Plan validation failed.' 'stop-report-to-user'}
  # WorktreeCli reads every .md under Documents/Plans/ as a plan document, and one without valid metadata can fail every
  # plan complete|reject, so a layout violation or an invalid-metadata diagnostic stops the run before any claim.

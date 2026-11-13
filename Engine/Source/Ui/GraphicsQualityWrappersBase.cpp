@@ -9,13 +9,6 @@
 namespace engine
 {
 
-// int64_t 0/1/2 == GraphicsQualityLevel kLow/kMedium/kHigh
-engine::Wrapper gWaterLevel(2i64, std::vector<int64_t> {0, 1, 2});
-engine::Wrapper gTerrainShadowsLevel(1i64, std::vector<int64_t> {0, 1, 2});
-engine::Wrapper gObjectShadowsLevel(1i64, std::vector<int64_t> {0, 1, 2});
-engine::Wrapper gLightingLevel(1i64, std::vector<int64_t> {0, 1, 2});
-engine::Wrapper gSmokeDetailLevel(1i64, std::vector<int64_t> {0, 1, 2});
-
 constexpr int64_t kiLevelCount = static_cast<int64_t>(GraphicsQualityLevel::kCount);
 
 constexpr float kpfTerrainShadowsRenderMultipliers[kiLevelCount] {0.05f, 0.1f, 0.2f};
@@ -39,6 +32,8 @@ constexpr LightingLevelValues kpLightingLevels[kiLevelCount]
 };
 
 constexpr float kpfSmokeSimulationPixels[kiLevelCount] {0.75f, 1.0f, 1.5f};
+
+constexpr float kpfObjectShadowsBlurMultipliers[] {0.6f, 1.0f};
 
 static int64_t LevelIndex(const engine::Wrapper& rWrapper)
 {
@@ -70,12 +65,18 @@ void ApplySmokeDetailLevel()
 	engine::gSmokeSimulationPixels.Set(kpfSmokeSimulationPixels[LevelIndex(gSmokeDetailLevel)]);
 }
 
+void ApplyObjectShadowsBlurLevel()
+{
+	engine::gObjectShadowsBlurMultiplier.Set(kpfObjectShadowsBlurMultipliers[gObjectShadowsBlurLevel.Get<int64_t>()]);
+}
+
 void ApplyAllGraphicsQualityLevels()
 {
 	ApplyTerrainShadowsLevel();
 	ApplyObjectShadowsLevel();
 	ApplyLightingLevel();
 	ApplySmokeDetailLevel();
+	ApplyObjectShadowsBlurLevel();
 }
 
 } // namespace engine

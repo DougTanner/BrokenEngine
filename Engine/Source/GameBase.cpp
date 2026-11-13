@@ -307,7 +307,7 @@ void GameBase::ClientUpdate()
 	int64_t iEstimatedLatestServerTick = rRuntime.EstimatedLatestServerTick();
 	int64_t iCeiling = iEstimatedLatestServerTick < 0 ? -1 : iEstimatedLatestServerTick - rRuntime.miCurrentTargetBehind + engine::kiSimulationCeilingSlackTicks;
 	int64_t iAbsorbedTicks = 0;
-	if (iCeiling >= 0 && iFullTicks > 0)
+	if (iEstimatedLatestServerTick >= 0 && iFullTicks > 0)
 	{
 		int64_t iRoomToAdvance = std::max<int64_t>(0, iCeiling - miTickCounter);
 		if (iFullTicks > iRoomToAdvance)
@@ -952,6 +952,7 @@ static void ClearRetainedEffects()
 	gpParticleManager->mbReset = true;
 	WindTrailsInterpolate::sPreviousPositions.clear();
 	gbWaterFoamReset = true;
+	gbObjectShadowsReset = true;
 	// Wind has no per-frame clear; the one-shot clear needs the graphics queue drained.
 	CHECK_VK(vkQueueWaitIdle(gpDeviceManager->mGraphicsVkQueue));
 	gpTextureManager->mRenderTargetTextures.ClearWindTextures();
@@ -978,7 +979,11 @@ void GameBase::Render()
 		return;
 	}
 
-	// Behind an opaque map overlay no world pass is recorded or submitted; the frame waits its fence and submits only the UI.
+	// Pack island instances after the current camera update and only once the acquired framebuffer index is valid.
+	UpdateActiveIslands();
+
+	// Behind an opaque map overlay no world pass is recorded or submitted; the frame still runs the game's world-hidden step and the
+	// residency step, then submits the acquire command buffer when recorded and the UI.
 	bool bWorldHidden = game::gpGame->MapOpacity() >= 1.0f;
 	static bool sbWorldHidden = false;
 	if (bWorldHidden && !sbWorldHidden)
@@ -988,14 +993,15 @@ void GameBase::Render()
 	sbWorldHidden = bWorldHidden;
 	if (bWorldHidden)
 	{
+		// The skipped collection render walk also issues each model's once-only texture request and steps wrecks; the game's world-hidden
+		// step does both with no GPU write, so the textures start loading and the wrecks keep falling while the world is hidden.
+		game::FrameInterpolate::UpdateWorldHidden(mRenderInterpolates, rActiveCoordinates);
 		// RenderGlobal is skipped, so drop this frame's staged spawns as the deferred-swapchain skip does.
 		gpParticleManager->DiscardStagedSpawns();
 		gpGraphics->RenderUiPresentAcquire(gpSwapchainManager->miFramebufferIndex);
 		return;
 	}
 
-	// Pack island instances after the current camera update and only once the acquired framebuffer index is valid.
-	UpdateActiveIslands();
 	gbGameplayPaused = mGameFlags & GameFlags::kPaused;
 	gpGraphics->RenderGlobal(elapsedTime);
 

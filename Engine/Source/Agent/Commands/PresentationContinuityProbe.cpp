@@ -57,6 +57,7 @@ void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohm
 		{"noiseFrequency", rSnapshot.fNoiseFrequency},
 	};
 	rResult["shadow"] = RetainedAreaJson(rSnapshot.shadow);
+	rResult["objectShadowArea"] = AreaJson(rSnapshot.f4ObjectShadowArea);
 	nlohmann::json& rLighting = rResult["lighting"] = nlohmann::json::array();
 	for (const RetainedAreaReport& rLightingLayer : rSnapshot.pLighting)
 	{

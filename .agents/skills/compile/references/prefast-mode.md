@@ -2,17 +2,36 @@
 
 ## Authorization and when to use
 
-Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Outside this explicitly authorized mode, omit `-Prefast` so the build keeps the Microsoft rule-set path off.
+Use this mode only when an approved plan explicitly requires Microsoft PREfast
+verification. Outside this explicitly authorized mode, omit `-Prefast` so the
+build keeps the Microsoft rule-set path off.
 
 ## Invocation and coverage
 
-`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the two Release paths selected by the toolchain's `RunMsvcAnalysis`, the `EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the `CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top of it:
+`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the
+Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the
+two Release paths selected by the toolchain's `RunMsvcAnalysis`, the
+`EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the
+`CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top
+of it:
 
-- Report "analysis executed" and "policy passed" as separate facts — a zero exit alone establishes only the second.
-- `RunNativeCodeAnalysis` is an incremental target, so a green incremental run could otherwise mean "skipped as up-to-date". A full `-Prefast` build therefore forces the rebuild itself, and its returned result covers a full analysis pass — no separate rebuild or regeneration evidence is needed. Budget for the longer runtime: this is a from-scratch Release rebuild of the whole target, not an incremental one.
-- Exception: a `-Prefast` run that also passes `-Files` stays incremental for the selected files and carries no rebuild guarantee, so it does not establish that analysis ran across the target.
+- Report "analysis executed" and "policy passed" as separate facts — a zero exit
+  alone establishes only the second.
+- `RunNativeCodeAnalysis` is an incremental target, so a green incremental run
+  could otherwise mean "skipped as up-to-date". A full `-Prefast` build
+  therefore forces the rebuild itself, and its returned result covers a full
+  analysis pass — no separate rebuild or regeneration evidence is needed. Budget
+  for the longer runtime: this is a from-scratch Release rebuild of the whole
+  target, not an incremental one.
+- Exception: a `-Prefast` run that also passes `-Files` stays incremental for
+  the selected files and carries no rebuild guarantee, so it does not establish
+  that analysis ran across the target.
 
-`-Prefast` forces Clang-Tidy off and Microsoft code analysis on, and it is accepted for Client and Server Release builds only. Do not override the projects' warnings-as-errors settings, the rule set, or `CodeAnalysisTreatWarningsAsErrors`, and never pass `CodeAnalysisNeverReportRuleErrors` — it disables error promotion silently:
+`-Prefast` forces Clang-Tidy off and Microsoft code analysis on, and it is
+accepted for Client and Server Release builds only. Do not override the
+projects' warnings-as-errors settings, the rule set, or
+`CodeAnalysisTreatWarningsAsErrors`, and never pass
+`CodeAnalysisNeverReportRuleErrors` — it disables error promotion silently:
 
 ```powershell
 # BrokenEngineSandbox client Release PREfast, then server Release PREfast.
@@ -20,8 +39,18 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target Server -Configuration Release -Prefast
 ```
 
-`EnableMicrosoftCodeAnalysis=true`, which `-Prefast` passes, is an extra safety measure here: the toolchain forces analysis off only on an explicit `false`, and the Release configurations set it nowhere, so passing it changes nothing today. Keep it so an upstream default change cannot silently disable the mode.
+`EnableMicrosoftCodeAnalysis=true`, which `-Prefast` passes, is an extra safety
+measure here: the toolchain forces analysis off only on an explicit `false`, and
+the Release configurations set it nowhere, so passing it changes nothing today.
+Keep it so an upstream default change cannot silently disable the mode.
 
 ## Results
 
-A policy failure surfaces as a nonzero MSBuild exit after the link step, with the executable already produced — analysis runs through `AfterBuildLinkTargets`. Existing binaries after a failed run are expected, not a partial success. A failing run also does not write `*.lastcodeanalysissucceeded`, so the failure correctly re-reports on the next build until it is fixed. The matched diagnostics reach the caller through the envelope file and retained log the `## Handoff` rows cite, never inline.
+A policy failure surfaces as a nonzero MSBuild exit after the link step, with
+the executable already produced — analysis runs through `AfterBuildLinkTargets`.
+Existing binaries after a failed run are expected, not a partial success. A
+failing run also does not write `*.lastcodeanalysissucceeded`, so the failure
+correctly re-reports on the next build until it is fixed. The matched
+diagnostics reach the caller through the envelope file the `## Handoff`
+`Evidence` row cites and each build's retained log at that build's
+`retainedLog.path` in that file, never inline.

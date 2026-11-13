@@ -39,9 +39,9 @@ constexpr float kfBattleshipExplosionPositionJitter = kfBattleshipRadius * 0.375
 constexpr float kfBattleshipExplosionDirectionJitter = 0.5f;
 constexpr int64_t kiBattleshipExplosionTrailCount = 5;
 
+#if defined(BT_CLIENT)
 // Shared type indices (accessible from BattleshipsCombat.cpp via extern)
 int64_t giBattleshipExplosionTypeIndex = 0xFF;
-#if defined(BT_CLIENT)
 static int64_t siBattleshipHitFlashTypeIndex = 0xFF;
 int64_t giBattleshipHitFlashControllerTypeIndex = 0xFF;
 
@@ -64,6 +64,7 @@ constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 
 void BattleshipsInterpolate::Register()
 {
+#if defined(BT_CLIENT)
 	engine::ExplosionsInterpolate::RegisterType(giBattleshipExplosionTypeIndex,
 	{
 		.iBaseParticleCount = kiBattleshipExplosionBaseParticleCount,
@@ -90,7 +91,6 @@ void BattleshipsInterpolate::Register()
 		.pParticleIntensityPowerScale = &gFighterExplosionParticleIntensityPower,
 	});
 
-#if defined(BT_CLIENT)
 	RegisterBattleshipHitFlashEffect();
 #endif
 }
@@ -136,12 +136,12 @@ static void RegisterBattleshipHitFlashEffect()
 		.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
 	});
 }
-#endif // BT_CLIENT
 
 void SpawnBattleshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent)
 {
-	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfBattleshipExplosionPositionJitter>(vecPosition, rFrame.postRender.randomEngine);
-	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfBattleshipExplosionDirectionJitter>(vecDirection, rFrame.postRender.randomEngine);
+	common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
+	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfBattleshipExplosionPositionJitter>(vecPosition, randomEngine);
+	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfBattleshipExplosionDirectionJitter>(vecDirection, randomEngine);
 
 	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 	{
@@ -157,10 +157,9 @@ void SpawnBattleshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitte
 		.fSizePercent = fPercent * kfBattleshipExplosionSizeStart + (1.0f - fPercent) * kfBattleshipExplosionSizeEnd,
 		.fSmokePercent = fPercent * kfBattleshipExplosionSmoke,
 		.fTimePercent = fPercent,
-	});
+	}, randomEngine);
 }
 
-#if defined(BT_CLIENT)
 // Battleship models, one per ShipController (defined in BattleshipsRender.cpp)
 extern const common::crc_t kBattleshipFleetModel;
 extern const common::crc_t kBattleshipRandomModel;
@@ -338,10 +337,12 @@ void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[m
 		{
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
 
+#if defined(BT_CLIENT)
 			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kBattleshipDestroyTime;
 			// A dying Battleship holds still, so each explosion flies away from the damage direction.
 			XMVECTOR vecDirection = XMVector3Normalize(XMVectorSetZ(XMVectorNegate(rCurrentPostRender.pVecDamageDirections[i]), 0.0f));
 			SpawnBattleshipExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
+#endif
 		}
 	}
 }
@@ -541,9 +542,13 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				{
 					bool bInLineOfSight = false;
 					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
-					vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
-					// A fleeing Battleship turns away from the enemy itself. The pick tests sight on kiFiringClearanceTier; flying
-					// at the target also needs sight on the Battleship's own tier.
+					vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
+					if ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter))
+					{
+						vecDestination = FleeRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]));
+					}
+					// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
+					// tier.
 					bRouteToTarget = bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter) && !(flags & ShipFlags::kFlee) && (!bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget));
 				}
 				if (bRouteToTarget)
@@ -557,8 +562,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				fDeltaRotation = 0.0f;
 				if (bHasDestination)
 				{
-					bool bFleeing = (flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter);
-					AimAiDirection(bFleeing ? XMVectorSubtract(vecPosition, vecDestination) : XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
+					AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
 					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
 				}
 				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);

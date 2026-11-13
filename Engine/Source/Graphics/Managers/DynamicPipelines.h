@@ -48,6 +48,7 @@ public:
 	void CreateModelPipelines(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
 	void UpdateModelPipelineDescriptors(common::crc_t crc, int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
 	void WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount);
+	void RequestModelPipelineTextures(common::crc_t crc);
 	void CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers);
 	void CreatePipelineBillboards(common::crc_t crc, std::string_view name);
 	void CreatePipelineHexShields(common::crc_t crc, std::string_view name);

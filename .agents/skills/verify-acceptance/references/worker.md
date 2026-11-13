@@ -1,7 +1,7 @@
 # Verify Acceptance Worker
 
-Steps and rules for the dispatched reviewer. The public [`SKILL.md`](../SKILL.md)
-owns the triggers, inputs, and handoff form.
+Steps and rules for the dispatched reviewer. The public
+[`SKILL.md`](../SKILL.md) owns the triggers, inputs, and handoff form.
 
 ## Steps
 
@@ -38,9 +38,9 @@ settles only on a check the unedited tree could not pass, and a bug-fix
 criterion only once its pre-change red run is on record, each as the execution
 card `Acceptance checks:` field in
 [`execution-card.md`](../../../references/execution-card.md) `## Template`
-defines it; a `query_profile` timing criterion settles only on
-cohorts compared as the
-`query_profile` caveat in [`command-reference.md`](../../agent-harness/references/command-reference.md)
+defines it; a `query_profile` timing criterion settles only on cohorts compared
+as the `query_profile` caveat in
+[`command-reference.md`](../../agent-harness/references/command-reference.md)
 `## Durable caveats` requires.
 
 ## Rules

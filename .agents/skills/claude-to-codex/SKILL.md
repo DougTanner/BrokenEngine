@@ -113,9 +113,9 @@ enforces those available presets.
 
 - A genuine failure is a `failed` status, a `malformed` status, a non-zero
   launcher exit, or a step 1 block or error on a routed launch. Report it to the
-  user, or to the skill that routed the launch, with the receipt's `reason` — for
-  the model check, its `checks` rows with `reason` set or its `message` — and
-  without a further diagnostic call.
+  user, or to the skill that routed the launch, with the receipt's `reason` —
+  for the model check, its `checks` rows with `reason` set or its `message` —
+  and without a further diagnostic call.
 - One bounded exception covers what the verdict-line check cannot see: when a
   `completed` read-only result passed it but this session judges it malformed
   anyway — leaked drafting notes, or an answer to a different task — re-dispatch
@@ -144,5 +144,5 @@ enforces those available presets.
 - [scripts/Invoke-Codex.ps1](scripts/Invoke-Codex.ps1) — the launcher; its
   `.NOTES` owns the receipt fields, exit codes, verdict-line check, and
   automatic read-only retry.
-- [scripts/Invoke-CodexModelsCheck.ps1](scripts/Invoke-CodexModelsCheck.ps1) — the model
-  check; its header owns the block conditions and exit codes.
+- [scripts/Invoke-CodexModelsCheck.ps1](scripts/Invoke-CodexModelsCheck.ps1) —
+  the model check; its header owns the block conditions and exit codes.

@@ -126,7 +126,7 @@ void TextureDescriptors::WriteGlobalDescriptorSets()
 
 void TextureDescriptors::AppendPublication(common::crc_t bindingKey, int64_t iSlot)
 {
-	// Heap: the list persists until every framebuffer applies the entry; appended inside RenderGlobal.
+	// Heap: the list persists until every framebuffer applies the entry; appended inside Graphics::UpdateFrameResidency.
 	ScopedSuppressAllocationTracking suppress;
 	mPendingPublications.push_back({.bindingKey = bindingKey, .iSlot = iSlot});
 }
@@ -296,8 +296,22 @@ void TextureDescriptors::SynchronizeFullArrayBindingGenerations(const TextureBin
 	{
 		for (TextureBinding& rOtherBinding : rBindings)
 		{
-			if (&rOtherBinding == &rBinding || rOtherBinding.pPipeline != rBinding.pPipeline || rOtherBinding.iBinding != rBinding.iBinding
-			 || rOtherBinding.iArrayIndex >= 0 || rOtherBinding.textures != rBinding.textures)
+			if (&rOtherBinding == &rBinding)
+			{
+				continue;
+			}
+
+			if (rOtherBinding.pPipeline != rBinding.pPipeline || rOtherBinding.iBinding != rBinding.iBinding)
+			{
+				continue;
+			}
+
+			if (rOtherBinding.iArrayIndex >= 0)
+			{
+				continue;
+			}
+
+			if (rOtherBinding.textures != rBinding.textures)
 			{
 				continue;
 			}
@@ -443,7 +457,7 @@ void TextureDescriptors::MintIslandSlot(int64_t iSlot, common::crc_t islandCrc, 
 	AssignChannel(2, rTargets.mAmbientOcclusionTextures);
 	AssignChannel(3, rTargets.mMasksTextures);
 
-	// Heap: first-mint adds slot metadata and five binding-key vectors while RenderGlobal may be allocation tracked.
+	// Heap: first-mint adds slot metadata and five binding-key vectors in the main loop.
 	ScopedSuppressAllocationTracking suppress;
 	IslandSlot islandSlot;
 	islandSlot.islandCrc = islandCrc;
@@ -609,7 +623,7 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
 void TextureDescriptors::UnregisterBindingsForKey(common::crc_t bindingKey)
 {
 	// Heap: unordered_map::erase deallocates the bucket's vector<TextureBinding>; called from
-	// IslandTerrainResidency::EvictionSweep inside RenderGlobal.
+	// IslandTerrainResidency::EvictionSweep inside Graphics::UpdateFrameResidency.
 	ScopedSuppressAllocationTracking suppress;
 	mTextureBindings.erase(bindingKey);
 }

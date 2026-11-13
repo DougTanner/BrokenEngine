@@ -31,7 +31,6 @@ layout (set = 1, binding = kiWaterBindingFoamBreakup) uniform sampler2D pFoamBre
 // Input
 layout (location = 0) in vec2 f2InInitialPosition;
 layout (location = 1) in vec3 f3InPosition;
-layout (location = 2) in vec2 f2InVisibleAreaTexcoord;
 layout (location = 3) in vec3 f3InNormal;
 
 // Output
@@ -77,7 +76,7 @@ void main()
 
 	// Color (noise with precision-safe UV — same contract as SAMPLE_NORMAL_PRECISE above).
 	// CPU stores fmod(freq*camera, 10.0) so mult * 10 must be integer for fract() to absorb the wrap.
-	// gWaterColorNoiseMultiplierOne/Two sliders (WaterWrappersBase.cpp) snap to a 0.1 grid so the
+	// gWaterColorNoiseMultiplierOne/Two sliders (WaterWrappersBase.h) snap to a 0.1 grid so the
 	// product stays integer for any tuning (0.0, 0.1, 0.2, ...). Derivatives taken from the un-scaled
 	// local position and scaled the same way as the UV keep mip selection stable across the wrap
 	// (plain texture() pops at the seam).
@@ -179,7 +178,7 @@ void main()
 	// luminance-weighted blend of the two shadow values rather than a per-channel split: the
 	// f3SkyboxColor mix above breaks pure linearity in (Sun + Moon), so a per-channel divide
 	// would zero entire channels when Sun.c + Moon.c happens to be ~0 (e.g. morning sun has B=0).
-	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, f2InVisibleAreaTexcoord).x;
+	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ObjectShadowsArea)).x;
 	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ShadowArea));
 	// Rec.601 sun/moon weights and their guarded reciprocal-sum are folded CPU-side (GlobalUniforms.cpp).
 	float fEffectiveShadow = (fShadowSun * globalLayout.fWaterSunWeight + fShadowMoon * globalLayout.fWaterMoonWeight) * globalLayout.fWaterShadowWeightSumInverse;
@@ -253,7 +252,7 @@ void main()
 	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
 	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Only plane 0
 	// receives the combined object shadow at the base-height projected position.
-	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4VisibleArea)).x;
+	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4ObjectShadowsArea)).x;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane);

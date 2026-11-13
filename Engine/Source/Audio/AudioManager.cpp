@@ -342,7 +342,12 @@ void AudioManager::AttemptSilentEngineRecovery()
 		// Still silent; the throttled retry re-enters next interval.
 	}
 
-	if (!bDefaultReset || !mpAudioEngine->IsAudioDevicePresent())
+	if (!bDefaultReset)
+	{
+		return;
+	}
+
+	if (!mpAudioEngine->IsAudioDevicePresent())
 	{
 		return;
 	}

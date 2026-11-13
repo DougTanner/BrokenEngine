@@ -57,7 +57,12 @@ void SetCaptureResult(int64_t iCaptureToken, nlohmann::json result)
 std::optional<nlohmann::json> TakeCaptureResult(int64_t iCaptureToken)
 {
 	std::unique_lock lock(sCaptureResultMutex);
-	if (iCaptureToken != siCaptureTokenActive || !sOptionalCaptureResult.has_value())
+	if (iCaptureToken != siCaptureTokenActive)
+	{
+		return std::nullopt;
+	}
+
+	if (!sOptionalCaptureResult.has_value())
 	{
 		return std::nullopt;
 	}

@@ -1,8 +1,12 @@
 # Render - Per-Frame GPU Data
 
-Client-only population of mapped Global and Main layouts before their record-once command buffers submit. Each render subsystem owns its layout region; tunable-dependent staging remains separate from per-frame phase state.
+Client-only population of mapped Global and Main layouts before their
+record-once command buffers submit. Each render subsystem owns its layout
+region; tunable-dependent staging remains separate from per-frame phase state.
 
-Render free-runs between simulation ticks and sits outside the CRC (the per-tick checksum that keeps client and server bit-identical), so nothing computed here may feed simulation state.
+Render free-runs between simulation ticks and sits outside the CRC (the per-tick
+checksum that keeps client and server bit-identical), so nothing computed here
+may feed simulation state.
 
 ## Ordering and Publication
 
@@ -10,11 +14,22 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   and all Main lighting data even when the camera interpolate is absent; water
   drawing still requires it. Main lighting publication runs every rendered
   frame independently of lighting and smoke refresh cadence.
-- Global population precedes Main. Global is submitted, possibly on a worker thread, before `RenderFrameMain` runs, so nothing in Main's call tree writes GlobalLayout: a value Main produces for a shader, such as the water band counts and active quad dimensions, is published in MainLayout. Within Global, Smoke precedes Wind because wind consumes smoke's current and previous world areas.
-- Gameplay main rendering runs collection `BeginRender`, per-coord `Render`, collection `EndRender`, lighting-spread gate publication, then debug publication, with the camera coord first. The no-renderable-coord path, including an empty active set, still runs begin/end publication so every indirect count and per-render profile counter reaches zero instead of ghost-drawing or reporting prior-frame instances.
-- Lighting deposit clears its attachments through the render pass load operation every frame, so no separate clear pass is recorded.
+- Global population precedes Main. Global is submitted, possibly on a worker
+  thread, before `RenderFrameMain` runs, so nothing in Main's call tree writes
+  GlobalLayout: a value Main produces for a shader, such as the water band
+  counts and active quad dimensions, is published in MainLayout. Within Global,
+  Smoke precedes Wind because wind consumes smoke's current and previous world
+  areas.
+- Gameplay main rendering runs collection `BeginRender`, per-coord `Render`,
+  collection `EndRender`, lighting-spread gate publication, then debug
+  publication, with the camera coord first. The no-renderable-coord path,
+  including an empty active set, still runs begin/end publication so every
+  indirect count and per-render profile counter reaches zero instead of
+  ghost-drawing or reporting prior-frame instances.
+- Lighting deposit clears its attachments through the render pass load operation
+  every frame, so no separate clear pass is recorded.
 - World lighting has one layer per flight plane. Each layer keeps its own
-  combine outputs, history, area latch, held area, and reset flag; one shared
+  combine outputs, history, area latch, and reset flag; one shared
   deposit, spread, combine, temporal, and history-copy chain refreshes at most
   one layer per frame, named by `giLightingRefreshLayer` (`Render.h`). That
   layer's refresh atomically advances its current and history area mappings,
@@ -29,27 +44,63 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - The terrain shadow elevation, source, blur, temporal, and history-copy chain
   shares one update interval, using the same current/previous area latch as
   lighting (`TemporalAreaLatch`, `Render.h`). A refresh runs on the cadence, on
-  reset or first use, or once the live visible area leaves the held shadow area
-  (crop safety, no margin); it advances both areas and publishes full-texture
-  indirect work from `RenderFrameGlobal`. A skipped frame republishes the held
-  area pair and blend and writes zero indirect work; the elevation render-pass
-  clear and every layout transition still run.
-- The lighting, terrain shadow, and smoke schedules read
-  `Graphics::miFrameCounter`, which `Graphics::RenderGlobal` advances once
-  before `RenderFrameGlobal`. Lighting and smoke share one rule: with cadence
-  N and C layers or planes, a frame is scheduled when `miFrameCounter % N == 0`
-  and schedules index `(miFrameCounter / N) % C` — lighting that layer, smoke
-  that plane with `gSmokeLayerStagger` on and every plane with it off. Terrain
-  shadows refresh when `(miFrameCounter + 1) % shadowCadence == 0`. Forced
-  refreshes — resets, first use, and crop safety — stay outside the schedule; a
-  lighting reset or first use needs both layers, and crop safety only the layer
-  whose held crop the visible area left.
-- Disabling player-facing Lighting zeroes area-, point-, and shield-light deposit draws without hiding their visible sprites or shield geometry. The disable edge forces one reset refresh of each layer: spread draws stay off, their unconditional attachment clears feed a black combine/temporal/history publication, and later cadence or crop refreshes remain suppressed until Lighting is enabled again.
-- Downstream thresholds that the amplitude must cross before the effect applies may clear an upstream count only when they also skip the corresponding array write. Keep count and data publication paired.
-- Write-combined mapped layouts are write-only. Compute dependent values in CPU staging state and copy each populated region once.
-- State that crosses files, or that something outside this directory resets, lives as `inline` globals in `Render.h`. Single-file edge detectors and latches (the statics that remember the previous frame's value) stay function-local or file-static — do not promote them, because a promoted latch looks externally resettable and invites a second writer.
-- Every latch assumes its entry point runs exactly once per frame. Hosts invoke `RenderWaterMain` in `WaterUniforms.cpp` once per frame from their water-rendering path to publish Main water data. Main wave phases use the supplied elapsed time; water's reduced-time accumulation remains on the Global publication path.
-- The whole day cycle resolves on the CPU in `GlobalUniforms.cpp`: sun and moon angle and direction, the piecewise color and ambient ramps, the separate night-gate and moon envelopes, and every product of those that more than one shader reads. Shaders only read the finished uniform values, so a new day-cycle term belongs here rather than recomputed per pixel.
+  reset or first use, or on a teleport; it advances both areas and publishes
+  full-texture indirect work from `RenderFrameGlobal`. A skipped frame
+  republishes the held area pair and blend and writes zero indirect work; the
+  elevation render-pass clear and every layout transition still run.
+- The object shadow raster and its two blur passes share one update interval,
+  `gObjectShadowCadence`, and one held area, with no temporal pass. A
+  refresh runs on the cadence, on first use, object-shadow texture recreation,
+  or the world's return from hiding (`gbObjectShadowsReset`, `Render.h`), or on
+  a teleport; it sets the held area to the live visible area scaled about its
+  center by `gExtraArea`. Global publishes the held area as
+  `f4ObjectShadowsArea` and the decision as `gbObjectShadowsRefreshFrame`
+  (`Render.h`), which Main's model shadow draw counts read. A skipped frame
+  writes zero shadow draw and blur dispatch work; the raster pass still clears
+  the unblurred texture, and the blurred texture consumers read keeps its last
+  refresh.
+- The lighting, terrain shadow, object shadow, and smoke schedules read
+  `Graphics::miFrameCounter`, which the residency step
+  (`Graphics::UpdateFrameResidency`) advances once per frame, before
+  `RenderFrameGlobal` on a world frame. Lighting and smoke share one rule: with
+  cadence N and C layers or planes, a frame is scheduled when
+  `miFrameCounter % N == 0` and schedules index `(miFrameCounter / N) % C` —
+  lighting that layer, smoke that plane with `gSmokeLayerStagger` on and every
+  plane with it off. Terrain shadows refresh when
+  `(miFrameCounter + 1) % shadowCadence == 0` and object shadows when
+  `(miFrameCounter + 2) % objectShadowCadence == 0`. Forced refreshes — resets,
+  first use, and a teleport — stay outside the schedule. A teleport is the live
+  visible area's center lying outside the area a chain's retained texture was
+  last written for (each lighting layer's and smoke plane's own), tested after
+  the `RetainedAreaBasis` shift; a view edge that only pans past that area
+  samples outside it until the next refresh. A lighting reset or first use
+  needs both layers, and a teleport each layer whose area the center left.
+- Disabling player-facing Lighting zeroes area-, point-, and shield-light
+  deposit draws without hiding their visible sprites or shield geometry. The
+  disable edge forces one reset refresh of each layer: spread draws stay off,
+  their unconditional attachment clears feed a black combine/temporal/history
+  publication, and later cadence or teleport refreshes remain suppressed until
+  Lighting is enabled again.
+- Downstream thresholds that the amplitude must cross before the effect applies
+  may clear an upstream count only when they also skip the corresponding array
+  write. Keep count and data publication paired.
+- Write-combined mapped layouts are write-only. Compute dependent values in CPU
+  staging state and copy each populated region once.
+- State that crosses files, or that something outside this directory resets,
+  lives as `inline` globals in `Render.h`. Single-file edge detectors and
+  latches (the statics that remember the previous frame's value) stay
+  function-local or file-static — do not promote them, because a promoted latch
+  looks externally resettable and invites a second writer.
+- Every latch assumes its entry point runs exactly once per frame. Hosts invoke
+  `RenderWaterMain` in `WaterUniforms.cpp` once per frame from their
+  water-rendering path to publish Main water data. Main wave phases use the
+  supplied elapsed time; water's reduced-time accumulation remains on the Global
+  publication path.
+- The whole day cycle resolves on the CPU in `GlobalUniforms.cpp`: sun and moon
+  angle and direction, the piecewise color and ambient ramps, the separate
+  night-gate and moon envelopes, and every product of those that more than one
+  shader reads. Shaders only read the finished uniform values, so a new
+  day-cycle term belongs here rather than recomputed per pixel.
 
 - Water skybox components blend continuously from their daytime inputs to their
   night inputs using the moon envelope. Component 1's daytime endpoint includes
@@ -57,7 +108,12 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 
 ## Precision and History
 
-- Water phase and camera-relative UV origins are computed in `double`, reduced with `std::fmod`, then cast to float. Integrate reduced phase from per-frame size, speed, and delta time so tunable changes do not jump. The reduction consumes the absolute camera position, rebuilt as a `double` from the camera cell and the camera's local position, so the pattern stays continuous when the camera changes cell.
+- Water phase and camera-relative UV origins are computed in `double`, reduced
+  with `std::fmod`, then cast to float. Integrate reduced phase from per-frame
+  size, speed, and delta time so tunable changes do not jump. The reduction
+  consumes the absolute camera position, rebuilt as a `double` from the camera
+  cell and the camera's local position, so the pattern stays continuous when the
+  camera changes cell.
 - Rotate normal-map camera origins into the shader's pattern space before
   reduction, and preserve integral shader-side wrap multipliers. The stationary
   foam material layers and spawn noise each reduce camera position divided by
@@ -67,8 +123,13 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   Scale is applied on the CPU, so each scaled size, frequency, or tile size must
   be the identical float in its origin reduction and its published uniform, or
   the pattern drifts as the camera moves.
-- Retained world rectangles — shadow, lighting, and water foam history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
-- Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
+- Retained world rectangles — shadow, lighting, and water foam history areas
+  and the held object shadow area — are expressed in the camera cell's frame
+  and carry it through `RetainedAreaBasis` (`Render.h`).
+- Lighting snaps its footprint to the light-deposit grid; shadow snaps to its
+  own world-sized texel grid. Both publish current and previous areas for
+  temporal sampling, and recreation reseeds history from the current area for
+  one frame.
 - Water owns foam footprint, time, controls, and reset publication. Graphics
   Water Foam activates the system only above Low water quality. Inactive foam
   skips CPU history and foam UV preparation; reactivation resets history with
@@ -80,30 +141,42 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
   without resetting retained coverage. Threshold resolution preserves a positive
   J range.
-- Each frame that publishes also copies what it published — camera basis, water origins, each owner's area pair, and each water patch lattice's `LatticeReport` — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
-- Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
+- Each frame that publishes also copies what it published — camera basis, water
+  origins, each owner's area pair, the held object shadow area, and each water
+  patch lattice's `LatticeReport` — into the `gPresentationContinuity` snapshot
+  in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A
+  new retained or reduced value that a continuity guarantee covers joins it; a
+  frame that skips rendering leaves it untouched.
+- Smoke and wind spread remap through current and previous world areas. Their
+  enable, disable, recreate, and occupancy paths must clear or drain stale tiles
+  without relying on command-buffer re-recording.
 - GameBase publishes gameplay pause before Global. Paused smoke skips cadence
-  and crop refreshes while retaining its pending steps; held areas still follow
-  camera-cell basis shifts. Clear, disable, and recreation paths retain
+  and teleport refreshes while retaining its pending steps; held areas still
+  follow camera-cell basis shifts. Clear, disable, and recreation paths retain
   precedence. Wind publishes zero delta and holds its accumulated time, but
   keeps ping-pong and occupancy rebuilding active. All smoke and wind producers
   publish zero deposit counts. Resume excludes paused frames and time.
-- Each flight plane's smoke keeps its own held area, step count, and decay.
-  With `gSmokeLayerStagger` on, a scheduled frame (`## Ordering and
-  Publication`) refreshes only its scheduled plane, which steps by its unpaused frames
-  since its last refresh; off, every live plane refreshes on each scheduled
-  frame. A smoke clear and the disabled path refresh every plane, and crop
-  safety refreshes plane k early once the live visible area leaves plane k's
-  held area (no margin). A skipped plane publishes its held area as both current and previous
-  and zeroes its dilate dispatch, so its next refresh remaps held to current.
-  Wind and wind deposits read plane 0's area pair, so wind's remap is the
-  identity on frames plane 0 skips.
+- Each flight plane's smoke keeps its own held area, step count, and decay. With
+  `gSmokeLayerStagger` on, a scheduled frame (`## Ordering and Publication`)
+  refreshes only its scheduled plane, which steps by its unpaused frames since
+  its last refresh; off, every live plane refreshes on each scheduled frame. A
+  smoke clear and the disabled path refresh every plane, and a teleport
+  (`## Ordering and Publication`) refreshes plane k early. A skipped plane
+  publishes its held area as both current and previous and zeroes its dilate
+  dispatch, so its next refresh remaps held to current. Wind and wind deposits
+  read plane 0's area pair, so wind's remap is the identity on frames plane 0
+  skips.
 
 ## Area Roles
 
-The visible area anchors water and geometry coverage. Shadow uses a sunward-expanded, texel-snapped footprint; lighting uses the light-deposit grid shared by spread, combine, and temporal passes. Grid snapping and camera-height policy belong to Graphics.
+The visible area anchors water and geometry coverage. Shadow uses a
+sunward-expanded, texel-snapped footprint; lighting uses the light-deposit grid
+shared by spread, combine, and temporal passes. Grid snapping and camera-height
+policy belong to Graphics.
 
 ## See Also
 
-- Water shaders (`../../../Data/Shaders/Water/AGENTS.md`) - Shader-side phase and sampling constraints
-- Smoke shaders (`../../../Data/Shaders/Smoke/AGENTS.md`) and Wind shaders (`../../../Data/Shaders/Wind/AGENTS.md`) - Temporal remapping
+- Water shaders (`../../../Data/Shaders/Water/AGENTS.md`) - Shader-side phase
+  and sampling constraints
+- Smoke shaders (`../../../Data/Shaders/Smoke/AGENTS.md`) and Wind shaders
+  (`../../../Data/Shaders/Wind/AGENTS.md`) - Temporal remapping

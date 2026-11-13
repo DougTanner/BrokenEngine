@@ -1,10 +1,18 @@
 # Architecture: Game Reconciliation
 
-> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/` and the reconciliation replay chain in `Engine/Source/Network/Client/`; update when depicted reconciliation flow, client-loop integration, desync handling, or owned-entity event parsing changes.
+> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/`
+> and the reconciliation replay chain in `Engine/Source/Network/Client/`; update
+> when depicted reconciliation flow, client-loop integration, desync handling,
+> or owned-entity event parsing changes.
 
 ## Reconciliation State Machine
 
-Each coord is reconciled independently through CRC fast-path, per-coord rollback, replay, catch-up, and snapshot ring buffer storage. The pipeline runs synchronously on the main thread from `ClientUpdate()` in a single pass (drops validated old frames, replays mismatches, and forward-sims empty-input ticks up to the post-advance `miTickCounter`). Per-coord work is parallelized via `common::gpMultithreading->Dispatch()`.
+Each coord is reconciled independently through CRC fast-path, per-coord
+rollback, replay, catch-up, and snapshot ring buffer storage. The pipeline runs
+synchronously on the main thread from `ClientUpdate()` in a single pass (drops
+validated old frames, replays mismatches, and forward-sims empty-input ticks up
+to the post-advance `miTickCounter`). Per-coord work is parallelized via
+`common::gpMultithreading->Dispatch()`.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -63,7 +71,11 @@ flowchart TD
 
 ## Pending Full State Injection
 
-Full states arrive during initial subscription and active-slot resync flows. A state ahead of the current target remains pending. Once due, it is injected at a reachable matching tick or adopted directly as the authoritative ring base when a gap prevents replay from reaching that tick. A state below the confirmed tick is stale and discarded:
+Full states arrive during initial subscription and active-slot resync flows. A
+state ahead of the current target remains pending. Once due, it is injected at a
+reachable matching tick or adopted directly as the authoritative ring base when
+a gap prevents replay from reaching that tick. A state below the confirmed tick
+is stale and discarded:
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -85,11 +97,17 @@ flowchart LR
 
 ## Extrapolation Mode
 
-No longer a distinct mode. Forward simulation from the confirmed server state is performed inline by the reconcile dispatch's catch-up pass (`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance `miTickCounter`). The snapshot ring (`Cell::snapshots[]`) is now the unified state buffer — there is no separate extrapolation stack or transition step.
+No longer a distinct mode. Forward simulation from the confirmed server state is
+performed inline by the reconcile dispatch's catch-up pass
+(`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance
+`miTickCounter`). The snapshot ring (`Cell::snapshots[]`) is now the unified
+state buffer — there is no separate extrapolation stack or transition step.
 
 ## Main Loop Integration
 
-Where reconciliation sits relative to render in the client main loop. There is no separate physics tick loop on the client — reconciliation's catch-up pass is the forward sim.
+Where reconciliation sits relative to render in the client main loop. There is
+no separate physics tick loop on the client — reconciliation's catch-up pass is
+the forward sim.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -128,7 +146,11 @@ flowchart TD
 
 ## Desync Recovery and Optional Debug Frames
 
-CRC mismatch always reports the differing CRCs. The manual `kbDesynchronizationDebugFrames` switch is disabled by default; disabled builds immediately enter the normal recovery/disconnect policy without requesting or waiting for a full frame, while matching enabled client/server builds retain the per-field diagnostic comparison.
+CRC mismatch always reports the differing CRCs. The manual
+`kbDesynchronizationDebugFrames` switch is disabled by default; disabled builds
+immediately enter the normal recovery/disconnect policy without requesting or
+waiting for a full frame, while matching enabled client/server builds retain the
+per-field diagnostic comparison.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -163,7 +185,13 @@ sequenceDiagram
 
 ## Owned-Entity Events
 
-The server reports each owned-entity change as one engine `kServerOwnedEntityState` packet carrying an `OwnedEntityState`. `Client::Receive` decodes it into a `ReceivedOwnedEntityEvent`, and `ClientSessionBase::ApplyOwnedEntityEvents` hands each event to the game's `ClientSession::ApplyOwnedEntityEvent`. `kSpawned` and `kChangedCell` first add the entity to the client's owned list when it is absent, then update its coordinate; `kDied` removes it.
+The server reports each owned-entity change as one engine
+`kServerOwnedEntityState` packet carrying an `OwnedEntityState`.
+`Client::Receive` decodes it into a `ReceivedOwnedEntityEvent`, and
+`ClientSessionBase::ApplyOwnedEntityEvents` hands each event to the game's
+`ClientSession::ApplyOwnedEntityEvent`. `kSpawned` and `kChangedCell` first add
+the entity to the client's owned list when it is absent, then update its
+coordinate; `kDied` removes it.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

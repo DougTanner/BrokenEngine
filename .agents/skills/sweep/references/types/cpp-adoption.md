@@ -13,4 +13,5 @@ target form, and any rulings. Hand-read every line of every unit file for them.
 
 ## Deferred fixes
 
-Record: `Documents/Investigations/ChangeWorkflow/<Plan file stem>DeferredFixes.md`
+Record:
+`Documents/Investigations/ChangeWorkflow/<Plan file stem>DeferredFixes.md`

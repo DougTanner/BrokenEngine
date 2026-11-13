@@ -32,8 +32,8 @@ struct AcceleratedMovementConstants
 	float fCatchUpMaximumSpeed = 0.0f;
 };
 
-// Tuning for ApplyHeadingMovement, instantiated in Fighters.h and Battleships.h, and for the ramped turn
-// (RampHeadingTurnRate, SteerHeading, CaptureHeading), instantiated in Battleships.h.
+// Tuning for ApplyHeadingMovement and the ramped turn (RampHeadingTurnRate, SteerHeading, CaptureHeading), instantiated in
+// Fighters.h and Battleships.h.
 struct HeadingMovementConstants
 {
 	float fChaseAcceleration = 0.0f;
@@ -125,13 +125,18 @@ public:
 // the rectangles rNavRectangleBoard selects; rbFinal: it is the destination snapped clear of terrain.
 [[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, bool& rbFinal);
 
+// The next route waypoint, as NextRouteWaypoint gives it, toward the neighbouring cell center most nearly away from
+// vecThreat as seen from vecPosition. Recomputed from the current positions on every call; nothing is stored.
+[[nodiscard]] XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane);
+
 // Fleet navigation: roaming, cross-cell movement, island destinations, following the row's own flagship, and a fleet
 // Omni's patrol around its flagship while that flagship is in the cell.
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
 
-// Random-spawn steering destination: return to the nearest island, else the nearest enemy. Updates the kFlee and
-// kReturnToIslandCenter hysteresis; rbHasDestination is false in an island-free cell with no enemy.
-[[nodiscard]] XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, ShipFlags_t& rFlags, bool& rbHasDestination);
+// Random-spawn steering destination: the next route waypoint toward the nearest island center when returning or with
+// no enemy, else the nearest enemy. Updates the kFlee and kReturnToIslandCenter hysteresis, which measures the raw
+// enemy distance and island center; rbHasDestination is false in an island-free cell with no enemy.
+[[nodiscard]] XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
 
 // The horizontal AI bearing is inside the inclusive +/-45-degree forward cone.
 [[nodiscard]] bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection);
@@ -139,9 +144,6 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 // Aims rVecAiDirection along vecOffset flattened to x/y. An offset with zero x/y length keeps the previous bearing, so
 // the AI direction stays a unit vector.
 void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection);
-
-// A negative fTurnRate turns away from the destination; without a destination the turn only decays.
-void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation);
 
 // Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
 [[nodiscard]] float RampHeadingTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants);

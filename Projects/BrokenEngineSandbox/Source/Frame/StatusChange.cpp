@@ -121,14 +121,19 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 		{
 			return rData.iTypeIndex >= 0 && rData.iTypeIndex < std::ssize(BlastersInterpolate::sTypes);
 		}
-		else if constexpr (std::is_same_v<Data, engine::ExplosionsPostRender::SpawnInfo>)
-		{
-			return rData.iTypeIndex >= 0 && rData.iTypeIndex < std::ssize(engine::ExplosionsInterpolate::sTypes);
-		}
 		else if constexpr (IsShipSpawnInfo<Data>)
 		{
 			static constexpr ShipType keShipType = std::is_same_v<Data, FightersPostRender::SpawnInfo> ? ShipType::kFighter : std::is_same_v<Data, OmnisPostRender::SpawnInfo> ? ShipType::kOmni : ShipType::kBattleship;
-			return rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders)) && (rData.uiFlightPlane == kuiNoFlightPlane || IsFlightPlaneAllowed(keShipType, rData.uiFlightPlane));
+			bool bFireTimeInRange = true;
+			if constexpr (keShipType == ShipType::kFighter)
+			{
+				bFireTimeInRange = FightersPostRender::IsBeamFireTimeInRange(rData.nextBeamFireTime.count());
+			}
+			else if constexpr (keShipType == ShipType::kBattleship)
+			{
+				bFireTimeInRange = BattleshipsPostRender::IsMissileFireTimeInRange(rData.nextMissileFireTime.count());
+			}
+			return bFireTimeInRange && rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders)) && (rData.uiFlightPlane == kuiNoFlightPlane || IsFlightPlaneAllowed(keShipType, rData.uiFlightPlane));
 		}
 		else if constexpr (std::is_same_v<Data, UpdateShipData>)
 		{
@@ -146,17 +151,12 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 	}, rChange.data);
 }
 
-void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange, engine::GridCoord coordinate)
+void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange)
 {
 	std::visit([&]([[maybe_unused]] const auto& rData)
 	{
 		using Data = std::remove_cvref_t<decltype(rData)>;
-		if constexpr (std::is_same_v<Data, engine::ExplosionsPostRender::SpawnInfo>)
-		{
-			// rFrame was just ticked, so its tick is the one an in-tick explosion spawned this tick would start at.
-			engine::ExplosionsPostRender::Spawn(rFrame, coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), rData);
-		}
-		else if constexpr (HasSpawnTraits<Data>)
+		if constexpr (HasSpawnTraits<Data>)
 		{
 			SpawnTraits<Data>::Collection::Spawn(rFrame, rData);
 		}

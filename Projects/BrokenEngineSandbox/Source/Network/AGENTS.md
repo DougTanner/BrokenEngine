@@ -1,12 +1,26 @@
 # Game Network - Sessions and Game Wire Payloads
 
-Game-layer packet extensions, status-change payload formats and their per-type read/write (`StatusChangeCodec`), and multiplayer orchestration. Engine transport, channels, ACK state, cursors, hostile-input enforcement, and the status-change batch envelope, ordering, and framing are owned by `../../../../Engine/Source/Network/AGENTS.md`.
+Game-layer packet extensions, status-change payload formats and their per-type
+read/write (`StatusChangeCodec`), and multiplayer orchestration. Engine
+transport, channels, ACK state, cursors, hostile-input enforcement, and the
+status-change batch envelope, ordering, and framing are owned by
+`../../../../Engine/Source/Network/AGENTS.md`.
 
 ## Game Packet Contracts
 
-- `GamePacketType` starts at `engine::PacketType::kGamePacketStart`; enumerator order is wire order and new values append. Every client-to-server type needs a game contract row and follows the engine validation and rate-limit checklist.
-- Drained game packets arrive with their type byte removed. A server-to-client fixed payload has no contract row, and the client trusts its size under the corrupt-input policy; client-to-server sizing follows `../../../../Engine/Source/Network/AGENTS.md` `## Transport Contracts`. Variable payloads decode through the engine-owned `NetworkMessages::MessageReader`, whose bounded-read rules are in that same section.
-- Fleet synchronization consumes matching raw packets and replaces the whole destination with each decoded sync; an empty fleet list is still an applied result.
+- `GamePacketType` starts at `engine::PacketType::kGamePacketStart`; enumerator
+  order is wire order and new values append. Every client-to-server type needs a
+  game contract row and follows the engine validation and rate-limit checklist.
+- Drained game packets arrive with their type byte removed. A server-to-client
+  fixed payload has no contract row, and the client trusts its size under the
+  corrupt-input policy; client-to-server sizing follows
+  `../../../../Engine/Source/Network/AGENTS.md` `## Transport Contracts`.
+  Variable payloads decode through the engine-owned
+  `NetworkMessages::MessageReader`, whose bounded-read rules are in that same
+  section.
+- Fleet synchronization consumes matching raw packets and replaces the whole
+  destination with each decoded sync; an empty fleet list is still an applied
+  result.
 
 ## Status-Change Wire Format
 
@@ -18,10 +32,18 @@ Game-layer packet extensions, status-change payload formats and their per-type r
   `StatusChangeData` variant arm whose payload has `Fields()` and default-data
   handling in `DefaultDataForType`; keep the per-item maximum large enough for
   every payload.
-- Any incompatible `StatusChange` payload (any `StatusChangeData` arm's `Fields()`) layout change — enumerator set or order, type tag, field order, field width, variant arm membership, or per-item wire size — requires the game codec author to increment `engine::kiProtocolVersion`; Engine Network owns the shared Hello rejection gate.
-- The protocol gate is distinct from `FrameInput::kiVersion` (replay-input compatibility) and `Frame::kiVersion` (deterministic-Frame/save/replay compatibility); neither Frame version substitutes for the protocol bump.
+- Any incompatible `StatusChange` payload (any `StatusChangeData` arm's
+  `Fields()`) layout change — enumerator set or order, type tag, field order,
+  field width, variant arm membership, or per-item wire size — requires the game
+  codec author to increment `engine::kiProtocolVersion`; Engine Network owns the
+  shared Hello rejection gate.
+- The protocol gate is distinct from `FrameInput::kiVersion` (replay-input
+  compatibility) and `Frame::kiVersion` (deterministic-Frame/save/replay
+  compatibility); neither Frame version substitutes for the protocol bump.
 - Client-only values still occupy identical server-side wire space.
-- A `StatusChange` payload member the codec deliberately never writes or reads occupies no wire bytes, so it takes no protocol bump; the server supplies such a member locally.
+- A `StatusChange` payload member the codec deliberately never writes or reads
+  occupies no wire bytes, so it takes no protocol bump; the server supplies such
+  a member locally.
 - `GameMessages` owns the field order and byte size of game payloads. Each
   message struct carries one `Visit` descriptor that both the writing and the
   reading side route through, plus a `static_assert`ed `kiSize`. Add or change a
@@ -30,7 +52,11 @@ Game-layer packet extensions, status-change payload formats and their per-type r
 
 ## Layering
 
-- Top-level code owns packet identifiers, shared game payload codecs, and side-agnostic parsing.
+- Top-level code owns packet identifiers, shared game payload codecs, and
+  side-agnostic parsing.
 - `Client/AGENTS.md` owns reconciliation and client game-session behavior.
-- `Server/AGENTS.md` owns fleets, client management, and the game policy the engine-owned transfer and broadcast machinery works on.
-- Detailed rollback and packet flow belong in `../../../../Documents/Architecture/GameReconciliation.md` and `../../../../Documents/Architecture/Network.md`.
+- `Server/AGENTS.md` owns fleets, client management, and the game policy the
+  engine-owned transfer and broadcast machinery works on.
+- Detailed rollback and packet flow belong in
+  `../../../../Documents/Architecture/GameReconciliation.md` and
+  `../../../../Documents/Architecture/Network.md`.

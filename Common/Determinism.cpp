@@ -7,9 +7,22 @@ namespace common
 // Same-thread re-entry formally makes std::mutex::try_lock undefined, but MSVC's SRWLOCK-backed implementation returns false for an already-owned lock.
 static std::mutex sMutex;
 
-std::recursive_mutex gDbgHelpMutex;
+// DbgHelp (dbghelp.dll) is documented single-threaded per process, so FilteredStackWalker::ShowCallstack below
+// serializes every stack walk on this mutex: acquired try_to_lock, and recursive so a fault inside DbgHelp during a
+// walk can re-acquire it on the same thread.
+static std::recursive_mutex sDbgHelpMutex;
 
-constinit thread_local int64_t giExpectedThrowDepth = 0;
+BOOL FilteredStackWalker::ShowCallstack()
+{
+	std::unique_lock<std::recursive_mutex> uniqueLock(sDbgHelpMutex, std::try_to_lock);
+	if (!uniqueLock.owns_lock())
+	{
+		Emit("<callstack skipped - DbgHelp busy>");
+		return FALSE;
+	}
+
+	return StackWalker::ShowCallstack();
+}
 
 void ConfigureThreadFloatingPoint()
 {

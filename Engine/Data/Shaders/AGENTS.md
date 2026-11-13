@@ -2,35 +2,72 @@
 
 ## Overview
 
-Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` wrapper extends engine `ShaderLayoutsBase.h`, keeping CPU and shader layouts single-sourced. GLSL indents with tabs and aligns with spaces after them, as `Documents/C++StyleGuide.txt` rules 1 and 51 require of C++.
+Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h`
+wrapper extends engine `ShaderLayoutsBase.h`, keeping CPU and shader layouts
+single-sourced. GLSL indents with tabs and aligns with spaces after them, as
+`Documents/C++StyleGuide.txt` rules 1 and 51 require of C++.
 
 ## Shared Contract
 
-- `BT_ENGINE` selects C++ versus GLSL declarations; it is not a client-affinity guard. Layout headers are consumed by client and server builds.
-- Uniform blocks inherit scalar layout from `ShaderLayoutsBase.h`; storage blocks declare it explicitly where the CPU/GLSL contract requires it. Preserve CPU/GLSL field types, alignment, and order together; plain scalar arrays in scalar-layout blocks retain scalar stride.
+- `BT_ENGINE` selects C++ versus GLSL declarations; it is not a client-affinity
+  guard. Layout headers are consumed by client and server builds.
+- Uniform blocks inherit scalar layout from `ShaderLayoutsBase.h`; storage
+  blocks declare it explicitly where the CPU/GLSL contract requires it. Preserve
+  CPU/GLSL field types, alignment, and order together; plain scalar arrays in
+  scalar-layout blocks retain scalar stride.
 - Main-pass model projection and material view direction use the model camera
   fields in `MainLayout`; world-texture sampling uses the world camera's eye
   line (`ToEyeLine`). Hosts drawing models in the world publish the same camera
   to both field pairs.
-- Uniform-only terms — products, reciprocals, and pre-normalized vectors whose every operand is invocation-invariant — are merged CPU-side into precomputed layout fields by the Render populators (`../../Source/Graphics/Render/AGENTS.md`); shaders read the finished field rather than recomputing it per invocation. Route new such math to the populator, not the shader; shared layout field comments own the reason each term was merged CPU-side and the operands deliberately left raw.
-- Descriptor ownership is semantic: Set 0 is global, Set 1 is per-pipeline, and Set 2 is per-material. Binding constants live in the shared layout header and must match C++ layout/writes.
-- Bindless texture indices require `nonuniformEXT()`. A fixed-size sampler array indexed by a dynamically uniform value, such as a loop counter bounded by a uniform, relies instead on the required `shaderSampledImageArrayDynamicIndexing` device feature. Push constants select projection/render modes where command buffers are recorded once.
-- `ShaderFunctions.h` owns shared transforms, projection, normal mapping, randomized patch blending, smoke blending, wind magnitude factor, and lighting helpers. `ShaderRandom.h` mirrors the engine's 32-bit RNG family.
+- Uniform-only terms — products, reciprocals, and pre-normalized vectors whose
+  every operand is invocation-invariant — are merged CPU-side into precomputed
+  layout fields by the Render populators
+  (`../../Source/Graphics/Render/AGENTS.md`); shaders read the finished field
+  rather than recomputing it per invocation. Route new such math to the
+  populator, not the shader; shared layout field comments own the reason each
+  term was merged CPU-side and the operands deliberately left raw.
+- Descriptor ownership is semantic: Set 0 is global, Set 1 is per-pipeline, and
+  Set 2 is per-material. Binding constants live in the shared layout header and
+  must match C++ layout/writes.
+- Bindless texture indices require `nonuniformEXT()`. A fixed-size sampler array
+  indexed by a dynamically uniform value, such as a loop counter bounded by a
+  uniform, relies instead on the required
+  `shaderSampledImageArrayDynamicIndexing` device feature. Push constants select
+  projection/render modes where command buffers are recorded once.
+- `ShaderFunctions.h` owns shared transforms, projection, normal mapping,
+  randomized patch blending, smoke blending, wind magnitude factor, and lighting
+  helpers. `ShaderRandom.h` mirrors the engine's 32-bit RNG family.
 - Randomized patch blending (`ShaderFunctions.h`): each blended read has its
   own lattice from `PopulatePatchLattice` (`Render.h`), and passes the
   camera-cell position its UV derives from, before any rotation or time scroll.
 
 ## Lighting and Vector Invariants
 
-- EWNS is one 4-float vector holding four directional values in slot order east, west, north, south. The consuming helpers in `ShaderFunctions.h` read them that way: slot 0 is weighted by a surface normal pointing +x (east), slot 1 by -x (west), slot 2 by +y (north), and slot 3 by -y (south).
-- Every depositor packs the direction the light arrives from, so slot 0 fills when the light source lies east of the receiving texel. Offset-based depositors (`Lighting/AreaLight.frag`, `Lighting/PointLight.frag`) pack the light-center-to-fragment offset as `(-x, +x, -y, +y)`; the surface-normal depositor (`Objects/HexShieldLighting.frag`) packs its projected blended normal the same way.
-- Directional lighting uses four EWNS channels. Light-source deposits derive directional weights from world-space source offsets; surface-normal deposits use the projected blended normal. Keep the documented epsilon fallbacks at family leaves.
+- EWNS is one 4-float vector holding four directional values in slot order east,
+  west, north, south. The consuming helpers in `ShaderFunctions.h` read them
+  that way: slot 0 is weighted by a surface normal pointing +x (east), slot 1 by
+  -x (west), slot 2 by +y (north), and slot 3 by -y (south).
+- Every depositor packs the direction the light arrives from, so slot 0 fills
+  when the light source lies east of the receiving texel. Offset-based
+  depositors (`Lighting/AreaLight.frag`, `Lighting/PointLight.frag`) pack the
+  light-center-to-fragment offset as `(-x, +x, -y, +y)`; the surface-normal
+  depositor (`Objects/HexShieldLighting.frag`) packs its projected blended
+  normal the same way.
+- Directional lighting uses four EWNS channels. Light-source deposits derive
+  directional weights from world-space source offsets; surface-normal deposits
+  use the projected blended normal. Keep the documented epsilon fallbacks at
+  family leaves.
 - Model direct sun/moon lighting reads its own normalized direction; world
   lighting uses the world direction and its derived products. Camera rotation
   ownership belongs to Graphics (`../../Source/Graphics/AGENTS.md`
   `## World and Camera Contracts`).
-- Final lighting and shadow helpers are plain texture reads: every pass writes its whole texture, so the border samplers (transparent black for lighting, white for shadow) own rejection outside the footprint. Keep those sampler flags on every consumer pipeline.
-- Skip redundant normalization only where the identity is proven: `reflect(I, N)` preserves length for unit inputs, and `cross(a, b)` is unit only for unit orthogonal inputs.
+- Final lighting and shadow helpers are plain texture reads: every pass writes
+  its whole texture, so the border samplers (transparent black for lighting,
+  white for shadow) own rejection outside the footprint. Keep those sampler
+  flags on every consumer pipeline.
+- Skip redundant normalization only where the identity is proven:
+  `reflect(I, N)` preserves length for unit inputs, and `cross(a, b)` is unit
+  only for unit orthogonal inputs.
 - Never call GLSL `inverse()` on a `mat3` or `mat4`: NVIDIA's shader compiler
   hangs forever while the pipeline is being created, and reports nothing. This
   is a recorded debugging result — reading the shader source cannot show it.
@@ -42,20 +79,27 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
 ## Top-Level Shaders
 
 - HDR resolve tone maps and color grades every texel with non-negative alpha,
-  for every program; material shaders output linear HDR. After policy gamma, it applies standard
-  piecewise sRGB encoding once to scene RGB, with alpha 1. Pixels no draw
-  covers hold the program's HDR clear color, graded with the scene unless its
-  alpha is negative: the resolve writes a negative-alpha texel's RGB with
-  alpha 1 and no exposure, tone mapping, grading or sRGB encoding, so the clear
-  value is the displayed value. Only a clear may write negative alpha; HDR-pass
-  draws must not, and a clear texel covered only by additive blends that leave
-  the destination alpha negative still shows ungraded. Presentation formats
-  belong to [InstanceManager](../../Source/Graphics/Managers/AGENTS.md#instancemanager).
+  for every program; material shaders output linear HDR. After policy gamma, it
+  applies standard piecewise sRGB encoding once to scene RGB, with alpha 1.
+  Pixels no draw covers hold the program's HDR clear color, graded with the
+  scene unless its alpha is negative: the resolve writes a negative-alpha
+  texel's RGB with alpha 1 and no exposure, tone mapping, grading or sRGB
+  encoding, so the clear value is the displayed value. Only a clear may write
+  negative alpha; HDR-pass draws must not, and a clear texel covered only by
+  additive blends that leave the destination alpha negative still shows
+  ungraded. Presentation formats belong to
+  [InstanceManager](../../Source/Graphics/Managers/AGENTS.md#instancemanager).
 - Debug texture display decodes renderer targets, including EWNS views.
-- The UI depth prepass is self-contained and expands opaque ImGui rectangles to populate depth before world rendering.
+- The UI depth prepass is self-contained and expands opaque ImGui rectangles to
+  populate depth before world rendering.
 
 ## Family Documentation
 
-- Debug (`Debug/AGENTS.md`), Lighting (`Lighting/AGENTS.md`), Model (`Model/AGENTS.md`), Objects (`Objects/AGENTS.md`), Particles (`Particles/AGENTS.md`), Quads (`Quads/AGENTS.md`), Shadow (`Shadow/AGENTS.md`), Smoke (`Smoke/AGENTS.md`), Terrain (`Terrain/AGENTS.md`), Water (`Water/AGENTS.md`), Wind (`Wind/AGENTS.md`)
+- Debug (`Debug/AGENTS.md`), Lighting (`Lighting/AGENTS.md`), Model
+  (`Model/AGENTS.md`), Objects (`Objects/AGENTS.md`), Particles
+  (`Particles/AGENTS.md`), Quads (`Quads/AGENTS.md`), Shadow
+  (`Shadow/AGENTS.md`), Smoke (`Smoke/AGENTS.md`), Terrain
+  (`Terrain/AGENTS.md`), Water (`Water/AGENTS.md`), Wind (`Wind/AGENTS.md`)
 
-Family documents own algorithms and local correctness constraints; they do not repeat layouts, bindings, EWNS, or the `inverse()` rule.
+Family documents own algorithms and local correctness constraints; they do not
+repeat layouts, bindings, EWNS, or the `inverse()` rule.

@@ -123,8 +123,8 @@ runner applies. The purpose and the triggers live in
       `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`.
 
     Done when that box holds.
-15. Settle the harness exposure decision, the second decision that auditor cannot
-    reach:
+15. Settle the harness exposure decision, the second decision that auditor
+    cannot reach:
 
     - [ ] Inspect
       `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`
@@ -133,8 +133,9 @@ runner applies. The purpose and the triggers live in
         `query_collection` arm, and allowed-name error text.
       - If not, record the deliberate exclusion. Pure client-only collections
         have no server query.
-    - [ ] For a server-visible collection, add the `FrameCollection` specialization
-      and column list the server build demands, per the `edit_frame` rule in
+    - [ ] For a server-visible collection, add the `FrameCollection`
+      specialization and column list the server build demands, per the
+      `edit_frame` rule in
       [`Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`](../../../../Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md)
       `## Contracts`.
 
@@ -152,14 +153,14 @@ runner applies. The purpose and the triggers live in
     the blocking rule:
     [`../../../references/collection-layout-auditor.md`](../../../references/collection-layout-auditor.md).
     Done when the run reports no violation.
-18. Return an exact `Build required` request naming every affected
-    client/server target and that target's configuration/platform inline; when
-    the field would push the handoff past the shared character cap, only the
-    per-`.cpp` selected project-member path and each changed header's consuming
-    targets move with the overflow, on the shared form's terms, and the request
-    stays executable without rediscovery wherever that detail sits. Main schedules
-    `/compile` after the C++ and project-membership stages are complete. Done
-    when every affected target is present in that request.
+18. Return an exact `Build required` request naming every affected client/server
+    target and that target's configuration/platform inline; when the field would
+    push the handoff past the shared character cap, only the per-`.cpp` selected
+    project-member path and each changed header's consuming targets move with
+    the overflow, on the shared form's terms, and the request stays executable
+    without rediscovery wherever that detail sits. Main schedules `/compile`
+    after the C++ and project-membership stages are complete. Done when every
+    affected target is present in that request.
 19. Return each runtime-observable acceptance criterion as an exact runtime
     request naming the setup, action, observation, and required evidence. Main
     schedules `/agent-harness` at the owning verification stage. Done when all

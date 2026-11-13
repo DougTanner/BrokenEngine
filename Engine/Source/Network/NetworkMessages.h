@@ -254,7 +254,12 @@ public:
 	void OptionalGuid(ClientGuid& rGuid, bool& rbHasGuid)
 	{
 		rbHasGuid = false;
-		if (!mbValid || !mCursor.Has(kiGuidSize))
+		if (!mbValid)
+		{
+			return;
+		}
+
+		if (!mCursor.Has(kiGuidSize))
 		{
 			return;
 		}

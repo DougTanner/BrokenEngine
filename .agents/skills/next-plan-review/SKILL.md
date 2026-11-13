@@ -1,6 +1,6 @@
 ---
 name: next-plan-review
-description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when prioritized process improvements are wanted for plan/objective conformance, solution minimality/overengineering, review/testing coverage, main-session token efficiency, workflow friction, or landing speed, including when a tooling-friction Plan directs this session to run `/next-plan-review <landing ref>`.
+description: Review a landed change from its Git commit and proven parent/child session transcripts. Use when prioritized process improvements are wanted for plan/objective conformance, solution minimality/overengineering, review/testing coverage, main-session token efficiency, workflow friction, or landing speed, including when a tooling-friction Plan directs this session to run `/next-plan-review <review ref>`.
 user-invocable: true
 argument-hint: "[commit-ish]"
 allowed-tools: [Read, Grep, Glob, Agent, PowerShell]
@@ -54,16 +54,17 @@ Require the shared handoff form in
 - `Assessment` — one row per assessed concern,
   `<concern> | <verdict> | <one-sentence basis> | <citation>`.
 - `Observed usage` — present only when the usage-analysis request was made,
-  absent in bounded friction mode, and `none` when provenance is `BLOCKED`. Its first row states that the counters
-  are observed transcript usage, distinct from main-context chars, elapsed
-  time, and billed cost. Then one row per transcript and model,
+  absent in bounded friction mode, and `none` when provenance is `BLOCKED`. Its
+  first row states that the counters are observed transcript usage, distinct
+  from main-context chars, elapsed time, and billed cost. Then one row per
+  transcript and model,
   `<transcript label> | <status> | <model> | <messageCount> | <inputTokens> | <outputTokens> | <cacheReadInputTokens> | <cacheCreationInputTokens>`,
   with `<status>` `complete` or `partial`; one
   `<transcript label> | partial | none` row for a `partial` result with no
   resolved model; and one `<transcript label> | unsupported (<reason>)` row per
   unsupported transcript. The label is the parent's session ID, a Claude child's
-  `<parent session ID>/agent-<agentId>`, or a Codex row's own session ID;
-  child rows come after the parent's rows and are never merged with them.
+  `<parent session ID>/agent-<agentId>`, or a Codex row's own session ID; child
+  rows come after the parent's rows and are never merged with them.
 
 The shared `Decisive checks` rows carry provenance, sessions read, sourced
 timeline, pauses, and conformance, minimality, and process evidence. Each

@@ -2,20 +2,52 @@
 
 ## Overview
 
-`Collection<T>` provides cache-oriented SOA storage for paired Interpolate and PostRender collection structs. Game and engine collections share this contract; leaves document only behavior-specific deviations.
+`Collection<T>` provides cache-oriented SOA storage for paired Interpolate and
+PostRender collection structs. Game and engine collections share this contract;
+leaves document only behavior-specific deviations.
 
-Use `/add-collection` for a new collection and `/add-collection-member` for any SOA layout change.
+Use `/add-collection` for a new collection and `/add-collection-member` for any
+SOA layout change.
 
 ## Core Contract
 
-- `Members()` defines allocated and build-local serialized columns. `SharedMembers()` is the server wire subset and also the CRC subset unless the struct declares a narrower `SharedCrcMembers()`, which the CRC uses instead; `ClientMembers()` holds client-only state. Server builds require member parity because they write the shared format directly.
-- `AllocateAndCopyMembers()` allocates at the previous frame's exact capacity, then copies `PersistentMembers()` when declared or the full `Members()` tuple otherwise. Tuple entries and nested pointer arrays pair by position, so corresponding shapes and element types must match. `PersistentMembers()` must remain a subset of `Members()`; an omitted member's owning phase must initialize it before use.
-- Interpolate and PostRender rows have identical counts. Grow/copy/remove them through paired helpers so indices remain aligned.
-- A positive capacity always has backing storage, even when `Members()` is empty. Allocation failure must not publish a capacity or layout that was not installed.
-- `Update` is mandatory and compile-checked. Other hooks merged into the surrounding phases are opt-in: declare a hook only when it has work, with the exact `ForEach*` signature; hooks that are absent or cannot be called skip silently. `static constexpr bool kbManualRender = true;` opts a collection out of the merge of interpolate and render work, for an explicit manual render path.
-- The interpolate-phase `Update` fan-out runs in two situations it cannot tell apart: fixed-step simulation inside the frame tick, and client render interpolation at a variable time step that is 0.0 while a coord's snapshots are still filling. Every `Update` must therefore be correct at any delta time including zero, and must not assume it is called once per tick — no counters, cooldowns, or spawns driven by call count.
-- Registering a collection type is a startup-only, once-per-type action with side effects: on the client, a non-zero type CRC schedules that texture chunk to load and registers it for lighting pre-blur. Register every type before the worker threads fan out; afterwards the type registry is read from parallel ticks without synchronization.
-- Use `ZeroMemberRow()` when a spawn's defaults are zero across a whole member tuple, then apply collection-specific non-zero defaults. Every Add path must still initialize its complete new row; stale shared state can desynchronize CRCs, and stale client-only state still corrupts local behavior.
+- `Members()` defines allocated and build-local serialized columns.
+  `SharedMembers()` is the server wire subset and also the CRC subset unless the
+  struct declares a narrower `SharedCrcMembers()`, which the CRC uses instead;
+  `ClientMembers()` holds client-only state. Server builds require member parity
+  because they write the shared format directly.
+- `AllocateAndCopyMembers()` allocates at the previous frame's exact capacity,
+  then copies `PersistentMembers()` when declared or the full `Members()` tuple
+  otherwise. Tuple entries and nested pointer arrays pair by position, so
+  corresponding shapes and element types must match. `PersistentMembers()` must
+  remain a subset of `Members()`; an omitted member's owning phase must
+  initialize it before use.
+- Interpolate and PostRender rows have identical counts. Grow/copy/remove them
+  through paired helpers so indices remain aligned.
+- A positive capacity always has backing storage, even when `Members()` is
+  empty. Allocation failure must not publish a capacity or layout that was not
+  installed.
+- `Update` is mandatory and compile-checked. Other hooks merged into the
+  surrounding phases are opt-in: declare a hook only when it has work, with the
+  exact `ForEach*` signature; hooks that are absent or cannot be called skip
+  silently. `static constexpr bool kbManualRender = true;` opts a collection out
+  of the merge of interpolate and render work, for an explicit manual render
+  path.
+- The interpolate-phase `Update` fan-out runs in two situations it cannot tell
+  apart: fixed-step simulation inside the frame tick, and client render
+  interpolation at a variable time step that is 0.0 while a coord's snapshots
+  are still filling. Every `Update` must therefore be correct at any delta time
+  including zero, and must not assume it is called once per tick — no counters,
+  cooldowns, or spawns driven by call count.
+- Registering a collection type is a startup-only, once-per-type action with
+  side effects: on the client, a non-zero type CRC schedules that texture chunk
+  to load and registers it for lighting pre-blur. Register every type before the
+  worker threads fan out; afterwards the type registry is read from parallel
+  ticks without synchronization.
+- Use `ZeroMemberRow()` when a spawn's defaults are zero across a whole member
+  tuple, then apply collection-specific non-zero defaults. Every Add path must
+  still initialize its complete new row; stale shared state can desynchronize
+  CRCs, and stale client-only state still corrupts local behavior.
 - Row lifecycle is mark-then-compact. Every PostRender carries the standard
   `pLifecycleFlags` column (`engine::LifecycleFlags_t`,
   `CollectionLifecycle.h`), carried to the next frame (listed in
@@ -24,24 +56,28 @@ Use `/add-collection` for a new collection and `/add-collection-member` for any 
   either a timed death in progress, which only a collection with a timed death
   acts on, or a row marked for removal. Simulation code marks a row for removal
   only through `engine::MarkDestroy`, which sets `kDestroy` and `kDying`
-  together. `AddElement` zeroes `pLifecycleFlags` on every new row. Transfer
-  and Destroy hooks only set these bits and build transfer requests; the one
-  removal a hook makes is `DestroyExpiredControlled` dropping
-  expired controlled rows, which no handle names. `engine::CompactCollections` (`FrameUtils.h`),
-  called once as the last step of the game's Destroy phase, is the only removal
-  of a `kTransfer` or `kDestroy` row, and the rows a marked row's
-  `OwnedHandles()` name leave in their owner's tick whatever the tuple order.
-  `OwnedHandles()` returns a `std::tie` of the handle columns naming rows the
-  struct owns, each also a `Members()` column and client-only ones only under
-  `BT_CLIENT`; handles that name no collection row, such as frame registry
-  handles, stay out of it. An owner that drops a held row while it stays alive
-  calls `ReleaseIndexableElementAndClearHandle(rFrame, rId)`. Its lookup reaches
-  only the engine `Collections()`, so only engine collections can be owned.
+  together. `AddElement` zeroes `pLifecycleFlags` on every new row. Transfer and
+  Destroy hooks only set these bits and build transfer requests; the one removal
+  a hook makes is `DestroyExpiredControlled` dropping expired controlled rows,
+  which no handle names. `engine::CompactCollections` (`FrameUtils.h`), called
+  once as the last step of the game's Destroy phase, is the only removal of a
+  `kTransfer` or `kDestroy` row, and the rows a marked row's `OwnedHandles()`
+  name leave in their owner's tick whatever the tuple order. `OwnedHandles()`
+  returns a `std::tie` of the handle columns naming rows the struct owns, each
+  also a `Members()` column and client-only ones only under `BT_CLIENT`; handles
+  that name no collection row, such as frame registry handles, stay out of it.
+  An owner that drops a held row while it stays alive calls
+  `ReleaseIndexableElementAndClearHandle(rFrame, rId)`. Its lookup reaches only
+  the engine `Collections()`, so only engine collections can be owned.
 
 ## Identity, Serialization, and CRC
 
-- Optional ID maps are part of collection identity. Add/remove/swap operations must keep map entries and row indices synchronized.
-- Collection code calls `RemoveIndexableElement()` only from the removals the `## Core Contract` row-lifecycle bullet names: the `CompactCollections` fold and a `DestroyExpiredControlled` callback. Generated insertion callables are invoked exactly once so each helper preserves its assigned ID stream.
+- Optional ID maps are part of collection identity. Add/remove/swap operations
+  must keep map entries and row indices synchronized.
+- Collection code calls `RemoveIndexableElement()` only from the removals the
+  `## Core Contract` row-lifecycle bullet names: the `CompactCollections` fold
+  and a `DestroyExpiredControlled` callback. Generated insertion callables are
+  invoked exactly once so each helper preserves its assigned ID stream.
 - ID maps are not serialized. Once both frame halves are read,
   `engine::ValidateCollectionPair` checks each pair's count/capacity parity and
   then rebuilds the map from the paired PostRender `pIds`, rejecting a zero or
@@ -58,20 +94,69 @@ Use `/add-collection` for a new collection and `/add-collection-member` for any 
   corrupt-row rejection occurs before consumers use the rows. This validation
   exists for the server's grid-save read; it also runs on client network
   full-state reads, where it is redundant but harmless.
-- The serialized row capacity participates in collection CRCs, so paired growth must remain deterministic for shared collections. The physical buffer capacity actually installed can exceed it after a deserialize reuses a larger existing buffer for fewer rows; that transient capacity drives buffer reuse and post-read zero-fill and stays out of serialization, CRC, and difference logging.
-- `SharedMembers()` must be a subset of `Members()`. A narrower `SharedCrcMembers()` must also remain a subset of `SharedMembers()`.
-- Never add a `#if defined(BT_CLIENT)` member to a collection that declares only `Members()`. It silently joins the CRC and the server wire format with no compile error, because the parity `static_assert` fires only on collections that declare `SharedMembers()`. Split the leaf into `SharedMembers()` plus `ClientMembers()` first. A leaf with no client-only fields yet can head the trap off by declaring `SharedMembers()` as its full set and forwarding `Members()` to it.
-- Visual-only spawns take their identity from the separate visual counter: `Id<T>::GenerateVisual` / `Uuid::GenerateVisual`, added through `AddVisualIndexableElement`. Using the ordinary counter for a client-only spawn advances it on the client but not the server, so every later server-issued ID differs between the two. Random-number draws must still happen unconditionally on both builds even when only the client consumes the resulting spawn, or the two random streams drift apart.
-- Full build-local reads consume `Members()`; cross-build reads consume only shared columns. Change tuple membership and ordering as one serialization contract.
-- `LogDifferences()` compares two independently produced snapshots, and a row-count mismatch between them is itself a reported difference rather than an excluded case. Bound every row loop with `std::min(iCount, rOther.iCount)` so a loop cannot read past the shorter side's member arrays.
+- The serialized row capacity participates in collection CRCs, so paired growth
+  must remain deterministic for shared collections. The physical buffer capacity
+  actually installed can exceed it after a deserialize reuses a larger existing
+  buffer for fewer rows; that transient capacity drives buffer reuse and
+  post-read zero-fill and stays out of serialization, CRC, and difference
+  logging.
+- `SharedMembers()` must be a subset of `Members()`. A narrower
+  `SharedCrcMembers()` must also remain a subset of `SharedMembers()`.
+- Never add a `#if defined(BT_CLIENT)` member to a collection that declares only
+  `Members()`. It silently joins the CRC and the server wire format with no
+  compile error, because the parity `static_assert` fires only on collections
+  that declare `SharedMembers()`. Split the leaf into `SharedMembers()` plus
+  `ClientMembers()` first. A leaf with no client-only fields yet can head the
+  trap off by declaring `SharedMembers()` as its full set and forwarding
+  `Members()` to it.
+- Visual-only spawns take their identity from the separate visual counter:
+  `Id<T>::GenerateVisual` / `Uuid::GenerateVisual`, added through
+  `AddVisualIndexableElement`. Using the ordinary counter for a client-only
+  spawn advances it on the client but not the server, so every later
+  server-issued ID differs between the two. Where a visual spawn's random
+  draws come from is owned by `../AGENTS.md` `## Simulation and Visual State`.
+- Full build-local reads consume `Members()`; cross-build reads consume only
+  shared columns. Change tuple membership and ordering as one serialization
+  contract.
+- `LogDifferences()` compares two independently produced snapshots, and a
+  row-count mismatch between them is itself a reported difference rather than an
+  excluded case. Bound every row loop with `std::min(iCount, rOther.iCount)` so
+  a loop cannot read past the shorter side's member arrays.
 
 ## Runtime Rules
 
-- Main-loop allocation uses paired collection storage or persistent owned state, not transient heap containers. Rendering may publish counters only where that collection actually owns them; counter publication is not a universal collection contract.
-- Controlled collections declare persistent controller metadata through `PersistentMembers()`. Audit allocation/copy, spawn, transfer, serialization, and difference logging whenever persistent fields change.
-- Client-only graphics resources and render hooks remain under narrow `BT_CLIENT` guards without changing shared layout.
-- Client-only state that must survive from one frame to the next without entering the CRC'd frame belongs in file-scope render state keyed by `Id<T>`, pruned each frame with `EraseStaleRenderState<>()`. That is the sanctioned alternative to adding a client-only column to a shared collection. State that outlives its row is instead keyed by `(GridCoord, Id<T>)` and pruned when its cell leaves the rendered set or the non-map visible area.
-- Renderable collections use three phases. `BeginRender` sizes the GPU buffer once, from `AccumulateRenderCapacity()` summed over every active grid cell; `Render` fills it per cell; `EndRender` publishes counters and writes the indirect draw count. Sizing from a single cell's count overflows the buffer as soon as a second cell activates. `kbManualRender` collections opt out and own their own path.
+- Main-loop allocation uses paired collection storage or persistent owned state,
+  not transient heap containers. Rendering may publish counters only where that
+  collection actually owns them; counter publication is not a universal
+  collection contract.
+- Controlled collections declare persistent controller metadata through
+  `PersistentMembers()`. Audit allocation/copy, spawn, transfer, serialization,
+  and difference logging whenever persistent fields change.
+- Client-only graphics resources and render hooks remain under narrow
+  `BT_CLIENT` guards without changing shared layout.
+- Client-only state that must survive from one frame to the next without
+  entering the CRC'd frame belongs in file-scope render state keyed by `Id<T>`,
+  pruned each frame with `EraseStaleRenderState<>()`. That is the sanctioned
+  alternative to adding a client-only column to a shared collection. Client-only
+  state needed per tick or owning frame rows is a client-only collection
+  (`../AGENTS.md` `## Simulation and Visual State`). State that outlives its
+  row is instead keyed by `(GridCoord, Id<T>)` and pruned when its cell leaves
+  the rendered set or the non-map visible area.
+- Renderable collections use three phases. `BeginRender` sizes the GPU buffer
+  once, from `AccumulateRenderCapacity()` summed over every active grid cell;
+  `Render` fills it per cell; `EndRender` publishes counters and writes the
+  indirect draw count. Sizing from a single cell's count overflows the buffer as
+  soon as a second cell activates. `kbManualRender` collections opt out and own
+  their own path.
+  A collection whose `EndRender` writes a model pipeline also declares a
+  static `RequestTextures(rRenderInterpolates, rActiveCoordinates)` beside
+  `BeginRender` that calls `DynamicPipelines::RequestModelPipelineTextures`
+  for each pipeline a row in an active cell would draw, writing nothing to the
+  GPU, so a type that first appears behind the map starts loading its textures
+  while the world is hidden;
+  `../../../../Documents/Architecture/FrameUpdatePipeline.md` owns the
+  world-hidden step that runs it. A missed hook only defers that request to
+  the first world frame.
 
 ## See Also
 

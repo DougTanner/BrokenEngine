@@ -68,7 +68,9 @@ reorders, formats, retitles, or clarifies behavior that stays exactly as it was.
 
 For each finding:
 
-> `PSR-F-###` Critical|Required|Recommended `plan-path:line` — class — concrete problem — simpler alternative — disposition: simplify | user-judgment — evidence: `<locator>`
+> `PSR-F-###` Critical|Required|Recommended `plan-path:line` — class — concrete
+> problem — simpler alternative — disposition: simplify | user-judgment —
+> evidence: `<locator>`
 
 Each finding's concrete problem, simpler alternative, and disposition appear
 exactly once, as one single-line `Findings` row of the shared handoff in the

@@ -1,5 +1,5 @@
 #pragma once
 
-extern std::atomic<int64_t> giAllocationsThisFrame;
+inline constinit std::atomic<int64_t> giAllocationsThisFrame = 0;
 
-extern std::atomic<bool> gbAllocationTrackingReady;
+inline constinit std::atomic<bool> gbAllocationTrackingReady = false;

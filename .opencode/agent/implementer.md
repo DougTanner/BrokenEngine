@@ -8,4 +8,5 @@ permission:
 
 Follow repository instructions for the assigned implementation role.
 
-Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`.
+Author the returned handoff per the field rules in
+`.agents/references/subagent-handoff.md` `## Handoffs`.

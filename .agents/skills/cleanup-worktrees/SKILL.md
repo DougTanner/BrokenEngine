@@ -38,9 +38,9 @@ worktrees, so run it once from each.
 2. Start in the primary checkout, never a session worktree, resolving that root
    with `git rev-parse --show-toplevel`. Done when the run directory is that
    resolved root.
-3. Run the repository-owned script from that primary checkout root with no switch
-   for cleanup, or `-Preview` for preview. Done when that invocation has returned
-   its report.
+3. Run the repository-owned script from that primary checkout root with no
+   switch for cleanup, or `-Preview` for preview. Done when that invocation has
+   returned its report.
 
    ```powershell
    pwsh -NoProfile -File .agents/skills/cleanup-worktrees/scripts/cleanup-worktrees.ps1

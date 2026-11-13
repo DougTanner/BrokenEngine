@@ -8,6 +8,9 @@ permission:
 
 Follow repository instructions for the assigned review role.
 
-A reviewer that finds an input its assigned skill's `## Inputs` requires for the dispatched case missing from the brief returns `BLOCKED` naming it, and never substitutes one it selected itself.
+A reviewer that finds an input its assigned skill's `## Inputs` requires for the
+dispatched case missing from the brief returns `BLOCKED` naming it, and never
+substitutes one it selected itself.
 
-Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`.
+Author the returned handoff per the field rules in
+`.agents/references/subagent-handoff.md` `## Handoffs`.

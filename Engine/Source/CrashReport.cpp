@@ -147,8 +147,9 @@ void ResolveCrashReportPaths()
 
 	if (spcUserReportPath[0] != L'\0' && AppendReportPath(spcUserReportPath, L"\\") && AppendReportPath(spcUserReportPath, pcGameName))
 	{
-		// Allocator-free single-level create (parent guaranteed present above): FileManager creates the same directory but
-		// is constructed later, so a crash before that still needs it. Ignore the result — ERROR_ALREADY_EXISTS is fine.
+		// Approved rule 35 exception (no heap allocation): this single-level create (parent guaranteed present above) runs
+		// before FileManager, which creates the same directory later, so a crash before then still has it. Ignore the
+		// result — ERROR_ALREADY_EXISTS is fine.
 		CreateDirectoryW(spcUserReportPath, nullptr);
 
 		if (AppendReportPath(spcUserReportPath, L"\\"))
@@ -169,6 +170,7 @@ void RenamePreviousCrashReport()
 		return;
 	}
 
+	// Approved rule 35 exception (no heap allocation).
 	WIN32_FILE_ATTRIBUTE_DATA fileAttributeData {};
 	if (GetFileAttributesExW(ReportPath(), GetFileExInfoStandard, &fileAttributeData) == FALSE)
 	{
@@ -180,6 +182,7 @@ void RenamePreviousCrashReport()
 		return;
 	}
 
+	// Approved rule 35 exception (no heap allocation).
 	if (MoveFileExW(ReportPath(), PendingReportPath(), MOVEFILE_REPLACE_EXISTING) == FALSE)
 	{
 		LOG(kDefault, kWarning, "RenamePreviousCrashReport Failed to rename the previous crash report Error: {}", static_cast<int64_t>(GetLastError()));
@@ -337,7 +340,8 @@ void PromptCrashReportDesktopCopy()
 	}
 #endif
 
-	// Nothing on the crash path may recover or log a failed copy.
+	// Approved rule 35 exception (no heap allocation): the crash path copies between fixed path buffers, and nothing on it
+	// may recover or log a failed copy.
 	CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
 }
 

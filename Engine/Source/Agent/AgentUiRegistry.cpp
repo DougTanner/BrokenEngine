@@ -7,17 +7,6 @@
 namespace engine
 {
 
-// Bounded copy into a fixed char buffer, always null-terminated.
-static void CopyTruncate(std::span<char> destination, const char* pcSource)
-{
-	int64_t i = 0;
-	for (; i < std::ssize(destination) - 1 && pcSource[i] != '\0'; ++i)
-	{
-		destination[i] = pcSource[i];
-	}
-	destination[i] = '\0';
-}
-
 // Length of the display portion of an ImGui label — everything before the "##" id separator (or the whole string).
 static int64_t DisplayLength(std::string_view label)
 {
@@ -78,7 +67,7 @@ void AgentUiRegistry::RemovePendingLabel(int64_t iIndex)
 	mpPendingLabels[miPendingLabelCount] = {};
 }
 
-void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, const char* pcWindow, bool bDisabled, bool bVisible)
+void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, std::string_view window, bool bDisabled, bool bVisible)
 {
 	int64_t iPendingLabel = FindPendingLabel(uiIdentifier);
 	bool bEmptyRectangle = rf4Rectangle.x >= rf4Rectangle.z || rf4Rectangle.y >= rf4Rectangle.w;
@@ -100,10 +89,10 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 	rItem.bDisabled = bDisabled;
 	rItem.pcLabel[0] = '\0';
 	rItem.pcValue[0] = '\0';
-	CopyTruncate(rItem.pcWindow, pcWindow);
+	CopyStringParameter(rItem.pcWindow, window);
 	if (iPendingLabel >= 0)
 	{
-		CopyTruncate(rItem.pcLabel, mpPendingLabels[iPendingLabel].pcLabel);
+		CopyStringParameter(rItem.pcLabel, mpPendingLabels[iPendingLabel].pcLabel);
 		RemovePendingLabel(iPendingLabel);
 	}
 	++riCount;
@@ -120,7 +109,7 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, in
 		{
 			if (pcLabel != nullptr && pcLabel[0] != '\0')
 			{
-				CopyTruncate(rItem.pcLabel, pcLabel);
+				CopyStringParameter(rItem.pcLabel, pcLabel);
 			}
 			rItem.iStatusFlags |= iStatusFlags;
 			return;
@@ -143,10 +132,10 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, in
 		mpPendingLabels[iPendingLabel].uiIdentifier = uiIdentifier;
 	}
 	// The pre-ItemAdd status belongs to the prior item for tabs; only the label crosses into pending state.
-	CopyTruncate(mpPendingLabels[iPendingLabel].pcLabel, pcLabel);
+	CopyStringParameter(mpPendingLabels[iPendingLabel].pcLabel, pcLabel);
 }
 
-void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcValue)
+void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcFormat, double fValue)
 {
 	int64_t iCount = mpiItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
@@ -154,7 +143,7 @@ void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcValue)
 		AgentUiItem& rItem = mpItems[miWrite][i];
 		if (rItem.uiIdentifier == uiIdentifier)
 		{
-			CopyTruncate(rItem.pcValue, pcValue);
+			std::snprintf(rItem.pcValue, sizeof(rItem.pcValue), pcFormat, fValue);
 			return;
 		}
 	}
@@ -199,7 +188,7 @@ void AgentUiRegistry::Swap()
 			break;
 		}
 		AgentUiWindow& rWindow = mpWindows[miWrite][riWindowCount];
-		CopyTruncate(rWindow.pcName, pWindow->Name);
+		CopyStringParameter(rWindow.pcName, pWindow->Name);
 		rWindow.f4Rectangle = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
 		rWindow.bFocused = (pContext->NavWindow == pWindow);
 		++riWindowCount;
@@ -215,10 +204,10 @@ void AgentUiRegistry::Swap()
 	miPendingLabelCount = 0;
 }
 
-int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow) const
+int64_t AgentUiRegistry::ResolveLabel(std::string_view label, const char* pcWindow) const
 {
 	int64_t iCount = mpiItemCount[miRead];
-	int64_t iNeedleDisplay = DisplayLength(pcLabel);
+	int64_t iNeedleDisplay = DisplayLength(label);
 
 	// Three resolution tiers, tried in order; the first tier with any match decides (single -> hit, multiple -> ambiguous).
 	for (int64_t k = 0; k < 3; ++k)
@@ -237,19 +226,20 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 				continue;
 			}
 
+			std::string_view itemLabel = rItem.pcLabel;
 			bool bMatch = false;
 			if (k == 0)
 			{
-				bMatch = std::strcmp(rItem.pcLabel, pcLabel) == 0;
+				bMatch = itemLabel == label;
 			}
 			else if (k == 1)
 			{
-				int64_t iItemDisplay = DisplayLength(rItem.pcLabel);
-				bMatch = iItemDisplay == iNeedleDisplay && std::strncmp(rItem.pcLabel, pcLabel, static_cast<size_t>(iNeedleDisplay)) == 0;
+				int64_t iItemDisplay = DisplayLength(itemLabel);
+				bMatch = iItemDisplay == iNeedleDisplay && itemLabel.substr(0, static_cast<size_t>(iNeedleDisplay)) == label.substr(0, static_cast<size_t>(iNeedleDisplay));
 			}
 			else
 			{
-				bMatch = ContainsCaseInsensitive(rItem.pcLabel, pcLabel);
+				bMatch = ContainsCaseInsensitive(itemLabel, label);
 			}
 
 			if (bMatch)

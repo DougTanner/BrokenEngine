@@ -3,7 +3,8 @@
 On Claude, one external review covers the run for tooling friction, context
 efficiency, and content a subagent could have consumed instead. Codex runs no
 live lens and leaves all three concerns to `/next-plan-review` after landing.
-[The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference owns how.
+[The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference
+owns how.
 
 ## Dispatch
 
@@ -54,8 +55,8 @@ citation plus the provenance block sourced per
 finding never becomes a follow-up Plan: it returns to the current change as a
 blocker.
 
-The [post-checkpoint outcome table](../SKILL.md#post-checkpoint-outcomes) owns the
-authoritative claim disposition and whether a landing is followup-only.
+The [post-checkpoint outcome table](../SKILL.md#post-checkpoint-outcomes) owns
+the authoritative claim disposition and whether a landing is followup-only.
 
 Friction first observed after this checkpoint — including friction in running
 the claim-exit script and in `/finalize-changes` itself — is recorded through

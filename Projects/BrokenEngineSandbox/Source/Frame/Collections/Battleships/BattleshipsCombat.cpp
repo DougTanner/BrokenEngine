@@ -21,14 +21,14 @@ namespace game
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
 
+#if defined(BT_CLIENT)
 // Shared type indices (defined in Battleships.cpp, set during Register())
 extern int64_t giBattleshipExplosionTypeIndex;
-#if defined(BT_CLIENT)
 extern int64_t giBattleshipHitFlashControllerTypeIndex;
-#endif
 
 // Defined in Battleships.cpp.
 void SpawnBattleshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
+#endif
 
 constexpr float kfBattleshipMissileInitialVelocity = 30.0f;
 constexpr float kfBattleshipMissileAcceleration = 40.0f;
@@ -51,12 +51,14 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 
 #if defined(BT_CLIENT)
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], gFighterDeathVolume.mfCurrent, gFighterDeathPitchMinimum.mfCurrent, gFighterDeathPitchRandom.mfCurrent);
-#endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
+#endif
 	// The dying ship holds still from its death tick on.
 	rCurrentPostRender.pVecVelocities[i] = XMVectorZero();
+#if defined(BT_CLIENT)
 	SpawnBattleshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
+#endif
 }
 
 void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage)

@@ -91,4 +91,5 @@ this `Temp/` file.
 
 ## References
 
-- [`references/worker.md`](references/worker.md) — private: read it only if you are the session executing this skill. Mode routing and executor boundaries.
+- [`references/worker.md`](references/worker.md) — private: read it only if you
+  are the session executing this skill. Mode routing and executor boundaries.

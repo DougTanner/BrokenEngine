@@ -22,10 +22,10 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      enumerating hunks inline.
    - Done when the scope is fixed and stated as session-changed or
      caller-supplied, or the unavailability is reported.
-2. Run the bundled scanner: `pwsh -NoProfile -File
-   .agents/skills/comment-review/scripts/Find-CommentBlocks.ps1 -Path <paths>`,
-   using `pwsh -NoProfile -Command "&
-   '.agents/skills/comment-review/scripts/Find-CommentBlocks.ps1' -Path 'a','b'"`
+2. Run the bundled scanner:
+   `pwsh -NoProfile -File .agents/skills/comment-review/scripts/Find-CommentBlocks.ps1 -Path <paths>`,
+   using
+   `pwsh -NoProfile -Command "& '.agents/skills/comment-review/scripts/Find-CommentBlocks.ps1' -Path 'a','b'"`
    for more than one path.
    - One run covers the whole scope by default. Only `status` `pass` (exit 0)
      with `truncated` false is usable; `blocked` (exit 2) or `error` (exit 1)

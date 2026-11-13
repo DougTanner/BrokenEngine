@@ -38,14 +38,14 @@ carries `schemaVersion`, `status`, `code`, `message`, `plan`, `createdUtc`,
 `dependsOn`, `written`, `validation` (the folded `plan validate` `exitCode`,
 `status`, `code`, `message`, `diagnostics`, and `notices`), and `truncated`.
 
-Exit `0` with nested validation `exitCode: 0`, `status: valid`, and `code: ok` is
-the only outcome reportable as created. Exit `1` (`error`) and exit `2`
+Exit `0` with nested validation `exitCode: 0`, `status: valid`, and `code: ok`
+is the only outcome reportable as created. Exit `1` (`error`) and exit `2`
 (`blocked`) both block reporting the Plan as created; report the returned `code`
 and `message`. Whether a file exists on disk is `written`, not the exit code: a
 validation failure leaves the written Plan staged and in place, so correct the
 body and revalidate instead of recreating the Plan or rewriting the file by
-hand. Staging affects only the exact new Plan path; existing staged and
-worktree changes remain untouched.
+hand. Staging affects only the exact new Plan path; existing staged and worktree
+changes remain untouched.
 
 Two codes report a plan scheduler lock outcome rather than a body problem, and
 both also leave the written Plan staged and in place: `scheduler.busy` (exit

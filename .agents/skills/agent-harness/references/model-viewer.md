@@ -16,8 +16,8 @@ window behavior is in
 [ModelViewer application contracts](../../../../Projects/ModelViewer/AGENTS.md#application-contracts).
 
 No harness claim, launch script, process check, or release applies: the viewer
-binds no port, so the capture takes no harness lock and touches no other session's
-process. The native application mutex still applies under
+binds no port, so the capture takes no harness lock and touches no other
+session's process. The native application mutex still applies under
 [Engine single-instance policy](../../../../Engine/Source/AGENTS.md#crash-reporting).
 
 Before capture, apply the pre-launch wait policy in [`launch.md`](launch.md)
@@ -34,7 +34,8 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCap
 
 - Optionally pass `-ModelPath '<exact packed scene path>'` to select a scene
   before rendering. Case and separators are significant; this is not a source
-  filesystem path. See [ModelViewer application contracts](../../../../Projects/ModelViewer/AGENTS.md#application-contracts)
+  filesystem path. See
+  [ModelViewer application contracts](../../../../Projects/ModelViewer/AGENTS.md#application-contracts)
   for the shared scene-selection contract.
 - Optionally pass `-Flight` to enter autonomous flight before the capture: the
   script posts TAB to the viewer's window after the initial streaming wait, lets

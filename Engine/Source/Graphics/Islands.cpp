@@ -147,7 +147,7 @@ std::unique_ptr<StagingBuffer> Islands::UploadMesh(VkCommandBuffer vkCommandBuff
 
 void Islands::RetireMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation)
 {
-	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	// Heap: the entry persists across frames; retired inside Graphics::UpdateFrameResidency.
 	ScopedSuppressAllocationTracking suppress;
 	uint32_t uiAllFramebuffersMask = (1ui32 << static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers))) - 1ui32;
 	mRetiredMeshRanges.push_back({.vmaIndexAllocation = vmaIndexAllocation, .vmaVertexAllocation = vmaVertexAllocation, .uiFramebufferMask = uiAllFramebuffersMask});
@@ -191,9 +191,9 @@ void Islands::FreeAllRetiredMeshRanges()
 
 void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeCells)
 {
-	// Write only the framebuffer instance the current frame will consume. miFramebufferIndex was set by the
-	// trailing AcquireNextImage of the prior render (Graphics.cpp); it is the index RenderGlobal reads
-	// and the record-once CB for that framebuffer binds, and is stable until this frame's
+	// Write only the framebuffer instance the current frame's world draw consumes; a world-hidden frame writes it but draws nothing.
+	// miFramebufferIndex was set by the trailing AcquireNextImage of the prior render (Graphics.cpp); it is the index RenderGlobal
+	// reads on a world frame and the record-once CB for that framebuffer binds, and is stable until this frame's
 	// submission. Re-acquiring this image index implies the prior frame that used it has presented, so its
 	// GPU read of this instance has finished; this frame's render is not yet submitted — hence no host/GPU race.
 	int64_t iFramebuffer = gpSwapchainManager->miFramebufferIndex;
@@ -201,7 +201,7 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 	VkDrawIndexedIndirectCommand* pVkIndirect = mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(iFramebuffer);
 
 	// Per-template reference counts reset each frame. Templates with reference count zero for
-	// kiGraceRenderFrames become eviction candidates in RenderGlobal's next post-fence EvictionSweep.
+	// kiGraceRenderFrames become eviction candidates in Graphics::UpdateFrameResidency's next post-fence EvictionSweep.
 	// Mesh draw ranges come from residency state, so a range retired by eviction leaves this framebuffer's
 	// record before its next submission, and a restored range enters it only after the frame that recorded its copy.
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)

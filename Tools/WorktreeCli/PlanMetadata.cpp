@@ -289,9 +289,9 @@ bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_vie
 
 bool IsBlockedByDependencies(const Plan& rPlan, const std::unordered_map<std::wstring, Plan>& rPlans)
 {
-	return std::ranges::any_of(rPlan.dependencies, [&rPlans](const std::wstring& rDependency)
+	return std::ranges::any_of(rPlan.dependencies, [&rPlans](std::wstring_view dependency)
 	{
-		return rPlans.find(rDependency) != rPlans.end();
+		return rPlans.contains(std::wstring(dependency));
 	});
 }
 

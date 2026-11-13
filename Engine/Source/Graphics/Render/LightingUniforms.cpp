@@ -4,6 +4,7 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/MiscWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WaterWrappersBase.h"
@@ -14,14 +15,6 @@
 namespace engine
 {
 
-static bool IsVisibleAreaInsideHeldCombineCrop(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4HeldVisibleArea, const XMFLOAT4& rf4HeldLightingArea, float fCombineTextureWidth, float fCombineTextureHeight)
-{
-	float fHeldCombineTexelX = (rf4HeldLightingArea.z - rf4HeldLightingArea.x) / fCombineTextureWidth;
-	float fHeldCombineTexelY = (rf4HeldLightingArea.y - rf4HeldLightingArea.w) / fCombineTextureHeight;
-	return rf4VisibleArea.x >= rf4HeldVisibleArea.x - fHeldCombineTexelX && rf4VisibleArea.z <= rf4HeldVisibleArea.z + fHeldCombineTexelX
-	    && rf4VisibleArea.y <= rf4HeldVisibleArea.y + fHeldCombineTexelY && rf4VisibleArea.w >= rf4HeldVisibleArea.w - fHeldCombineTexelY;
-}
-
 // The pending-layer rule below names "the other layer" as 1 - layer.
 static_assert(shaders::kiLightingLayers == 2);
 
@@ -29,28 +22,24 @@ static_assert(shaders::kiLightingLayers == 2);
 static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int64_t iScheduledLayer, bool bLightingEnabled)
 {
 	// Lighting mirrors the shadow area's raw-frustum-safe framing reference. RenderTargetTextures sizes deposit/spread/combine through
-	// LightingDetailTextureSize with kfLightingHeadroomMultiplier; textureWidth / that multiplier pixels span the framing's reference-angle
-	// frustum at mfLightingTexelFraming. The reference expands immediately outward, contracts at the existing rate inward, and never falls below
+	// ExtraAreaDetailTextureSize with gExtraArea; textureWidth / gExtraArea pixels span the framing's reference-angle frustum at
+	// mfLightingTexelFraming. The reference expands immediately outward, contracts at the existing rate inward, and never falls below
 	// live framing times the coverage ratio. Actual clamped extents preserve device-independent coverage. For a settled footprint the grid
 	// stays fixed; snap f4LightingArea, centered on the tilted footprint, to integer deposit texels because deposit rasterizes lights.
 	// Spread/combine/temporal resample that world rectangle at their own resolutions.
 	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.width);
 	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.height);
-	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0].mInfo.vkExtent3D.width);
-	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0][0].mInfo.vkExtent3D.height);
 	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 
 	XMVECTOR vecFootprintCenter = XMVectorAdd(engine::gpCamera->mVecPosition, XMVectorSet(0.0f, engine::gpCamera->mfTexelCenterOffsetNorth, 0.0f, 0.0f));
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelFraming, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(gExtraArea.mfCurrent, engine::gpCamera->mfLightingTexelFraming, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, vecFootprintCenter);
 
 	// Each layer's temporal accumulation publishes the current and previous world areas from that layer's own refresh
 	// epoch, so its temporal pass reprojects only from its own previous refresh; a skip retains both.
 	static TemporalAreaLatch spTemporalAreaLatches[shaders::kiLightingLayers] {};
-	static XMFLOAT4 spf4HeldVisibleAreas[shaders::kiLightingLayers] {};
-	static bool spbHeldVisibleAreas[shaders::kiLightingLayers] {};
 	static bool spbTemporalResets[shaders::kiLightingLayers] {};
 	// The layer that also needed a refresh on a frame another layer took, or -1; it refreshes first next frame, so a
-	// fast pan escaping both crops every frame alternates the layers instead of starving one.
+	// teleport, which needs both layers, refreshes them on consecutive frames.
 	static int64_t siPendingLayer = -1;
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
 	// the refresh test compares them with this frame's areas.
@@ -60,7 +49,6 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	{
 		ShiftArea(spTemporalAreaLatches[i].f4CurrentArea, f2Shift);
 		ShiftArea(spTemporalAreaLatches[i].f4PreviousArea, f2Shift);
-		ShiftArea(spf4HeldVisibleAreas[i], f2Shift);
 	}
 	if (gbLightingTemporalReset)
 	{
@@ -71,8 +59,8 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	bool pbNeedsRefresh[shaders::kiLightingLayers] {};
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		pbNeedsRefresh[i] = spbTemporalResets[i] || !spbHeldVisibleAreas[i] || i == iScheduledLayer
-		                 || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rf4VisibleArea, spf4HeldVisibleAreas[i], spTemporalAreaLatches[i].f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
+		pbNeedsRefresh[i] = spbTemporalResets[i] || i == iScheduledLayer
+		                 || (bLightingEnabled && IsVisibleCenterOutsideArea(rf4VisibleArea, spTemporalAreaLatches[i].f4CurrentArea));
 	}
 	// The shared deposit and spread chain refreshes at most one layer per frame.
 	int64_t iRefreshLayer = siPendingLayer;
@@ -91,8 +79,6 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 		TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[iRefreshLayer];
 		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent, rGlobalLayout.f4LightingAreaPrevious);
 		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
-		spf4HeldVisibleAreas[iRefreshLayer] = rf4VisibleArea;
-		spbHeldVisibleAreas[iRefreshLayer] = true;
 	}
 	else
 	{
@@ -102,7 +88,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 		rGlobalLayout.f4LightingAreaPrevious = rTemporalAreaLatch.f4PreviousArea;
 		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.fBlend;
 	}
-	int64_t iChainLayer = std::max(iRefreshLayer, 0i64);
+	int64_t iChainLayer = iRefreshLayer >= 0 ? iRefreshLayer : 0;
 	rGlobalLayout.uiLightingRefreshLayer = static_cast<uint32_t>(iChainLayer);
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{

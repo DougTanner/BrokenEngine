@@ -17,6 +17,7 @@ struct SaveStagedState
 
 void WriteSaveState(std::fstream& rFileStream);
 void ReadSaveState(std::fstream& rFileStream, int64_t iNextGlobalId, SaveStagedState& rStagedState);
+void ValidateSaveState(const SaveStagedState& rStagedState, const std::unordered_map<engine::GridCoord, engine::Cell>& rCells, int64_t iNextGlobalId);
 void AdoptSaveState(SaveStagedState&& rStagedState);
 void ResetSaveState();
 

@@ -307,8 +307,8 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	struct PriorityEntry
 	{
-		float fAttenuated;
-		int64_t iSoundIndex;
+		float fAttenuated = 0.0f;
+		int64_t iSoundIndex = 0;
 	};
 	// RAII handle keeps the workbuffer frame alive; raw pointer below avoids
 	// std::sort deducing _RanIt from the ScopedWorkbufferAllocation type.

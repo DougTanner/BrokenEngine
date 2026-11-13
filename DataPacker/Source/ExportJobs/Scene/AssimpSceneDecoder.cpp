@@ -544,6 +544,11 @@ static void LoadAssimpNode(const aiScene& rScene, const aiNode& rNode, const XMM
 		{
 			ASSERT(iSet < 0 || rMesh.HasTextureCoords(static_cast<unsigned int>(iSet)));
 		}
+		// Like a glTF fully transparent primitive, this mesh draws nothing, so it must not size the model or its hitbox
+		if (rShaderData.f4BaseColorFactor.w == 0.0f)
+		{
+			continue;
+		}
 		bool bSkinned = rMesh.mNumBones != 0;
 		int64_t iEffective = ResolveEffectiveMaterial(rData.materials, rData.materialNodeInfos, rMaterialNodeMap, iOriginal, iNode, bSkinned, matWorld);
 		ASSERT(std::ssize(rData.materials) <= common::SceneHeader::kiMaxMaterials);
@@ -672,27 +677,6 @@ AssimpSceneDecoder::AssimpSceneDecoder(const std::filesystem::path& rPath, Scene
 		throw std::runtime_error(std::format("Assimp failed to import '{}': {}", rPath.string(), importer.GetErrorString()));
 	}
 	pIO->ValidateReads();
-	bool bHasBones = false;
-	for (int64_t i = 0; i < pScene->mNumMeshes; ++i)
-	{
-		ASSERT(pScene->mMeshes[i]->mNumAnimMeshes == 0);
-		bHasBones = bHasBones || pScene->mMeshes[i]->mNumBones != 0;
-	}
-	std::unordered_set<std::string> animatedNames;
-	for (int64_t i = 0; i < pScene->mNumAnimations; ++i)
-	{
-		const aiAnimation& rAnimation = *pScene->mAnimations[i];
-		ASSERT(rAnimation.mNumMeshChannels == 0 && rAnimation.mNumMorphMeshChannels == 0);
-		for (int64_t j = 0; j < rAnimation.mNumChannels; ++j)
-		{
-			const aiNodeAnim& rChannel = *rAnimation.mChannels[j];
-			if (rChannel.mNumPositionKeys != 0 || rChannel.mNumRotationKeys != 0 || rChannel.mNumScalingKeys != 0)
-			{
-				animatedNames.emplace(rChannel.mNodeName.C_Str());
-			}
-		}
-	}
-	bool bHasSkeleton = bHasBones || !animatedNames.empty();
 	rData.iSourceAnimationCount = pScene->mNumAnimations;
 	rData.iSourceMaterialCount = std::max<int64_t>(1, pScene->mNumMaterials);
 	ASSERT(rData.iSourceMaterialCount <= common::SceneHeader::kiMaxMaterials);
@@ -710,6 +694,33 @@ AssimpSceneDecoder::AssimpSceneDecoder(const std::filesystem::path& rPath, Scene
 		material.f3EmissiveFactor = XMFLOAT3(0.0f, 0.0f, 0.0f);
 		mSourceMaterialShaderDatas.push_back(material);
 	}
+	bool bHasBones = false;
+	for (int64_t i = 0; i < pScene->mNumMeshes; ++i)
+	{
+		const aiMesh& rMesh = *pScene->mMeshes[i];
+		ASSERT(rMesh.mNumAnimMeshes == 0);
+		// A fully transparent mesh is not exported, so its bones must not select skeleton export
+		if (mSourceMaterialShaderDatas.at(rMesh.mMaterialIndex).f4BaseColorFactor.w == 0.0f)
+		{
+			continue;
+		}
+		bHasBones = bHasBones || rMesh.mNumBones != 0;
+	}
+	std::unordered_set<std::string> animatedNames;
+	for (int64_t i = 0; i < pScene->mNumAnimations; ++i)
+	{
+		const aiAnimation& rAnimation = *pScene->mAnimations[i];
+		ASSERT(rAnimation.mNumMeshChannels == 0 && rAnimation.mNumMorphMeshChannels == 0);
+		for (int64_t j = 0; j < rAnimation.mNumChannels; ++j)
+		{
+			const aiNodeAnim& rChannel = *rAnimation.mChannels[j];
+			if (rChannel.mNumPositionKeys != 0 || rChannel.mNumRotationKeys != 0 || rChannel.mNumScalingKeys != 0)
+			{
+				animatedNames.emplace(rChannel.mNodeName.C_Str());
+			}
+		}
+	}
+	bool bHasSkeleton = bHasBones || !animatedNames.empty();
 	XMMATRIX matBasis = XMMatrixRotationX(XM_PIDIV2);
 	std::unordered_map<std::string, int64_t> nodeNames;
 	std::vector<XMMATRIX> worldMatrices;

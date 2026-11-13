@@ -94,6 +94,9 @@ calculations, ensuring any divergence is immediately detected.
 
 No time-based or hardware-based seeding occurs in simulation paths.
 
+Which engine a value only a client visual consumes draws from is owned by
+Engine/Source/Frame/AGENTS.md "Simulation and Visual State".
+
 File: Common/Math/Random.h
 
 
@@ -158,10 +161,10 @@ floating-point aggregation occurs during simulation.
 -------------------
 A single shared CRC detects any divergence. It is computed over the
 cross-build-shared collection subset (ServerCollections(), currently
-explosions and pushers) and excludes both client-only visual data and
-server-only fields, so both builds produce identical CRCs from the same
-simulation (FrameInterpolateBase::Crcs() and FramePostRenderBase::Crcs()
-in Engine/Source/Frame/FrameBase.cpp).
+pushers) and excludes both client-only visual data and server-only fields,
+so both builds produce identical CRCs from the same simulation
+(FrameInterpolateBase::Crcs() and FramePostRenderBase::Crcs() in
+Engine/Source/Frame/FrameBase.cpp).
 
 The CRC is computed after every tick and compared during reconciliation.
 On mismatch, the client performs rollback-and-replay. Persistent

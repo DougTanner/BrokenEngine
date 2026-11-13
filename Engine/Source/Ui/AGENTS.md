@@ -11,24 +11,60 @@ is engine-owned here.
 
 ## Wrapper Contracts
 
-- `Wrapper` stores float, bool, or discrete values with one-consumer change tracking. `Changed<T>()` advances the previous-value state, so exactly one consumer may poll a wrapper each frame.
-- Mutate through `Set` or `Reset`, or restore defaults with `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
-- A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it, so every returned index is in range. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
-- One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
-- A wrapper control's visible label (including a slider's label) must use the wrapper identifier's words in the same order, with the naming prefix removed and spaces between words: `gPbrBrdfDiffuse` becomes `Pbr Brdf Diffuse`. This makes the wrapper searchable from its on-screen label. For localized controls, apply this rule to the English/source label; translated labels retain their normal localization behavior.
-- Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
-- Settings that alter baked render-target dimensions must participate in `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
+- `Wrapper` stores float, bool, or discrete values with one-consumer change
+  tracking. `Changed<T>()` advances the previous-value state, so exactly one
+  consumer may poll a wrapper each frame.
+- Mutate through `Set` or `Reset`, or restore defaults with
+  `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the
+  prior value intact so the next poll observes a change. `Reset` updates both
+  values and is for initialization or capability clamping that must not trigger
+  rebuilds.
+- A discrete wrapper stores a persisted value outside its allowed set as-is, and
+  `GetIndex()` reports index 0 for it, so every returned index is in range.
+  Capability clamps write only allowed values. Float wrappers may snap to a
+  configured grid.
+- One-argument construction is Boolean-only. Non-Boolean numeric and enum
+  constructors are deleted so a scalar cannot silently convert to the Boolean
+  overload; floats use the ranged constructor and discrete values supply an
+  allowed-value set.
+- A wrapper control's visible label (including a slider's label) must use the
+  wrapper identifier's words in the same order, with the naming prefix removed
+  and spaces between words: `gPbrBrdfDiffuse` becomes `Pbr Brdf Diffuse`. This
+  makes the wrapper searchable from its on-screen label. For localized controls,
+  apply this rule to the English/source label; translated labels retain their
+  normal localization behavior.
+- Wrapper bounds annotated with shader invariants are correctness constraints,
+  not UI tuning.
+- Settings that alter baked render-target dimensions must participate in
+  `Graphics::Refresh`; prefer per-frame uniforms when recreation is unnecessary.
 
 ## Localization
 
-- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped `int32_t` enum whose values 0..5 are persisted in the game settings file), `kiLanguageCount`, the `LanguageOption` labels in enum order, the selected-language state `geLanguage`, and `StandardString` with the standard menu strings. Game UI re-exports these through its facade (the game project's own `Source/Ui/AGENTS.md`).
-- The UTF-32 standard table lives in `LocalizationBase.cpp` with internal linkage. Its outer extent stays deduced so the trailing all-empty sentinel row plus the `static_assert` catches a dropped or added row; an empty language cell falls back to English.
-- `InitializeLocalization` sets the locale and uppercases the table in place. It is startup work, called from the `Game` constructor on both builds, and never runs in the main loop.
+- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped
+  `int32_t` enum whose values 0..5 are persisted in the game settings file),
+  `kiLanguageCount`, the `LanguageOption` labels in enum order, the
+  selected-language state `geLanguage`, and `StandardString` with the standard
+  menu strings. Game UI re-exports these through its facade (the game project's
+  own `Source/Ui/AGENTS.md`).
+- The UTF-32 standard table lives in `LocalizationBase.cpp` with internal
+  linkage. Its outer extent stays deduced so the trailing all-empty sentinel row
+  plus the `static_assert` catches a dropped or added row; an empty language
+  cell falls back to English.
+- `InitializeLocalization` sets the locale and uppercases the table in place. It
+  is startup work, called from the `Game` constructor on both builds, and never
+  runs in the main loop.
 
 ## Menu and Panel Helpers
 
-- Engine UI owns reusable player-facing menu layout and interaction helpers, including workbuffer-backed localized text conversion, wrapper controls, common sizing, menu chrome, and slide-panel behavior. Game UI owns the HUD's composition, game-state gating, labels, and interaction flows.
-- Side-panel hover (`ComputeMouseOpennessTarget`) is the full-height strip on the panel's side, measured by horizontal distance only, per the layout contract (`../../../Documents/UserInterfaceDesign.txt` section `11. Verification`). Layout rule: any future top or bottom bar's hover is the full-width strip on its edge, measured by vertical distance only.
+- Engine UI owns reusable player-facing menu layout and interaction helpers,
+  including workbuffer-backed localized text conversion, wrapper controls,
+  common sizing, menu chrome, and slide-panel behavior. Game UI owns the HUD's
+  composition, game-state gating, labels, and interaction flows.
+- Side-panel hover (`ComputeMouseOpennessTarget`) is the full-height strip on
+  the panel's side, measured by horizontal distance only, per the layout
+  contract (`../../../Documents/UserInterfaceDesign.txt` section
+  `11. Verification`). Layout rule: any future top or bottom bar's hover is the
+  full-width strip on its edge, measured by vertical distance only.
 
 ## Graphics Quality Levels
 
@@ -37,38 +73,84 @@ is engine-owned here.
   per-frame rendering; the other levels drive derived renderer wrappers that
   are never persisted. Water recreation rules live in
   [CommandBufferManager](../Graphics/Managers/AGENTS.md#commandbuffermanager).
-- Apply functions write derived renderer wrappers through `Set` when a level changes and once after both successful and failed graphics-settings loads. `Graphics::Refresh` is the sole consumer polling those wrappers; apply functions never call `Changed<T>()`.
+- Apply functions write derived renderer wrappers through `Set` when a level
+  changes and once after both successful and failed graphics-settings loads.
+  `Graphics::Refresh` is the sole consumer polling those wrappers; apply
+  functions never call `Changed<T>()`.
 
 ## Settings Persistence
 
-- `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
-- Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
-- `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
+- `SoundSettings.bin` is version 3 and persists the three volume controls plus
+  the checked-by-default `Mute in background` setting, which save and load
+  preserve and reset restores to its checked default. Version 2 is intentionally
+  rejected and settings fall back to defaults.
+- Background mute is client presentation state and remains outside
+  Frame/PostRender CRC and network state.
+- `GraphicsSettings.cpp` persists the engine-owned player-facing quality levels
+  declared in `GraphicsQualityWrappersBase.h` in `GraphicsSettings.bin`. A
+  selected level is the persisted source of truth; derived renderer wrapper
+  values are not serialized. Water mesh detail is fixed at `0.25` and is not
+  persisted.
 - `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
-  Water quality, Water Foam, Break Repetition, the Stagger Smoke Layer Updates flag, Smoke Update
-  Cadence, Shadow Update Cadence, Field of View, Camera Tilt, and Orthographic
-  Projection.
-  Lighting, Water Foam and Break Repetition default on, and Defaults restores them. Older versions fail the current-format gate
-  and use defaults. Water Foam, Break Repetition and Orthographic Projection are validated Boolean
+  Water quality, Water Foam, Break Repetition, the Stagger Smoke Layer Updates
+  flag, Smoke Update Cadence, Shadow Update Cadence, Object Shadow Cadence,
+  Object Shadows Blur Level, Field of View, Camera Tilt, and Orthographic
+  Projection. Lighting, Water Foam and Break Repetition default on, and Defaults
+  restores them. Older versions fail the current-format gate and use defaults.
+  Water Foam, Break Repetition and Orthographic Projection are validated Boolean
   bytes; any value other than zero or one rejects the whole file before
   application.
-- The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
-- `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
-- `TweaksSettings.cpp` persists the Tweaks visibility flag and the Tweaks section state in `TweaksSettings.bin` version 15, versioned POD written through the engine versioned-file helpers, in `kbDebugInput` builds only.
+- The loaders check every persisted language index, float, quality level, and
+  graphics sample count before applying any. A non-finite or out-of-range value,
+  or a sample count that is not one of `gSampleCount`'s allowed values, rejects
+  the whole file with one warning, and every setting it holds stays at its
+  default, as when the file is missing. Accepted floats keep the wrapper's
+  normal snapping.
+- `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI
+  toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language
+  is stored as a fixed-width `int32_t` so the `Language` enum's underlying type
+  never decides the file layout; an index outside the enum rejects the file.
+- `TweaksSettings.cpp` persists the Tweaks visibility flag and the Tweaks
+  section state in `TweaksSettings.bin` version 15, versioned POD written
+  through the engine versioned-file helpers, in `kbDebugInput` builds only.
 
 ## Shared Types
 
-- `engine::UiState`, the unguarded `engine::GameBase` members `meUiState` and `mModalMessage`, and the unguarded `GameBase::mGameFlags` main-menu flag form the shared engine/game UI-state contract. The engine owns their public vocabulary and storage for both client and server; the game HUD retains its own state transitions, gating, and rendering semantics.
-- The client-only `engine::gbShowImGui` in `ImGuiManager.h` is the Tweaks visibility flag every client program reads and writes, outside that shared contract.
-- The client-only `StandardMenuFeature`, `StandardMenuState`, `StandardMenuModel`, and `StandardMenuAction` types plus the `game::Game` members `GetStandardMenuModel` and `ApplyStandardMenuAction`, which the screens call, extend that contract for the engine-owned menus. They are the only surface through which a standard screen reaches game-owned networking and frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on them.
-- The client-only `GameBase::mChatLog` (`ChatLog.h`) is the chat state: a `ChatLog::kiCapacity`-entry history ring that `Client::ServerChat` appends to, plus the input box's open flag and text. `GameBase::ProcessInput` opens the box; `ChatScreen` draws the history and closes the box (`Screens/AGENTS.md`).
-- Height-dependent wrapper groups resolve camera-height-conditioned render values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values reach the per-frame GPU buffers.
-- Client-only curves use bounded monotone cubic interpolation and an ImPlot editor. Endpoints remain X-locked and interior control points ordered.
-- The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be compared live against the shipping baseline. They currently hold identical control points; that is the A/B setup, not dead duplication. Collapse to a single curve once tuning settles.
-- `NetworkUiControl` disables a control while authoritative state has not resolved its request; call `Update` every frame with that authoritative state.
+- `engine::UiState`, the unguarded `engine::GameBase` members `meUiState` and
+  `mModalMessage`, and the unguarded `GameBase::mGameFlags` main-menu flag form
+  the shared engine/game UI-state contract. The engine owns their public
+  vocabulary and storage for both client and server; the game HUD retains its
+  own state transitions, gating, and rendering semantics.
+- The client-only `engine::gbShowImGui` in `ImGuiManager.h` is the Tweaks
+  visibility flag every client program reads and writes, outside that shared
+  contract.
+- The client-only `StandardMenuFeature`, `StandardMenuState`,
+  `StandardMenuModel`, and `StandardMenuAction` types plus the `game::Game`
+  members `GetStandardMenuModel` and `ApplyStandardMenuAction`, which the
+  screens call, extend that contract for the engine-owned menus. They are the
+  only surface through which a standard screen reaches game-owned networking and
+  frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No
+  server declaration depends on them.
+- The client-only `GameBase::mChatLog` (`ChatLog.h`) is the chat state: a
+  `ChatLog::kiCapacity`-entry history ring that `Client::ServerChat` appends to,
+  plus the input box's open flag and text. `GameBase::ProcessInput` opens the
+  box; `ChatScreen` draws the history and closes the box (`Screens/AGENTS.md`).
+- Height-dependent wrapper groups resolve camera-height-conditioned render
+  values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values
+  reach the per-frame GPU buffers.
+- Client-only curves use bounded monotone cubic interpolation and an ImPlot
+  editor. Endpoints remain X-locked and interior control points ordered.
+- The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and
+  `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be
+  compared live against the shipping baseline. They currently hold identical
+  control points; that is the A/B setup, not dead duplication. Collapse to a
+  single curve once tuning settles.
+- `NetworkUiControl` disables a control while authoritative state has not
+  resolved its request; call `Update` every frame with that authoritative state.
 
 Engine UI headers stay out of `Engine.h` and are included directly, or through
-the game facade for localization, so tuning edits recompile little. `ChatLog.h`
+the game facade for localization, so a tuning edit to a wrapper header's inline
+definitions recompiles only that header's includers, not the PCH. `ChatLog.h`
 is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
 `ChatLog.h` and carries it into the game PCH. Headers compiling into both builds
 carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so
@@ -81,4 +163,5 @@ server-side screens.
 ## See Also
 
 - Screens (`Screens/AGENTS.md`) - Engine screen routing
-- TweaksScreen (`Screens/TweaksScreen/AGENTS.md`) - Runtime parameter UI contracts
+- TweaksScreen (`Screens/TweaksScreen/AGENTS.md`) - Runtime parameter UI
+  contracts

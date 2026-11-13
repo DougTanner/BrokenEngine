@@ -159,7 +159,12 @@ void TextureUploadManager::WaitIdle()
 {
 	// No upload thread can acknowledge a drain after shutdown/exit or before startup. First-boot Create calls Destroy before TextureManager
 	// starts the thread, while mbShutdown is false. This thread is the sole starter/joiner, so joinable() is main-thread-only state.
-	if (mbShutdown || mbThreadExited || !mUploadThread.joinable())
+	if (mbShutdown || mbThreadExited)
+	{
+		return;
+	}
+
+	if (!mUploadThread.joinable())
 	{
 		return;
 	}
@@ -476,7 +481,7 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 
 void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
 {
-	const std::byte* pData = rLazyChunk.pData;
+	const std::byte* pData = rLazyChunk.pData.get();
 	int64_t iStagingUsed = 0;
 
 	while (iStagingUsed < miStagingSize && miCurrentLayer < rDimensions.iArrayLayers)

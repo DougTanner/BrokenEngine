@@ -52,7 +52,8 @@ From https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing:
   whatever the VM state.
 - "Stopped" is billed. That state results from the `PowerOff` API (`az vm stop`)
   or "invoking shutdown from within the guest OS". Stopping always means
-  deallocating (https://learn.microsoft.com/en-us/cli/azure/vm#az-vm-deallocate).
+  deallocating
+  (https://learn.microsoft.com/en-us/cli/azure/vm#az-vm-deallocate).
 
 ## Schedule
 
@@ -76,7 +77,8 @@ cost data that can lag 8-24 hours, so spend can pass that amount before the stop
 (https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets).
 
 The template omits `endDate`; Azure then defaults it to 10 years from the start
-date (https://learn.microsoft.com/en-us/azure/templates/microsoft.consumption/budgets
+date
+(https://learn.microsoft.com/en-us/azure/templates/microsoft.consumption/budgets
 `BudgetTimePeriod`, queried 2026-10-18).
 
 ## Cost examples
@@ -93,4 +95,7 @@ date (https://learn.microsoft.com/en-us/azure/templates/microsoft.consumption/bu
 
 ## Provisioned OS disk
 
-Size and tier: none (recorded from `az disk show -g <instance>-server-rg -n <instance>-server-osdisk` after provisioning; the template fixes the image and disk type and leaves the size at the image default, so the record holds for every instance).
+Size and tier: none (recorded from
+`az disk show -g <instance>-server-rg -n <instance>-server-osdisk` after
+provisioning; the template fixes the image and disk type and leaves the size at
+the image default, so the record holds for every instance).

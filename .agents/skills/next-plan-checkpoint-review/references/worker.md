@@ -13,12 +13,12 @@ are the isolation lens.
    `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`
    then measure it from the session worktree root:
    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -SessionId <id>`
-   (or `-TranscriptPath '<resolved path>'`). Classify the returned envelope by the
-   states `## Measurement states` in
-   `../../next-plan/references/run-checkpoint.md` keeps. Return `BLOCKED` for the
-   whole review when that glob resolves to nothing, the transcript file cannot be
-   read, or the measurement returns `transcript.not-found`, because then no lens
-   has evidence; every other blocked or error code skips only the
+   (or `-TranscriptPath '<resolved path>'`). Classify the returned envelope by
+   the states `## Measurement states` in
+   `../../next-plan/references/run-checkpoint.md` keeps. Return `BLOCKED` for
+   the whole review when that glob resolves to nothing, the transcript file
+   cannot be read, or the measurement returns `transcript.not-found`, because
+   then no lens has evidence; every other blocked or error code skips only the
    context-efficiency lens, while the friction and isolation lenses still run.
    Done when one transcript path and one measurement state are in hand, or the
    review is `BLOCKED`.
@@ -65,25 +65,25 @@ are the isolation lens.
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
    finding names all three, and the rest are dropped.
-8. Review every `topResults` row marked `overThreshold: true`. The other rows are
-   context only. Done when every such row has been read.
+8. Review every `topResults` row marked `overThreshold: true`. The other rows
+   are context only. Done when every such row has been read.
 9. Identify the emitting invocation for each row from `toolName` plus
    `inputSummary`: the repository script, skill instruction, or documented
    command that produced that output. Read the emitter in the tree. Done when
    each row names one emitter or is recorded as unidentifiable. An `Agent` or
-   `SendMessage` row is a completed subagent's handoff; its emitter is the return
-   format of the skill the dispatch named.
+   `SendMessage` row is a completed subagent's handoff; its emitter is the
+   return format of the skill the dispatch named.
 10. Classify each row, done when every row carries one class:
-    - `fixable-defect` — a bounded projection, a count plus the decision-relevant
-      rows, an explicit cap with a truncation flag, or a file drop plus a receipt
-      and selector would have carried the same decision. For an isolation
-      finding, the step 11 mechanism is that bounding. The landed shape is
-      `.agents/skills/next-plan/scripts/Get-NextPlanList.ps1`, which folds a full
-      Plan listing into counts plus the first rows.
-    - `necessary-evidence` — the manager's decision genuinely required the content
-      verbatim, so no bounding mechanism preserves it.
-    - `active-change-blocker` — the emitter is a script or skill the claimed Plan
-      itself changes.
+    - `fixable-defect` — a bounded projection, a count plus the
+      decision-relevant rows, an explicit cap with a truncation flag, or a file
+      drop plus a receipt and selector would have carried the same decision. For
+      an isolation finding, the step 11 mechanism is that bounding. The landed
+      shape is `.agents/skills/next-plan/scripts/Get-NextPlanList.ps1`, which
+      folds a full Plan listing into counts plus the first rows.
+    - `necessary-evidence` — the manager's decision genuinely required the
+      content verbatim, so no bounding mechanism preserves it.
+    - `active-change-blocker` — the emitter is a script or skill the claimed
+      Plan itself changes.
 11. Precision guard: name in each context or isolation finding the emitting
     invocation and one concrete bounding mechanism — for an isolation finding,
     the role from the Change Workflow delegation role table that could have

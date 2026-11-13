@@ -1,10 +1,16 @@
 # Plans
 
-Tracked tasks ready to be picked up by another session through `/next-plan`. Ideas saved for another day in `../Features/` (see `../Features/AGENTS.md`) are manually executed and are never scheduler inputs.
+Tracked tasks ready to be picked up by another session through `/next-plan`.
+Ideas saved for another day in `../Features/` (see `../Features/AGENTS.md`) are
+manually executed and are never scheduler inputs.
 
 ## Authorship
 
-Every Plan is agent-written. Its statements about what the user chose, asked, or decided are the authoring agent's record, never the user's own words. Never present Plan wording or a Plan-recorded choice to the user as the user's own decision. When a Plan decision binds is in `.agents/references/authority-order.md`.
+Every Plan is agent-written. Its statements about what the user chose, asked, or
+decided are the authoring agent's record, never the user's own words. Never
+present Plan wording or a Plan-recorded choice to the user as the user's own
+decision. When a Plan decision binds is in
+`.agents/references/authority-order.md`.
 
 ## Git-backed scheduler
 
@@ -12,13 +18,24 @@ An executable plan starts at byte zero with exactly one metadata line:
 
 `<!-- broken-engine-plan/v1 {"createdUtc":"2026-07-22T18:24:31.042Z","dependsOn":["Documents/Plans/Area/Prerequisite.md"]} -->`
 
-Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths. Every plan document in this tree carries the marker; a missing marker — including one preceded by a BOM, so it is not at byte zero — is a validation error naming the file. `AGENTS.md` is exempt at every level of the tree and must never carry metadata.
+Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn`
+is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths.
+Every plan document in this tree carries the marker; a missing marker —
+including one preceded by a BOM, so it is not at byte zero — is a validation
+error naming the file. `AGENTS.md` is exempt at every level of the tree and must
+never carry metadata.
 
-WorktreeCli is the only component that parses the scheduler and changes claims. It selects the newest eligible executable plan by `(createdUtc descending, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. A plan is excluded from selection — left out without affecting other plans, which stay claimable — when its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip.
+WorktreeCli is the only component that parses the scheduler and changes claims.
+It selects the newest eligible executable plan by
+`(createdUtc descending, normalized path)`. Existing valid dependencies block a
+child; a missing dependency is a satisfied stale edge reported as a notice. A
+plan is excluded from selection — left out without affecting other plans, which
+stay claimable — when its metadata is invalid, its dependencies form a cycle, or
+it is not present and valid at the primary tip.
 
 For a scheduler health check, run
-`pwsh -NoProfile -File .agents/scripts/Invoke-PlanSchedulerStateCheck.ps1` — it folds
-`plan validate` into a compact status/diagnostics result; never run a raw
+`pwsh -NoProfile -File .agents/scripts/Invoke-PlanSchedulerStateCheck.ps1` — it
+folds `plan validate` into a compact status/diagnostics result; never run a raw
 whole-tree `plan validate`, whose result lists every Plan and floods a session
 context, except the whole-tree `--lint-only` run of
 `.agents/skills/finalize-changes/references/landing-acceptance-table.md`
@@ -29,39 +46,63 @@ a present-but-invalid Plan still exits 0 with an empty `plans` array, an absent
 or untracked one exits 2 with `plan-not-found`, and `status`, `code`, and
 `diagnostics` describe the whole tree.
 
-`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per session, and last a fixed lifetime (`kiClaimLifetimeTicks`, in 100 ns ticks); a claim whose owning session or worktree no longer exists is orphaned, and self-healing releases an expired or orphaned claim automatically. Deferral is `plan unclaim`, which makes the plan immediately eligible again.
+`/next-plan` validates then uses `plan claim-next`. Claims are PC-local, one per
+session, and last a fixed lifetime (`kiClaimLifetimeTicks`, in 100 ns ticks); a
+claim whose owning session or worktree no longer exists is orphaned, and
+self-healing releases an expired or orphaned claim automatically. Deferral is
+`plan unclaim`, which makes the plan immediately eligible again.
 
-Completion uses `plan complete`; explicit rejection uses `plan reject --user-authorized-rejection`. Preparation removes direct child metadata edges and deletes the target in the Git worktree. After landing succeeds, the claim is deleted.
+Completion uses `plan complete`; explicit rejection uses
+`plan reject --user-authorized-rejection`. Preparation removes direct child
+metadata edges and deletes the target in the Git worktree. After landing
+succeeds, the claim is deleted.
 
 ## Plan files
 
-Plans live in area subdirectories, never directly at `Plans/`. The area is decided by the files the plan's critical-files and `## In scope` sections name, not by what motivated it:
+Plans live in area subdirectories, never directly at `Plans/`. The area is
+decided by the files the plan's critical-files and `## In scope` sections name,
+not by what motivated it:
 
-- `Engine/` — the runtime and asset pipeline: `Engine/`, `Common/`, `DataPacker/`, shaders, and the `AGENTS.md` files that document them.
-- `Game/` — the game built on the engine, under `Projects/`: gameplay collections, spawning and transfer, fleets, player input, game save and settings, and game-side agent commands.
-- `Tools/` — the C++ tools under `Tools/`: WorktreeCli, AgentHarness, ToolCommon.
-- `ChangeWorkflow/` — how agents work rather than what the product does: the root `AGENTS.md`, `.agents/`, `.claude/`, `.codex/`, skills and their scripts, the wrapper and scheduler scripts, and this file.
+- `Engine/` — the runtime and asset pipeline: `Engine/`, `Common/`,
+  `DataPacker/`, shaders, and the `AGENTS.md` files that document them.
+- `Game/` — the game built on the engine, under `Projects/`: gameplay
+  collections, spawning and transfer, fleets, player input, game save and
+  settings, and game-side agent commands.
+- `Tools/` — the C++ tools under `Tools/`: WorktreeCli, AgentHarness,
+  ToolCommon.
+- `ChangeWorkflow/` — how agents work rather than what the product does: the
+  root `AGENTS.md`, `.agents/`, `.claude/`, `.codex/`, skills and their scripts,
+  the wrapper and scheduler scripts, and this file.
 
-A plan spanning areas goes to the area owning most of its named files; a tie stays in `Engine/`.
+A plan spanning areas goes to the area owning most of its named files; a tie
+stays in `Engine/`.
 
 Every Plan sits exactly at `Documents/Plans/<Area>/<Name>.md` and may own a
 support folder named after its file without `.md`
-(`Documents/Plans/<Area>/<Name>/`), holding the files the Plan needs, every
-one committed with the Plan. A ledger support file holds only rows the Plan acts on,
+(`Documents/Plans/<Area>/<Name>/`), holding the files the Plan needs, every one
+committed with the Plan. A ledger support file holds only rows the Plan acts on,
 never excluded false positives. Each file keeps its real format and extension,
-except that a Markdown file is saved as `.txt`: the scheduler reads every
-`.md` under this tree as a plan document, so no `.md` file lives in a support
-folder. No support file's name contains a comma: the session change inventory
-splits its untracked-path list on commas, and a new support file stays
-untracked until its session lands. Every support folder has its Plan beside
-it, and an area holds only Plans, their support folders, and `AGENTS.md`.
-Delete a support folder only
-with `pwsh -NoProfile -File .agents/scripts/Remove-PlanSupportFolder.ps1 -Plan '<Plan path>'`,
-never with a deletion command of your own; `/next-plan`'s claim exit runs it
-for every Plan it completes or rejects, and a Plan removed by hand takes its
-folder through it too.
+except that a Markdown file is saved as `.txt`: the scheduler reads every `.md`
+under this tree as a plan document, so no `.md` file lives in a support folder.
+No support file's name contains a comma: the session change inventory splits its
+untracked-path list on commas, and a new support file stays untracked until its
+session lands. Every support folder has its Plan beside it, and an area holds
+only Plans, their support folders, and `AGENTS.md`. Delete a support folder only
+with
+`pwsh -NoProfile -File .agents/scripts/Remove-PlanSupportFolder.ps1 -Plan '<Plan path>'`,
+never with a deletion command of your own; `/next-plan`'s claim exit runs it for
+every Plan it completes or rejects, and a Plan removed by hand takes its folder
+through it too.
 
-An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
+When primary deletes a Plan file the session has edited, restore the file to
+its session baseline content so the landing takes primary's deletion; never
+carry the edit forward or recreate the Plan.
+
+An executable plan provides metadata, `# Title`, context, design, critical
+files, a required `## In scope` section naming the specific functions, members,
+or regions to change, required `## Out of scope` boundaries, risk
+triggers/invariants, and observable acceptance criteria when a diff is not
+decisive. Put directional prerequisites in metadata, not prose.
 
 A Plan for a proven, reproducible problem whose root cause is not yet confirmed
 carries an investigation portion, the one place a Plan states what is still
@@ -73,8 +114,16 @@ inside that region, surfacing a fix outside it for re-planning instead of
 widening scope; and an acceptance criterion states that the recorded symptom no
 longer reproduces.
 
-Work that splits into stages (the term as `.agents/references/change-workflow.md` `## IMPORTANT: Change Workflow` defines it), each ending at a cut after which the tree builds and that stage's acceptance criteria can pass, is written as one Plan per stage, whether or not the stages edit the same files.
+Work that splits into stages (the term as
+`.agents/references/change-workflow.md` `## IMPORTANT: Change Workflow` defines
+it), each ending at a cut after which the tree builds and that stage's
+acceptance criteria can pass, is written as one Plan per stage, whether or not
+the stages edit the same files.
 
-The two scope sections are the control the finished change is measured against (`.agents/references/scope-authorization.md`), so write each boundary precisely enough to enforce.
+The two scope sections are the control the finished change is measured against
+(`.agents/references/scope-authorization.md`), so write each boundary precisely
+enough to enforce.
 
-Whether a document belongs here follows the deciding test in `../AGENTS.md` `## Planning Trees`. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.
+Whether a document belongs here follows the deciding test in `../AGENTS.md`
+`## Planning Trees`. Work blocked on another change expresses that as a
+`dependsOn` edge; work blocked on a decision is not a Plan yet.

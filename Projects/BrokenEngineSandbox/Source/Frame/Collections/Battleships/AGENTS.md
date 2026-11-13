@@ -3,7 +3,7 @@
 Battleships are a copy of Fighters with larger, slower constants
 (`Battleships.h`): every Fighters invariant (`../Fighters/AGENTS.md`) holds with
 the Battleship names. Keep the two collections parallel; only the tube missiles,
-turning, fleet health, and death below and the Fighters' beam, client-only climb tilt
+fleet health, and death below and the Fighters' beam, client-only climb tilt
 and turn roll, fleet tactics, `pVecVeerOffPoints`, and lack of flee differ: a
 random-spawn Battleship, when island candidates are available, prioritizes
 returning to an island, fleeing its enemy ship when nearby, then chasing it; in
@@ -27,7 +27,10 @@ model as a wreck (`## Wreck Invariants`).
   height rule allows it (`../Ships/AGENTS.md` `## Ship Invariants`), and its
   `pNextMissileFireTimes` cooldown is at or below zero. A launch resets the
   cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
-  ship, so launches come exactly `kBattleshipMissileCooldown` apart.
+  ship, so launches come exactly `kBattleshipMissileCooldown` apart. The
+  simulation keeps the cooldown finite and at most
+  `kBattleshipMissileCooldown`, with no lower clamp; `PostRead` rejects any
+  other row on every Frame read.
 - A launching row launches at most one missile per tick, at the enemy nearest
   it by 3D distance among those within `kfBattleshipMissileRange` that the
   shared plane and line-of-sight targeting rules allow (`../Ships/AGENTS.md`),
@@ -41,38 +44,22 @@ model as a wreck (`## Wreck Invariants`).
 - Tubes are the controller model's packed missile tubes
   ([exporter](../../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment));
   these armed models require at least one. A launch uses the yawed tube nearest
-  the selected enemy in XY (exact tie: first authored), its full aligned Z, and a
-  flattened direction with zero Z. A launch `MissilesPostRender::Spawn` refuses
-  leaves the cooldown unchanged.
-
-## Turning Invariants
-
-- Every Battleship turns at one maximum rate, `kBattleshipMovement`'s
-  `fMaxTurnRate`. Each tick PostRender Update moves the turn rate toward a
-  wanted rate by at most its `fTurnAcceleration` times the tick time
-  (`RampHeadingTurnRate`), and terrain bounce and terrain avoidance pass
-  through that same ramp instead of setting the rate directly. The wanted rate
-  is zero within the heading capture angle of the wanted heading.
-- Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet
-  rows their navigation bearing, random-spawn rows the normalized horizontal
-  direction to their destination, away from it while fleeing and not
-  returning. Without a destination a random-spawn row keeps its previous wanted
-  heading with `ShipFlags::kNoAiDirection` set, and its wanted rate is zero;
-  the flag is clear while it has one.
-- Interpolate Update, while the previous turn rate is exactly 0, the previous
-  row does not carry `ShipFlags::kNoAiDirection`, and the previous wanted
-  heading is within the capture angle, rotates the direction a fixed percent
-  toward it each tick.
+  the selected enemy in XY (exact tie: first authored), its full aligned Z, and
+  a flattened direction with zero Z. A launch `MissilesPostRender::Spawn`
+  refuses leaves the cooldown unchanged.
 
 ## Fleet Health Invariants
 
-- A fleet-controlled Battleship never dies, a harness-injected one included: when collision, area, or beam damage takes its health to 0 or below, PostRender holds its health at 0 and starts no explosion, and it otherwise behaves as any Battleship. Its health is never refilled.
+- A fleet-controlled Battleship never dies, a harness-injected one included:
+  when collision, area, or beam damage takes its health to 0 or below,
+  PostRender holds its health at 0 and starts no explosion, and it otherwise
+  behaves as any Battleship. Its health is never refilled.
 
 ## Wreck Invariants
 
 - Wrecks are client-only render state, the `sWrecks` list in
   `BattleshipsRender.cpp`, outside every Frame, CRC, save, and the wire, keyed
-  by `(GridCoord, battleship_t)`. `BeginRender` captures, once per key, each row
+  by `(GridCoord, battleship_t)`. `UpdateWrecks` captures, once per key, each row
   whose interpolated `pDestroyedTimes` is at or above zero in a visible cell, so
   only a combat death makes one; a `kDestroyShip` or harness `kDestroy` removal
   leaves none.
@@ -80,7 +67,7 @@ model as a wreck (`## Wreck Invariants`).
   hexagon overlaps the camera's cell loaded area (`mf4CellLoadedArea`), or
   during a camera jump the previous cell loaded area
   (`mf4PreviousCellLoadedArea`), by the client subscription's
-  `RectangleOverlapsHex` test. Each `BeginRender` drops every
+  `RectangleOverlapsHex` test. Each `UpdateWrecks` drops every
   wreck whose cell is not visible and every sinking wreck whose hull top is
   below the water.
 - Capture samples the cell's elevation under the hull box's center and four
@@ -90,9 +77,11 @@ model as a wreck (`## Wreck Invariants`).
 - A wreck falls straight down, its gravity ramping up over
   `kBattleshipWreckPowerLossTime`, then brakes hard once its center reaches
   z = 0 to `kfBattleshipWreckSinkSpeed`, stepped by the sim-scaled render delta
-  and not at all while paused. Capture, motion, and prune run only in
-  `BeginRender`, so map view's world-hidden frames freeze wrecks, and a death
-  wholly inside map view leaves none.
+  and not at all while paused. Capture, motion, and prune run in
+  `UpdateWrecks`, which `BeginRender` calls on a world frame and the game's
+  world-hidden step (`FrameInterpolate::UpdateWorldHidden`) calls behind an
+  opaque map, so wrecks keep falling there and a death wholly inside map view
+  leaves one.
 - `Game::ResetGameState` and `ClientSession::OnServerLoad` clear the list,
   because cell-local Ids restart there.
 - Dying rows are not drawn. A coordinate and pipeline's visible wrecks take the

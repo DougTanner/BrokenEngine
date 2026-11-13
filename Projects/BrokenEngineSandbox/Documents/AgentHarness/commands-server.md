@@ -19,12 +19,12 @@ adding the fields below; the other entries are its own commands. For the engine
   scheduled for a later `tick` until a drain releases them.
 - `replay_transfer_capture`: takes over the engine
   [`replay_transfer_capture`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
-  adding `fighterCount`, `omniCount`, `battleshipCount`, `blasterCount`, and `missileCount` to
-  each `events` entry, each entry's counts summed across the destinations of
-  that tick. A spawn, whether an `inject_payload` or a fleet spawn, counts under
-  its collection's count, as a transfer does; a `SpawnExplosion` counts under
-  none, so an event holding only explosion spawns has every count zero.
-- `query_frame`: `{"coord":[q,r]}` for a loaded, ready cell. Returns counts under `fighters`, `omnis`, `battleships`, `missiles`, and `blasters`.
+  adding `fighterCount`, `omniCount`, `battleshipCount`, `blasterCount`, and
+  `missileCount` to each `events` entry, each entry's counts summed across the
+  destinations of that tick. A spawn, whether an `inject_payload` or a fleet
+  spawn, counts under its collection's count, as a transfer does.
+- `query_frame`: `{"coord":[q,r]}` for a loaded, ready cell. Returns counts
+  under `fighters`, `omnis`, `battleships`, `missiles`, and `blasters`.
 - `query_collection`:
   `{"coord":[q,r],"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
   A negative `offset` or `limit` is a parameter error. Returns
@@ -54,21 +54,20 @@ adding the fields below; the other entries are its own commands. For the engine
   keys. Overwrites chosen values in the cell's current frame, the frame
   `query_frame` reads, at the command drain, paused or not; the next tick
   simulates from the edited frame. Each edit is
-  `{"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters"|"explosions"|"pushers","index":int,"writes":{...}}`
+  `{"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters"|"pushers","index":int,"writes":{...}}`
   or `{"collection":"frame","writes":{...}}`, with no other keys. A collection
   edit's `index` is a row with `0 <= index < count`, the collection's row count
-  (`query_frame` reports it for fighters, omnis, battleships, missiles, and blasters;
-  `read_frame` reports it as `count`, and an out-of-range index fails with an
-  error naming it), and its `writes` keys may name any column of that
+  (`query_frame` reports it for fighters, omnis, battleships, missiles, and
+  blasters; `read_frame` reports it as `count`, and an out-of-range index fails
+  with an error naming it), and its `writes` keys may name any column of that
   collection's Interpolate and PostRender structs; a `frame` edit takes no
   `index` and its keys are `fSpawnTimer`, `randomEngine`, `uiNextUuid`,
   `uiFrameIdentifier`, `uiPinned`, `alignments`, `randomAlignment`, and
   `fleetAlignment` (`uiPinned` nonzero pins the cell and 0 releases it, as the
   engine
   [`create_cell`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands)
-  describes);
-  `iTick` and `fDeltaTime` are named but refused as clock values. Collection
-  keys are the C++ member names, verbatim, as listed in
+  describes); `iTick` and `fDeltaTime` are named but refused as clock values.
+  Collection keys are the C++ member names, verbatim, as listed in
   `Agent/Commands/ServerFrameEdit.cpp`; `frame` keys are each frame struct's
   `Values()` entries, in `Engine/Source/Frame/FrameBase.h` and `Frame/Frame.h`;
   client-only columns are not listed and fail. Edits apply in request order.
@@ -81,19 +80,17 @@ adding the fields below; the other entries are its own commands. For the engine
   the element's current w; a flags column, such as a ship's `pOrders` or
   `pFlags`, an integer within its underlying type; a ship's `pController`
   `"Fleet"` or `"RandomSpawn"`, the form `read_frame` returns;
-  `engine::AlignmentIdentifier` an integer within `uint32_t`;
-  `engine::GlobalId` an integer within `int64_t`;
-  `engine::ClientGuid` `[high,low]`; `engine::GridCoord` a `[q,r]` grid
-  coordinate; the `explosions` `pTrailTimes` array exactly
-  `kiMaxExplosionTrails` values; `randomEngine` a nonzero integer within
-  `uint64_t`; `alignments` an array of `{"a","b","flags"}` objects (`a` and `b`
-  integers within `uint32_t`, `flags` an integer within `uint8_t`: 1 enemies, 2
-  allies, 3 both) that replaces the alignment table, rebuilt in sorted order, so
-  an empty array clears it. `edit_frame` never adds or removes a row itself: an
-  agent adds rows through `inject_payload` spawn entries and removes one by
-  writing its kill state (below), or for a ship by an `inject_payload`
-  `DestroyShip` entry. Identity and handle columns (`engine::Id<T>`, such as
-  `pIds`, `pPushers`, and `pRegistryIds`) are refused.
+  `engine::AlignmentIdentifier` an integer within `uint32_t`; `engine::GlobalId`
+  an integer within `int64_t`; `engine::ClientGuid` `[high,low]`;
+  `engine::GridCoord` a `[q,r]` grid coordinate; `randomEngine` a nonzero
+  integer within `uint64_t`; `alignments` an array of `{"a","b","flags"}`
+  objects (`a` and `b` integers within `uint32_t`, `flags` an integer within
+  `uint8_t`: 1 enemies, 2 allies, 3 both) that replaces the alignment table,
+  rebuilt in sorted order, so an empty array clears it. `edit_frame` never adds
+  or removes a row itself: an agent adds rows through `inject_payload` spawn
+  entries and removes one by writing its kill state (below), or for a ship by
+  an `inject_payload` `DestroyShip` entry. Identity and handle columns
+  (`engine::Id<T>`, such as `pIds`, `pPushers`, and `pRegistryIds`) are refused.
 
   `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked,
   apart from a ship's `pGlobalIds` and `pClientGuids` under the
@@ -102,11 +99,10 @@ adding the fields below; the other entries are its own commands. For the engine
   but no assert. Positions are also unchecked, apart from a ship's height under
   that admission, and a flying (neither falling nor dying) missile's height and
   velocity z, which the save reader requires to be finite and 0 respectively.
-  Positions must stay inside the cell: an out-of-cell omni position
-  transfers to one edge neighbour, so a position more than one neighbour step out
-  asserts in the source cell's `FramePostRenderBase::PrepareTransferRequest`
-  before any transfer ([Frame
-  invariants](../../../../Engine/Source/Frame/AGENTS.md)).
+  Positions must stay inside the cell: an out-of-cell omni position transfers to
+  one edge neighbour, so a position more than one neighbour step out asserts in
+  the source cell's `FramePostRenderBase::PrepareTransferRequest` before any
+  transfer ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
@@ -134,7 +130,6 @@ adding the fields below; the other entries are its own commands. For the engine
   | `fighters`, `battleships` | `pLifecycleFlags:2` (`kDestroy`) | Use a killing blaster hit or missile blast to start natural staged death. Directly setting `kDying` fails the ship pusher ownership check because identity and handle columns cannot be edited. `pfHealths:0` alone changes nothing until the next hit |
   | `missiles` | `pLifecycleFlags:2` (`kDestroy`) | none: `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
   | `blasters` | `pLifecycleFlags:2` (`kDestroy`) | none |
-  | `explosions` | `pLifecycleFlags:2` (`kDestroy`); a row with trails takes its trails with it. Also `pLifecycleFlags:4` (`kDying`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pLifecycleFlags:4` on a row with trails: the row goes when its last trail ends. A row with neither bit, such as a `SpawnExplosion` injected without `lifecycleFlags`, is never removed unless one is written |
   | `pushers` | removed when their owning ship releases them or is removed | |
 
   - A `pFlags` or `pLifecycleFlags` write replaces the whole mask, so include
@@ -150,8 +145,8 @@ adding the fields below; the other entries are its own commands. For the engine
   - A fleet-controlled Battleship cannot be removed or detached from its fleet:
     the commit fails when a `battleships` row whose live or staged `pController`
     is `Fleet` is given `kDestroy` or `kDying`, or has its `pController` changed
-    away from `Fleet`, and when a row whose live `pController` is `Fleet` has its
-    `pGlobalIds` or `pClientGuids` changed (`inject_payload` `DestroyShip`
+    away from `Fleet`, and when a row whose live `pController` is `Fleet` has
+    its `pGlobalIds` or `pClientGuids` changed (`inject_payload` `DestroyShip`
     refuses its destruction too).
 
   With a handshaken client, each successful edit runs the load-time
@@ -175,7 +170,13 @@ adding the fields below; the other entries are its own commands. For the engine
   are not resynchronized. Without a client nothing is resynchronized and queued
   entries survive.
 
-  Recipe: `load {"pauseAfterLoad":true}` or `pause {"paused":true}`, then `create_cell` when the scenario needs an isolated empty cell, then `edit_frame`, then `pause {"paused":false}`; edit before `inject_payload`, because with a handshaken client the resynchronization drops queued entries, as `load` and `reset` do. Edits are never recorded into a replay; recording an edit into the replay stream could be built if an agent needs edits inside a recorded scenario.
+  Recipe: `load {"pauseAfterLoad":true}` or `pause {"paused":true}`, then
+  `create_cell` when the scenario needs an isolated empty cell, then
+  `edit_frame`, then `pause {"paused":false}`; edit before `inject_payload`,
+  because with a handshaken client the resynchronization drops queued entries,
+  as `load` and `reset` do. Edits are never recorded into a replay; recording an
+  edit into the replay stream could be built if an agent needs edits inside a
+  recorded scenario.
 - `read_frame`: `{"coord":[q,r],"collection":<name>,"index"?:int}`; these are
   the only top-level keys. Reads one row or the frame-wide values of the cell's
   current frame, the frame `query_frame` reads, and changes nothing.
@@ -183,16 +184,21 @@ adding the fields below; the other entries are its own commands. For the engine
   collection read requires `index` with `0 <= index < count` and returns
   `{"count":int,"index":int,"values":{...}}`, `count` being the collection's row
   count and `values` holding one key per column of that collection, identity and
-  handle columns included. A `frame` read takes no `index` and returns
+  handle columns included. An index names a row only until the next unpaused
+  tick: that tick's Destroy phase removes each dead or departing row by
+  swap-and-pop, moving the last row into its slot, and spawns, arrivals, and
+  fleet respawns append rows. A reader that spans ticks confirms a ship row by
+  matching its `pIds` with the `query_collection` row's `uuid`, not by
+  `pGlobalIds`, which is 0 on every random-spawn row and stays the same across a
+  fleet ship's respawn. A `frame` read takes no `index` and returns
   `{"values":{...}}`, one key per `edit_frame` `frame` key plus the clock values
-  `iTick` and `fDeltaTime`. The keys are the `edit_frame` keys;
-  key order is not meaningful. Each value takes the `edit_frame` form for its
-  member type, except that `XMVECTOR` returns `[x,y,z]` with no w, an
-  `engine::Id<T>` column such as `pIds` or `pPushers` returns its uuid integer,
-  `iTick` returns an integer, and `alignments` returns the stored table in
-  sorted order with `a <= b` in each pair. The command fails without
-  `kbDebugInput`; recording, playback, and a pending `replay_record` or
-  `replay_play` transition do not refuse it.
+  `iTick` and `fDeltaTime`. The keys are the `edit_frame` keys; key order is not
+  meaningful. Each value takes the `edit_frame` form for its member type, except
+  that `XMVECTOR` returns `[x,y,z]` with no w, an `engine::Id<T>` column such as
+  `pIds` or `pPushers` returns its uuid integer, `iTick` returns an integer, and
+  `alignments` returns the stored table in sorted order with `a <= b` in each
+  pair. The command fails without `kbDebugInput`; recording, playback, and a
+  pending `replay_record` or `replay_play` transition do not refuse it.
 - `inject_payload`: `{"entries":[...],"pauseAfterWriterInput"?:bool}`; these are
   the only top-level keys, and `entries` is a non-empty array. It queues spawns
   into a cell's post-tick batch, the batch that also carries that tick's
@@ -203,23 +209,23 @@ adding the fields below; the other entries are its own commands. For the engine
   `{"coord":[q,r],"type":<type>,"tick"?:int,...fields}` with a `type` from the
   table below; a key other than `coord`, `type`, `tick`, and that type's fields
   fails the batch. Field keys are the `Fields()` member tokens of the type's
-  payload, verbatim: the collection's `SpawnInfo` for a spawn type (`Frame/Collections/<Collection>/<Collection>.h`; Explosions in
-  `Engine/Source/Frame/Collections/Explosions/Explosions.h`) and the destroy and
-  update payloads in `Frame/StatusChange.h`. Values by member type: `bool` a
-  JSON boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in
-  `[0,255]`; `float` a finite number; `std::chrono::duration<float>` a finite
-  number of seconds; `engine::GridCoord` a `[q,r]` grid coordinate; `XMVECTOR`
-  an `[x,y]` pair of finite numbers in the cell's local frame, a position being
-  meters from the cell's center: a ship spawn's `vecPosition` takes z at the
-  height of its `orders` target flight plane (`orders` 256 names plane 1) and its `uiFlightPlane` that plane whatever the entry supplies, any
-  other `vecPosition` z at the lowest flight plane, both w 1,
-  and every other vector z 0 and w 0; `engine::AlignmentIdentifier`
-  `"fleet"` or `"random"`, the game's two alignments; a ship's `eController`
-  `"Fleet"` or `"RandomSpawn"`; an `eType` `"Fighter"`, `"Omni"`, or
-  `"Battleship"`; a flags member, such as a ship's `orders` or an omni's
-  `flags`, the whole mask as an integer within its underlying type, replacing
-  the default mask; `flagshipGlobalId` an integer; and a ship's own `globalId`
-  is refused, because the server mints it.
+  payload, verbatim: the collection's `SpawnInfo` for a spawn type
+  (`Frame/Collections/<Collection>/<Collection>.h`) and the destroy and update
+  payloads in `Frame/StatusChange.h`. Values by member type: `bool` a
+  JSON boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in `[0,255]`;
+  `float` a finite number; `std::chrono::duration<float>` a finite number of
+  seconds; `engine::GridCoord` a `[q,r]` grid coordinate; `XMVECTOR` an `[x,y]`
+  pair of finite numbers in the cell's local frame, a position being meters from
+  the cell's center: a ship spawn's `vecPosition` takes z at the height of its
+  `orders` target flight plane (`orders` 256 names plane 1) and its
+  `uiFlightPlane` that plane whatever the entry supplies, any other
+  `vecPosition` z at the lowest flight plane, both w 1, and every other vector z
+  0 and w 0; `engine::AlignmentIdentifier` `"fleet"` or `"random"`, the game's
+  two alignments; a ship's `eController` `"Fleet"` or `"RandomSpawn"`; an
+  `eType` `"Fighter"`, `"Omni"`, or `"Battleship"`; a flags member, such as a
+  ship's `orders` or an omni's `flags`, the whole mask as an integer within its
+  underlying type, replacing the default mask; `flagshipGlobalId` an integer;
+  and a ship's own `globalId` is refused, because the server mints it.
 
   | `type` | Fields |
   |--------|--------|
@@ -228,7 +234,6 @@ adding the fields below; the other entries are its own commands. For the engine
   | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextMissileFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
   | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
-  | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
   | `UpdateShip` | `eType` (required), `iUuid` (required), `navigationDelaySeconds`, `uiTargetFlightPlane` |
   | `UpdateFleet` | `eType` (required), `iUuid` (required), `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
@@ -237,18 +242,18 @@ adding the fields below; the other entries are its own commands. For the engine
   names, which changes when the ship crosses cells. An omitted field takes its
   payload struct default (for example `eController` `"Fleet"`, empty `orders`,
   an omni's `flags` 8, `kBlasterSpawnLeft`, and `navigationDelay` 60), except
-  that `vecPosition` defaults to the cell center; `vecDirection`,
-  `vecVelocity`, and a missile's `vecStoredDirection` to `[1,0]`; `alignment` to
-  `"fleet"`; a ship's `fleetWantedCoordinate` to `coord`; a `SpawnMissile`'s
-  `flags`, when the entry has no `flags` key, to `kTargetRandom` (16) for a
-  `"fleet"` `alignment` and to `kTargetFleet` (8) otherwise; and the
-  `UpdateFleet` `uiPendingFleetWantedCoordinateTicks` to 32
-  (`engine::kiTickRate`); the
+  that `vecPosition` defaults to the cell center; `vecDirection`, `vecVelocity`,
+  and a missile's `vecStoredDirection` to `[1,0]`; `alignment` to `"fleet"`; a
+  ship's `fleetWantedCoordinate` to `coord`; a `SpawnMissile`'s `flags`, when
+  the entry has no `flags` key, to `kTargetRandom` (16) for a `"fleet"`
+  `alignment` and to `kTargetFleet` (8) otherwise; and the `UpdateFleet`
+  `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
   plane. A missile returns to plane 0 from any launch height. Ship spawn height
-  follows [shared ship policy](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants).
-  A spawn gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
-  unless the entry sets them. `bTransfer` defaults to false, so the
+  follows
+  [shared ship policy](../../Source/Frame/Collections/Ships/AGENTS.md#ship-invariants).
+  A spawn gets no arrival values: `transferLockTimer` and `arrivalGracePeriod`
+  stay 0 unless the entry sets them. `bTransfer` defaults to false, so the
   collection's `Spawn` starts the row as a fresh spawn; a fighter or battleship
   then takes full health (`kfFighterHealth`, `kfBattleshipHealth`) whatever
   `fHealth` says and an omni full armor and shield (`kfOmniArmor`,
@@ -257,37 +262,34 @@ adding the fields below; the other entries are its own commands. For the engine
   for a ship spawn whose `eController` is `"Fleet"` (a `"RandomSpawn"` ship
   keeps global id 0) and an empty client GUID, so an injected ship is synthetic
   AI and not an ownership harness rig; a missile starts with no homing target,
-  which only in-tick code sets. A `SpawnExplosion` starts at the simulation time
-  of the tick it is applied after, in its `coord`.
-  Any other `uiTargetFlightPlane` sets the ship's target flight plane, toward
-  which it then climbs or descends; a Fighter's own PostRender Update rewrites
-  that plane from the next tick whenever it runs its
+  which only in-tick code sets. Any other `uiTargetFlightPlane` sets the ship's
+  target flight plane, toward which it then climbs or descends; a Fighter's own
+  PostRender Update rewrites that plane from the next tick whenever it runs its
   [fleet or attack tactics](../../Source/Frame/Collections/Fighters/AGENTS.md),
   and a fleet or random-spawn Omni's on every tick outside its transfer lock
-  ([Omni behavior](../../Source/Frame/Collections/Omnis/AGENTS.md)).
-  Every `UpdateShip` entry also applies its `navigationDelaySeconds`, default
+  ([Omni behavior](../../Source/Frame/Collections/Omnis/AGENTS.md)). Every
+  `UpdateShip` entry also applies its `navigationDelaySeconds`, default
   included, and resets the ship's cell-change timer to that delay, so an entry
   that only changes the plane restates the ship's current delay (`read_frame`
   `pNavigationDelays`).
 
   The batch also fails during replay playback, on an inactive `coord`, on an
-  unknown key, on a value outside its member type's form above, on a
-  non-finite value, on a `vecPosition` outside the cell, on a ship spawn whose
-  `orders` target flight plane its type does not allow
-  (`'orders' target flight plane is not allowed for <type>`), on an
-  `UpdateShip` `uiTargetFlightPlane` other than 255 that its `eType` does not
-  allow (`'uiTargetFlightPlane' is not allowed for <type>`), on a `SpawnBlaster` or
-  `SpawnExplosion` `iTypeIndex` that is not an adoptable blaster or explosion
-  type, on a `SpawnExplosion` `iTrailCount` below 0 or
-  `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
-  exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a `navigationDelay` or
-  `navigationDelaySeconds` outside `[0,60]`, on a ship spawn whose
-  `vecDirection` is not a horizontal unit vector within
+  unknown key, on a value outside its member type's form above, on a non-finite
+  value, on a `vecPosition` outside the cell, on a ship spawn whose `orders`
+  target flight plane its type does not allow
+  (`'orders' target flight plane is not allowed for <type>`), on an `UpdateShip`
+  `uiTargetFlightPlane` other than 255 that its `eType` does not allow
+  (`'uiTargetFlightPlane' is not allowed for <type>`), on a `SpawnBlaster`
+  `iTypeIndex` that is not an adoptable blaster type, on a `SpawnOmni`
+  `vecVelocity` whose XY length exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a
+  `navigationDelay` or `navigationDelaySeconds` outside `[0,60]`, on a ship
+  spawn whose `vecDirection` is not a horizontal unit vector within
   `kfShipHeadingUnitTolerance` (`IsShipHeadingUnit`, `ShipBehaviours.h`), on a
-  `nextBlasterFireTime`
-  outside `[0,kBlasterFireInterval]`,
-  and on a `DestroyShip` whose `iUuid` names a fleet-controlled Battleship in
-  its `coord`'s current frame. The command makes no terrain check; a blaster
+  `nextBlasterFireTime` outside `[0,kBlasterFireInterval]`, on a
+  `nextBeamFireTime` above `kFighterBeamCooldown` or a `nextMissileFireTime`
+  above `kBattleshipMissileCooldown` (`'<field>' is out of range`), and on a
+  `DestroyShip` whose `iUuid` names a fleet-controlled Battleship in its
+  `coord`'s current frame. The command makes no terrain check; a blaster
   destroys itself on terrain contact, so a `SpawnBlaster` that must survive
   needs a terrain-clear `vecPosition` (the probe in
   [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
@@ -307,15 +309,15 @@ adding the fields below; the other entries are its own commands. For the engine
   `kfOmniMaximumSpeed`, so the omni coasts under its transfer lock, which skips
   navigation and acceleration, and crosses into the northern neighbor, `<cell>`
   plus `[0,1]`, about 16 ticks after the tick it is applied, through the
-  ordinary transfer producers; that crossing creates the neighbor when it is
-  not active. A smaller margin crosses sooner: `vecPosition:[0,449.5]` crosses
-  on the first tick after the one it is applied. For another edge, rotate both
+  ordinary transfer producers; that crossing creates the neighbor when it is not
+  active. A smaller margin crosses sooner: `vecPosition:[0,449.5]` crosses on
+  the first tick after the one it is applied. For another edge, rotate both
   vectors to that edge's direction: edge k of the `kCellDirections` table
-  (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`) faces
-  30 - 60k degrees from +x, for example `[375.73,216.93]` and `[28.86,16.66]` for
-  the NE edge (k = 0), and the omni arrives at `<cell>` plus that entry's axial
-  delta. Terrain near that path can push the coast off its line; then pick
-  another cell.
+  (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`) faces 30 - 60k
+  degrees from +x, for example `[375.73,216.93]` and `[28.86,16.66]` for the NE
+  edge (k = 0), and the omni arrives at `<cell>` plus that entry's axial delta.
+  Terrain near that path can push the coast off its line; then pick another
+  cell.
 
   `tick` is an absolute `status.tick` value and must be a JSON integer greater
   than the current `status.tick`; omitted, it means the next tick,
@@ -342,10 +344,19 @@ adding the fields below; the other entries are its own commands. For the engine
   and pauses at `N + 1`, the writer input of the event tick whose post-dispatch
   record is written later in the same update.
 
-  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for ship spawn entries whose `eController` is `"Fleet"`, in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
+  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`.
+  `globalIds` lists the ids minted for ship spawn entries whose `eController` is
+  `"Fleet"`, in entry order, and `deferred` is true while the server is paused.
+  A request carrying `pauseAfterWriterInput` adds its echo.
 
-Every grid-coordinate parameter of this project's server commands (`coord`, `fleetWantedCoordinate`) follows the engine
+Every grid-coordinate parameter of this project's server commands (`coord`,
+`fleetWantedCoordinate`) follows the engine
 [grid-coordinate rule](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
-and a bad one fails `inject_payload` before that entry mints an ID and before anything is queued.
+and a bad one fails `inject_payload` before that entry mints an ID and before
+anything is queued.
 
-`inject_payload` fails during replay playback. While paused, it remains accepted and queued; `deferred:true` means each entry applies on the next unpaused tick, or on its `tick` when that is later. A speculative client reconciliation line after that tick is not a confirmed desync; only `CONFIRMED DESYNC after full rollback/replay` proves one.
+`inject_payload` fails during replay playback. While paused, it remains accepted
+and queued; `deferred:true` means each entry applies on the next unpaused tick,
+or on its `tick` when that is later. A speculative client reconciliation line
+after that tick is not a confirmed desync; only
+`CONFIRMED DESYNC after full rollback/replay` proves one.

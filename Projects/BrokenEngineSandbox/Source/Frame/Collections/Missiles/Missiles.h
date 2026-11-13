@@ -107,6 +107,8 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 	static void GraphicsResources();
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
+	// Requests the model pipeline's textures when an active cell holds a row.
+	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 #endif // BT_CLIENT

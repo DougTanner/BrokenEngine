@@ -121,10 +121,9 @@ private:
 
 	struct PendingCell
 	{
-		uint64_t uiPreparation = 0;
 		ReceivedCellIdentity identity;
 		std::optional<CellStaticData> optionalStaticData;
-		std::optional<CellStaticData> optionalAuthoritativeStaticData;
+		std::optional<std::vector<NavData>> optionalNavigationData;
 		std::unique_ptr<game::Frame> pLocalFrame;
 		std::optional<ReceivedCoordFullState> optionalFullState;
 		std::unordered_map<int64_t, ReceivedCoordUpdate> updates;
@@ -138,12 +137,9 @@ private:
 	void StartTerrainPreparation();
 	void PublishPreparedCells();
 	void AdoptFullState(ReceivedCoordFullState& rFullState);
-	void ResolveAuthoritativeTerrain(PendingCell& rPending);
 	std::unordered_map<GridCoord, PendingCell> mPendingCells;
 	std::future<CellStaticData> mTerrainPreparation;
 	GridCoord mPreparingCoordinate {};
-	uint64_t muiNextPreparation = 0;
-	uint64_t muiPreparingIdentity = 0;
 
 	void ResetForConnect();
 	void ResetForServerLoad();

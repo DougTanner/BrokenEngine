@@ -493,6 +493,27 @@ XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData
 	return vecWaypoint;
 }
 
+XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane)
+{
+	// The neighbouring cell centre whose horizontal direction from the ship has the largest cosine with the ship's
+	// horizontal offset from the threat; an exact tie, a zero offset included, keeps the first entry in table order.
+	XMVECTOR vecAwayDirection = XMVector2Normalize(XMVectorSubtract(vecPosition, vecThreat));
+	XMVECTOR vecPickedCenter = XMVectorZero();
+	float fBestCosine = -std::numeric_limits<float>::max();
+	for (const common::HexDirection& rDirection : engine::kCellDirections.pEntries)
+	{
+		XMVECTOR vecCenter = XMVectorSet(rDirection.f2CenterOffset.x, rDirection.f2CenterOffset.y, 0.0f, 1.0f);
+		float fCosine = XMVectorGetX(XMVector2Dot(XMVector2Normalize(XMVectorSubtract(vecCenter, vecPosition)), vecAwayDirection));
+		if (fCosine > fBestCosine)
+		{
+			fBestCosine = fCosine;
+			vecPickedCenter = vecCenter;
+		}
+	}
+	bool bFinalWaypoint = false;
+	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecPickedCenter, rNavRectangleBoard, iTargetFlightPlane, bFinalWaypoint);
+}
+
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	engine::GlobalId globalId = VisitShip(rFrame, self, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
@@ -678,7 +699,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	}
 }
 
-XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, ShipFlags_t& rFlags, bool& rbHasDestination)
+XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination)
 {
 	XMVECTOR vecToEnemy = bEnemyFound ? XMVectorSubtract(vecNearestEnemy, vecPosition) : XMVectorZero();
 	float fEnemyDistance = bEnemyFound ? XMVectorGetX(XMVector3Length(vecToEnemy)) : kfFleeEndDistance + 1.0f;
@@ -723,12 +744,12 @@ XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> is
 	}
 
 	rbHasDestination = true;
-	XMVECTOR vecDestination = bEnemyFound ? vecNearestEnemy : vecIslandCenter;
-	if (rFlags & ShipFlags::kReturnToIslandCenter)
+	if (bEnemyFound && !(rFlags & ShipFlags::kReturnToIslandCenter))
 	{
-		vecDestination = vecIslandCenter;
+		return vecNearestEnemy;
 	}
-	return vecDestination;
+	bool bFinalWaypoint = false;
+	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecIslandCenter, rNavRectangleBoard, iTargetFlightPlane, bFinalWaypoint);
 }
 
 bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection)
@@ -744,18 +765,6 @@ void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection)
 	{
 		rVecAiDirection = vecAiDirection;
 	}
-}
-
-void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation)
-{
-	if (bHasDestination)
-	{
-		XMVECTOR vecToDestinationNormal = XMVector3Normalize(XMVectorSubtract(vecDestination, vecPosition));
-		float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(vecDirection, vecToDestinationNormal));
-		float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? fTurnRate : -fTurnRate;
-		rfDeltaRotation = std::lerp(fWantedDeltaRotation, rfDeltaRotation, common::ExponentialDecay(fSmoothing, deltaTime.count()));
-	}
-	rfDeltaRotation = common::ExponentialDecay(fDecay, deltaTime.count()) * rfDeltaRotation;
 }
 
 float RampHeadingTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants)

@@ -157,10 +157,15 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 	static void GraphicsResources();
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
+	// Requests the textures of each controller's model pipeline that has a row in an active cell.
+	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
 #if defined(BT_CLIENT)
+	// Drops the wrecks whose cell left view and the sunk ones, captures each visible dying row, then advances every wreck
+	// by the sim-scaled render delta, or not at all while paused. Called from BeginRender and on world-hidden frames.
+	static void UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	// Drops every wreck; called where cell-local Ids restart (session reset, server load).
 	static void ClearWrecks();
 #endif
@@ -172,14 +177,27 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 {
 	static constexpr int64_t kiVersion = 8;
 
-	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, no navigation-delay admission accepts an out-of-range delay, every simulation write and
-	// ship spawn stores a horizontal unit AI direction, no controller writes a target flight plane the type disallows, and
-	// only a fleet spawn writes a client GUID or a global ID.
+	// Simulation keeps the missile countdown finite and at most kBattleshipMissileCooldown; the floor is only finite
+	// because a battleship with no target counts down without a clamp. Written as one range test so NaN and both
+	// infinities fail it too.
+	static bool IsMissileFireTimeInRange(float fTime)
+	{
+		return fTime >= -std::numeric_limits<float>::max() && fTime <= kBattleshipMissileCooldown.count();
+	}
+
+	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, a +inf missile
+	// countdown never launches, one above the cooldown delays the launch past it, and NaN launches without the cooldown,
+	// an unknown controller selects no script, no navigation-delay admission accepts an out-of-range delay, every
+	// simulation write and ship spawn stores a horizontal unit AI direction, no controller writes a target flight plane
+	// the type disallows, and only a fleet spawn writes a client GUID or a global ID.
 	static void PostRead(const BattleshipsPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
+			if (!IsMissileFireTimeInRange(rCurrent.pNextMissileFireTimes[i].count()))
+			{
+				throw std::ios_base::failure("BattleshipsPostRender pNextMissileFireTimes");
+			}
 			if (!std::isfinite(rCurrent.pfHealths[i]))
 			{
 				throw std::ios_base::failure("BattleshipsPostRender pfHealths");

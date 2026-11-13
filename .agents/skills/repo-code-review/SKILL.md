@@ -30,24 +30,21 @@ Delegation form: `../../references/subagent-reporting.md`
 
 Require a self-contained brief containing:
 
-- the session baseline as a full Git SHA, complete immutable authorized C++ diff,
-  and exact changed files/regions, separated from pre-existing and concurrently
-  owned changes;
+- the session baseline as a full Git SHA, complete immutable authorized C++
+  diff, and exact changed files/regions, separated from pre-existing and
+  concurrently owned changes;
 - a `broken-engine-code-quality-targets/v1` targets file, produced for a
   manager-saved run by
-  `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
-  -RepositoryRoot '<absolute repository toplevel>'
-  -Baseline <full 40-character SHA> -EmitTargets >
-  Temp/code-review-targets.json`, adding
-  `-IncludeUntracked '<comma-separated paths>'` for authorized untracked
-  additions and `-Head <commit>` for a committed head, from that
-  authorized diff (or focused re-review), listing the script-selected baseline
-  and current C++ paths of additions, deletions, and renames; it excludes
-  pre-existing and concurrently owned changes. Its `paths` are the C++ target
-  set selected by the same run's `cpp` and `dual-language-header` classes,
-  requiring no separately supplied class decision. Those script class rules
-  are the only statement of which `.h` files are GLSL-only, and every
-  `dual-language-header` entry routes to both this C++ review and the GLSL review;
+  `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -EmitTargets > Temp/code-review-targets.json`,
+  adding `-IncludeUntracked '<comma-separated paths>'` for authorized untracked
+  additions and `-Head <commit>` for a committed head, from that authorized diff
+  (or focused re-review), listing the script-selected baseline and current C++
+  paths of additions, deletions, and renames; it excludes pre-existing and
+  concurrently owned changes. Its `paths` are the C++ target set selected by the
+  same run's `cpp` and `dual-language-header` classes, requiring no separately
+  supplied class decision. Those script class rules are the only statement of
+  which `.h` files are GLSL-only, and every `dual-language-header` entry routes
+  to both this C++ review and the GLSL review;
 - approved intent, plan and deltas, affected contracts, and declared
   invariants;
 - implementation handoff, acceptance criteria, notes on which other code sites
@@ -72,11 +69,11 @@ and `paths`, so a check of that file confirms those two keys. Never rebuild the
 targets file or restate the class decision inline.
 
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
-or invariants are missing or moving. Do not reconstruct them from a mutable merge
-base, derive a broader target selection from checkout changes, or expand a supplied
-review into an open-ended repository audit. After an accepted fix, review only the
-fixed region and directly affected paths unless a reproducible failure justifies
-another round.
+or invariants are missing or moving. Do not reconstruct them from a mutable
+merge base, derive a broader target selection from checkout changes, or expand a
+supplied review into an open-ended repository audit. After an accepted fix,
+review only the fixed region and directly affected paths unless a reproducible
+failure justifies another round.
 
 ## Handoff
 

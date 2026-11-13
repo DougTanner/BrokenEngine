@@ -29,16 +29,16 @@ primary checkout, and no candidate rebases or changes the fixed baseline.
 Each candidate implementer edits the affected tracked-shape source and project
 membership in its own worktree. The manager dispatches the existing `/compile`
 builder workflow inside that worktree: target/configuration follows candidate
-affinity, using Client or Server Debug as appropriate; shared interfaces
-compile under both affinities. The builder is the sole compiler owner and
-returns a structured result tied to that worktree, branch, candidate, and
-baseline. The manager semantically owns the comparison evidence, user
-interaction, exact user selection, and selected-design handoff. The coordinator
-implementer materializes one comparison packet within the manager-supplied
-run scope and is its only filesystem writer; the manager routes candidate
-observations and the exact selection to it. Before disposal, after the manager
-confirms the handoff is complete, the coordinator materializes the selected-design evidence
-and exact choice at the manager-supplied implementation-plan scope.
+affinity, using Client or Server Debug as appropriate; shared interfaces compile
+under both affinities. The builder is the sole compiler owner and returns a
+structured result tied to that worktree, branch, candidate, and baseline. The
+manager semantically owns the comparison evidence, user interaction, exact user
+selection, and selected-design handoff. The coordinator implementer materializes
+one comparison packet within the manager-supplied run scope and is its only
+filesystem writer; the manager routes candidate observations and the exact
+selection to it. Before disposal, after the manager confirms the handoff is
+complete, the coordinator materializes the selected-design evidence and exact
+choice at the manager-supplied implementation-plan scope.
 
 On success, after the manager confirms the handoff is complete, the coordinator
 implementer disposes only the three worktree paths and branch references

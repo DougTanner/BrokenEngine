@@ -53,11 +53,11 @@ Membership outcomes: <settled>/<total> settled
 <path> — <client|server|both|DataPacker|ModelViewer|ServerMonitor|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — NOTE <detail>|FAIL <detail> — <path-plus-selector | Decisive checks row | Residuals row>
 ```
 
-Use `Debug|x64` for game client/server unless approved otherwise,
-`Release|x64` for DataPacker and ServerMonitor, and the AgentTools promotion route for
-tool source membership. Verify-only/`None`-only membership requires no build,
-and neither does game client/server membership whose only added or removed
-items are `ClInclude` or `None`
+Use `Debug|x64` for game client/server unless approved otherwise, `Release|x64`
+for DataPacker and ServerMonitor, and the AgentTools promotion route for tool
+source membership. Verify-only/`None`-only membership requires no build, and
+neither does game client/server membership whose only added or removed items are
+`ClInclude` or `None`
 ([VisualStudio2026 `AGENTS.md`](../../../Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md)
 `## vcxproj File Inclusion Rules`). Never claim a build ran.
 

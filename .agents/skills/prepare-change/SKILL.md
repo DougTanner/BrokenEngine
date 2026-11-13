@@ -14,19 +14,20 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 
 ## Purpose
 
-One `implementer` produces the repository evidence that fixes the risk tier, and,
-for the Tier-2+ plan preparation the Prepare and explore alternatives step
+One `implementer` produces the repository evidence that fixes the risk tier,
+and, for the Tier-2+ plan preparation the Prepare and explore alternatives step
 dispatches, the implementation plan as a file with the draft execution card
-inside it. A Tier-1 dispatch made only to
-classify the work returns the evidence alone.
+inside it. A Tier-1 dispatch made only to classify the work returns the evidence
+alone.
 
 ## When to use
 
 - The `implementer` preparation bullets of the Change Workflow Approve and
   classify and Prepare and explore alternatives steps — Tier 2 and above, or
   any tier where classifying the work needs repository evidence.
-- Not for a claimed executable Plan: [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
-  keeps its own preparation route.
+- Not for a claimed executable Plan:
+  [`../next-plan/SKILL.md`](../next-plan/SKILL.md) keeps its own preparation
+  route.
 - Runs in the delegated execution context of
   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   `## Delegated execution context`.
@@ -59,8 +60,8 @@ Candidate zero: <the drafted mechanism as the `Mechanism` through `Pays off when
 Unresolved decisions: <one row each, decision and the options main chooses between, or none>
 ```
 
-When a plan was prepared, main passes that one file to `/plan-audit`, which reads the scope headings and
-the card marker from the supplied path alone
+When a plan was prepared, main passes that one file to `/plan-audit`, which
+reads the scope headings and the card marker from the supplied path alone
 ([`../plan-audit/SKILL.md`](../plan-audit/SKILL.md), `## Inputs`); never inline
 the plan or card text in the handoff.
 

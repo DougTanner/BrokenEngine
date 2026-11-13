@@ -55,7 +55,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <ConformanceMode>false</ConformanceMode>
+      <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <FloatingPointModel>Strict</FloatingPointModel>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -218,13 +218,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenLighting.cpp" />
@@ -237,15 +231,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenTerrain.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWater.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWind.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
     <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\Source\Main.cpp" />
     <ClCompile Include="..\..\Source\ModelViewerApplication.cpp" />

@@ -1,14 +1,26 @@
 # Texture Export Helpers
 
-Texture transforms, intermediate-file I/O, block encoding, and legacy-intermediate migration. The parent ExportJobs hub owns asset matching and final chunk routing.
+Texture transforms, intermediate-file I/O, block encoding, and
+legacy-intermediate migration. The parent ExportJobs hub owns asset matching and
+final chunk routing.
 
 ## Intermediate Contract
 
-`Texture::Save` writes a magic marker, dimensions, mip count, then the encoded payload. BCn and R16 intermediates are zlib-compressed on disk; half-float cubemap pre-pass output remains raw. Readers must use the shared parser and its returned payload offset rather than duplicating header math.
+`Texture::Save` writes a magic marker, dimensions, mip count, then the encoded
+payload. BCn and R16 intermediates are zlib-compressed on disk; half-float
+cubemap pre-pass output remains raw. Readers must use the shared parser and its
+returned payload offset rather than duplicating header math.
 
-Intermediates written by `Texture::Save` and by both IBL cubemap pre-pass writers in `ExportJobs/ExportCubemapIbl.cpp` are published through the shared staged atomic replace helper `WriteStagedIntermediate` in `Texture.h`. A process killed between the staged write and the replace leaves that stage behind as an inert orphan nothing sweeps.
+Intermediates written by `Texture::Save` and by both IBL cubemap pre-pass
+writers in `ExportJobs/ExportCubemapIbl.cpp` are published through the shared
+staged atomic replace helper `WriteStagedIntermediate` in `Texture.h`. A process
+killed between the staged write and the replace leaves that stage behind as an
+inert orphan nothing sweeps.
 
-Final texture chunks use LZ4 and store compressed and uncompressed sizes for `FileManager`. Raw intermediate input is decoded as needed and re-encoded for the chunk; changing the intermediate or chunk contract requires coordinated producer, exporter-version, shared-header, and runtime-reader updates.
+Final texture chunks use LZ4 and store compressed and uncompressed sizes for
+`FileManager`. Raw intermediate input is decoded as needed and re-encoded for
+the chunk; changing the intermediate or chunk contract requires coordinated
+producer, exporter-version, shared-header, and runtime-reader updates.
 
 ## Encoding
 
@@ -34,7 +46,13 @@ before that rewrite; preserve the ordering, because the write is not
 transactional and it is changing tracked files. Dimensions, mip count, texture
 format, and payload meaning must survive migration.
 
-Eligibility is deliberately narrow: the inverse format map recognizes only the BC4, BC5, BC7, and R16 intermediate extensions, and everything else is skipped. The IBL (image-based lighting) `.R16G16B16A16_SFLOAT` cubemap intermediates are excluded on purpose — they are legacy-shaped by design and carry no magic marker, so they look exactly like unmarked files awaiting migration. Widening the format map would zlib-wrap and re-header raw half-float cube faces and silently break IBL.
+Eligibility is deliberately narrow: the inverse format map recognizes only the
+BC4, BC5, BC7, and R16 intermediate extensions, and everything else is skipped.
+The IBL (image-based lighting) `.R16G16B16A16_SFLOAT` cubemap intermediates are
+excluded on purpose — they are legacy-shaped by design and carry no magic
+marker, so they look exactly like unmarked files awaiting migration. Widening
+the format map would zlib-wrap and re-header raw half-float cube faces and
+silently break IBL.
 
 ## See Also
 

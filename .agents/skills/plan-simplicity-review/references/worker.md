@@ -60,8 +60,8 @@ steps change product, user interface, tooling, or public interface behavior.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
    later if it ever occurs. Honor the repository's no-useless-ASSERT rule
-   (`.agents/references/cpp-conventions.md`): prefer making the condition impossible over
-   an ASSERT that adds nothing.
+   (`.agents/references/cpp-conventions.md`): prefer making the condition
+   impossible over an ASSERT that adds nothing.
 5. Configuration and extension surface. Report options, hooks, and formats with
    no current consumer.
 6. Bandaid versus root cause. For any step that fixes, guards, works around, or
@@ -147,12 +147,12 @@ steps change product, user interface, tooling, or public interface behavior.
   interviews the user.
 - Give every finding one disposition. Use `simplify` when the evidence supports
   a concrete simpler replacement. Use `user-judgment` when two or more viable
-  answers remain and the trade-off is genuinely the user's — accepting an `observed`
-  or `credible exposure` failure versus paying for the machinery that prevents it, or keeping a symptom
-  patch versus paying for a much larger root-cause fix — and present the
-  options, their costs, and a recommendation in plain language, so the manager
-  can put it to the user (Tier 2) or feed `/external-grill-plan` (Tier 3)
-  without rework. The manager owns all judgment; this reviewer never interviews
-  the user.
+  answers remain and the trade-off is genuinely the user's — accepting an
+  `observed` or `credible exposure` failure versus paying for the machinery that
+  prevents it, or keeping a symptom patch versus paying for a much larger
+  root-cause fix — and present the options, their costs, and a recommendation in
+  plain language, so the manager can put it to the user (Tier 2) or feed
+  `/external-grill-plan` (Tier 3) without rework. The manager owns all judgment;
+  this reviewer never interviews the user.
 - Do not edit any repository file, run `/agent-harness`, interview the user, or
   spawn another agent.

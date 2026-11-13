@@ -6,15 +6,15 @@ Priority: LOW — Only implement if WAN packet loss consistently exceeds 2%.
 
 Concept
 -------
-XOR parity: for every N consecutive data packets on a given slot, compute a parity
-packet as the bitwise XOR of all N payloads. If any single packet in the group is
-lost, the client reconstructs it from the remaining N-1 data packets plus the parity
-packet. Cost: 1/N bandwidth overhead per slot.
+XOR parity: for every N consecutive data packets on a given slot, compute a
+parity packet as the bitwise XOR of all N payloads. If any single packet in the
+group is lost, the client reconstructs it from the remaining N-1 data packets
+plus the parity packet. Cost: 1/N bandwidth overhead per slot.
 
-FEC groups are per-coord-per-client because Server::SendUpdate() (ServerSend.cpp:124)
-sends one unreliable packet per active subscription slot per tick. Each slot already
-has independent ACK tracking (AckState in coordAckStates), so FEC state naturally
-lives alongside it.
+FEC groups are per-coord-per-client because Server::SendUpdate()
+(ServerSend.cpp:124) sends one unreliable packet per active subscription slot
+per tick. Each slot already has independent ACK tracking (AckState in
+coordAckStates), so FEC state naturally lives alongside it.
 
 Adaptive group size: start with N=8 (12.5% overhead). If observed loss rate on a
 slot exceeds 5%, shrink to N=4 (25% overhead). If loss rate drops below 1%, grow
@@ -58,7 +58,8 @@ Add to ClientConnection struct (after coordAckStates, line 25):
 
     std::vector<FecSlotState> coordFecStates;
 
-Initialize in Server::Connect() (resize calls at Server.cpp:129-132), add after coordAckStates resize:
+Initialize in Server::Connect() (resize calls at Server.cpp:129-132), add after
+coordAckStates resize:
 
     connection.coordFecStates.resize(NetworkManager::kiMaximumEnetCoordinateSlots);
 
@@ -76,9 +77,9 @@ Add private method declaration to Server class (after line 131):
 ----------------------------------------------
 Modify Server::SendUpdate() (line 124):
 
-After the enet_peer_send call (line 150; the resend path's send is at line 233), before
-rWorkbuffer.Pop(), accumulate the
-packet payload into the FEC parity buffer and check if the group is complete:
+After the enet_peer_send call (line 150; the resend path's send is at line 233),
+before rWorkbuffer.Pop(), accumulate the packet payload into the FEC parity
+buffer and check if the group is complete:
 
     // FEC: accumulate parity and send parity packet when group is complete
     AccumulateFecParity(rClient, iSlot, packetSpan);
@@ -171,7 +172,8 @@ Add private method declaration to Client class (after line 109):
 
 5. Engine/Source/Network/Client/Client.cpp
 ------------------------------------------
-Add case to Client::Receive() switch (line 157-190), after kServerCoordinateResend case (line 174):
+Add case to Client::Receive() switch (line 157-190), after
+kServerCoordinateResend case (line 174):
 
     case PacketType::kServerFecParity:
         ServerFecParity(pData);
@@ -183,15 +185,17 @@ Client::Receive() (line 170-171), after the ServerCoordinateUpdateOrResend call:
     // Note: FEC accumulation for received data packets is handled inside
     // ServerCoordinateUpdateOrResend, which calls FecAccumulateReceived.
 
-Actually, cleaner: add FecAccumulateReceived call inside ServerCoordinateUpdateOrResend.
+Actually, cleaner: add FecAccumulateReceived call inside
+ServerCoordinateUpdateOrResend.
 
 
 6. Engine/Source/Network/Client/ClientReceive.cpp
 -------------------------------------------------
 In Client::ServerCoordinateUpdateOrResend() (line 107-167):
 
-After the mReceivedCoordinateUpdates push_back (line 161), before the TrackReceivedTick
-call (line 164), add FEC accumulation for kServerCoordinateUpdate packets only (not resends):
+After the mReceivedCoordinateUpdates push_back (line 161), before the
+TrackReceivedTick call (line 164), add FEC accumulation for
+kServerCoordinateUpdate packets only (not resends):
 
     // FEC: accumulate received data packet for parity reconstruction
     // Only accumulate fresh updates, not resends (resends fill gaps outside FEC groups)
@@ -309,7 +313,8 @@ Add new methods at end of file (before closing namespace brace, line 283):
 
 7. Engine/Source/Network/Server/ServerReceive.cpp
 -------------------------------------------------
-Adaptive FEC group sizing. In Server::ClientAcknowledgementStream() (epoch/ack logic at ~lines 44-73):
+Adaptive FEC group sizing. In Server::ClientAcknowledgementStream() (epoch/ack
+logic at ~lines 44-73):
 
 After updating the ACK state, compute per-slot loss rate from the bitfield
 and adjust FEC group size:
@@ -343,17 +348,19 @@ DESIGN NOTES
 =============
 
 1. FEC parity packets use the same unreliable coord slot channel as data packets
-   (NetworkManager::CoordinateSlotUnreliable). This means they share ordering with
-   data packets on that slot, which is fine since ENet unreliable channels have
-   no ordering guarantees anyway.
+   (NetworkManager::CoordinateSlotUnreliable). This means they share ordering
+   with data packets on that slot, which is fine since ENet unreliable channels
+   have no ordering guarantees anyway.
 
-2. The FEC accumulator on the client XORs raw packet bytes (including the header).
-   This means the recovered packet will have a valid header and can be fed directly
-   to ServerCoordinateUpdateOrResend(). The packet type byte will be kServerCoordinateUpdate
-   (recovered via XOR), so the parse path is the same.
+2. The FEC accumulator on the client XORs raw packet bytes (including the
+   header). This means the recovered packet will have a valid header and can be
+   fed directly to ServerCoordinateUpdateOrResend(). The packet type byte will
+   be kServerCoordinateUpdate (recovered via XOR), so the parse path is the
+   same.
 
-3. FEC only protects kServerCoordinateUpdate packets. Resends (kServerCoordinateResend) and
-   full state (kServerCoordinateFullState) are not FEC-protected because:
+3. FEC only protects kServerCoordinateUpdate packets. Resends
+   (kServerCoordinateResend) and full state (kServerCoordinateFullState) are not
+   FEC-protected because:
    - Resends are already the fallback for lost packets
    - Full state uses reliable delivery
 
@@ -365,5 +372,5 @@ DESIGN NOTES
    across groups. Add ScopedSuppressAllocationTracking where the vector is first
    resized, and a "// Heap:" comment.
 
-6. Client-side FEC state (FecReceiveState) also needs its parityAccumulator vector
-   guarded with ScopedSuppressAllocationTracking and "// Heap:" comment.
+6. Client-side FEC state (FecReceiveState) also needs its parityAccumulator
+   vector guarded with ScopedSuppressAllocationTracking and "// Heap:" comment.

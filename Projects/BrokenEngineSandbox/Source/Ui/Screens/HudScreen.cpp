@@ -123,7 +123,7 @@ void HudScreen::Render()
 
 	// Final shared targets. When right has content: both panels see max(force, mouse) — strict sync.
 	// When right has no content: left can still auto-un-hide (force only), right stays hidden.
-	float fForceTarget = bForceOpen ? 1.0f : 0.0f;
+	float fForceTarget = (bForceOpen || gpGame->mFleetSelection.mbRevealFleetPanel) ? 1.0f : 0.0f;
 	// Both panels slide off while the map shows.
 	if (gpGame->MapOpacity() > 0.0f)
 	{

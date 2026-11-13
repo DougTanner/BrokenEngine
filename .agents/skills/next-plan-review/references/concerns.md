@@ -4,15 +4,14 @@ Build a chronological evidence table covering the objective, tier/card/approval,
 implementation, propagation, checks, domain and conditional reviews, fix loops,
 build/harness work, reconciliation, user redirects of an action main chose,
 landing approval, and landing. Include Plan selection, final preparation, and
-claim/release only when they occurred.
-Locate the governing user objective and, when present, the latest approved plan
-from transcript evidence. The latest approved plan governs conformance. Without an
-approved plan, the governing scope is the user objective plus recorded acceptance
-statements. Execution cards corroborate process and timeline only in that
-fallback; they cannot impose scope. When a claimed Plan exists, also inspect its
-executable metadata. Map the governing scope and acceptance criteria to the final
-diff and verification. Source every event to a session/time or Git/WorktreeCli
-result.
+claim/release only when they occurred. Locate the governing user objective and,
+when present, the latest approved plan from transcript evidence. The latest
+approved plan governs conformance. Without an approved plan, the governing scope
+is the user objective plus recorded acceptance statements. Execution cards
+corroborate process and timeline only in that fallback; they cannot impose
+scope. When a claimed Plan exists, also inspect its executable metadata. Map the
+governing scope and acceptance criteria to the final diff and verification.
+Source every event to a session/time or Git/WorktreeCli result.
 
 Report wall-clock span, explicit user/external pauses, and approximate active
 elapsed time. Builds, harness work, debugging, and review are active work.
@@ -32,24 +31,24 @@ workflow process evidence only.
 Assess in this order:
 
 1. Governing-scope conformance: `aligned` when all governing work is represented
-   with no meaningful unauthorized scope; `partial` when only part is implemented
-   without meaningful contradiction; `divergent` when landed scope meaningfully
-   contradicts, substitutes for, or exceeds governing scope; or `unverified`
-   when evidence is insufficient. This is factual scope mapping, not a
-   correctness assessment. Treat required affected-site changes as propagation,
-   not scope expansion.
+   with no meaningful unauthorized scope; `partial` when only part is
+   implemented without meaningful contradiction; `divergent` when landed scope
+   meaningfully contradicts, substitutes for, or exceeds governing scope; or
+   `unverified` when evidence is insufficient. This is factual scope mapping,
+   not a correctness assessment. Treat required affected-site changes as
+   propagation, not scope expansion.
 2. Solution minimality: `minimal` when no concrete simpler complete alternative
    is identified; `mixed` when localized removable complexity exists while the
-   core approach still matches the size of the change; `overengineered` when the core approach
-   or a meaningful portion is more complex than a concrete scope-conforming
-   alternative; or `unverified` when evidence is insufficient. Report an issue
-   only when it names landed complexity and a concrete simpler alternative that
-   preserves governing scope, fixed decisions, and required invariants. Candidate
-   signals include needless abstraction, indirection, generalization,
-   configuration or extension points, duplicate mechanisms, compatibility paths,
-   new subsystems, or scope expansion. Do not count required affected-site
-   propagation, invariant preservation, or mandated workflow controls as
-   overengineering; do not make taste-only findings.
+   core approach still matches the size of the change; `overengineered` when the
+   core approach or a meaningful portion is more complex than a concrete
+   scope-conforming alternative; or `unverified` when evidence is insufficient.
+   Report an issue only when it names landed complexity and a concrete simpler
+   alternative that preserves governing scope, fixed decisions, and required
+   invariants. Candidate signals include needless abstraction, indirection,
+   generalization, configuration or extension points, duplicate mechanisms,
+   compatibility paths, new subsystems, or scope expansion. Do not count
+   required affected-site propagation, invariant preservation, or mandated
+   workflow controls as overengineering; do not make taste-only findings.
 3. Workflow coverage: report each required review or testing step only as
    `occurred`, `missing`, or `unverified`. This is process compliance evidence,
    not an assessment of adequacy or implementation correctness.
@@ -83,15 +82,16 @@ risk; no repetition, extra reconcile, or elapsed-time threshold is automatically
 burden and frequency, unique signal, and safety risk: higher burden and
 frequency, lower unique signal, and lower safety risk rank first, ahead of
 recommendations that add or retain control work. A demonstrated higher-risk
-`Critical` issue may outrank such a removal; otherwise do not let a required-control or new-rule
-recommendation displace proven lowest-value removable control work.
+`Critical` issue may outrank such a removal; otherwise do not let a
+required-control or new-rule recommendation displace proven lowest-value
+removable control work.
 
 Keep findings separate from recommendations, and omit empty recommendations
 rather than manufacturing work. Each minimality recommendation names the
-unnecessary mechanism, a simpler removal or consolidation alternative, and why it
-preserves governing scope and required invariants. Explain the safety tradeoff
-of weakening any tier-required control. A proposed rule weighs per-change cost
-against how often the problem fires.
+unnecessary mechanism, a simpler removal or consolidation alternative, and why
+it preserves governing scope and required invariants. Explain the safety
+tradeoff of weakening any tier-required control. A proposed rule weighs
+per-change cost against how often the problem fires.
 
 Carry an improvement forward only when this landing's evidence supports it
 directly, the signal is durable rather than one session's stylistic preference,

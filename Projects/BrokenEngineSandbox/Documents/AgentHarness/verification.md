@@ -4,24 +4,30 @@
 
 ## Authoritative verification
 
-Set up server and client state with the recipe below, then verify and release per the skill's Authoritative verification evidence principles and lifecycle checklist.
+Set up server and client state with the recipe below, then verify and release
+per the skill's Authoritative verification evidence principles and lifecycle
+checklist.
 
-1. Set up server state with `reset`, then `inject_payload` entries at a coord from `status.activeCoords`; confirm through `query_collection`/`query_frame`.
+1. Set up server state with `reset`, then `inject_payload` entries at a coord
+   from `status.activeCoords`; confirm through `query_collection`/`query_frame`.
 2. Launch/connect the client and require `status.clientCount` to increase.
-3. Use `describe_ui` before label-addressed `click` or `set_slider`, which activate the item even offscreen unless it is disabled; use `key` for key bindings and `wheel` for camera zoom.
+3. Use `describe_ui` before label-addressed `click` or `set_slider`, which
+   activate the item even offscreen unless it is disabled; use `key` for key
+   bindings and `wheel` for camera zoom.
 
 ### Chosen omni placement
 
-To place omnis at exact positions instead of the point the fleet spawn search picks,
-send one `inject_payload` batch holding two `SpawnOmni` entries on the same
-active coord whose `vecPosition` values lie about 600 m apart, for example
+To place omnis at exact positions instead of the point the fleet spawn search
+picks, send one `inject_payload` batch holding two `SpawnOmni` entries on the
+same active coord whose `vecPosition` values lie about 600 m apart, for example
 `"vecPosition":[-300,0]` and `"vecPosition":[300,0]` (a cell is a flat-top
 hexagon whose edges lie 450 m from its center, so any position less than 450 m
-from the center is inside; a position outside the hexagon fails the batch). No response reports the tick that
-applied the batch, so poll `query_collection {"coord":[q,r],"collection":"omnis"}`
-on that coord until both minted `globalIds` from the injection response appear
-in `items` (`total` rises by two), then send `pause {"paused":true}` and read
-the exact positions with a final `query_collection`.
+from the center is inside; a position outside the hexagon fails the batch). No
+response reports the tick that applied the batch, so poll
+`query_collection {"coord":[q,r],"collection":"omnis"}` on that coord until both
+minted `globalIds` from the injection response appear in `items` (`total` rises
+by two), then send `pause {"paused":true}` and read the exact positions with a
+final `query_collection`.
 
 ### Forced reconciliation re-simulation
 
@@ -32,20 +38,29 @@ injection must apply on a tick the client has already simulated: slowing the
 timescale shrinks the lag, and pausing until the client's `tailTick` passes the
 server tick guarantees it. Command contracts: the engine
 [server](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
-[client](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands), and shared
+[client](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands),
+and shared
 [`get_logs`/`set_log_level`](../../../../.agents/skills/agent-harness/references/command-reference.md#shared-commands)
 commands, and this project's [server](commands-server.md#server-commands) and
 [client](commands-client.md#client-commands) additions.
 
 1. Client `set_log_level {"category":"Network","level":"Debug"}`.
-2. Server `timescale {"faster":false}` once, then poll client `query_profile` until `clock.targetBehindTicks` is at most 2 (about 11 s at 1/2).
-3. Server `pause {"paused":true}`; after about 2 s, require the client `describe_scene {"includeUnits":false}` `cellStates` row whose `coord` is `[0,0]`, the cell step 4 injects into, to report `tailTick` above the server `status.tick`. [0,0] must also be in the server's `status.activeCoords`.
-4. Server `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni"}]}`; require `deferred:true`.
+2. Server `timescale {"faster":false}` once, then poll client `query_profile`
+   until `clock.targetBehindTicks` is at most 2 (about 11 s at 1/2).
+3. Server `pause {"paused":true}`; after about 2 s, require the client
+   `describe_scene {"includeUnits":false}` `cellStates` row whose `coord` is
+   `[0,0]`, the cell step 4 injects into, to report `tailTick` above the server
+   `status.tick`. [0,0] must also be in the server's `status.activeCoords`.
+4. Server `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni"}]}`;
+   require `deferred:true`.
 5. Server `pause {"paused":false}`.
-6. Client `get_logs {"pattern":"resimulation completed","category":"Network"}`; require a line with `Replayed: true` and `DesyncTick: -1`.
+6. Client `get_logs {"pattern":"resimulation completed","category":"Network"}`;
+   require a line with `Replayed: true` and `DesyncTick: -1`.
 7. Restore 1/1 with server `timescale {"faster":true}` before release.
 
-The client suppresses that line when a CRC mismatch on the same coord falls within 32 ticks of the last logged one, so space repeated injections on one coord more than 32 ticks apart.
+The client suppresses that line when a CRC mismatch on the same coord falls
+within 32 ticks of the last logged one, so space repeated injections on one
+coord more than 32 ticks apart.
 
 ## Durable caveats
 

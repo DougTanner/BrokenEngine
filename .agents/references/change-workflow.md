@@ -1,14 +1,24 @@
 <!-- session-context-part: Context management, delegation, and main-session conduct -->
-This file, `.agents/references/change-workflow.md`, carries the Change Workflow, the delegation rules, and the main-session conduct rules for the main session, delivered at session start.
+This file, `.agents/references/change-workflow.md`, carries the Change Workflow,
+the delegation rules, and the main-session conduct rules for the main session,
+delivered at session start.
 
 ## IMPORTANT: Context management and agent selection
 
 ### Subagents
 
 - Main session is manager; subagents execute work to keep main context clean.
-- Subagents must not spawn subagents. Only main-session skills request delegation; a subagent needing delegated work returns the requirement to its caller.
-- Give subagents only the instructions and context their task needs; they return a short handoff that main routes. Handoff format: `.agents/references/subagent-handoff.md`. Task brief and worker interruption/recovery: `.agents/references/subagent-reporting.md`.
-- While workers run, continue useful independent work when available; avoid unnecessary status checks, duplicating their investigation or implementation, and context-heavy work unless it advances a useful independent task. Waiting and recovery mechanics: `.agents/references/subagent-reporting.md`.
+- Subagents must not spawn subagents. Only main-session skills request
+  delegation; a subagent needing delegated work returns the requirement to its
+  caller.
+- Give subagents only the instructions and context their task needs; they return
+  a short handoff that main routes. Handoff format:
+  `.agents/references/subagent-handoff.md`. Task brief and worker
+  interruption/recovery: `.agents/references/subagent-reporting.md`.
+- While workers run, continue useful independent work when available; avoid
+  unnecessary status checks, duplicating their investigation or implementation,
+  and context-heavy work unless it advances a useful independent task. Waiting
+  and recovery mechanics: `.agents/references/subagent-reporting.md`.
 
 ### Delegation roles
 
@@ -26,8 +36,12 @@ work.
 | `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
 | `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
-- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
-- Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
+- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On
+  Claude only, a documented host-unavailability fallback to `general-purpose`
+  may pass `model:` and runs without a locked-in effort
+- Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never
+  substitute for a role, including inside plan mode — route the work through the
+  table above. The documented host-unavailability fallback is the only exception
 - Do not follow review findings blindly. Use judgement on each one: accept it
   when the failure is real and reachable, and be especially careful with
   findings that add guards, options, or machinery for cases nobody has observed
@@ -51,9 +65,15 @@ work.
   visible — and explain what the answer changes or blocks. When relevant, give
   options, trade-offs, and a recommendation. The user has NOT read the source
   code or plan file.
-- AVOID jargon: the user is NOT a domain expert. Use everyday words and short sentences. Define an unavoidable technical term in one clause the first time it appears.
-- Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
-- Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
+- AVOID jargon: the user is NOT a domain expert. Use everyday words and short
+  sentences. Define an unavoidable technical term in one clause the first time
+  it appears.
+- Explain fully when asked; use headings and bullet points so a longer
+  explanation stays skimmable.
+- Reporting work: state what was built and what was verified separately, and
+  name every required check still open; "done" means those checks have closed. A
+  defect is stated with its evidence and effect, never as a verdict or count
+  alone.
 - Comparing options: give each the same criteria, evidence, detail, and tone;
   recommend one without selling the favorite by benefit and the alternative by
   risk; prefer removing a cause to suppressing a symptom. Pros and cons cover
@@ -85,8 +105,14 @@ work.
 
 ### Resolving Ambiguity
 
-- Non-trivial ties (two viable approaches, neither architectural): fan out `researcher` subagents to validate each, compare pros/cons, then pick the simplest good solution.
-- Architectural decisions (new system shape, public API, data layout, threading model), and any reading of the request that changes observable behavior and that neither the request nor a build, an existing harness command, or a code read settles: stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
+- Non-trivial ties (two viable approaches, neither architectural): fan out
+  `researcher` subagents to validate each, compare pros/cons, then pick the
+  simplest good solution.
+- Architectural decisions (new system shape, public API, data layout, threading
+  model), and any reading of the request that changes observable behavior and
+  that neither the request nor a build, an existing harness command, or a code
+  read settles: stop and ask the user, presenting the problem, proposed
+  solutions, and pros/cons of each.
 - Races: a race is reachable when an existing actor — another thread, another
   process, or a repository tool such as DataPacker — can perform the
   interleaving under supported use. Remove a reachable race by construction
@@ -95,28 +121,57 @@ work.
   unlikely ever to see or report. Treat a race no existing actor can perform as
   impossible or ASSERT it; it is never a cost when comparing options and never a
   user question.
-- Hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
-- Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.
+- Hand-edited files that have never been seen and have no named trigger: never a
+  cost when comparing options and never a user question. Trust-boundary
+  validation (`.agents/references/cpp-conventions.md`) still applies.
+- Questions a build, an existing harness command, or a code read settles: settle
+  them that way, through the role that runs it, and never ask the user.
 
 <!-- session-context-part: Change Workflow, Steps 1-3 (continues in the next part) -->
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
-This workflow governs every tracked artifact. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
+This workflow governs every tracked artifact. An artifact type a step does not
+name is a case this workflow does not assign to anyone: resolve it with the
+user, never by treating the step as inapplicable.
 
-A sweep run, defined by `/sweep`, does not follow this workflow; `/sweep` owns what it keeps.
+A sweep run, defined by `/sweep`, does not follow this workflow; `/sweep` owns
+what it keeps.
 
-For Tier 1 and Tier 2, the user's request is the approval. Classify the work, make the smallest complete change, run the checks that fit its size, and report changed files, the checks that settled it, and residuals. No approval round-trip or report file unless a landing gate applies.
+For Tier 1 and Tier 2, the user's request is the approval. Classify the work,
+make the smallest complete change, run the checks that fit its size, and report
+changed files, the checks that settled it, and residuals. No approval round-trip
+or report file unless a landing gate applies.
 
 Definitions:
 
-- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card. Field template: `.agents/references/execution-card.md`.
-- Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
-- Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
-- Wrapper session — session started through `.claude/claude-worktree.sh` or `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree.
-  If the user opens a session directly on main, work in that checkout and do not use the worktree flow.
-- Primary — the shared main checkout and its main branch that finished session work lands into.
-- Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.
-- Residual — a known leftover problem reported at the end of a task instead of fixed inside it.
+- Execution card — the pre-implementation record the Step 2 preparation drafts
+  (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit`
+  audits; after approval it carries the approved scope before any dispatch cites
+  the card. Field template: `.agents/references/execution-card.md`.
+- Landing gate — the finalizer's acceptance table plus the `/finalize-changes`
+  landing flow with one explicit user confirmation; applies whenever primary
+  will be changed: landing a session's work, or executable Plan completion or
+  rejection. Shared AgentTools promotion and Tier-3 integration always land
+  through it.
+- Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero
+  `broken-engine-plan/v1` metadata; selection and marker rules:
+  `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
+- Wrapper session — session started through `.claude/claude-worktree.sh` or
+  `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper
+  session reattaches only through the same wrapper with its explicit reattach
+  worktree input — `--reattach-worktree <path>` for Claude and
+  `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree. If
+  the user opens a session directly on main, work in that checkout and do not
+  use the worktree flow.
+- Primary — the shared main checkout and its main branch that finished session
+  work lands into.
+- Step and stage — a step is one of the nine numbered Change Workflow steps
+  below; outside this file a step is cited by its heading name
+  (`the Plan review step`), never by its number, so renumbering here changes
+  nothing elsewhere; a stage is one approved unit of session work that can
+  complete or land independently.
+- Residual — a known leftover problem reported at the end of a task instead of
+  fixed inside it.
 
 Risk tiers: `.agents/references/risk-tiers.md`.
 
@@ -126,13 +181,23 @@ Risk tiers: `.agents/references/risk-tiers.md`.
 
 #### Step 1 — Approve and classify
 
-- `implementer` runs `/prepare-change` — Tier 2+, or any tier where classifying the work needs repository evidence.
+- `implementer` runs `/prepare-change` — Tier 2+, or any tier where classifying
+  the work needs repository evidence.
 
-From user intent and any such preparation, main locks in the objective, the approved stage decisions, the tier and its triggers, the roles, and the acceptance checks. Tier 1 and Tier 2 authorize implementation; Tier 2, Tier 3, and a Plan claim also require an execution card, which `/plan-audit` needs.
+From user intent and any such preparation, main locks in the objective, the
+approved stage decisions, the tier and its triggers, the roles, and the
+acceptance checks. Tier 1 and Tier 2 authorize implementation; Tier 2, Tier 3,
+and a Plan claim also require an execution card, which `/plan-audit` needs.
 
 #### Step 2 — Prepare and explore alternatives
 
-Order: `/prepare-change` first at Tier 2+, because the alternative investigations need the drafted plan's objective and mechanism; at Tier 1 there is no plan file, so main briefs from the Step 1 preparation where that step's `/prepare-change` bullet applied, and from the request otherwise. Then `/plan-alternatives` when its trigger fires. A chosen alternative returns to `/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan and Tier-1 routes.
+Order: `/prepare-change` first at Tier 2+, because the alternative
+investigations need the drafted plan's objective and mechanism; at Tier 1 there
+is no plan file, so main briefs from the Step 1 preparation where that step's
+`/prepare-change` bullet applied, and from the request otherwise. Then
+`/plan-alternatives` when its trigger fires. A chosen alternative returns to
+`/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan
+and Tier-1 routes.
 
 - `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
 - main dispatches one `researcher` per axis for `/plan-alternatives`,
@@ -158,36 +223,80 @@ Order: `/prepare-change` first at Tier 2+, because the alternative investigation
 
 #### Step 3 — Plan review
 
-Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-external-claims` for the requests the audit handoff raises; then, at Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with `/verify-external-claims` between rounds; then, when it triggers, the difference `/plan-simplicity-review` after the accepted findings are last written into the plan snapshot.
+Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then
+`/verify-external-claims` for the requests the audit handoff raises; then, at
+Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with
+`/verify-external-claims` between rounds; then, when it triggers, the difference
+`/plan-simplicity-review` after the accepted findings are last written into the
+plan snapshot.
 
 - `reviewer` runs `/plan-audit` — Tier 2+; Tier 1 skips it.
-- fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot — every tier, when the plan adds new code or changes non-documentation behavior (both defined in that skill's `## When to use`); when unsure whether a plan triggers it, dispatch it.
-- `implementer` owns `/external-grill-plan` repository evidence and short written decision summaries, updated round by round — Tier 3 only.
-- main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and at Tier 3 also for the claims a grill round raises.
-- fresh `implementer` carrying a continuation capsule from the preparation writes the Plan review findings main accepts into the plan snapshot; main does not write those findings into the snapshot itself — Tier 1-2 with a plan snapshot, after main accepts a finding; Tier 3 follows `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
-- fresh `reviewer` runs `/plan-simplicity-review` over only the difference those findings added to the plan snapshot — Tier 2+, once per Plan review and never repeated, when the findings main accepted from `/plan-audit` or a Tier-3 grill round add mechanism (a new guard, check, option, or code path) rather than only correcting statements.
+- fresh `reviewer` runs `/plan-simplicity-review` on the same plan snapshot —
+  every tier, when the plan adds new code or changes non-documentation behavior
+  (both defined in that skill's `## When to use`); when unsure whether a plan
+  triggers it, dispatch it.
+- `implementer` owns `/external-grill-plan` repository evidence and short
+  written decision summaries, updated round by round — Tier 3 only.
+- main runs `/verify-external-claims`, dispatching one `locator` as its evidence
+  worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and
+  at Tier 3 also for the claims a grill round raises.
+- fresh `implementer` carrying a continuation capsule from the preparation
+  writes the Plan review findings main accepts into the plan snapshot; main does
+  not write those findings into the snapshot itself — Tier 1-2 with a plan
+  snapshot, after main accepts a finding; Tier 3 follows
+  `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
+- fresh `reviewer` runs `/plan-simplicity-review` over only the difference those
+  findings added to the plan snapshot — Tier 2+, once per Plan review and never
+  repeated, when the findings main accepted from `/plan-audit` or a Tier-3 grill
+  round add mechanism (a new guard, check, option, or code path) rather than
+  only correcting statements.
 
-At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval per `/next-plan` `### Implementation approval`; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
+At Tier 3 main only decides and interviews from the `implementer` and `locator`
+handoffs, then presents the resolved plan for approval per `/next-plan`
+`### Implementation approval`; the brief and iteration contract is in
+`.agents/skills/next-plan/references/tier3-workflow.md`.
 
 <!-- session-context-part: Change Workflow, Steps 4-6 (continued from the previous part; continues in the next part) -->
 #### Step 4 — Implement and propagate
 
-Order: the acceptance checks the execution card marks `before the first edit` run first, on the unedited tree; then the slices run in parallel; `/update-affected-code` runs after them.
+Order: the acceptance checks the execution card marks `before the first edit`
+run first, on the unedited tree; then the slices run in parallel;
+`/update-affected-code` runs after them.
 
-- `builder` runs `/compile` for the unedited-tree build a check marked `before the first edit` needs — when it needs one; a check whose steps interleave file edits with builds follows the `/compile` `## Purpose` exception instead.
-- `implementer` records each acceptance check the execution card marks `before the first edit`, on the unedited tree — a card with none adds no step.
+- `builder` runs `/compile` for the unedited-tree build a check marked
+  `before the first edit` needs — when it needs one; a check whose steps
+  interleave file edits with builds follows the `/compile` `## Purpose`
+  exception instead.
+- `implementer` records each acceptance check the execution card marks
+  `before the first edit`, on the unedited tree — a card with none adds no step.
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
 - `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
 
-Main splits the work into disjoint slices where possible. Review-fix exceptions belong to `/resolve-findings`.
+Main splits the work into disjoint slices where possible. Review-fix exceptions
+belong to `/resolve-findings`.
 
 #### Step 5 — Run targeted pre-review checks
 
-Order: the full applicable static pass and `/code-style-review` run after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with the static pass, except that when the change touches C++ the pre-review build waits for `/code-style-review`. Focused implementation self-checks remain inside the implementation slices.
+Order: the full applicable static pass and `/code-style-review` run after
+propagation; each `Build required` handoff compiles as it arrives and may run in
+parallel with the static pass, except that when the change touches C++ the
+pre-review build waits for `/code-style-review`. Focused implementation
+self-checks remain inside the implementation slices.
 
-- main runs `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked` after propagation — every tier; the runner selects its own checks, and its header documents the result and options. Main has an `implementer` rewrap every `line-length` failure the static-checks runner reports in that same pass, whether or not the change added the line, and never records one as a residual.
-- `mechanic` runs `/code-style-review` — for changed C++; a later `/resolve-findings` round that changes C++ re-runs it over the newly changed ranges before that round's `Build required` handoff compiles.
-- `builder` runs `/compile` — every `Build required` handoff, before the covered work advances; the brief states the agent-harness trigger `/compile` `## Inputs` defines, so a stage whose acceptance table carries `/agent-harness` criteria also builds the client and the server.
+- main runs
+  `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked`
+  after propagation — every tier; the runner selects its own checks, and its
+  header documents the result and options. Main has an `implementer` rewrap
+  every `line-length` failure the static-checks runner reports in that same
+  pass, whether or not the change added the line, and never records one as a
+  residual.
+- `mechanic` runs `/code-style-review` — for changed C++; a later
+  `/resolve-findings` round that changes C++ re-runs it over the newly changed
+  ranges before that round's `Build required` handoff compiles.
+- `builder` runs `/compile` — every `Build required` handoff, before the covered
+  work advances; the brief states the agent-harness trigger `/compile`
+  `## Inputs` defines, so a stage whose acceptance table carries
+  `/agent-harness` criteria also builds the client and the server.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
@@ -207,32 +316,46 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 after them; `/verify-external-claims` runs whenever a review or
 `/resolve-findings` handoff raises requests, before main decides the dependent
 finding or resolution; `/resolve-findings` runs after each finding main accepts,
-followed by re-review and retest of the affected regions only; a reviewer with
-no accepted finding whose region a fix changed reruns as a fresh first-round
-pass; a second round needs a reproducible blocker; `/external-diagnose-bug` runs
-before any further `/resolve-findings` attempt on a cause whose fix failed its
-retest, and its proven cause returns to `/resolve-findings` or a plan. Whenever
-the `/over-engineering-review` validator or a `/resolve-findings` round changed
-C++, `/code-style-review` runs over the newly changed ranges and `/compile`
-builds its `Build required`, as in Step 5, and only then do `/repo-code-review`
-and `/comment-review` start, after a round as that round's
-re-reviews of the affected regions; when `/over-engineering-review` runs, its
-finder and validator run before `/repo-code-review` and `/comment-review`
-start, with the validator's handoff, or the finder's when the validator is
-skipped, as `/repo-code-review`'s implementation handoff. Other per-artifact
-reviews and re-reviews wait for neither `/over-engineering-review` nor that
-`/code-style-review` run and build. `/over-engineering-review` runs once per
-stage; a later `/resolve-findings` round's re-review covers its own fix.
+followed by re-review and retest of the affected regions only, each re-review
+brief carrying the first-round findings its skill's `## Inputs` requires; a
+reviewer with no accepted finding whose region a fix changed reruns as a fresh
+first-round pass; a second round needs a reproducible blocker;
+`/external-diagnose-bug` runs before any further `/resolve-findings` attempt on
+a cause whose fix failed its retest, and its proven cause returns to
+`/resolve-findings` or a plan. Whenever the `/over-engineering-review` validator
+or a `/resolve-findings` round changed C++, `/code-style-review` runs over the
+newly changed ranges and `/compile` builds its `Build required`, as in Step 5,
+and only then do `/repo-code-review` and `/comment-review` start, after a round
+as that round's re-reviews of the affected regions; when
+`/over-engineering-review` runs, its finder and validator run before
+`/repo-code-review` and `/comment-review` start, with the validator's handoff,
+or the finder's when the validator is skipped, as `/repo-code-review`'s
+implementation handoff. Other per-artifact reviews and re-reviews wait for
+neither `/over-engineering-review` nor that `/code-style-review` run and build.
+`/over-engineering-review` runs once per stage; a later `/resolve-findings`
+round's re-review covers its own fix.
 
-- fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
-- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its brief carries what `.agents/skills/repo-code-review/SKILL.md` `## Inputs` requires.
+- fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a
+  fresh `implementer` runs its validator pass — when a `cpp`-class file changed
+  (`overEngineeringReview`), every tier; skip the validator when the finder
+  returns no removal candidates.
+- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its
+  brief carries what `.agents/skills/repo-code-review/SKILL.md` `## Inputs`
+  requires.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
 - `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
-- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and also carries Steps 7 and 8.
-- fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the reviewer must be new to the change.
-- `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier for one concrete unresolved hypothesis.
-- main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — for the external claims a review or `/resolve-findings` handoff raises.
-- separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
+- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier
+  1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and
+  also carries Steps 7 and 8.
+- fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the
+  reviewer must be new to the change.
+- `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier
+  for one concrete unresolved hypothesis.
+- main runs `/verify-external-claims`, dispatching one `locator` as its evidence
+  worker — for the external claims a review or `/resolve-findings` handoff
+  raises.
+- separate `implementer` runs `/resolve-findings` — whenever main accepts a
+  finding.
 - `implementer` runs `/external-diagnose-bug` — when a fix fails its retest.
 
 Main dispatches one fresh `reviewer` per changed artifact type, plus the
@@ -244,31 +367,46 @@ main rejected it, and is not decided again; when it was fixed, the re-raise
 counts as a fix that failed its retest, and main decides it as a new finding.
 Churn — a new finding at the site of an applied fix that undoing that fix would
 resolve — is resolved by first considering undoing or reworking that fix rather
-than patching on top of it.
-`/over-engineering-review` candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the
-pair as one review row from the validator handoff, or the finder's when the
-validator is skipped, and the later reviews check the applied removals like any
-other changed bytes. Main decides each design suggestion from either pass once,
-by putting it to the user before Step 9 under `### User Interaction`; an
-accepted one follows the Step 8 Leftovers rule, and one the user does not accept
-is logged at Step 9, where one still unanswered counts as not accepted.
+than patching on top of it. `/over-engineering-review` candidates are not
+findings: the validator's re-proof, not main, decides each one, the landing
+reconciliation records the pair as one review row from the validator handoff, or
+the finder's when the validator is skipped, and the later reviews check the
+applied removals like any other changed bytes. Main decides each design
+suggestion from either pass once, by putting it to the user before Step 9 under
+`### User Interaction`; an accepted one follows the Step 8 Leftovers rule, and
+one the user does not accept is logged at Step 9, where one still unanswered
+counts as not accepted.
 
 <!-- session-context-part: Change Workflow, Steps 7-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 7 — Apply the triggered cleanup
 
-Order: all run in parallel, except `/progressive-disclosure-review` runs after `/update-claude-docs` so the prose that step generates is in scope.
+Order: all run in parallel, except `/progressive-disclosure-review` runs after
+`/update-claude-docs` so the prose that step generates is in scope.
 
-- `mechanic` runs `/update-vcxproj` — for changes to file membership or to which executable a whole file belongs to.
-- fresh `reviewer` runs `/external-skill-creator` in findings-only validate mode — when the session changed any file in a `.agents/skills/*/` package that has a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass instead of its own dispatch.
+- `mechanic` runs `/update-vcxproj` — for changes to file membership or to which
+  executable a whole file belongs to.
+- fresh `reviewer` runs `/external-skill-creator` in findings-only validate mode
+  — when the session changed any file in a `.agents/skills/*/` package that has
+  a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass
+  instead of its own dispatch.
 - `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.
-- fresh `reviewer` runs `/progressive-disclosure-review` — when the session changed a file its `## When to use` names; where the Step 6 combined pass applies it runs inside that pass like the `/external-skill-creator` validate mode.
+- fresh `reviewer` runs `/progressive-disclosure-review` — when the session
+  changed a file its `## When to use` names; where the Step 6 combined pass
+  applies it runs inside that pass like the `/external-skill-creator` validate
+  mode.
 
 #### Step 8 — Verify the acceptance table
 
-Order: `/verify-acceptance` runs after Step 7; `/create-follow-up-plans` runs when a leftover is proven, per the Leftovers paragraph below.
+Order: `/verify-acceptance` runs after Step 7; `/create-follow-up-plans` runs
+when a leftover is proven, per the Leftovers paragraph below.
 
-- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing without landing; a stage landing in the same session gets this from Step 9's landing table instead, and where the Step 6 combined pass applies that pass is this reviewer, read-only apart from the one `Temp/` handoff file `/coherence-review` `## Handoff` requires.
-- `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope leftover not fixed inside the current change.
+- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing
+  without landing; a stage landing in the same session gets this from Step 9's
+  landing table instead, and where the Step 6 combined pass applies that pass is
+  this reviewer, read-only apart from the one `Temp/` handoff file
+  `/coherence-review` `## Handoff` requires.
+- `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope
+  leftover not fixed inside the current change.
 
 Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded,
 decidable from evidence already in hand), such as the same defect at a sibling
@@ -296,11 +434,26 @@ round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land
 
-- main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows its header lists, from the session's handoffs and its own context, reading no further code — before the `/finalize-changes` dispatch; a changed log joins the session's full landing set. Skipped for a `/save-plan` or Plan-rejection landing, whose `/finalize-changes` exception requires the change to hold exactly its Plan paths.
+- main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows
+  its header lists, from the session's handoffs and its own context, reading no
+  further code — before the `/finalize-changes` dispatch; a changed log joins
+  the session's full landing set. Skipped for a `/save-plan` or Plan-rejection
+  landing, whose `/finalize-changes` exception requires the change to hold
+  exactly its Plan paths.
 - `implementer` runs `/finalize-changes` — at a landing gate.
 
-Exactly one explicit user confirmation authorizes changing primary; after it the finalizer advances primary under the landing lock. The confirmation contract, the acceptance table, and what a later diff change re-triggers live in `/finalize-changes`. Landing completes one stage; the session ends only when every stage is complete or explicitly deferred, with a tracked follow-up Plan where required.
+Exactly one explicit user confirmation authorizes changing primary; after it
+the finalizer advances primary under the landing lock. The confirmation
+contract, the acceptance table, and what a later diff change re-triggers live
+in `/finalize-changes`. A landing completes the stages it carries; the session
+ends only when every stage is complete or explicitly deferred, with a tracked
+follow-up Plan where required.
 
 ### Convergence
 
-Once a stage's required checks pass, stop changing it: advance to the next stage, approval gate, blocker, or session end without adding untriggered tests, reviews, or process steps. This never shortens a valid build, lock, or harness deadline, and never licenses skipping a step this workflow does route — an unclear trigger is an ambiguity to surface, not grounds to call a check untriggered.
+Once a stage's required checks pass, stop changing it: advance to the next
+stage, approval gate, blocker, or session end without adding untriggered tests,
+reviews, or process steps. This never shortens a valid build, lock, or harness
+deadline, and never licenses skipping a step this workflow does route — an
+unclear trigger is an ambiguity to surface, not grounds to call a check
+untriggered.

@@ -215,16 +215,16 @@ private:
 };
 
 // Internal-only wrappers (not bound to any UI: not Tweaks, not GraphicsMenuScreen, not SoundMenuScreen).
-extern Wrapper gWireframe;
+inline Wrapper gWireframe(true);
 
-extern Wrapper gVisibleAreaExtraTop;
-extern Wrapper gVisibleAreaExtraBottom;
-extern Wrapper gTerrainElevationTextureMultiplier;
+inline Wrapper gVisibleAreaExtraTop(0.046f, 0.0f, 1.0f);
+inline Wrapper gVisibleAreaExtraBottom(0.16f, 0.0f, 1.0f);
+inline Wrapper gTerrainElevationTextureMultiplier(0.5f, 0.25f, 1.0f);
 
-extern Wrapper gSmokeTrailAlpha;
+inline Wrapper gSmokeTrailAlpha(0.8f, 0.0f, 1.0f);
 
 
-extern Wrapper gDebugTexture;
-extern Wrapper gDebugTextureIndex;
+inline Wrapper gDebugTexture(false);
+inline Wrapper gDebugTextureIndex(0.0f, 0.0f, static_cast<float>(shaders::kiMaxDebugTextures - 1));
 
 } // namespace engine

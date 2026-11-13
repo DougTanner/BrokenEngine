@@ -77,11 +77,13 @@ DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
 
 ### Setup
 
-1. Run `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -ListModels`,
+1. Run
+   `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -ListModels`,
    then ask the user to pick one listed slug, offering the one marked
    `(recommended)` first. Done when the user has chosen; that slug is `-Model`
    for every `-Batch` and `-Close` launch.
-2. Run `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
+2. Run
+   `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
    Done when it prints each batch name with its unit count, in run order.
 
 ### Per batch

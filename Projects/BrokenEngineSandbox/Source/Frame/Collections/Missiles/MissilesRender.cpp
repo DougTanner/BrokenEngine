@@ -62,6 +62,19 @@ void MissilesInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, c
 	}
 }
 
+void MissilesInterpolate::RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
+{
+	bool bPresent = std::ranges::any_of(rActiveCoordinates, [&](const engine::GridCoord& rCoordinate)
+	{
+		auto it = rRenderInterpolates.find(rCoordinate);
+		return it != rRenderInterpolates.end() && it->second.pMissiles->iCount > 0;
+	});
+	if (bPresent)
+	{
+		engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiCrc);
+	}
+}
+
 void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
 {
 	const MissilesInterpolate& rCurrent = *rFrameInterpolate.pMissiles;

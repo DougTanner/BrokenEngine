@@ -1,26 +1,25 @@
 # Bundled Scripts
 
 Use the bundled scripts; never reconstruct their Git, lock, or WorktreeCli
-operations. Parse their single fixed-shape JSON result and show only status, code,
-message, next-stage state, short counts/paths, and retry or authority
-outcome when applicable. Never return a nested tool response or
-file/XML/log body. The public `Invoke-FinalizePrimaryMovementCheck.ps1`
-invocation below redirects its complete stdout losslessly to the ignored
-repository-relative `Temp/finalize-primary-movement-result.json` artifact.
-The caller parses that artifact for every result. For the exact result with
-`status` `needs-review` and `code` `primary.disjoint-needs-review`, the finalizer
-handoff returns the artifact path and selector `$`; main reads the complete typed
+operations. Parse their single fixed-shape JSON result and show only status,
+code, message, next-stage state, short counts/paths, and retry or authority
+outcome when applicable. Never return a nested tool response or file/XML/log
+body. The public `Invoke-FinalizePrimaryMovementCheck.ps1` invocation below
+redirects its complete stdout losslessly to the ignored repository-relative
+`Temp/finalize-primary-movement-result.json` artifact. The caller parses that
+artifact for every result. For the exact result with `status` `needs-review` and
+`code` `primary.disjoint-needs-review`, the finalizer handoff returns the
+artifact path and selector `$`; main reads the complete typed
 `broken-engine-finalize-primary-movement/v3` result, including the
 foreign-commit manifest, losslessly from that artifact. Never inline-copy,
 summarize, or reconstruct it; the artifact remains byte-identical and available
 through the SmartGit/summary handoff. Other results surface only short status,
 code, message, counts, and paths after parsing. Exit/result/schema mismatches
-block. For
-`Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete command stdout
-losslessly in the ignored repository-relative
+block. For `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete
+command stdout losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
-below. The `Show-FinalizeApprovalReview.ps1` invocation
-below likewise redirects its single-line stdout to the ignored repository-relative
+below. The `Show-FinalizeApprovalReview.ps1` invocation below likewise redirects
+its single-line stdout to the ignored repository-relative
 `Temp/finalize-approval-review-result.json` artifact, and that artifact path is
 what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
 never re-typed by hand.
@@ -218,17 +217,17 @@ reviewed commit, expanded from an abbreviated `-ApprovedTip`. The redirected
 artifact is that receipt: landing reads `approvedTip` and `status` from the
 file named by `-ApprovalReviewResultFile`.
 
-The review outcome stays non-blocking — `opened`, `unavailable`, and `failed` all
-satisfy the gate, because only an attempted launch is required, not a successful
-one. An `error` status does not satisfy it. A receipt that is absent,
+The review outcome stays non-blocking — `opened`, `unavailable`, and `failed`
+all satisfy the gate, because only an attempted launch is required, not a
+successful one. An `error` status does not satisfy it. A receipt that is absent,
 unreadable, not valid JSON, or not a `broken-engine-finalize-approval-review/v1`
-result carrying `status` and `approvedTip` blocks with `approval-review.missing`,
-one whose `approvedTip` is not the commit being landed blocks with
-`approval-review.candidate-mismatch`, and one recording no attempted launch
-blocks with `approval-review.not-launched`. All three are exit 2, `blocked`,
-`terminal`, and happen before the landing changes anything on primary. The
-landing lease claimed after confirmation is already live, and
-the worker releases it with `-Release` exactly as for any other blocked landing.
+result carrying `status` and `approvedTip` blocks with
+`approval-review.missing`, one whose `approvedTip` is not the commit being
+landed blocks with `approval-review.candidate-mismatch`, and one recording no
+attempted launch blocks with `approval-review.not-launched`. All three are exit
+2, `blocked`, `terminal`, and happen before the landing changes anything on
+primary. The landing lease claimed after confirmation is already live, and the
+worker releases it with `-Release` exactly as for any other blocked landing.
 
 A refreshed confirmation reruns the review against the newly reviewed candidate
 and overwrites the artifact; the stale receipt is never reused, because its
@@ -236,21 +235,20 @@ and overwrites the artifact; the stale receipt is never reused, because its
 
 ### Landing and recovery
 
-- `Invoke-FinalizeLanding.ps1` exclusively advances primary by
-  compare-and-swap under the landing lock, rolls back on postcondition failure,
-  and releases the lock. Before it registers the session, scans recovery, or
-  claims or refreshes any lock itself, it
-  enforces the [approval review receipt](#approval-review-receipt) contract on
-  the receipt named by `-ApprovalReviewResultFile`.
-  Its guarded primary checkout — the advance to the
-  candidate and the rollback restore alike — waits out a foreign
-  `.git/index.lock` on the primary repository, re-running the same checkout every
-  500 milliseconds while git reports that lock. That waiting is bounded by the
-  `-IndexLockWaitSeconds` budget across the whole invocation, and every sleep
-  pays for one more attempt, so a lock clearing right at the bound still lands;
-  only when that last attempt still reports the lock does the run return the
-  truthful terminal `git.rollback-failed` result, and it never reports a landed
-  commit or tree it did not verify. A run that waited reports one
+- `Invoke-FinalizeLanding.ps1` exclusively advances primary by compare-and-swap
+  under the landing lock, rolls back on postcondition failure, and releases the
+  lock. Before it registers the session, scans recovery, or claims or refreshes
+  any lock itself, it enforces the
+  [approval review receipt](#approval-review-receipt) contract on the receipt
+  named by `-ApprovalReviewResultFile`. Its guarded primary checkout — the
+  advance to the candidate and the rollback restore alike — waits out a foreign
+  `.git/index.lock` on the primary repository, re-running the same checkout
+  every 500 milliseconds while git reports that lock. That waiting is bounded by
+  the `-IndexLockWaitSeconds` budget across the whole invocation, and every
+  sleep pays for one more attempt, so a lock clearing right at the bound still
+  lands; only when that last attempt still reports the lock does the run return
+  the truthful terminal `git.rollback-failed` result, and it never reports a
+  landed commit or tree it did not verify. A run that waited reports one
   `git.index-lock-wait` diagnostic naming the seconds spent, on a landed result
   as well as a failed one. Allow a landing invocation on the default budget a
   command timeout of up to 20 minutes; its worst case is about 15 minutes — the
@@ -263,89 +261,89 @@ and overwrites the artifact; the stale receipt is never reused, because its
   its host timeout by the same amount. Pass the post-confirmation claim's owner
   token as `-OwnerToken` so landing continues under that same lease, which it
   accepts only as a same-actor continuation under the `worker.md`
-  `## Bundled scripts` ownership rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
-  `$SessionLabel/landing`, first inspects the lock, and adopts a live owner only
-  when that exact derived session and the same canonical worktree match and the
-  recorded integer lease duration is at least the 3600-second landing duration; it
-  immediately refreshes a matching retained lease before proceeding, preserving
-  ownership across a possible rebase; otherwise
-  it mints its own token through WorktreeCli `lock token` and claims under the
-  derived identity. A recovery invocation applies the identity matching rule
-  without the duration gate to release a live retained claim because it performs
-  no rebase or advance; foreign, mismatched, and unverifiable claims are untouched.
-  Under the held 3600-second lease, after any internal rebase, it runs Generate
-  with the primary tip it now builds on as BaseCommit. Landing
-  measures the approved source patch from the confirmed candidate's own parent,
-  so a candidate whose parent is behind live primary — including one where the
-  intervening commits only rewrote the three generated history paths — is the
-  ordinary bounded internal rebase case rather than a blocked result, and
-  `-ExpectedPrimaryTip` remains the approved primary ancestor used for recovery
-  matching. The producer receives a new, absent child
+  `## Bundled scripts` ownership rule, preserving the raw `$SessionLabel`.
+  Without `-OwnerToken`, it derives `$SessionLabel/landing`, first inspects the
+  lock, and adopts a live owner only when that exact derived session and the
+  same canonical worktree match and the recorded integer lease duration is at
+  least the 3600-second landing duration; it immediately refreshes a matching
+  retained lease before proceeding, preserving ownership across a possible
+  rebase; otherwise it mints its own token through WorktreeCli `lock token` and
+  claims under the derived identity. A recovery invocation applies the identity
+  matching rule without the duration gate to release a live retained claim
+  because it performs no rebase or advance; foreign, mismatched, and
+  unverifiable claims are untouched. Under the held 3600-second lease, after any
+  internal rebase, it runs Generate with the primary tip it now builds on as
+  BaseCommit. Landing measures the approved source patch from the confirmed
+  candidate's own parent, so a candidate whose parent is behind live primary —
+  including one where the intervening commits only rewrote the three generated
+  history paths — is the ordinary bounded internal rebase case rather than a
+  blocked result, and `-ExpectedPrimaryTip` remains the approved primary
+  ancestor used for recovery matching. The producer receives a new, absent child
   directory beneath an existing ignored `Temp` parent; it never reuses an output
-  directory, and landing makes no capture decision of its own. All three generated
-  files are then committed over the approved source commit through a temporary
-  index as one sole-parent commit with the frozen approved metadata; no branch
-  ref moves while that object is built. The final result is
-  `broken-engine-finalize-landing/v6` and separates
-  `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
-  fields. The reviewed PNG deletion remains an ordinary source change; only the
-  three generated paths are allowed after confirmation. When primary
-  advanced first it makes at most one internal rebase, which requires a provably
-  byte-identical patch outside those three paths. Report the commit from the
-  result's `landed` block rather than `candidate`. A blocked result reports its
-  `disposition` and a `lock` projection; act on those, never a memorized code
-  list. A `retryable-wait` result may be re-invoked with the approval-bound
-  arguments after its reported `retryAfterMilliseconds`. When it acquired no lock
-  (`lock.claimed` false), simply re-invoke — on the caller-token route claim the
-  landing lock anew through `Invoke-FinalizeLockClaim.ps1` first and pass the new
-  owner token. When it acquired but did not release the lock (`lock.claimed`
-  true, `lock.released` false), the claim is retained: handle it per the release
-  paragraph below before claiming anew. Blocked
-  `rebase.patch-not-identical` means the clean rebase changed the patch, which
-  returns for re-review and a refreshed confirmation; `rebase.conflicted` leaves
-  the session branch restored; `rebase.abort-failed` leaves restoration unproven
-  and always retains the lease; `landing.retry-exhausted` is retryable and leaves
-  the confirmed session commit restored. Blocked `history.source-changed` means
-  the approved source patch itself — measured from that candidate's own parent —
-  rewrites one of the three generated history paths, or that patch changed after
+  directory, and landing makes no capture decision of its own. All three
+  generated files are then committed over the approved source commit through a
+  temporary index as one sole-parent commit with the frozen approved metadata;
+  no branch ref moves while that object is built. The final result is
+  `broken-engine-finalize-landing/v6` and separates `approvedSource`,
+  `rebasedSource`, `historyUpdate`, and `final` commit/tree fields. The reviewed
+  PNG deletion remains an ordinary source change; only the three generated paths
+  are allowed after confirmation. When primary advanced first it makes at most
+  one internal rebase, which requires a provably byte-identical patch outside
+  those three paths. Report the commit from the result's `landed` block rather
+  than `candidate`. A blocked result reports its `disposition` and a `lock`
+  projection; act on those, never a memorized code list. A `retryable-wait`
+  result may be re-invoked with the approval-bound arguments after its reported
+  `retryAfterMilliseconds`. When it acquired no lock (`lock.claimed` false),
+  simply re-invoke — on the caller-token route claim the landing lock anew
+  through `Invoke-FinalizeLockClaim.ps1` first and pass the new owner token.
+  When it acquired but did not release the lock (`lock.claimed` true,
+  `lock.released` false), the claim is retained: handle it per the release
+  paragraph below before claiming anew. Blocked `rebase.patch-not-identical`
+  means the clean rebase changed the patch, which returns for re-review and a
+  refreshed confirmation; `rebase.conflicted` leaves the session branch
+  restored; `rebase.abort-failed` leaves restoration unproven and always retains
+  the lease; `landing.retry-exhausted` is retryable and leaves the confirmed
+  session commit restored. Blocked `history.source-changed` means the approved
+  source patch itself — measured from that candidate's own parent — rewrites one
+  of the three generated history paths, or that patch changed after
   confirmation; it is a genuine block that returns for re-review and a refreshed
   confirmation, never a condition a rebase can cure. Blocked
   `history.overlay-invalid` means the temporary overlay tree changed something
-  other than exactly the three reserved history paths; its message names the unexpected
-  paths, and any reserved path the overlay failed to add. That guard runs before
-  the compare-and-swap advance, so the run changed nothing on primary and the
-  message is the whole evidence. A rolled-back
-  `candidate.postcondition-failed` landing likewise leaves the session branch and
-  worktree at the approved tip — not at the commit its own internal rebase
-  produced — so re-invoking it with the original approved arguments passes strict
-  sanity and needs no fresh approval preparation. Re-invoking a crashed landing
-  that left primary advanced, with the original approved arguments, is idempotent,
-  including against a tip its own internal rebase produced. Recovery walks
-  first-parent from the primary ref back to `-ExpectedPrimaryTip` and accepts a
-  commit only when it has exactly one parent, carries the frozen approved commit
-  metadata, contains all three generated history paths, and its patch identity
-  excluding those three paths equals the approved patch identity. No match is
-  ordinary foreign primary movement, not a blocker, when the primary head itself
-  does not carry the frozen metadata; a head that does carry it with no matching
-  commit blocks, as do multiple matches and a primary head that does not descend
-  from `-ExpectedPrimaryTip`. It never assigns indices or reruns
+  other than exactly the three reserved history paths; its message names the
+  unexpected paths, and any reserved path the overlay failed to add. That guard
+  runs before the compare-and-swap advance, so the run changed nothing on
+  primary and the message is the whole evidence. A rolled-back
+  `candidate.postcondition-failed` landing likewise leaves the session branch
+  and worktree at the approved tip — not at the commit its own internal rebase
+  produced — so re-invoking it with the original approved arguments passes
+  strict sanity and needs no fresh approval preparation. Re-invoking a crashed
+  landing that left primary advanced, with the original approved arguments, is
+  idempotent, including against a tip its own internal rebase produced. Recovery
+  walks first-parent from the primary ref back to `-ExpectedPrimaryTip` and
+  accepts a commit only when it has exactly one parent, carries the frozen
+  approved commit metadata, contains all three generated history paths, and its
+  patch identity excluding those three paths equals the approved patch identity.
+  No match is ordinary foreign primary movement, not a blocker, when the primary
+  head itself does not carry the frozen metadata; a head that does carry it with
+  no matching commit blocks, as do multiple matches and a primary head that does
+  not descend from `-ExpectedPrimaryTip`. It never assigns indices or reruns
   historical Snapshot, never rewrites a newer primary ref, and reconciles a
   proven-stale primary checkout plus the original session branch/worktree only
-  after guarded checks prove each expected state; it never overwrites a mismatched
-  checkout state. After the recovery lock, guarded checkout reconciliation
-  re-reads the ref and proves the expected primary and session checkouts before
-  resetting them. Before resetting the session checkout, its branch ref must be
-  exactly the approved source/recovered commit or a proven single-parent
-  patch-equivalent; an arbitrary ancestor is never a valid reset target.
-  Pass `-ReleasePlanClaim` when a claimed Plan reached final preparation; the
-  script then deletes the claim best-effort. Without the switch it invokes no
-  `plan` command at all.
+  after guarded checks prove each expected state; it never overwrites a
+  mismatched checkout state. After the recovery lock, guarded checkout
+  reconciliation re-reads the ref and proves the expected primary and session
+  checkouts before resetting them. Before resetting the session checkout, its
+  branch ref must be exactly the approved source/recovered commit or a proven
+  single-parent patch-equivalent; an arbitrary ancestor is never a valid reset
+  target. Pass `-ReleasePlanClaim` when a claimed Plan reached final
+  preparation; the script then deletes the claim best-effort. Without the switch
+  it invokes no `plan` command at all.
 
 Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
 before an open-ended user wait. After a failed landing the lock is released once
 every registered worktree is inspectable and provably free of Git operation
-markers, on both the supplied-token and omitted-token routes. When that cannot be
-proven the claim is retained and reported: a supplied token's retained claim
+markers, on both the supplied-token and omitted-token routes. When that cannot
+be proven the claim is retained and reported: a supplied token's retained claim
 stays the caller's lease, released the same way once the worktrees are provably
 clear; an omitted-token claim is discoverable by a later invocation only when
 its derived session and canonical worktree match, and every foreign or
@@ -359,13 +357,13 @@ it. `finalize-changes` and the `claim.session-diverged` block message of
 `.agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1` are its documented
 callers; for the `finalize-changes` route, the `Recovery` entry in
 [`worker.md`](worker.md#recovery) owns when to run it. It takes no parameters,
-resolves the session from the worktree root it is run in, touches no lock, lease,
-or primary ref, and never rebases primary.
+resolves the session from the worktree root it is run in, touches no lock,
+lease, or primary ref, and never rebases primary.
 
 It emits one compressed JSON line whose schema version is
-`broken-engine-fork-point-repair/v1`, carrying exactly `schemaVersion`, `status`,
-`code`, `message`, `exitCode`, `forkPoint`, `primaryTip`, `branch`, `baseline`,
-and `rebased`:
+`broken-engine-fork-point-repair/v1`, carrying exactly `schemaVersion`,
+`status`, `code`, `message`, `exitCode`, `forkPoint`, `primaryTip`, `branch`,
+`baseline`, and `rebased`:
 
 | Exit | Status | Codes | Caller action |
 | ---: | --- | --- | --- |
@@ -373,8 +371,9 @@ and `rebased`:
 | 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | `fork-point.not-recoverable` means the resolved fork point is still on primary's history, so there is nothing to replay, which after a detected rewrite means the true fork point has expired from the primary branch's reflog; `fork-point.repair-refused` means preservation, replay, or restoration failed, or another Git operation is active. `rebased` is true if replay completed but restoration failed. The message describes the actual state and any retained snapshot recovery command. Return the message as a blocker. |
 | 1 | `error` | `session.unresolved` | The session worktree could not be resolved. Return the message as a blocker. |
 
-When repair is needed, the shared helper preserves staged, unstaged, and untracked
-work in a uniquely named stash, replays session commits, and restores local work
-with its index. The stash is retained on success and failure; the helper's
-diagnostic identifies it and gives the recovery command. A failed restoration
-leaves the resulting state for manual resolution and does not publish a baseline.
+When repair is needed, the shared helper preserves staged, unstaged, and
+untracked work in a uniquely named stash, replays session commits, and restores
+local work with its index. The stash is retained on success and failure; the
+helper's diagnostic identifies it and gives the recovery command. A failed
+restoration leaves the resulting state for manual resolution and does not
+publish a baseline.

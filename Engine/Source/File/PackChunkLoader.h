@@ -28,15 +28,8 @@ private:
 	void Stop();
 public:
 	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority);
-public:
-	// Queues a single uncompressed lazy-chunk range for background recommit/reload. Same-range requests deduplicate
-	// while pending or ready; a failed request stays failed until its consumer resets it. State reads acquire the
-	// worker's ready/failed publication, and reset refuses a pending request so it cannot invalidate an in-flight reload.
-	void RequestChunkRangeReload(common::crc_t crc, int64_t iOffset, int64_t iLength, LoadPriority ePriority);
-	ChunkRangeReloadState GetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength) const;
-	void ResetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength);
 	void WaitForChunks(std::span<const common::crc_t> crcs);
-	// Blocks until no whole or range load is queued or running, with every accepted job's terminal state published.
+	// Blocks until no chunk load is queued or running, with every accepted job's terminal state published.
 	// Full graphics recovery calls this before texture-upload teardown so no loader can publish into the reset that
 	// follows. Callers must not enqueue new work afterwards until recovery completes. No separate admission state
 	// enforces that, because the exclusion is temporal: the one off-main producer (one-shot audio requesting its chunk

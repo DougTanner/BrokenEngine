@@ -187,16 +187,14 @@ void TweaksScreen::WrapperSlider(std::string_view label, Wrapper& rWrapper, int6
 	if (gpAgentUiRegistry != nullptr)
 	{
 		// Same formats as the slider's own text, applied to the post-change value.
-		char pcAgentValue[32] {};
 		if (!rWrapper.mAllowed.empty())
 		{
-			std::snprintf(pcAgentValue, sizeof(pcAgentValue), "%.6g", static_cast<double>(rWrapper.mAllowed.at(rWrapper.GetIndex())));
+			gpAgentUiRegistry->RecordItemValue(ImGui::GetID(pcImGuiLabel), "%.6g", static_cast<double>(rWrapper.mAllowed.at(rWrapper.GetIndex())));
 		}
 		else
 		{
-			std::snprintf(pcAgentValue, sizeof(pcAgentValue), "%.6f", static_cast<double>(rWrapper.mfCurrent));
+			gpAgentUiRegistry->RecordItemValue(ImGui::GetID(pcImGuiLabel), "%.6f", static_cast<double>(rWrapper.mfCurrent));
 		}
-		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(pcImGuiLabel), pcAgentValue);
 	}
 
 	if (!bIsActiveSlider)

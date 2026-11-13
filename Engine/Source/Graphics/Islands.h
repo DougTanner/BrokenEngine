@@ -18,9 +18,9 @@ inline constexpr int64_t kiMaxActivePlacements = (kiCoordinateSlots + 1) * kiMax
 inline constexpr int64_t kiIslandMeshArenaBytes = 128i64 * 1'024i64 * 1'024i64;
 
 // SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
-// RenderGlobal and writes only the re-acquired instance: its prior frame has presented and completed its GPU read, while this frame has not
-// submitted. All instances are allocated at boot and indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain
-// recreation.
+// RenderGlobal, or on a world-hidden frame before RenderUiPresentAcquire, and writes only the re-acquired instance: its prior
+// frame has presented and completed its GPU read, while this frame has not submitted. All instances are allocated at boot and
+// indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain recreation.
 
 class Islands : public common::Singleton<Islands>
 {
@@ -40,7 +40,7 @@ public:
 	bool HasRetiredMeshRanges() const;
 	// Every frame once iFramebuffer's fence has signaled.
 	void MarkFramebufferWaited(int64_t iFramebuffer);
-	// Every frame after RenderGlobal's publication block; each free bumps miMeshArenaCapacityGeneration.
+	// Every frame after Graphics::UpdateFrameResidency's publication block; each free bumps miMeshArenaCapacityGeneration.
 	void FreeUnheldRetiredMeshRanges();
 	// After a device drain.
 	void FreeAllRetiredMeshRanges();

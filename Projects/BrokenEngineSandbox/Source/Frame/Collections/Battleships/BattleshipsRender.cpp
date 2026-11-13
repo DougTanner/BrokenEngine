@@ -81,10 +81,11 @@ struct BattleshipWreck
 static std::vector<BattleshipWreck> sWrecks;
 static int64_t siWrecksRendered = 0;
 
-// Drops the wrecks whose cell left view and the sunk ones, captures each visible dying row, then advances every wreck by
-// fSeconds.
-static void UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates, float fSeconds)
+void BattleshipsInterpolate::UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
+	// The sim-scaled render delta keeps running while paused; only the render clock stops.
+	float fSeconds = (gpGame->mGameFlags & engine::GameFlags::kPaused) ? 0.0f : static_cast<float>(gpGame->mfLastRenderFrameSeconds);
+
 	// The client subscription's cell loaded area, or during a camera jump the previous cell loaded area too; map view
 	// leaves both unchanged.
 	auto OverlapsCellLoadedArea = [](engine::GridCoord coordinate)
@@ -208,9 +209,7 @@ void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 	siRendered = {};
 	siWrecksRendered = 0;
 
-	// The sim-scaled render delta keeps running while paused; only the render clock stops.
-	float fSeconds = (gpGame->mGameFlags & engine::GameFlags::kPaused) ? 0.0f : static_cast<float>(gpGame->mfLastRenderFrameSeconds);
-	UpdateWrecks(rRenderInterpolates, rActiveCoordinates, fSeconds);
+	UpdateWrecks(rRenderInterpolates, rActiveCoordinates);
 
 	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BattleshipsInterpolate&
 	{
@@ -228,6 +227,34 @@ void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
 			engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiPipelineCrcs[i], iCommandBuffer, 2, pBuffer);
+		}
+	}
+}
+
+void BattleshipsInterpolate::RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
+{
+	std::array<bool, kiPipelineCount> bPresent {};
+	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+	{
+		auto it = rRenderInterpolates.find(rCoordinate);
+		if (it == rRenderInterpolates.end())
+		{
+			continue;
+		}
+
+		// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
+		const BattleshipsPostRender& rPostRender = *gpGame->RenderFrame(rCoordinate).postRender.pBattleships;
+		for (int64_t i = 0; i < it->second.pBattleships->iCount; ++i)
+		{
+			bPresent[std::to_underlying(rPostRender.pController[i])] = true;
+		}
+	}
+
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
+	{
+		if (bPresent[i])
+		{
+			engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs[i]);
 		}
 	}
 }

@@ -1,17 +1,21 @@
 # Ships - Shared Ship Code
 
-What the three ship collections — Fighters, Omnis, Battleships — share: the vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and Omnis steer by (`FleetCoordination`), the ship status changes (`ShipStatusChanges`), and the collision hitboxes (`ShipHitboxes`). This folder holds no collection; each type's own `AGENTS.md` documents its script.
-The ramped heading turn in `ShipBehaviours` follows the
-[turning rule](../Battleships/AGENTS.md#turning-invariants).
+What the three ship collections — Fighters, Omnis, Battleships — share: the
+vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script
+calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet
+coordination fleet Fighters and Omnis steer by (`FleetCoordination`), the ship
+status changes (`ShipStatusChanges`), and the collision hitboxes
+(`ShipHitboxes`). This folder holds no collection; each type's own `AGENTS.md`
+documents its script. The ramped heading turn in `ShipBehaviours` follows the
+[turning rule](#turning-invariants).
 
 ## Ship Invariants
 
 - Ships have no ship-to-ship collision or ram damage. Pushers provide horizontal
-  separation within their 3D range between ships sharing an occupied flight-plane
-  layer, including an X position
-  correction for near-coincident XY; blaster collision and missile explosion
-  damage still apply.
-  The [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
+  separation within their 3D range between ships sharing an occupied
+  flight-plane layer, including an X position correction for near-coincident XY;
+  blaster collision and missile explosion damage still apply. The
+  [engine pusher contract](../../../../../../Engine/Source/Frame/Collections/Pushers/AGENTS.md#unique-aspects)
   owns the layer, distance, correction, and shared-snapshot rules.
 - Apply the pusher's X correction once to the current stored Interpolate
   position after terrain resolution, preserving Y/Z/W and target orders, then
@@ -36,12 +40,14 @@ The ramped heading turn in `ShipBehaviours` follows the
   PreCollision writes every row's radius and posed hitbox from its current pose
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
   each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
-  death shrink. A row's pusher radius is its hitbox sphere radius times its
-  type's `kShipHitboxTypes` pusher radius scale. Each `kShipHitboxTypes`
-  model's Z range also contains its local origin, which the bake keeps inside
-  its outline and so its box: `ShipHullContact`'s center-directed ray asserts
-  that it meets that prism, and the bake tests the origin against the outline
-  only (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
+  death shrink. Only the row's own cell tests its hitbox, so a hull part past
+  the cell edge is never hit from the neighbour cell; this is accepted by
+  design. A row's pusher radius is its hitbox sphere radius times its type's
+  `kShipHitboxTypes` pusher radius scale. Each `kShipHitboxTypes` model's Z
+  range also contains its local origin, which the bake keeps inside its outline
+  and so its box: `ShipHullContact`'s center-directed ray asserts that it meets
+  that prism, and the bake tests the origin against the outline only
+  (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
   `## Model Alignment`), so a sidecar `offset` must not move the Z range off it.
 - Shared startup caches each controller model's minimum origin height from its
   aligned upright geometry, keeping the hull at least 1 meter above water.
@@ -49,7 +55,12 @@ The ramped heading turn in `ShipBehaviours` follows the
   requested flight-plane height; bank and pitch do not affect it. Genuine
   spawns apply this height once before initializing owned objects; transfers
   preserve their carried position.
-- A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and run the fleet navigation below, except a fleet Fighter in its flagship's cell and a fleet Omni there on a tick its tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
+- A row's CRC'd `ShipController` selects its script branch and its model.
+  Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and
+  run the fleet navigation below, except a fleet Fighter in its flagship's cell
+  and a fleet Omni there on a tick its tactic gives a destination
+  (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the
+  frame's random-spawn waves create, carry global ID 0.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
   its cell's previous frame holds an enemy `kIsFlagship` Battleship row past
@@ -59,8 +70,16 @@ The ramped heading turn in `ShipBehaviours` follows the
   `../Omnis/AGENTS.md`, `../Battleships/AGENTS.md`). With no such flagship the
   row steers as an unflagged one that tick. The bit stays and transfers with the
   row.
-- Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
-- In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon targeting and the Fighter beam in PostCollision read the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
+- Stable global IDs provide lookup and transfer identity; flagship status is the
+  `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row
+  follows its own flagship, found by `pFlagshipGlobalIds` in any of the three
+  types.
+- In PostRender Update a ship script reads other ship rows only from the
+  previous frame, so the tuple order never hands it a row this tick has not
+  updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon
+  targeting and the Fighter beam in PostCollision read the current frame, after
+  every ship's Update. Changing a read's source frame shifts CRC-visible
+  behavior by one tick.
 - Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
   `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
   Each type's PostRender `PostRead` rejects a non-finite or out-of-range
@@ -83,7 +102,13 @@ The ramped heading turn in `ShipBehaviours` follows the
   between or above planes and after a terrain rise, even one ending at an exact
   effective height. A genuine spawn stores its spawn plane and a transfer
   arrival carries the stored value.
-- Between the two flight planes, the lower plane carries the union of terrain restrictions because the upper plane has none. A ship navigates on its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph of the ship type's clearance tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
+- Between the two flight planes, the lower plane carries the union of terrain
+  restrictions because the upper plane has none. A ship navigates on its
+  `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the
+  terrain-contact start snap use that plane's graph of the ship type's clearance
+  tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and
+  avoidance read terrain relative to that plane's height, ignoring it on a plane
+  without terrain collision.
 - Path queries route around large ships. `NavRectangleBoard`, built once per
   ship type's PostRender Update, holds one rectangle per previous-frame row
   `IsNavRectangleRow` accepts, so a navigation-obstacle ship's rectangle exists
@@ -99,24 +124,26 @@ The ramped heading turn in `ShipBehaviours` follows the
   that hull.
 - A query sees only the rectangles `NavRectangleBoard::Select` picks, so no
   exception code exists for a ship's own rectangle, a flagship, or an attack
-  target. Plane sharing reads each ship's `CappedOccupiedPlanes`, and the terrain
-  graph stays on `NavigationFlightPlane`. Pushers move a ship out of a box it
-  starts in. A stored destination is never snapped out of a box, because a point
-  left beside a ship that moves on might never be reached.
+  target. Plane sharing reads each ship's `CappedOccupiedPlanes`, and the
+  terrain graph stays on `NavigationFlightPlane`. Pushers move a ship out of a
+  box it starts in. A stored destination is never snapped out of a box, because
+  a point left beside a ship that moves on might never be reached.
 - Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles.
-  In-sight attack, chase, and Omni circling steering, flee, return to an island,
-  veer-off, roaming, escort, and terrain snaps all ignore them, and a ship in a
-  neighbouring cell makes none.
+  Flee and veer-off (`FleeRouteWaypoint`) and return to an island
+  (`ComputeFleeOrReturnDestination`) steer at a `NextRouteWaypoint` every tick,
+  as a hidden target's route does. In-sight attack, chase, and Omni circling
+  steering, roaming, escort, and terrain snaps all ignore rectangles, and a
+  ship in a neighbouring cell makes none.
 - Line of sight reads no rectangle. `HasShipLineOfSight` tests the unmodified
   model box of every `IsNavRectangleRow` Battleship in the frame its caller
   reads that occupies the tested plane. That Battleship-only walk matches the
   rows `NavRectangleBoard` holds only while `navigationObstacle` stays on the
   two Battleship models.
 - Interpolate Update owns ordinary plane travel: `ClimbTowardsFlightPlane` lands
-  exactly on the effective flight height, so client and server match bit-exactly.
-  A descent blocked by the lower plane's clearance graph at the integrated XY
-  returns toward the upper plane, keeping order and horizontal motion, until the
-  first clear update.
+  exactly on the effective flight height, so client and server match
+  bit-exactly. A descent blocked by the lower plane's clearance graph at the
+  integrated XY returns toward the upper plane, keeping order and horizontal
+  motion, until the first clear update.
 - A live ship whose type allows plane 1 immediately rises to at least the
   terrain elevation sampled at its center XY plus the lowest plane's height.
   Apply this floor after ordinary Interpolate plane travel and after the final
@@ -132,17 +159,19 @@ The ramped heading turn in `ShipBehaviours` follows the
   from the previous to the current Interpolate position against the cell's
   elevation grid, blocked at the current position's height, and write the
   resolved position back to the current Interpolate row. A ship on a plane
-  without terrain collision skips contact, as does a dying Battleship. On contact
-  Omnis slide along the terrain once and Fighters and Battleships bounce off it.
-  A start already inside terrain logs a warning; spawn sites test at most the
-  body's center against terrain, so a warning right after a spawn is expected.
-- Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
-  Every simulation write and every ship spawn stores a horizontal unit vector
-  in `pVecAiDirections`, and spawn stores the heading; the agent `edit_frame`
-  command writes raw values, bounded only by the read check
-  (`IsShipHeadingValid`). An Omni row carrying `ShipFlags::kNoAiDirection` has
-  no AI direction it wants, so the Omni thrust ignores it; the
-  [Battleship turning rule](../Battleships/AGENTS.md#turning-invariants) covers
+  without terrain collision skips contact, as does a dying Battleship. On
+  contact Omnis slide along the terrain once and Fighters and Battleships bounce
+  off it. A start already inside terrain logs a warning; spawn sites test at
+  most the body's center against terrain, so a warning right after a spawn is
+  expected.
+- Headings stay horizontal: a direction that can aim at another plane, such as
+  the Omni wanted direction or the random-wave heading, is flattened before it
+  becomes or turns a ship's heading. Every simulation write and every ship spawn
+  stores a horizontal unit vector in `pVecAiDirections`, and spawn stores the
+  heading; the agent `edit_frame` command writes raw values, bounded only by the
+  read check (`IsShipHeadingValid`). An Omni row carrying
+  `ShipFlags::kNoAiDirection` has no AI direction it wants, so the Omni thrust
+  ignores it; the [turning rule](#turning-invariants) covers Fighter and
   Battleship rows.
 - Target choice treats a ship as on its nearest flight plane
   (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
@@ -212,19 +241,25 @@ The ramped heading turn in `ShipBehaviours` follows the
 
 - After arrival grace expires, a living fleet Fighter or Battleship accelerates
   only when its horizontal AI bearing is within the inclusive +/-45-degree
-  forward cone. Outside the cone it retains drag
-  and skips terrain avoidance; the shared terrain response and pusher response still
-  apply. A fleet Fighter outside the cone uses its signed maximum turn rate, and
-  inside the cone uses ordinary steering smoothing. A fleet Battleship turns as
-  `../Battleships/AGENTS.md` `## Turning Invariants` states. This rule does not
-  apply to Omnis or random-spawn ships.
-- Navigation covers roaming, cross-cell movement, island destinations, flagship following, and a fleet Omni's patrol around its flagship (`../Omnis/AGENTS.md`). The patrol runs in the island-destination mode (mode 6) and, on a tick the Omni's flagship is in its cell, replaces the fleet override, flagship following, and the cell-change timer. Mode transitions depend only on shared state.
+  forward cone. Outside the cone it retains drag and skips terrain avoidance;
+  the shared terrain response and pusher response still apply. This rule does
+  not apply to Omnis or random-spawn ships; every Fighter and Battleship turns
+  as `## Turning Invariants` states.
+- Navigation covers roaming, cross-cell movement, island destinations, flagship
+  following, and a fleet Omni's patrol around its flagship
+  (`../Omnis/AGENTS.md`). The patrol runs in the island-destination mode (mode 6)
+  and, on a tick the Omni's flagship is in its cell, replaces the fleet
+  override, flagship following, and the cell-change timer. Mode transitions
+  depend only on shared state.
 - Flagship following has no frame-local exit when the flagship row is not in
   the follower's cell, and the server never reassigns the flagship: a fleet's
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
   a follower stalls until that row is in its cell again or a fleet wanted cell
   other than its own sends it cross-cell.
-- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode or destination changes. A tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island destination is dropped keeps the cached steering with no recompute.
+- Path queries run on a deterministic cadence staggered by tick and stable
+  global ID, with immediate recomputation for mode or destination changes. A
+  tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island
+  destination is dropped keeps the cached steering with no recompute.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current
   position. Both tests are needed: containment ahead does not imply containment
@@ -239,12 +274,12 @@ The ramped heading turn in `ShipBehaviours` follows the
   draws on any tick they can flip between, so mode 7 mirrors mode 6's three
   entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
   a cell with no centred islands neither mode draws: mode 7 skips the mirror and
-  mode 6 navigates to the cell center instead of an island. A fleet Omni's patrol pick
-  instead draws two values per attempt in any cell; a fleet Omni never enters
-  mode 7, so none of its ticks can flip between the modes. Only the draw count
-  matters — each `common::Random` advances the shared random stream once no matter what
-  bound it is given — so mode 7's mirror draws are load-bearing, not dead code,
-  even though it throws their results away.
+  mode 6 navigates to the cell center instead of an island. A fleet Omni's
+  patrol pick instead draws two values per attempt in any cell; a fleet Omni
+  never enters mode 7, so none of its ticks can flip between the modes. Only the
+  draw count matters — each `common::Random` advances the shared random stream
+  once no matter what bound it is given — so mode 7's mirror draws are
+  load-bearing, not dead code, even though it throws their results away.
 - Every ship's island decisions, destination picks and returns alike, read the
   cell's `CentredIslands`, never its full list
   (`../../../../../../Engine/Source/Frame/AGENTS.md`
@@ -256,4 +291,25 @@ The ramped heading turn in `ShipBehaviours` follows the
   tick draws again. A dropped largest or smallest pick still advances to the
   next waypoint.
 - Spawning always consumes its cell-change random draw.
-- Preserve cached steering and client debug waypoints across ticks where pathfinding is skipped.
+- Preserve cached steering and client debug waypoints across ticks where
+  pathfinding is skipped.
+
+## Turning Invariants
+
+- Every Fighter and Battleship turns at one maximum rate, its type's
+  `kFighterMovement` or `kBattleshipMovement` `fMaxTurnRate`. Each tick
+  PostRender Update moves the turn rate toward a wanted rate by at most its
+  `fTurnAcceleration` times the tick time (`RampHeadingTurnRate`), and terrain
+  bounce and terrain avoidance pass through that same ramp instead of setting
+  the rate directly. The wanted rate is zero within the heading capture angle
+  of the wanted heading.
+- Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet
+  rows their navigation or fleet tactic bearing, random-spawn rows the
+  normalized horizontal direction to their destination. Without a destination a
+  random-spawn row keeps its previous wanted heading with
+  `ShipFlags::kNoAiDirection` set, and its wanted rate is zero; the flag is
+  clear while it has one.
+- Interpolate Update, while the previous turn rate is exactly 0, the previous
+  row does not carry `ShipFlags::kNoAiDirection`, and the previous wanted
+  heading is within the capture angle, rotates the direction a fixed percent
+  toward it each tick.

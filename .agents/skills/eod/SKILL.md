@@ -43,14 +43,14 @@ resumes the work.
    retained `fork-point-recovery-*` stash (`git stash list`; untracked files
    from `<stash>^3`) and merging it with the current file where that path now
    exists, without reapplying what it already restored. If
-   `Get-AgentWorktreeSessionContext` reports a `Baseline` other than the one recorded here, record the new one,
-   fix every place that merged cleanly but changed the code's meaning (such as
-   a version constant both sides bumped to the same value) - find them by
-   comparing `git diff <recorded Baseline> <stash>` against
+   `Get-AgentWorktreeSessionContext` reports a `Baseline` other than the one
+   recorded here, record the new one, fix every place that merged cleanly but
+   changed the code's meaning (such as a version constant both sides bumped to
+   the same value) - find them by comparing
+   `git diff <recorded Baseline> <stash>` against
    `git diff <recorded Baseline> <new Baseline>` - and rerun every build and
-   check recorded at the old one. Then redispatch each stopped worker as a
-   fresh worker of the same role carrying its capsule, then take the next
-   action."
+   check recorded at the old one. Then redispatch each stopped worker as a fresh
+   worker of the same role carrying its capsule, then take the next action."
    Done when the file holds every item listed next, or `none` for it.
    - Objective and current Change Workflow step.
    - Each stopped worker's role and continuation capsule.

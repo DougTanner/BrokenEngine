@@ -257,14 +257,14 @@ void main()
 	// linear in fPbrSun, because its luminance comes from the UNSCALED color.
 	vec3 f3AmbientColor = globalLayout.f4AmbientColor.rgb;
 
-	vec2 f2VisibleAreaPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4VisibleArea);
+	vec2 f2ObjectShadowsPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ObjectShadowsArea);
 	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
 	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ShadowArea);
 	float fShadow = max(mainLayout.fPbrShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
 	// Only ships on the planes above iInLayer shade this ship; the smoke loop below reuses this sample.
-	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2VisibleAreaPosition);
+	vec4 f4ObjectShadows = texture(objectShadowsTextureSampler, f2ObjectShadowsPosition);
 	float fObjectShadow = ObjectShadowAbove(f4ObjectShadows, iInLayer);
 	fShadow *= fObjectShadow;
 	float fShadowMoon = fObjectShadow;

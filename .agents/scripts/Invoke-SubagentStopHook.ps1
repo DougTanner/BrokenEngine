@@ -1,13 +1,14 @@
 # Claude Code SubagentStop hook, registered in .claude/settings.json. Sends an
-# implementer or reviewer subagent back when its final message lacks the shared
-# handoff form of .agents/references/subagent-handoff.md ## Handoffs or is at
-# least that section's character cap long. The form needs a line that is exactly
-# Status: PASS, Status: NEEDS_ACTION, or Status: BLOCKED; a line starting with
-# each of Findings:, Changed files:, Decisive checks:, Build required:,
-# Evidence:, and Residuals:; and none of those field lines after the Residuals:
-# line. The length check runs only on a message that has the form and counts the
-# whole message. Every other agent type is allowed, and so is a stop the input
-# marks as a repeat (stop_hook_active), so a subagent is sent back at most once.
+# implementer, reviewer, or researcher subagent back when its final message
+# lacks the shared handoff form of .agents/references/subagent-handoff.md
+# ## Handoffs or is at least that section's character cap long. The form needs
+# a line that is exactly Status: PASS, Status: NEEDS_ACTION, or
+# Status: BLOCKED; a line starting with each of Findings:, Changed files:,
+# Decisive checks:, Build required:, Evidence:, and Residuals:; and none of
+# those field lines after the Residuals: line. The length check runs only on a
+# message that has the form and counts the whole message. Every other agent
+# type is allowed, and so is a stop the input marks as a repeat
+# (stop_hook_active), so a subagent is sent back at most once.
 # Exit codes:
 #   0 - allowed, including input that cannot be parsed and any unexpected
 #       script error
@@ -18,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
-$script:CheckedAgentTypes = @('implementer', 'reviewer')
+$script:CheckedAgentTypes = @('implementer', 'reviewer', 'researcher')
 $script:FieldNames = @('Findings', 'Changed files', 'Decisive checks', 'Build required', 'Evidence', 'Residuals')
 # Mirrors the cap owned by .agents/references/subagent-handoff.md ## Handoffs.
 $script:HandoffCharacterCap = 4000
@@ -48,7 +49,7 @@ function Get-HandoffProblem([string] $Message) {
 		}
 	}
 	if ($Message.Length -ge $script:HandoffCharacterCap) {
-		return "is $($Message.Length) characters, at least the $($script:HandoffCharacterCap)-character cap; move the fields that push it over to a file under the overflow rule in .agents/references/subagent-handoff.md ## Handoffs"
+		return "is $($Message.Length) characters, at least the $($script:HandoffCharacterCap)-character cap; shorten the fields that push it over, or, when your skill lets you write a file, move them to a file under the overflow rule in .agents/references/subagent-handoff.md ## Handoffs"
 	}
 	return $null
 }

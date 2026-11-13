@@ -81,7 +81,12 @@ void ClientDesyncCore::PollDebugFrameResponse()
 
 bool ClientDesyncCore::PollDesyncTimeout()
 {
-	if (mDesyncDebugState.iTick < 0 || std::chrono::steady_clock::now() - mDesyncDebugState.entryTime <= kDesyncDebugTimeout)
+	if (mDesyncDebugState.iTick < 0)
+	{
+		return false;
+	}
+
+	if (std::chrono::steady_clock::now() - mDesyncDebugState.entryTime <= kDesyncDebugTimeout)
 	{
 		return false;
 	}

@@ -31,7 +31,7 @@ Why
   means every subsequent draw (terrain, water, objects) naturally
   occludes it with no extra work
 
-Changes (11 files)
+Changes (10 files)
 ------------------
 
 1. Engine/Data/Shaders/Skybox/Skybox.frag  (new file)
@@ -162,9 +162,10 @@ Changes (11 files)
    render pass, before the Objects GPU timer.  After line 692
    (RecordBeginRenderPass), before line 694 (kGpuTimerObjects), add:
 
-     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSkybox);
-     pPipelines[kPipelineSkybox].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0);
-     gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSkybox);
+     gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer,
+     kGpuTimerSkybox); pPipelines[kPipelineSkybox].RecordDraw(iCommandBuffer,
+     vkCommandBuffer, 1, 0); gpProfileManager->GpuStop(iCommandBuffer,
+     vkCommandBuffer, kGpuTimerSkybox);
 
 7. Engine/Source/Profile/ProfileManagerBase.h
    Add kGpuTimerSkybox to the GpuTimers enum.  Insert after
@@ -179,18 +180,12 @@ Changes (11 files)
      {.name = "    Skybox"},
 
 8. Engine/Source/Ui/WrapperBase.h
-   Add the skybox exposure Wrapper declaration.  After line 219
-   (extern Wrapper gSunAngleOverride;), add:
+   Add the skybox exposure Wrapper as an inline definition.  After line 219
+   (inline Wrapper gSunAngleOverride ...), add:
 
-     extern Wrapper gSkyboxExposure;
+     inline Wrapper gSkyboxExposure(1.0f, 0.1f, 5.0f);
 
-9. Engine/Source/Ui/WrapperBase.cpp
-   Add the skybox exposure Wrapper definition.  After line 27
-   (Wrapper gSunAngleOverride ...), add:
-
-     Wrapper gSkyboxExposure(1.0f, 0.1f, 5.0f);
-
-10. Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenMisc.cpp
+9. Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenMisc.cpp
     Add the skybox slider to the Misc section.  After line 15
     (WrapperSlider("Misc0", kiSection);), before the closing brace,
     add:
@@ -198,7 +193,7 @@ Changes (11 files)
       WrapperSeparatorText("Skybox");
       WrapperSlider("Skybox Exposure", kiSection);
 
-11. Engine/Source/Ui/Screens/TweaksScreen/TweaksSliderMap.cpp
+10. Engine/Source/Ui/Screens/TweaksScreen/TweaksSliderMap.cpp
     Register the skybox slider in the map.  After line 170
     ({"Misc Depth Reflection Feather", ...}), add:
 

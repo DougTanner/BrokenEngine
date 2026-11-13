@@ -64,8 +64,8 @@ remains exact-file scope.
    the digest carries no metric values, and keep all four for the final
    summary. Done when all four values are in hand.
 7. Judge every `excessDecisions` reading by the interpretation bar in
-   `.agents/skills/code-quality-metrics/references/MetricContract.md` `## Output`.
-   Done when every `excessDecisions` reading is judged that way.
+   `.agents/skills/code-quality-metrics/references/MetricContract.md`
+   `## Output`. Done when every `excessDecisions` reading is judged that way.
 8. Treat an operational failure as a pipeline blocker: it exits `2` with
    diagnostics on stderr and no digest on stdout. Done when the run either
    produced a digest or its failure is reported as a blocker.
@@ -145,8 +145,8 @@ remains exact-file scope.
     reviewer wrote, scored, or relocated a plan, and none delegated.
 24. For every candidate, require a verdict and evidence for:
 
-    1. Correctness — cited path, symbol, behavior, and repository authority exist
-       and support the claimed root cause.
+    1. Correctness — cited path, symbol, behavior, and repository authority
+       exist and support the claimed root cause.
     2. Benefit and safety — the proposed outcome is functional or structural,
        not cosmetic, pattern-breaking, or more risky than the proven debt.
     3. Actionability — the unmet acceptance criterion and smallest correction
@@ -168,9 +168,9 @@ remains exact-file scope.
 27. Route every accepted candidate through `create-follow-up-plans`, passing
     oversized files with their required `/reduce-file <path>` instruction
     intact. Done when every accepted candidate is routed.
-28. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
-    Verify and land steps through `finalize-changes` for acceptance and
-    landing. Done when the applicable finalization outcome is known.
+28. Follow the `.agents/references/change-workflow.md` Verify the acceptance
+    table and Verify and land steps through `finalize-changes` for acceptance
+    and landing. Done when the applicable finalization outcome is known.
 
 ## Handoff
 

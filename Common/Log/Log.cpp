@@ -9,31 +9,15 @@
 namespace common
 {
 
-constinit std::atomic<int64_t> giMyOutputDebugString = 0;
-static_assert(decltype(giMyOutputDebugString)::is_always_lock_free);
-std::mutex gLogMutex;
+static std::mutex sLogMutex;
 
-LogRingBuffer gpLogRingBuffers[kiLogCategoryCount];
-LogGlobalBuffer gLogGlobalBuffer;
-LogAgentBuffer gLogAgentBuffer;
-
-#if defined(BT_DATA_PACKER)
-constexpr LogLevel keLogRuntimeDefault = kVerbose; // Offline tool: no agent / set_log_level, keep full verbosity
-#else
-constexpr LogLevel keLogRuntimeDefault = kInfo; // Documented out-of-box threshold; the agent lowers it live via set_log_level
-#endif
-constinit std::atomic<LogLevel> gpeLogRuntimeLevels[kiLogCategoryCount]
-{
-	keLogRuntimeDefault, kVerbose, // [1] kTemp: transient agent/dev diagnostics — always emit (compile floor keLogLevelTemporary = kVerbose)
-	keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault,
-	keLogRuntimeDefault, // [8] kReplay: compiled in at kVerbose but silent by default — the agent lowers this category alone to scrape per-tick checksums
-};
-static_assert(std::size(gpeLogRuntimeLevels) == kiLogCategoryCount, "gpeLogRuntimeLevels out of sync with LogCategory");
+static constinit char spcLogGlobalLines[kiGlobalBufferLineCount][kiLogBufferSize] {}; // Non-wrapping; freezes after kiGlobalBufferLineCount lines — feeds the crash-dump path (do not repurpose).
+static constinit std::atomic<int64_t> siLogGlobalWritePosition = 0;
 
 // Constant-initialized, so it reads false before this TU's dynamic initialization and after its destruction.
 static constinit std::atomic<bool> sbLogAlive = false;
 
-// Whole-stream file sink (Log.h EnableLogFile); teed by LogWrite under gLogMutex.
+// Whole-stream file sink (Log.h EnableLogFile); teed by LogWrite under sLogMutex.
 static std::ofstream sLogFileStream;
 
 // Declaration order relative to sLogFileStream is load-bearing: dynamic init runs in declaration order within a TU and
@@ -65,12 +49,12 @@ void EnableLogFile(const std::filesystem::path& rPath)
 {
 	bool bOpened = false;
 	{
-		std::unique_lock lockGuard(gLogMutex);
+		std::unique_lock lockGuard(sLogMutex);
 		sLogFileStream.open(rPath, std::ios::out | std::ios::trunc);
 		bOpened = sLogFileStream.is_open();
 	}
 
-	// LOG tees through LogWrite, which locks gLogMutex — must log only after the lock above releases (gLogMutex is
+	// LOG tees through LogWrite, which locks sLogMutex — must log only after the lock above releases (sLogMutex is
 	// non-recursive). Runs at startup before allocation tracking arms, so rPath.string() allocating is acceptable.
 	if (!bOpened)
 	{
@@ -148,7 +132,7 @@ void LogWrite(char* pLogBuffer)
 {
 	if (!sbLogAlive.load(std::memory_order_relaxed)) [[unlikely]]
 	{
-		// Outside this TU's lifetime gLogMutex and sLogFileStream may not exist, so emit without them: giMyOutputDebugString
+		// Outside this TU's lifetime sLogMutex and sLogFileStream may not exist, so emit without them: giMyOutputDebugString
 		// is constant-initialized and EnableLogFile only ever runs inside the window, so the sink cannot be open here.
 		DEBUG_BREAK_NO_LOG();
 		++giMyOutputDebugString;
@@ -161,7 +145,7 @@ void LogWrite(char* pLogBuffer)
 		return;
 	}
 
-	std::unique_lock lockGuard(gLogMutex);
+	std::unique_lock lockGuard(sLogMutex);
 	++giMyOutputDebugString;
 	OutputDebugString(pLogBuffer);
 	--giMyOutputDebugString;
@@ -189,15 +173,16 @@ void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory)
 		std::memcpy(pLine, logBuffer.data(), logBuffer.size());
 	};
 
-	CopyToLine(gpLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());
-	CopyToLine(gLogGlobalBuffer.AcquireLine());
-	CopyToLine(gLogAgentBuffer.AcquireLine());
+	int64_t iCategory = static_cast<int64_t>(eCategory);
+	CopyToLine(LogAcquireLine<true>(gpcLogRingLines[iCategory], gpiLogRingWritePositions[iCategory]));
+	CopyToLine(LogAcquireLine<false>(spcLogGlobalLines, siLogGlobalWritePosition));
+	CopyToLine(LogAcquireLine<true>(gpcLogAgentLines, giLogAgentWritePosition));
 }
 
 void LogDumpBuffers(CrashFileWriter& rWriter)
 {
 	rWriter.Write("\n\n\n<Begin Global Log>\n");
-	gLogGlobalBuffer.Dump(rWriter);
+	LogDump<false>(spcLogGlobalLines, siLogGlobalWritePosition, rWriter);
 	rWriter.Write("<End Global Log>\n");
 
 	for (int64_t i = 0; i < kiLogCategoryCount; ++i)
@@ -205,7 +190,7 @@ void LogDumpBuffers(CrashFileWriter& rWriter)
 		rWriter.Write("\n\n\n<Begin ");
 		rWriter.Write(kpcLogCategoryNames[i]);
 		rWriter.Write(" Log>\n");
-		gpLogRingBuffers[i].Dump(rWriter);
+		LogDump<true>(gpcLogRingLines[i], gpiLogRingWritePositions[i], rWriter);
 		rWriter.Write("<End ");
 		rWriter.Write(kpcLogCategoryNames[i]);
 		rWriter.Write(" Log>\n");

@@ -1,11 +1,17 @@
 # Model Shaders - Physically Based Rendering
 
-Static and skinned model paths feed a Cook-Torrance material shader with split-sum image-based lighting. DataPacker generates irradiance and prefiltered-radiance cubemaps; the renderer generates and caches the BRDF lookup texture with this shader family.
+Static and skinned model paths feed a Cook-Torrance material shader with
+split-sum image-based lighting. DataPacker generates irradiance and
+prefiltered-radiance cubemaps; the renderer generates and caches the BRDF lookup
+texture with this shader family.
 
 ## Architecture Notes
 
-- The material push-constant index also selects the mesh-data slot relative to the instance base. CPU draw generation must keep one material/primitive draw aligned with that mesh slot.
-- The generated BRDF lookup stores inverted roughness on its V axis. Generator and runtime lookup must remain paired.
+- The material push-constant index also selects the mesh-data slot relative to
+  the instance base. CPU draw generation must keep one material/primitive draw
+  aligned with that mesh slot.
+- The generated BRDF lookup stores inverted roughness on its V axis. Generator
+  and runtime lookup must remain paired.
 - `GetNormal` builds tangent space from the vertex tangent, authored or
   generated at export
   ([Scene and Model](../../../../DataPacker/Source/ExportJobs/AGENTS.md#scene-and-model)):
@@ -15,7 +21,10 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   such as zero `xyz` (`ModelVertex::f4Tangent` owns the encoding) or one almost
   parallel to the normal, falls back to the geometric normal to avoid NaNs, as a
   normal texture scale of 0 does.
-- Authored occlusion strength blends the linear red sample from neutral 1 and attenuates only the diffuse/specular image-based lighting sum. Direct sun/moon, engine directional lighting, and emissive remain independent of ambient occlusion.
+- Authored occlusion strength blends the linear red sample from neutral 1 and
+  attenuates only the diffuse/specular image-based lighting sum. Direct
+  sun/moon, engine directional lighting, and emissive remain independent of
+  ambient occlusion.
 - Skinning uses compact three-row joint matrices in a buffer separate from mesh
   data. That split is a layout choice — each mesh indexes the shared buffer
   through an offset, so no per-mesh joint cap is baked into the mesh-data struct
@@ -35,10 +44,10 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   samples the terrain elevation render target at the model centre for the
   blur height (`../Shadow/AGENTS.md` `## Overview`); the vertex shader is
   shared, so every model pipeline binds that texture.
-- Object shadow coverage uses each surface point's original interpolated world Z:
-  full at and above sea level, fading linearly to zero at the configured depth
-  below Z=0. Scale all RGBA coverage channels before MAX blending; model-centre
-  height and displaced water waves do not determine this fade.
+- Object shadow coverage uses each surface point's original interpolated world
+  Z: full at and above sea level, fading linearly to zero at the configured
+  depth below Z=0. Scale all RGBA coverage channels before MAX blending;
+  model-centre height and displaced water waves do not determine this fade.
 - A model's height above the lowest flight plane fades the terrain shadow it
   receives and moves its lighting sample: each lighting layer is sampled along
   the eye line by the model centre's height above that layer's plane. The
@@ -56,4 +65,6 @@ Static and skinned model paths feed a Cook-Torrance material shader with split-s
   and A planes above `iInLayer`, or 1 when no plane lies above. That value
   multiplies into `fShadow`, reaching sun direct, IBL diffuse, and IBL
   specular, and is `fShadowMoon` for the moon terms.
-- Material output remains linear HDR for the fullscreen resolve. Engine cubemaps use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the sampling boundary.
+- Material output remains linear HDR for the fullscreen resolve. Engine cubemaps
+  use Y-up sampling, so model shaders perform the Z-up/Y-up conversion at the
+  sampling boundary.

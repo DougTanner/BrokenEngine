@@ -108,7 +108,8 @@ Resolve the explicitly supplied complete proposal as follows:
     cause. Done when the duplicate search has run.
 12. For an executable Plan, write the plan body to a file. Done when that body
     file exists.
-13. Create the Plan with the repository-owned `.agents/scripts/New-PlanFile.ps1`:
+13. Create the Plan with the repository-owned
+    `.agents/scripts/New-PlanFile.ps1`:
 
     ```powershell
     pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
@@ -127,7 +128,9 @@ Resolve the explicitly supplied complete proposal as follows:
 
 ## Handoff
 
-Report source, selected path, duplicate outcome, tier trigger, dependency decision, validation command/result where applicable, and changed files. A saved Plan is tracked Git content, not a queue change and not a claim.
+Report source, selected path, duplicate outcome, tier trigger, dependency
+decision, validation command/result where applicable, and changed files. A saved
+Plan is tracked Git content, not a queue change and not a claim.
 
 ### Landing pre-approval
 

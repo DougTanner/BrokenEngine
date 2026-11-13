@@ -56,8 +56,8 @@ a filename-safe form of each cluster label, under one `## <hotspot cluster>`
 heading that keeps the label itself, and cites each path plus its `##` selector
 under `Evidence`.
 
-`Changed files` and `Build required` are `none` because this researcher run edits
-no tracked file.
+`Changed files` and `Build required` are `none` because this researcher run
+edits no tracked file.
 
 Main presents the profiling report, decides every proposal, routes accepted
 residuals through `/create-follow-up-plans`, and owns any landing action.

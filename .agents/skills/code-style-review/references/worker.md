@@ -214,41 +214,38 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    Rule 2, surrounding code must reject declaration-shaped text inside a
    block comment or raw string opened on an earlier line. Rule 29 needs the
    base class, which is off the line, so look it up.
-   - These kinds' permitted forms are off the line, so reject a row that is
-     one: rule 5, ownership handed straight to a RAII owner; rule 6, a
-     preprocessor guard `if constexpr` cannot replace — around an `#include`,
-     a namespace-scope declaration, or code naming a symbol declared only in
-     that configuration — or a `kb*` definition block in a project's `Pch.h`
-     or `Engine/Source/EngineSwitches.h`, or a feature toggle in a
-     dual-language header, which GLSL must also read; rule 11, a
-     macro argument, a function type, or a functional-notation cast in code of
-     a dual-language header that GLSL compiles, since GLSL has no
-     `static_cast`; rule 17, a container that is not a
-     `std::vector`; `style-rule-22` kind, an enum body
-     or a function body, which is not an initializer list; rule 25, a
-     namespace-scope `constexpr` variable in a `.cpp` file, since rule 25
-     governs only function scope and header global scope; rule 26, an enum
-     declared in the file's own header — the file itself when it is a header,
-     or for a `.cpp` the header declaring the functions or class it defines;
-     rule 27, a literal with both digits and no suffix whose destination or
-     other operand is double; rule 36, a class type with a user-provided default
-     constructor, an out-parameter filled on the next line, or a static member whose
-     initializer names types the header only forward-declares, but the
-     class-type-with-constructor rejection does not apply to an `extern` row,
-     a `.cpp` `extern` declaration, or a header namespace-scope definition that
-     is not `inline`, because rule 36's inline-header-global clause covers
-     every type; rule 39,
-     a discard of a lambda capture held only for lifetime, in any of the
-     `style-rule-39` kind's spellings;
-     rule 40, a local, member, cast, or template argument rather than a
-     parameter, a parameter type an external callback signature fixes, or a
-     `const char*` or `const wchar_t*` parameter that a caller can pass as
-     null, or whose value reaches an API that needs null termination; rule 44,
-     storage that is not an aligned type; rule 51, one of the established
-     multi-line forms the guide keeps; rule 52, a brace that opens a
-     function, lambda, type, namespace, or control-statement body, which is
-     not an initializer; rule 54, a local or a struct
-     member rather than a class member; rule 55, an index-and-count enum.
+   - These kinds' permitted forms are off the line, so reject a row that is one:
+     rule 5, ownership handed straight to a RAII owner; rule 6, a preprocessor
+     guard `if constexpr` cannot replace — around an `#include`, a
+     namespace-scope declaration, or code naming a symbol declared only in that
+     configuration — or a `kb*` definition block in a project's `Pch.h` or
+     `Engine/Source/EngineSwitches.h`, or a feature toggle in a dual-language
+     header, which GLSL must also read; rule 11, a macro argument, a function
+     type, or a functional-notation cast in code of a dual-language header that
+     GLSL compiles, since GLSL has no `static_cast`; rule 17, a container that
+     is not a `std::vector`; `style-rule-22` kind, an enum body or a function
+     body, which is not an initializer list; rule 25, a namespace-scope
+     `constexpr` variable in a `.cpp` file, since rule 25 governs only function
+     scope and header global scope; rule 26, an enum declared in the file's own
+     header — the file itself when it is a header, or for a `.cpp` the header
+     declaring the functions or class it defines; rule 27, a literal with both
+     digits and no suffix whose destination or other operand is double; rule 36,
+     a class type with a user-provided default constructor, an out-parameter
+     filled on the next line, or a static member whose initializer names types
+     the header only forward-declares, but the class-type-with-constructor
+     rejection does not apply to an `extern` row, a `.cpp` `extern` declaration,
+     or a header namespace-scope definition that is not `inline`, because rule
+     36's inline-header-global clause covers every type; rule 39, a discard of a
+     lambda capture held only for lifetime, in any of the `style-rule-39` kind's
+     spellings; rule 40, a local, member, cast, or template argument rather than
+     a parameter, a parameter type an external callback signature fixes, or a
+     `const char*` or `const wchar_t*` parameter that a caller can pass as null,
+     or whose value reaches an API that needs null termination; rule 44, storage
+     that is not an aligned type; rule 51, one of the established multi-line
+     forms the guide keeps; rule 52, a brace that opens a function, lambda,
+     type, namespace, or control-statement body, which is not an initializer;
+     rule 54, a local or a struct member rather than a class member; rule 55, an
+     index-and-count enum.
    - The rows carry their own rule number, so this step covers whatever kinds
      the run emits; step 6's hand read supplies the other hand-read rules'
      findings.
@@ -307,8 +304,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 - Rule 49 forwarding findings are routed, not auto-fixed — see
   `/repo-code-review` (`../../repo-code-review/SKILL.md`).
 - The untracked rule differs per script: the step-3 inventory covers an
-  untracked file only when `-IncludeUntracked '<comma-separated paths>'` lists it,
-  and its `counts.unlistedUntracked` reports how many it did not list; the
+  untracked file only when `-IncludeUntracked '<comma-separated paths>'` lists
+  it, and its `counts.unlistedUntracked` reports how many it did not list; the
   step-7 scanner takes `-IncludeUntracked` as a switch and enumerates the
   untracked files itself.
 - Each `-OutputPath` run in steps 3 and 7 writes its result document to

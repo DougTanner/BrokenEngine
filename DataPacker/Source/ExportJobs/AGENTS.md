@@ -1,6 +1,8 @@
 # DataPacker Export Jobs
 
-Asset processors convert source files into cached `.pack` chunks. The parent `RunExportJobs<T>` orchestration discovers each job by `Handles()` and assembles its output.
+Asset processors convert source files into cached `.pack` chunks. The parent
+`RunExportJobs<T>` orchestration discovers each job by `Handles()` and assembles
+its output.
 
 ## Shared Pipeline
 
@@ -17,9 +19,18 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   directories. Checkout-local packs and manifests can be rebuilt from clean
   shared chunks without re-exporting sources. The `.meta` also records the chunk
   body's CRC, so comparing a clean job with the manifest reads no chunk body.
-- Before a clean cached chunk body is republished, its CRC is checked against the `.meta` record and its chunk-header CRC against the job's path CRC; a failed read or a mismatch logs a warning and falls back to a full re-export.
-- A successful export writes derived metadata before the primary fingerprint. Interrupted or failed work therefore remains dirty, and jobs remove incomplete sidecars in `CleanupOnFailure()`.
-- `ExportJob::Version(N)` folds in `sizeof(common::ChunkHeader)`. Jobs that serialize additional payload structs also fold in their sizes (`ExportScene.h` and `ExportModel.h` show the pattern). Same-size reorder or semantic changes need the owning manual version bump; the layout `static_assert`s in `Common/DataFile.h` name which job's version owns each payload struct, so read the failing assertion message instead of guessing which version to bump.
+- Before a clean cached chunk body is republished, its CRC is checked against
+  the `.meta` record and its chunk-header CRC against the job's path CRC; a
+  failed read or a mismatch logs a warning and falls back to a full re-export.
+- A successful export writes derived metadata before the primary fingerprint.
+  Interrupted or failed work therefore remains dirty, and jobs remove incomplete
+  sidecars in `CleanupOnFailure()`.
+- `ExportJob::Version(N)` folds in `sizeof(common::ChunkHeader)`. Jobs that
+  serialize additional payload structs also fold in their sizes (`ExportScene.h`
+  and `ExportModel.h` show the pattern). Same-size reorder or semantic changes
+  need the owning manual version bump; the layout `static_assert`s in
+  `Common/DataFile.h` name which job's version owns each payload struct, so read
+  the failing assertion message instead of guessing which version to bump.
 - A job may version an expensive sub-stage independently of its chunk payload
   when that stage's outputs are tracked in the checkout, giving the stage its
   own marker and a fingerprint covering only its own inputs. Name and key that
@@ -37,17 +48,35 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   functions and is exempt from the removal rule
   (`ExportScene::UpdateCacheMetadata` holds the reason). Root `.gitattributes`
   marks which of these tracked outputs carry `export-output`.
-- Each job's `std::async` launch wraps `RunExport` in `common::ThreadLocal::Entry`, so the job runs with its own worker's `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other parallel exports.
-- `AllocateHeaderAndData` is normally called once per export. Scene animation data and the model outline and hardpoint sections are appended afterward; the chunk size excludes them and a header pointer captured before vector growth is invalid after reallocation.
-- `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL convolution, or texture encoding begins. Clean cached outputs remain readable under this guard.
+- Each job's `std::async` launch wraps `RunExport` in
+  `common::ThreadLocal::Entry`, so the job runs with its own worker's
+  `ThreadLocal` and workbuffer. Keep job output and scratch isolated from other
+  parallel exports.
+- `AllocateHeaderAndData` is normally called once per export. Scene animation
+  data and the model outline and hardpoint sections are appended afterward; the
+  chunk size excludes them and a header pointer captured before vector growth is
+  invalid after reallocation.
+- `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` must fail before dirty Gaea, IBL
+  convolution, or texture encoding begins. Clean cached outputs remain readable
+  under this guard.
 
 ## Matching and Routing
 
-`Handles()` determines both ownership and initial chunk flags. Filename tags and path components are inputs the output actually depends on: `[C]` marks cubemaps, `[BC4]`/`[BC5]`/`[BC7]` select block formats, and a `Raw` component marks raw assets. Shader stage flags and compression flags are added by their owning jobs. Scene discovery ignores `Intermediates` paths so generated Gaea meshes do not become standalone scenes.
+`Handles()` determines both ownership and initial chunk flags. Filename tags and
+path components are inputs the output actually depends on: `[C]` marks cubemaps,
+`[BC4]`/`[BC5]`/`[BC7]` select block formats, and a `Raw` component marks raw
+assets. Shader stage flags and compression flags are added by their owning jobs.
+Scene discovery ignores `Intermediates` paths so generated Gaea meshes do not
+become standalone scenes.
 
-Regular images generate a full mip chain; raw BCn/R16 and half-float intermediates preserve their supplied mip/face layout; KTX and live six-face cubemaps preserve cubemap ordering. Before encoding each live-cubemap face, the exporter requires the first face to be square and later faces to match its dimensions. Every final texture chunk is LZ4-compressed.
+Regular images generate a full mip chain; raw BCn/R16 and half-float
+intermediates preserve their supplied mip/face layout; KTX and live six-face
+cubemaps preserve cubemap ordering. Before encoding each live-cubemap face, the
+exporter requires the first face to be square and later faces to match its
+dimensions. Every final texture chunk is LZ4-compressed.
 
-Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/Gaea ingest is described in `Island/AGENTS.md`.
+Texture encoding and chunk routing are described in `Texture/AGENTS.md`.
+Island/Gaea ingest is described in `Island/AGENTS.md`.
 
 ## Scene and Model
 
@@ -120,19 +149,18 @@ also forces normal pre-export from the newly published GLB.
 `GltfSceneDecoder` owns glTF/GLB loading and decoding into `SceneExportData`,
 which owns the consumed image, texture-slot, mesh, material, skeleton and
 animation values without references into the source model. `ExportScene` owns
-optimization, intermediate/chunk writes, and cache/publication behavior.
-Scene images contain byte channels; the glTF decoder normalizes unsigned-short
-samples to bytes before transfer. Blender channel packing preserves sRGB color
-encoding, source images, and scalar/alpha values.
-Material decoding preserves RGB emissive factors, glTF occlusion strength and
-glTF normal texture scale; formats without those values keep the neutral
-defaults.
-A glTF primitive with no material gets the glTF 2.0 default material.
-glTF decoding stays phased: source loading, canonical skin selection and normalization
-precede pre-export marker removal; texture publication and orphan sweeping
-precede pre-export skeleton/animation and mesh/material checks. Main-only export
-retains its own consumed-data predicates and validation order. Blender staging
-validation loads the source without decoding export payloads.
+optimization, intermediate/chunk writes, and cache/publication behavior. Scene
+images contain byte channels; the glTF decoder normalizes unsigned-short samples
+to bytes before transfer. Blender channel packing preserves sRGB color encoding,
+source images, and scalar/alpha values. Material decoding preserves RGB emissive
+factors, glTF occlusion strength and glTF normal texture scale; formats without
+those values keep the neutral defaults. A glTF primitive with no material gets
+the glTF 2.0 default material. glTF decoding stays phased: source loading,
+canonical skin selection and normalization precede pre-export marker removal;
+texture publication and orphan sweeping precede pre-export skeleton/animation
+and mesh/material checks. Main-only export retains its own consumed-data
+predicates and validation order. Blender staging validation loads the source
+without decoding export payloads.
 
 `AssimpSceneDecoder` decodes the four exchange formats directly into the same
 owned payload, including representable skeletal and node TRS clips. Fidelity
@@ -163,40 +191,43 @@ convention. PLY UVs pass through unchanged despite its undefined format origin;
 STL has no UVs. Absent UV channels stay zero.
 
 Assimp scenes keep a source-only primary fingerprint and an independently
-versioned scene dependency sidecar. Successful auxiliary opens and external image
-reads record input-root-relative identities and content hashes, including an
-empty dependency set. Warm checks read that sidecar without loading Assimp;
+versioned scene dependency sidecar. Successful auxiliary opens and external
+image reads record input-root-relative identities and content hashes, including
+an empty dependency set. Warm checks read that sidecar without loading Assimp;
 missing or changed dependencies force pre-export. Failed opens fail the asset
 even if Assimp would substitute a default. Export failure removes both markers.
 
-The ordinary two-phase export's `.PreExport` marker
-covers the scene's generated
+The ordinary two-phase export's `.PreExport` marker covers the scene's generated
 outputs — the `<scene>.MODEL` file and every matched texture intermediate — not
 just the source scene, so a deleted, reverted, or edited output re-runs
 pre-export. A clean scene also needs its keyed `.pre-export` sidecar, which
 records the same fingerprint for that entry, to match, so a restored source
-re-runs pre-export when the tree still holds another entry's outputs.
-The main phase writes scene metadata and optional animation data.
-Pre-export also removes orphaned scene texture intermediates so recursive
-texture discovery cannot ship stale assets. Generated assets are referenced by
-relative-path CRC. An export-only glTF scene's dirty check covers the source plus every external
-file it references, so editing a referenced texture or buffer re-runs
-pre-export; a reference the scene names but disk does not have keeps the scene
-dirty, leaving that failure to the per-asset export rather than aborting the
-whole run. Dependency enumeration parses text glTF JSON or the bounded first
-JSON chunk of a GLB without loading binary buffers or decoding images. Invalid
-GLB framing contributes no dependencies and leaves failure to the export-time
-loader. The source fingerprint covers embedded bytes.
+re-runs pre-export when the tree still holds another entry's outputs. The main
+phase writes scene metadata and optional animation data. Pre-export also removes
+orphaned scene texture intermediates so recursive texture discovery cannot ship
+stale assets. Generated assets are referenced by relative-path CRC. An
+export-only glTF scene's dirty check covers the source plus every external file
+it references, so editing a referenced texture or buffer re-runs pre-export; a
+reference the scene names but disk does not have keeps the scene dirty, leaving
+that failure to the per-asset export rather than aborting the whole run.
+Dependency enumeration parses text glTF JSON or the bounded first JSON chunk of
+a GLB without loading binary buffers or decoding images. Invalid GLB framing
+contributes no dependencies and leaves failure to the export-time loader. The
+source fingerprint covers embedded bytes.
 
-Scene texture pre-export deduplicates attempts by source and output format. Each attempt writes a private, untagged stage; all attempts must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
+Scene texture pre-export deduplicates attempts by source and output format. Each
+attempt writes a private, untagged stage; all attempts must finish before any
+final intermediate is published. Keep cleanup ownership separate for stages from
+this attempt and final paths published by it, because a failure during encoding
+or publication must not classify one kind of path as the other.
 
-A scene pack supports one node-referenced skin, and a scene whose nodes reference
-more than one skin is rejected. A vertex joint index is bounded by that skin's
-full joint count: a scene whose exported primitive has a weighted joint index at
-or above that count, or any joint index at or above it when the primitive
-carries no weights, is rejected; a zero-weight slot is not checked. CPU and GPU
-consumers must skip zero-weight slots before dereferencing their unused joint
-indices.
+A scene pack supports one node-referenced skin, and a scene whose nodes
+reference more than one skin is rejected. A vertex joint index is bounded by
+that skin's full joint count: a scene whose exported primitive has a weighted
+joint index at or above that count, or any joint index at or above it when the
+primitive carries no weights, is rejected; a zero-weight slot is not checked.
+CPU and GPU consumers must skip zero-weight slots before dereferencing their
+unused joint indices.
 
 Exported default-pose geometry is centered at the origin with its longest
 extent spanning -1..1, so game render scales are plain sizes. For glTF,
@@ -208,15 +239,21 @@ into their vertices; skeleton exports ship it as the hierarchy root and keep
 vertices mesh-local and inverse-bind matrices and keyframes as authored. Bounds
 cover only drawn vertices at their runtime default-pose positions; no drawn
 vertex, non-finite bounds, or a zero extent fails the export. A glTF primitive
-whose material is `BLEND` with base color alpha 0 is not exported, so it sizes
-neither the bounds nor the outline. A skin whose joints lie outside the default
-scene does not inherit node 0, so its geometry exports un-normalized.
+whose material is `BLEND` with base color alpha 0, or an Assimp mesh whose
+material's base color alpha times opacity is 0, is not exported, so it sizes
+neither the bounds nor the outline. On the Assimp path such a mesh's bones also
+do not make the scene a skeleton export; on the glTF path any skin still
+selects one. A skin whose joints lie outside the default scene does not inherit
+node 0, so its geometry exports un-normalized.
 
-When multiple mesh nodes reuse one source material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
+When multiple mesh nodes reuse one source material, or primitives under one
+material differ in deformation mode (skinned versus not), preserve distinct
+material entries while retaining the source material index used for texture
+lookup, so no draw mixes deformation modes.
 
 Vertex colors are not part of the packed model format. Scene export warns with
-source path and primitive identity when `COLOR_0` is present and ignores that attribute
-without modifying the source.
+source path and primitive identity when `COLOR_0` is present and ignores that
+attribute without modifying the source.
 
 `BuildVertices` packs a glTF primitive's `TANGENT` into
 `ModelVertex::f4Tangent`, whose comment owns the encoding. A static export bakes
@@ -261,30 +298,29 @@ validator, shared with ModelViewer authoring.
 
 Export converts degrees to radians once and stores rotation, scale, and offset
 separately in `ModelHeader`, leaving geometry and animation unchanged.
-`common::GetModelAlignment` owns the complete
-matrix `(offset translation * authored XYZ scale) * XYZ pre-rotation` in
-exported model coordinates, with rotation ordered X, then Y, then Z. Apply it
-once in the outline and hardpoint bakes, ModelViewer and game rendering;
-metadata alone sets static model scale after source normalization. Dynamic render transforms and
+`common::GetModelAlignment` owns the complete matrix
+`(offset translation * authored XYZ scale) * XYZ pre-rotation` in exported model
+coordinates, with rotation ordered X, then Y, then Z. Apply it once in the
+outline and hardpoint bakes, ModelViewer and game rendering; metadata alone sets
+static model scale after source normalization. Dynamic render transforms and
 independent gameplay dimensions remain consumer-owned.
 
 Every model chunk, whatever its hitbox setting, appends a `common::ModelOutline`
 section: the top-down convex hull and z range of the vertices after alignment,
 the setting, the navigation obstacle tag, the outline weapons test, and the
-inset it was baked with. An
-`outline` model's outline is the outer contour of its top-down triangles moved
-in by `outlineInset` and simplified; every other model's outline is its hull.
-The outline is a simple polygon of either winding. It must stay inside the hull
-because the game's `ShipHitboxes.cpp` builds a ship's row radius and box from
-the hull, and those must enclose the outline
-(`../../../Engine/Source/Frame/AGENTS.md` `## Architecture`); the bake meets that
-by construction, with no hull check:
-its contour comes from the same vertices and only moves in, so `outlineInset`
-cannot be negative. It holds the model origin because the Fighter beam
-contact's center-directed ray relies on that. The bake owns the outline's value
-checks — a hull or outline outside 3 to `kiModelOutlineVertexMaximum` vertices,
-a non-finite value, a failed hull convexity check, or an outline without the
-origin fails the export — so runtime readers check only memory safety.
+inset it was baked with. An `outline` model's outline is the outer contour of
+its top-down triangles moved in by `outlineInset` and simplified; every other
+model's outline is its hull. The outline is a simple polygon of either winding.
+It must stay inside the hull because the game's `ShipHitboxes.cpp` builds a
+ship's row radius and box from the hull, and those must enclose the outline
+(`../../../Engine/Source/Frame/AGENTS.md` `## Architecture`); the bake meets
+that by construction, with no hull check: its contour comes from the same
+vertices and only moves in, so `outlineInset` cannot be negative. It holds the
+model origin because the Fighter beam contact's center-directed ray relies on
+that. The bake owns the outline's value checks — a hull or outline outside 3 to
+`kiModelOutlineVertexMaximum` vertices, a non-finite value, a failed hull
+convexity check, or an outline without the origin fails the export — so runtime
+readers check only memory safety.
 
 Hardpoints pack into separate missile tube then fighter launch bay sections
 after the outline, each counted by the model header. Both sections use packed
@@ -297,9 +333,9 @@ gameplay projection. A zero count emits no records. The outline and both
 sections stay outside the GPU payload size; their shared offsets live in
 `ModelHeader`.
 
-The model job fingerprints both `.MODEL` content and metadata content or explicit
-absence, so metadata addition, editing, or removal dirties model packing without
-forcing scene pre-export. Runtime admission follows
+The model job fingerprints both `.MODEL` content and metadata content or
+explicit absence, so metadata addition, editing, or removal dirties model
+packing without forcing scene pre-export. Runtime admission follows
 [Packed Assets](../../../Engine/Source/File/AGENTS.md#packed-assets).
 
 ## Cubemap Pre-pass
@@ -318,7 +354,10 @@ resulting half-float intermediates are consumed through texture raw routing.
 
 ## Shader Dependencies
 
-Shader export records every dependency from `glslc -MD` as an input-root index, root-relative path, and content fingerprint. Never persist absolute worktree paths. Missing or changed dependencies recompile the shader; Vulkan SDK header-version changes also invalidate shader chunks.
+Shader export records every dependency from `glslc -MD` as an input-root index,
+root-relative path, and content fingerprint. Never persist absolute worktree
+paths. Missing or changed dependencies recompile the shader; Vulkan SDK
+header-version changes also invalidate shader chunks.
 
 ## Audio Policy
 
@@ -338,5 +377,6 @@ repair-order, or export-rate changes require an `ExportAudio` version bump.
 ## See Also
 
 - `Island/AGENTS.md` - Gaea route caches, split lifecycle, and island payloads
-- `Texture/AGENTS.md` - texture intermediates, encoding, migration, and chunk formats
+- `Texture/AGENTS.md` - texture intermediates, encoding, migration, and chunk
+  formats
 - `../../../Common/AGENTS.md` - shared chunk and serialization contracts

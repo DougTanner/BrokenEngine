@@ -91,16 +91,15 @@ the question main makes no tool call other than these and the ones the handoff's
 own result requires. A receipt with any status the line forms below do not name,
 or one that is unreadable, is a blocker to report, not a summary to present.
 
-Main then presents the self-contained summary immediately before the question:
-a one-sentence change that names a superseded decision whenever the session
-record holds one, changed-file count and kind, session branch and the
-primary branch resolved as `<primary-branch>` below,
-the acceptance table's non-PASS rows if it has any, and the required
-line `**SmartGit review:** <status>` for `opened` and
+Main then presents the self-contained summary immediately before the question: a
+one-sentence change that names a superseded decision whenever the session record
+holds one, changed-file count and kind, session branch and the primary branch
+resolved as `<primary-branch>` below, the acceptance table's non-PASS rows if it
+has any, and the required line `**SmartGit review:** <status>` for `opened` and
 `**SmartGit review:** <status> — <manualCommand> — <message>` for `unavailable`
-and `failed`, filled from the fields just read — so the summary cannot be written
-before that receipt exists. Write it in plain words the user can act on, with no
-repository jargon. Then ask exactly:
+and `failed`, filled from the fields just read — so the summary cannot be
+written before that receipt exists. Write it in plain words the user can act on,
+with no repository jargon. Then ask exactly:
 
 - `Confirm landing this change from <session-branch> onto primary branch <primary-branch>?`
 
@@ -161,25 +160,23 @@ re-asking, and needs no re-review or rebuild; a rebuild before the summary is
 owned by `references/worker.md` step 5. A `builder` handoff since that step's
 meaning-change handoff whose `Residuals` names a failed
 `Get-CompileRewrittenPaths.ps1` run ([`/compile`](../compile/SKILL.md)
-`## Handoff`) is a stop for the user. After that build,
-main dispatches a fresh preparation whose path set is the session's full landing set plus every
-path that any `builder` handoff since that step's meaning-change handoff lists
-under `Changed files` ([`/compile`](../compile/SKILL.md) `## Handoff`), and
-whose brief carries the
-`-RequireExportOutputsRewritten` switch (`references/scripts.md`
-`## Invocation`); every later preparation brief of that landing keeps it, the
-restart after `rebase.conflicted` included. A returned
+`## Handoff`) is a stop for the user. After that build, main dispatches a fresh
+preparation whose path set is the session's full landing set plus every path
+that any `builder` handoff since that step's meaning-change handoff lists under
+`Changed files` ([`/compile`](../compile/SKILL.md) `## Handoff`), and whose
+brief carries the `-RequireExportOutputsRewritten` switch
+(`references/scripts.md` `## Invocation`); every later preparation brief of that
+landing keeps it, the restart after `rebase.conflicted` included. A returned
 `candidate.export-output-not-regenerated` blocker is a stop for the user: main
 reports it and dispatches no recovery. Only a direct user instruction under
-`## Inputs`' user-override paragraph clears the switch for that landing.
-An actual rebase conflict
-requiring manual resolution, a change to the session bytes, or a meaningful
-semantic change re-runs review of the affected regions and requires a refreshed
-summary, a fresh `SmartGit launch:` line for the new commit that main runs the
-same way, and a fresh confirmation unless a landing override stands, through a
-fresh preparation dispatch and
-then a fresh landing dispatch; `references/worker.md` defines the recovery
-transition after `rebase.conflicted`.
+`## Inputs`' user-override paragraph clears the switch for that landing. An
+actual rebase conflict requiring manual resolution, a change to the session
+bytes, or a meaningful semantic change re-runs review of the affected regions
+and requires a refreshed summary, a fresh `SmartGit launch:` line for the new
+commit that main runs the same way, and a fresh confirmation unless a landing
+override stands, through a fresh preparation dispatch and then a fresh landing
+dispatch; `references/worker.md` defines the recovery transition after
+`rebase.conflicted`.
 
 ## References
 

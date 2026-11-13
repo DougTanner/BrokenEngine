@@ -1,10 +1,21 @@
 # Architecture: Frame Update Pipeline
 
-> Maintained architecture reference for `Engine/Source/Frame/`, `Engine/Source/Main.cpp`, and the game frame pipeline. Update this document only when ownership, phase order, lifecycle, client/server affinity, or collection participation changes; within-stage implementation details live in the linked code.
+> Maintained architecture reference for `Engine/Source/Frame/`,
+> `Engine/Source/Main.cpp`, and the game frame pipeline. Update this document
+> only when ownership, phase order, lifecycle, client/server affinity, or
+> collection participation changes; within-stage implementation details live in
+> the linked code.
 
 ## RunFrameTick Pipeline
 
-[`RunFrameTick()`](../../Engine/Source/Frame/FrameBase.cpp) advances each frame through these five ordered phases. Server simulation dispatches this core across active frames. Client reconciliation replay/catch-up can use the same core through [`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp), while ordinary reconciliation fast paths can skip it. [`GameBase.cpp`](../../Engine/Source/GameBase.cpp) owns the server dispatch boundary.
+[`RunFrameTick()`](../../Engine/Source/Frame/FrameBase.cpp) advances each frame
+through these five ordered phases. Server simulation dispatches this core across
+active frames. Client reconciliation replay/catch-up can use the same core
+through
+[`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp),
+while ordinary reconciliation fast paths can skip it.
+[`GameBase.cpp`](../../Engine/Source/GameBase.cpp) owns the server dispatch
+boundary.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -29,14 +40,16 @@ retained Missile homes on. It only validates the handle each Missile received
 at launch.
 
 The window makes one combined workbuffer reservation for its eligible source-row
-indices and layer descriptors. The pointer-derived spans are formed only after that reservation
-returns, and the single scoped allocation owns them for the window's lifetime
+indices and layer descriptors. The pointer-derived spans are formed only after
+that reservation returns, and the single scoped allocation owns them for the
+window's lifetime
 ([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The
-worker workbuffer's initial size (`common::Multithreading`) remains a performance
-preallocation, not a hard bound: a grow while a window is live does not invalidate it
-(that same document). No window outlives its phase. The ownership layer is not a window
-and is never built from a phase; its by-value lifetime and post-tick
-main-thread-only restriction are engine contracts in that same document.
+worker workbuffer's initial size (`common::Multithreading`) remains a
+performance preallocation, not a hard bound: a grow while a window is live does
+not invalidate it (that same document). No window outlives its phase. The
+ownership layer is not a window and is never built from a phase; its by-value
+lifetime and post-tick main-thread-only restriction are engine contracts in that
+same document.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -60,7 +73,13 @@ owns game reconciliation policy, while the replay/catch-up machinery it drives
 is engine-owned in
 [`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp).
 
-`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::previous-snapshot assignment` advances the previous snapshot on every path, including the modal path that skips `Game::ProcessGameMenuInput`.
+`GameBase::ProcessInput` has a fixed internal order.
+[`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the
+display-frame raw snapshot and produces menu and camera input; engine menu
+policy runs next (quit, then the modal gate, cursor, pause/back-out, engine
+toggles); `Game::ProcessGameMenuInput` runs last; and
+`Input::previous-snapshot assignment` advances the previous snapshot on every
+path, including the modal path that skips `Game::ProcessGameMenuInput`.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -105,14 +124,14 @@ difference stream's post-dispatch channel rather than inside any `FrameInput`;
 the authoritative state and network publication stay on that same harvest tick.
 The record holds the whole post-tick batch, so spawns decided outside the tick
 and applied after it are recorded with that tick's transfers; status-change
-spawns take no part in the Spawn phase. For an event at `E`, the recording path calls
-`mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The channel
-is named for when its transfers are applied, not for when its record is read:
-during playback, `SyncReplayTick` first checksum-validates and removes any prior
-generation whose terminal tick is `E`, then activates a later generation due at
-`E`, loads that generation's exact-tick post-dispatch record, and stages its
-transfer before the frame dispatch for `E`. The active set was fixed before that
-activation, so the returned coordinate is absent from this dispatch.
+spawns take no part in the Spawn phase. For an event at `E`, the recording path
+calls `mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The
+channel is named for when its transfers are applied, not for when its record is
+read: during playback, `SyncReplayTick` first checksum-validates and removes any
+prior generation whose terminal tick is `E`, then activates a later generation
+due at `E`, loads that generation's exact-tick post-dispatch record, and stages
+its transfer before the frame dispatch for `E`. The active set was fixed before
+that activation, so the returned coordinate is absent from this dispatch.
 `FinalizeFrameTick` applies the staged transfer after dispatch and publishes the
 destination for `E`; the next iteration refreshes the replay active set and
 gives the new generation its first simulation dispatch at `E + 1`. At most one
@@ -161,7 +180,13 @@ flowchart TB
 
 ## Frame Lifecycle
 
-[`Cell`](../../Engine/Source/GameBase.h) is server/client-affine: server state has `pCurrent` and `pNext`, with the shared tick writing the destination before the buffers swap. Client state uses a `snapshots[]` ring; reconciliation replay/catch-up populates snapshots and rendering interpolates from the ring. Frame ownership is declared by [`FrameBase.h`](../../Engine/Source/Frame/FrameBase.h) and the game [`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h).
+[`Cell`](../../Engine/Source/GameBase.h) is server/client-affine: server state
+has `pCurrent` and `pNext`, with the shared tick writing the destination before
+the buffers swap. Client state uses a `snapshots[]` ring; reconciliation
+replay/catch-up populates snapshots and rendering interpolates from the ring.
+Frame ownership is declared by
+[`FrameBase.h`](../../Engine/Source/Frame/FrameBase.h) and the game
+[`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h).
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -200,7 +225,11 @@ which walks the engine collections before the game collections. A
 world-hidden frame
 ([`Engine/Source/Graphics/AGENTS.md`](../../Engine/Source/Graphics/AGENTS.md)
 `## Frame and Resource Lifecycle`) skips the main render pass, so no
-begin/render/end collection walk runs on it.
+begin/render/end collection walk runs on it; `GameBase::Render` instead calls
+the game's world-hidden step, `game::FrameInterpolate::UpdateWorldHidden`,
+which runs the game collections' `RequestTextures` fold
+(`ForEachRequestTextures`) and the wreck step. No engine collection declares
+`RequestTextures`, so no engine walk precedes it.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

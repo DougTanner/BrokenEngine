@@ -101,6 +101,7 @@ void OmnisInterpolate::Register()
 		.pWindTrailLengthMultiplierWrapper = &gWindDepositOmniBlastersLengthMultiplier,
 	});
 
+#if defined(BT_CLIENT)
 	engine::ExplosionsInterpolate::RegisterType(siExplosionTypeIndex,
 	{
 		.iBaseParticleCount = kiExplosionBaseParticleCount,
@@ -126,7 +127,6 @@ void OmnisInterpolate::Register()
 		.pParticleIntensityPowerScale = &gOmniExplosionParticleIntensityPower,
 	});
 
-#if defined(BT_CLIENT)
 	// Hits trigger the impact light controller.
 	int64_t iImpactPointLightTypeIndex = 0xFF;
 	engine::PointLightsInterpolate::RegisterType(iImpactPointLightTypeIndex,
@@ -680,7 +680,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					SetTargetFlightPlane(orders, DefaultFlightPlane(ShipType::kOmni));
 				}
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecTarget, flags, bHasDestination);
+				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
 					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.

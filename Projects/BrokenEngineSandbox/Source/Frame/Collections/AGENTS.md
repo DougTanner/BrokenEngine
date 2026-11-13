@@ -2,14 +2,21 @@
 
 ## Overview
 
-Game-specific SOA collections built on the engine Collection framework (`../../../../../Engine/Source/Frame/Collections/AGENTS.md`). Children document behavior-specific invariants only.
+Game-specific SOA collections built on the engine Collection framework
+(`../../../../../Engine/Source/Frame/Collections/AGENTS.md`). Children document
+behavior-specific invariants only.
 
 ## Game-Specific Rules
 
-- Transferable entity collections resolve collision/terrain outcomes before marking surviving out-of-bounds rows for Transfer.
+- Transferable entity collections resolve collision/terrain outcomes before
+  marking surviving out-of-bounds rows for Transfer.
 - Ship terrain contact: [shared ship policy](Ships/AGENTS.md#ship-invariants).
-- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals in PostRender Spawn, except the heal beam, which PostRender Update recreates. Hydration is filling a newly allocated collection slot from transferred or loaded data.
-- Every ship type receives a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
+- Collections with client-owned visual/audio objects hydrate them after shared
+  state arrives. Omnis instead recreate missing owned visuals in PostRender
+  Spawn, except the heal beam, which PostRender Update recreates. Hydration is
+  filling a newly allocated collection slot from transferred or loaded data.
+- Every ship type receives a fresh one-second arrival grace timer after
+  transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival
   grace, which is an intentional fresh one-second arrival default, each ship's
   navigation state, which resets to spawn defaults, Fighters' and Battleships'
@@ -29,9 +36,15 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   position. New collections and new spawn overloads keep those `ValidateVector`
   calls. In a `Spawn(SpawnInfo)` overload the bounds test runs before them
   (`../../../../../Engine/Source/Frame/AGENTS.md`).
-- Shared Update fields are loaded from the previous row and stored to the current row unconditionally. Persistent transition-only fields copied by `AllocateAndCopy` are the documented exception.
-- Pack related multi-valued state into the collection `Flags` type where appropriate; transfer, destroy, and dying states go in the engine lifecycle column instead (`../../../../../Engine/Source/Frame/Collections/AGENTS.md` `## Core Contract`). Use `/add-collection-member` for every layout change.
-- Debug geometry reads positions from the fully interpolated frame; PostRender may supply only flags, metadata, and static world positions.
+- Shared Update fields are loaded from the previous row and stored to the
+  current row unconditionally. Persistent transition-only fields copied by
+  `AllocateAndCopy` are the documented exception.
+- Pack related multi-valued state into the collection `Flags` type where
+  appropriate; transfer, destroy, and dying states go in the engine lifecycle
+  column instead (`../../../../../Engine/Source/Frame/Collections/AGENTS.md`
+  `## Core Contract`). Use `/add-collection-member` for every layout change.
+- Debug geometry reads positions from the fully interpolated frame; PostRender
+  may supply only flags, metadata, and static world positions.
 
 ## Model Rendering
 
@@ -46,7 +59,8 @@ navigation dimensions.
 
 ## Collections
 
-- `Battleships/AGENTS.md`, `Blasters/AGENTS.md`, `Fighters/AGENTS.md`, `Missiles/AGENTS.md`, `Omnis/AGENTS.md`
+- `Battleships/AGENTS.md`, `Blasters/AGENTS.md`, `Fighters/AGENTS.md`,
+  `Missiles/AGENTS.md`, `Omnis/AGENTS.md`
 - `Ships/AGENTS.md` - Code the three ship collections share
 
 ## See Also

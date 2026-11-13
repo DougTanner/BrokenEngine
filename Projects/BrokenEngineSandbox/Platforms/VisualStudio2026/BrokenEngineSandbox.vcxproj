@@ -85,7 +85,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <ConformanceMode>false</ConformanceMode>
+      <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(GeneratedDataIncludeRoot);$(ProjectDir)\..\..\..\..\ThirdParty;$(ProjectDir)\..\..\..\..\ThirdParty\glm;$(ProjectDir)\..\..\..\..\ThirdParty\enet\include;$(ProjectDir)\..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)\..\..\..\..\ThirdParty\imgui;$(ProjectDir)\..\..\..\..\ThirdParty\implot;$(ProjectDir)\..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)\..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)\..\..\..\..\Common;$(ProjectDir)\..\..\..\..\Common\ClangTidyShims;$(ProjectDir)\..\..\..\..\Engine\Source;$(ProjectDir)\..\..\..\..\Engine\Data;$(ProjectDir)\..\..\Source;$(ProjectDir)\..\..\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -509,7 +509,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
       <TreatWarningAsError>false</TreatWarningAsError>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles></ForcedIncludeFiles>
-      <PreprocessorDefinitions>MI_DEFAULT_RESERVE_OS_MEMORY=1048576;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MI_DEFAULT_RESERVE_OS_MEMORY=4194304;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
@@ -578,31 +578,11 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSmoke.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenWind.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GameSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
-    <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\MapWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\SmokeWrappers.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
-    <ClCompile Include="..\..\Source\Ui\SoundWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp" />

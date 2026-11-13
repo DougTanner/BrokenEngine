@@ -13,11 +13,15 @@ inline void TransferViaStream(const game::Frame& rFrom, game::Frame& rTo)
 	buffer >> rTo;
 }
 
+struct DifferenceRecord
+{
+	int64_t iTick = 0;
+	game::FrameInput input {};
+};
+
 class DifferenceStreamWriter
 {
 public:
-
-	using difference_t = std::tuple<int64_t, game::FrameInput>;
 
 	DifferenceStreamWriter(const game::Frame& rSavedStart, const game::FrameInput& rInitialDifference, bool bRecordInitialChecksum = true)
 	{
@@ -82,9 +86,9 @@ public:
 			common::Write(rHeaderStream, iDifferenceCount);
 			rHeaderStream << rSavedEnd;
 			common::Write(rHeaderStream, iPostDispatchCount);
-			for (const auto& [riTick, rPostDispatch] : mPostDispatchRecords)
+			for (const DifferenceRecord& rRecord : mPostDispatchRecords)
 			{
-				WriteDifferenceRecord(rHeaderStream, riTick, rPostDispatch);
+				WriteDifferenceRecord(rHeaderStream, rRecord.iTick, rRecord.input);
 			}
 		});
 		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
@@ -92,9 +96,9 @@ public:
 		std::filesystem::path framesFilename = std::filesystem::path(rFilename).concat(".frames");
 		bool bFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, framesFilename, [&](std::fstream& rFramesStream)
 		{
-			for (const auto& [riTick, rDifference] : mDifferences)
+			for (const DifferenceRecord& rRecord : mDifferences)
 			{
-				WriteDifferenceRecord(rFramesStream, riTick, rDifference);
+				WriteDifferenceRecord(rFramesStream, rRecord.iTick, rRecord.input);
 			}
 		});
 
@@ -182,13 +186,13 @@ private:
 	game::Frame mSavedStart {};
 	game::FrameInput mInitialDifference {};
 
-	std::vector<difference_t> mDifferences;
+	std::vector<DifferenceRecord> mDifferences;
 	game::FrameInput mCurrentDifference {};
 
 public:
 	// Records an event that happens after iTick's dispatch. Appends are strictly increasing by construction,
 	// because the caller harvests at most one batch per tick.
-	std::vector<difference_t> mPostDispatchRecords;
+	std::vector<DifferenceRecord> mPostDispatchRecords;
 private:
 
 	std::vector<common::crc_t> mChecksums;
@@ -200,8 +204,6 @@ private:
 class DifferenceStreamReader
 {
 public:
-
-	using difference_t = std::tuple<int64_t, game::FrameInput>;
 
 	DifferenceStreamReader(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename, game::Frame& rSavedStart, game::FrameInput& rInitialDifference, bool& rbLoaded, bool& rbVersionMismatch, int64_t& riMismatchFileVersion, int64_t& riMismatchExpectedVersion, bool bRecordsInitialChecksum = true)
 	{
@@ -286,7 +288,7 @@ public:
 			// difference record the start tick is in range. The terminal tick is not: recording stops
 			// before it is dispatched, so no post-dispatch event can exist there.
 			if (iTick < miStartTick || iTick > mSavedEnd.interpolate.iTick
-			 || (!mPostDispatchRecords.empty() && iTick <= std::get<0>(mPostDispatchRecords.back())))
+			 || (!mPostDispatchRecords.empty() && iTick <= mPostDispatchRecords.back().iTick))
 			{
 				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section has non-canonical tick data");
 				return;
@@ -334,7 +336,7 @@ public:
 				return;
 			}
 			if (iTick <= miStartTick || iTick > mSavedEnd.interpolate.iTick + 1
-			 || (!mDifferences.empty() && iTick <= std::get<0>(mDifferences.back())))
+			 || (!mDifferences.empty() && iTick <= mDifferences.back().iTick))
 			{
 				LOG(kDefault, kWarning, "Recorded frames file has non-canonical tick data");
 				return;
@@ -480,12 +482,12 @@ public:
 	// carried forward the way a difference is.
 	bool LoadPostDispatch(int64_t iTick, game::FrameInput& rPostDispatch)
 	{
-		if (mPostDispatchRecordsIterator == mPostDispatchRecords.end() || iTick != std::get<0>(*mPostDispatchRecordsIterator))
+		if (mPostDispatchRecordsIterator == mPostDispatchRecords.end() || iTick != mPostDispatchRecordsIterator->iTick)
 		{
 			return false;
 		}
 
-		rPostDispatch = std::get<1>(*mPostDispatchRecordsIterator);
+		rPostDispatch = mPostDispatchRecordsIterator->input;
 		++mPostDispatchRecordsIterator;
 
 		LOG(kDefault, kVerbose, "Loaded post-dispatch record {}: {}", iTick, rPostDispatch.Crc());
@@ -502,9 +504,9 @@ public:
 			return false;
 		}
 
-		if (mDifferencesIterator != mDifferences.end() && iTick == std::get<0>(*mDifferencesIterator))
+		if (mDifferencesIterator != mDifferences.end() && iTick == mDifferencesIterator->iTick)
 		{
-			rDifference = std::get<1>(*mDifferencesIterator);
+			rDifference = mDifferencesIterator->input;
 			++mDifferencesIterator;
 			mCurrentDifference = rDifference;
 
@@ -593,12 +595,12 @@ public:
 
 private:
 
-	std::vector<difference_t> mDifferences;
-	typename std::vector<difference_t>::iterator mDifferencesIterator = mDifferences.end();
+	std::vector<DifferenceRecord> mDifferences;
+	typename std::vector<DifferenceRecord>::iterator mDifferencesIterator = mDifferences.end();
 	game::FrameInput mCurrentDifference {};
 
-	std::vector<difference_t> mPostDispatchRecords;
-	typename std::vector<difference_t>::iterator mPostDispatchRecordsIterator = mPostDispatchRecords.end();
+	std::vector<DifferenceRecord> mPostDispatchRecords;
+	typename std::vector<DifferenceRecord>::iterator mPostDispatchRecordsIterator = mPostDispatchRecords.end();
 
 	std::vector<common::crc_t> mChecksums;
 public:

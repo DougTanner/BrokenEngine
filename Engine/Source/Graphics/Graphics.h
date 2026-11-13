@@ -107,8 +107,8 @@ public:
 
 	void RenderGlobal(std::chrono::duration<float> currentTime);
 	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
-	// A world-hidden frame: waits only this framebuffer's fence and submits only the UI, recording no Global or Main
-	// work and leaving miFrameCounter unchanged.
+	// A world-hidden frame: waits only this framebuffer's fence, runs the same residency step as RenderGlobal, and submits
+	// only the acquire command buffer, when recorded, and the UI, recording no Global or Main work.
 	void RenderUiPresentAcquire(int64_t iCommandBuffer);
 	void Create();
 	void Refresh();
@@ -165,6 +165,9 @@ private:
 	bool SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabilitiesKHR);
 
 	void WaitFramebuffer(int64_t iCommandBuffer);
+	// Every presented frame after WaitFramebuffer: descriptor churn, publication, retired-resource destruction, and the
+	// miFrameCounter advance.
+	void UpdateFrameResidency(int64_t iCommandBuffer);
 	void PresentAcquire(int64_t iCommandBuffer);
 
 	template <typename T>

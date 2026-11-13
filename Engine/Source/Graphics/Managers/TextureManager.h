@@ -24,7 +24,7 @@ class TextureManager : public common::Singleton<TextureManager>
 public:
 
 	static std::tuple<int64_t, int64_t> DetailTextureSize(float fMultiplier);
-	static std::tuple<int64_t, int64_t> LightingDetailTextureSize(float fMultiplier);
+	static std::tuple<int64_t, int64_t> ExtraAreaDetailTextureSize(float fMultiplier);
 	static std::tuple<int64_t, int64_t> WaterDetailTextureSize(float fMultiplier);
 	static float DetailTextureAspectRatio();
 
@@ -53,10 +53,12 @@ public:
 
 	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier);
 	// Returns the acquire command buffer of the framebuffer ProcessPendingTextures last named, beginning it on first use
-	// since the last EndAcquireCommandBuffer. Work recorded into it precedes that framebuffer's Global submission.
+	// since the last EndAcquireCommandBuffer. Work recorded into it precedes that framebuffer's Global submission, or on a
+	// world-hidden frame its ImGui submission.
 	VkCommandBuffer EnsureAcquireCommandBufferBegun();
-	// Ends a begun acquire command buffer and publishes it for the next Global submission; once per frame, after the last
-	// recording (RenderGlobal after RestorationSweep, and each WaitForTextures pass before its flush).
+	// Ends a begun acquire command buffer and publishes it for the next Global submission, or on a world-hidden frame for its
+	// standalone submission; once per frame, after the last recording (Graphics::UpdateFrameResidency after RestorationSweep,
+	// and each WaitForTextures pass before its flush).
 	void EndAcquireCommandBuffer();
 
 	// Drained context: opens its own all-framebuffer bindless write epoch, so the caller must not hold one.
@@ -70,7 +72,7 @@ public:
 	void RetireImage(Texture& rTexture);
 	// Every frame once iFramebuffer's fence has signaled: no retired resource is held by that framebuffer any longer.
 	void MarkFramebufferWaited(int64_t iFramebuffer);
-	// Every frame after RenderGlobal's publication block: destroys the retired resources no framebuffer holds.
+	// Every frame after Graphics::UpdateFrameResidency's publication block: destroys the retired resources no framebuffer holds.
 	void DestroyUnheldRetiredResources();
 	// After a device drain.
 	void DestroyAllRetiredResources();
@@ -146,10 +148,15 @@ public:
 		data::kTexturesTerrainBC5SandNormal0jpgCrc,
 		data::kTexturesTerrainBC5SandNormal1pngCrc,
 		data::kTexturesTerrainBC5SandNormal2pngCrc,
+		data::kTexturesBC4Radial2pngCrc,             // WindTrails
+		data::kTexturesParticlesBC4Square24pngCrc,   // WindRadials
+		data::kTexturesSmokeBC44jpgCrc,              // Puffs
+		data::kTexturesCSkyboxCrc,                   // HexShields
 	};
 
-	// Priority textures preloaded at boot so chevron switches and the first terrain frame never show a
-	// placeholder. The water catalogs are single-sourced from their CRC tables.
+	// Priority textures preloaded at boot so chevron switches, the first terrain frame, and the first draw of an
+	// effect type, including one that first appears behind the map, never show a placeholder. The water catalogs
+	// are single-sourced from their CRC tables.
 	static inline constexpr int64_t kiPriorityTextureCount = std::size(kpPriorityHead) + kiWaterFoamTextureCount + kiWaterFoamBreakupTextureCount + kiWaterNormalCount + std::size(kpPriorityTail);
 	static inline constexpr std::array<common::crc_t, kiPriorityTextureCount> kPriorityTextures = []() consteval
 	{

@@ -234,7 +234,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 			return eType;
 		}
 	}
-	throw std::runtime_error("'type' must be SpawnFighter|SpawnOmni|SpawnBattleship|SpawnBlaster|SpawnMissile|SpawnExplosion|DestroyShip|UpdateShip|UpdateFleet");
+	throw std::runtime_error("'type' must be SpawnFighter|SpawnOmni|SpawnBattleship|SpawnBlaster|SpawnMissile|DestroyShip|UpdateShip|UpdateFleet");
 }
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
@@ -335,6 +335,12 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 	{
 		case StatusChangeType::kSpawnFighter:
 			SeatShipSpawnHeight(ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kFighter);
+			// The controller parses as a token and SeatShipSpawnHeight has already refused a disallowed target plane and
+			// seated an allowed stored plane, so only the fire time can fail here.
+			if (!IsAdoptableStatusChange(scheduled.change))
+			{
+				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(FightersPostRender::SpawnInfo, nextBeamFireTime)::kName));
+			}
 			break;
 		case StatusChangeType::kSpawnOmni:
 		{
@@ -355,6 +361,11 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		}
 		case StatusChangeType::kSpawnBattleship:
 			SeatShipSpawnHeight(ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kBattleship);
+			// As for SpawnFighter, only the fire time can fail here.
+			if (!IsAdoptableStatusChange(scheduled.change))
+			{
+				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(BattleshipsPostRender::SpawnInfo, nextMissileFireTime)::kName));
+			}
 			break;
 		case StatusChangeType::kSpawnBlaster:
 			ParseSpawnEntry<BlastersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
@@ -370,25 +381,6 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			if (!rEntry.contains(FRAME_COLUMN(MissilesPostRender::SpawnInfo, flags)::kName))
 			{
 				rData.flags = (rData.alignment == gpGame->mFleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
-			}
-			break;
-		}
-		case StatusChangeType::kSpawnExplosion:
-		{
-			const engine::ExplosionsPostRender::SpawnInfo& rData = ParseSpawnEntry<engine::ExplosionsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
-			if (!IsAdoptableStatusChange(scheduled.change))
-			{
-				throw std::runtime_error(std::format("'{}' is not a registered Explosion type", FRAME_COLUMN(engine::ExplosionsPostRender::SpawnInfo, iTypeIndex)::kName));
-			}
-			// Spawn caps only the trail count's upper end; the explosion read check of a later save or replay rejects a
-			// negative count or a time percent outside [0,1].
-			if (rData.iTrailCount < 0)
-			{
-				throw std::runtime_error(std::format("'{}' must not be negative", FRAME_COLUMN(engine::ExplosionsPostRender::SpawnInfo, iTrailCount)::kName));
-			}
-			if (!(rData.fTimePercent >= 0.0f && rData.fTimePercent <= 1.0f))
-			{
-				throw std::runtime_error(std::format("'{}' must be within [0,1]", FRAME_COLUMN(engine::ExplosionsPostRender::SpawnInfo, fTimePercent)::kName));
 			}
 			break;
 		}
@@ -689,8 +681,6 @@ void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, Repla
 			case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
 			case StatusChangeType::kSpawnMissile:
 			case StatusChangeType::kTransferMissile: ++rCounts.iMissileCount; break;
-			// The capture counts have no explosion field.
-			case StatusChangeType::kSpawnExplosion: break;
 			default: DEBUG_BREAK(); break;
 		}
 	}

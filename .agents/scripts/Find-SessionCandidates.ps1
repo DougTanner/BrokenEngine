@@ -54,7 +54,7 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'assert-false'; Pattern = '(?i)\bassert\s*\(\s*false\s*\)' }
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
-	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$|^\s*(?:namespace|class|struct|enum|union)\b[^;()]*\{\s*$|\}\s*(?:else|catch)\b'; Except = '(?://|/\*|\*/|["''])|^\s*(?:return|if|else|for|while|switch|try|catch|do)\b|^\s*(?:class|struct|union|enum|namespace)\b(?![^;()]*\{\s*$)' }
+	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$|^\s*(?:namespace|class|struct|enum|union)\b[^;()]*\{\s*$|\}\s*(?:else|catch)\b|\}\s*while\b[^{;]*;'; Except = '(?://|/\*|\*/|["''])|^\s*(?:return|if|else|for|while|switch|try|catch|do)\b|^\s*(?:class|struct|union|enum|namespace)\b(?![^;()]*\{\s*$)' }
 	@{ Kind = 'style-rule-15'; Pattern = $script:CodePrefix + '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)[A-Z]|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|=\s*[&*]?(?:[\w:.]|->)*<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
 	@{ Kind = 'style-rule-18'; Pattern = '^\s*(?:static\s+)?const\s+(?![^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*])(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]|^\s*(?:static\s+)?const\s+auto\s*\[|^\s*(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*?\s+)+const\s+[A-Za-z_]\w*\s*[={(]|\bfor\s*\(\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*:' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|[\w.]\s+[A-Z0-9_]*[a-z]\w*\s*(?:[,=>]|$))' }

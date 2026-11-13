@@ -26,10 +26,11 @@ report template live in [`../SKILL.md`](../SKILL.md).
    dropped or survives disproof.
 6. Report the smallest correction, without implementing it. Done when every
    surviving finding carries one correction.
-7. Emit a single-claim [`/verify-external-claims`](../../verify-external-claims/SKILL.md)
-   request (`## Inputs`) for every candidate finding that
-   depends on a non-obvious external API, language, specification, OS, or
-   library fact. Done when each such candidate carries one request.
+7. Emit a single-claim
+   [`/verify-external-claims`](../../verify-external-claims/SKILL.md) request
+   (`## Inputs`) for every candidate finding that depends on a non-obvious
+   external API, language, specification, OS, or library fact. Done when each
+   such candidate carries one request.
 8. Withhold every such candidate from the confirmed findings until the caller
    receives `VERIFIED` evidence. Do not browse or present that fact as
    confirmed. Done when the review is `NEEDS_ACTION` while any verdict is
@@ -57,7 +58,8 @@ report template live in [`../SKILL.md`](../SKILL.md).
   reviewer conduct is in
   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md).
 - For a Tier-2+ change, also run the scope authorization, minimality, and KISS
-  passes in [`../../../references/scope-authorization.md`](../../../references/scope-authorization.md)
+  passes in
+  [`../../../references/scope-authorization.md`](../../../references/scope-authorization.md)
   over the changed C++ regions this review already covers. Report the result in
   the `Scope:` field.
 - A decision the plan, execution card, or brief states is a claim this review

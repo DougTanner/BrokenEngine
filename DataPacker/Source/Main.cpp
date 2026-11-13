@@ -329,8 +329,11 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 			return false;
 		}
 		packFileStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
-		if (!packFileStream || packFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader))
-		 || chunkHeader.iMagic != common::ChunkHeader::kiMagic || chunkHeader.crc != rChunkLocation.crc)
+		if (!packFileStream || packFileStream.gcount() != static_cast<std::streamsize>(sizeof(chunkHeader)))
+		{
+			return false;
+		}
+		if (chunkHeader.iMagic != common::ChunkHeader::kiMagic || chunkHeader.crc != rChunkLocation.crc)
 		{
 			return false;
 		}

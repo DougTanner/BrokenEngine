@@ -6,6 +6,7 @@
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/MiscWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -144,12 +145,8 @@ void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 	}
 }
 
-void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
+void Graphics::UpdateFrameResidency(int64_t iCommandBuffer)
 {
-	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
-
-	WaitFramebuffer(iCommandBuffer);
-
 	// Only this framebuffer's sets are idle after its fence wait, so the epoch writes them alone; every other framebuffer applies
 	// the queued publications once its own fence has signaled. AnyRestorationPending also covers template-owned elevation without a
 	// texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame cannot resubmit it.
@@ -205,6 +202,14 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 		vmaSetCurrentFrameIndex(gpDeviceManager->mpAllocator, static_cast<uint32_t>(miFrameCounter));
 	}
 	++miFrameCounter;
+}
+
+void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
+{
+	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
+
+	WaitFramebuffer(iCommandBuffer);
+	UpdateFrameResidency(iCommandBuffer);
 
 	gpProfileManager->GpuRead(iCommandBuffer);
 
@@ -235,6 +240,7 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
 {
 	WaitFramebuffer(iCommandBuffer);
+	UpdateFrameResidency(iCommandBuffer);
 
 	gpProfileManager->GpuRead(iCommandBuffer);
 
@@ -620,6 +626,16 @@ void Graphics::Refresh()
 	[[maybe_unused]] auto [fObjectShadowsBlurMultiplier, fObjectShadowsBlurMultiplierPrevious, bObjectShadowsBlurMultiplierChanged] = gObjectShadowsBlurMultiplier.Changed<float>();
 	if ((bObjectShadowsRenderMultiplierChanged || bObjectShadowsBlurMultiplierChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
+		mDestroyFlags.Set(DestroyFlags::kObjectShadows);
+
+		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
+	}
+
+	[[maybe_unused]] auto [fExtraArea, fExtraAreaPrevious, bExtraAreaChanged] = gExtraArea.Changed<float>();
+	if (bExtraAreaChanged && gpTextureManager != nullptr) [[unlikely]]
+	{
+		mDestroyFlags.Set(DestroyFlags::kShadowTextures);
+		mDestroyFlags.Set(DestroyFlags::kLightingTextures);
 		mDestroyFlags.Set(DestroyFlags::kObjectShadows);
 
 		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);

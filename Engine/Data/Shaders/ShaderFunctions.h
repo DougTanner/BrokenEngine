@@ -44,8 +44,8 @@ vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, ve
 		float fDistance = clamp(fDirection * (fRelativeX - fNearX) / fWidth, 0.0f, 1.0f);
 		f3ShadowPosition.x += fDirection * globalLayout.fObjectShadowsExtension * fWidth * pow(fDistance, globalLayout.fObjectShadowsStretchPower);
 	}
-	vec2 f2VisibleAreaUV = WorldToVisibleArea(f3ShadowPosition, globalLayout.f4VisibleArea);
-	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
+	vec2 f2ObjectShadowsUV = WorldToVisibleArea(f3ShadowPosition, globalLayout.f4ObjectShadowsArea);
+	return vec4(2.0f * f2ObjectShadowsUV.x - 1.0f, 1.0f - 2.0f * f2ObjectShadowsUV.y, 0.0f, 1.0f);
 }
 
 // Unnormalized direction from f3Position toward the world camera along its eye line.
@@ -454,7 +454,7 @@ vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, float fSmoke, float fIn
 	float fRed = IntensityLighting(pf4Lighting[0]);
 	float fGreen = IntensityLighting(pf4Lighting[1]);
 	float fBlue = IntensityLighting(pf4Lighting[2]);
-	// fSmokeLightingCombinedMultiplier (= fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier) and
+	// fSmokeLightingCombinedMultiplier (= gSmokeLightingMultiplier * fLightingTimeOfDayMultiplier) and
 	// f4SmokeBaseLighting (max(sun,moon) sky term + ambient) are folded CPU-side (GlobalUniforms.cpp).
 	vec3 f3Final = vec3(fRed, fGreen, fBlue) * globalLayout.fSmokeLightingCombinedMultiplier;
 	f3Final += fObjectShadow * globalLayout.f4SmokeBaseLighting.xyz;

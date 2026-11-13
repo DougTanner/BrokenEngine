@@ -503,13 +503,19 @@ finally
 }
 ```
 
-From the adopted worktree root, run the ignored copy with the retained PID (the `Profile` target is the acceptance scenario):
+From the adopted worktree root, run the ignored copy with the retained PID (the
+`Profile` target is the acceptance scenario):
 
 ```powershell
 pwsh -NoProfile -File .\Temp\Capture-ServerMonitor.ps1 -MonitorPid <exact retained monitor PID> -Target Profile
 ```
 
-Run the acceptance scenario with `-Target Profile`; it switches only the monitor's Profile tab and writes the before/after captures. The optional `-Target ProfileCopy` click uses the live painted client height and the Copy rectangle `x=260..340`, `y=clientHeight-48..clientHeight-20`; it replaces the current clipboard contents, so use it only when clipboard mutation is intended. `Map` and `Profile` centers are `(300,16)` and `(400,16)` in client coordinates.
+Run the acceptance scenario with `-Target Profile`; it switches only the
+monitor's Profile tab and writes the before/after captures. The optional
+`-Target ProfileCopy` click uses the live painted client height and the Copy
+rectangle `x=260..340`, `y=clientHeight-48..clientHeight-20`; it replaces the
+current clipboard contents, so use it only when clipboard mutation is intended.
+`Map` and `Profile` centers are `(300,16)` and `(400,16)` in client coordinates.
 
 This recipe changes the interactive Windows desktop: it moves the physical
 cursor, temporarily changes foreground focus and z-order, and (for
