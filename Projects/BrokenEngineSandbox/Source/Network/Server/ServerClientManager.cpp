@@ -1,5 +1,7 @@
 #include "Pch.h"
 
+#if defined(BT_SERVER)
+
 #include "Network/Server/ServerClientManager.h"
 
 #include "Frame/IslandChainPlacement.h"
@@ -16,8 +18,6 @@
 
 namespace game
 {
-
-#if defined(BT_SERVER)
 
 // The fleet spawn search walks square rings of this pitch around the origin cell's center.
 constexpr float kfFleetSpawnSearchStepMeters = 10.0f;
@@ -328,6 +328,6 @@ void ServerClientManager::ResetState()
 	mNextFighterLaunchTicks.clear();
 }
 
-#endif // BT_SERVER
-
 } // namespace game
+
+#endif // BT_SERVER

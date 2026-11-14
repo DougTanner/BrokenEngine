@@ -1,5 +1,7 @@
 #include "Pch.h"
 
+#if defined(BT_SERVER)
+
 #include "Network/Server/ServerSession.h"
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
@@ -13,8 +15,6 @@
 
 namespace game
 {
-
-#if defined(BT_SERVER)
 
 ServerSession::ServerSession()
 : common::Singleton<ServerSession>(gpServerSession, this)
@@ -226,6 +226,6 @@ void ServerSession::WriteFleetData(std::fstream& rFileStream) const
 	::game::WriteFleetData(rFileStream, mpFleetManager->mFleets, mpFleetManager->mRandomEngine);
 }
 
-#endif // BT_SERVER
-
 } // namespace game
+
+#endif // BT_SERVER

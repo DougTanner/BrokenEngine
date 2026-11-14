@@ -145,3 +145,6 @@ change alters a save/replay file layout (`ReplayMeta`) and bumps its version.
   function). Each Plan raises the version once from the value it finds at
   claim; whichever lands second bumps again and does not reuse the first
   one's bump.
+- `Documents/Plans/Game/FighterLaunchTerrainAdmissionNeedsElevationGrid.md`
+  also bumps `ReplayMeta::kiVersion`. Each Plan raises the version once from
+  the value it finds at claim and does not reuse the other's bump.

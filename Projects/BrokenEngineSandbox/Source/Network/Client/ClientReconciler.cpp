@@ -1,5 +1,7 @@
 #include "Network/Client/ClientReconciler.h"
 
+#if defined(BT_CLIENT)
+
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
@@ -8,8 +10,6 @@
 
 namespace game
 {
-
-#if defined(BT_CLIENT)
 
 // The visual-error smoothing in Run and the three position helpers below is game-agnostic apart from this function's
 // ship row read: a future project may want it moved into shared engine code, depending on its requirements.
@@ -148,6 +148,6 @@ void ClientReconciler::Reset()
 	miLastVisualErrorLogTick = -1'000;
 }
 
-#endif // BT_CLIENT
-
 } // namespace game
+
+#endif // BT_CLIENT

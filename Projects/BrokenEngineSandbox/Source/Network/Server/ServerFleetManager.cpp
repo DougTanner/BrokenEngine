@@ -1,5 +1,7 @@
 #include "Pch.h"
 
+#if defined(BT_SERVER)
+
 #include "Network/Server/ServerFleetManager.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
@@ -10,8 +12,6 @@
 
 namespace game
 {
-
-#if defined(BT_SERVER)
 
 // 32 ticks at engine::kiTickRate; exact in float, so the countdown expires on a tick boundary.
 constexpr std::chrono::duration<float> kRespawnDelay = 1s;
@@ -515,6 +515,6 @@ void ServerFleetManager::ResetState()
 	mGuidToClientId.clear();
 }
 
-#endif // BT_SERVER
-
 } // namespace game
+
+#endif // BT_SERVER

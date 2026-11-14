@@ -1,5 +1,7 @@
 #include "Network/Client/ReconcileReplay.h"
 
+#if defined(BT_CLIENT)
+
 #include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Omnis/Omnis.h"
@@ -8,8 +10,6 @@
 
 namespace game
 {
-
-#if defined(BT_CLIENT)
 
 void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool bAnyFullReplay, ConfirmedClientState& rInOutState)
 {
@@ -79,6 +79,6 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 	rInOutState = clientState;
 }
 
-#endif // BT_CLIENT
-
 } // namespace game
+
+#endif // BT_CLIENT

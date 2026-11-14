@@ -1,5 +1,7 @@
 #include "Pch.h"
 
+#if defined(BT_SERVER)
+
 #include "Network/Server/FleetNavigationController.h"
 
 #include "Frame/NavQuery.h"
@@ -12,8 +14,6 @@
 
 namespace game
 {
-
-#if defined(BT_SERVER)
 
 // The fleet step runs ahead of this tick's dispatch, so a cell just loaded or activated has not built its navigation data.
 // It builds here, on the main thread with no tick running: the answer reaches the fleet checksum, and playback can hold an
@@ -217,6 +217,6 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 	}
 }
 
-#endif // BT_SERVER
-
 } // namespace game
+
+#endif // BT_SERVER

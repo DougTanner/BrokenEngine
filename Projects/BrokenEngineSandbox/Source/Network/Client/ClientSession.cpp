@@ -1,5 +1,7 @@
 #include "Network/Client/ClientSession.h"
 
+#if defined(BT_CLIENT)
+
 #include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Fighters/Fighters.h"
@@ -13,8 +15,6 @@
 
 namespace game
 {
-
-#if defined(BT_CLIENT)
 
 // Wall clock: the poll keeps its rate when the simulation is paused or time-scaled.
 constexpr std::chrono::steady_clock::duration kMapFleetMarkersRequestInterval = 1s;
@@ -310,6 +310,6 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 	}
 }
 
-#endif // BT_CLIENT
-
 } // namespace game
+
+#endif // BT_CLIENT

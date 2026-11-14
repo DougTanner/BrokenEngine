@@ -630,3 +630,21 @@ No directional dependencies. Mandatory nondirectional coordination:
   finds at claim; whichever lands second bumps again and does not reuse the
   first one's bump. The baseline 7 this Plan names for `ReplayMeta::kiVersion`
   is then the value found at claim.
+- `Documents/Plans/Game/FighterLaunchTerrainAdmissionNeedsElevationGrid.md`
+  adds an elevation grid build to the Fighter case of
+  `ServerClientManager::SpawnFleetMember`, directly before the bay loop, and
+  also bumps `ReplayMeta::kiVersion`. Whichever lands second applies its
+  change to the function as the other left it, keeping that build before the
+  bay loop. Each Plan raises the version once from the value it finds at
+  claim and does not reuse the other's bump.
+- `Documents/Plans/Game/RemoveRedundantGuidToClientIdWriters.md` removes the
+  owner client-id out-parameter of `ReadFleetData`. If it lands first,
+  slice 1 item 7's "still dropping the all-disconnected owner map" describes
+  nothing: `ReadReplayFleetRecord` is the `ReadFleetData` call with that
+  Plan's parameter list. If this Plan lands first, that Plan removes the
+  dropped local from the function as this Plan left it.
+- `Documents/Plans/Game/RemoveServerNetworkRedundantCode.md` replaces the
+  four queue clears in `ServerFleetManager::ResetState` with a
+  `ClearPendingRequests()` call. Whichever lands second keeps the other's
+  edit: the function ends up with that call and slice 2's
+  `mChangedFleetOwners` clear.

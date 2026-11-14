@@ -1,5 +1,7 @@
 #include "Pch.h"
 
+#if defined(BT_SERVER)
+
 #include "Network/Server/ServerFleetSerialization.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
@@ -12,8 +14,6 @@
 
 namespace game
 {
-
-#if defined(BT_SERVER)
 
 void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 {
@@ -438,6 +438,6 @@ void ResetSaveState()
 	gpServerSession->mpFleetManager->ResetState();
 }
 
-#endif // BT_SERVER
-
 } // namespace game
+
+#endif // BT_SERVER
