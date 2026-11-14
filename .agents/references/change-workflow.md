@@ -30,10 +30,11 @@ work.
 | --- | --- | --- | --- |
 | `planner` | .claude/agents/planner.md | .codex/agents/astra-planner.toml | Plans, design |
 | `reviewer` | .claude/agents/reviewer.md | .codex/agents/astra.toml | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Preparation, implementation, propagation, docs, plans, harness, finalization |
+| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Preparation, implementation, propagation, docs, plans, finalization |
 | `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
+| `runner` | .claude/agents/runner.md | .codex/agents/sonnet.toml | `/agent-harness` runs dispatched on their own |
 | `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On
@@ -267,8 +268,10 @@ run first, on the unedited tree; then the slices run in parallel;
   `before the first edit` needs — when it needs one; a check whose steps
   interleave file edits with builds follows the `/compile` `## Purpose`
   exception instead.
-- `implementer` records each acceptance check the execution card marks
-  `before the first edit`, on the unedited tree — a card with none adds no step.
+- `runner` runs each acceptance check the execution card marks
+  `before the first edit` that is an `/agent-harness` scenario, and
+  `implementer` records the others, on the unedited tree — a card with none
+  adds no step.
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
 - `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
 
@@ -285,9 +288,9 @@ self-checks remain inside the implementation slices.
 
 - main runs
   `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked`
-  after propagation — every tier; the runner selects its own checks, and its
-  header documents the result and options. Main has an `implementer` rewrap
-  every `line-length` failure the static-checks runner reports in that same
+  after propagation — every tier; the static-checks runner selects its own
+  checks, and its header documents the result and options. Main has an
+  `implementer` rewrap every `line-length` failure it reports in that same
   pass, whether or not the change added the line, and never records one as a
   residual.
 - `mechanic` runs `/code-style-review` — for changed C++; a later

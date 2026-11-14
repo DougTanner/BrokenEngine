@@ -792,10 +792,34 @@ case.
 
 ### Process verification report
 
-47. Run plan-provided runtime steps when present; otherwise derive the smallest
-    live checks for runtime-observable criteria only. Done when every
-    runtime-observable criterion has been exercised and the handoff in
-    [`../SKILL.md`](../SKILL.md) is returned.
+47. Run the scenario steps the brief supplies under
+    [`../SKILL.md`](../SKILL.md) `## Inputs`, in their numbered order, inside
+    the claim, readiness, retry, and release mechanics of the steps above. Done
+    when every runtime-observable criterion is settled or `BLOCKED` and the
+    handoff in [`../SKILL.md`](../SKILL.md) is returned.
+
+    - The brief's steps fix the setup, action, and observation: never add,
+      reorder, or substitute a scenario step. Step 37's hub recipe, step 38's
+      evidence principles, and the capture and result-reading entries under
+      `## Rules` govern only what a step leaves open.
+    - Record the evidence each observing step names as one `Decisive checks`
+      row.
+    - At a branching step, take only the branch the brief states for the
+      recorded observation. A criterion whose settling step is never reached
+      because a stated branch ended the run or skipped it is `BLOCKED`, citing
+      the `Decisive checks` row of the branch that was taken.
+    - A step that cannot be performed as written makes the criterion it
+      settles `BLOCKED` under the missing-capability rule in
+      [`../SKILL.md`](../SKILL.md) `## Handoff`. Such a step that settles
+      none, or a recorded observation that matches no outcome its branch
+      states, makes every criterion not yet settled `BLOCKED` the same way.
+    - A brief with no step sequence returns `BLOCKED` naming the missing
+      sequence, except for the launch for the user and a release-only
+      recovery.
+    - A worker running this skill inside its own task has no such brief: it
+      runs plan-provided runtime steps when present, otherwise derives the
+      smallest live checks for runtime-observable criteria only, and steps
+      37-38 and those `## Rules` entries govern its whole check design.
 
 ## Rules
 

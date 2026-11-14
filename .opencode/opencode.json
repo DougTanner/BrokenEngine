@@ -45,6 +45,7 @@
 					"researcher": "allow",
 					"locator": "allow",
 					"builder": "allow",
+					"runner": "allow",
 					"mechanic": "allow"
 				}
 			}

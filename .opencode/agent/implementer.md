@@ -1,5 +1,5 @@
 ---
-description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring; driving runtime/harness verification.
+description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring.
 mode: subagent
 model: opencode/union-alpha
 permission:

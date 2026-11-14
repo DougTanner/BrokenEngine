@@ -66,6 +66,21 @@ wall-clock budget for the run; otherwise a 10-minute default applies. A longer
 run follows [`change-workflow.md`](../../references/change-workflow.md)
 `### User Interaction` Long test runs.
 
+A harness run dispatched on its own runs in the delegated execution context of
+[`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Delegated execution context` as one `runner`. Its brief supplies the
+scenario as a numbered sequence of steps in execution order. Each step names
+one action (launch, setup, command, UI input, query, screenshot, or wait) or,
+by name only, one recipe this skill's references own (replay determinism check,
+ModelViewer capture); the brief never restates a recipe. A step that observes
+something names the evidence to record (query result fields, log selector,
+screenshot path), and each such record comes back as one `Decisive checks`
+row; where the step settles a criterion, it also names the criterion ID and the
+expected observation. A step may branch: it states a condition on its own
+recorded observation and, for each outcome, the number of the step to run next
+or that the run ends. The launch for the user and a release-only recovery
+(`## When to use`) take no step sequence.
+
 ## Handoff
 
 Evaluate each criterion as `PASS`, `FAIL`, or `BLOCKED` from exact

@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring; driving runtime/harness verification.
+description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring.
 model: fable
 effort: medium
 disallowedTools: Agent
