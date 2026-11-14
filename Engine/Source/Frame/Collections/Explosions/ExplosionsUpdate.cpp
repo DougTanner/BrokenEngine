@@ -9,9 +9,6 @@
 namespace engine
 {
 
-// Shared helper defined in Explosions.cpp.
-void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity);
-
 void ExplosionsInterpolate::Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame)
 {
 	ExplosionsInterpolate& rCurrent = rCurrentFrameInterpolate.explosions;
@@ -77,7 +74,11 @@ void ExplosionsInterpolate::Update(game::FrameInterpolate& __restrict rCurrentFr
 			if (explosionTime >= common::FloatSecondsToNanoseconds(trailEndTime))
 			{
 				XMVECTOR vecTrailEnd = rCurrent.pVecTrailEndPositions[j][i];
-				SyncExplosionTrail(rCurrentFrameInterpolate, trailId, vecTrailEnd, 0.0f);
+				SmokeTrailsInterpolate::Sync(rCurrentFrameInterpolate, trailId,
+				{
+					.vecPosition = vecTrailEnd,
+					.fIntensity = 0.0f,
+				});
 				continue;
 			}
 
@@ -91,7 +92,11 @@ void ExplosionsInterpolate::Update(game::FrameInterpolate& __restrict rCurrentFr
 			XMVECTOR vecTrailPosition = XMVectorLerp(vecTrailStart, XMVectorSubtract(vecTrailEnd, vecGravityOffset), fTrailPercent);
 			float fTrailIntensity = (1.0f - fTrailPercent) * rCurrent.pfTrailIntensities[j][i];
 
-			SyncExplosionTrail(rCurrentFrameInterpolate, trailId, vecTrailPosition, fTrailIntensity);
+			SmokeTrailsInterpolate::Sync(rCurrentFrameInterpolate, trailId,
+			{
+				.vecPosition = vecTrailPosition,
+				.fIntensity = fTrailIntensity,
+			});
 		}
 	}
 }

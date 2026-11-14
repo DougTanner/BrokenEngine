@@ -27,3 +27,9 @@ top of the file. A session reviewing the log removes each row it handles.
   either buffer ended empty it empties both" form, so it needs the user's
   approval — makes unnecessary: the `spcUserReportPath[0] == L'\0'` operand at
   CrashReport.cpp:89 and the pending-buffer store at CrashReport.cpp:92
+- 2026-11-14 claude/17346847-3ec8-430a-8b7a-bdce55b2d1f2 —
+  Engine/Source/Frame/Collections/Puffs/Puffs.h:47 — require an area and an
+  intensity scale wrapper for every used keyframe of a `PuffControllerType`
+  (all four registrations already supply them), so Update and `AddControlled`
+  multiply unconditionally — makes unnecessary:
+  Engine/Source/Frame/Collections/Puffs/PuffsUpdate.cpp:28, :32, :70, :71

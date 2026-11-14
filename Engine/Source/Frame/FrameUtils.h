@@ -368,32 +368,6 @@ void DestroySweep(const INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_R
 	}
 }
 
-// Releases every row a nonzero handle in row i's OwnedHandles() columns names; a pair half without the accessor owns
-// nothing.
-template <typename FRAME, typename INTERPOLATE, typename POST_RENDER>
-void ReleaseOwnedHandles([[maybe_unused]] FRAME& rFrame, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, [[maybe_unused]] int64_t i)
-{
-	auto OwnedHandleColumns = [](auto& rCollection)
-	{
-		if constexpr (requires { rCollection.OwnedHandles(); })
-		{
-			return rCollection.OwnedHandles();
-		}
-		else
-		{
-			return std::tie();
-		}
-	};
-
-	std::apply([&](auto&... rHandleColumns)
-	{
-		(ForEachMemberPointer(rHandleColumns, [&](auto& rpHandles)
-		{
-			ReleaseIndexableElementAndClearHandle(rFrame, rpHandles[i]);
-		}), ...);
-	}, std::tuple_cat(OwnedHandleColumns(rInterpolate), OwnedHandleColumns(rPostRender)));
-}
-
 // The one removal of kTransfer and kDestroy rows, at the end of the Destroy phase. The cascade pass releases the rows
 // each such row owns in every pair before any pair compacts, so an owned row leaves in its owner's fold whatever the
 // tuple order.

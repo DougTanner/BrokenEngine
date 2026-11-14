@@ -98,18 +98,10 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		rLayout.f3x4TransformNormal[1] = rCurrent.pf4TransformNormals[1][i];
 		rLayout.f3x4TransformNormal[2] = rCurrent.pf4TransformNormals[2][i];
 
-		// Convert packed color to vec4 (ABGR to RGBA float)
-		uint32_t uiColor = rType.uiColor;
-		rLayout.f4Color.x = static_cast<float>((uiColor >> 0) & 0xFF) / 255.0f;
-		rLayout.f4Color.y = static_cast<float>((uiColor >> 8) & 0xFF) / 255.0f;
-		rLayout.f4Color.z = static_cast<float>((uiColor >> 16) & 0xFF) / 255.0f;
-		rLayout.f4Color.w = static_cast<float>((uiColor >> 24) & 0xFF) / 255.0f;
-
-		uint32_t uiLightingColor = rType.uiLightingColor;
-		rLayout.f4LightingColor.x = static_cast<float>((uiLightingColor >> 0) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.y = static_cast<float>((uiLightingColor >> 8) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.z = static_cast<float>((uiLightingColor >> 16) & 0xFF) / 255.0f;
-		rLayout.f4LightingColor.w = static_cast<float>((uiLightingColor >> 24) & 0xFF) / 255.0f;
+		DirectX::PackedVector::XMUBYTEN4 color(rType.uiColor);
+		XMStoreFloat4(&rLayout.f4Color, DirectX::PackedVector::XMLoadUByteN4(&color));
+		DirectX::PackedVector::XMUBYTEN4 lightingColor(rType.uiLightingColor);
+		XMStoreFloat4(&rLayout.f4LightingColor, DirectX::PackedVector::XMLoadUByteN4(&lightingColor));
 
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{

@@ -23,7 +23,6 @@ struct SmokeTrailsInterpolate;
 using smoke_trails_t = Id<SmokeTrailsInterpolate>;
 
 inline constexpr int64_t kiMaxExplosionTrails = 8;
-inline constexpr int64_t kiInvalidTrailType = 255;
 
 enum class ExplosionFlags : uint8_t
 {
@@ -112,7 +111,7 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 
 	static inline int64_t siTotalCount = 0;
 
-	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;
+	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTypeIndex;
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 

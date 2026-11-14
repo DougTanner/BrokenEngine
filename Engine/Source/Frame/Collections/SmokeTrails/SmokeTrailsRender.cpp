@@ -74,14 +74,14 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 	static common::RandomEngine sRandomEngine;
 
-	for (const auto& [rId, riIndex] : rCurrent.idToIndexMap)
+	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
-		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[riIndex];
-		const SmokeTrailsType& rType = SmokeTrailsInterpolate::sTypes.at(rCurrent.puiTypeIndices[riIndex]);
-		float fIntensity = rCurrent.pfIntensities[riIndex];
+		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
+		const SmokeTrailsType& rType = SmokeTrailsInterpolate::sTypes.at(rCurrent.puiTypeIndices[i]);
+		float fIntensity = rCurrent.pfIntensities[i];
 		float fWidth = rType.fWidth;
-		XMVECTOR vecLocalSmoothedPosition = rCurrent.pVecSmoothedPositions[riIndex];
+		XMVECTOR vecLocalSmoothedPosition = rCurrent.pVecSmoothedPositions[i];
 
 		XMFLOAT4A f4Position {};
 		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
@@ -95,7 +95,7 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		fJitterTwo = fJitterTwo * fJitterTwo;
 
 		float fLength = gSmokeTrailsLength.mfCurrent + gSmokeTrailsLengthJitter.mfCurrent * common::Random(sRandomEngine);
-		if (TickToSimulationTime(rFrameInterpolate.iTick) - rCurrent.pStartTimes[riIndex] < 50ms)
+		if (TickToSimulationTime(rFrameInterpolate.iTick) - rCurrent.pStartTimes[i] < 50ms)
 		{
 			fLength = 0.0f;
 		}

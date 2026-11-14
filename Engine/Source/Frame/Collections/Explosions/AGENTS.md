@@ -25,7 +25,7 @@ particles. The collection is client-only visual state (`../../AGENTS.md`
   state. A `kDying` explosion marks its row `kDestroy` once its last trail
   ends; any other row stays until something marks it `kDestroy`, and its
   remaining trails leave with it.
-- Expiry compares whole nanoseconds: the row destruction, the trail cleanup,
-  and the expired-trail sync each convert a trail end with
-  `common::FloatSecondsToNanoseconds`, so cleanup and destruction agree on every
-  row.
+- Expiry compares whole nanoseconds: the trail cleanup converts each trail end
+  once with `common::FloatSecondsToNanoseconds` and the row destruction reuses
+  those values, so cleanup and destruction agree on every row; the
+  expired-trail sync converts its own trail end the same way.

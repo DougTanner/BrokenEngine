@@ -152,6 +152,32 @@ void ReleaseIndexableElementAndClearHandle(FRAME& rFrame, Id<INTERPOLATE>& rId)
 	rId = {};
 }
 
+// Releases every row a nonzero handle in row i's OwnedHandles() columns names; a pair half without the accessor owns
+// nothing.
+template <typename FRAME, typename INTERPOLATE, typename POST_RENDER>
+void ReleaseOwnedHandles([[maybe_unused]] FRAME& rFrame, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, [[maybe_unused]] int64_t i)
+{
+	auto OwnedHandleColumns = [](auto& rCollection)
+	{
+		if constexpr (requires { rCollection.OwnedHandles(); })
+		{
+			return rCollection.OwnedHandles();
+		}
+		else
+		{
+			return std::tie();
+		}
+	};
+
+	std::apply([&](auto&... rHandleColumns)
+	{
+		(ForEachMemberPointer(rHandleColumns, [&](auto& rpHandles)
+		{
+			ReleaseIndexableElementAndClearHandle(rFrame, rpHandles[i]);
+		}), ...);
+	}, std::tuple_cat(OwnedHandleColumns(rInterpolate), OwnedHandleColumns(rPostRender)));
+}
+
 // Removes element at index from paired collections using swap-and-pop: the last row moves into index iIndex, so
 // the row now at iIndex has not been visited by a forward walk. Iteration state stays the caller's to adjust.
 template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>

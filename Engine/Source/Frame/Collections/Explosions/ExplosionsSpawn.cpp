@@ -2,7 +2,6 @@
 
 #if defined(BT_CLIENT)
 
-#include "Data/Texture.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Frame/Collections/SmokeTrails/SmokeTrails.h"
@@ -17,9 +16,6 @@ namespace engine
 {
 
 using enum ExplosionFlags;
-
-// Forward declaration for shared helper (defined in Explosions.cpp)
-void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity);
 
 bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, const SpawnInfo& rSpawnInformation, common::RandomEngine& rRandomEngine)
 {
@@ -149,7 +145,17 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 		rInterpolate.pVecTrailEndPositions[j][iSpawnIndex] = vecTrailEnd;
 
 		// Sync trail after Add()
-		SyncExplosionTrail(rFrame.interpolate, trailId, vecTrailStart, fTrailIntensity);
+		SmokeTrailsInterpolate::Sync(rFrame.interpolate, trailId,
+		{
+			.vecPosition = vecTrailStart,
+			.fIntensity = fTrailIntensity,
+		});
+	}
+
+	// GPU particles live outside the Frame, so a re-simulated tick must not spawn them again.
+	if (rFrame.interpolate.frameFlags & FrameFlags::kRecalculated)
+	{
+		return true;
 	}
 
 	int64_t iTotalParticles = rSpawnInformation.iParticleCount + rType.iBaseParticleCount;
@@ -201,26 +207,23 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 
 		float fLengthJitter = common::Random<1.0f>(rRandomEngine);
 
-		if (!(rFrame.interpolate.frameFlags & FrameFlags::kRecalculated))
+		// ParticleManager::Spawn culls against the camera cell's visible area, so convert before the call.
+		XMFLOAT4A f4Position {};
+		XMStoreFloat4A(&f4Position, Rebase(basis, vecParticlePosition));
+		ParticleManager::Spawn(gpParticleManager->mLongParticlesSpawnLayout,
 		{
-			// ParticleManager::Spawn culls against the camera cell's visible area, so convert before the call.
-			XMFLOAT4A f4Position {};
-			XMStoreFloat4A(&f4Position, Rebase(basis, vecParticlePosition));
-			ParticleManager::Spawn(gpParticleManager->mLongParticlesSpawnLayout,
-			{
-				.iColor = static_cast<int32_t>(uiParticleColor),
-				.iColorEnd = static_cast<int32_t>(rType.uiParticleColorEnd),
-				.fVelocityDecay = rType.fParticleVelocityDecay * fVelocityDecayScale,
-				.fGravity = rType.fParticleGravity * fGravityScale,
-				.fIntensityDecay = rType.fParticleIntensityDecay * fIntensityDecayScale,
-				.fSize = rType.fParticleWidth * fWidthScale,
-				.fLength = rType.fParticleLength * fLengthScale * (1.0f + fLengthJitter * fLengthSpreadScale),
-				.fVisibleIntensity = fParticleIntensity,
-				.fIntensityPower = rType.fParticleIntensityPower * fIntensityPowerScale,
-				.f4Position = f4Position,
-				.f4Velocity = f4Velocity,
-			}, rType.particleCrc);
-		}
+			.iColor = static_cast<int32_t>(uiParticleColor),
+			.iColorEnd = static_cast<int32_t>(rType.uiParticleColorEnd),
+			.fVelocityDecay = rType.fParticleVelocityDecay * fVelocityDecayScale,
+			.fGravity = rType.fParticleGravity * fGravityScale,
+			.fIntensityDecay = rType.fParticleIntensityDecay * fIntensityDecayScale,
+			.fSize = rType.fParticleWidth * fWidthScale,
+			.fLength = rType.fParticleLength * fLengthScale * (1.0f + fLengthJitter * fLengthSpreadScale),
+			.fVisibleIntensity = fParticleIntensity,
+			.fIntensityPower = rType.fParticleIntensityPower * fIntensityPowerScale,
+			.f4Position = f4Position,
+			.f4Velocity = f4Velocity,
+		}, rType.particleCrc);
 	}
 
 	return true;

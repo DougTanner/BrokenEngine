@@ -66,7 +66,7 @@ struct PuffsInterpolate : public Collection<PuffsInterpolate>,
 	float* __restrict pfAreas = nullptr;
 	float* __restrict pfRotations = nullptr;
 
-	// Controller fields (kiInvalidControllerType = not controlled)
+	// Controller fields (every puff is controlled)
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
 	SimulationTime* __restrict pStartTimes = nullptr;
 

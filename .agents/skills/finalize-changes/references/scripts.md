@@ -127,16 +127,19 @@ reconstructs the assessment from Git output.
   `git.owned-path-mixed-state` and a message naming the remedy.
   `-OwnedPathsFile` names a `Temp/` file the worker writes, BOM-less UTF-8 with
   each repository-relative path followed by one LF, holding the session's full
-  caller-owned landing set, never a hand-trimmed subset: an
-  entry already committed as a deletion is a satisfied no-op, so a
-  re-preparation dispatch passes the same set unchanged. A path found in neither
-  the baseline tree nor the expected-tip tree nor the worktree still blocks with
-  `input.path-not-single-entry`. With `-RequireExportOutputsRewritten`, a
-  landing-set path whose `export-output` attribute, read by Git's attribute
-  lookup in the session worktree, is `set` but which is unchanged between
-  `<baseline>` and the candidate tree blocks with
-  `candidate.export-output-not-regenerated`, naming every such path, before
-  any ref, index, or worktree change; without the switch no such check runs.
+  caller-owned landing set, never a hand-trimmed subset: an entry with nothing
+  to stage — one the expected-tip tree and the worktree both lack, because it
+  was already committed as a deletion or was created and deleted within the
+  session — is a satisfied no-op, so a re-preparation dispatch passes the same
+  set unchanged. A mistyped entry is not rejected here;
+  `Invoke-FinalizeApprovalPreparation.ps1` blocks it with `git.session-dirty`
+  only when its intended file has a pending change, which then stays
+  uncommitted. With `-RequireExportOutputsRewritten`, a landing-set path whose
+  `export-output` attribute, read by Git's attribute lookup in the session
+  worktree, is `set` but which is unchanged between `<baseline>` and the
+  candidate tree blocks with `candidate.export-output-not-regenerated`, naming
+  every such path, before any ref, index, or worktree change; without the
+  switch no such check runs.
 - `Invoke-FinalizeCandidateCommit.ps1` never advances primary. Its result is
   `broken-engine-finalize-candidate/v5`, carrying only the candidate.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact

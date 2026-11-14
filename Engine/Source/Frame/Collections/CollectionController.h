@@ -64,10 +64,6 @@ inline std::remove_extent_t<decltype(CONTROLLER_TYPE::pKeyframes)> InterpolateKe
 	{
 		return rController.pKeyframes[0];
 	}
-	if (elapsedTime.count() >= rController.pTimes[iKeyframeCount - 1].count())
-	{
-		return rController.pKeyframes[iKeyframeCount - 1];
-	}
 
 	for (int64_t j = 1; j < iKeyframeCount; ++j)
 	{

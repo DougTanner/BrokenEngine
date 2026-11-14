@@ -5,7 +5,6 @@
 #include "Data/Shader.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileRows.h"

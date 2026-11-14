@@ -9,7 +9,6 @@
 #include "Graphics/Managers/ParticleManager.h"
 #include "Ui/WrapperBase.h"
 
-#include "Profile/ProfileRows.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"
 
@@ -32,22 +31,8 @@ constexpr float kfExplosionTrailWidth = 1.0f;
 static int64_t siExplosionPointLightTypeIndex = kiInvalidControllerType;
 static int64_t siExplosionPuffTypeIndex = kiInvalidControllerType;
 
-void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity)
-{
-	SmokeTrailsInterpolate::Sync(rFrameInterpolate, trailId,
-	{
-		.vecPosition = vecPosition,
-		.fIntensity = fIntensity,
-	});
-}
-
 void ExplosionsInterpolate::Register()
 {
-	if (siExplosionPointLightTypeIndex != kiInvalidControllerType)
-	{
-		return;
-	}
-
 	PointLightsInterpolate::RegisterType(siExplosionPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
@@ -170,6 +155,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 		float fTimePercent = rInterpolate.pfTimePercents[i];
 
 		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
+		std::chrono::nanoseconds endTime = 0ns;
 
 		// Release expired trails (cleanup happens every frame, not just at explosion expiration).
 		// Cleanup uses unmultiplied pTrailTimes so it fires in lockstep with the explosion-entry
@@ -177,23 +163,17 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 		// destroyed first, and the compaction fold would then release its trails before they end.
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
-			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
-			if (explosionTime >= common::FloatSecondsToNanoseconds(trailEndTime))
+			std::chrono::nanoseconds trailEndTime = common::FloatSecondsToNanoseconds(fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i]);
+			if (explosionTime >= trailEndTime)
 			{
 				ReleaseIndexableElementAndClearHandle(rFrame, rInterpolate.pTrails[j][i]);
 			}
+			endTime = std::max(endTime, trailEndTime);
 		}
 
 		if (!(rPostRender.pLifecycleFlags[i] & LifecycleFlags::kDying))
 		{
 			continue;
-		}
-
-		std::chrono::nanoseconds endTime = 0ns;
-		for (int64_t j = 0; j < iTrailCount; ++j)
-		{
-			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
-			endTime = std::max(endTime, common::FloatSecondsToNanoseconds(trailEndTime));
 		}
 
 		if (explosionTime < endTime)

@@ -132,7 +132,7 @@ struct FrameInterpolateBase
 #endif
 
 	// Collection Sync dependencies determine tuple order: consumers may read an owner's newly synced
-	// current-frame data during the same phase walk. ExplosionsInterpolate::Update calls SyncExplosionTrail
+	// current-frame data during the same phase walk. ExplosionsInterpolate::Update calls SmokeTrailsInterpolate::Sync
 	// to sync smokeTrails positions before SmokeTrailsInterpolate::Update smooths them, so explosions
 	// (client index 2) must precede smokeTrails (client index 8) to avoid a one-frame trail lag.
 	// The collection-count and ServerCollections() static_asserts do not verify order.

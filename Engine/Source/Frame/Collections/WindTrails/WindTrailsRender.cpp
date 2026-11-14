@@ -89,14 +89,16 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			float fIntensity = rCurrent.pfIntensities[rIndex];
 			float fWidth = rCurrent.pfWidths[rIndex];
 
+			// Every trail, culled and zero-motion ones included, stores its current position as the next render's
+			// previous; a new entry starts at the current position, so its trail has zero motion this render.
+			XMVECTOR vecLocalPreviousPosition = std::exchange(sPreviousPositions.try_emplace(rId, vecLocalPosition).first->second, vecLocalPosition);
+
 			XMFLOAT4A f4Position {};
 			if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
 			{
 				continue;
 			}
 
-			auto it = sPreviousPositions.find(rId);
-			XMVECTOR vecLocalPreviousPosition = (it != sPreviousPositions.end()) ? it->second : vecLocalPosition;
 			float fLengthMultiplier = rCurrent.pfLengthMultipliers[rIndex];
 
 			XMVECTOR vecBasePosition = ProjectToBaseHeight(vecLocalPosition, rBasis);
@@ -144,12 +146,6 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			pQuadLayouts[siRendered].uiColor = 0xFFFFFFFF;
 
 			++siRendered;
-		}
-
-		// Snapshot current positions as previous for next render
-		for (const auto& [rId, rIndex] : rCurrent.idToIndexMap)
-		{
-			sPreviousPositions.insert_or_assign(rId, rCurrent.pVecPositions[rIndex]);
 		}
 	}
 }

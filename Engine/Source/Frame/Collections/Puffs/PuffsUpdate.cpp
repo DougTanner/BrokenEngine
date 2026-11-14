@@ -16,39 +16,29 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
-		float fIntensity = rPrevious.pfIntensities[i];
-		float fArea = rPrevious.pfAreas[i];
-		float fRotation = rPrevious.pfRotations[i];
 
 		// Load controller fields (copied in AllocateAndCopy)
 		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
 
-		if (iControllerTypeIndex != kiInvalidControllerType)
+		std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(currentTime - rCurrent.pStartTimes[i]));
+		const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
+
+		PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime, [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
 		{
-			std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(currentTime - rCurrent.pStartTimes[i]));
-			const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
-
-			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime, [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
+			if (rOriginalController.ppAreaScales[j] != nullptr)
 			{
-				if (rOriginalController.ppAreaScales[j] != nullptr)
-				{
-					rScaledController.pKeyframes[j].fArea *= rOriginalController.ppAreaScales[j]->mfCurrent;
-				}
-				if (rOriginalController.ppIntensityScales[j] != nullptr)
-				{
-					rScaledController.pKeyframes[j].fIntensity *= rOriginalController.ppIntensityScales[j]->mfCurrent;
-				}
-			});
-
-			fArea = interpolated.fArea;
-			fIntensity = interpolated.fIntensity;
-			fRotation = interpolated.fRotation;
-		}
+				rScaledController.pKeyframes[j].fArea *= rOriginalController.ppAreaScales[j]->mfCurrent;
+			}
+			if (rOriginalController.ppIntensityScales[j] != nullptr)
+			{
+				rScaledController.pKeyframes[j].fIntensity *= rOriginalController.ppIntensityScales[j]->mfCurrent;
+			}
+		});
 
 		rCurrent.pVecPositions[i] = vecPosition;
-		rCurrent.pfIntensities[i] = fIntensity;
-		rCurrent.pfAreas[i] = fArea;
-		rCurrent.pfRotations[i] = fRotation;
+		rCurrent.pfIntensities[i] = interpolated.fIntensity;
+		rCurrent.pfAreas[i] = interpolated.fArea;
+		rCurrent.pfRotations[i] = interpolated.fRotation;
 	}
 }
 

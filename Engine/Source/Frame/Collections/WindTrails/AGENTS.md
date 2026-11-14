@@ -11,11 +11,11 @@ the ping-pong wind texture. Sync pattern (parent owns lifetime).
   previous→current vector scales by a per-trail length multiplier about the
   current position. Trails with negligible motion or failing visibility culling
   are skipped.
-- When wind is enabled, after the build loop, every trail's current position —
-  including culled and zero-motion trails — is snapshotted as next frame's
-  previous position, so each quad spans exactly one render frame of motion and
-  trails never smear when re-entering view; a trail deposits nothing its first
-  rendered frame (previous defaults to current).
+- When wind is enabled, the build loop snapshots every trail's current position
+  — including culled and zero-motion trails — as next frame's previous position
+  before its visibility test, so each quad spans exactly one render frame of
+  motion and trails never smear when re-entering view; a trail deposits nothing
+  its first rendered frame (previous defaults to current).
 - Two ping-pong wind-deposit pipelines (A/B) share one dynamic
   `shaders::QuadLayout` buffer; `EndRender` writes the indirect draw count only
   to the side matching the active wind texture, the other gets 0 — both passes

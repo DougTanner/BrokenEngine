@@ -41,11 +41,6 @@ constexpr float kfTerrainPuffRotationEnd = 10.0f;
 
 void BlastersInterpolate::Register()
 {
-	if (siTerrainCraterTypeIndex != 0xFF)
-	{
-		return;
-	}
-
 	engine::PointLightsInterpolate::RegisterType(siTerrainCraterTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC7TerrainImpactpngCrc,
