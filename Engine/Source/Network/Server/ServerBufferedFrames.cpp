@@ -242,15 +242,18 @@ ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnectio
 	return NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE, pFreeCallback);
 }
 
-void ServerBufferedFrames::WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, int64_t iEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNanoseconds)
+void ServerBufferedFrames::SendBufferedFramePacket(const ClientConnection& rClient, PacketType eType, int64_t iSlot, const PerCoordBufferedFrame& rBuffered)
 {
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+
 	NetworkMessages::CoordUpdateFields fields
 	{
 		.uiLoadGeneration = static_cast<uint8_t>(mrServer.miLoadGeneration),
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
-		.uiEpoch = static_cast<uint16_t>(iEpoch),
+		.uiEpoch = rClient.slots.at(iSlot).ack.uiEpoch,
 		.iTick = rBuffered.iTick,
-		.iEchoedTimestampNanoseconds = iTimestampNanoseconds,
+		.iEchoedTimestampNanoseconds = rClient.iClientTimestampNanoseconds,
 		.uiSharedCrc = rBuffered.uiSharedCrc,
 		.compressedPayload = {.puiData = rBuffered.compressedData.data(), .iSize = static_cast<int32_t>(std::ssize(rBuffered.compressedData))},
 	};
@@ -265,6 +268,8 @@ void ServerBufferedFrames::WriteBufferedFramePacket(common::Workbuffer& rWorkbuf
 		NetworkMessages::ServerCoordResendMessage message {fields};
 		NetworkMessages::Write(rWorkbuffer, message);
 	}
+
+	NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(iSlot), rWorkbuffer, 0);
 }
 
 void ServerBufferedFrames::SendUpdate(ClientConnection& rClient, int64_t iTick)
@@ -303,12 +308,7 @@ void ServerBufferedFrames::SendUpdate(ClientConnection& rClient, int64_t iTick)
 			continue;
 		}
 
-		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-
-		WriteBufferedFramePacket(rWorkbuffer, PacketType::kServerCoordinateUpdate, i, rSlot.ack.uiEpoch, *pBuffered, rClient.iClientTimestampNanoseconds);
-
-		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(i), rWorkbuffer, 0);
+		SendBufferedFramePacket(rClient, PacketType::kServerCoordinateUpdate, i, *pBuffered);
 		if (!(rSlot.subscription.flags & SubscriptionFlags::kFirstUpdateLogged))
 		{
 			LOG(kNetwork, kVerbose, "Server::SendUpdate Client: {} Slot: {} Coord: ({},{}) Tick: {}", rClient.iClientId, i, coordinate.iQ, coordinate.iR, iTick);
@@ -330,7 +330,6 @@ void ServerBufferedFrames::SendResends(ClientConnection& rClient, int64_t iTick)
 
 		if (!(rSlot.subscription.flags & SubscriptionFlags::kActive))
 		{
-			UpdateResendLogState(rClient, i, 0, coordinate);
 			continue;
 		}
 		if (rSlot.bHoldUpdatesUntilFullStateAck)
@@ -383,12 +382,7 @@ void ServerBufferedFrames::SendResends(ClientConnection& rClient, int64_t iTick)
 				continue;
 			}
 
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-
-			WriteBufferedFramePacket(rWorkbuffer, PacketType::kServerCoordinateResend, i, rSlot.ack.uiEpoch, *pBuffered, rClient.iClientTimestampNanoseconds);
-
-			NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(i), rWorkbuffer, 0);
+			SendBufferedFramePacket(rClient, PacketType::kServerCoordinateResend, i, *pBuffered);
 
 			++iSlotResendCount;
 		}
@@ -490,12 +484,7 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 							continue;
 						}
 
-						common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-						common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-
-						WriteBufferedFramePacket(rWorkbuffer, PacketType::kServerCoordinateResend, iSlotIndex, rSlot.ack.uiEpoch, *pBuffered, rClient.iClientTimestampNanoseconds);
-
-						NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(iSlotIndex), rWorkbuffer, 0);
+						SendBufferedFramePacket(rClient, PacketType::kServerCoordinateResend, iSlotIndex, *pBuffered);
 					}
 				}
 			}

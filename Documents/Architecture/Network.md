@@ -330,7 +330,11 @@ sizes are the full packet including the type byte.
   `[min, max]` → violation; (4) handshake gate → **silent drop, no count**
   (pre-Hello ack race, below); (5) per-type per-tick cap → drop, violation only
   if `bOverCapCountsViolation`. Game-range types skip gates 3–5 at `Receive`
-  (kept opaque) and take the same three checks at the deferred drain.
+  (kept opaque): there they take only a handshake gate of their own (silent
+  drop, no count); at the deferred drain
+  `ServerSessionBase::DispatchDeferredClientPackets` looks up the contract row
+  and `Server::AdmitGamePacket` applies its sentinel, size, and per-type cap
+  checks.
 - **Per-update reset**: `Server::Poll` zeroes each client's
   `iTickPacketCount`/`iTickByteCount` and `puiTickTypeCounts`, but only in
   `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same

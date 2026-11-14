@@ -179,6 +179,8 @@ the engine calls by name.
   `game::ApplySpawnStatusChange`,
   `game::IsSpawnType`, `game::IsTransferType`, `game::SpawnPosition`,
   `game::OwnedSpawnGlobalId`, `game::OwnedSpawnClientGuid`,
+  `game::StatusChangeTypeName`, `game::DrainPendingAgentStatusChanges`,
+  `game::ResetPendingAgentStatusChanges`,
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.
 - The harness rig status-change queue comes from the game Agent's session-bound

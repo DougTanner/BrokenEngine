@@ -85,7 +85,7 @@ public:
 
 private:
 
-	void WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, int64_t iEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNanoseconds);
+	void SendBufferedFramePacket(const ClientConnection& rClient, PacketType eType, int64_t iSlot, const PerCoordBufferedFrame& rBuffered);
 	const PerCoordBufferedFrame* FindBufferedFrame(GridCoord coordinate, int64_t iTick) const;
 	int64_t CompressToBuffer(std::span<const char> data);
 

@@ -155,8 +155,8 @@ namespace engine
 {
 
 // Client-to-server packet limits are declarative and checked once at Server::Receive for engine types below
-// kGamePacketStart; game-range types are checked during parsing by GetGamePacketContract. See
-// Documents/Architecture/Network.md "Client -> Server Contract".
+// kGamePacketStart; game-range types take only the handshake gate there and are checked against
+// GetGamePacketContract at the deferred drain. See Documents/Architecture/Network.md "Client -> Server Contract".
 
 // The 64 mirrors NetworkManager::kiMaximumEnetCoordinateSlots; a static_assert tying it to the transport
 // ceiling lives in Server.cpp because NetworkProtocol.h cannot include NetworkManager.h.
@@ -192,7 +192,7 @@ struct ClientPacketContract
 };
 
 // Contract for engine packet types (< kGamePacketStart) only. Game-range types bypass this at
-// Server::Receive and are contract-checked at parse via GetGamePacketContract. Default row is the
+// Server::Receive and are contract-checked at the deferred drain via GetGamePacketContract. Default row is the
 // not-client-sendable sentinel (server->client and unknown engine types).
 inline constexpr ClientPacketContract GetClientPacketContract(PacketType eType)
 {

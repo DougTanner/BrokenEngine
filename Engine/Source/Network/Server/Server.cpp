@@ -18,7 +18,7 @@ namespace engine
 // NetworkProtocol.h cannot include NetworkManager.h; tie the codec's maximum ack message to the real
 // slot ceiling here so a transport slot change trips this assertion.
 static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaximumEnetCoordinateSlots, "ack-stream codec cardinality must match the transport slot ceiling");
-static_assert(kiMaximumAcknowledgmentStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaximumEnetCoordinateSlots), "kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
+static_assert(kiMaximumAcknowledgmentStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaximumEnetCoordinateSlots), "kiMaximumAcknowledgmentStreamPacketSize must match the ack-stream wire layout sized by NetworkManager::kiMaximumEnetCoordinateSlots");
 static_assert(kiCoordinateSlots <= NetworkManager::kiMaximumEnetCoordinateSlots, "kiCoordinateSlots must fit the transport slot ceiling");
 
 // Both the unscheduled poll gap that opens the budget stall grace and the grace length, each on top of the
@@ -532,7 +532,7 @@ void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, 
 	// Before the cooldown, so a corrupt report does not consume it.
 	if (message.iTick < 0)
 	{
-		NetworkMessages::ThrowCorruptStream("Server::ClientDesyncReport");
+		NetworkMessages::ThrowCorruptStream("Server::ClientDesynchronizationReport");
 	}
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -549,7 +549,7 @@ void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, 
 
 	char pcExpected[20] {};
 	char pcActual[20] {};
-	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iQ, coordinate.iR, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
+	LOG(kNetwork, kError, "Server::ClientDesynchronizationReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iQ, coordinate.iR, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
 }
 
 void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ClientConnection& rClient)
@@ -815,7 +815,7 @@ void Server::ClientResynchronizationRequest(std::span<const uint8_t> packetData,
 	NetworkMessages::ClientResyncRequestMessage message {};
 	NetworkMessages::Read(packetData, message);
 
-	LOG(kNetwork, kWarning, "Server::ClientResyncRequest Client: {}", rClient.iClientId);
+	LOG(kNetwork, kWarning, "Server::ClientResynchronizationRequest Client: {}", rClient.iClientId);
 
 	if (std::ranges::contains(mPendingResynchronizationClientIds, rClient.iClientId))
 	{
