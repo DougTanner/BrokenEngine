@@ -171,9 +171,9 @@ the engine calls by name.
   exception to the engine/game contract, because the payload crossing a cell
   boundary is game-defined while the machinery moving it is not. Owned-entity
   identity is not part of that exception: it goes through the engine ownership
-  layer (`../../Frame/AGENTS.md`). Their headers therefore stay out of the
-  `Engine.h` aggregation and consumers include them directly. The two managers
-  also use these game names directly, naming no gameplay type:
+  layer (`../../Frame/AGENTS.md`). Their headers stay out of the `Engine.h`
+  aggregation and consumers include them directly. The two managers also use
+  these game names directly, naming no gameplay type:
   `game::IsOwnedEntityTransfer` (whether a transfer carries an owned entity),
   `game::Frame::OwnershipLayers`, `game::Frame::OwnedEntityCount`,
   `game::ApplySpawnStatusChange`,

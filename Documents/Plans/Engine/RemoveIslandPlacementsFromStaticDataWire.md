@@ -121,7 +121,11 @@ executing session sets them up from the harness documentation.
 
 ## Coordination
 
-No directional dependencies or mandatory nondirectional coordination.
+`Documents/Plans/Engine/StaticDataDrainInClientRuntime.md` moves the
+static-data drain that `## Context` names from `ClientSessionBase` into a
+private `ClientSessionRuntime` member. Neither Plan depends on the other, and
+this Plan's scope is unchanged: after that Plan lands, the only drain is that
+runtime member into `ClientSessionRuntime::StageStaticData`.
 
 ## Notes
 

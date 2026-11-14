@@ -140,9 +140,10 @@ are in [Network](../../../../Documents/Architecture/Network.md).
 ## Reconciliation Replay Chain
 
 This directory owns CRC fast-path, rollback/ring orchestration, replay,
-per-coord parallel dispatch, profiling merge, and first-in-slot-order unresolved
-mismatch selection. Each worker writes only its coord. The game supplies
-payloads, transfer materialization, and reconciliation/desync policy; see
+per-coord parallel dispatch, profiling merge, and selection of the first
+unresolved mismatch in work-list order. Each worker writes only its coord. The
+game supplies payloads, transfer materialization, and reconciliation/desync
+policy; see
 [Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md).
 
 - `ReconcileReplayTick.cpp` applies the post-tick batch (spawn and transfer
@@ -150,9 +151,9 @@ payloads, transfer materialization, and reconciliation/desync policy; see
   recomputes CRC after that batch; this ordering is required for the broadcast
   CRC ([server detail](../Server/AGENTS.md)).
 - `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types
-  because their payloads are game-defined while their machinery is engine-owned;
-  both stay out of `Engine.h`, and consumers include them directly, matching the
-  exception in the [server detail](../Server/AGENTS.md). `ClientSessionBase.h`
+  because their payloads are game-defined while their machinery is engine-owned,
+  matching the exception in the [server detail](../Server/AGENTS.md). Both stay
+  out of `Engine.h` and consumers include them directly. `ClientSessionBase.h`
   includes `ClientDesyncCore.h`.
 
 ## Other

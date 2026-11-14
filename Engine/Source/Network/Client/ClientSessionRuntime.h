@@ -141,7 +141,7 @@ private:
 	std::future<CellStaticData> mTerrainPreparation;
 	GridCoord mPreparingCoordinate {};
 
-	void ResetForConnect();
+	void ResetConnectionState();
 	void ResetForServerLoad();
 	void UnsubscribeStaleCoordinates(std::span<const GridCoord> desiredCoordinates);
 	void BuildSubscriptionQueue(std::span<const GridCoord> desiredCoordinates);

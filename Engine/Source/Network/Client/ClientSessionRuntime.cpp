@@ -6,7 +6,6 @@
 
 #include "Network/Client/Client.h"
 #include "Network/NetworkDiscoveryScanner.h"
-#include "CrashReport.h"
 
 #include "Network/Client/ClientSession.h"
 #include "Profile/ProfileRows.h"
@@ -328,7 +327,7 @@ void ClientSessionRuntime::ResetClock()
 	miLastClockErrorLogTick = -1;
 }
 
-void ClientSessionRuntime::ResetForConnect()
+void ClientSessionRuntime::ResetConnectionState()
 {
 	ResetClock();
 	ClearSubscriptionState();
@@ -343,7 +342,7 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort
 {
 	// Heap: address copy, GUID file I/O, and Client/ENet construction
 	ScopedSuppressAllocationTracking suppress;
-	ResetForConnect();
+	ResetConnectionState();
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
 	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, clientGuid, &PersistClientGuidToDisk);
@@ -365,13 +364,7 @@ void ClientSessionRuntime::Disconnect()
 	// Heap: Client/ENet and discovery teardown may allocate during cleanup
 	ScopedSuppressAllocationTracking suppress;
 	mpClient.reset();
-	mpDiscoveryScanner.reset();
-	ResetClock();
-	ClearSubscriptionState();
-	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
-	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
-	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
-	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted, false);
+	ResetConnectionState();
 	game::gpClientSession->OnRuntimeDisconnected();
 }
 
@@ -866,14 +859,9 @@ void ClientSessionRuntime::UnsubscribeStaleCoordinates(std::span<const GridCoord
 void ClientSessionRuntime::BuildSubscriptionQueue(std::span<const GridCoord> desiredCoordinates)
 {
 	mSubscriptionQueue.clear();
-	const std::vector<ClientCoordSlot>& rSlots = mpClient->mSubscriptions.mCoordinateSlots;
 	for (const GridCoord& rCoordinate : desiredCoordinates)
 	{
-		bool bActive = std::ranges::any_of(rSlots, [&](const ClientCoordSlot& rSlot)
-		{
-			return IsSlotActive(rSlot) && rSlot.coordinate == rCoordinate;
-		});
-		if (!bActive && !mpClient->mSubscriptions.mSubscribeRequests.IsLive(rCoordinate))
+		if (!HoldsSlotOrRequest(rCoordinate))
 		{
 			mSubscriptionQueue.push_back(rCoordinate);
 		}

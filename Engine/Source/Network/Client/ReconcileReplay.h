@@ -6,8 +6,8 @@
 // orchestration, and the replay tick driver that applies transfers after each tick and recomputes the Frame CRC at the
 // same comparison point the server uses. The game supplies the Frame/FrameInput/StatusChange payloads this machinery
 // replays, the transfer classification and materialization it calls, and the client-state policy that consumes the
-// per-coordinate scratch. Naming game types keeps this header out of the Engine.h aggregation; its consumers include
-// it directly.
+// per-coordinate scratch. This header stays out of the Engine.h aggregation because it needs the complete engine::Cell
+// and SnapshotIndex from GameBase.h, which each game Pch.h includes after Engine.h; its consumers include it directly.
 
 namespace game
 {
@@ -162,7 +162,8 @@ struct ReconcileDispatchResult
 	int64_t iActiveCount = 0;
 	bool bAnyFullReplay = false;
 	ReconcileProfiling profiling;
-	// The first coord in slot order whose reconcile ended in an unresolved CRC mismatch; bDesync is false when none did.
+	// The first coord in work-list order whose reconcile ended in an unresolved CRC mismatch; bDesync is false when none
+	// did. The work list follows cell-map iteration order, which is unspecified.
 	ReconcileDesyncInfo desync;
 };
 

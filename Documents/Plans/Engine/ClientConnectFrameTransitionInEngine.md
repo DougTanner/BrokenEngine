@@ -164,6 +164,23 @@ the client poll and UI paths, and stays there.
 The supplied evidence records no harness setup for criteria 3 to 5; the
 executing session sets them up from the harness documentation.
 
+## Coordination
+
+No Plan below depends on this one, and it depends on none. Whichever lands
+second re-derives its regions by symbol from the landed files.
+
+- `Documents/Plans/Engine/StaticDataDrainInClientRuntime.md` removes
+  `ClientSessionBase::ApplyReceivedStaticData` and edits
+  `Engine/Source/Network/Client/AGENTS.md` `## Overview` where it says what
+  `ClientSessionBase` owns, the class and text this Plan adds to.
+- `Documents/Plans/Engine/RemoveGuidAssignedCallback.md` adds a client GUID
+  persist call in `ClientSessionRuntime::PollAndDrain` just ahead of the
+  `OnConnectionAccepted` call this Plan replaces, and edits the game client
+  `AGENTS.md`. The persist call stays ahead of whatever the accepted branch
+  calls first.
+- `Documents/Plans/Engine/ReduceClientSessionRuntimeCpp.md` may move
+  `PollAndDrain` and `Connect` to another file.
+
 ## Notes
 
 - The smoke-trail copy in `ClientSession::HydrateReceivedFullState` uses only

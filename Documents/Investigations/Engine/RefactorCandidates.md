@@ -19,6 +19,15 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-14 claude/79a8b3b8-5c7c-4714-9b08-ff5184e4c1b7 —
+  Engine/Source/Network/Client/Client.cpp:126 — treat a short or undecodable
+  delayed connection response as the fatal corrupt-server-data case that
+  Engine/Source/Network/AGENTS.md `## Corrupt Input Policy` already defines (the
+  client trusts its server), by dropping the size test and letting
+  NetworkMessages::Read throw, or by routing the peek through the same catch
+  Client::Receive uses; this reverses Fixed decision (1), so it needs the user's
+  approval — makes unnecessary: Client.cpp:126-129 size test and the rationale
+  comment at Client.cpp:125
 - 2026-11-14 claude/5939deae-ae49-4fa3-8c68-a2981f6a14ef —
   Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.h:125
   — drop NextRouteWaypoint's `rbFinal` out parameter and the snap-and-compare at

@@ -122,9 +122,20 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 					// Deliver that rejection before the disconnect tears down the session and its delay queue.
 					auto it = std::ranges::find_if(mDelayedPackets, [](const DelayedPacket& rPacket)
 					{
-						return std::ssize(rPacket.data) >= NetworkMessages::ServerConnectionResponseMessage::kiMinSize
-						    && static_cast<PacketType>(rPacket.data.at(0)) == PacketType::kServerConnectionResponse
-						    && rPacket.data.at(2) == 0;
+						// Read throws on a layout it cannot decode and Receive's catches do not cover this predicate, so the size and type tests come first.
+						if (std::ssize(rPacket.data) < NetworkMessages::ServerConnectionResponseMessage::kiMinSize)
+						{
+							return false;
+						}
+
+						if (static_cast<PacketType>(rPacket.data.at(0)) != PacketType::kServerConnectionResponse)
+						{
+							return false;
+						}
+
+						NetworkMessages::ServerConnectionResponseMessage message {};
+						NetworkMessages::Read(rPacket.data, message);
+						return message.uiAccepted == 0;
 					});
 					if (it != mDelayedPackets.end())
 					{

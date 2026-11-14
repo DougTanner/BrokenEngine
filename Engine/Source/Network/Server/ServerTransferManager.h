@@ -5,8 +5,9 @@
 // The engine owns the cross-cell transfer machinery: harvest, adjacency and destination-liveness validation,
 // deterministic type ordering, destination materialization, and the post-spawn destination CRC recompute. The game
 // supplies the StatusChange payloads carried across the boundary and the transfer classification. The manager also
-// holds spawns decided outside the tick until their tick's post-tick batch. Naming game types keeps this header out of
-// the Engine.h aggregation; its consumers include it directly.
+// holds spawns decided outside the tick until their tick's post-tick batch. This header stays out of the Engine.h
+// aggregation and its consumers include it directly, though nothing in it requires that: game::StatusChange, the one
+// game type it needs, is already complete where the game Pch.h includes Engine.h.
 
 namespace engine
 {
