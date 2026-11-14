@@ -25,7 +25,7 @@ struct CellStaticData;
 namespace game
 {
 
-// Shared constants (used across Omnis*.cpp files)
+// Omni tuning constants; kfPushMargin also sizes every ship type's navigation clearance.
 inline constexpr std::chrono::duration<float> kDestroyTime = std::chrono::duration<float>(0.7f);
 inline constexpr std::chrono::duration<float> kDestroyExplosionInterval = std::chrono::duration<float>(0.005f);
 inline constexpr float kfOmniBlastersSpeed = 225.0f;
@@ -91,11 +91,11 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	static inline int64_t siBlasterTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
 	static inline int64_t siExplosionTypeIndex = 0xFF;
-#endif
 	static inline int64_t siImpactPuffControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siImpactPointLightControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siHexShieldTypeIndex = 0xFF;
 	static inline int64_t siHealBeamAreaLightTypeIndex = 0xFF;
+#endif
 
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.

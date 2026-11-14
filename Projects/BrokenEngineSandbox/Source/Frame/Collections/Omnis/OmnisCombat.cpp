@@ -5,7 +5,6 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
-#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 
 #if defined(BT_CLIENT)
