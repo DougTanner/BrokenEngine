@@ -17,12 +17,12 @@ key. Secret trimming and the authentication response are shared Common helpers.
 
 The UI thread owns networking, the received model, and painting. Its single 50
 ms timer uses nonblocking sockets and retries disconnected connections every 2
-seconds. Authentication retains one 32-byte response and its sent-byte offset:
-positive sends advance it, would-block preserves it, and connection state
-changes to connected only after all bytes have been accepted. Disconnect clears
-the model and pending response before reconnecting. Each snapshot replaces the
-model and invalidates the window. Server records are trusted under the root
-trust policy.
+seconds. Authentication retains one response of
+`common::kiServerMonitorResponseSize` bytes and its sent-byte offset: positive
+sends advance it, would-block preserves it, and connection state changes to
+connected only after all bytes have been accepted. Disconnect clears the model
+and pending response before reconnecting. Each snapshot replaces the model and
+invalidates the window. Server records are trusted under the root trust policy.
 
 ## Presentation
 

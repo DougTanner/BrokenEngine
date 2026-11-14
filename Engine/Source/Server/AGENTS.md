@@ -28,19 +28,22 @@ Server-only statistics aggregation and the separate Server Monitor channel.
 
 ## Monitor Channel
 
-The channel is non-ENet IPv4 TCP on port 27017, with one accepted connection
-and backlog 1. The main thread reads `ServerMonitorSecret.txt` from the server
-app-data directory and copies its trimmed key into host-owned storage. An empty
-key or `--loopback-only` binds 127.0.0.1; otherwise it binds all interfaces.
-No socket reuse option permits another process to take the port.
+The channel is non-ENet IPv4 TCP on port `common::kiServerMonitorPort`, with
+one accepted connection and backlog 1. The main thread reads
+`ServerMonitorSecret.txt` from the server app-data directory and copies its
+trimmed key into host-owned storage. An empty key or `--loopback-only` binds
+127.0.0.1; otherwise it binds all interfaces. No socket reuse option permits
+another process to take the port.
 
 `Common/ServerMonitorProtocol.h` owns the little-endian x64 layout, magic,
 version, bounds, key trimming and HMAC helper. A frame header carries body size
-and type. The challenge contains magic, version and a fresh 32-byte random
-nonce. The monitor sends exactly 32 raw HMAC-SHA256 response bytes using the
-shared secret as key; the secret never travels. With no key any 32 bytes are
-accepted, because the listener is loopback-only. One response attempt is allowed
-per connection. The server never reads a client-controlled allocation size.
+and type. The challenge contains magic, version and a fresh random nonce, sized
+by `common::ServerMonitorChallenge`. The monitor sends exactly
+`common::kiServerMonitorResponseSize` raw HMAC-SHA256 response bytes using the
+shared secret as key; the secret never travels. With no key any
+`common::kiServerMonitorResponseSize` bytes are accepted, because the listener
+is loopback-only. One response attempt is allowed per connection. The server
+never reads a client-controlled allocation size.
 
 Receive requests cover only the missing response bytes. Mismatch, five seconds
 from accept without a complete response, or any byte after authentication closes
