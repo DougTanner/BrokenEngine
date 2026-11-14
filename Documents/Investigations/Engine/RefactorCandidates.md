@@ -26,6 +26,12 @@ top of the file. A session reviewing the log removes each row it handles.
   (Battleships.cpp:508, Omnis.cpp:673 and :697, ShipBehaviours.cpp:564 and :828,
   FleetCoordination.cpp:118) — makes unnecessary:
   Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:507
+- 2026-11-14 claude/d2a0bc7b-1e0b-4fb0-b1fc-8d003a2e91f6 —
+  Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp:165 —
+  in ApplyOwnedEntityEvent, find the entity once and either write its coordinate
+  through the found iterator or add it with the event coordinate, which
+  AddClientOwnedEntity already stores; the separate UpdateOwnedEntityCoordinate
+  function and its second search then go away
 - 2026-11-14 claude/79a8b3b8-5c7c-4714-9b08-ff5184e4c1b7 —
   Engine/Source/CrashReport.cpp:89 — test only the pending buffer after the two
   file-name appends: both paths share one prefix and the pending name is the

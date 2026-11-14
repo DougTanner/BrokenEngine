@@ -165,13 +165,10 @@ static void RenderFleetMemberRow(const FleetMember& rMember, int64_t iRowNumber)
 	bool bSelected = rMember.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
 	engine::GridCoord memberCoordinate {};
-	for (int64_t j = 0; j < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++j)
+	auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, rMember.globalId, &engine::OwnedEntity::globalId);
+	if (ownedIt != gpGame->mClientOwnedEntities.end())
 	{
-		if (gpGame->mClientOwnedEntityIdentifiers.at(j) == rMember.globalId)
-		{
-			memberCoordinate = gpGame->mClientOwnedEntityCoordinates.at(j);
-			break;
-		}
+		memberCoordinate = ownedIt->coord;
 	}
 
 	char pcMemberId[32];
@@ -190,7 +187,7 @@ static void RenderFleetMemberRow(const FleetMember& rMember, int64_t iRowNumber)
 		}
 		if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
 		{
-			bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rMember.globalId);
+			bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntities, rMember.globalId, &engine::OwnedEntity::globalId);
 			engine::NetworkUiControl<int64_t>& rDestroyToggle = gpGame->mFleetSelection.mDestroyMemberToggle;
 			ImGui::SameLine();
 			ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());

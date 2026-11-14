@@ -82,9 +82,6 @@ public:
 
 private:
 
-	// Position of rFleetGuid within one client's fleet vector; -1 when absent.
-	int64_t FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const;
-
 	void CreateFleet(const engine::ClientGuid& rClientGuid);
 
 public:

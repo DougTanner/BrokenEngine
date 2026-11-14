@@ -75,13 +75,10 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 	const FleetMember& rMember = *memberIt;
 	if (!(rMember.flags & FleetMemberFlags::kIsDead))
 	{
-		for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
+		auto ownedIt = std::ranges::find(gpGame->mClientOwnedEntities, rMember.globalId, &engine::OwnedEntity::globalId);
+		if (ownedIt != gpGame->mClientOwnedEntities.end())
 		{
-			if (gpGame->mClientOwnedEntityIdentifiers.at(i) == rMember.globalId)
-			{
-				gpGame->SetClientGridCoordinate(gpGame->mClientOwnedEntityCoordinates.at(i));
-				break;
-			}
+			gpGame->SetClientGridCoordinate(ownedIt->coord);
 		}
 	}
 
@@ -108,32 +105,16 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	}
 	mClientFleets = std::move(rFleets);
 
-	auto FindFleetIndexByGuid = [this](const FleetGuid& rGuid) -> int64_t
-	{
-		if ((rGuid.uiHigh == 0 && rGuid.uiLow == 0))
-		{
-			return -1;
-		}
-		for (int64_t i = 0; i < std::ssize(mClientFleets); ++i)
-		{
-			if (mClientFleets.at(static_cast<size_t>(i)).guid == rGuid)
-			{
-				return i;
-			}
-		}
-		return -1;
-	};
-
 	// Restore from disk-persisted client state on the first sync after a reconnect-style clear.
 	// The remembered FleetGuid identifies which fleet to focus; a missing or destroyed ship falls back to the fleet's current flagship.
 	bool bRestoredRemembered = false;
 	if (iPreviousFleetCount == 0)
 	{
-		int64_t iRememberedFleetIndex = FindFleetIndexByGuid(gpGame->mRememberedFleetGuid);
-		if (iRememberedFleetIndex >= 0)
+		auto rememberedFleetIt = std::ranges::find(mClientFleets, gpGame->mRememberedFleetGuid, &Fleet::guid);
+		if (rememberedFleetIt != mClientFleets.end())
 		{
-			const Fleet& rFleet = mClientFleets.at(static_cast<size_t>(iRememberedFleetIndex));
-			miFocusedFleetIndex = iRememberedFleetIndex;
+			const Fleet& rFleet = *rememberedFleetIt;
+			miFocusedFleetIndex = rememberedFleetIt - mClientFleets.begin();
 			mFocusedMemberGlobalId = {};
 			if ((gpGame->mRememberedFocusedShipIdentifier.iValue != 0))
 			{
@@ -159,10 +140,10 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 
 	if (!bRestoredRemembered)
 	{
-		int64_t iReanchoredFleetIndex = FindFleetIndexByGuid(previousFocusedFleetGuid);
-		if (iReanchoredFleetIndex >= 0)
+		auto reanchoredFleetIt = std::ranges::find(mClientFleets, previousFocusedFleetGuid, &Fleet::guid);
+		if (reanchoredFleetIt != mClientFleets.end())
 		{
-			miFocusedFleetIndex = iReanchoredFleetIndex;
+			miFocusedFleetIndex = reanchoredFleetIt - mClientFleets.begin();
 		}
 
 		if (miFocusedFleetIndex >= std::ssize(mClientFleets))
@@ -192,7 +173,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 			engine::GlobalId newMemberGlobalId = pFleet->members.back().globalId;
 			// The spawn event and this sync share one reliable flush, and the client applies owned-entity events
 			// before game packets, so the spawn may already have been applied.
-			if (std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, newMemberGlobalId))
+			if (std::ranges::contains(gpGame->mClientOwnedEntities, newMemberGlobalId, &engine::OwnedEntity::globalId))
 			{
 				mFocusedMemberGlobalId = newMemberGlobalId;
 				mPendingFocusMemberGlobalId = {};
@@ -236,23 +217,14 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	}
 
 	engine::GlobalId focusedId = gpGame->ClientOwnedEntityIdentifier();
-	bool bGridCoordinateResolved = false;
-	if ((focusedId.iValue != 0))
+	auto focusedOwnedIt = std::ranges::find(gpGame->mClientOwnedEntities, focusedId, &engine::OwnedEntity::globalId);
+	if ((focusedId.iValue != 0) && focusedOwnedIt != gpGame->mClientOwnedEntities.end())
 	{
-		for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
-		{
-			if (gpGame->mClientOwnedEntityIdentifiers.at(i) == focusedId)
-			{
-				gpGame->SetClientGridCoordinate(gpGame->mClientOwnedEntityCoordinates.at(i));
-				bGridCoordinateResolved = true;
-				break;
-			}
-		}
+		gpGame->SetClientGridCoordinate(focusedOwnedIt->coord);
 	}
-
-	// No valid selection — camera to origin
-	if (!bGridCoordinateResolved)
+	else
 	{
+		// No valid selection — camera to origin
 		gpGame->SetClientGridCoordinate({});
 	}
 

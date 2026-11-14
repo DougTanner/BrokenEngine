@@ -5,12 +5,6 @@
 namespace engine
 {
 
-struct OwnedEntity
-{
-	GlobalId globalId {};
-	GridCoord coord {};
-};
-
 class OwnedEntityRegistry
 {
 public:

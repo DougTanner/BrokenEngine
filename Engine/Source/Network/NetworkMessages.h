@@ -38,6 +38,12 @@ struct ReceivedOwnedEntityEvent
 	GridCoord coordinate {};
 };
 
+struct OwnedEntity
+{
+	GlobalId globalId {};
+	GridCoord coord {};
+};
+
 } // namespace engine
 
 namespace engine::NetworkMessages

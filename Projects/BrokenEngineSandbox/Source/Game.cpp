@@ -64,28 +64,22 @@ engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 	return {};
 }
 
-// The client owned-entity list (mClientOwnedEntityIdentifiers, mClientOwnedEntityCoordinates) holds only engine global
-// IDs and grid coordinates, so it is game-agnostic: a future project may want it moved into shared engine code,
-// depending on its requirements.
+// The client owned-entity list (mClientOwnedEntities) holds only engine global IDs and grid coordinates, so it is
+// game-agnostic.
 void Game::AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate)
 {
-	// Heap: mClientOwnedEntityIdentifiers / mClientOwnedEntityCoordinates push_back may grow vectors
+	// Heap: mClientOwnedEntities push_back may grow the vector
 	ScopedSuppressAllocationTracking suppress;
-	mClientOwnedEntityIdentifiers.push_back(identifier);
-	mClientOwnedEntityCoordinates.push_back(coordinate);
+	mClientOwnedEntities.push_back(engine::OwnedEntity {.globalId = identifier, .coord = coordinate});
 }
 
 void Game::RemoveClientOwnedEntity(engine::GlobalId identifier)
 {
-	for (int64_t i = 0; i < std::ssize(mClientOwnedEntityIdentifiers); ++i)
+	auto it = std::ranges::find(mClientOwnedEntities, identifier, &engine::OwnedEntity::globalId);
+	if (it != mClientOwnedEntities.end())
 	{
-		if (mClientOwnedEntityIdentifiers.at(i) == identifier)
-		{
-			LOG(kNetwork, kVerbose, "RemoveClientOwnedEntity GlobalId: {} Index: {} OldOwnedEntityCount: {}", identifier, i, std::ssize(mClientOwnedEntityIdentifiers));
-			mClientOwnedEntityIdentifiers.erase(mClientOwnedEntityIdentifiers.begin() + i);
-			mClientOwnedEntityCoordinates.erase(mClientOwnedEntityCoordinates.begin() + i);
-			return;
-		}
+		LOG(kNetwork, kVerbose, "RemoveClientOwnedEntity GlobalId: {} Index: {} OldOwnedEntityCount: {}", identifier, it - mClientOwnedEntities.begin(), std::ssize(mClientOwnedEntities));
+		mClientOwnedEntities.erase(it);
 	}
 }
 
@@ -105,7 +99,7 @@ void Game::UpdateCameraShake()
 	// Camera shake — read most recent ring frame
 	auto it = mCells.find(mClientGridCoordinate);
 	const Frame* pTailFrame = it != mCells.end() ? it->second.TailFrame() : nullptr;
-	if ((ClientOwnedEntityIdentifier().iValue != 0) && pTailFrame != nullptr)
+	if (pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
 
@@ -164,17 +158,11 @@ Game::~Game()
 #if defined(BT_SERVER)
 	mpServerSession.reset();
 #endif
-
-	if (!(mMenuFlags & engine::MenuFlags::kMouseVisible))
-	{
-		ShowCursor(TRUE);
-	}
 }
 
 void Game::ResetGameState()
 {
-	mClientOwnedEntityIdentifiers.clear();
-	mClientOwnedEntityCoordinates.clear();
+	mClientOwnedEntities.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
 	mMapFleetMarkers.clear();
@@ -266,7 +254,7 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 			it->second.staticData.elevationGrid = {};
 			it->second.staticData.islandRenderQueries = {};
 
-			// Pre-mint the texture slot now (mirrors ClientSessionBase::ApplyReceivedStaticData) so the
+			// Pre-mint the texture slot now (mirrors ClientSessionRuntime::StartTerrainPreparation) so the
 			// chunk loads, and the elevation upload request on a distinct transfer queue, are in-flight
 			// before UpdateActiveIslands references the slot this same frame. AcquireTextureSlot is
 			// idempotent (hot-path early return).
@@ -288,6 +276,11 @@ void Game::CaptureClientState()
 	if (pFleet != nullptr)
 	{
 		mRememberedFleetGuid = pFleet->guid;
+		// A different focused member's hull is unrelated to the stored one, so the next comparison adds no shake.
+		if (mFleetSelection.mFocusedMemberGlobalId != mRememberedFocusedShipIdentifier)
+		{
+			mfPreviousClientArmor = 0.0f;
+		}
 		mRememberedFocusedShipIdentifier = mFleetSelection.mFocusedMemberGlobalId;
 	}
 }

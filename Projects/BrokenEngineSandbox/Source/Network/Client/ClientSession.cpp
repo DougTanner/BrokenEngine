@@ -162,7 +162,7 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	}
 
 	// Spawned and ChangedCell each carry the assignment.
-	if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rEvent.globalId)))
+	if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntities, rEvent.globalId, &engine::OwnedEntity::globalId)))
 	{
 		LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iQ, rEvent.coordinate.iR, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR);
 		gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
@@ -185,13 +185,10 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 
 void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate)
 {
-	for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
+	auto it = std::ranges::find(gpGame->mClientOwnedEntities, globalId, &engine::OwnedEntity::globalId);
+	if (it != gpGame->mClientOwnedEntities.end())
 	{
-		if (gpGame->mClientOwnedEntityIdentifiers.at(i) == globalId)
-		{
-			gpGame->mClientOwnedEntityCoordinates.at(i) = coordinate;
-			break;
-		}
+		it->coord = coordinate;
 	}
 }
 
@@ -243,8 +240,7 @@ void ClientSession::OnServerLoad()
 	LOG(kDefault, kDebug, "ClientSession::OnServerLoad");
 
 	// Clear owned-entity identity — server will reassign
-	gpGame->mClientOwnedEntityIdentifiers.clear();
-	gpGame->mClientOwnedEntityCoordinates.clear();
+	gpGame->mClientOwnedEntities.clear();
 	gpGame->SetClientGridCoordinate({});
 	gpGame->mfPreviousClientArmor = 0.0f;
 	engine::gpCamera->mVecVisualErrorOffset = {};

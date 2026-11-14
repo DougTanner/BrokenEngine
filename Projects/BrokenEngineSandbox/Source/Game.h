@@ -120,8 +120,7 @@ private:
 #endif
 
 public:
-	std::vector<engine::GlobalId> mClientOwnedEntityIdentifiers;
-	std::vector<engine::GridCoord> mClientOwnedEntityCoordinates;
+	std::vector<engine::OwnedEntity> mClientOwnedEntities;
 	float mfPreviousClientArmor = 0.0f;
 	engine::AlignmentIdentifier mFleetAlignment {};
 	engine::AlignmentIdentifier mRandomAlignment {};
@@ -142,8 +141,6 @@ public:
 #endif
 
 	void InitializeFramePostRender(Frame& rFrame);
-
-private:
 };
 
 inline Game* gpGame = nullptr;

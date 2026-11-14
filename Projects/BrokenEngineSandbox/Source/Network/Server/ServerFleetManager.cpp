@@ -31,18 +31,6 @@ int64_t ServerFleetManager::FindClientIdForGuid(const engine::ClientGuid& rGuid)
 	return 0;
 }
 
-int64_t ServerFleetManager::FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const
-{
-	for (int64_t i = 0; i < std::ssize(rFleets); ++i)
-	{
-		if (rFleets.at(static_cast<size_t>(i)).guid == rFleetGuid)
-		{
-			return i;
-		}
-	}
-	return -1;
-}
-
 // The fleet's Battleship is its first member and its flagship; it and every later member are born dead with an expired
 // countdown, so TickRespawnTimers queues each first spawn.
 void ServerFleetManager::CreateFleet(const engine::ClientGuid& rClientGuid)
@@ -98,13 +86,13 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 			continue;
 		}
 
-		int64_t iFleetIndex = FindFleetIndexByGuid(it->second, rRequest.fleetGuid);
-		if (iFleetIndex < 0)
+		auto fleetIt = std::ranges::find(it->second, rRequest.fleetGuid, &Fleet::guid);
+		if (fleetIt == it->second.end())
 		{
 			continue;
 		}
 
-		Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
+		Fleet& rFleet = *fleetIt;
 		uint8_t uiSquadron = FindOpenFleetSquadron(rFleet, rRequest.eType);
 		if (uiSquadron == kuiNoOpenFleetSquadron)
 		{
@@ -482,13 +470,13 @@ void ServerFleetManager::UpdateFleetNavigation(const engine::ClientGuid& rGuid, 
 		return;
 	}
 
-	int64_t iFleetIndex = FindFleetIndexByGuid(fleetIt->second, rFleetGuid);
-	if (iFleetIndex < 0)
+	auto it = std::ranges::find(fleetIt->second, rFleetGuid, &Fleet::guid);
+	if (it == fleetIt->second.end())
 	{
 		return;
 	}
 
-	Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleetIndex));
+	Fleet& rFleet = *it;
 	rFleet.navigationDelaySeconds = navigationDelaySeconds;
 
 	// Entering Stay in Cell holds the flagship's own cell, so the request's hold is ignored there. Fleet navigation

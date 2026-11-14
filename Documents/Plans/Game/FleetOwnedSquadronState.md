@@ -622,4 +622,11 @@ No harness run backs this Plan; its source was a code read.
 
 ## Coordination
 
-No directional dependencies or mandatory nondirectional coordination.
+No directional dependencies. Mandatory nondirectional coordination:
+
+- `Documents/Plans/Game/RemoveClientStateFromReplayMeta.md` also bumps
+  `ReplayMeta::kiVersion` and edits `WriteReplayMetadata` in
+  `Save/GameSaveLoad.cpp`. Each Plan raises the version once from the value it
+  finds at claim; whichever lands second bumps again and does not reuse the
+  first one's bump. The baseline 7 this Plan names for `ReplayMeta::kiVersion`
+  is then the value found at claim.

@@ -39,6 +39,11 @@ GameBase::~GameBase()
 	{
 		CloseHandle(mHandleMinimizedThrottleTimer);
 	}
+
+	if (!(mMenuFlags & MenuFlags::kMouseVisible))
+	{
+		ShowCursor(TRUE);
+	}
 #endif // BT_CLIENT
 }
 
