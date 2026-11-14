@@ -28,47 +28,44 @@ static bool HasTerrainCollision(int64_t iFlightPlane)
 
 AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour, int64_t iFlightPlane)
 {
-	XMVECTOR vecNormal = engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition);
-	float fNormalX = XMVectorGetX(vecNormal);
-	float fNormalY = XMVectorGetY(vecNormal);
-	float fGradientSquared = fNormalX * fNormalX + fNormalY * fNormalY;
-
 	float fLocalSteerRate = kfSteerRate;
-	XMVECTOR vecDesiredDirection = XMVectorZero();
-
-	// Without terrain collision the plane flies over every island, so it steers as an island-free cell does.
-	if (HasTerrainCollision(iFlightPlane) && fGradientSquared > kfMinimumGradientSquared)
-	{
-		float fElevationOffset = FlightPlaneElevationOffset(iFlightPlane);
-
-		// Contour direction: perpendicular to downhill gradient
-		XMVECTOR vecContour = bAlternateContour
-			? XMVectorSet(fNormalY, -fNormalX, 0.0f, 0.0f)
-			: XMVectorSet(-fNormalY, fNormalX, 0.0f, 0.0f);
-
-		// Elevation correction: push toward preferred elevation
-		float fElevationArtificialIntelligence = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) - fElevationOffset;
-		float fElevationError = fElevationArtificialIntelligence - kfPreferredElevation;
-		XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNormalX, fNormalY, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
-
-		vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
-
-		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecCurrentDirection, kfLookAheadDistance));
-		float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead) - fElevationOffset;
-		if (fElevationAhead > kfHighElevationThreshold)
-		{
-			fLocalSteerRate *= kfUrgentSteerMultiplier;
-		}
-	}
-	else
-	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
-	}
+	XMVECTOR vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
 
 	if (common::Distance(vecPosition, vecCellCenter) > kfReturnToIslandDistance)
 	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
 		fLocalSteerRate = kfSteerRate * kfUrgentSteerMultiplier;
+	}
+	else
+	{
+		XMVECTOR vecNormal = engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition);
+		float fNormalX = XMVectorGetX(vecNormal);
+		float fNormalY = XMVectorGetY(vecNormal);
+		float fGradientSquared = fNormalX * fNormalX + fNormalY * fNormalY;
+
+		// Without terrain collision the plane flies over every island, so it steers as an island-free cell does.
+		if (HasTerrainCollision(iFlightPlane) && fGradientSquared > kfMinimumGradientSquared)
+		{
+			float fElevationOffset = FlightPlaneElevationOffset(iFlightPlane);
+
+			// Contour direction: perpendicular to downhill gradient
+			XMVECTOR vecContour = bAlternateContour
+				? XMVectorSet(fNormalY, -fNormalX, 0.0f, 0.0f)
+				: XMVectorSet(-fNormalY, fNormalX, 0.0f, 0.0f);
+
+			// Elevation correction: push toward preferred elevation
+			float fElevationArtificialIntelligence = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) - fElevationOffset;
+			float fElevationError = fElevationArtificialIntelligence - kfPreferredElevation;
+			XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNormalX, fNormalY, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
+
+			vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
+
+			XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecCurrentDirection, kfLookAheadDistance));
+			float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead) - fElevationOffset;
+			if (fElevationAhead > kfHighElevationThreshold)
+			{
+				fLocalSteerRate *= kfUrgentSteerMultiplier;
+			}
+		}
 	}
 
 	XMVECTOR vecArtificialIntelligenceDirection = common::LerpDirection(vecCurrentDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime));

@@ -18,7 +18,7 @@ values. `kTargetFleet` and `kTargetRandom` are written and never tested:
   (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationHarnessRigs.cpp:384-388`);
 - readers: none. Every `pFlags` test in the tree is `kFalling`
   (`Missiles.cpp:90`, 115, 123, 147, 362, 367, 384; `MissilesUpdate.cpp:60`,
-  108, 192, 210, 290; `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:92`).
+  108, 192, 210, 290; `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:93`).
 
 The values ride in `pFlags`, a `SharedMembers()` column (`Missiles.h:142`),
 and in `SpawnInfo::flags`, so they are part of the CRC, the save, and the
@@ -62,7 +62,7 @@ The author's recommendations, with rationale:
    lifetime and no `flags` still relies on it, and for an arrival that already
    carries `kFalling` it changes nothing.
 5. Increment `MissilesPostRender::kiVersion` (`Missiles.h:114`), which feeds
-   `Frame::kiVersion` (`Frame.cpp:114`). Rationale: the bits stored in a saved
+   `Frame::kiVersion` (`Frame.cpp:115`). Rationale: the bits stored in a saved
    or replayed `pFlags` change meaning.
 6. No `engine::kiProtocolVersion` increment. Rationale:
    `SpawnInfo::Fields()` keeps its members, order, and widths, and

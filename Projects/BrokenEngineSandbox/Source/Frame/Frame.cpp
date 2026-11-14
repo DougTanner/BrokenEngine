@@ -1,5 +1,6 @@
 #include "Frame.h"
 
+#include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/Collections/Ships/ShipStatusChanges.h"
 #include "Frame/FrameCollections.h"
@@ -232,11 +233,6 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 
 constexpr int64_t kiMaximumFleetSize = 16;
 
-static float ShipRadius(ShipType eType)
-{
-	return eType == ShipType::kFighter ? kfFighterRadius : eType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
-}
-
 // The uuid MakeUuid mints from counter value uiCounter, leaving uiNextUuid unchanged.
 static int64_t CounterUuid(FramePostRender& rPostRender, uint64_t uiCounter)
 {
@@ -256,7 +252,7 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 	// The wave starts settled on its type's default flight plane.
 	int64_t iWaveFlightPlane = DefaultFlightPlane(eWaveType);
 	const engine::FlightPlane& rWaveFlightPlane = engine::gpFlightPlanes->Plane(iWaveFlightPlane);
-	float fWaveRadius = ShipRadius(eWaveType);
+	float fWaveRadius = kShipHitboxTypes[std::to_underlying(eWaveType)].fGameplayRadius;
 	float fTerrainClearance = fWaveRadius * 2.0f;
 	float fChevronStagger = fWaveRadius * 2.0f;
 	float fShipSideSpacing = fWaveRadius * 3.0f;
@@ -291,7 +287,7 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 				}
 				else if (rShipInterpolate.pRegistryIds[j].uuid.iValue < iWaveFirstUuid)
 				{
-					float fClearance = fShipSideSpacing + ShipRadius(eType);
+					float fClearance = fShipSideSpacing + kShipHitboxTypes[std::to_underlying(eType)].fGameplayRadius;
 					bNearShip = fDistanceSquared < fClearance * fClearance;
 				}
 			}
@@ -416,44 +412,22 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 		// flagship; Battleships chase it whatever the toss.
 		ShipOrders_t orders = waveOrders;
 		orders.Set(ShipOrders::kTargetFlagship, common::Random(1i64, rFrame.postRender.randomEngine) == 1);
-		switch (eWaveType)
+		ForEachShipType(rFrame, [&](ShipType eType, [[maybe_unused]] const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
 		{
-			case ShipType::kFighter:
-				FightersPostRender::Spawn(rFrame,
-				{
-					.vecPosition = vecSpawnPosition,
-					.vecDirection = vecDirectionToFleet,
-					.alignment = rFrame.postRender.randomAlignment,
-					.eController = ShipController::kRandomSpawn,
-					.orders = orders,
-					.uiFlightPlane = uiWaveFlightPlane,
-				});
-				break;
-			case ShipType::kOmni:
-				OmnisPostRender::Spawn(rFrame,
-				{
-					.vecPosition = vecSpawnPosition,
-					.vecDirection = vecDirectionToFleet,
-					.alignment = rFrame.postRender.randomAlignment,
-					.eController = ShipController::kRandomSpawn,
-					.orders = orders,
-					.uiFlightPlane = uiWaveFlightPlane,
-				});
-				break;
-			case ShipType::kBattleship:
-				BattleshipsPostRender::Spawn(rFrame,
-				{
-					.vecPosition = vecSpawnPosition,
-					.vecDirection = vecDirectionToFleet,
-					.alignment = rFrame.postRender.randomAlignment,
-					.eController = ShipController::kRandomSpawn,
-					.orders = orders,
-					.uiFlightPlane = uiWaveFlightPlane,
-				});
-				break;
-			case ShipType::kCount:
-				break;
-		}
+			if (eType != eWaveType)
+			{
+				return;
+			}
+			std::remove_cvref_t<decltype(rShipPostRender)>::Spawn(rFrame,
+			{
+				.vecPosition = vecSpawnPosition,
+				.vecDirection = vecDirectionToFleet,
+				.alignment = rFrame.postRender.randomAlignment,
+				.eController = ShipController::kRandomSpawn,
+				.orders = orders,
+				.uiFlightPlane = uiWaveFlightPlane,
+			});
+		});
 	}
 }
 
@@ -610,6 +584,11 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 {
 	engine::ForEachBeginRender(GameInterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
+	if constexpr (!kbProfiling)
+	{
+		return;
+	}
+
 	// Population counters: one sum over the cells this transaction renders, published once so a render with no
 	// renderable cell reads zero.
 	int64_t iTotalOmnis = 0;
@@ -629,30 +608,12 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 			iTotalBattleships += it->second.pBattleships->iCount;
 		}
 	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterOmnis).iCount = iTotalOmnis;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterBlastersRendered).iCount = iTotalBlasters;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterFighters).iCount = iTotalFighters;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterBattleships).iCount = iTotalBattleships;
-	}
+	gpProfileManager->GetCpuCounter(kCpuCounterOmnis).iCount = iTotalOmnis;
+	gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
+	gpProfileManager->GetCpuCounter(kCpuCounterBlastersRendered).iCount = iTotalBlasters;
+	gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
+	gpProfileManager->GetCpuCounter(kCpuCounterFighters).iCount = iTotalFighters;
+	gpProfileManager->GetCpuCounter(kCpuCounterBattleships).iCount = iTotalBattleships;
 }
 
 void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)

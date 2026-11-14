@@ -9,8 +9,6 @@ inline constexpr float kfOmniArmor = 25.0f;
 inline constexpr float kfOmniShield = 50.0f;
 inline constexpr float kfOmniShieldRegeneration = 5.0f;
 
-inline constexpr float kfOmniEnergy = 25.0f;
-
 // Arrival grace period: arriving entities are skipped in targeting/behavior scans (not collision)
 inline constexpr std::chrono::duration<float> kArrivalGracePeriod(1.0f);
 
@@ -27,7 +25,6 @@ inline constexpr float kfBattleshipHealth = 300.0f;
 namespace CollisionCategory
 {
 
-inline constexpr uint16_t kuiNone       = 0x0000;
 inline constexpr uint16_t kuiBlaster    = 0x0001;
 inline constexpr uint16_t kuiFighter    = 0x0002;
 inline constexpr uint16_t kuiOmni       = 0x0004;
@@ -40,8 +37,6 @@ inline constexpr uint16_t kuiShips = kuiFighter | kuiOmni | kuiBattleship;
 
 namespace CollidesWith
 {
-
-inline constexpr uint16_t kuiNone = CollisionCategory::kuiNone;
 
 // Alignment filters same-team collisions.
 inline constexpr uint16_t kuiBlaster = CollisionCategory::kuiShips;

@@ -65,7 +65,7 @@ remaining details are the author's recommendations, with rationale.
 2. Increment `MissilesPostRender::kiVersion`
    (`Frame/Collections/Missiles/Missiles.h:114`). The comment on
    `Frame::kiVersion`
-   (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:111-113`) asks for a
+   (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:112-114`) asks for a
    version change on any change that shifts computed frame CRCs, and a replay
    recorded before this change computes a different stored direction after
    an untargeted crossing.

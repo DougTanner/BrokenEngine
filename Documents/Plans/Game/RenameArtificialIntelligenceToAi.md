@@ -49,14 +49,16 @@ one the collection member, the flag, and the header declaration carry. The
 change is identifier text only; no type, parameter order, value, or statement
 changes, so the compiled simulation is unchanged.
 
-Rename set (line numbers as of commit `213d2577`):
+Rename set (line numbers as of commit `213d2577`, except the `TerrainUtils.cpp`
+ones, which are from the commit that last changed this Plan, so locate by
+symbol if they moved):
 
 | Old identifier | New identifier | Sites |
 |---|---|---|
 | `ComputeArtificialIntelligenceSteering` | `ComputeAiSteering` | `TerrainUtils.h:24`, `TerrainUtils.cpp:29`, `ShipBehaviours.cpp:351` (comment), `ShipBehaviours.cpp:775` |
-| `AiSteeringResult::vecArtificialIntelligenceDirection` | `vecAiDirection` | `TerrainUtils.h:19`, `TerrainUtils.cpp:76` (designated initializer) |
-| local `vecArtificialIntelligenceDirection` in the steering function | `vecAiDirection` | `TerrainUtils.cpp:74`, `:76` |
-| local `fElevationArtificialIntelligence` | `fElevationAi` | `TerrainUtils.cpp:50`, `:51` |
+| `AiSteeringResult::vecArtificialIntelligenceDirection` | `vecAiDirection` | `TerrainUtils.h:19`, `TerrainUtils.cpp:73` (designated initializer) |
+| local `vecArtificialIntelligenceDirection` in the steering function | `vecAiDirection` | `TerrainUtils.cpp:71`, `:73` |
+| local `fElevationArtificialIntelligence` | `fElevationAi` | `TerrainUtils.cpp:56`, `:57` |
 | parameter `vecArtificialIntelligenceDirection` of `ShouldRecomputeNavigation` | `vecAiDirection` | `ShipBehaviours.cpp:339`, `:355` |
 | parameter `rVecArtificialIntelligenceDirection` of `RecomputeNavigationPath` | `rVecAiDirection` | `ShipBehaviours.cpp:510`, `:518`, `:522` |
 | parameter `rVecArtificialIntelligenceDirection` of `ComputeNavigation` | `rVecAiDirection` | `ShipBehaviours.cpp:567`, `:598`, `:619`, `:742`, `:769`, `:775`, `:776` |

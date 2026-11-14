@@ -72,7 +72,7 @@ also to allies?
 Allow `uiCollidesWith & uiCategory` on one layer and enumerate the diagonal once
 with `i < j`. Both rows receive the result through the existing routing.
 - Sites: assert `Collision.cpp:316-319`; loop `:322-324`; skip `iOther <= i` in
-  `:678-687`; doc `Frame/AGENTS.md:85-86`; game masks `HealthDamage.h:39-53`;
+  `:678-687`; doc `Frame/AGENTS.md:85-86`; game masks `HealthDamage.h:38-52`;
   own-category handling in each PostCollision. The zone insert (`:352`) already
   inserts only layer B and needs no change.
 - Determinism and CRC: the sort stays total because each pair is unique. The
@@ -92,11 +92,11 @@ Register the collection twice with paired categories X and Y that collide with
 each other. No engine change is needed.
 - Sites: two `AddLayer` calls per type (pattern `FightersCombat.cpp:64-74`), a
   paired category bit for each of the three per-type ship categories in
-  `uint16_t` (`Collision.h:43-44`; five used, `HealthDamage.h:30-34`, ship types
-  `:31-33`), and a layer budget of 16 (`Collision.h:11`).
+  `uint16_t` (`Collision.h:43-44`; five used, `HealthDamage.h:28-32`, ship types
+  `:29-31`), and a layer budget of 16 (`Collision.h:11`).
 - Determinism: deterministic, but (X,i,Y,j) and (X,j,Y,i) both pass, so every
   contact appears twice; the game must read one view, and blasters and missiles
-  must target only X (`HealthDamage.h:44-46`). Only the alignment check drops
+  must target only X (`HealthDamage.h:42-44`). Only the alignment check drops
   the self pair (`Collision.cpp:548`).
 - Cost: double the tests, candidates, and sort length.
 - Risks: high. Duplicate-event discipline is spread across every consumer.
