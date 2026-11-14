@@ -17,16 +17,17 @@ under `Engine/Source/File` were corrected for later changes:
   (`ServerReset`), `Engine/Source/File/Replay.cpp:288`
   (`Replay::ClearReplayAbortState`) and `:552` (replay adoption, right after
   `game::AdoptReplayMetadata`), and
-  `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp:210`.
+  `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp:213`.
 - `engine::ServerSessionBase::ResetForLoad` (public, declared at
   `Engine/Source/Network/Server/ServerSessionBase.h:24`, defined at
   `ServerSessionBase.cpp:285`) has no caller other than `OnStateReplaced`.
 - Game policy already enters the load reset from inside it:
   `ResetForLoad` calls `game::gpServerSession->OnResetForLoad()`
   (`ServerSessionBase.cpp:319`). The wrapper adds no game policy of its own.
-- All five call sites can already reach the target: the two engine files use
-  `game::gpServerSession->` on adjacent lines, and `ServerFrameEdit.cpp`
-  includes `Game.h`, which includes `Network/Server/ServerSession.h`.
+- Four of the five call sites can already reach the target: the two engine
+  files use `game::gpServerSession->` on adjacent lines. `ServerFrameEdit.cpp`
+  no longer includes `Game.h`, so it needs
+  `#include "Network/Server/ServerSession.h"`, which declares `gpServerSession`.
 - Three documents describe the wrapper. `Save/AGENTS.md` `## Replay Contract`,
   the bullet starting "After a successful save load" (lines 47-51), says one
   game entry point runs the engine session load reset and is its sole caller.
@@ -51,10 +52,11 @@ Recommended: call the load reset at the five sites and delete the wrapper.
 
 1. `ServerSaveLoad.cpp:43` and `:61`, `Replay.cpp:288` and `:552`: replace
    `game::OnStateReplaced();` with `game::gpServerSession->ResetForLoad();`.
-2. `ServerFrameEdit.cpp:210`: replace `OnStateReplaced();` with
-   `gpServerSession->ResetForLoad();`. Remove the `Save/GameSaveLoad.h` include
-   at line 15 if nothing else in the file then uses that header; at the
-   baseline the call is the file's only use of it.
+2. `ServerFrameEdit.cpp:213`: replace `OnStateReplaced();` with
+   `gpServerSession->ResetForLoad();` and add
+   `#include "Network/Server/ServerSession.h"`. Remove the
+   `Save/GameSaveLoad.h` include at line 15 if nothing else in the file then
+   uses that header; at the baseline the call is the file's only use of it.
 3. `Save/GameSaveLoad.cpp`: delete the `OnStateReplaced` definition.
 4. `Save/GameSaveLoad.h`: delete the `OnStateReplaced` declaration, and end the
    header comment at lines 10-11 after the per-tick fleet checksums, dropping
@@ -97,6 +99,8 @@ each site keeps its call at the same position, so no ordering changes.
   and 2.
 - The `Save/GameSaveLoad.h` include in `ServerFrameEdit.cpp`, only if unused
   after the change.
+- A `#include "Network/Server/ServerSession.h"` line added to
+  `ServerFrameEdit.cpp`.
 - The header comment above `WriteReplayMetadata` in `Save/GameSaveLoad.h`: its
   "and client resynchronization" tail only.
 - `Save/AGENTS.md` `## Replay Contract`: the "After a successful save load"

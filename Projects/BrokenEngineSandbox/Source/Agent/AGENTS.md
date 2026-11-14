@@ -66,10 +66,11 @@ and orchestration for `inject_payload` and the
   pending replay transition, because no replay records the edit. The command
   adds and removes no row itself; the shared compaction ending the next tick's
   Destroy phase removes a row whose kill state it wrote, with the rows it owns,
-  so `edit_frame` never writes a handle or runs a removal. `edit_frame` and
-  `inject_payload` refuse an edit that would let a fleet Battleship die or leave
-  its fleet, because one never does
-  (`../Frame/Collections/Battleships/AGENTS.md`). Connected clients
+  so `edit_frame` never writes a handle or runs a removal. `edit_frame` refuses
+  an edit that would let a fleet Battleship die or leave its fleet, because one
+  never does (`../Frame/Collections/Battleships/AGENTS.md`); `inject_payload`
+  refuses a `DestroyShip` entry for a fleet Battleship only when it is in the
+  entry's coord's current frame as the command runs. Connected clients
   resynchronize through the Save entry point (`../Save/AGENTS.md`). Command
   contract: `../../Documents/AgentHarness/commands-server.md`.
 - The engine `create_cell` and the game `edit_frame` are the only writers of the

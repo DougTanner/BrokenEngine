@@ -2,10 +2,6 @@
 
 #include "Game.h"
 
-#if defined(BT_CLIENT)
-#include "Profile/ProfileRows.h"
-#endif
-
 namespace game
 {
 
@@ -38,8 +34,6 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 	{
 		throw std::runtime_error("unknown command");
 	}
-#else
-	throw std::runtime_error("unknown command");
 #endif
 }
 

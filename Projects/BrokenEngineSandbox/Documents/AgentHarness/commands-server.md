@@ -70,9 +70,11 @@ adding the fields below; the other entries are its own commands. For the engine
   [`create_cell`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands)
   describes); `iTick` and `fDeltaTime` are named but refused as clock values.
   Collection keys are the C++ member names, verbatim, as listed in
-  `Agent/Commands/ServerFrameEdit.cpp`; `frame` keys are each frame struct's
-  `Values()` entries, in `Engine/Source/Frame/FrameBase.h` and `Frame/Frame.h`;
-  client-only columns are not listed and fail. Edits apply in request order.
+  `Agent/Commands/ServerFrameEdit.cpp` (Pushers:
+  `Engine/Source/Agent/Commands/FrameEdit.h`); `frame` keys are each frame
+  struct's `Values()` entries, in `Engine/Source/Frame/FrameBase.h` and
+  `Frame/Frame.h`; client-only columns are not listed and fail. Edits apply in
+  request order.
   Values by member type: `float` a finite number within the `float` range;
   `std::chrono::duration<float>` a finite number of seconds within the `float`
   range; `engine::SimulationTime` a JSON integer number of nanoseconds within
@@ -105,7 +107,12 @@ adding the fields below; the other entries are its own commands. For the engine
   Positions must stay inside the cell: an out-of-cell omni position transfers to
   one edge neighbour, so a position more than one neighbour step out asserts in
   the source cell's `FramePostRenderBase::PrepareTransferRequest` before any
-  transfer ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
+  transfer ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)). A
+  `pLifecycleFlags` write that sets `LifecycleFlags::kTransfer` (1) is likewise
+  unchecked, apart from a Pushers row, and is valid only on a row whose
+  position is outside the cell: the Transfer phase selects rows by the flag
+  alone, and `PrepareTransferRequest` finds no exit direction for a row inside
+  the cell.
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the

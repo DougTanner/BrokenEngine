@@ -13,7 +13,6 @@
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/FrameCollections.h"
 #include "Save/GameSaveLoad.h"
-#include "Game.h"
 
 namespace game
 {
@@ -76,6 +75,17 @@ static std::pair<decltype(std::tuple_cat(std::declval<FRAME&>().interpolate.Serv
 	return std::pair(std::tuple_cat(rFrame.interpolate.ServerCollections(), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.ServerCollections(), GamePostRenderCollections(rFrame.postRender)));
 }
 
+[[noreturn]] static void ThrowUnknownCollection(std::span<const std::string_view> names)
+{
+	std::string nameList;
+	for (std::string_view name : names)
+	{
+		nameList += name;
+		nameList += '|';
+	}
+	throw std::runtime_error(std::format("'collection' must be {}frame", nameList));
+}
+
 // ApplyEdit, CommandEditFrame, and CommandReadFrame reach collections only through FrameCollections and each
 // FrameCollection specialization's column list, so they name no game collection apart from the fleet Battleship
 // refusals in CommandEditFrame: a future project may want them moved into shared engine code, depending on its
@@ -109,13 +119,7 @@ static int64_t ApplyEdit(Frame& rFrame, const nlohmann::json& rEdit)
 		bool bKnown = ((collection == kNames[INDICES] && (iEdited = engine::WriteRow(typename engine::FrameCollectionAt<Interpolates, INDICES>::Columns {}, std::get<INDICES>(postRenders).iCount, std::get<INDICES>(interpolates), std::get<INDICES>(postRenders), rEdit, collection), true)) || ...);
 		if (!bKnown)
 		{
-			std::string names;
-			for (std::string_view name : kNames)
-			{
-				names += name;
-				names += '|';
-			}
-			throw std::runtime_error(std::format("'collection' must be {}frame", names));
+			ThrowUnknownCollection(kNames);
 		}
 		return iEdited;
 	}(std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<Interpolates>)> {});
@@ -170,8 +174,7 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 			{
 				throw std::runtime_error(std::format("battleships row {} is fleet-controlled and cannot change its pGlobalIds or pClientGuids", i));
 			}
-			bool bIsFleet = rLiveBattleships.pController[i] == ShipController::kFleet || rStagedBattleships.pController[i] == ShipController::kFleet;
-			if (bIsFleet && ((rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDestroy) || (rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)))
+			if (rStagedBattleships.pController[i] == ShipController::kFleet && ((rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDestroy) || (rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)))
 			{
 				throw std::runtime_error(std::format("battleships row {} is fleet-controlled and cannot be destroyed", i));
 			}
@@ -254,13 +257,7 @@ void CommandReadFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 			bool bKnown = ((collection == kNames[INDICES] && (engine::ReadRow(typename engine::FrameCollectionAt<Interpolates, INDICES>::Columns {}, std::get<INDICES>(interpolates), std::get<INDICES>(postRenders), rParameters, collection, rResult), true)) || ...);
 			if (!bKnown)
 			{
-				std::string names;
-				for (std::string_view name : kNames)
-				{
-					names += name;
-					names += '|';
-				}
-				throw std::runtime_error(std::format("'collection' must be {}frame", names));
+				ThrowUnknownCollection(kNames);
 			}
 		}(std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<Interpolates>)> {});
 	}
