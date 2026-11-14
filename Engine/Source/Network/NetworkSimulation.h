@@ -3,19 +3,6 @@
 namespace engine
 {
 
-// Network simulation levels for testing different real-world latency scenarios (East Coast server)
-enum class NetworkSimulationLevel : uint8_t
-{
-	kDisabled,
-	kEastCoast,    // East Coast to East Coast
-	kWestCoast,    // West Coast to East Coast
-	kEurope,       // Europe to East Coast
-	kSouthAmerica, // South America to East Coast
-	kChina,        // China (behind firewall) to East Coast
-};
-
-inline constexpr engine::NetworkSimulationLevel keNetworkSimulation = engine::NetworkSimulationLevel::kDisabled;
-
 struct NetworkSimulationConfig
 {
 	float fPacketLossPercent = 0.0f;

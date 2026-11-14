@@ -82,3 +82,21 @@ inline constexpr LogLevel keLogLevelLoading = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelNavigationData = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelNetwork = keLogLevelDefault;
 inline constexpr LogLevel keLogLevelInput = keLogLevelDefault;
+
+namespace engine
+{
+
+// Network simulation levels for testing different real-world latency scenarios (East Coast server)
+enum class NetworkSimulationLevel : uint8_t
+{
+	kDisabled,
+	kEastCoast,    // East Coast to East Coast
+	kWestCoast,    // West Coast to East Coast
+	kEurope,       // Europe to East Coast
+	kSouthAmerica, // South America to East Coast
+	kChina,        // China (behind firewall) to East Coast
+};
+
+inline constexpr engine::NetworkSimulationLevel keNetworkSimulation = engine::NetworkSimulationLevel::kDisabled;
+
+} // namespace engine
