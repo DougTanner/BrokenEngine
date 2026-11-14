@@ -59,11 +59,9 @@ when that window must be observed or clicked.
   an array of any other size fails with `'coord' must be a [q,r] array`, a
   non-integer value with `'coord' must be an array of 2 integers`, and an
   integer outside that range with
-  `'coord' values must fit in a signed 32-bit integer`. Its one precondition is
-  loaded island templates; without them it fails with
-  `cell_coordinate_probe requires loaded island templates`. Read-only: it
-  generates throwaway static data for the requested cell, reports it, and frees
-  it, changing no live cell, tick, or subscription. Returns
+  `'coord' values must fit in a signed 32-bit integer`. Read-only: it generates
+  throwaway static data for the requested cell, reports it, and frees it,
+  changing no live cell, tick, or subscription. Returns
   `{"coord":[q,r],"area":{"width":float,"height":float},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64,"liveCrc"?:uint64},"islands":[{"crc":uint64,"x":float,"y":float,"rotation":float,"footprint":[x,y],"peak":float},...],"elevation":{"crc":uint64}}`,
   where `area` is the cell hexagon's bounding rectangle, twice `kfCellHalfWidth`
   by twice `kfCellHalfHeight`. Run the same coordinate on the client and on the

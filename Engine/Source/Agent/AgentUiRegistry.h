@@ -90,6 +90,7 @@ private:
 
 	int64_t FindPendingLabel(ImGuiID uiIdentifier) const;
 	void RemovePendingLabel(int64_t iIndex);
+	int64_t FindWriteItem(ImGuiID uiIdentifier) const;
 
 	AgentUiPendingLabel mpPendingLabels[kiMaxPendingLabels];
 	int64_t miPendingLabelCount = 0;

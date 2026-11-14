@@ -254,137 +254,129 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 #if !defined(BT_DEBUG)
 	throw std::runtime_error("audio_streaming_harness_rig requires Debug build");
 #else
+	if (!rParameters.contains("action"))
 	{
-		// Heap: hostile-input validation and the bounded JSON harness rig response
-		ScopedSuppressAllocationTracking suppress;
-		if (!rParameters.contains("action"))
-		{
-			throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
-		}
-		if (!rParameters.at("action").is_string())
-		{
-			throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
-		}
-
-		engine::AudioStreamingHarnessRig& rHarnessRig = *engine::gpAgentCommandServer->mpAudioStreamingHarnessRig;
-		std::string action = rParameters.at("action").get<std::string>();
-		if (action == "play")
-		{
-			RequireAudioStreamingHarnessRigFields(rParameters, {"crc"});
-			if (!rHarnessRig.Play(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc"))))
-			{
-				throw std::runtime_error("audio_streaming_harness_rig play requires a live audio voice");
-			}
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "hold_read")
-		{
-			RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "offset", "length"});
-			if (!rHarnessRig.ArmHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled, ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigInteger(rParameters.at("offset")), ReadAudioStreamingHarnessRigInteger(rParameters.at("length"))))
-			{
-				throw std::runtime_error("audio_streaming_harness_rig hold_read requires an idle hold");
-			}
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "load_chunk")
-		{
-			RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "priority"});
-			rHarnessRig.LoadChunk(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigPriority(rParameters.at("priority")));
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-
-		RequireAudioStreamingHarnessRigFields(rParameters, {});
-		if (action == "inspect")
-		{
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "clear")
-		{
-			rHarnessRig.Clear();
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "suspend")
-		{
-			engine::gpAudioManager->Suspend();
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "resume")
-		{
-			engine::gpAudioManager->Resume();
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "clear_history")
-		{
-			if (rHarnessRig.BeginHistory())
-			{
-				rResult = BuildAudioStreamingHarnessRigSnapshot();
-				return;
-			}
-			engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
-			{
-				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->BeginHistory())
-				{
-					return std::nullopt;
-				}
-				ScopedSuppressAllocationTracking deferredSuppress;
-				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
-				return result;
-			});
-			return;
-		}
-		if (action == "release_read")
-		{
-			rHarnessRig.ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
-			{
-				engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
-				if (snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
-				{
-					return std::nullopt;
-				}
-				if (snapshot.iHeldIndex != 4'294'967'295i64)
-				{
-					return std::nullopt;
-				}
-				ScopedSuppressAllocationTracking deferredSuppress;
-				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
-				return result;
-			});
-			return;
-		}
-		if (action == "stall_loaders")
-		{
-			rHarnessRig.StallLoaders();
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "release_loaders")
-		{
-			rHarnessRig.ReleaseLoaders();
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "stop_publication")
-		{
-			rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped);
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
-		if (action == "resume_publication")
-		{
-			rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped, false);
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
-			return;
-		}
 		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 	}
+	if (!rParameters.at("action").is_string())
+	{
+		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
+	}
+
+	engine::AudioStreamingHarnessRig& rHarnessRig = *engine::gpAgentCommandServer->mpAudioStreamingHarnessRig;
+	std::string action = rParameters.at("action").get<std::string>();
+	if (action == "play")
+	{
+		RequireAudioStreamingHarnessRigFields(rParameters, {"crc"});
+		if (!rHarnessRig.Play(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc"))))
+		{
+			throw std::runtime_error("audio_streaming_harness_rig play requires a live audio voice");
+		}
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "hold_read")
+	{
+		RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "offset", "length"});
+		if (!rHarnessRig.ArmHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled, ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigInteger(rParameters.at("offset")), ReadAudioStreamingHarnessRigInteger(rParameters.at("length"))))
+		{
+			throw std::runtime_error("audio_streaming_harness_rig hold_read requires an idle hold");
+		}
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "load_chunk")
+	{
+		RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "priority"});
+		rHarnessRig.LoadChunk(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigPriority(rParameters.at("priority")));
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+
+	RequireAudioStreamingHarnessRigFields(rParameters, {});
+	if (action == "inspect")
+	{
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "clear")
+	{
+		rHarnessRig.Clear();
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "suspend")
+	{
+		engine::gpAudioManager->Suspend();
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "resume")
+	{
+		engine::gpAudioManager->Resume();
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "clear_history")
+	{
+		if (rHarnessRig.BeginHistory())
+		{
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			return;
+		}
+		engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
+		{
+			if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->BeginHistory())
+			{
+				return std::nullopt;
+			}
+			return BuildAudioStreamingHarnessRigSnapshot();
+		});
+		return;
+	}
+	if (action == "release_read")
+	{
+		rHarnessRig.ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+		engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
+		{
+			engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
+			if (snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
+			{
+				return std::nullopt;
+			}
+			if (snapshot.iHeldIndex != 4'294'967'295i64)
+			{
+				return std::nullopt;
+			}
+			return BuildAudioStreamingHarnessRigSnapshot();
+		});
+		return;
+	}
+	if (action == "stall_loaders")
+	{
+		rHarnessRig.StallLoaders();
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "release_loaders")
+	{
+		rHarnessRig.ReleaseLoaders();
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "stop_publication")
+	{
+		rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped);
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	if (action == "resume_publication")
+	{
+		rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped, false);
+		rResult = BuildAudioStreamingHarnessRigSnapshot();
+		return;
+	}
+	throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 #endif
 }
 

@@ -55,6 +55,10 @@ static uint64_t NextHoldGeneration(uint64_t uiGeneration)
 	return uiGeneration + 1;
 }
 
+static_assert(static_cast<uint8_t>(AudioChunkReadState::kFree) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kFree));
+static_assert(static_cast<uint8_t>(AudioChunkReadState::kQueued) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kQueued));
+static_assert(static_cast<uint8_t>(AudioChunkReadState::kLoading) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kLoading));
+static_assert(static_cast<uint8_t>(AudioChunkReadState::kReady) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kReady));
 static AudioStreamingHarnessRigQueueState ToHarnessRigState(AudioChunkReadState eState)
 {
 	return static_cast<AudioStreamingHarnessRigQueueState>(eState);

@@ -64,7 +64,19 @@ void AgentUiRegistry::RemovePendingLabel(int64_t iIndex)
 	{
 		mpPendingLabels[iIndex] = mpPendingLabels[miPendingLabelCount];
 	}
-	mpPendingLabels[miPendingLabelCount] = {};
+}
+
+int64_t AgentUiRegistry::FindWriteItem(ImGuiID uiIdentifier) const
+{
+	// Search newest records first, so every caller reaches the same record when an identifier repeats in a frame.
+	for (int64_t i = mpiItemCount[miWrite] - 1; i >= 0; --i)
+	{
+		if (mpItems[miWrite][i].uiIdentifier == uiIdentifier)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, std::string_view window, bool bDisabled, bool bVisible)
@@ -100,20 +112,17 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 
 void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int64_t iStatusFlags)
 {
-	// Search newest records first; tabs can emit ItemInfo before their ItemAdd.
-	int64_t iCount = mpiItemCount[miWrite];
-	for (int64_t i = iCount - 1; i >= 0; --i)
+	// Tabs can emit ItemInfo before their ItemAdd, so a miss falls through to the pending labels.
+	int64_t iItem = FindWriteItem(uiIdentifier);
+	if (iItem >= 0)
 	{
-		AgentUiItem& rItem = mpItems[miWrite][i];
-		if (rItem.uiIdentifier == uiIdentifier)
+		AgentUiItem& rItem = mpItems[miWrite][iItem];
+		if (pcLabel != nullptr && pcLabel[0] != '\0')
 		{
-			if (pcLabel != nullptr && pcLabel[0] != '\0')
-			{
-				CopyStringParameter(rItem.pcLabel, pcLabel);
-			}
-			rItem.iStatusFlags |= iStatusFlags;
-			return;
+			CopyStringParameter(rItem.pcLabel, pcLabel);
 		}
+		rItem.iStatusFlags |= iStatusFlags;
+		return;
 	}
 
 	if (pcLabel == nullptr || pcLabel[0] == '\0')
@@ -137,37 +146,31 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, in
 
 void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcFormat, double fValue)
 {
-	int64_t iCount = mpiItemCount[miWrite];
-	for (int64_t i = iCount - 1; i >= 0; --i)
+	int64_t iItem = FindWriteItem(uiIdentifier);
+	if (iItem < 0)
 	{
-		AgentUiItem& rItem = mpItems[miWrite][i];
-		if (rItem.uiIdentifier == uiIdentifier)
-		{
-			std::snprintf(rItem.pcValue, sizeof(rItem.pcValue), pcFormat, fValue);
-			return;
-		}
+		return;
 	}
+	AgentUiItem& rItem = mpItems[miWrite][iItem];
+	std::snprintf(rItem.pcValue, sizeof(rItem.pcValue), pcFormat, fValue);
 }
 
 void AgentUiRegistry::RecordItemChecked(ImGuiID uiIdentifier, bool bChecked)
 {
-	int64_t iCount = mpiItemCount[miWrite];
-	for (int64_t i = iCount - 1; i >= 0; --i)
+	int64_t iItem = FindWriteItem(uiIdentifier);
+	if (iItem < 0)
 	{
-		AgentUiItem& rItem = mpItems[miWrite][i];
-		if (rItem.uiIdentifier == uiIdentifier)
-		{
-			rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checkable);
-			if (bChecked)
-			{
-				rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
-			}
-			else
-			{
-				rItem.iStatusFlags &= ~static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
-			}
-			return;
-		}
+		return;
+	}
+	AgentUiItem& rItem = mpItems[miWrite][iItem];
+	rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checkable);
+	if (bChecked)
+	{
+		rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
+	}
+	else
+	{
+		rItem.iStatusFlags &= ~static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
 	}
 }
 
@@ -197,10 +200,6 @@ void AgentUiRegistry::Swap()
 	// Publish: the write buffer becomes the read buffer; reset the new write buffer's item count for the next frame.
 	std::swap(miWrite, miRead);
 	mpiItemCount[miWrite] = 0;
-	for (int64_t i = 0; i < miPendingLabelCount; ++i)
-	{
-		mpPendingLabels[i] = {};
-	}
 	miPendingLabelCount = 0;
 }
 

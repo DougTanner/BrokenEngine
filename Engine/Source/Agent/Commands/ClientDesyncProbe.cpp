@@ -49,9 +49,6 @@ static int64_t DesynchronizationProbeCountParameter(const nlohmann::json& rParam
 
 void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	// Heap: validation errors, JSON result, and triggerRecovery's serialized Frame snapshot
-	ScopedSuppressAllocationTracking suppress;
-
 	int64_t iKnownParameterCount = static_cast<int64_t>(rParameters.contains("desyncReports")) + static_cast<int64_t>(rParameters.contains("debugFrameRequests")) + static_cast<int64_t>(rParameters.contains("triggerRecovery"));
 	if (std::ssize(rParameters) != iKnownParameterCount)
 	{
@@ -139,7 +136,7 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 	}
 
 	rResult["tick"] = iTick;
-	rResult["coord"] = {coordinate.iQ, coordinate.iR};
+	rResult["coord"] = AgentCoordinateJson(coordinate);
 	rResult["desyncDebugFrames"] = kbDesynchronizationDebugFrames;
 	rResult["stalled"] = game::gpClientSession->mpDesynchronizationCore->IsStalled();
 	rResult["desyncReports"] = iDesynchronizationReportCount;

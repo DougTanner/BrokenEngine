@@ -43,7 +43,8 @@ static const char* LogLevelName(common::LogLevel eLevel)
 		case kWarning: return "Warning";
 		case kError: return "Error";
 	}
-	return "Info";
+	ASSERT(false);
+	std::unreachable();
 }
 
 static common::LogCategory ParseLogCategory(std::string_view name)

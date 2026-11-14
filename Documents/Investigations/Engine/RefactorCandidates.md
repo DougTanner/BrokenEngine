@@ -28,6 +28,22 @@ top of the file. A session reviewing the log removes each row it handles.
   Client::Receive uses; this reverses Fixed decision (1), so it needs the user's
   approval — makes unnecessary: Client.cpp:126-129 size test and the rationale
   comment at Client.cpp:125
+- 2026-11-14 claude/d2a0bc7b-1e0b-4fb0-b1fc-8d003a2e91f6 —
+  Engine/Source/Agent/Commands/AudioStreamingHarnessRig.h:33 — carry
+  `AudioChunkReadState` (Engine/Source/File/PackChunks.h:11) directly in the
+  rig's snapshot, pool-entry, and record types and in `Record`/`RecordEntry`,
+  deleting the mirrored `AudioStreamingHarnessRigQueueState`; the rig header
+  already includes `File/FileManager.h`, and an opaque
+  `enum class AudioChunkReadState : uint8_t;` declaration suffices if
+  `PackChunks.h` must stay out of it — makes unnecessary: the four
+  `static_assert`s and `ToHarnessRigState` at
+  Engine/Source/Agent/Commands/AudioStreamingHarnessRig.cpp:58-65, and the
+  value cast at Engine/Source/File/PackChunks.cpp:700
+- 2026-11-14 claude/d2a0bc7b-1e0b-4fb0-b1fc-8d003a2e91f6 — refactor
+  observation: Engine/Source/Agent/Commands/AgentCommandsAudioStreaming.cpp:267
+  — every synchronous action branch ends with the same snapshot assignment and
+  return — let those branches fall through to one tail assignment, with only
+  the two deferred branches returning early.
 - 2026-11-14 claude/5939deae-ae49-4fa3-8c68-a2981f6a14ef —
   Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.h:125
   — drop NextRouteWaypoint's `rbFinal` out parameter and the snap-and-compare at

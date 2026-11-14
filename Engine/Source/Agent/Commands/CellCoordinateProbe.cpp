@@ -44,14 +44,6 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 #endif
 	GridCoord coordinate = CoordinateFromParameter(rParameters);
 
-	if (gpIslandTerrain == nullptr)
-	{
-		throw std::runtime_error("cell_coordinate_probe requires loaded island templates");
-	}
-
-	// Heap: Production builders generate temporary cell geometry; the probe writes JSON without retaining live state.
-	ScopedSuppressAllocationTracking suppress;
-
 	CellStaticData staticData {.coordinate = coordinate};
 #if defined(BT_SERVER)
 	std::vector<int64_t> graphs;

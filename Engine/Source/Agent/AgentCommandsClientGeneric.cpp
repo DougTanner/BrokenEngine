@@ -10,7 +10,6 @@
 #include "Agent/Commands/PresentationContinuityProbe.h"
 
 #include "Network/Client/ClientSession.h"
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
@@ -1081,9 +1080,6 @@ static void CommandSendRawPacket(const nlohmann::json& rParameters, nlohmann::js
 // adoption path. Schema: {"coord":[q,r]}.
 static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	// Heap: validation errors and JSON result
-	ScopedSuppressAllocationTracking suppress;
-
 	if (rParameters.size() != 1 || !rParameters.contains("coord"))
 	{
 		throw std::runtime_error("set_client_grid_coord accepts only 'coord'");
@@ -1106,16 +1102,13 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	game::gpClientSession->mpRuntime->PinClientGridCoordinate(coordinate);
 	game::gpClientSession->mpRuntime->UpdateDesiredCoordinates("kPollTick");
 
-	rResult["clientGridCoord"] = {coordinate.iQ, coordinate.iR};
+	rResult["clientGridCoord"] = AgentCoordinateJson(coordinate);
 }
 
 // release_client_grid_coord: clear the set_client_grid_coord pin; the cell stays put until the next game writer
 // moves it. Schema: {}.
 static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	// Heap: validation errors and JSON result
-	ScopedSuppressAllocationTracking suppress;
-
 	if (!rParameters.empty())
 	{
 		throw std::runtime_error("release_client_grid_coord accepts no params");
@@ -1123,7 +1116,7 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 
 	game::gpClientSession->mpRuntime->mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned, false);
 
-	rResult["clientGridCoord"] = {game::gpGame->mClientGridCoordinate.iQ, game::gpGame->mClientGridCoordinate.iR};
+	rResult["clientGridCoord"] = AgentCoordinateJson(game::gpGame->mClientGridCoordinate);
 }
 
 const char* UiStateName(UiState eState)

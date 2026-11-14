@@ -99,7 +99,7 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nlohmann:
 	nlohmann::json activeCoordinates = nlohmann::json::array();
 	for (const engine::GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
-		activeCoordinates.push_back({rCoordinate.iQ, rCoordinate.iR});
+		activeCoordinates.push_back(AgentCoordinateJson(rCoordinate));
 	}
 	rResult["activeCoords"] = std::move(activeCoordinates);
 
@@ -254,7 +254,7 @@ static void CommandCreateCell([[maybe_unused]] const nlohmann::json& rParameters
 		}
 		game::gpGame->CreateCellAtCoordinate(coordinate);
 		game::gpGame->mCells.at(coordinate).pCurrent->postRender.uiPinned = 1;
-		rResult["coord"] = nlohmann::json::array({coordinate.iQ, coordinate.iR});
+		rResult["coord"] = AgentCoordinateJson(coordinate);
 	}
 }
 
@@ -368,7 +368,7 @@ static void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::j
 			throw std::runtime_error("replay_drop_retained_end_frame requires a retained terminal frame for 'coord'");
 		}
 
-		rResult["coord"] = {coordinate.iQ, coordinate.iR};
+		rResult["coord"] = AgentCoordinateJson(coordinate);
 		rResult["dropped"] = true;
 	}
 }
@@ -454,7 +454,7 @@ static void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohman
 		rResult["stage"] = std::move(stage);
 		if (bRequiresCoordinate)
 		{
-			rResult["coord"] = {coordinate.iQ, coordinate.iR};
+			rResult["coord"] = AgentCoordinateJson(coordinate);
 		}
 		rResult["armed"] = true;
 	}

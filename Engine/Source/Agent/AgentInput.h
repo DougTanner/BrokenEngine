@@ -103,7 +103,7 @@ private:
 	int64_t miPhaseFrame = 0;
 
 	// Persistent synthetic state read by Overlay() (game-binding sink).
-	bool mpbSyntheticKeys[0xFF] {};
+	bool mpbSyntheticKeys[kiKeyboardKeyCount] {};
 };
 
 inline AgentInput* gpAgentInput = nullptr;

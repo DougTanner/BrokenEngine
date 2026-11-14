@@ -32,10 +32,6 @@ bool AgentInput::BeginScript(const AgentScript& rScript)
 	miPhase = 0;
 	miPhaseFrame = 0;
 	mbResolvedDisabled = false;
-
-	// Clear held synthetic keys so nothing leaks from a prior script; the scroll accumulator is a lifetime accumulator
-	// by design (consumers diff it), so it persists.
-	std::fill(std::begin(mpbSyntheticKeys), std::end(mpbSyntheticKeys), false);
 	return true;
 }
 
@@ -192,10 +188,7 @@ void AgentInput::AdvanceFrame()
 			// Overlay sink only: hold the synthetic VK down for iHoldFrames, then release, driving KeyboardPressed edges.
 			if (miPhase == 0)
 			{
-				if (mScript.iVirtualKey > 0 && mScript.iVirtualKey < static_cast<int32_t>(std::size(mpbSyntheticKeys)))
-				{
-					mpbSyntheticKeys[mScript.iVirtualKey] = true;
-				}
+				mpbSyntheticKeys[mScript.iVirtualKey] = true;
 				miPhase = 1;
 				miPhaseFrame = 0;
 				return;
@@ -204,10 +197,7 @@ void AgentInput::AdvanceFrame()
 			{
 				if (++miPhaseFrame >= mScript.iHoldFrames)
 				{
-					if (mScript.iVirtualKey > 0 && mScript.iVirtualKey < static_cast<int32_t>(std::size(mpbSyntheticKeys)))
-					{
-						mpbSyntheticKeys[mScript.iVirtualKey] = false;
-					}
+					mpbSyntheticKeys[mScript.iVirtualKey] = false;
 					miPhase = 2;
 				}
 				return;
