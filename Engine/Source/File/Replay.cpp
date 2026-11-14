@@ -11,7 +11,6 @@
 #include "GameBase.h"
 
 #include "Network/Server/ServerSession.h"
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
@@ -490,7 +489,7 @@ void Replay::SaveLoadReplay()
 				// Parse the grid into isolated state. Its membership must correlate with the manifest before ResetSession
 				// and adoption, because those operations notify clients and replace the live game state.
 				engine::StagedGridSave stagedGrid;
-				if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("F7.replay.grid"), stagedGrid))
+				if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(ReplayArtifactKind::kGrid, 0, -1), stagedGrid))
 				{
 					LOG(kDefault, kError, "Failed to read replay grid");
 					ReplayHarnessRigs::Reset(*this);
@@ -716,7 +715,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			mPendingReplayReaders.clear();
 			game::gpGame->mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
 
-			bool bGridWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kGrid) && engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.grid"), game::gpGame->mClientGridCoordinate);
+			bool bGridWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kGrid) && engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kGrid, 0, -1), game::gpGame->mClientGridCoordinate);
 			if (!bGridWritten)
 			{
 				LOG(kDefault, kError, "Replay grid write failed; recording not started");

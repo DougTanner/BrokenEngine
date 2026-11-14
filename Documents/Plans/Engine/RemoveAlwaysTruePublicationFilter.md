@@ -17,7 +17,7 @@ free of duplicates. Each push is guarded by a `contains` test:
 `Engine/Source/Network/Server/ServerSessionRuntime.cpp`, and
 `ServerSessionBase::AddOwnedEntityCoordinates`. Or the list is rebuilt from
 the unique keys of the replay reader map:
-`Engine/Source/File/Replay.cpp:557-561` and
+`Engine/Source/File/Replay.cpp:556-560` and
 `GameBase::RefreshReplayActiveSet` (`Engine/Source/GameBase.cpp:1034-1038`).
 So the `std::find` test at `SB:76` is always true, and the loop does what the
 non-replay loop at `SB:67-70` does, with a quadratic scan.

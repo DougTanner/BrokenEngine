@@ -148,9 +148,10 @@ then resimulates against recorded tick checksums.
 - Replay persistence never gates an accepted live transfer: a capture failure
   invalidates recording state instead, and the accepted batch still completes.
 - Replay harness rig controls and observations live in the Agent's Replay-bound
-  slot (`../Agent/AGENTS.md`); writer state and storage are public only for it
-  to select and alter a retained generation. Keep reader state private and
-  replay algorithms here.
+  slot (`../Agent/AGENTS.md`). Writer state and storage are public for two
+  uses: engine and game code may read whether `mReplayWriters` is empty as the
+  is-recording test, and the Agent slot alone selects or alters a retained
+  generation. Keep reader state private and replay algorithms here.
 - Whether playback is running is one engine-owned `GameBase` flag because
   tick-path engine and game code read it every update. Republish it after every
   live or pending reader-set change, including the clears on abort, retirement,

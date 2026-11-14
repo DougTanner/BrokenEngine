@@ -1,8 +1,5 @@
 #include "PackChunks.h"
 
-#include "Profile/ProfileRows.h"
-#include "Game.h"
-
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
 #if defined(BT_DEBUG)
@@ -31,12 +28,6 @@ static constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
 static constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
 {
 	return uiOwnership >> 2;
-}
-
-static uint64_t NextAudioReadGeneration(uint64_t uiGeneration)
-{
-	ASSERT(uiGeneration != (std::numeric_limits<uint64_t>::max() >> 2));
-	return uiGeneration + 1;
 }
 #endif // BT_CLIENT
 
@@ -91,11 +82,10 @@ PackChunks::~PackChunks()
 
 	for (HANDLE& rHandle : mpHandleLazyPackFile)
 	{
-		if (rHandle != nullptr && rHandle != INVALID_HANDLE_VALUE)
+		if (rHandle != nullptr)
 		{
 			CloseHandle(rHandle);
 		}
-		rHandle = nullptr;
 	}
 	for (std::byte* pDecompressScratch : mpDecompressScratches)
 	{
@@ -367,15 +357,16 @@ void PackChunks::LoadPackFiles()
 			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file could not be opened for loading");
 		}
 
-		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0);
+		HANDLE handleReopened = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0);
 		// Trust boundary: a failed reopen leaves no handle to read the headers through; reading them would build
 		// the lazy map from garbage. A required pack is as fatal as a missing manifest.
-		if (handlePackValidation == INVALID_HANDLE_VALUE)
+		if (handleReopened == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file missing or unreadable");
 		}
+		common::ScopedHandle pPackValidation(handleReopened);
 		LARGE_INTEGER packFileSize {};
-		if (GetFileSizeEx(handlePackValidation, &packFileSize) == FALSE)
+		if (GetFileSizeEx(pPackValidation.get(), &packFileSize) == FALSE)
 		{
 			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file size unreadable");
 		}
@@ -391,7 +382,7 @@ void PackChunks::LoadPackFiles()
 			overlapped.Offset = static_cast<DWORD>(rChunkLocation.uiOffset & 0xffffffff);
 			overlapped.OffsetHigh = static_cast<DWORD>(rChunkLocation.uiOffset >> 32);
 			DWORD uiBytesRead = 0;
-			if (ReadFile(handlePackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE)
+			if (ReadFile(pPackValidation.get(), &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE)
 			{
 				int64_t iError = GetLastError();
 				FailMissingRequiredAsset(mpPackFilePaths[i], std::format("chunk header read failed: Windows error {} at offset {}", iError, rChunkLocation.uiOffset));
@@ -418,7 +409,6 @@ void PackChunks::LoadPackFiles()
 				miDecompressScratchSize = iOnDiskSize;
 			}
 		}
-		CloseHandle(handlePackValidation);
 	}
 
 	// The handshake token folds the Islands then the Model location table CRC, each kCrcSeed when its table is empty.
@@ -480,7 +470,6 @@ void PackChunks::LoadPackFiles()
 			}
 			packStream.close();
 
-			iPackFileSize = std::ssize(rPackBytes);
 			for (const common::ChunkLocation& rChunkLocation : mpChunkLocations[i])
 			{
 				if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
@@ -654,7 +643,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			continue;
 		}
 
-		uint64_t uiGeneration = NextAudioReadGeneration(AudioReadGeneration(uiFreeOwnership));
+		uint64_t uiGeneration = AudioReadGeneration(uiFreeOwnership) + 1;
 		rEntry.crc = crc;
 		rEntry.iOffset = iOffset;
 		rEntry.iLength = std::ssize(buffer);
@@ -698,7 +687,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		{
 			break;
 		}
-		uint64_t uiCancelledGeneration = NextAudioReadGeneration(uiRequestGeneration);
+		uint64_t uiCancelledGeneration = uiRequestGeneration + 1;
 		AudioChunkReadState eCancelledState = eState == AudioChunkReadState::kLoading
 			? AudioChunkReadState::kLoading
 			: AudioChunkReadState::kFree;
@@ -773,7 +762,7 @@ void PackChunks::AcknowledgeQueuedAudioReads()
 		uint64_t uiQueuedOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 		while (AudioReadState(uiQueuedOwnership) == AudioChunkReadState::kQueued)
 		{
-			uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, NextAudioReadGeneration(AudioReadGeneration(uiQueuedOwnership)));
+			uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, AudioReadGeneration(uiQueuedOwnership) + 1);
 			if (rEntry.uiOwnership.compare_exchange_weak(uiQueuedOwnership, uiFreeOwnership, std::memory_order_acq_rel))
 			{
 				break;
@@ -889,21 +878,25 @@ MemoryStats PackChunks::GetEagerStatistics() const
 	return statistics;
 }
 
+// No lock: callers iterate a map frozen after boot with iDataSize fixed at construction, and eState is read with
+// acquire against the loaders' release stores. An adopted texture (kReady) has freed its buffer, so counting it
+// would overstate what is held.
+static bool LazyChunkHoldsBuffer(const LazyChunk& rLazyChunk)
+{
+	ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
+	if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
+	{
+		return false;
+	}
+	return eState >= ChunkState::kDiskLoaded;
+}
+
 MemoryStats PackChunks::GetLazyStatistics() const
 {
 	MemoryStats statistics;
-	// No lock: mLazyChunkMap structure is frozen after boot, eState is atomic (acquire), and iDataSize is fixed
-	// at construction. PackChunkLoader::mQueueMutex never guarded these value reads — the lockless writers never take it.
-	// An adopted texture (kReady) has freed its buffer; skip it or the readout overstates what is held.
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
-		if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
-		{
-			continue;
-		}
-
-		if (eState >= ChunkState::kDiskLoaded)
+		if (LazyChunkHoldsBuffer(rLazyChunk))
 		{
 			statistics.iBytes += rLazyChunk.iDataSize;
 			++statistics.iCount;
@@ -928,16 +921,9 @@ MemoryStats PackChunks::GetMemoryStatistics(data::DataTypes eDataType) const
 	}
 	else
 	{
-		// No lock, and adopted textures skipped: see GetLazyStatistics.
 		for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 		{
-			ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
-			if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
-			{
-				continue;
-			}
-
-			if (DataTypeFromFlags(rLazyChunk.header.flags) == eDataType && eState >= ChunkState::kDiskLoaded)
+			if (DataTypeFromFlags(rLazyChunk.header.flags) == eDataType && LazyChunkHoldsBuffer(rLazyChunk))
 			{
 				statistics.iBytes += rLazyChunk.iDataSize;
 				++statistics.iCount;

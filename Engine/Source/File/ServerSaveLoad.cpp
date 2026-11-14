@@ -9,20 +9,23 @@
 #include "GameBase.h"
 
 #include "Network/Server/ServerSession.h"
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
 {
 
+constexpr std::string_view kAutosaveFilename = "ServerAutosave.save";
+
 bool ServerSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 {
+	// Heap: the sorted coord key list, file paths, and grid save file I/O
 	ScopedSuppressAllocationTracking suppress;
 	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoordinate);
 }
 
 bool ServerSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 {
+	// Heap: grid save file I/O, the staged snapshot's frames, and the session reset that follows adoption
 	ScopedSuppressAllocationTracking suppress;
 	gpProfileManager->LatchRawCpuTimers(false);
 
@@ -45,6 +48,7 @@ bool ServerSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 
 void ServerSaveLoad::ServerReset()
 {
+	// Heap: new frame creation and the session reset
 	ScopedSuppressAllocationTracking suppress;
 	gpProfileManager->LatchRawCpuTimers(false);
 
@@ -60,8 +64,9 @@ void ServerSaveLoad::ServerReset()
 
 bool ServerSaveLoad::Autosave()
 {
+	// Heap: the sorted coord key list, file paths, the backup copy, and grid save file I/O
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoordinate);
+	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path(kAutosaveFilename), game::gpGame->mClientGridCoordinate);
 }
 
 void ServerSaveLoad::TickAutosave()
@@ -112,15 +117,16 @@ void ServerSaveLoad::FinalAutosave()
 
 bool ServerSaveLoad::Autoload()
 {
+	// Heap: file paths, grid save file I/O, and the staged snapshot's frames
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"))))
+	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename))))
 	{
 		return false;
 	}
 
 	engine::GridCoord loadedClientGridCoordinate {};
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"), loadedClientGridCoordinate))
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename), loadedClientGridCoordinate))
 	{
 		return false;
 	}

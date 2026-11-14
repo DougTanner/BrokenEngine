@@ -9,14 +9,13 @@
 `game::gpServerSession->ResetForLoad();`. `Documents/C++StyleGuide.txt` rule 49
 forbids a function whose implementation is only one pass-through call.
 
-Verified against commit `4cf9d607`; `GameSaveLoad.cpp` line numbers are one
-lower than at that commit, because the comment above `WriteReplayMetadata` was
-shortened in the change that landed this Plan:
+Verified against commit `4cf9d607`; the line numbers in `GameSaveLoad.cpp` and
+under `Engine/Source/File` were corrected for later changes:
 
 - `OnStateReplaced` has five callers:
-  `Engine/Source/File/ServerSaveLoad.cpp:40` (`ServerLoad`) and `:57`
-  (`ServerReset`), `Engine/Source/File/Replay.cpp:289`
-  (`Replay::ClearReplayAbortState`) and `:553` (replay adoption, right after
+  `Engine/Source/File/ServerSaveLoad.cpp:43` (`ServerLoad`) and `:61`
+  (`ServerReset`), `Engine/Source/File/Replay.cpp:288`
+  (`Replay::ClearReplayAbortState`) and `:552` (replay adoption, right after
   `game::AdoptReplayMetadata`), and
   `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp:210`.
 - `engine::ServerSessionBase::ResetForLoad` (public, declared at
@@ -31,7 +30,7 @@ shortened in the change that landed this Plan:
 - Three documents describe the wrapper. `Save/AGENTS.md` `## Replay Contract`,
   the bullet starting "After a successful save load" (lines 47-51), says one
   game entry point runs the engine session load reset and is its sole caller.
-  `Engine/Source/File/AGENTS.md:170-171` says abort "also runs the game
+  `Engine/Source/File/AGENTS.md:171-172` says abort "also runs the game
   state-replacement hook".
   `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md:72-73` says connected
   clients "resynchronize through the Save entry point (`../Save/AGENTS.md`)".
@@ -50,7 +49,7 @@ code reached by name.
 
 Recommended: call the load reset at the five sites and delete the wrapper.
 
-1. `ServerSaveLoad.cpp:40` and `:57`, `Replay.cpp:289` and `:553`: replace
+1. `ServerSaveLoad.cpp:43` and `:61`, `Replay.cpp:288` and `:552`: replace
    `game::OnStateReplaced();` with `game::gpServerSession->ResetForLoad();`.
 2. `ServerFrameEdit.cpp:210`: replace `OnStateReplaced();` with
    `gpServerSession->ResetForLoad();`. Remove the `Save/GameSaveLoad.h` include
@@ -65,7 +64,7 @@ Recommended: call the load reset at the five sites and delete the wrapper.
    the engine session load reset (`engine::ServerSessionBase::ResetForLoad`),
    which rebuilds client ownership and resynchronizes connected clients; the
    ordering is inside that one function, so every path shares it.
-6. `Engine/Source/File/AGENTS.md:170-171`: reword "Abort also runs the game
+6. `Engine/Source/File/AGENTS.md:171-172`: reword "Abort also runs the game
    state-replacement hook (...)" to say abort also runs the engine session
    load reset, citing `Engine/Source/Network/Server/AGENTS.md` (from that
    file, `../Network/Server/AGENTS.md`) instead of the game Save document.
@@ -112,7 +111,7 @@ each site keeps its call at the same position, so no ordering changes.
 - `ServerSessionBase::ResetForLoad` and `ServerSession::OnResetForLoad`: body,
   signature, and ordering unchanged.
 - Any statement around the five call sites, including the comments at
-  `ServerSaveLoad.cpp:37` and `:54-55` and the `ComputeActiveSet` calls.
+  `ServerSaveLoad.cpp:40` and `:58-59` and the `ComputeActiveSet` calls.
 - Every other function in `Save/GameSaveLoad.cpp` and `.h`, and renaming those
   files.
 - The block comment above `WriteReplayMetadata` in `Save/GameSaveLoad.cpp`.

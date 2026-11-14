@@ -195,9 +195,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 		BackupExistingFile(rFlags, rFilename);
 	}
 
-	// Strip kBackup because the destination was backed up above; enable kStreaming for the temporary-file write.
 	FileFlags_t openFlags = rFlags;
-	openFlags.Set(FileFlags::kBackup, false);
 	openFlags.Set(FileFlags::kStreaming);
 
 	std::filesystem::path temporaryFilename = rFilename;

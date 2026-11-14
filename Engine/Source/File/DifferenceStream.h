@@ -520,13 +520,6 @@ public:
 		return true;
 	}
 
-	bool Update(int64_t iTick, game::FrameInput& rDifference, const game::Frame& rSavedCurrent)
-	{
-		ValidateChecksum(iTick, rSavedCurrent);
-
-		return LoadDifference(iTick, rDifference);
-	}
-
 private:
 
 	enum class ReaderFlags : uint8_t

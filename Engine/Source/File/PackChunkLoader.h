@@ -26,9 +26,9 @@ private:
 
 	void Start();
 	void Stop();
+	void WaitForChunks(std::span<const common::crc_t> crcs);
 public:
 	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority);
-	void WaitForChunks(std::span<const common::crc_t> crcs);
 	// Blocks until no chunk load is queued or running, with every accepted job's terminal state published.
 	// Full graphics recovery calls this before texture-upload teardown so no loader can publish into the reset that
 	// follows. Callers must not enqueue new work afterwards until recovery completes. No separate admission state

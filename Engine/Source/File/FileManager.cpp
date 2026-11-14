@@ -154,11 +154,6 @@ std::fstream FileManager::OpenFile(const FileFlags_t& rFlags, const std::filesys
 	// kWrite must opt into raw streaming via kStreaming; one-shot writes use WriteFileAtomically.
 	ASSERT(!(rFlags & kWrite) || (rFlags & kStreaming));
 
-	if (rFlags & kBackup)
-	{
-		BackupExistingFile(rFlags, rFilename);
-	}
-
 	std::filesystem::path file = GetFilePath(rFlags, rFilename);
 	std::fstream fileStream(file, (rFlags & kRead ? std::ios::in : std::ios::out) | std::ios::binary);
 	LOG(kLoading, kDebug, "{} \"{}\" at \"{}\"", fileStream.is_open() ? (rFlags & kRead ? "Reading" : "Writing") : "Failed to open", rFilename.string(), file.string());
@@ -247,7 +242,6 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 			return false;
 		}
 		int64_t iBytesRead = static_cast<int64_t>(uiBytesRead);
-		ASSERT(iBytesRead <= std::ssize(buffer));
 		hasher.Update(buffer.first(static_cast<size_t>(iBytesRead)));
 		if (iBytesRead == 0)
 		{
