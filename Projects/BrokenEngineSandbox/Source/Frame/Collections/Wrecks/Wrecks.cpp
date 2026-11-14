@@ -32,9 +32,6 @@ constexpr float kfBattleshipExplosionSmoke = 0.5f;
 constexpr float kfBattleshipExplosionDirectionJitter = 0.5f;
 constexpr int64_t kiBattleshipExplosionTrailCount = 5;
 
-// Defined in Battleships.cpp, set during Register().
-extern int64_t giBattleshipExplosionTypeIndex;
-
 void WrecksInterpolate::Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	WrecksInterpolate& rCurrent = *rCurrentFrameInterpolate.pWrecks;

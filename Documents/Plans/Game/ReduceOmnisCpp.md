@@ -31,6 +31,25 @@ The prerequisite in this Plan's metadata edits `OmnisPostRender::Update` in
 the file first, so the run measures and plans against the file as that edit
 leaves it.
 
+Boundary hint for that run only, with line numbers as of commit `629ced2e`,
+from the architecture phase (cohesion lens) of a later deep analysis of
+`Projects/BrokenEngineSandbox/Source/Frame/Collections` (recursive),
+confirmed by an independent verification read. It is evidence for the
+boundary choice, not a work item, and it widens no scope of this Plan:
+
+- Four functions in the shared `Ships/` folder each have exactly one caller,
+  all in `OmnisPostRender::Update`: `AcquireTarget`
+  (`Ships/ShipQueries.cpp:163`, called at `Omnis.cpp:708`),
+  `ApplyAcceleratedMovement` (`:712`), `RegenerateShield` (`:749`), and
+  `ApplyTerrainPush` (`:752`), the last three defined in
+  `Ships/ShipBehaviours.cpp`. `AcceleratedMovementConstants`
+  (`Ships/ShipTypes.h:144`) is instantiated only at `Omnis/Omnis.h:58`. They
+  are Omni-only code a later change may move into the Omnis folder, and
+  moving them into `Omnis.cpp` would work against this reduction, so a new
+  Omnis file this run creates is their likely destination.
+  `Documents/Plans/Game/ReduceShipBehavioursCpp.md` carries the matching
+  hint.
+
 Risk tier: Tier 2 (the author's classification). Trigger: a file split
 restructures one subsystem's translation units and can add a declaration to
 `Omnis.h`, which the game precompiled header includes, more than Tier 1's "no

@@ -251,11 +251,6 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	if (rCurrentInterpolate.iCount == 0)
-	{
-		return;
-	}
-
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]

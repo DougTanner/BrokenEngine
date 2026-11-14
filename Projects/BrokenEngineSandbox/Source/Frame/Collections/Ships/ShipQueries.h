@@ -101,9 +101,6 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellSt
 // unchanged, when none qualifies; ties keep the first row.
 [[nodiscard]] bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryId, XMVECTOR& rVecResult);
 
-// A Battleship row whose orders carry kIsFlagship.
-[[nodiscard]] bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator);
-
 struct ShipUuid
 {
 	ShipType eType {};

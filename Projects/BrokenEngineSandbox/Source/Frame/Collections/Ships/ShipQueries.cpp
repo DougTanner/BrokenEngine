@@ -234,6 +234,11 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellSt
 	}
 }
 
+static bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator)
+{
+	return locator.eType == ShipType::kBattleship && (rPostRender.pBattleships->pOrders[locator.iRow] & ShipOrders::kIsFlagship);
+}
+
 bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryId, XMVECTOR& rVecResult)
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
@@ -254,11 +259,6 @@ bool XM_CALLCONV FindNearestEnemyFlagship(const Frame& rFrame, FXMVECTOR vecFrom
 		}
 	});
 	return bFound;
-}
-
-bool IsFlagship(const FramePostRender& rPostRender, ShipLocator locator)
-{
-	return locator.eType == ShipType::kBattleship && (rPostRender.pBattleships->pOrders[locator.iRow] & ShipOrders::kIsFlagship);
 }
 
 ShipUuid ShipUuidByGlobalId(const Frame& rFrame, engine::GlobalId globalId)

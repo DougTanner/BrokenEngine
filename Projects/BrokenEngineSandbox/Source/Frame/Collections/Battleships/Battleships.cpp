@@ -13,12 +13,12 @@
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
-#include "Ui/ParticleWrappers.h"
-#include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
 #include "Data/Scene.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Ui/LightingWrappers.h"
+#include "Ui/ParticleWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 #endif
 
 namespace engine
@@ -33,8 +33,7 @@ namespace game
 {
 
 #if defined(BT_CLIENT)
-// Shared type indices: Wrecks.cpp reads the explosion type and BattleshipsCombat.cpp the hit flash controller type via extern.
-int64_t giBattleshipExplosionTypeIndex = 0xFF;
+// BattleshipsCombat.cpp reads the hit flash controller type via extern.
 static int64_t siBattleshipHitFlashTypeIndex = 0xFF;
 int64_t giBattleshipHitFlashControllerTypeIndex = 0xFF;
 

@@ -7,7 +7,6 @@
 #include "Ui/WrapperBase.h"
 
 #include "Frame/HealthDamage.h"
-#include "Frame/TerrainUtils.h"
 #if defined(BT_CLIENT)
 #include "Data/Texture.h"
 #include "Frame/Collections/PointLights/PointLights.h"
@@ -200,11 +199,6 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 {
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
-
-	if (rCurrentInterpolate.iCount == 0)
-	{
-		return;
-	}
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{

@@ -13,11 +13,11 @@
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
-#include "Ui/ParticleWrappers.h"
-#include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Ui/LightingWrappers.h"
+#include "Ui/ParticleWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 #endif
 
 namespace engine

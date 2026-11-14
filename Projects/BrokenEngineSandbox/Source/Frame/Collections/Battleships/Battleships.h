@@ -324,6 +324,11 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);
 };
 
+#if defined(BT_CLIENT)
+// Set during Register().
+inline int64_t giBattleshipExplosionTypeIndex = 0xFF;
+#endif
+
 } // namespace game
 
 namespace engine

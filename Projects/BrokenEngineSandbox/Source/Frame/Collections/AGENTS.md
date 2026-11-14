@@ -18,16 +18,20 @@ behavior-specific invariants only.
 - Every ship type receives a fresh one-second arrival grace timer after
   transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival
-  grace, which is an intentional fresh one-second arrival default, each ship's
-  navigation state, which resets to spawn defaults, Fighters' and Battleships'
-  previous-frame reaction flags, which restart from defaults, every ship type's
-  kept attack target, which clears because registry ids are per cell, and
-  client-only
-  shield animation state, which uses canonical client defaults; other fresh
-  gameplay spawn defaults and fresh random draws apply only to genuine spawns.
-  Select between transferred gameplay values and fresh
-  gameplay spawn defaults from an explicit transfer marker, not by testing a
-  carried value for zero or non-positive.
+  grace, which is an intentional fresh one-second arrival default, the Omni
+  transfer lock, which `OmnisPostRender::Transfer` sets fresh
+  (`SpawnInfo::transferLockTimer`), each ship's navigation state, which resets
+  to spawn defaults, every ship type's cell-change timer (`pCellChangeTimers`),
+  which is drawn fresh, Fighters' and Battleships' previous-frame reaction
+  flags, which restart from defaults, every ship type's kept attack target,
+  which clears because registry ids are per cell, and client-only shield
+  animation state, which uses canonical client defaults; other fresh gameplay
+  spawn defaults and every fresh random draw but that cell-change draw
+  (`Ships/AGENTS.md` `## Fleet Navigation Invariants`, "Spawning always
+  consumes its cell-change random draw") apply only to genuine spawns. Select
+  between transferred gameplay values and fresh gameplay spawn defaults from an
+  explicit transfer marker, not by testing a carried value for zero or
+  non-positive.
 - Spawn and Transfer sites validate position and velocity XMVECTORs through
   `common::ValidateVector<IS_POSITION>()`, Transfer sites by way of the shared
   `FramePostRenderBase::PushTransferRequest` (`FrameBase.h`). Cross-cell handoff

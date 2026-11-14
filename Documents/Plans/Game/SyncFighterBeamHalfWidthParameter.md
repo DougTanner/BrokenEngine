@@ -9,9 +9,11 @@ without a root are under
 
 `SyncFighterBeam` is defined in `Fighters/Fighters.cpp:136-152` under
 `BT_CLIENT` and no header declares it. It is declared by hand at
-`Fighters/FightersCombat.cpp:35` and at `Omnis/Omnis.cpp:72`. The second is
-the only hand declaration under `Collections/` that crosses from one
-collection into another.
+`Fighters/FightersCombat.cpp:35` and at `Omnis/Omnis.cpp:72`. The second
+crosses from one collection into another, and it is the only hand declaration
+under `Collections/` that does so: `giBattleshipExplosionTypeIndex`, which
+`Wrecks/Wrecks.cpp` reads, is declared under `BT_CLIENT` in
+`Battleships/Battleships.h`.
 
 It has three callers. `Fighters/Fighters.cpp:349` and
 `Fighters/FightersCombat.cpp:136` pass `giFighterBeamAreaLightTypeIndex`;

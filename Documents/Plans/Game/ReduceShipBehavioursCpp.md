@@ -49,6 +49,25 @@ inspecting this file. None is a finding, a work item, or a reason to split:
   `Documents/Plans/Game/RenameArtificialIntelligenceToAi.md` owns that rename.
   The comment at lines 346-352 holds one over-long line.
 
+Boundary hint for that run only, with line numbers as of commit `629ced2e`,
+from the architecture phase (cohesion lens) of a later deep analysis of
+`Projects/BrokenEngineSandbox/Source/Frame/Collections` (recursive),
+confirmed by an independent verification read. It is evidence for the
+boundary choice, not a work item:
+
+- `ApplyAcceleratedMovement` (line 873), `ApplyTerrainPush` (line 888, with
+  its file-local constants `kfTerrainPushVelocity` and
+  `kfMaximumPushVelocity` at lines 21-22), and `RegenerateShield` (line
+  1046) each have exactly one caller, all in `Omnis/Omnis.cpp` (lines 712,
+  752, 749). Moving them next to their caller is a pure move that changes no
+  operation order, but it takes only about 30 lines out of this file, and
+  `Omnis/Omnis.cpp` is itself oversized
+  (`Documents/Plans/Game/ReduceOmnisCpp.md`), so the destination would be
+  another Omnis file. `ResolveTerrainContact` also has one caller
+  (`Omnis/Omnis.cpp:758`) but stays: it shares the file-static
+  `TerrainContactNavData` and the start-overlap prefix with
+  `ApplyTerrainBounce`.
+
 Risk tier: Tier 2 (the author's classification). Trigger: a file split
 restructures one subsystem's translation units and can add declarations to
 `ShipBehaviours.h`, a header shared across the game, more than Tier 1's "no
