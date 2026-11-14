@@ -4,7 +4,6 @@
 
 #include "File/PackChunks.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 
 namespace engine
 {

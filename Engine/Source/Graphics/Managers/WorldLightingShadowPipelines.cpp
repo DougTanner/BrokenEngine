@@ -159,85 +159,41 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		},
 	});
 
-	mpPipelines[kPipelineShadow].Create(
+	struct ShadowComputePipelineDescription
 	{
-		.name = "Shadow",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowcompCrc)},
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowElevationTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
-		},
-	});
-
-	mpPipelines[kPipelineShadowBlurH].Create(
+		Pipelines ePipeline;
+		std::string_view name;
+		common::crc_t shaderCrc;
+		Texture* pSourceTexture = nullptr;
+		Texture* pTargetTexture = nullptr;
+	};
+	RenderTargetTextures& rTextures = gpTextureManager->mRenderTargetTextures;
+	ShadowComputePipelineDescription pShadowComputePipelineDescriptions[]
 	{
-		.name = "ShadowBlurH",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurHcompCrc)},
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
-		},
-	});
-
-	mpPipelines[kPipelineShadowBlurV].Create(
+		{.ePipeline = kPipelineShadow, .name = "Shadow", .shaderCrc = data::kShadersShadowShadowcompCrc, .pSourceTexture = &rTextures.mShadowElevationTexture, .pTargetTexture = &rTextures.mShadowTexture},
+		{.ePipeline = kPipelineShadowBlurH, .name = "ShadowBlurH", .shaderCrc = data::kShadersShadowShadowBlurHcompCrc, .pSourceTexture = &rTextures.mShadowTexture, .pTargetTexture = &rTextures.mShadowBlurIntermediateTexture},
+		{.ePipeline = kPipelineShadowBlurV, .name = "ShadowBlurV", .shaderCrc = data::kShadersShadowShadowBlurVcompCrc, .pSourceTexture = &rTextures.mShadowBlurIntermediateTexture, .pTargetTexture = &rTextures.mShadowBlurTexture},
+		{.ePipeline = kPipelineObjectShadowsBlurH, .name = "ObjectShadowsBlurH", .shaderCrc = data::kShadersShadowObjectShadowsBlurHcompCrc, .pSourceTexture = &rTextures.mObjectShadowsTexture, .pTargetTexture = &rTextures.mObjectShadowsBlurIntermediateTexture},
+		{.ePipeline = kPipelineObjectShadowsBlurV, .name = "ObjectShadowsBlurV", .shaderCrc = data::kShadersShadowObjectShadowsBlurVcompCrc, .pSourceTexture = &rTextures.mObjectShadowsBlurIntermediateTexture, .pTargetTexture = &rTextures.mObjectShadowsBlurTexture},
+		// Temporal accumulation: gather the reprojected last-refresh shadow and blend it in place into
+		// mShadowBlurTexture. ShadowHistoryCopy then refreshes the distinct history image over the final window.
+		{.ePipeline = kPipelineShadowTemporal, .name = "ShadowTemporal", .shaderCrc = data::kShadersShadowShadowTemporalcompCrc, .pSourceTexture = &rTextures.mShadowHistoryTexture, .pTargetTexture = &rTextures.mShadowBlurTexture},
+	};
+	for (const ShadowComputePipelineDescription& rDescription : pShadowComputePipelineDescriptions)
 	{
-		.name = "ShadowBlurV",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurVcompCrc)},
-		.descriptorInfos =
+		mpPipelines[rDescription.ePipeline].Create(
 		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
-		},
-	});
-
-	mpPipelines[kPipelineObjectShadowsBlurH].Create(
-	{
-		.name = "ObjectShadowsBlurH",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurHcompCrc)},
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
-		},
-	});
-
-	mpPipelines[kPipelineObjectShadowsBlurV].Create(
-	{
-		.name = "ObjectShadowsBlurV",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurVcompCrc)},
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
-		},
-	});
-
-	// Temporal accumulation: gather the reprojected last-refresh shadow and blend it in place into
-	// mShadowBlurTexture. ShadowHistoryCopy then refreshes the distinct history image over the final window.
-	mpPipelines[kPipelineShadowTemporal].Create(
-	{
-		.name = "ShadowTemporal",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowTemporalcompCrc)},
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
-			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
-		},
-	});
+			.name = rDescription.name,
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+			.ppShaders = {&mrShaders.at(rDescription.shaderCrc)},
+			.descriptorInfos =
+			{
+				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = rDescription.pSourceTexture},
+				{.flags = DescriptorFlags::kStorageImages, .pTexture = rDescription.pTargetTexture},
+			},
+		});
+	}
 
 	mpPipelines[kPipelineShadowHistoryCopy].Create(
 	{

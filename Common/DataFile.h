@@ -230,6 +230,9 @@ struct MeshData
 	uint32_t uiJointMatrixOffset = 0;        // Index into joint matrix buffer
 };
 static_assert(MeshData::kiMaxMeshes >= 2 * SceneHeader::kiMaxMaterials, "MeshData::kiMaxMeshes must cover 2x SceneHeader::kiMaxMaterials");
+static_assert(sizeof(MeshData) == 120, "MeshData layout changed — update the GLSL MeshData in Shaders/Model/ModelCommon.h to match");
+static_assert(BT_OFFSETOF(MeshData, uiJointCount) == 112, "MeshData padding changed — uiJointCount no longer at offset 112");
+static_assert(BT_OFFSETOF(MeshData, uiJointMatrixOffset) == 116, "MeshData padding changed — uiJointMatrixOffset no longer at offset 116");
 
 // A joint matrix stores three vec4s (48 bytes); pf4Rows[i].xyz is rotation row i and pf4Rows[i].w is its
 // translation component.
@@ -237,6 +240,7 @@ struct JointMatrix
 {
 	XMFLOAT4 pf4Rows[3] {};
 };
+static_assert(sizeof(JointMatrix) == 48, "JointMatrix layout changed — update the GLSL JointMatrix in Shaders/Model/ModelCommon.h to match");
 
 inline constexpr int64_t kiInitialJointMatrixCapacity = 8'192;  // Room for multiple skinned model instances
 

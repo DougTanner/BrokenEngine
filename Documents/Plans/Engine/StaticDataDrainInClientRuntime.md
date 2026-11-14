@@ -150,3 +150,7 @@ No Plan below depends on this one, and it depends on none.
 - `Documents/Plans/Engine/ReduceClientSessionRuntimeCpp.md` may move
   `PollAndDrain` and the drains to another file. Whichever lands second
   re-derives its regions by symbol from the landed file.
+- `Documents/Plans/Engine/ReduceTextureManagerCpp.md` may move the comment
+  at `Engine/Source/Graphics/Managers/TextureManager.cpp:208` to another
+  file. Whichever lands second finds the comment by its text in the landed
+  files.

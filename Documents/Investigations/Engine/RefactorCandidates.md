@@ -19,6 +19,21 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-14 claude/179efbf3-916e-4701-9a2c-e96ffd751f75 —
+  Engine/Source/Graphics/Managers/DeviceManager.cpp:400 — drop the
+  std::filesystem::exists pre-check and its filesystem_error catch and let the
+  OpenFile is_open test be the only absent-or-unopenable rejection; the return
+  value is identical and the only difference is that a first launch with no
+  cache logs the kDebug "Discarded unreadable pipeline cache" line; needs a
+  user decision because the Plan fixes exists in its present form — makes
+  unnecessary: Engine/Source/Graphics/Managers/DeviceManager.cpp:400-411
+- 2026-11-14 claude/179efbf3-916e-4701-9a2c-e96ffd751f75 —
+  Engine/Source/Graphics/Managers/DeviceManager.cpp:434 — let the read's
+  gcount/stream test at :443 answer a failed seek to the beginning: a failed
+  seekg sets failbit, the read then extracts nothing, and the same log text and
+  empty return follow; needs a user decision because the Plan keeps one return
+  per existing check — makes unnecessary:
+  Engine/Source/Graphics/Managers/DeviceManager.cpp:434-439
 - 2026-11-14 claude/79a8b3b8-5c7c-4714-9b08-ff5184e4c1b7 —
   Engine/Source/Network/Client/Client.cpp:126 — treat a short or undecodable
   delayed connection response as the fatal corrupt-server-data case that

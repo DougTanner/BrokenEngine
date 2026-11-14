@@ -8,9 +8,6 @@
 #include "Ui/LightingWrappersBase.h"
 #include "CommandBufferManager.h"
 
-#include "Profile/ProfileRows.h"
-#include "Game.h"
-
 namespace engine
 {
 
@@ -56,7 +53,7 @@ void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerMain);
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerImage);
-	RecordImageRenderPass(vkCommandBuffer, iCommandBuffer, iFramebuffer);
+	RecordImageRenderPass(vkCommandBuffer, iCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerImage);
 
 	CHECK_VK(vkEndCommandBuffer(vkCommandBuffer));
@@ -182,36 +179,28 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 	// Phase 3: Temporal accumulation reprojects + EMA-blends the previous history into the 4 combine outputs in place,
 	// then the history-copy compute pipeline publishes the blended result into distinct history images.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
+	auto TransitionCombineAndHistory = [&](int64_t iLayer, TextureLayout eCombineNewLayout, TextureLayout eHistoryOldLayout, TextureLayout eHistoryNewLayout)
+	{
+		for (int64_t j = 0; j < static_cast<int64_t>(std::size(rRenderTargetTextures.mpCombineTextures[iLayer])); ++j)
+		{
+			rRenderTargetTextures.mpCombineTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
+			rRenderTargetTextures.mpLightingHistoryTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
+		}
+		rRenderTargetTextures.mpAmbientCombineTextures[iLayer].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
+		rRenderTargetTextures.mpAmbientHistoryTextures[iLayer].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
+	};
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
-		}
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
+		TransitionCombineAndHistory(i, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
 
 		gpPipelineManager->mpLightingTemporalPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
 		// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
 		// preserve temporal's no-sampled/output-alias contract.
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
-		}
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
+		TransitionCombineAndHistory(i, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
 		gpPipelineManager->mpLightingHistoryCopyPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
-		for (int64_t j = 0; j < 3; ++j)
-		{
-			rRenderTargetTextures.mpCombineTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-			rRenderTargetTextures.mpLightingHistoryTextures[i][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-		}
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
-		rRenderTargetTextures.mpAmbientHistoryTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		TransitionCombineAndHistory(i, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	}
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
 
@@ -294,7 +283,7 @@ void CommandBufferRecordMain::RecordObjectShadows(VkCommandBuffer vkCommandBuffe
 {
 	// Object-shadow commands stay fixed across the continuous day cycle, which has no explicit feature toggle; their cost is low.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadows);
-	Texture::RecordBeginRenderPass(vkCommandBuffer, gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass, gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkFramebuffer, {.width = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.vkExtent3D.width, .height = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.vkExtent3D.height}, gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.vkRenderPassClearColorValue, RenderPassFlags_t {RenderPassFlags::kClear});
+	gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.RecordBeginRenderPass(vkCommandBuffer);
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModelShadow])
 	{
 		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 2.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
@@ -421,7 +410,7 @@ void CommandBufferRecordMain::RecordWaterFoam(VkCommandBuffer vkCommandBuffer, i
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoam);
 }
 
-void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iFramebuffer)
+void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
 {
 	Pipeline* pPipelines = gpPipelineManager->mpPipelines;
 	{
@@ -439,9 +428,9 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 	{
 		Pipeline& rUiPrepass = pPipelines[kPipelineUiDepthPrepass];
 		vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipeline);
-		VkDescriptorSet pVkUiPrepassSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iFramebuffer), rUiPrepass.mVkDescriptorSets.at(iFramebuffer)};
+		VkDescriptorSet pVkUiPrepassSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iCommandBuffer), rUiPrepass.mVkDescriptorSets.at(iCommandBuffer)};
 		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipelineLayout, 0, 2, pVkUiPrepassSets, 0, nullptr);
-		vkCmdDrawIndirect(vkCommandBuffer, gpImGuiManager->mUiPrepassIndirectVkBuffer, static_cast<VkDeviceSize>(iFramebuffer) * sizeof(VkDrawIndirectCommand), 1, sizeof(VkDrawIndirectCommand));
+		vkCmdDrawIndirect(vkCommandBuffer, gpImGuiManager->mUiPrepassIndirectVkBuffer, static_cast<VkDeviceSize>(iCommandBuffer) * sizeof(VkDrawIndirectCommand), 1, sizeof(VkDrawIndirectCommand));
 	};
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
 	RecordUiDepth();
@@ -486,7 +475,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, &gpIslands->mIslandMeshArena.mDeviceLocalVkBuffer, &vkVertexOffset);
 		for (int64_t i = 0; i < gpIslands->miTemplateCount; ++i)
 		{
-			vkCmdDrawIndexedIndirect(vkCommandBuffer, gpIslands->mIslandsIndirectVkBuffers.at(iFramebuffer), static_cast<VkDeviceSize>(i) * sizeof(VkDrawIndexedIndirectCommand), 1, sizeof(VkDrawIndexedIndirectCommand));
+			vkCmdDrawIndexedIndirect(vkCommandBuffer, gpIslands->mIslandsIndirectVkBuffers.at(iCommandBuffer), static_cast<VkDeviceSize>(i) * sizeof(VkDrawIndexedIndirectCommand), 1, sizeof(VkDrawIndexedIndirectCommand));
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrain);
 

@@ -19,7 +19,7 @@ private:
 	static void RecordObjectShadowsBlur(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer);
 	static void RecordWaterDisplacement(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer);
 	static void RecordWaterFoam(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer);
-	static void RecordImageRenderPass(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iFramebuffer);
+	static void RecordImageRenderPass(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer);
 };
 
 } // namespace engine

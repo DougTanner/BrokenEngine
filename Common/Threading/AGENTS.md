@@ -22,9 +22,11 @@ same pool.
 
 `PersistentWorker` is a long-lived single worker for subsystems that need
 explicit wake/wait control. Its caller contract is one `Wake` followed by
-`Wait`, with `Wait` completed before the next wake and before destruction. Calls
-come from one controlling thread. The type is neither copyable nor movable
-because its worker captures the owning object.
+`Wait`, with `Wait` completed before the next wake and before destruction. The
+calls on one worker are serialized, never concurrent: they come from one
+controlling thread, or from different threads that another wake/wait edge
+orders. The type is neither copyable nor movable because its worker captures
+the owning object.
 
 Every `PersistentWorker` thread runs at `THREAD_PRIORITY_TIME_CRITICAL`, above
 ordinary application threads. It is therefore not a host for background or

@@ -70,8 +70,7 @@ PipelineManager::PipelineManager()
 			.pVkVertexAttributes = reinterpret_cast<const VkVertexInputAttributeDescription*>(rChunk.pData + iAttributesOffset),
 			.iSpirvSize = rChunk.pHeader->iSize - iSpirvOffset,
 		};
-		auto [it, bInserted] = mShaders.try_emplace(rCrc, info, rChunk.pData + iSpirvOffset);
-		ASSERT(bInserted);
+		mShaders.try_emplace(rCrc, info, rChunk.pData + iSpirvOffset);
 	}
 
 	// Generate BRDF LUT texture before creating model pipelines that reference it
@@ -231,7 +230,6 @@ void PipelineManager::CreateSmokeWindPipelines()
 		std::string_view name;
 		common::crc_t shaderCrc;
 		VkBuffer* pVkSourceOccupancyBuffer = nullptr;
-		VkBuffer* pVkActiveTileBuffer = nullptr;
 		VkBuffer* pVkDestinationOccupancyBuffer = nullptr;
 	};
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
@@ -239,8 +237,8 @@ void PipelineManager::CreateSmokeWindPipelines()
 		VkBuffer* pVkOccupancyBuffers = gpBufferManager->mpSmokeOccupancyVkBuffers[i];
 		SmokeOccupancyPipelineDescription pSmokeOccupancyPipelineDescriptions[]
 		{
-			{.eKind = kSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[0], .pVkActiveTileBuffer = &gpBufferManager->mSmokeActiveTileVkBuffer, .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[1]},
-			{.eKind = kSmokeOccupancyDilateRemap, .name = "SmokeOccupancyDilateRemap", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilateRemapcompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[1], .pVkActiveTileBuffer = &gpBufferManager->mSmokeActiveTileVkBuffer, .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[0]},
+			{.eKind = kSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[0], .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[1]},
+			{.eKind = kSmokeOccupancyDilateRemap, .name = "SmokeOccupancyDilateRemap", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilateRemapcompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[1], .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[0]},
 		};
 		// The remap dilate reads its plane index from push constant x for the plane's area pair; the plain dilate shares
 		// this description, declares no push-constant block, and ignores it.
@@ -255,7 +253,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 				{
 					{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkSourceOccupancyBuffer},
-					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkActiveTileBuffer},
+					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = &gpBufferManager->mSmokeActiveTileVkBuffer},
 					{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = rDescription.pVkDestinationOccupancyBuffer},
 				},
 			});

@@ -353,26 +353,24 @@ DeviceManager::~DeviceManager()
 	if constexpr (kbVulkanPipelineCache)
 	{
 		size_t uiDataSize = 0;
+		std::vector<uint8_t> cacheData;
 		VkResult vkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, nullptr);
 		if (vkResult == VK_SUCCESS)
 		{
-			std::vector<uint8_t> cacheData(uiDataSize);
+			cacheData.resize(uiDataSize);
 			vkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, cacheData.data());
-			if (vkResult == VK_SUCCESS)
+		}
+
+		if (vkResult == VK_SUCCESS)
+		{
+			common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data(), uiDataSize));
+			if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
 			{
-				common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data(), uiDataSize));
-				if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
-				{
-					rStream.write(reinterpret_cast<const char*>(&uiCrc), static_cast<std::streamsize>(sizeof(uiCrc)));
-					rStream.write(reinterpret_cast<const char*>(cacheData.data()), static_cast<std::streamsize>(uiDataSize));
-				}))
-				{
-					LOG(kGraphics, kDebug, "Saved pipeline cache ({} bytes)", uiDataSize);
-				}
-			}
-			else
+				rStream.write(reinterpret_cast<const char*>(&uiCrc), static_cast<std::streamsize>(sizeof(uiCrc)));
+				rStream.write(reinterpret_cast<const char*>(cacheData.data()), static_cast<std::streamsize>(uiDataSize));
+			}))
 			{
-				LOG(kGraphics, kWarning, "Skipping pipeline cache save: vkGetPipelineCacheData returned {}", string_VkResult(vkResult));
+				LOG(kGraphics, kDebug, "Saved pipeline cache ({} bytes)", uiDataSize);
 			}
 		}
 		else
@@ -394,10 +392,90 @@ DeviceManager::~DeviceManager()
 	vkDestroyDevice(mVkDevice, nullptr);
 }
 
-void DeviceManager::LoadPipelineCache()
+// Returns the whole accepted file, the stored CRC followed by the driver's cache data, or empty when absent or rejected
+static std::vector<uint8_t> ReadPipelineCacheFile()
 {
 	static constexpr int64_t kiMaxPipelineCacheBytes = 64 * 1'024 * 1'024;
 
+	try
+	{
+		if (!std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, "pipeline.cache")))
+		{
+			return {};
+		}
+	}
+	catch (const std::filesystem::filesystem_error&)
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
+		return {};
+	}
+
+	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, "pipeline.cache");
+	if (!fileStream.is_open())
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
+		return {};
+	}
+
+	fileStream.seekg(0, std::ios::end);
+	int64_t iSize = fileStream.tellg();
+	if (!fileStream || iSize < 0)
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
+		return {};
+	}
+
+	if (iSize < static_cast<int64_t>(sizeof(common::crc_t) + sizeof(VkPipelineCacheHeaderVersionOne)) || iSize > kiMaxPipelineCacheBytes)
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+		return {};
+	}
+
+	fileStream.seekg(0, std::ios::beg);
+	if (!fileStream)
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+		return {};
+	}
+
+	std::vector<uint8_t> cacheData(static_cast<size_t>(iSize));
+	fileStream.read(reinterpret_cast<char*>(cacheData.data()), static_cast<std::streamsize>(iSize));
+	if (fileStream.gcount() != static_cast<std::streamsize>(iSize) || !fileStream)
+	{
+		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
+		return {};
+	}
+
+	common::crc_t uiStoredCrc = 0;
+	std::memcpy(&uiStoredCrc, cacheData.data(), sizeof(uiStoredCrc));
+	common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data() + sizeof(uiStoredCrc), static_cast<size_t>(iSize) - sizeof(uiStoredCrc)));
+	if (uiCrc != uiStoredCrc)
+	{
+		LOG(kGraphics, kDebug, "Discarded pipeline cache with CRC mismatch ({} bytes)", iSize);
+		return {};
+	}
+
+	// Pre-validate header — NVIDIA logs a warning instead of silently discarding incompatible entries
+	VkPipelineCacheHeaderVersionOne vkPipelineCacheHeader {};
+	std::memcpy(&vkPipelineCacheHeader, cacheData.data() + sizeof(uiStoredCrc), sizeof(vkPipelineCacheHeader));
+	const VkPhysicalDeviceProperties& rVkPhysicalDeviceProperties = gpInstanceManager->mVkPhysicalDeviceProperties;
+	bool bCompatible = vkPipelineCacheHeader.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
+	                && vkPipelineCacheHeader.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+	                && vkPipelineCacheHeader.vendorID == rVkPhysicalDeviceProperties.vendorID
+	                && vkPipelineCacheHeader.deviceID == rVkPhysicalDeviceProperties.deviceID
+	                && std::memcmp(vkPipelineCacheHeader.pipelineCacheUUID, rVkPhysicalDeviceProperties.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+	if (!bCompatible)
+	{
+		LOG(kGraphics, kDebug, "Discarded incompatible pipeline cache ({} bytes)", iSize);
+		return {};
+	}
+
+	LOG(kGraphics, kDebug, "Loaded pipeline cache ({} bytes)", iSize);
+	return cacheData;
+}
+
+void DeviceManager::LoadPipelineCache()
+{
 	if constexpr (kbVulkanPipelineCache)
 	{
 		VkPipelineCacheCreateInfo vkPipelineCacheCreateInfo
@@ -408,87 +486,11 @@ void DeviceManager::LoadPipelineCache()
 			.initialDataSize = 0,
 			.pInitialData = nullptr,
 		};
-		std::vector<uint8_t> cacheData;
-		bool bFileExists = false;
-		try
+		std::vector<uint8_t> cacheData = ReadPipelineCacheFile();
+		if (!cacheData.empty())
 		{
-			bFileExists = std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, "pipeline.cache"));
-		}
-		catch (const std::filesystem::filesystem_error&)
-		{
-			LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
-		}
-
-		if (bFileExists)
-		{
-			std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, "pipeline.cache");
-			if (!fileStream.is_open())
-			{
-				LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
-			}
-			else
-			{
-				fileStream.seekg(0, std::ios::end);
-				int64_t iSize = fileStream.tellg();
-				if (!fileStream || iSize < 0)
-				{
-					LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");
-				}
-				else if (iSize < static_cast<int64_t>(sizeof(common::crc_t) + sizeof(VkPipelineCacheHeaderVersionOne)) || iSize > kiMaxPipelineCacheBytes)
-				{
-					LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
-				}
-				else
-				{
-					fileStream.seekg(0, std::ios::beg);
-					if (!fileStream)
-					{
-						LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
-					}
-					else
-					{
-						cacheData.resize(static_cast<size_t>(iSize));
-						fileStream.read(reinterpret_cast<char*>(cacheData.data()), static_cast<std::streamsize>(iSize));
-						if (fileStream.gcount() != static_cast<std::streamsize>(iSize) || !fileStream)
-						{
-							LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
-						}
-						else
-						{
-							common::crc_t uiStoredCrc = 0;
-							std::memcpy(&uiStoredCrc, cacheData.data(), sizeof(uiStoredCrc));
-							common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data() + sizeof(uiStoredCrc), static_cast<size_t>(iSize) - sizeof(uiStoredCrc)));
-							if (uiCrc != uiStoredCrc)
-							{
-								LOG(kGraphics, kDebug, "Discarded pipeline cache with CRC mismatch ({} bytes)", iSize);
-							}
-							else
-							{
-								// Pre-validate header — NVIDIA logs a warning instead of silently discarding incompatible entries
-								VkPipelineCacheHeaderVersionOne vkPipelineCacheHeader {};
-								std::memcpy(&vkPipelineCacheHeader, cacheData.data() + sizeof(uiStoredCrc), sizeof(vkPipelineCacheHeader));
-								const VkPhysicalDeviceProperties& rVkPhysicalDeviceProperties = gpInstanceManager->mVkPhysicalDeviceProperties;
-								bool bCompatible = vkPipelineCacheHeader.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
-								                && vkPipelineCacheHeader.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
-								                && vkPipelineCacheHeader.vendorID == rVkPhysicalDeviceProperties.vendorID
-								                && vkPipelineCacheHeader.deviceID == rVkPhysicalDeviceProperties.deviceID
-								                && std::memcmp(vkPipelineCacheHeader.pipelineCacheUUID, rVkPhysicalDeviceProperties.pipelineCacheUUID, VK_UUID_SIZE) == 0;
-
-								if (bCompatible)
-								{
-									vkPipelineCacheCreateInfo.initialDataSize = static_cast<size_t>(std::ssize(cacheData) - static_cast<int64_t>(sizeof(uiStoredCrc)));
-									vkPipelineCacheCreateInfo.pInitialData = cacheData.data() + sizeof(uiStoredCrc);
-									LOG(kGraphics, kDebug, "Loaded pipeline cache ({} bytes)", iSize);
-								}
-								else
-								{
-									LOG(kGraphics, kDebug, "Discarded incompatible pipeline cache ({} bytes)", iSize);
-								}
-							}
-						}
-					}
-				}
-			}
+			vkPipelineCacheCreateInfo.initialDataSize = static_cast<size_t>(std::ssize(cacheData) - static_cast<int64_t>(sizeof(common::crc_t)));
+			vkPipelineCacheCreateInfo.pInitialData = cacheData.data() + sizeof(common::crc_t);
 		}
 		CHECK_VK(vkCreatePipelineCache(mVkDevice, &vkPipelineCacheCreateInfo, nullptr, &mVkPipelineCache));
 	}
@@ -518,8 +520,6 @@ void DeviceManager::ProbeTransferQueueOwnershipTransfer(bool bMaintenance9Availa
 
 	int64_t iTransferFamily = gpInstanceManager->miTransferQueueFamilyIndex;
 	uint32_t uiGraphicsFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
-	// Both indices must identify valid queue families; InstanceManager falls back to the graphics family when no transfer family is available.
-	ASSERT(iTransferFamily < uiQueueFamilyCount && uiGraphicsFamily < uiQueueFamilyCount);
 	uint32_t uiOptimalMask = queueFamilyOwnershipTransferProperties.at(iTransferFamily).optimalImageTransferToQueueFamilies;
 	mCapabilities.Set(DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional, (uiOptimalMask & (1ui32 << uiGraphicsFamily)) != 0);
 	LOG(kGraphics, kDebug, "Transfer->Graphics QFOT optional: {} (transfer family {} optimal mask {}, graphics family {})", static_cast<bool>(mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional), iTransferFamily, uiOptimalMask, uiGraphicsFamily);

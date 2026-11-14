@@ -4,8 +4,6 @@
 
 #include "CommandBufferManager.h"
 
-#include "Profile/ProfileRows.h"
-
 namespace engine
 {
 
@@ -39,13 +37,8 @@ void CommandBufferRecordGlobal::Record(int64_t iFramebuffer)
 
 	RecordTerrainPasses(vkCommandBuffer, iCommandBuffer, pPipelines);
 
-	int64_t iWindWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
-	int64_t iWindHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
-	int64_t iWindTilesX = TileCount(iWindWidth);
-	int64_t iWindTilesY = TileCount(iWindHeight);
-
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSpread);
-	RecordWindSpreadPipeline(vkCommandBuffer, iCommandBuffer, iWindTilesX, iWindTilesY, pPipelines);
+	RecordWindSpreadPipeline(vkCommandBuffer, iCommandBuffer, pPipelines);
 	RecordSmokeSpreadPipeline(vkCommandBuffer, iCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSpread);
 
@@ -110,12 +103,10 @@ void CommandBufferRecordGlobal::RecordTerrainPasses(VkCommandBuffer vkCommandBuf
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrainElevation);
 }
 
-void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iWindTilesX, int64_t iWindTilesY, Pipeline* pPipelines)
+void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, Pipeline* pPipelines)
 {
 	// Persistent spread state must drain and advance and has no simple disabled-state latch, so disabled-state recording stays fixed.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWindSpread);
-
-	int64_t iWindDilateGroups = (iWindTilesX * iWindTilesY + shaders::kiOccupancyDilateGroupSize - 1) / shaders::kiOccupancyDilateGroupSize;
 
 	uint32_t pWindResetCommand[3] {0, 1, 1};
 	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mpWindActiveTileVkBuffers[0], 0, sizeof(pWindResetCommand), pWindResetCommand);
@@ -150,6 +141,8 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindActiveTileResetBarriers)), pVkWindActiveTileResetBarriers, 0, nullptr);
 
 	// Both dilates (read different occupancy buffers, write different active tile buffers)
+	VkExtent3D vkWindExtent3D = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D;
+	int64_t iWindDilateGroups = (TileCount(vkWindExtent3D.width) * TileCount(vkWindExtent3D.height) + shaders::kiOccupancyDilateGroupSize - 1) / shaders::kiOccupancyDilateGroupSize;
 	pPipelines[kPipelineWindOccupancyDilateB].RecordCompute(iCommandBuffer, vkCommandBuffer, iWindDilateGroups);
 	pPipelines[kPipelineWindOccupancyDilateA].RecordCompute(iCommandBuffer, vkCommandBuffer, iWindDilateGroups);
 

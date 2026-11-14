@@ -79,7 +79,7 @@ public:
 
 	// Water normal map atlas: ordered alphabetically by stripped display name; index used by Wrapper indices and shader.
 	static inline constexpr int64_t kiWaterNormalCount = shaders::kiWaterNormalCount;
-	static inline constexpr common::crc_t kpWaterNormalCrcs[kiWaterNormalCount]
+	static inline constexpr common::crc_t kpWaterNormalCrcs[]
 	{
 		data::kTexturesWaterBC50pngCrc,
 		data::kTexturesWaterBC53jpgCrc,
@@ -99,12 +99,14 @@ public:
 		data::kTexturesWaterBC5StonesAndRipplesjpgCrc,
 		data::kTexturesWaterBC5WaterFalljpgCrc,
 	};
-	static inline constexpr std::string_view kpWaterNormalNames[kiWaterNormalCount]
+	static inline constexpr std::string_view kpWaterNormalNames[]
 	{
 		"0", "3", "Foam", "FoamB", "GreenCalm", "GreenSea", "GreenSeaB", "Lake",
 		"PondSediment", "Pool", "SeaDistant", "SeaWaves", "SeaWavesB", "SlimyWater",
 		"SlimyWaterB", "StonesAndRipples", "WaterFall",
 	};
+	static_assert(std::size(kpWaterNormalCrcs) == kiWaterNormalCount);
+	static_assert(std::size(kpWaterNormalNames) == kiWaterNormalCount);
 
 	static inline constexpr int64_t kiWaterFoamTextureCount = shaders::kiWaterFoamTextureCount;
 	static inline constexpr common::crc_t kpWaterFoamCrcs[]

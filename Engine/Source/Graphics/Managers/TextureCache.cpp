@@ -2,7 +2,7 @@
 
 #include "TextureCache.h"
 
-#include "Data/Data.h"
+#include "Data/Shader.h"
 
 namespace engine
 {
@@ -136,7 +136,7 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 		.name = "LutBrdf",
 		.vkImageCreateFlags = 0,
 		.vkFormat = vkFormat,
-		.vkExtent3D = VkExtent3D {.width = 512, .height = 512, .depth = 1},
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iSize), .height = static_cast<uint32_t>(iSize), .depth = 1},
 		.iMipLevels = 1,
 		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
