@@ -24,14 +24,7 @@ void CommandCrashReportHarnessRig([[maybe_unused]] const nlohmann::json& rParame
 			throw std::runtime_error("crash_report_harness_rig requires empty params");
 		}
 
-		if (HandleException())
-		{
-#if defined(BT_CLIENT)
-			TryUploadCrashReport();
-#else
-			TryPostCrashReport();
-#endif
-		}
+		HandleExceptionAndSend();
 		ExitProcess(0);
 	}
 }

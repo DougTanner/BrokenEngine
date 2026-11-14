@@ -98,9 +98,9 @@ session. Exposure: client only. No packet, CRC, save, `.pack`, `kiVersion` or
 replay change is expected: the moved statements send nothing and change no
 simulation state beyond what `ResetSession()` and `CreateNewFrame()` already
 do. Affinity: the new functions are `BT_CLIENT` code; `GameBase.cpp` is
-compiled by both executables, so they are guarded as
-`ChangeFrameToMainMenu` guards its client lines. Threading: all of this runs
-on the main thread in the client poll and UI paths, and stays there.
+compiled by both executables, so each is guarded whole under `BT_CLIENT`, as
+`ChangeFrameToMainMenu` is. Threading: all of this runs on the main thread in
+the client poll and UI paths, and stays there.
 
 ## Critical files
 
@@ -163,10 +163,6 @@ on the main thread in the client poll and UI paths, and stays there.
 
 The supplied evidence records no harness setup for criteria 3 to 5; the
 executing session sets them up from the harness documentation.
-
-## Coordination
-
-No directional dependencies or mandatory nondirectional coordination.
 
 ## Notes
 

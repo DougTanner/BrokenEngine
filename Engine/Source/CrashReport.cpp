@@ -8,7 +8,6 @@ namespace engine
 static std::string sDxDiag;
 static constinit std::atomic<bool> sbDxDiagComplete(false);
 static_assert(decltype(sbDxDiagComplete)::is_always_lock_free);
-static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
 static constinit wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
 static constinit wchar_t spcUserReportPath[MAX_PATH + 1] {};
 static constinit wchar_t spcPendingReportPath[MAX_PATH + 1] {};
@@ -42,30 +41,6 @@ const wchar_t* PendingReportPath()
 	return spcPendingReportPath[0] != L'\0' ? spcPendingReportPath : kpcFallbackPendingReportPath;
 }
 
-void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
-{
-	spcAppDataOverride[0] = L'\0';
-
-	wchar_t pcGameName[64] {};
-	swprintf_s(pcGameName, std::size(pcGameName), L"%hs", game::kGameName.data());
-	wchar_t pcCrashReportFile[128] {};
-	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
-
-	int64_t iDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
-	int64_t iSuffixLength = 1 + static_cast<int64_t>(std::wcslen(pcGameName)) + static_cast<int64_t>(std::wcslen(pcCrashReportFile));
-	if (iDirectoryLength >= std::ssize(spcAppDataOverride))
-	{
-		return;
-	}
-
-	if (iSuffixLength >= std::ssize(spcAppDataOverride) - iDirectoryLength)
-	{
-		return;
-	}
-
-	wcscpy_s(spcAppDataOverride, std::size(spcAppDataOverride), pcDirectory);
-}
-
 // Appends only after proving the result fits: wcscat_s on an overflowing input invokes the invalid-parameter handler,
 // which would terminate this otherwise healthy process at startup. A non-fitting append empties the candidate so its
 // buffer is either the complete intended path or empty, never a partial one the crash handler would write to.
@@ -90,6 +65,35 @@ static void StoreUserProfilePath(int64_t iCodePage, const wchar_t* pcUserProfile
 	{
 		rBuffer[0] = '\0';
 	}
+}
+
+// Builds both per-user paths from one base directory and returns true when both fit; otherwise both are left empty, so
+// the two never resolve from different bases. Expects both buffers empty on entry.
+static bool BuildUserReportPaths(const wchar_t* pcBaseDirectory, const wchar_t* pcGameName, const wchar_t* pcCrashReportFile, const wchar_t* pcPendingReportFile)
+{
+	if (AppendReportPath(spcUserReportPath, pcBaseDirectory) && AppendReportPath(spcUserReportPath, L"\\") && AppendReportPath(spcUserReportPath, pcGameName))
+	{
+		// Approved rule 35 exception (no heap allocation): this single-level create (parent guaranteed present by the
+		// caller) runs before FileManager, which creates the same directory later, so a crash before then still has it.
+		// Ignore the result — ERROR_ALREADY_EXISTS is fine.
+		CreateDirectoryW(spcUserReportPath, nullptr);
+
+		if (AppendReportPath(spcUserReportPath, L"\\"))
+		{
+			wcscpy_s(spcPendingReportPath, std::size(spcPendingReportPath), spcUserReportPath);
+			AppendReportPath(spcUserReportPath, pcCrashReportFile);
+			AppendReportPath(spcPendingReportPath, pcPendingReportFile);
+		}
+	}
+
+	if (spcUserReportPath[0] == L'\0' || spcPendingReportPath[0] == L'\0')
+	{
+		spcUserReportPath[0] = L'\0';
+		spcPendingReportPath[0] = L'\0';
+		return false;
+	}
+
+	return true;
 }
 
 void ResolveCrashReportPaths()
@@ -125,51 +129,26 @@ void ResolveCrashReportPaths()
 		AppendReportPath(spcDesktopReportPath, pcCrashReportFile);
 	}
 
-	if (spcAppDataOverride[0] != L'\0')
-	{
-		AppendReportPath(spcUserReportPath, spcAppDataOverride);
-	}
-	else
+	// The override applies only when both paths built from it fit; otherwise both come from the roaming base.
+	if (gLaunchOptions.appDataDirectory.empty() || !BuildUserReportPaths(gLaunchOptions.appDataDirectory.c_str(), pcGameName, pcCrashReportFile, pcPendingReportFile))
 	{
 		PWSTR pcWideCharacter = nullptr;
 		int64_t iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pcWideCharacter);
 		if (SUCCEEDED(static_cast<HRESULT>(iHresult)) && pcWideCharacter != nullptr)
 		{
-			AppendReportPath(spcUserReportPath, pcWideCharacter);
+			BuildUserReportPaths(pcWideCharacter, pcGameName, pcCrashReportFile, pcPendingReportFile);
 		}
 		else if (bDesktopFound)
 		{
 			// OS failure on the roaming lookup: fall back to the Desktop so the report still lands somewhere writable.
-			AppendReportPath(spcUserReportPath, pcDesktopDirectory);
+			BuildUserReportPaths(pcDesktopDirectory, pcGameName, pcCrashReportFile, pcPendingReportFile);
 		}
 		CoTaskMemFree(pcWideCharacter);
-	}
-
-	if (spcUserReportPath[0] != L'\0' && AppendReportPath(spcUserReportPath, L"\\") && AppendReportPath(spcUserReportPath, pcGameName))
-	{
-		// Approved rule 35 exception (no heap allocation): this single-level create (parent guaranteed present above) runs
-		// before FileManager, which creates the same directory later, so a crash before then still has it. Ignore the
-		// result — ERROR_ALREADY_EXISTS is fine.
-		CreateDirectoryW(spcUserReportPath, nullptr);
-
-		if (AppendReportPath(spcUserReportPath, L"\\"))
-		{
-			wcscpy_s(spcPendingReportPath, std::size(spcPendingReportPath), spcUserReportPath);
-			AppendReportPath(spcUserReportPath, pcCrashReportFile);
-			AppendReportPath(spcPendingReportPath, pcPendingReportFile);
-		}
 	}
 }
 
 void RenamePreviousCrashReport()
 {
-	// Exactly one empty buffer means the two paths resolved from different bases, and a rename would move the report
-	// between the app-data folder and the working-directory-relative fallback.
-	if ((spcUserReportPath[0] == L'\0') != (spcPendingReportPath[0] == L'\0'))
-	{
-		return;
-	}
-
 	// Approved rule 35 exception (no heap allocation).
 	WIN32_FILE_ATTRIBUTE_DATA fileAttributeData {};
 	if (GetFileAttributesExW(ReportPath(), GetFileExInfoStandard, &fileAttributeData) == FALSE)

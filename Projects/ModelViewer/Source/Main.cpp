@@ -371,10 +371,6 @@ static int ProcessMain(HINSTANCE hinstance)
 	{
 		common::EnableLogFile(engine::gLaunchOptions.logFile);
 	}
-	if (!engine::gLaunchOptions.appDataDirectory.empty())
-	{
-		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
-	}
 	engine::ResolveCrashReportPaths();
 	HANDLE handleMutex = CreateMutex(nullptr, TRUE, "Broken Engine Sandbox");
 	DWORD uiMutexError = GetLastError();

@@ -117,8 +117,8 @@ is engine-owned here.
 ## Shared Types
 
 - `engine::UiState`, the unguarded `engine::GameBase` members `meUiState` and
-  `mModalMessage`, and the unguarded `GameBase::mGameFlags` main-menu flag form
-  the shared engine/game UI-state contract. The engine owns their public
+  `mpcModalMessage`, and the unguarded `GameBase::mGameFlags` main-menu flag
+  form the shared engine/game UI-state contract. The engine owns their public
   vocabulary and storage for both client and server; the game HUD retains its
   own state transitions, gating, and rendering semantics.
 - The client-only `engine::gbShowImGui` in `ImGuiManager.h` is the Tweaks

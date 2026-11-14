@@ -18,3 +18,12 @@ under `## Entries`, so the newest rows are at the top and main reads only the
 top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
+
+- 2026-11-14 claude/79a8b3b8-5c7c-4714-9b08-ff5184e4c1b7 —
+  Engine/Source/CrashReport.cpp:89 — test only the pending buffer after the two
+  file-name appends: both paths share one prefix and the pending name is the
+  report name plus 8 characters (CrashReport.cpp:110, :113), so a pending path
+  that fits proves the report path fits; this changes the plan's stated "if
+  either buffer ended empty it empties both" form, so it needs the user's
+  approval — makes unnecessary: the `spcUserReportPath[0] == L'\0'` operand at
+  CrashReport.cpp:89 and the pending-buffer store at CrashReport.cpp:92

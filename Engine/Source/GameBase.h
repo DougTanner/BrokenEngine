@@ -219,12 +219,14 @@ public:
 
 	void ResetSession();
 	void CreateNewFrame();
+#if defined(BT_CLIENT)
 	void ChangeFrameToMainMenu();
 
 	static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput);
 	// Developer main-menu island browser index into gpIslandTerrain->mIslandCrcsByArea (largest footprint first);
 	// advanced by 'E'.
 	int64_t miMenuIslandIndex = 0;
+#endif // BT_CLIENT
 
 	GameFlags_t mGameFlags;
 	UiState meUiState = UiState::kPause;
@@ -301,6 +303,14 @@ private:
 	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const;
 	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
 #endif // BT_CLIENT
+
+#if defined(BT_SERVER)
+private:
+
+	// True when this tick records, plays back, or starts a replay recording. SyncReplayTick changes the answer, so
+	// each use calls it again.
+	bool HasReplayTickWork() const;
+#endif // BT_SERVER
 
 protected:
 

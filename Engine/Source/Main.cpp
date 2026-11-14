@@ -1,5 +1,4 @@
 #include "File/PackChunks.h"
-#include "Input/Input.h"
 #include "Memory/GlobalAllocator.h"
 #include "Server/ServerMonitorHost.h"
 #include "Ui/GameSettings.h"
@@ -11,7 +10,6 @@
 
 #include "Frame/TerrainUtils.h"
 #include "Graphics/Camera.h"
-#include "Profile/ProfileRows.h"
 #include "Ui/Screens/TweaksScreen/Tweaks.h"
 #include "Game.h"
 
@@ -97,6 +95,18 @@ static int64_t HandleEagerLoadCompletion()
 	}
 
 	return 0;
+}
+
+void HandleExceptionAndSend(std::optional<const std::exception*> optionalException)
+{
+	if (HandleException(optionalException))
+	{
+#if defined(BT_CLIENT)
+		TryUploadCrashReport();
+#else
+		TryPostCrashReport();
+#endif
+	}
 }
 
 static int64_t MainThread(HINSTANCE hinstance)
@@ -493,14 +503,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		if (IsDebuggerPresent() == 0) [[likely]]
 		{
-			if (HandleException(&rException))
-			{
-#if defined(BT_CLIENT)
-				TryUploadCrashReport();
-#else
-				TryPostCrashReport();
-#endif
-			}
+			HandleExceptionAndSend(&rException);
 		}
 		throw;
 	}
@@ -508,14 +511,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		if (IsDebuggerPresent() == 0) [[likely]]
 		{
-			if (HandleException())
-			{
-#if defined(BT_CLIENT)
-				TryUploadCrashReport();
-#else
-				TryPostCrashReport();
-#endif
-			}
+			HandleExceptionAndSend();
 		}
 		throw;
 	}
@@ -856,13 +852,8 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 		common::EnableLogFile(engine::gLaunchOptions.logFile);
 	}
 
-	if (!engine::gLaunchOptions.appDataDirectory.empty())
-	{
-		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
-	}
-
-	// Must follow the override above: the crash handler only selects between the buffers this fills, so it runs as early
-	// as the launch options allow.
+	// Must follow launch-option parsing: the crash handler only selects between the buffers this fills, so it runs as
+	// early as the launch options allow.
 	engine::ResolveCrashReportPaths();
 
 	common::ScopedHandle pMutex(nullptr);
@@ -870,12 +861,10 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 	pMutex.reset(handleMutex);
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
-#if defined(BT_CLIENT)
 		LOG(kDefault, kError, "Another instance is already running");
-		engine::ShowStartupError("Another instance is already running");
-#else
 		// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.
-		LOG(kDefault, kError, "Another instance is already running");
+#if defined(BT_CLIENT)
+		engine::ShowStartupError("Another instance is already running");
 #endif
 		return 0;
 	}
@@ -893,10 +882,9 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 	if (iFoundationResult != S_OK) [[unlikely]]
 	{
 		LOG(kDefault, kError, "Windows::Foundation::Initialize failed: {:#x}", static_cast<uint32_t>(iFoundationResult));
-		if ((engine::gLaunchOptions.iAgentPort == 0))
-		{
-			MessageBox(nullptr, common::HresultToString(static_cast<HRESULT>(iFoundationResult)).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
-		}
+		std::string errorMessage = "Windows::Foundation::Initialize failed: ";
+		errorMessage += common::HresultToString(static_cast<HRESULT>(iFoundationResult));
+		engine::ShowStartupError(errorMessage.c_str());
 		return 0;
 	}
 #endif

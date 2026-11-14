@@ -366,6 +366,11 @@ void GameBase::ClientUpdate()
 #endif // BT_CLIENT
 
 #if defined(BT_SERVER)
+bool GameBase::HasReplayTickWork() const
+{
+	return (!gpReplay->mReplayWriters.empty()) || mbReplaying || (mGameFlags & GameFlags::kSaveReplay);
+}
+
 void GameBase::ServerUpdate()
 {
 	common::LogTickScope logTickScope(miTickCounter);
@@ -400,8 +405,7 @@ void GameBase::ServerUpdate()
 	if constexpr (kbProfiling)
 	{
 		bAcceptRawCpuTimers = iFullTicks == 1 && mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1
-		                   && !(mGameFlags & GameFlags::kPaused) && gpReplay->mReplayWriters.empty() && !mbReplaying
-		                   && !(mGameFlags & GameFlags::kSaveReplay);
+		                   && !(mGameFlags & GameFlags::kPaused) && !HasReplayTickWork();
 	}
 	gpServer->BroadcastTimespeedIfChanged();
 	if (mGameFlags & GameFlags::kPaused) [[unlikely]]
@@ -445,7 +449,7 @@ void GameBase::ServerUpdate()
 			RefreshReplayActiveSet();
 		}
 
-		if ((!gpReplay->mReplayWriters.empty()) || mbReplaying || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
+		if (HasReplayTickWork()) [[unlikely]]
 		{
 			if (gpReplay->SyncReplayTick() == Replay::ReplayTickDecision::kStopBeforeDispatch)
 			{
@@ -472,12 +476,10 @@ void GameBase::ServerUpdate()
 		}
 
 		BuildAndDispatchFrameTicks(rActiveCoordinates);
-#if defined(BT_SERVER)
 		if constexpr (kbProfiling)
 		{
 			gpProfileManager->LatchRawCpuTimers(bAcceptRawCpuTimers);
 		}
-#endif // BT_SERVER
 		FinalizeFrameTick();
 		++iFinalizedTicks;
 		if (mGameFlags & GameFlags::kPaused) [[unlikely]]
@@ -587,7 +589,7 @@ void GameBase::FinalizeFrameTick()
 
 	game::gpServerSession->mpRuntime->CompleteTick(miTickCounter);
 
-	if ((!gpReplay->mReplayWriters.empty()) || mbReplaying || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
+	if (HasReplayTickWork()) [[unlikely]]
 	{
 		// Heap: the game's replay checksum serialization and the recording's per-tick checksum list
 		ScopedSuppressAllocationTracking suppress;
@@ -1092,6 +1094,7 @@ void GameBase::CreateNewFrame()
 	Cell& rCell = mCells.try_emplace(kOriginCoordinate).first->second;
 	CreateCellFrame(rCell, kOriginCoordinate);
 
+#if defined(BT_CLIENT)
 	// kbDebugInput turns the main-menu cell into a single centered island browser ('E' cycles it);
 	// otherwise it keeps the procedural island chain. Gameplay cells always use the chain.
 	bool bMenuBrowse = false;
@@ -1102,14 +1105,14 @@ void GameBase::CreateNewFrame()
 	if (bMenuBrowse)
 	{
 		BuildMenuIslandPlacement(miMenuIslandIndex, rCell.staticData.islands);
+		return;
 	}
-	else
-	{
-		GenerateIslandChain(kOriginCoordinate, rCell.staticData.islands);
-	}
+#endif // BT_CLIENT
+	GenerateIslandChain(kOriginCoordinate, rCell.staticData.islands);
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
 }
 
+#if defined(BT_CLIENT)
 // Developer main-menu island browser: build the origin cell as a single island centered at (0,0),
 // selected by index into the boot-fixed area-sorted list of all packed islands (largest footprint
 // first). clear()+push_back reuses the vector's capacity (grown once under
@@ -1124,24 +1127,19 @@ void GameBase::BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacem
 
 void GameBase::ChangeFrameToMainMenu()
 {
-#if defined(BT_CLIENT)
 	game::gpClientSession->mpRuntime->Disconnect();
-#endif
 
 	ASSERT(!(mGameFlags & GameFlags::kMainMenu));
 
-#if defined(BT_CLIENT)
 	game::gpGame->StartMenuMusic();
 	static_cast<game::Camera&>(*gpCamera).StorePose(false);
-#endif // BT_CLIENT
 
 	mGameFlags.Set(GameFlags::kMainMenu);
 	CreateNewFrame();
 	ResetSession();
-#if defined(BT_CLIENT)
 	static_cast<game::Camera&>(*gpCamera).ApplyPose(true);
-#endif // BT_CLIENT
 }
+#endif // BT_CLIENT
 
 void GameBase::PrepareActiveSet()
 {

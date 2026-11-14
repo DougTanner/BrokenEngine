@@ -6,7 +6,7 @@ namespace engine
 enum class LaunchOptionFlags : uint8_t
 {
 	kLoopbackOnly = 1 << 0, // bind game/discovery sockets to loopback and disable LAN discovery broadcast
-	kRenderDoc    = 1 << 1, // force-load renderdoc.dll before instance creation and expose the in-app capture API (client; requires game kbRenderDoc)
+	kRenderDoc    = 1 << 1, // force-load renderdoc.dll before instance creation and expose the in-app capture API (client; requires kbRenderDoc)
 };
 
 // Parsed once in ProcessMain before any subsystem starts.
@@ -31,8 +31,7 @@ bool ParseLaunchOptions();
 // True for an agent-harness client: a kbAgent build launched with --agent-port. Every physical (human) input
 // chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source,
 // except IME result characters, which still reach an active ImGui text field on a focused window.
-// Constant from the ProcessMain parse (equals agent-channel existence) — never flips mid-run. Reading game kbAgent is the
-// sanctioned engine->game direction.
+// Constant from the ProcessMain parse (equals agent-channel existence) — never flips mid-run.
 inline bool PhysicalInputSuppressed()
 {
 	return kbAgent && gLaunchOptions.iAgentPort != 0;

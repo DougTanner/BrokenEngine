@@ -141,16 +141,18 @@ not log, allocate, use allocator-dependent formatting or path construction, or
 follow a heap-owned pointer. `--app-data-directory` therefore reaches crash
 handling through a fixed buffer populated at startup, not the launch options'
 heap-owned path; reading an inline scalar of the statically allocated launch
-options, such as the agent port, is allowed.
-`ResolveCrashReportPaths` resolves the Desktop and per-user report paths once at
-startup, after launch options are parsed, into fixed buffers, and creates the
-per-user report directory; the override applies only when the complete report
-path fits the per-user buffer, otherwise the per-user location remains.
-`HandleException` always writes the per-user path, falling back to a fixed
-working-directory-relative file name when resolution left it empty; nothing is
-copied when the Desktop buffer is empty. The server never asks and always
-copies to the Desktop path, even in an agent launch; the client's prompt never
-shows in an agent launch, and Yes copies.
+options, such as the agent port, is allowed. The stack walk inside the write is
+a deliberate exception to the no-allocation rule: it allocates from the CRT
+heap and through DbgHelp, not from the engine allocator.
+`ResolveCrashReportPaths` resolves the Desktop and per-user report paths once
+at startup, after launch options are parsed, into fixed buffers, and creates
+the per-user report directory; it may drop the `--app-data-directory` override
+in favor of the default per-user location, a fit condition
+`BuildUserReportPaths` owns. `HandleException` always writes the per-user
+path, falling back to a fixed working-directory-relative file name when
+resolution left it empty; nothing is copied when the Desktop buffer is empty.
+The server never asks and always copies to the Desktop path, even in an agent
+launch; the client's prompt never shows in an agent launch, and Yes copies.
 
 Reports leave the machine, so `common::CrashFileWriter` replaces the user
 profile path, in the UTF-8 and ANSI forms `ResolveCrashReportPaths` also
@@ -167,19 +169,19 @@ it until those managers are destroyed. The server uses a distinct game name and
 runs alongside either.
 `ProcessMain` renames the previous run's non-empty report to the pending file
 beside it, right after the single-instance check and before any other thread
-starts, only when both paths resolved from the same base. From then on
-`HandleException` writes only the live path, and only the client's
-`PollPendingCrashReport` or the server's startup pass reads the pending file,
-so no writer and reader share a file.
+starts. From then on `HandleException` writes only the live path, and only the
+client's `PollPendingCrashReport` or the server's startup pass reads the
+pending file, so no writer and reader share a file.
 
-Only the main-loop catch, when no debugger is attached, and the agent
-crash-report harness rig call `TryUploadCrashReport` (client) or
-`TryPostCrashReport` (server), on the main thread and only after their own
-`HandleException` call returned `true`, so neither reads a report another
-thread's SIGABRT handler is still writing. Both may allocate and log and never
-propagate an exception. The upload sends the first `kiMaximumCrashReportSize`
-bytes only when the client is connected and accepted and the connection has
-carried no report, a limit owned by the `kClientCrashReport` row of
+Only `HandleExceptionAndSend` calls `TryUploadCrashReport` (client) or
+`TryPostCrashReport` (server), on the main thread and only after its own
+`HandleException` call returned `true`, so it never reads a report another
+thread's SIGABRT handler is still writing; its only callers are the main-loop
+catch, when no debugger is attached, and the agent crash-report harness rig.
+The upload and the post may allocate and log and never propagate an exception.
+The upload sends the first `kiMaximumCrashReportSize` bytes only when the
+client is connected and accepted and the connection has carried no report, a
+limit owned by the `kClientCrashReport` row of
 [Client to Server Contract](../../Documents/Architecture/Network.md#client--server-contract).
 `ProcessMain`'s catches and the SIGABRT handler write and prompt but never
 upload or post; the next start's rename makes that report pending.

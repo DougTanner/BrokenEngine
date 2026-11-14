@@ -19,7 +19,7 @@ runtime contracts that code changes must preserve.
 
 - A standard screen takes `Render()`, reaches the game through `game::gpGame`,
   and never names a game session type. It uses the engine-owned `meUiState`,
-  `mModalMessage`, `mGameFlags`, and the `GameFlags::kMainMenu` bit through
+  `mpcModalMessage`, `mGameFlags`, and the `GameFlags::kMainMenu` bit through
   `game::gpGame`, including the quit flag; calls `GetStandardMenuModel()` for
   the title, offered features, and live client/discovery state; and routes
   game-owned side effects through `ApplyStandardMenuAction()`. Engine-owned

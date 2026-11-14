@@ -11,11 +11,13 @@ struct CrashReportHeader
 	std::string_view exceptionLine;
 };
 
-void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory);
 void ResolveCrashReportPaths();
 void RenamePreviousCrashReport();
 // Returns true only for the call that wrote the report; every later call returns false at once.
 bool HandleException(std::optional<const std::exception*> optionalException = std::nullopt);
+// Calls HandleException and, when that call wrote the report, uploads it (client) or posts it (server). Defined in
+// Main.cpp, not CrashReport.cpp: ModelViewer compiles CrashReport.cpp without the upload and post functions.
+void HandleExceptionAndSend(std::optional<const std::exception*> optionalException = std::nullopt);
 void PromptCrashReportDesktopCopy();
 // Call only from a catch handler: an attached debugger gets the handled exception back through a bare rethrow.
 void HandleProcessMainException(std::optional<const std::exception*> optionalException = std::nullopt);
