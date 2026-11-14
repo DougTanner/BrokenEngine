@@ -570,8 +570,6 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// Each level of detail halves mesh quads per dimension, coupling mesh density to the visible-area snap grid.
 	// The integer framing bucket latches quad size within a level of detail to prevent sub-pixel framing drift from jittering snapped edges.
 	// floor(area / quadSize) amplifies quad-size jitter by approximately area / quadSize, so quad size must stay stable while the latch key is unchanged.
-	[[maybe_unused]] XMFLOAT4 f4RawInputArea = mf4RenderVisibleArea;
-
 	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fRenderFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
 	// LOD hysteresis: refuse to flip back across the shared boundary if framing is still
 	// near it. Boundaries are at kfMinimumFraming * 4^L; 5% band absorbs FP rounding around

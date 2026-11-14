@@ -171,6 +171,15 @@ setup, so the executing session builds one from the three states below.
 - With foam on and the world visible, every row that reported a nonzero
   sample before the change still does.
 
+## Coordination
+
+Neither Plan depends on the other.
+`Documents/Plans/Engine/IslandsWriteAfterFramebufferFenceWait.md` may move
+the `Graphics::WaitFramebuffer` calls this Plan cites by line
+(`Graphics.cpp:213-216`, `244-247`); it keeps the fence wait ahead of
+`GpuRead` on the same framebuffer, the order this Plan relies on. Whichever
+lands second re-derives its regions by symbol from the landed file.
+
 ## Notes
 
 - `Documents/Plans/Engine/ExtractGpuStallTimeline.md` also edits `GpuRead`,

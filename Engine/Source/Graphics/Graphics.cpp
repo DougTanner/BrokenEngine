@@ -10,7 +10,6 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
@@ -125,7 +124,7 @@ void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 		ScopedSlowOperation scopedSlowOperation(kGraphics, "Framebuffer fence wait");
 		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 	}
-	else if (vkResult != VK_SUCCESS)
+	else
 	{
 		CHECK_VK(vkResult);
 	}
@@ -603,35 +602,17 @@ void Graphics::Refresh()
 
 	PollSetting<float>(gShadowRenderMultiplier, "Shadow render multiplier", DestroyType::kPipelines, DestroyFlags::kShadowTextures, gpTextureManager != nullptr);
 
-	[[maybe_unused]] auto [fLightingMultiplier, fLightingMultiplierPrevious, bLightingMultiplierChanged] = gLightingDepositTextureMultiplier.Changed<float>();
-	[[maybe_unused]] auto [fSpreadTextureMultiplierStart, fSpreadTextureMultiplierStartPrevious, bSpreadTextureMultiplierStartChanged] = gSpreadTextureMultiplierStart.Changed<float>();
-	[[maybe_unused]] auto [fSpreadTextureMultiplierEnd, fSpreadTextureMultiplierEndPrevious, bSpreadTextureMultiplierEndChanged] = gSpreadTextureMultiplierEnd.Changed<float>();
-	[[maybe_unused]] auto [fSpreadPassCount, fSpreadPassCountPrevious, bSpreadPassCountChanged] = gSpreadPassCount.Changed<float>();
-	if ((bLightingMultiplierChanged || bSpreadTextureMultiplierStartChanged || bSpreadTextureMultiplierEndChanged || bSpreadPassCountChanged) && gpTextureManager != nullptr) [[unlikely]]
-	{
-		mDestroyFlags.Set(DestroyFlags::kLightingTextures);
+	PollSetting<float>(gLightingDepositTextureMultiplier, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingTextures, gpTextureManager != nullptr);
+	PollSetting<float>(gSpreadTextureMultiplierStart, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingTextures, gpTextureManager != nullptr);
+	PollSetting<float>(gSpreadTextureMultiplierEnd, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingTextures, gpTextureManager != nullptr);
+	PollSetting<float>(gSpreadPassCount, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingTextures, gpTextureManager != nullptr);
 
-		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
-	}
+	PollSetting<float>(gLightingBlurSigma, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingBlur, gpTextureManager != nullptr);
+	PollSetting<float>(gLightingBlurSampleCount, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingBlur, gpTextureManager != nullptr);
+	PollSetting<float>(gLightingBlurEdgeFalloff, nullptr, DestroyType::kPipelines, DestroyFlags::kLightingBlur, gpTextureManager != nullptr);
 
-	[[maybe_unused]] auto [fLightingBlurSigma, fLightingBlurSigmaPrevious, bLightingBlurSigmaChanged] = gLightingBlurSigma.Changed<float>();
-	[[maybe_unused]] auto [fLightingBlurSampleCount, fLightingBlurSampleCountPrevious, bLightingBlurSampleCountChanged] = gLightingBlurSampleCount.Changed<float>();
-	[[maybe_unused]] auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
-	if ((bLightingBlurSigmaChanged || bLightingBlurSampleCountChanged || bLightingBlurEdgeFalloffChanged) && gpTextureManager != nullptr) [[unlikely]]
-	{
-		mDestroyFlags.Set(DestroyFlags::kLightingBlur);
-
-		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
-	}
-
-	[[maybe_unused]] auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
-	[[maybe_unused]] auto [fObjectShadowsBlurMultiplier, fObjectShadowsBlurMultiplierPrevious, bObjectShadowsBlurMultiplierChanged] = gObjectShadowsBlurMultiplier.Changed<float>();
-	if ((bObjectShadowsRenderMultiplierChanged || bObjectShadowsBlurMultiplierChanged) && gpTextureManager != nullptr) [[unlikely]]
-	{
-		mDestroyFlags.Set(DestroyFlags::kObjectShadows);
-
-		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
-	}
+	PollSetting<float>(gObjectShadowsRenderMultiplier, nullptr, DestroyType::kPipelines, DestroyFlags::kObjectShadows, gpTextureManager != nullptr);
+	PollSetting<float>(gObjectShadowsBlurMultiplier, nullptr, DestroyType::kPipelines, DestroyFlags::kObjectShadows, gpTextureManager != nullptr);
 
 	[[maybe_unused]] auto [fExtraArea, fExtraAreaPrevious, bExtraAreaChanged] = gExtraArea.Changed<float>();
 	if (bExtraAreaChanged && gpTextureManager != nullptr) [[unlikely]]
@@ -663,11 +644,6 @@ void Graphics::Refresh()
 
 void Graphics::RecreateResources()
 {
-	if (std::to_underlying(mDestroyFlags.meFlags) == 0)
-	{
-		return;
-	}
-
 	if (mDestroyFlags & DestroyFlags::kShadowTextures)
 	{
 		gpTextureManager->mRenderTargetTextures.CreateShadowTextures();
@@ -732,7 +708,6 @@ void Graphics::Destroy()
 		// reset, so they keep their current cost.
 		gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
 	}
-	if (gpTextureUploadManager != nullptr)
 	{
 		// Must follow the loader drain: a whole-texture job finishing inside the drain stores kUploading and posts
 		// an upload, and the reset maps kUploading back to kDiskLoaded and re-arms the pending-adoption counter —
@@ -814,10 +789,7 @@ void Graphics::Destroy()
 		gpFileManager->mpPackChunks->ResetTextureChunkStates();
 		// IslandTerrainResidency is owned by Main.cpp (outlives Graphics); mesh arena allocations belong to Islands,
 		// which was destroyed above before mpDeviceManager.reset(). Release only template-owned resources here.
-		if (gpIslandTerrainResidency != nullptr)
-		{
-			gpIslandTerrainResidency->ReleaseGpuResources();
-		}
+		gpIslandTerrainResidency->ReleaseGpuResources();
 		mpDeviceManager.reset();
 		mpInstanceManager.reset();
 	}

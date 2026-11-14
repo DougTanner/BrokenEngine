@@ -227,15 +227,17 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   ticks or wall time. Both the frame counter and each template's last-used stamp
   advance only inside the render path, on world and world-hidden frames alike,
   so a deferred-swapchain skip ages nothing and cannot evict an island early.
-- Render-target sizes derive from a fixed 3840-pixel reference width, not the
-  live window. Smoke simulation resolution scales against that reference, and
-  the water vertex grid anchors to a fixed 3840x2160: Gerstner wave frequencies
-  are fixed, so letting the water grid follow the live extent (the obvious
-  cleanup, since the general detail size does) would change wave appearance per
-  monitor. Shadow sizes snap to the shared detail block and hold their width at
-  two thirds of the device's `maxImageDimension2D` (the largest 2D image the
-  device allows) so the 1.5x-wide derived elevation texture still fits; raising
-  shadow quality or adding a wider derived variant without that cap fails image
+- The general detail size (`FullDetail`) follows the live framebuffer extent;
+  the fixed reference width `kiReferenceWidth` governs only the smoke
+  simulation scale and the water grid. Smoke simulation resolution scales the
+  live width against that reference, and the water vertex grid anchors to the
+  fixed reference size `WaterFullDetail` owns: Gerstner wave frequencies are
+  fixed, so letting the water grid follow the live extent (the obvious cleanup,
+  since the general detail size does) would change wave appearance per monitor.
+  Shadow sizes snap to the shared detail block and hold their width at two
+  thirds of the device's `maxImageDimension2D` (the largest 2D image the device
+  allows) so the 1.5x-wide derived elevation texture still fits; raising shadow
+  quality or adding a wider derived variant without that cap fails image
   creation only on lower-limit devices.
 - Terrain collision belongs to shared Frame island terrain
   (`../Frame/AGENTS.md`), not this client renderer.

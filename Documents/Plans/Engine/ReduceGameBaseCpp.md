@@ -69,3 +69,10 @@ changes project membership only through `/update-vcxproj`.
 2. `/compile` builds every project whose membership changed, and the
    BrokenEngineSandbox client and server.
 3. The verification the `/reduce-file` reduction plan names passes.
+
+## Coordination
+
+Neither Plan depends on the other.
+`Documents/Plans/Engine/IslandsWriteAfterFramebufferFenceWait.md` changes the
+call order around `UpdateActiveIslands` in `GameBase::Render`. Whichever lands
+second re-derives its regions by symbol from the landed files.
