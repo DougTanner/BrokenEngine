@@ -3,6 +3,8 @@
 namespace engine
 {
 
+class Wrapper;
+
 inline constexpr float kfMenuUiScale = 2.0f;
 
 // Heading scale multiplier on top of kfMenuUiScale for menu/panel titles

@@ -27,12 +27,12 @@ is engine-owned here.
   constructors are deleted so a scalar cannot silently convert to the Boolean
   overload; floats use the ranged constructor and discrete values supply an
   allowed-value set.
-- A wrapper control's visible label (including a slider's label) must use the
+- A Tweaks control's visible label (including a slider's label) must use the
   wrapper identifier's words in the same order, with the naming prefix removed
   and spaces between words: `gPbrBrdfDiffuse` becomes `Pbr Brdf Diffuse`. This
-  makes the wrapper searchable from its on-screen label. For localized controls,
-  apply this rule to the English/source label; translated labels retain their
-  normal localization behavior.
+  makes the wrapper searchable from its on-screen label. Player-facing menu
+  labels are worded for the player and are harness names owned by
+  `Screens/AGENTS.md` `## Shared Authoring Rules`.
 - Wrapper bounds annotated with shader invariants are correctness constraints,
   not UI tuning.
 - Settings that alter baked render-target dimensions must participate in
@@ -92,20 +92,20 @@ is engine-owned here.
   values are not serialized. Water mesh detail is fixed at `0.25` and is not
   persisted.
 - `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
-  Water quality, Water Foam, Break Repetition, the Stagger Smoke Layer Updates
-  flag, Smoke Update Cadence, Shadow Update Cadence, Object Shadow Cadence,
-  Object Shadows Blur Level, Field of View, Camera Tilt, and Orthographic
-  Projection. Lighting, Water Foam and Break Repetition default on, and Defaults
-  restores them. Older versions fail the current-format gate and use defaults.
-  Water Foam, Break Repetition and Orthographic Projection are validated Boolean
-  bytes; any value other than zero or one rejects the whole file before
-  application.
-- The loaders check every persisted language index, float, quality level,
-  present mode, sample count, and UI theme before applying any. A non-finite or
-  out-of-range value, or a present mode, sample count, or UI theme that is not
-  one of its wrapper's allowed values, rejects the whole file with one warning,
-  and every setting it holds stays at its default, as when the file is missing.
-  Accepted floats keep the wrapper's normal snapping.
+  the fields of `struct GraphicsSettings` in `GraphicsSettings.cpp`, which owns
+  what is persisted. Lighting, Water Foam and Break Repetition default on, and
+  Defaults restores them. Older versions fail the current-format gate and use
+  defaults. Water Foam, Break Repetition and Orthographic Projection are
+  validated Boolean bytes; any value other than zero or one rejects the whole
+  file before application.
+- The game, sound, and graphics loaders check every persisted language index,
+  float, quality level, present mode, sample count, and UI theme before applying
+  any. A non-finite or out-of-range value, or a present mode, sample count, or
+  UI theme that is not one of its wrapper's allowed values, rejects the whole
+  file with one warning, and every setting it holds stays at its default, as
+  when the file is missing. Accepted floats keep the wrapper's normal snapping.
+  The Tweaks layout is gated instead as `Screens/TweaksScreen/AGENTS.md`
+  `## Registration and Layout Contracts` states.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI
   toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language
   is stored as a fixed-width `int32_t` so the `Language` enum's underlying type
@@ -153,12 +153,13 @@ the game facade for localization, so a tuning edit to a wrapper header's inline
 definitions recompiles only that header's includers, not the PCH. `ChatLog.h`
 is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
 `ChatLog.h` and carries it into the game PCH. Headers compiling into both builds
-carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so
-server-side simulation can read defaults, and the shared menu helper that shared
-game UI code includes on both sides. Client-only ImPlot types and menu panel,
-font, and chrome state remain `BT_CLIENT`-guarded, and game screen headers guard
-their client-only members without hiding shared declarations needed by
-server-side screens.
+carry no `BT_CLIENT`/`BT_SERVER` guard: localization, the wrapper storage that
+shared translation units name, though no simulation code reads a wrapper value
+(`../Frame/AGENTS.md` `## Simulation and Visual State`), and the shared menu
+helper that shared game UI code includes on both sides. Client-only
+ImPlot types and menu panel, font, and chrome state remain `BT_CLIENT`-guarded,
+and game screen headers guard their client-only members without hiding shared
+declarations needed by server-side screens.
 
 ## See Also
 

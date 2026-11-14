@@ -5,6 +5,8 @@
 namespace engine
 {
 
+class Wrapper;
+
 // Ceiling is 31, not 32: TweakSectionFlags is backed by uint32_t and AllSectionFlags() would need 1u << 32 (UB) at 32.
 inline constexpr int64_t kiMaxTweakSections = 31;
 inline constexpr int64_t kiInvalidTweakSection = -1;

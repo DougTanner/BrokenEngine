@@ -37,11 +37,7 @@ bool CurveWidget(std::string_view label, CurveData& rCurve)
 		float pfPassTicks[shaders::kiMaxSpreadPasses] {};
 		for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 		{
-			float fSamplePosition = 0.5f;
-			if constexpr (shaders::kiMaxSpreadPasses > 1)
-			{
-				fSamplePosition = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
-			}
+			float fSamplePosition = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
 			pfPassTicks[i] = fSamplePosition;
 		}
 		ImPlotSpec passSpecification;

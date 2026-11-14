@@ -170,11 +170,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fCombinePassTotalScale = fCombinePassNormalizationScale / fPassCount;
 	for (int64_t i = 0; i < _countof(rGlobalLayout.pfCombineCurvePoints); ++i)
 	{
-		float fPassFraction = 0.5f;
-		if constexpr (shaders::kiMaxSpreadPasses > 1)
-		{
-			fPassFraction = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
-		}
+		float fPassFraction = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
 		rGlobalLayout.pfCombineCurvePoints[i] = (gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld).Evaluate(fPassFraction);
 	}
 	rGlobalLayout.fLightingTerrain = gLightingTerrain.mfCurrent;

@@ -3,7 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Agent/AgentUiRegistry.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/WrapperBase.h"
 
 namespace engine
 {
@@ -152,10 +152,7 @@ void TweaksScreen::WrapperSlider(std::string_view label, Wrapper& rWrapper, int6
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.0f);
 	}
 
-	if (iSection >= 0)
-	{
-		ImGui::SetNextItemWidth(ImGui::CalcItemWidth() * fWidthMultiplier);
-	}
+	ImGui::SetNextItemWidth(ImGui::CalcItemWidth() * fWidthMultiplier);
 
 	float fValue = rWrapper.mfCurrent;
 

@@ -69,7 +69,7 @@ inline Wrapper gLightingWaterSkyboxThreePower(0.9f, 0.001f, 4.0f);
 inline Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
 
 // Specular - Skybox One Sampling
-inline Wrapper gWaterSkyboxOneSampleCount(2, std::vector<int32_t> {1, 2, 3, 4, 5, 6, 7, 8, 9});
+inline Wrapper gWaterSkyboxOneSampleCount(2, std::ranges::to<std::vector<int32_t>>(std::views::iota(1, shaders::kiMaxWaterSkyboxOneSampleOffsets + 2)));
 inline Wrapper gWaterSkyboxOneSampleRadius(0.5f, 0.0f, 1.0f);
 inline Wrapper gWaterSkyboxOneSampleBlend(1.0f, 0.0f, 1.0f);
 

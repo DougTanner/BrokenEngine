@@ -76,12 +76,6 @@ public:
 		{
 			mfMax = std::max(rfValue, mfMax);
 		}
-
-		// Break for the same static-initialization reason as the float constructor above.
-		if (mfMin == mfMax)
-		{
-			DEBUG_BREAK();
-		}
 	}
 
 	~Wrapper() = default;
