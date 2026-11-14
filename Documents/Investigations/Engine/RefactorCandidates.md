@@ -19,6 +19,13 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-14 claude/5939deae-ae49-4fa3-8c68-a2981f6a14ef —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.h:125
+  — drop NextRouteWaypoint's `rbFinal` out parameter and the snap-and-compare at
+  ShipBehaviours.cpp:542 that fills it, since no caller reads the result
+  (Battleships.cpp:508, Omnis.cpp:673 and :697, ShipBehaviours.cpp:564 and :828,
+  FleetCoordination.cpp:118) — makes unnecessary:
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:507
 - 2026-11-14 claude/79a8b3b8-5c7c-4714-9b08-ff5184e4c1b7 —
   Engine/Source/CrashReport.cpp:89 — test only the pending buffer after the two
   file-name appends: both paths share one prefix and the pending name is the

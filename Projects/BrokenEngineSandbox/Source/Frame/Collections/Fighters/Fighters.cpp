@@ -622,81 +622,78 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
-			if (arrivalGracePeriod > std::chrono::duration<float>::zero())
+			if (arrivalGracePeriod <= std::chrono::duration<float>::zero())
 			{
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-			}
-			else if (rPrevious.pController[i] == ShipController::kFleet && !(rPrevious.pOrders[i] & ShipOrders::kSeekAndDestroy))
-			{
-				// Patrol. A Seek and Destroy tick may have set kNoAiDirection.
-				flags.Set(ShipFlags::kNoAiDirection, false);
-				ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], flags, vecVeerOffPoint, registryTarget);
-				SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
-				if (tactic.bHasDestination)
+				if (rPrevious.pController[i] == ShipController::kFleet && !(rPrevious.pOrders[i] & ShipOrders::kSeekAndDestroy))
 				{
-					// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes
-					// mode and recomputes its path; no cached path direction survives.
-					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+					// Patrol. A Seek and Destroy tick may have set kNoAiDirection.
+					flags.Set(ShipFlags::kNoAiDirection, false);
+					ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], flags, vecVeerOffPoint, registryTarget);
+					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+					if (tactic.bHasDestination)
+					{
+						// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes
+						// mode and recomputes its path; no cached path direction survives.
+						AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+						iNavigationDirection = -1;
+					}
+					else
+					{
+						ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					}
+					bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
+					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+					HeadingMovementConstants movement = kFighterMovement;
+					if (tactic.fMaximumSpeed != 0.0f)
+					{
+						movement.fMaximumSpeed = tactic.fMaximumSpeed;
+					}
+					ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, movement, vecVelocity);
+				}
+				else if (rPrevious.pController[i] == ShipController::kFleet)
+				{
+					// Seek and Destroy, in any cell: attack, or with no enemy idle in place under drag, ignoring the flagship
+					// and the fleet's wanted cell. The row stays roaming, so a switch back to Patrol recomputes its path.
+					ShipTactic tactic {};
+					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
 					iNavigationDirection = -1;
+					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while idle.
+					flags.Set(ShipFlags::kNoAiDirection, !bHasTactic);
+					fDeltaRotation = 0.0f;
+					bool bAccelerate = false;
+					if (bHasTactic)
+					{
+						SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+						AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+						bAccelerate = IsWithinHeadingCone(vecDirection, vecAiDirection);
+						fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+					}
+					ApplyHeadingMovement(vecDirection, flags, bAccelerate, deltaTime, kFighterMovement, vecVelocity);
 				}
 				else
 				{
-					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					ShipTactic tactic {};
+					if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
+					{
+						SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+					}
+					else
+					{
+						// No enemy in the cell: return to an island.
+						tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
+					}
+					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
+					flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
+					fDeltaRotation = 0.0f;
+					if (tactic.bHasDestination)
+					{
+						AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+						fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+					}
+					ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kFighterMovement, vecVelocity);
 				}
-				bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
-				fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
-				HeadingMovementConstants movement = kFighterMovement;
-				if (tactic.fMaximumSpeed != 0.0f)
-				{
-					movement.fMaximumSpeed = tactic.fMaximumSpeed;
-				}
-				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, movement, vecVelocity);
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
-			else if (rPrevious.pController[i] == ShipController::kFleet)
-			{
-				// Seek and Destroy, in any cell: attack, or with no enemy idle in place under drag, ignoring the flagship
-				// and the fleet's wanted cell. The row stays roaming, so a switch back to Patrol recomputes its path.
-				ShipTactic tactic {};
-				bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
-				iNavigationDirection = -1;
-				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while idle.
-				flags.Set(ShipFlags::kNoAiDirection, !bHasTactic);
-				fDeltaRotation = 0.0f;
-				bool bAccelerate = false;
-				if (bHasTactic)
-				{
-					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
-					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
-					bAccelerate = IsWithinHeadingCone(vecDirection, vecAiDirection);
-					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
-				}
-				ApplyHeadingMovement(vecDirection, flags, bAccelerate, deltaTime, kFighterMovement, vecVelocity);
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-			}
-			else
-			{
-				ShipTactic tactic {};
-				if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
-				{
-					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
-				}
-				else
-				{
-					// No enemy in the cell: return to an island.
-					tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
-				}
-				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
-				flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
-				fDeltaRotation = 0.0f;
-				if (tactic.bHasDestination)
-				{
-					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
-					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
-				}
-				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kFighterMovement, vecVelocity);
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-			}
+			ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 		}
 		else
 		{

@@ -460,68 +460,66 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
-			if (arrivalGracePeriod > std::chrono::duration<float>::zero())
+			if (arrivalGracePeriod <= std::chrono::duration<float>::zero())
 			{
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-			}
-			else if (rPrevious.pController[i] == ShipController::kFleet)
-			{
-				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
-				bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
-				fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
-				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kBattleshipMovement, vecVelocity);
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-			}
-			else
-			{
-				XMVECTOR vecTarget = XMVectorZero();
-				bool bHasDestination = false;
-				XMVECTOR vecDestination = XMVectorZero();
-				bool bRouteToTarget = false;
-				if (FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecTarget))
+				if (rPrevious.pController[i] == ShipController::kFleet)
 				{
-					// A flagship chase never returns to an island.
-					flags.Set(ShipFlags::kReturnToIslandCenter, false);
-					vecDestination = vecTarget;
-					bHasDestination = true;
-					bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
+					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
+					ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kBattleshipMovement, vecVelocity);
 				}
 				else
 				{
-					bool bInLineOfSight = false;
-					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
-					if (bEnemyFound)
+					XMVECTOR vecTarget = XMVectorZero();
+					bool bHasDestination = false;
+					XMVECTOR vecDestination = XMVectorZero();
+					bool bRouteToTarget = false;
+					if (FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecTarget))
 					{
-						// An attack never returns to an island.
+						// A flagship chase never returns to an island.
 						flags.Set(ShipFlags::kReturnToIslandCenter, false);
 						vecDestination = vecTarget;
 						bHasDestination = true;
-						// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
-						// tier.
-						bRouteToTarget = !bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+						bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
 					}
 					else
 					{
-						vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
+						bool bInLineOfSight = false;
+						bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
+						if (bEnemyFound)
+						{
+							// An attack never returns to an island.
+							flags.Set(ShipFlags::kReturnToIslandCenter, false);
+							vecDestination = vecTarget;
+							bHasDestination = true;
+							// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
+							// tier.
+							bRouteToTarget = !bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+						}
+						else
+						{
+							vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
+						}
 					}
+					if (bRouteToTarget)
+					{
+						bool bFinalWaypoint = false;
+						vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					}
+					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination:
+					// random-spawn rows run no fleet navigation or cone test.
+					flags.Set(ShipFlags::kNoAiDirection, !bHasDestination);
+					fDeltaRotation = 0.0f;
+					if (bHasDestination)
+					{
+						AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
+						fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
+					}
+					ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);
 				}
-				if (bRouteToTarget)
-				{
-					bool bFinalWaypoint = false;
-					vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
-				}
-				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination:
-				// random-spawn rows run no fleet navigation or cone test.
-				flags.Set(ShipFlags::kNoAiDirection, !bHasDestination);
-				fDeltaRotation = 0.0f;
-				if (bHasDestination)
-				{
-					AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
-					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kBattleshipMovement);
-				}
-				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);
-				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
+			ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 		}
 
 		// A dying Battleship holds still, so it skips terrain contact.

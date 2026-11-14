@@ -341,7 +341,7 @@ public:
 		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pFlagshipGlobalIds);
 	}
 
-	// CRC-only subset: excludes pClientGuids and pGlobalIds which are server-side bookkeeping
+	// CRC-only subset: omits pClientGuids, which is server-local, and pGlobalIds, which the tick reads but Spawn sets identically on client and server
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
 		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pRegistryTargets, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks);

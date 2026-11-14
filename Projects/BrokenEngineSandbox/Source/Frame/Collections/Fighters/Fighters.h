@@ -293,7 +293,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pVecDamageDirections, rSelf.pAlignments, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds);
 	}
 
-	// CRC-only subset: excludes pGlobalIds and pClientGuids, which are server-side bookkeeping
+	// CRC-only subset: omits pClientGuids, which is server-local, and pGlobalIds, which the tick reads but Spawn sets identically on client and server
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
 		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
