@@ -408,9 +408,6 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h">
-      <Filter>Game\Ui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h">
       <Filter>Engine\Input</Filter>
     </ClInclude>

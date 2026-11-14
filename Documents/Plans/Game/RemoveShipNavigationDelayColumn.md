@@ -244,4 +244,9 @@ A Plan from another analysis overlaps the same way, with no ordering required:
 
 ## Coordination
 
-No directional dependencies or mandatory nondirectional coordination.
+`Documents/Plans/Game/NameNavigationDelayRangeBounds.md` edits the body and
+comment of `IsNavigationDelayInRange`, which this Plan keeps, and leaves the
+`SpawnInfo::navigationDelay` defaults this Plan deletes untouched. Neither Plan
+depends on the other. That Plan keeps the predicate's name and signature.
+Whichever lands second re-derives its sites from the landed tree: here, the
+predicate and its callers as they then read.

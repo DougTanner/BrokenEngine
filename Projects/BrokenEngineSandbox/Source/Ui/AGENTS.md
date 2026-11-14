@@ -12,8 +12,8 @@ lives in Screens (`Screens/AGENTS.md`).
   (`../../../../Engine/Source/Ui/AGENTS.md`). `Ui/Localization.h` is a facade:
   it includes the engine header and re-exports `Language`, `LanguageOption`,
   `StandardString`, `TranslatedString`, `InitializeLocalization`, `geLanguage`,
-  `kiLanguageCount`, and `kLanguageOptions` into `game`, so game code names them
-  without the `engine::` qualifier. The `Game` constructor calls that
+  `kiLanguageCount`, and `kpLanguageOptions` into `game`, so game code names
+  them without the `engine::` qualifier. The `Game` constructor calls that
   initializer on both builds.
 - The facade owns no table. A game-owned string type, table, and
   `TranslatedString` overload are deliberately deferred until a first

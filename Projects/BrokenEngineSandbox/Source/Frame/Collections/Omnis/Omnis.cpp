@@ -12,12 +12,12 @@
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
-#include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
 #include "Ui/LightingWrappers.h"
+#include "Ui/ParticleWrappers.h"
 #include "Ui/SmokeWrappers.h"
 #endif
 

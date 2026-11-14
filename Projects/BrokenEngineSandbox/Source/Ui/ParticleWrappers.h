@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+
 #include "Ui/WrapperBase.h"
 
 namespace game
@@ -53,3 +55,5 @@ inline engine::Wrapper gFighterExplosionParticleIntensityDecay(1.5f, 0.0f, 5.0f)
 inline engine::Wrapper gFighterExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);
 
 } // namespace game
+
+#endif // defined(BT_CLIENT)

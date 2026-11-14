@@ -4,7 +4,6 @@
 
 #include "Ui/MenuUtils.h"
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -187,7 +186,7 @@ static void RenderFleetMemberRow(const FleetMember& rMember, int64_t iRowNumber)
 		}
 		if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
 		{
-			bool bOwnedEntityPresent = std::ranges::contains(gpGame->mClientOwnedEntities, rMember.globalId, &engine::OwnedEntity::globalId);
+			bool bOwnedEntityPresent = ownedIt != gpGame->mClientOwnedEntities.end();
 			engine::NetworkUiControl<int64_t>& rDestroyToggle = gpGame->mFleetSelection.mDestroyMemberToggle;
 			ImGui::SameLine();
 			ImGui::BeginDisabled(!bOwnedEntityPresent || (rDestroyToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());

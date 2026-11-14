@@ -324,7 +324,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\MenuUtils.h" />
-    <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h" />
     <ClInclude Include="..\..\Source\Ui\WindDepositsWrappers.h" />
     <ClInclude Include="$(GameDataDirectory)\Audio.h" />
     <ClInclude Include="$(GameDataDirectory)\Data.h" />
