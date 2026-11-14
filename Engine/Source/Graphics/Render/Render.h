@@ -85,9 +85,10 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fExtraAr
 	};
 }
 
-// Retained world rectangles (shadow and lighting history, and the held object-shadow area) are expressed in the camera
-// cell's frame, so they follow the camera when it changes cell. The whole-cell shift applies at any step distance, so
-// GPU history stays usable wherever the camera's view still overlaps it.
+// Retained world rectangles (shadow, lighting, and water foam history, the held object-shadow area, and each smoke
+// plane's held area) are expressed in the camera cell's frame, so they follow the camera when it changes cell. The
+// whole-cell shift applies at any step distance, so GPU history stays usable wherever the camera's view still overlaps
+// it.
 struct RetainedAreaBasis
 {
 	GridCoord coordinate {};
@@ -220,7 +221,7 @@ float MoonAmount(float fSunAngle);
 void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime);
 
-inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame
+inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowArea first-frame guard so a recreate doesn't blend stale history for one frame
 
 // Forces the next object-shadow refresh whenever the blurred texture is undefined or stale.
 inline bool gbObjectShadowsReset = true;
@@ -228,7 +229,8 @@ inline bool gbObjectShadowsReset = true;
 // WriteModelPipelineIndirectBuffers reads it to zero the ModelShadow draws on a skipped frame.
 inline bool gbObjectShadowsRefreshFrame = false;
 
-// Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
+// Set by CreateLightingTextures on a recreate and by RenderLightingGlobal on a gLightingEnabled change; re-arms the
+// PopulateLightingParameters first-frame guard so neither blends stale history for one frame.
 inline bool gbLightingTemporalReset = false;
 // The lighting layer whose deposit, spread, combine, temporal, and history-copy chain runs this frame, or -1 for none.
 // PopulateLightingParameters writes it once per frame in Global; collection EndRender and RenderLightingSpreadIndirect

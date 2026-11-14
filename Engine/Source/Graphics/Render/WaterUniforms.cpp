@@ -46,8 +46,6 @@ bool WaterFoamActive()
 // Reduced-time accumulators require exactly one call per frame.
 static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
 {
-	// Reduce normal-map origins modulo 10.0: the shader's noninteger octave multipliers turn these wraps
-	// into integer UV shifts absorbed by fract(); modulo 1.0 produces visible UV jumps.
 	XMFLOAT4A f4CameraPosition {};
 	XMStoreFloat4A(&f4CameraPosition, engine::gpCamera->mVecPosition);
 	rGlobalLayout.fWaterOriginX = f4CameraPosition.x;
@@ -106,14 +104,14 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fDeltaThree = fSizeBaseThree * fSpeedThree * fPreciseDeltaTime;
 	double fCosineThree = static_cast<double>(std::cos(fRotationThree));
 	double fSineThree = static_cast<double>(std::sin(fRotationThree));
-	rGlobalLayout.f4WaterNormalRotationOne = {static_cast<float>(fCosineOne), -static_cast<float>(fSineOne), static_cast<float>(fSineOne), static_cast<float>(fCosineOne)};
-	rGlobalLayout.f4WaterNormalRotationTwo = {static_cast<float>(fCosineTwo), -static_cast<float>(fSineTwo), static_cast<float>(fSineTwo), static_cast<float>(fCosineTwo)};
-	rGlobalLayout.f4WaterNormalRotationThree = {static_cast<float>(fCosineThree), -static_cast<float>(fSineThree), static_cast<float>(fSineThree), static_cast<float>(fCosineThree)};
 	double fScrollGammaThree = static_cast<double>(fSpeedDirectionThree) - static_cast<double>(fRotationThree);
 	double fScrollCosineThree = std::cos(fScrollGammaThree);
 	double fScrollSineThree = std::sin(fScrollGammaThree);
 	sfReducedTimeThreeX = std::fmod(sfReducedTimeThreeX + fDeltaThree * (fScrollCosineThree - fScrollSineThree), 10.0);
 	sfReducedTimeThreeY = std::fmod(sfReducedTimeThreeY + fDeltaThree * (fScrollCosineThree + fScrollSineThree), 10.0);
+	rGlobalLayout.f4WaterNormalRotationOne = {static_cast<float>(fCosineOne), -static_cast<float>(fSineOne), static_cast<float>(fSineOne), static_cast<float>(fCosineOne)};
+	rGlobalLayout.f4WaterNormalRotationTwo = {static_cast<float>(fCosineTwo), -static_cast<float>(fSineTwo), static_cast<float>(fSineTwo), static_cast<float>(fCosineTwo)};
+	rGlobalLayout.f4WaterNormalRotationThree = {static_cast<float>(fCosineThree), -static_cast<float>(fSineThree), static_cast<float>(fSineThree), static_cast<float>(fCosineThree)};
 	// Phase must follow the camera across a cell change, so the reductions below run on the absolute camera position,
 	// reconstructed as a double from the camera cell and the camera's local position. This is client-only CPU work:
 	// fWaterOriginX/Y above stays in the rebased frame the shaders add it back to.
@@ -139,6 +137,8 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	RotatedCamera(fCosineTwo, fSineTwo, fRotatedCameraXTwo, fRotatedCameraYTwo);
 	RotatedCamera(fCosineThree, fSineThree, fRotatedCameraXThree, fRotatedCameraYThree);
 
+	// Reduce normal-map origins modulo 10.0: the shader's noninteger octave multipliers turn these wraps
+	// into integer UV shifts absorbed by fract(); modulo 1.0 produces visible UV jumps.
 	rGlobalLayout.fWaterReducedNormalOriginX = static_cast<float>(std::fmod(fSizeBaseOne * fRotatedCameraXOne, 10.0));
 	rGlobalLayout.fWaterReducedNormalOriginY = static_cast<float>(std::fmod(fSizeBaseOne * fRotatedCameraYOne, 10.0));
 	rGlobalLayout.fWaterReducedNormalTimeX = static_cast<float>(sfReducedTimeOneX);
@@ -496,7 +496,7 @@ void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> curren
 	}
 	else
 	{
-		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
+		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, TileCount(rWaterLevelOfDetail.iQuadCountX + 1), TileCount(rWaterLevelOfDetail.iQuadCountY + 1), 1);
 	}
 
 	PopulateGerstnerWaves(rMainLayout, currentTime.count(), eWaterLevel);

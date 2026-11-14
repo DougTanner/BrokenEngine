@@ -6,7 +6,6 @@
 #include "Render.h"
 
 #include "Frame/TerrainUtils.h"
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
@@ -293,7 +292,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
 	RenderLightingSpreadIndirect(iCommandBuffer);
 
-	// Phase 4: Game-specific debug rendering (positions from fully-interpolated frame)
+	// Game-specific debug rendering (positions from fully-interpolated frame)
 	if constexpr (kbDebugRender)
 	{
 		game::FrameInterpolate::DebugRender(rRenderInterpolates, rActiveCoordinates);

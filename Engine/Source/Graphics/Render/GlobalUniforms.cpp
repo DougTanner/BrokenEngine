@@ -308,7 +308,7 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	ShiftArea(sTemporalAreaLatch.f4CurrentArea, f2Shift);
 	ShiftArea(sTemporalAreaLatch.f4PreviousArea, f2Shift);
 
-	// Refresh on schedule, or early on a teleport. Shadow phase 1 against lighting's phase 0 keeps the two refreshes off
+	// Refresh on schedule, or early on a teleport. Shadow phase -1 against lighting's phase 0 keeps the two refreshes off
 	// the same frame whenever their cadences share a factor.
 	bool bShadowRefreshFrame = gbShadowTemporalReset || !sTemporalAreaLatch.bInitialized
 	                        || (gpGraphics->miFrameCounter + 1) % gShadowUpdateCadence.Get<int64_t>() == 0

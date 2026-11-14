@@ -48,6 +48,18 @@ static void WriteSmokeDilateDispatch(int64_t iCommandBuffer, int64_t iPlane, int
 	gpPipelineManager->SmokePipeline(iPlane, kSmokeOccupancyDilateRemap).WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
 }
 
+// Every exit publishes a plane through this, before its own held-area and frame-counter updates: the area and step
+// operands may be those values.
+static void PublishSmokePlane(shaders::GlobalLayout& rGlobalLayout, int64_t iCommandBuffer, int64_t iPlane, const XMFLOAT4& rf4CurrentArea, const XMFLOAT4& rf4PreviousArea, int64_t iStepCount, int64_t iDilateGroups, int64_t iGroupCountZ)
+{
+	rGlobalLayout.pf4SmokeAreas[iPlane] = rf4CurrentArea;
+	rGlobalLayout.pf4PreviousSmokeAreas[iPlane] = rf4PreviousArea;
+	PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, iPlane, rf4PreviousArea);
+	PublishSmokeContinuity(iPlane, rf4CurrentArea, rf4PreviousArea);
+	PublishSmokeStep(rGlobalLayout, iPlane, iStepCount);
+	WriteSmokeDilateDispatch(iCommandBuffer, iPlane, iDilateGroups, iGroupCountZ);
+}
+
 void RenderSmokeGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
@@ -115,18 +127,9 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		rGlobalLayout.pfSmokeWindNoiseQuantities[i] = FlightPlaneLerp(fWindNoiseQuantityBottom, fWindNoiseQuantityTop, i, iPlaneCount);
 	}
 
-	// Persisted across frames so the next frame's spread starts with previous == current
-	// after a clear/disabled span — avoids divide-by-zero in WorldToSmokeTexcoord(zero, ...)
-	static bool sbPreviousAreaInitialized = false;
+	// Each plane's held area, first written by the clear exit: gbSmokeClear starts true, so the first call always takes
+	// that exit, before a zero-sized initial area can reach PopulatePreviousSmokeAreaSizeInverse.
 	static XMFLOAT4 spf4PreviousSmokeAreas[shaders::kiMaxFlightPlanes] {};
-	if (!sbPreviousAreaInitialized)
-	{
-		for (int64_t i = 0; i < iPlaneCount; ++i)
-		{
-			spf4PreviousSmokeAreas[i] = f4CurrentSmokeArea;
-		}
-		sbPreviousAreaInitialized = true;
-	}
 
 	// The retained areas — plane 0's of which wind also consumes through pf4PreviousSmokeAreas[0] — are in the camera
 	// cell's frame, so follow a camera cell change before they are published beside this frame's area; the shift keeps
@@ -156,14 +159,9 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 		for (int64_t i = 0; i < iPlaneCount; ++i)
 		{
-			rGlobalLayout.pf4SmokeAreas[i] = f4CurrentSmokeArea;
-			rGlobalLayout.pf4PreviousSmokeAreas[i] = f4CurrentSmokeArea;
-			PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, i, f4CurrentSmokeArea);
+			PublishSmokePlane(rGlobalLayout, iCommandBuffer, i, f4CurrentSmokeArea, f4CurrentSmokeArea, 1, iDilateGroups, 1);
 			spf4PreviousSmokeAreas[i] = f4CurrentSmokeArea;
-			PublishSmokeContinuity(i, f4CurrentSmokeArea, f4CurrentSmokeArea);
-			PublishSmokeStep(rGlobalLayout, i, 1);
 			spiSmokeFramesSinceRefresh[i] = 0;
-			WriteSmokeDilateDispatch(iCommandBuffer, i, iDilateGroups, 1);
 		}
 
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 1);
@@ -176,13 +174,8 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	{
 		for (int64_t i = 0; i < iPlaneCount; ++i)
 		{
-			rGlobalLayout.pf4SmokeAreas[i] = spf4PreviousSmokeAreas[i];
-			rGlobalLayout.pf4PreviousSmokeAreas[i] = spf4PreviousSmokeAreas[i];
-			PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, i, spf4PreviousSmokeAreas[i]);
-			PublishSmokeContinuity(i, spf4PreviousSmokeAreas[i], spf4PreviousSmokeAreas[i]);
-			PublishSmokeStep(rGlobalLayout, i, 1);
+			PublishSmokePlane(rGlobalLayout, iCommandBuffer, i, spf4PreviousSmokeAreas[i], spf4PreviousSmokeAreas[i], 1, iDilateGroups, 1);
 			spiSmokeFramesSinceRefresh[i] = 0;
-			WriteSmokeDilateDispatch(iCommandBuffer, i, iDilateGroups, 1);
 		}
 
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 0);
@@ -207,24 +200,14 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 		{
 			// Skip: the plane's remap reduces to the identity over its held area (for plane 0, wind's too), and its
 			// next refresh remaps held -> current.
-			rGlobalLayout.pf4SmokeAreas[i] = spf4PreviousSmokeAreas[i];
-			rGlobalLayout.pf4PreviousSmokeAreas[i] = spf4PreviousSmokeAreas[i];
-			PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, i, spf4PreviousSmokeAreas[i]);
-			PublishSmokeContinuity(i, spf4PreviousSmokeAreas[i], spf4PreviousSmokeAreas[i]);
-			PublishSmokeStep(rGlobalLayout, i, 1);
-			WriteSmokeDilateDispatch(iCommandBuffer, i, iDilateGroups, 0);
+			PublishSmokePlane(rGlobalLayout, iCommandBuffer, i, spf4PreviousSmokeAreas[i], spf4PreviousSmokeAreas[i], 1, iDilateGroups, 0);
 
 			continue;
 		}
 
-		rGlobalLayout.pf4SmokeAreas[i] = f4CurrentSmokeArea;
-		rGlobalLayout.pf4PreviousSmokeAreas[i] = spf4PreviousSmokeAreas[i];
-		PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, i, spf4PreviousSmokeAreas[i]);
-		PublishSmokeContinuity(i, f4CurrentSmokeArea, spf4PreviousSmokeAreas[i]);
+		PublishSmokePlane(rGlobalLayout, iCommandBuffer, i, f4CurrentSmokeArea, spf4PreviousSmokeAreas[i], spiSmokeFramesSinceRefresh[i], iDilateGroups, 1);
 		spf4PreviousSmokeAreas[i] = f4CurrentSmokeArea;
-		PublishSmokeStep(rGlobalLayout, i, spiSmokeFramesSinceRefresh[i]);
 		spiSmokeFramesSinceRefresh[i] = 0;
-		WriteSmokeDilateDispatch(iCommandBuffer, i, iDilateGroups, 1);
 	}
 }
 

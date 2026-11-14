@@ -105,7 +105,7 @@ void RenderTargetTextures::CreateShadowTextures()
 	// width even (below) so the 1.5x elevation width stays integer; dispatch ceil-divides so no block multiple.
 
 	// Re-arm the temporal first-frame guard: mShadowHistoryTexture below is (re)created with undefined contents,
-	// so PopulateShadowParameters must blend pure-current for one frame before reusing history. Mirrors gbSmokeClear
+	// so PopulateShadowArea must blend pure-current for one frame before reusing history. Mirrors gbSmokeClear
 	// (and CreateWindTextures' creation-time hard clear).
 	gbShadowTemporalReset = true;
 
