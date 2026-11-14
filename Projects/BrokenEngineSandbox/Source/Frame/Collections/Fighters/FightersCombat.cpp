@@ -43,7 +43,9 @@ void XM_CALLCONV FightersPostRender::BeginExplosion(Frame& rFrame, [[maybe_unuse
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
 	rCurrentInterpolate.pDestroyedTimes[i] = kFighterDestroyTime;
+#if defined(BT_CLIENT)
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kFighterDestroyExplosionInterval;
+#endif
 
 	// Store damage direction for knockback
 	rCurrentPostRender.pVecDamageDirections[i] = vecDamageDirection;
@@ -133,7 +135,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	rCurrentInterpolate.pVecBeamEnds[i] = vecEnd;
 	SyncFighterBeam(rFrame.interpolate, rCurrentInterpolate.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecShooterPosition, vecEnd, 1.0f);
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecShooterPosition, gFighterBlasterVolume.mfCurrent, gFighterBlasterPitchMinimum.mfCurrent, gFighterBlasterPitchRandom.mfCurrent);
-	engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterBeamImpactControllerTypeIndex, vecEnd, 0.0f);
+	engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterBeamImpactControllerTypeIndex, vecEnd, 0.0f);
 #endif
 	return true;
 }
@@ -205,7 +207,7 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 #endif
 
 #if defined(BT_CLIENT)
-				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+				engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 				if (rCurrentPostRender.pfHealths[i] <= 0.0f)

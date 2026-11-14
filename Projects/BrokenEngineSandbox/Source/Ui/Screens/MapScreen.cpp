@@ -17,6 +17,10 @@ constexpr float kfMapHoverFillAlpha = 0.15f;
 constexpr float kfMapHoverTextWidth = 0.8f;
 // Fraction of the squared map opacity.
 constexpr float kfMapHoverTextAlpha = 0.5f;
+constexpr ImVec4 kMapOwnFleetMarkerColor(0.2f, 0.5f, 1.0f, 1.0f);
+constexpr ImVec4 kMapOtherFleetMarkerColor(0.2f, 0.9f, 0.3f, 1.0f);
+// At the 2160-pixel reference height.
+constexpr float kfMapFleetMarkerRadius = 8.0f;
 
 // Projects a ground point in the camera cell's frame at z = 0; false when its depth falls outside [0, 1].
 static bool ProjectGroundPoint(float fX, float fY, ImVec2& rOutPoint)
@@ -31,8 +35,19 @@ static bool ProjectGroundPoint(float fX, float fY, ImVec2& rOutPoint)
 	return true;
 }
 
+// The background, island pictures, cell hexagons, and hovered-cell label read only engine island, cell, and camera data
+// plus the map opacity, so they are game-agnostic; the fleet markers and the hold pick are the game-specific parts. A
+// future project may want the game-agnostic part moved into shared engine code, depending on its requirements.
 void MapScreen::Render()
 {
+	// Closing the map by any path, TAB included, cancels a hold pick.
+	FleetSelection& rSelection = gpGame->mFleetSelection;
+	if (!gpGame->MapOpen())
+	{
+		rSelection.mHoldPickFleetGuid = {};
+	}
+	bool bHoldPick = !(rSelection.mHoldPickFleetGuid == FleetGuid {});
+
 	float fOpacity = gpGame->MapOpacity();
 	if (fOpacity <= 0.0f)
 	{
@@ -170,7 +185,8 @@ void MapScreen::Render()
 			}
 			if (bProjected)
 			{
-				if (bHasCoordinate && !bHovered)
+				// Fleet navigation never moves a flagship into the origin, so a hold pick cannot hover it.
+				if (bHasCoordinate && !bHovered && !(bHoldPick && coordinate == engine::kOriginCoordinate))
 				{
 					XMFLOAT2 pf2Points[std::size(pPoints)] {};
 					for (const auto& [k, rvPoint] : std::views::enumerate(pPoints))
@@ -187,6 +203,45 @@ void MapScreen::Render()
 				}
 				pDrawList->AddPolyline(pPoints, static_cast<int>(std::size(pPoints)), uiLineColor, ImDrawFlags_Closed, fLineThickness);
 			}
+		}
+	}
+
+	// Drawn after the loop so no cell's outline or island picture covers them.
+	ImU32 uiOwnMarkerColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapOwnFleetMarkerColor.x, kMapOwnFleetMarkerColor.y, kMapOwnFleetMarkerColor.z, fOpacity));
+	ImU32 uiOtherMarkerColor = ImGui::ColorConvertFloat4ToU32(ImVec4(kMapOtherFleetMarkerColor.x, kMapOtherFleetMarkerColor.y, kMapOtherFleetMarkerColor.z, fOpacity));
+	float fMarkerRadius = kfMapFleetMarkerRadius * engine::UiScale();
+	for (const GameMessages::MapFleetMarker& rMarker : gpGame->mMapFleetMarkers)
+	{
+		engine::RenderBasis basis = engine::MakeRenderBasis(rMarker.coordinate, engine::gpCamera->mBasisCoordinate);
+		XMVECTOR vecPosition = engine::Rebase(basis, XMVectorSet(rMarker.f2Position.x, rMarker.f2Position.y, 0.0f, 1.0f));
+		ImVec2 vMarkerPoint {};
+		if (ProjectGroundPoint(XMVectorGetX(vecPosition), XMVectorGetY(vecPosition), vMarkerPoint))
+		{
+			bool bOwn = (rMarker.uiFlags & GameMessages::MapFleetMarkersMessage::kuiOwnFlag) != 0;
+			pDrawList->AddCircleFilled(vMarkerPoint, fMarkerRadius, bOwn ? uiOwnMarkerColor : uiOtherMarkerColor);
+		}
+	}
+
+	// Ahead of the label block, whose early return would skip it. The map draws under every other screen in every UI
+	// state, so a click while a menu or Tweaks is open, or with any window under the mouse, picks nothing.
+	if (bHoldPick && bHovered && gpGame->meUiState == engine::UiState::kNone && !engine::gbShowImGui
+	 && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+	{
+		FleetGuid pickFleetGuid = rSelection.mHoldPickFleetGuid;
+		rSelection.mHoldPickFleetGuid = {};
+		gpGame->ToggleMap();
+
+		// Only the HUD's focused-flagship gate updates the shared control, so a mark set for any other fleet would
+		// compare against the wrong key.
+		const Fleet* pFleet = rSelection.FocusedFleet();
+		engine::NetworkUiControl<FleetNavigationKey>& rNavigationControl = rSelection.mFleetNavigationControl;
+		bool bServerReplaying = engine::gpClient != nullptr && (engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kServerReplaying);
+		if (pFleet != nullptr && pFleet->guid == pickFleetGuid && gpGame->ClientOwnedEntityIdentifier() == pFleet->flagshipGlobalId
+		 && pFleet->eBehaviour == FleetBehaviour::kStayInCell && !(hoveredCoordinate == pFleet->holdCoordinate)
+		 && !(rNavigationControl.mFlags & engine::NetworkUiControlFlags::kPending) && !bServerReplaying)
+		{
+			rNavigationControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+			gpClientSession->SendFleetNavigationRequest(pFleet->guid, pFleet->navigationDelaySeconds.count(), FleetBehaviour::kStayInCell, hoveredCoordinate);
 		}
 	}
 

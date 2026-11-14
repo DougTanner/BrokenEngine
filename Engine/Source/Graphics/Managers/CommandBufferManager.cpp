@@ -132,16 +132,8 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 
-	VkSemaphore pVkSemaphores[]
-	{
-		rCommandBuffers.mGlobalFinishedVkSemaphore,
-		gpSwapchainManager->mImageAvailableVkSemaphore,
-	};
-	VkPipelineStageFlags pVkPipelineStageFlags[]
-	{
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-	};
+	// Main writes no swapchain image, so it waits only Global; ImGuiManager::Submit's resolve waits image availability.
+	VkPipelineStageFlags vkWaitStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
 	VkSemaphore pVkSignalSemaphores[]
 	{
@@ -153,9 +145,9 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
-		.waitSemaphoreCount = static_cast<uint32_t>(std::size(pVkSemaphores)),
-		.pWaitSemaphores = pVkSemaphores,
-		.pWaitDstStageMask = pVkPipelineStageFlags,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &rCommandBuffers.mGlobalFinishedVkSemaphore,
+		.pWaitDstStageMask = &vkWaitStage,
 		.commandBufferCount = 1,
 		.pCommandBuffers = &rCommandBuffers.mMainVkCommandBuffer,
 		.signalSemaphoreCount = static_cast<uint32_t>(std::size(pVkSignalSemaphores)),

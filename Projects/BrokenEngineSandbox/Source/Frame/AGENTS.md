@@ -22,14 +22,20 @@ order or participation changes.
   no collection has explicit per-collection dispatch. Register new collections
   in the correct tuple and preserve deterministic ordering: the three ship types
   follow in `ShipType` order, which `ForEachShipType`, the registry source
-  layers, and `Frame::OwnershipLayers` share. `FrameInterpolate::Values()` and
+  layers, and `Frame::OwnershipLayers` share. The client's tuples alone append
+  the client-only Wrecks after Battleships (`Collections/Battleships/AGENTS.md`
+  `## Wreck Invariants`). `GameServerInterpolateCollections` and
+  `GameServerPostRenderCollections` list the collections both builds hold;
+  `Frame::kiVersion`, `Crcs`, `LogDifferences`, and `ServerRead` with its pair
+  check walk only them, and a server-build `static_assert` keeps them equal to
+  the server's build-local tuples. `FrameInterpolate::Values()` and
   `FramePostRender::Values()` list the game frame-wide values under the engine
   `Values()` rule (`../../../../Engine/Source/Frame/AGENTS.md`
   `## Collection and Serialization Invariants`).
 - `SharedCrcMembers()` is a subset of `SharedMembers()`. Full `Write()`/`Read()`
   is build-local; `ServerRead()` consumes the shared cross-build format. Both
   `Read()` and `ServerRead()` require exact Interpolate/PostRender count and
-  capacity parity across every registered collection pair and rebuild ID maps
+  capacity parity across every collection pair they read and rebuild ID maps
   (`../../../../Engine/Source/Frame/Collections/AGENTS.md`); build-local reads
   replace the destination only after the full frame passes that check.
 - `Frame::kiVersion` composes the navigation version, the island scale
@@ -38,14 +44,20 @@ order or participation changes.
 - At save/replay read boundaries, reject a non-finite ship-spawn timer or one at
   or above the shared 0.5-second spawn interval as a corrupt stream, and leave
   smaller finite values unchanged before the loop that repeatedly subtracts the
-  interval.
-- Random-spawn waves cap enemy population per cell and per ship type: a wave
-  adds at most twice the cell's non-dying fleet ships of its type minus its
-  non-dying random-spawn ships of that type. The cap only limits new spawns;
-  random-spawn ships are never removed when the fleet shrinks or leaves the
-  cell. Each ship a wave places draws one coin toss right before its `Spawn`
-  call, and a skipped chevron slot draws none; a win sets its
-  `ShipOrders::kTargetFlagship` (`Collections/Ships/AGENTS.md`).
+  interval. Also reject a mirror-fleet uuid range (below) whose first value
+  exceeds its end or whose end exceeds `uiNextUuid`.
+- A cell's random-spawn ships form two mirror fleets, each sized per type by
+  the cell's non-dying fleet ships of that type, up to the wave cap
+  `kiMaximumFleetSize`. A fleet is known by its own `FramePostRender` range of
+  `uiNextUuid` values its last spawn used
+  (`uiMirrorFleet<N>FirstUuid`/`uiMirrorFleet<N>EndUuid`): it is alive while a
+  non-dying ship row's registry id lies in that range, and each spawn attempt
+  respawns whole, one wave per type in `ShipType` order, every fleet that is
+  not; a short or partly destroyed fleet is never refilled. Random-spawn ships
+  are never removed when the fleet shrinks or leaves the cell. Each ship a wave
+  places draws one coin toss right before its `Spawn` call, and a skipped
+  chevron slot draws none; a win sets its `ShipOrders::kTargetFlagship`
+  (`Collections/Ships/AGENTS.md`).
 - At the same read boundaries, non-dying Fighters, Omnis, and Battleships must
   own the Pushers rows one-to-one through nonzero `pPushers` handles; dying
   ships must have zero handles. Reject missing, duplicate, or orphan ownership,
@@ -63,11 +75,12 @@ order or participation changes.
   `FlightPlaneTable.h` supplies the game's heights under the engine's
   flight-plane contract (`../../../../Engine/Source/Frame/AGENTS.md`
   `## Architecture`).
-- Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`, and
-  `kDestroyShip` in Update, after every ship Update; spawn and transfer status
-  changes in the post-tick batch, outside the tick phases, through
-  `ApplySpawnStatusChange` (`StatusChange.h`). Their serialized tags and wire
-  rule are owned by game Network (`../Network/AGENTS.md`).
+- Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`,
+  `kUpdateSquadronOrders`, and `kDestroyShip` in Update, after every ship
+  Update; spawn and transfer status changes in the post-tick batch, outside the
+  tick phases, through `ApplySpawnStatusChange` (`StatusChange.h`). Their
+  serialized tags and wire rule are owned by game Network
+  (`../Network/AGENTS.md`).
 - `FrameInput` — the per-tick deterministic unit, a versioned serializable list
   of `StatusChange`s — is declared here (`FrameInput.h/.cpp`) and serialized by
   the engine stream functions in `FrameBase.h`, compiles in both builds, and

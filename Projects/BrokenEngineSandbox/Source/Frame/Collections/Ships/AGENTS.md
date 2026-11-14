@@ -58,9 +58,11 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
 - A row's CRC'd `ShipController` selects its script branch and its model.
   Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and
   run the fleet navigation below, except a fleet Fighter in its flagship's cell
-  and a fleet Omni there on a tick its tactic gives a destination
-  (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`); random-spawn rows, which the
-  frame's random-spawn waves create, carry global ID 0.
+  or in Seek and Destroy, and a fleet Omni in its flagship's cell on a tick its
+  tactic gives a destination (`../Fighters/AGENTS.md`, `../Omnis/AGENTS.md`);
+  random-spawn rows, which the frame's mirror-fleet waves create
+  (`../../AGENTS.md`), carry global ID 0, and a transfer arrival does not keep
+  a row's mirror-fleet membership.
 - A random-spawn row whose orders carry `ShipOrders::kTargetFlagship`, won by
   its spawn coin toss (`../../AGENTS.md`), targets the enemy flagship: on a tick
   its cell's previous frame holds an enemy `kIsFlagship` Battleship row past
@@ -69,11 +71,18 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   chases it as each type document describes (`../Fighters/AGENTS.md`,
   `../Omnis/AGENTS.md`, `../Battleships/AGENTS.md`). With no such flagship the
   row steers as an unflagged one that tick. The bit stays and transfers with the
-  row.
+  row. A random-spawn Battleship follows this flagship rule whatever the bit.
 - Stable global IDs provide lookup and transfer identity; flagship status is the
   `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row
   follows its own flagship, found by `pFlagshipGlobalIds` in any of the three
   types.
+- A fleet Fighter or Omni row's spawn sets `ShipOrders::kSquadron1` from its
+  member's squadron and its squadron setting bits from its member's settings
+  (`SquadronOrders`, `../../../Fleet.h`; `../../../Network/Server/AGENTS.md`
+  `## State Ownership`): `kSeekAndDestroy` and `kSharedTarget` on a Fighter
+  (`../Fighters/AGENTS.md`), `kPatrolCell` and `kPatrolTogether` on an Omni
+  (`../Omnis/AGENTS.md`). A transfer carries them, and afterwards only
+  `kUpdateSquadronOrders` changes the setting bits.
 - In PostRender Update a ship script reads other ship rows only from the
   previous frame, so the tuple order never hands it a row this tick has not
   updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon
@@ -128,12 +137,13 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   terrain graph stays on `NavigationFlightPlane`. Pushers move a ship out of a
   box it starts in. A stored destination is never snapped out of a box, because
   a point left beside a ship that moves on might never be reached.
-- Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles.
-  Flee and veer-off (`FleeRouteWaypoint`) and return to an island
-  (`ComputeFleeOrReturnDestination`) steer at a `NextRouteWaypoint` every tick,
+- Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles,
+  except the veer-off side test (`AttackOrStartVeerOff`,
+  `../Fighters/AGENTS.md`). Veer-off (`FleeRouteWaypoint`) and return to an
+  island (`ComputeReturnDestination`) steer at a `NextRouteWaypoint` every tick,
   as a hidden target's route does. In-sight attack, chase, and Omni circling
-  steering, roaming, escort, and terrain snaps all ignore rectangles, and a
-  ship in a neighbouring cell makes none.
+  steering, roaming, escort, and terrain snaps all ignore rectangles, and a ship
+  in a neighbouring cell makes none.
 - Line of sight reads no rectangle. `HasShipLineOfSight` tests the unmodified
   model box of every `IsNavRectangleRow` Battleship in the frame its caller
   reads that occupies the tested plane. That Battleship-only walk matches the
@@ -174,45 +184,51 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   ignores it; the [turning rule](#turning-invariants) covers Fighter and
   Battleship rows.
 - Target choice treats a ship as on its nearest flight plane
-  (`NearestFlightPlane`), while collision and hits stay normal 3D. Battleship
-  missiles and Omni blasters target only an enemy whose nearest plane is the
-  shooter's stored plane, hitting a climbing target only by 3D contact: a
-  missile aims along the horizontal offset to its target and flies on the
-  lowest plane (`../Missiles/AGENTS.md`), and an Omni
-  bolt flies flat along the Omni's hull. The Fighter beam
-  has its own plane rule (`../Fighters/AGENTS.md`). All three weapons fire only
-  at an enemy in line of sight (`HasShipLineOfSight`) on the shooter's stored
-  plane. The test is 2D against the Battleship model boxes above and tier 0's
-  inflated navigation polygons for every shooter (`kiFiringClearanceTier`), so
-  it blocks slightly early near terrain; it is unchecked on a plane without
-  terrain collision, which no Battleship box occupies
-  (`kiBattleshipHighestFlightPlane`). An Omni faces only an
-  enemy in line of sight. A ship storing `kuiNoFlightPlane` fires none of them,
-  and a Battleship launches missiles only while exactly at its stored plane's
-  effective flight height. No Omni targets, chases, or faces an enemy above its
-  highest plane.
+  (`NearestFlightPlane`), while collision and hits stay normal 3D. Omni blasters
+  target only an enemy whose nearest plane is the shooter's stored plane, and
+  Battleship missiles only one whose nearest plane is the launching tube's
+  nearest plane, each hitting a climbing target only by 3D contact: a missile
+  aims along the horizontal offset to its target and flies on the lowest plane
+  (`../Missiles/AGENTS.md`), and an Omni bolt flies flat along the Omni's hull.
+  The Fighter beam has its own plane rule (`../Fighters/AGENTS.md`). All three
+  weapons fire only at an enemy in line of sight (`HasShipLineOfSight`): the
+  Omni blaster and Fighter beam from the shooter's origin on its stored plane,
+  a Battleship missile from the launching tube on that tube's nearest plane
+  (`../Battleships/AGENTS.md` `## Weapon Invariants`). The test is 2D against
+  the Battleship model boxes above and tier 0's inflated navigation polygons
+  for every shooter (`kiFiringClearanceTier`), so it blocks slightly early near
+  terrain; it is unchecked on a plane without terrain collision, which no
+  Battleship box occupies (`kiBattleshipHighestFlightPlane`). An Omni faces
+  only an enemy in line of sight. A ship storing `kuiNoFlightPlane` fires none
+  of them, and a Battleship launches missiles only while exactly at its stored
+  plane's effective flight height. No Omni targets, chases, or faces an enemy
+  above its highest plane.
   These plane rules govern only target choice and aim; blaster and missile
   collision and explosion damage ignore planes, and pushers follow their
   height-derived layer rule above.
 - Every Fighter, Omni, and random-spawn Battleship keeps one attack target, the
   enemy row in the previous frame whose registry id its `pRegistryTargets`
   stores, chosen by `FindAttackTarget` (`ShipQueries.h`) or, for a
-  `kTargetFlagship` row, the flagship rule above. A fleet ship picks
-  from its flagship (`## Fleet Coordination Invariants`), a random-spawn ship
-  from itself as its type's `AGENTS.md` states. Sight is tested on the ship's
-  stored plane, so a ship changing layer sees every enemy and flies its regular
-  attack pattern. In `FindAttackTarget`'s pick an enemy in line of sight always
-  wins: a hidden kept target is kept, and routed to, only while no enemy is in
-  sight. An enemy above the type's highest plane is never a target; a
-  pick that finds no other enemy clears a kept target there. The pick and the
-  flagship chases test `HasShipLineOfSight`, a chase on the ship's own clearance
-  tier. Movement decisions after a pick retest terrain only (`HasLineOfSight`)
-  on the ship's own clearance tier, which can hide a target the tier-0 pick saw;
-  the box test does not depend on the tier. While the target is hidden the ship
-  steers at its `NextRouteWaypoint` on the target's nearest plane every tick, an
+  `kTargetFlagship` row or a random-spawn Battleship, the flagship rule above.
+  A fleet ship picks from its flagship (`## Fleet Coordination Invariants`), a
+  random-spawn ship from itself as its type's `AGENTS.md` states, except where
+  a fleet Fighter's squadron settings pick for it (`../Fighters/AGENTS.md`).
+  Sight is tested on the ship's stored plane, so a ship changing layer sees
+  every enemy and flies its regular attack pattern. In `FindAttackTarget`'s
+  pick an enemy in line of sight always wins: a hidden kept target is kept, and
+  routed to, only while no enemy is in sight, except under `FindAttackTarget`'s
+  `AttackTargetFlags::kIgnoreLineOfSight`, used only for those squadron
+  settings. An enemy above the type's highest plane is never a target; a pick
+  that finds no other enemy clears a kept target there. The pick and the
+  imposed-target chases (flagship and squadron settings) test
+  `HasShipLineOfSight`, a chase on the ship's own clearance tier. Movement
+  decisions after a pick retest terrain only (`HasLineOfSight`) on the ship's
+  own clearance tier, which can hide a target the tier-0 pick saw; the box test
+  does not depend on the tier. While the target is hidden the ship steers at
+  its `NextRouteWaypoint` on the target's nearest plane every tick, an
   exception to the path-query cadence (`## Fleet Navigation Invariants`), and
-  starts no veer-off; a random-spawn ship returning to an island and a fleeing
-  random-spawn Battleship skip that route. Fleet Battleships pick none.
+  starts no veer-off; a random-spawn Fighter or Omni returning to an island
+  skips that route. Fleet Battleships pick none.
 
 ## Fleet Coordination Invariants
 
@@ -221,21 +237,24 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   `kfWeaponsFreeDistanceSquared` x/y distance of the flagship
   (`FleetCoordination.cpp`), escort otherwise. Only a flagship row in the cell
   gives its fleet a stance and position; enemies in other cells are not seen.
-- Fleet Fighters and fleet Omnis steer by the stance through one shared tactic
-  function keyed by ship type (`ChooseFleetTactic`): escort at a Fighter's own
-  slot among the fleet's Fighters, and no destination for an Omni, which then
-  patrols (`../Omnis/AGENTS.md`); while weapons free, Attack, which an Omni's
-  script turns into circling the target (`../Omnis/AGENTS.md`). A fleet Fighter
-  calls it through `ChooseFighterFleetTactic`, which adds Veer-off.
-  `../Fighters/AGENTS.md` documents the slots.
-- A weapons-free fleet Omni, or fleet Fighter not finishing a veer-off, attacks
-  its kept attack target (`## Ship Invariants`), picked from its flagship in
-  x/y. Escort and veer-off leave the id untouched, so a target that died or left
-  keeps its stale id until the next pick; in Update only leaving the flagship's
-  cell, or a pick dropping a kept target above the type's highest plane
-  (`## Ship Invariants`), clears it. Registry ids come from a frame-wide counter
-  (`MakeUuid`, `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale
-  id never names another row.
+- Patrol fleet Fighters and fleet Omnis steer by the stance through one shared
+  tactic function keyed by ship type (`ChooseFleetTactic`): escort at a
+  Fighter's own slot among the fleet's Fighters, and no destination for an
+  Omni, which then patrols (`../Omnis/AGENTS.md`); while weapons free, Attack,
+  which an Omni's script turns into circling the target (`../Omnis/AGENTS.md`).
+  A Patrol fleet Fighter calls it through `ChooseFighterFleetTactic`, which adds
+  Veer-off. `../Fighters/AGENTS.md` documents the slots and Seek and Destroy.
+- A weapons-free fleet Omni, or Patrol fleet Fighter not finishing a veer-off,
+  attacks its kept attack target (`## Ship Invariants`), picked from its
+  flagship in x/y; a Same Target Fighter instead takes its squadron's shared
+  target first (`../Fighters/AGENTS.md`). Escort and veer-off leave the id
+  untouched, except for a Fighter's squadron-setting picks
+  (`../Fighters/AGENTS.md`), so a target that died or left keeps its stale id
+  until the next pick; in Update only leaving the flagship's cell, or a pick
+  dropping a kept target above the type's highest plane (`## Ship Invariants`),
+  clears it. Registry ids come from a frame-wide counter (`MakeUuid`,
+  `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale id never
+  names another row.
 
 ## Fleet Navigation Invariants
 
@@ -251,6 +270,17 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   and, on a tick the Omni's flagship is in its cell, replaces the fleet
   override, flagship following, and the cell-change timer. Mode transitions
   depend only on shared state.
+- A Patrol Cell Omni (`kPatrolCell`, `## Ship Invariants`) picks a random
+  point on a random centred island instead of a point around its flagship, or,
+  in a cell with no centred island, a point uniform within
+  `engine::kfCellHalfWidth` of the cell center; either pick is snapped and kept
+  only inside `kfOmniPatrolCellInset`, else dropped as a patrol pick is. With
+  `kPatrolTogether` too, its squadron's leader is the lowest-global-ID
+  non-dying, non-healing Omni in the previous frame with the same flagship,
+  `kSquadron1`, and both setting bits; the leader picks, and every other such
+  row takes the leader's previous-frame destination whenever it is set and
+  differs from its own, recomputing its path on that change, and skips the
+  off-plane snap and the arrival reset.
 - Flagship following has no frame-local exit when the flagship row is not in
   the follower's cell, and the server never reassigns the flagship: a fleet's
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
@@ -259,7 +289,8 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
 - Path queries run on a deterministic cadence staggered by tick and stable
   global ID, with immediate recomputation for mode or destination changes. A
   tick a fleet Omni's patrol pick (`../Omnis/AGENTS.md`) or an island
-  destination is dropped keeps the cached steering with no recompute.
+  destination is dropped, or a Patrol Together follower and its leader both
+  have no destination, keeps the cached steering with no recompute.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current
   position. Both tests are needed: containment ahead does not imply containment
@@ -275,11 +306,13 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
   a cell with no centred islands neither mode draws: mode 7 skips the mirror and
   mode 6 navigates to the cell center instead of an island. A fleet Omni's
-  patrol pick instead draws two values per attempt in any cell; a fleet Omni
-  never enters mode 7, so none of its ticks can flip between the modes. Only the
-  draw count matters — each `common::Random` advances the shared random stream
-  once no matter what bound it is given — so mode 7's mirror draws are
-  load-bearing, not dead code, even though it throws their results away.
+  Escort patrol pick instead draws two values per attempt in any cell, a Patrol
+  Cell pick three on a centred island and two otherwise, and a Patrol Together
+  follower none; a fleet Omni never enters mode 7, so none of its ticks can
+  flip between the modes. Only the draw count matters — each `common::Random`
+  advances the shared random stream once no matter what bound it is given — so
+  mode 7's mirror draws are load-bearing, not dead code, even though it throws
+  their results away.
 - Every ship's island decisions, destination picks and returns alike, read the
   cell's `CentredIslands`, never its full list
   (`../../../../../../Engine/Source/Frame/AGENTS.md`
@@ -306,7 +339,8 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
 - Every row stores its horizontal wanted heading in `pVecAiDirections`: fleet
   rows their navigation or fleet tactic bearing, random-spawn rows the
   normalized horizontal direction to their destination. Without a destination a
-  random-spawn row keeps its previous wanted heading with
+  random-spawn row, or an idle Seek and Destroy fleet Fighter
+  (`../Fighters/AGENTS.md`), keeps its previous wanted heading with
   `ShipFlags::kNoAiDirection` set, and its wanted rate is zero; the flag is
   clear while it has one.
 - Interpolate Update, while the previous turn rate is exactly 0, the previous

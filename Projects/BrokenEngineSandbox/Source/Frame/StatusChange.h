@@ -33,6 +33,7 @@ enum class StatusChangeType : uint8_t
 	kDestroyShip,
 	kUpdateShip,
 	kUpdateFleet,
+	kUpdateSquadronOrders,
 
 	kCount,
 };
@@ -66,20 +67,21 @@ inline const char* StatusChangeTypeName(StatusChangeType eType)
 {
 	switch (eType)
 	{
-		case StatusChangeType::kSpawnFighter:        return "SpawnFighter";
-		case StatusChangeType::kSpawnOmni:           return "SpawnOmni";
-		case StatusChangeType::kSpawnBattleship:     return "SpawnBattleship";
-		case StatusChangeType::kSpawnBlaster:        return "SpawnBlaster";
-		case StatusChangeType::kSpawnMissile:        return "SpawnMissile";
-		case StatusChangeType::kTransferFighter:     return "TransferFighter";
-		case StatusChangeType::kTransferOmni:        return "TransferOmni";
-		case StatusChangeType::kTransferBattleship:  return "TransferBattleship";
-		case StatusChangeType::kTransferBlaster:     return "TransferBlaster";
-		case StatusChangeType::kTransferMissile:     return "TransferMissile";
-		case StatusChangeType::kDestroyShip:         return "DestroyShip";
-		case StatusChangeType::kUpdateShip:          return "UpdateShip";
-		case StatusChangeType::kUpdateFleet:         return "UpdateFleet";
-		case StatusChangeType::kCount:               break;
+		case StatusChangeType::kSpawnFighter:         return "SpawnFighter";
+		case StatusChangeType::kSpawnOmni:            return "SpawnOmni";
+		case StatusChangeType::kSpawnBattleship:      return "SpawnBattleship";
+		case StatusChangeType::kSpawnBlaster:         return "SpawnBlaster";
+		case StatusChangeType::kSpawnMissile:         return "SpawnMissile";
+		case StatusChangeType::kTransferFighter:      return "TransferFighter";
+		case StatusChangeType::kTransferOmni:         return "TransferOmni";
+		case StatusChangeType::kTransferBattleship:   return "TransferBattleship";
+		case StatusChangeType::kTransferBlaster:      return "TransferBlaster";
+		case StatusChangeType::kTransferMissile:      return "TransferMissile";
+		case StatusChangeType::kDestroyShip:          return "DestroyShip";
+		case StatusChangeType::kUpdateShip:           return "UpdateShip";
+		case StatusChangeType::kUpdateFleet:          return "UpdateFleet";
+		case StatusChangeType::kUpdateSquadronOrders: return "UpdateSquadronOrders";
+		case StatusChangeType::kCount:                break;
 	}
 	return "Unknown";
 }
@@ -124,6 +126,19 @@ struct UpdateFleetData
 	}
 };
 
+// A Fighter or Omni row's squadron settings; the apply replaces only its kSquadronOrderBits.
+struct UpdateSquadronOrdersData
+{
+	ShipType eType {};
+	int64_t iUuid = 0;
+	ShipOrders_t orders {};
+
+	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateSquadronOrdersData, eType), FRAME_COLUMN(UpdateSquadronOrdersData, iUuid), FRAME_COLUMN(UpdateSquadronOrdersData, orders)> Fields()
+	{
+		return {};
+	}
+};
+
 using StatusChangeData = std::variant<
 	FightersPostRender::SpawnInfo,
 	OmnisPostRender::SpawnInfo,
@@ -132,7 +147,8 @@ using StatusChangeData = std::variant<
 	MissilesPostRender::SpawnInfo,
 	DestroyShipData,
 	UpdateShipData,
-	UpdateFleetData>;
+	UpdateFleetData,
+	UpdateSquadronOrdersData>;
 
 // A spawn payload's collection and tags. Pushers have no SpawnInfo and no specialization, so they cannot be
 // queued, parsed, or applied from outside their owner's Spawn.
@@ -186,19 +202,20 @@ inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 	switch (eType)
 	{
 		case StatusChangeType::kSpawnFighter:
-		case StatusChangeType::kTransferFighter:    return FightersPostRender::SpawnInfo {};
+		case StatusChangeType::kTransferFighter:      return FightersPostRender::SpawnInfo {};
 		case StatusChangeType::kSpawnOmni:
-		case StatusChangeType::kTransferOmni:       return OmnisPostRender::SpawnInfo {};
+		case StatusChangeType::kTransferOmni:         return OmnisPostRender::SpawnInfo {};
 		case StatusChangeType::kSpawnBattleship:
-		case StatusChangeType::kTransferBattleship: return BattleshipsPostRender::SpawnInfo {};
+		case StatusChangeType::kTransferBattleship:   return BattleshipsPostRender::SpawnInfo {};
 		case StatusChangeType::kSpawnBlaster:
-		case StatusChangeType::kTransferBlaster:    return BlastersPostRender::SpawnInfo {};
+		case StatusChangeType::kTransferBlaster:      return BlastersPostRender::SpawnInfo {};
 		case StatusChangeType::kSpawnMissile:
-		case StatusChangeType::kTransferMissile:    return MissilesPostRender::SpawnInfo {};
-		case StatusChangeType::kDestroyShip:        return DestroyShipData {};
-		case StatusChangeType::kUpdateShip:         return UpdateShipData {};
-		case StatusChangeType::kUpdateFleet:        return UpdateFleetData {};
-		case StatusChangeType::kCount:              break;
+		case StatusChangeType::kTransferMissile:      return MissilesPostRender::SpawnInfo {};
+		case StatusChangeType::kDestroyShip:          return DestroyShipData {};
+		case StatusChangeType::kUpdateShip:           return UpdateShipData {};
+		case StatusChangeType::kUpdateFleet:          return UpdateFleetData {};
+		case StatusChangeType::kUpdateSquadronOrders: return UpdateSquadronOrdersData {};
+		case StatusChangeType::kCount:                break;
 	}
 	ASSERT(false);
 	std::unreachable();

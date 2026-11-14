@@ -34,11 +34,6 @@ static int64_t siExplosionPuffTypeIndex = kiInvalidControllerType;
 
 void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity)
 {
-	if (!(trailId.uuid.iValue != 0))
-	{
-		return;
-	}
-
 	SmokeTrailsInterpolate::Sync(rFrameInterpolate, trailId,
 	{
 		.vecPosition = vecPosition,

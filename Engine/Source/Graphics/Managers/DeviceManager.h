@@ -13,6 +13,7 @@ enum class DeviceCapabilityFlags : uint8_t
 	kTransferQueueFamilyOwnershipTransferOptional = 1 << 1,
 	kSmoothLinesEnabled                           = 1 << 2,
 	kWideLinesEnabled                             = 1 << 3,
+	kCalibratedTimestampsEnabled                  = 1 << 4,
 };
 
 class DeviceManager : public common::Singleton<DeviceManager>
@@ -32,6 +33,8 @@ public:
 	VkPipelineCache mVkPipelineCache = VK_NULL_HANDLE;
 
 	common::Flags<DeviceCapabilityFlags> mCapabilities;
+	// Null unless kCalibratedTimestampsEnabled is set.
+	PFN_vkGetCalibratedTimestampsKHR mpVkGetCalibratedTimestamps = nullptr;
 
 	VkCommandPool mOneShotVkCommandPool = VK_NULL_HANDLE;
 	VkFence mOneShotVkFence = VK_NULL_HANDLE;

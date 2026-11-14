@@ -42,8 +42,8 @@ public:
 	void CreateScreenDependentResources();
 
 	void Prepare(int64_t iFramebuffer);
-	// Waits Main's completion when bAfterMain; otherwise waits swapchain image availability and discards the present
-	// image into the pass's load layout.
+	// Always waits swapchain image availability. When bAfterMain, also waits Main's completion and records the HDR
+	// resolve into the present image; otherwise discards the present image into the pass's load layout.
 	void Submit(int64_t iFramebuffer, bool bAfterMain);
 	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);
 	void UpdateTextArea(TextAreas eTextArea, std::string_view characters);

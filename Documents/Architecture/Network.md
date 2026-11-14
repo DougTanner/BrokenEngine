@@ -416,40 +416,54 @@ sizes are the full packet including the type byte.
 | `kClientDebugFrameRequest` | 17 | 17 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown in every build; independent per-client two-second wall-clock cooldown; otherwise a no-op when `kbDesynchronizationDebugFrames == false` |
 | `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; a report whose header is not the one `HandleException` writes, including its crash-report version line, → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per UTC calendar day, counted in memory so a restart resets the count, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root; GitHub posting: `Engine/Source/AGENTS.md` `## Crash Reporting`; the server sends no reply |
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
-| `kClientFleetNavigationDelay` | `GameMessages::FleetNavigationDelayRequestMessage::kiSize` + 1 | `GameMessages::FleetNavigationDelayRequestMessage::kiSize` + 1 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
+| `kClientFleetNavigation` | `GameMessages::FleetNavigationRequestMessage::kiSize` + 1 | `GameMessages::FleetNavigationRequestMessage::kiSize` + 1 | 8 | yes | violation | nav delay non-finite or outside `[0,60]` → corrupt, never clamped; behaviour byte at or above `FleetBehaviour::kCount` → corrupt; hold coordinate (0,0) → corrupt; fleet-guid lookup |
 | `kClientCreateFleetRequest` | `GameMessages::CreateFleetRequestMessage::kiSize` + 1 | `GameMessages::CreateFleetRequestMessage::kiSize` + 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
 | `kClientSpawnIntoFleetRequest` | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; no open squadron of that type (`FindOpenFleetSquadron`) → refused with a warning |
 | `kClientDestroyFleetMemberRequest` | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
+| `kClientMapFleetMarkersRequest` | `GameMessages::MapFleetMarkersRequestMessage::kiSize` + 1 | `GameMessages::MapFleetMarkersRequestMessage::kiSize` + 1 | 2 | yes | violation | none; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
+| `kClientSquadronOrdersRequest` | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 or a flags bit outside `kSquadronOrderFlags` → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
 | `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
 client-sendable). The current wire-protocol version is `kiProtocolVersion`.
-Version 49 removed the `kSpawnExplosion` status change and its
+Version 53 renamed the fighter-orders request `kClientSquadronOrdersRequest`
+and its status change `kUpdateSquadronOrders`, which gained a ship-type byte;
+the request now also carries the Omni squadron settings (`kOmniOrderFlags`),
+which FleetSync member flags also gained, and the status change the
+`ShipOrders` bits `kPatrolCell` and `kPatrolTogether`; version 52 appended the
+`kClientFighterOrdersRequest` packet and the `kUpdateFighterOrders` status
+change, and FleetSync member flags gained the `kFighterOrderFlags` bits;
+version 51 renamed the fleet navigation-delay request
+`kClientFleetNavigation` and added the fleet behaviour byte and hold coordinate
+to it and to each FleetSync fleet header; version 50 appended the
+`kClientMapFleetMarkersRequest` and `kServerMapFleetMarkers` packets; version
+49 removed the `kSpawnExplosion` status change and its
 `ExplosionsPostRender::SpawnInfo` payload, so every later `StatusChangeType`
-value moved down one; version 47 added a squadron byte to each FleetSync member;
-version 43 made the `kServerCoordinateStaticData` count one navigation graph per
-game `kNavigationGraphs` entry (clearance tier and flight plane) instead of one
-per flight plane; version 42 added the missile cooldown `nextMissileFireTime` to
-the Battleship `SpawnInfo` `Fields()`; version 41 removed the client
-update-owned-entity request, so every later game packet type moved down one
-value, and dropped the weapon-mode fields from the `UpdateShip` payload and the
-Omni `SpawnInfo` `Fields()`; version 40 replaced the beam cooldown
-`nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()` with the missile
-tube slot `uiNextMissileTube`; version 39 replaced the two Battleship blaster
-cooldowns in the Battleship `SpawnInfo` `Fields()` with the one beam cooldown
-`nextBeamFireTime`; version 38 made every cell a flat-top hexagon: each
-`GridCoord` on the wire carries axial coordinates (`iQ`, `iR`), every cell-local
-position is local to its hexagon, and a `kClientSubscribe` coord must lie within
-grid distance 1 of an authorized coord; version 37 added the replay playback
-byte to the accepted `kServerConnectionResponse` and to
-`kServerLoadNotification`; version 36 dropped `bIsFlagship` and
-`flagshipGlobalId` from the `UpdateFleetData` `Fields()` list and removed
-`kClientRespawnInFleetRequest` and `kClientDeleteFleetRequest`, shifting the
-later `GamePacketType` values; version 35 made the `kClientCrashReport` payload
-a crash report whose header, including its crash-report version line, the server
-parses and rejects as corrupt when it does not match; version 34 added
+value moved down one; version 47 added a squadron byte to each FleetSync
+member; version 43 made the `kServerCoordinateStaticData` count one navigation
+graph per game `kNavigationGraphs` entry (clearance tier and flight plane)
+instead of one per flight plane; version 42 added the missile cooldown
+`nextMissileFireTime` to the Battleship `SpawnInfo` `Fields()`;
+version 41 removed the client update-owned-entity request, so every later
+game packet type moved down one value, and dropped the weapon-mode fields from
+the `UpdateShip` payload and the Omni `SpawnInfo` `Fields()`; version 40
+replaced the beam cooldown `nextBeamFireTime` in the Battleship `SpawnInfo`
+`Fields()` with the missile tube slot `uiNextMissileTube`; version 39 replaced
+the two Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()`
+with the one beam cooldown `nextBeamFireTime`; version 38 made every cell a
+flat-top hexagon: each `GridCoord` on the wire carries axial coordinates
+(`iQ`, `iR`), every cell-local position is local to its hexagon, and a
+`kClientSubscribe` coord must lie within grid distance 1 of an authorized
+coord; version 37 added the replay playback byte to the accepted
+`kServerConnectionResponse` and to `kServerLoadNotification`; version 36
+dropped `bIsFlagship` and `flagshipGlobalId` from the `UpdateFleetData`
+`Fields()` list and removed `kClientRespawnInFleetRequest` and
+`kClientDeleteFleetRequest`, shifting the later `GamePacketType` values;
+version 35 made the `kClientCrashReport` payload a crash report whose header,
+including its crash-report version line, the server parses and rejects as
+corrupt when it does not match; version 34 added
 `uiFlightPlane` to the Fighters, Omnis, and Battleships `SpawnInfo` `Fields()`
 lists (commit `a1b4bbb91`); version 33 made the `kServerCoordinateStaticData`
 payload carry one navigation graph per flight plane (an `int32_t` plane count,

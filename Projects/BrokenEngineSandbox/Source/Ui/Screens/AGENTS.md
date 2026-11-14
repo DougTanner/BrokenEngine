@@ -20,9 +20,16 @@ runtime contracts of the screens that remain here.
   `## Standard Menu Contract`).
 - Networked controls remain disabled through `NetworkUiControl` until
   authoritative state resolves the request. The fleet Fighter/Omni [x] controls
-  share one pending mark and the spawn-into-fleet buttons another; each clears
-  at the next fleet sync the client applies
-  (`FleetSelection::miAppliedFleetSyncCount`) and resets with fleet selection.
+  share one pending mark, the spawn-into-fleet buttons another, and the right
+  panel's Fighter or Omni squadron settings a third; each clears at the next
+  fleet sync the client applies (`FleetSelection::miAppliedFleetSyncCount`) and
+  resets with fleet selection.
+- With a focused Fighter or Omni member of the focused fleet, the right panel
+  draws its squadron's settings (`../../Network/Server/AGENTS.md`
+  `## State Ownership`): for a Fighter `Patrol` and `Seek and Destroy` buttons
+  and a `Same Target` checkbox, for an Omni `Escort` and `Patrol Cell` buttons
+  and a `Patrol Together` checkbox, the current button disabled. Each change
+  sends one request naming the focused member.
 - While the server plays a replay, the HUD disables every control that sends a
   simulation-affecting request; fleet and member focus change only subscriptions
   and stay enabled. The server refuses those requests during playback
@@ -36,12 +43,15 @@ runtime contracts of the screens that remain here.
 - The HUD is the only game UI that changes network subscription state: its fleet
   and owned-entity focus controls tell the client session which cells it wants,
   tagged with an explicit reason. A rebuilt focus button that drops that call
-  leaves the client drawing a cell it never subscribed to. Its nav-delay slider
-  likewise sends one fleet request on a release that changes the value, not one
-  per frame, and marks itself pending until the server answers. A release whose
-  typed value falls outside the range the server admits reverts to the fleet's
-  current delay instead of sending, because the server treats such a delay as
-  corrupt data.
+  leaves the client drawing a cell it never subscribed to.
+- The fleet's nav-delay slider, behaviour selector, and hold button, with the
+  map hold pick, share one pending mark until the server answers. The slider,
+  the selector, and the pick each send the one fleet navigation request carrying
+  the fleet's current values with only their own field changed, and only on a
+  change, so the answering sync clears the mark. The slider sends on a release
+  that changes the value, not once per frame; a release whose typed value falls
+  outside the range the server admits reverts to the fleet's current delay
+  instead of sending, because the server treats such a delay as corrupt data.
 - Unless the map shows, the fleet panel opens on auto-unhide, which fires once
   the want-state has lasted `kForceOpenGracePeriod`; while
   `FleetSelection::mbRevealFleetPanel` holds (the agent `reveal_ui` request,
@@ -73,6 +83,16 @@ runtime contracts of the screens that remain here.
   `kbDebugInput` builds; their ranges keep the opaque framing above the ceiling
   and at or below every map framing, so the map always reaches full opacity. A
   map framing or ease-length change applies at the next toggle.
+- The map also draws a dot at each live fleet flagship from the server's latest
+  marker list, the player's own fleets and other players' in different colors
+  (`kMapOwnFleetMarkerColor`, `kMapOtherFleetMarkerColor`). The client session
+  requests that list while the map is open (`../../Network/Client/AGENTS.md`).
+- The hold button opens the map in hold pick mode for its fleet. A left click on
+  a hovered cell, while no menu or Tweaks is open and no window is under the
+  mouse, closes the map and sends that cell as the hold; the origin cannot be
+  hovered during a pick (`../../Network/Server/AGENTS.md`
+  `## Deterministic Tick Contracts`). Closing the map by any path cancels the
+  pick.
 - Game Tweaks content is a developer tool, not a player-facing screen: the
   engine Tweaks screen compiles its body in only under the `kbDebugInput`
   switch, and the engine `ImGuiManager` owns its runtime draw gate

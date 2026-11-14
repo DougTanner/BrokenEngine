@@ -160,10 +160,6 @@ int64_t ServerBufferedFrames::CompressToBuffer(std::span<const char> data)
 void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, int64_t iSlot, int64_t iTick, GridCoord coordinate, const game::Frame* pFrame)
 {
 	ClientConnection* pClient = mrServer.FindClient(iClientIdentifier);
-	if (pClient == nullptr)
-	{
-		return;
-	}
 
 	// Adopting this full state makes iTick the client's ACK floor, which moves that floor backward whenever the
 	// client had already received later ticks. Record the tick so ServerBufferedFrames::ApplyAckStream admits that one
@@ -263,8 +259,9 @@ void ServerBufferedFrames::WriteBufferedFramePacket(common::Workbuffer& rWorkbuf
 		NetworkMessages::ServerCoordUpdateMessage message {fields};
 		NetworkMessages::Write(rWorkbuffer, message);
 	}
-	else if (eType == PacketType::kServerCoordinateResend)
+	else
 	{
+		ASSERT(eType == PacketType::kServerCoordinateResend);
 		NetworkMessages::ServerCoordResendMessage message {fields};
 		NetworkMessages::Write(rWorkbuffer, message);
 	}

@@ -128,12 +128,8 @@ public:
 private:
 	friend class PackChunks;
 
-	PackChunks* mpPackChunks = nullptr;
 	int64_t miEntryIndex = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
 	uint64_t muiGeneration = 0;
-	common::crc_t muiCrc = 0;
-	int64_t miOffset = 0;
-	int64_t miLength = 0;
 };
 
 #endif // BT_CLIENT

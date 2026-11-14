@@ -49,12 +49,31 @@ static ShipType AdmitShipTypeByte(uint8_t uiValue)
 	return static_cast<ShipType>(uiValue);
 }
 
+static FleetBehaviour AdmitFleetBehaviourByte(uint8_t uiValue)
+{
+	if (uiValue >= std::to_underlying(FleetBehaviour::kCount))
+	{
+		engine::NetworkMessages::ThrowCorruptStream("ServerSession fleet behaviour byte");
+	}
+	return static_cast<FleetBehaviour>(uiValue);
+}
+
 // The engine drain admits each packet through its contract row first. Every client-sendable game contract row has
 // min == max (GamePacketType.h), so admission settles each payload's size exactly and the cases below add no per-case
-// size check; only residual value checks a row cannot express — navigation-delay range, ship type bytes and global IDs — stay, and
-// they throw to drop the packet.
+// size check; only residual value checks a row cannot express — navigation-delay range, ship type, fleet behaviour and
+// squadron-orders flags bytes, the never-origin fleet hold, and global IDs — stay, and they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
+	// Answered ahead of the playback refusal: the reply only reads state, so the map works during playback.
+	if (static_cast<GamePacketType>(rPacket.iPacketType) == GamePacketType::kClientMapFleetMarkersRequest)
+	{
+		GameMessages::MapFleetMarkersRequestMessage message;
+		engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
+		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
+		SendMapFleetMarkers(rPacket.iClientId, pClient->clientGuid, mpFleetManager->mFleets);
+		return;
+	}
+
 	// Playback takes every simulation change from the recording. This is a timing refusal, not corruption, so it records
 	// no contract violation.
 	if (gpGame->mbReplaying)
@@ -96,13 +115,36 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 			mpFleetManager->mPendingDestroyFleetMemberRequests.push_back({.iClientId = rPacket.iClientId, .globalId = message.globalId});
 			break;
 		}
-		case GamePacketType::kClientFleetNavigationDelay:
+		case GamePacketType::kClientSquadronOrdersRequest:
 		{
-			GameMessages::FleetNavigationDelayRequestMessage message;
+			GameMessages::SquadronOrdersRequestMessage message;
+			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
+			if (message.globalId.iValue <= 0)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession squadron-orders global ID");
+			}
+			FleetMemberFlags_t flags {static_cast<FleetMemberFlags>(message.uiFlags)};
+			if (flags.Mask(kSquadronOrderFlags) != message.uiFlags)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession squadron-orders flags");
+			}
+			mpFleetManager->mPendingSquadronOrdersRequests.push_back({.iClientId = rPacket.iClientId, .globalId = message.globalId, .flags = flags});
+			break;
+		}
+		case GamePacketType::kClientFleetNavigation:
+		{
+			GameMessages::FleetNavigationRequestMessage message;
 			engine::NetworkMessages::Read(std::span<const uint8_t>(rPacket.payload), message);
 			float fDelay = AdmitNavigationDelay(message.fNavigationDelay);
+			FleetBehaviour eBehaviour = AdmitFleetBehaviourByte(message.uiBehaviour);
+			engine::GridCoord holdCoordinate {.iQ = message.iHoldQ, .iR = message.iHoldR};
+			// Fleet navigation never moves a flagship into the origin, so no fleet holds it.
+			if (holdCoordinate == engine::kOriginCoordinate)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession fleet hold coordinate");
+			}
 			const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
-			mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, message.fleetGuid, std::chrono::duration<float>(fDelay));
+			mpFleetManager->UpdateFleetNavigation(pClient->clientGuid, message.fleetGuid, std::chrono::duration<float>(fDelay), eBehaviour, holdCoordinate);
 			break;
 		}
 		default:
@@ -133,6 +175,7 @@ void ServerSession::FinalizeTickClients()
 void ServerSession::BuildAdvancingFrameInputs()
 {
 	mpFleetManager->ProcessDestroyFleetMemberRequests();
+	mpFleetManager->ProcessSquadronOrdersRequests();
 }
 
 void ServerSession::TickGameTimers(bool bRecording)

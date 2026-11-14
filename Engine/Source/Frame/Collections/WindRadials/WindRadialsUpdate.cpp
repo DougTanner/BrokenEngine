@@ -47,8 +47,13 @@ void WindRadialsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
+void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
 {
+	if (!gpCamera->InSpawnVisibleArea(coordinate, vecPosition))
+	{
+		return;
+	}
+
 	WindRadialsInterpolate& rInterpolate = rFrame.interpolate.windRadials;
 	WindRadialsPostRender& rPostRender = rFrame.postRender.windRadials;
 

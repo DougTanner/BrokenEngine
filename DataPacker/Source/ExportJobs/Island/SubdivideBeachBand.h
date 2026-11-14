@@ -14,5 +14,6 @@ struct SubdivisionConfig
 // 1-to-2/3/4 splits and create none, limiting the cascade to one ring. Reaching iMaximumDepth skips the
 // split and increments riDepthCapHits for the caller's warning. Append to the same vectors, compact dead
 // triangles so no UINT32_MAX sentinel remains, and let the caller recompute vertex/index counts from
-// final sizes.
-void SubdivideBeachBand(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits);
+// final sizes. Throws std::runtime_error naming rMesherGltfFile, the triangle, and the edge when three
+// input triangles share an edge, before changing the mesh.
+void SubdivideBeachBand(const std::filesystem::path& rMesherGltfFile, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits);

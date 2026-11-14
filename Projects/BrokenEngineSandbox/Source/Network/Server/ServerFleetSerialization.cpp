@@ -3,10 +3,12 @@
 #include "Network/Server/ServerFleetSerialization.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/GamePacketType.h"
+#include "Game.h"
 
 namespace game
 {
@@ -28,6 +30,56 @@ void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
+// Unreliable: each list replaces the client's previous one, so the client's next poll replaces a lost list.
+void SendMapFleetMarkers(int64_t iClientId, const engine::ClientGuid& rClientGuid, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets)
+{
+	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
+
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena markerArena = rWorkbuffer.Push();
+	for (const auto& [rOwnerGuid, rOwnerFleets] : rFleets)
+	{
+		for (const Fleet& rFleet : rOwnerFleets)
+		{
+			auto memberIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+			if (memberIt->flags & FleetMemberFlags::kIsDead)
+			{
+				continue;
+			}
+
+			auto cellIt = gpGame->mCells.find(memberIt->coordinate);
+			if (cellIt == gpGame->mCells.end())
+			{
+				continue;
+			}
+
+			const Frame& rFrame = *cellIt->second.pCurrent;
+			std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFrame, rFleet.flagshipGlobalId);
+			if (!optionalFlagship)
+			{
+				continue;
+			}
+
+			GameMessages::MapFleetMarker marker {.coordinate = memberIt->coordinate, .uiFlags = rOwnerGuid == rClientGuid ? GameMessages::MapFleetMarkersMessage::kuiOwnFlag : 0ui8};
+			XMStoreFloat2(&marker.f2Position, ShipPosition(rFrame.interpolate, *optionalFlagship));
+			rWorkbuffer.PushBack(marker);
+		}
+	}
+	std::span<const GameMessages::MapFleetMarker> markers = rWorkbuffer.Span<GameMessages::MapFleetMarker>();
+
+	LOG(kNetwork, kDebug, "SendMapFleetMarkers Client: {} Markers: {}", iClientId, std::ssize(markers));
+	for (const GameMessages::MapFleetMarker& rMarker : markers)
+	{
+		LOG(kNetwork, kDebug, "SendMapFleetMarkers Client: {} Cell: ({},{}) Own: {}", iClientId, rMarker.coordinate.iQ, rMarker.coordinate.iR, rMarker.uiFlags & GameMessages::MapFleetMarkersMessage::kuiOwnFlag);
+	}
+
+	common::ScopedWorkbufferArena packetArena = rWorkbuffer.Push();
+	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerMapFleetMarkers));
+	GameMessages::MapFleetMarkersMessage::WritePayload(rWorkbuffer, markers);
+
+	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelUnreliable, rWorkbuffer, 0);
+}
+
 static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 {
 	common::Write(rStream, rFleet.guid.uiHigh);
@@ -40,6 +92,9 @@ static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 	common::Write(rStream, rFleet.uiPendingFleetWantedCoordinateTicks);
 	common::Write(rStream, rFleet.navigationDelaySeconds.count());
 	common::Write(rStream, rFleet.cellChangeTimerSeconds.count());
+	common::Write(rStream, std::to_underlying(rFleet.eBehaviour));
+	common::Write(rStream, rFleet.holdCoordinate.iQ);
+	common::Write(rStream, rFleet.holdCoordinate.iR);
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rStream, rMember.globalId.iValue);
@@ -88,6 +143,24 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	{
 		throw std::ios_base::failure("Fleet cell change timer");
 	}
+	// Trust boundary (save / replay file): the fleet step picks the flagship's next cell by this behaviour.
+	uint8_t uiBehaviour = 0;
+	common::Read(rFileStream, uiBehaviour);
+	if (uiBehaviour >= std::to_underlying(FleetBehaviour::kCount))
+	{
+		throw std::ios_base::failure("Fleet behaviour");
+	}
+	rFleet.eBehaviour = static_cast<FleetBehaviour>(uiBehaviour);
+	int32_t iHoldQ = 0;
+	int32_t iHoldR = 0;
+	common::Read(rFileStream, iHoldQ);
+	common::Read(rFileStream, iHoldR);
+	rFleet.holdCoordinate = engine::GridCoord {.iQ = iHoldQ, .iR = iHoldR};
+	// Trust boundary (save / replay file): fleet navigation never moves a flagship into the origin, so no fleet holds it.
+	if (rFleet.holdCoordinate == engine::kOriginCoordinate)
+	{
+		throw std::ios_base::failure("Fleet hold coordinate");
+	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
 	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + 3 * sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
@@ -104,10 +177,10 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		}
 		FleetMemberFlags_t flags {};
 		flags.Read(rFileStream);
-		// Trust boundary (save / replay file): kIsDead is the only member flag.
-		FleetMemberFlags_t unknownFlags = flags;
-		unknownFlags.Set(FleetMemberFlags::kIsDead, false);
-		if (std::to_underlying(unknownFlags.meFlags) != 0)
+		// Trust boundary (save / replay file): kIsDead and the member type's SquadronOrderFlags are the only member flags.
+		FleetMemberFlags_t allowedFlags = SquadronOrderFlags(static_cast<ShipType>(uiType));
+		allowedFlags.Set(FleetMemberFlags::kIsDead);
+		if (flags.Mask(allowedFlags) != std::to_underlying(flags.meFlags))
 		{
 			throw std::ios_base::failure("Fleet member flags");
 		}
@@ -137,6 +210,17 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	}))
 	{
 		throw std::ios_base::failure("Fleet squadron capacity");
+	}
+	// Trust boundary (save / replay file): every member of a squadron, dead ones included, holds the same settings.
+	if (std::ranges::any_of(rFleet.members, [&rFleet](const FleetMember& rMember)
+	{
+		return std::ranges::any_of(rFleet.members, [&rMember](const FleetMember& rOther)
+		{
+			return rOther.eType == rMember.eType && rOther.uiSquadron == rMember.uiSquadron && rOther.flags.Mask(kSquadronOrderFlags) != rMember.flags.Mask(kSquadronOrderFlags);
+		});
+	}))
+	{
+		throw std::ios_base::failure("Fleet squadron settings");
 	}
 }
 

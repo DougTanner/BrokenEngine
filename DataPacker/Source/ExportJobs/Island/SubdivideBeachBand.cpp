@@ -5,8 +5,9 @@
 // state, and edge maps are internal. Run drives the worklist.
 struct BeachSubdivider
 {
-	BeachSubdivider(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
-		: rMeshPositions(rMeshPositions)
+	BeachSubdivider(const std::filesystem::path& rMesherGltfFile, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
+		: rMesherGltfFile(rMesherGltfFile)
+		, rMeshPositions(rMeshPositions)
 		, rMeshIndices(rMeshIndices)
 		, fBandMinimumZ(rConfig.fBandMinimumMeters)
 		, fBandMaximumZ(rConfig.fBandMaximumMeters)
@@ -47,29 +48,27 @@ struct BeachSubdivider
 		return rMeshPositions.at(static_cast<size_t>(iV * 3 + 2));
 	}
 
-	void EdgeAdd(uint64_t uiKey, int64_t iTriangle)
+	// Returns false, leaving the slots unchanged, when both slots are already full.
+	bool EdgeAdd(uint64_t uiKey, int64_t iTriangle)
 	{
 		EdgeSlots& rSlots = edgeTriangles.try_emplace(uiKey, EdgeSlots {}).first->second;
 		if (rSlots.iSlot0 < 0)
 		{
 			rSlots.iSlot0 = iTriangle;
-			return;
+			return true;
 		}
 		if (rSlots.iSlot1 < 0)
 		{
 			rSlots.iSlot1 = iTriangle;
-			return;
+			return true;
 		}
-		ASSERT(false);  // 3+ triangles share a single edge -- malformed mesh input.
+		return false;
 	}
 
 	void EdgeRemove(uint64_t uiKey, int64_t iTriangle)
 	{
 		auto it = edgeTriangles.find(uiKey);
-		if (it == edgeTriangles.end())
-		{
-			return;
-		}
+		ASSERT(it != edgeTriangles.end());
 		EdgeSlots& rSlots = it->second;
 		if (rSlots.iSlot0 == iTriangle)
 		{
@@ -88,20 +87,14 @@ struct BeachSubdivider
 	int64_t EdgeOther(uint64_t uiKey, int64_t iTriangle) const
 	{
 		auto it = edgeTriangles.find(uiKey);
-		if (it == edgeTriangles.end())
-		{
-			return -1;
-		}
+		ASSERT(it != edgeTriangles.end());
 		const EdgeSlots& rSlots = it->second;
 		if (rSlots.iSlot0 == iTriangle)
 		{
 			return rSlots.iSlot1;
 		}
-		if (rSlots.iSlot1 == iTriangle)
-		{
-			return rSlots.iSlot0;
-		}
-		return -1;
+		ASSERT(rSlots.iSlot1 == iTriangle);
+		return rSlots.iSlot0;
 	}
 
 	bool IsBandEligible(int64_t iA, int64_t iB, int64_t iC) const
@@ -158,9 +151,9 @@ struct BeachSubdivider
 		rMeshIndices.insert(rMeshIndices.end(), {static_cast<uint32_t>(iA), static_cast<uint32_t>(iB), static_cast<uint32_t>(iC)});
 		triangleAlive.push_back(1);
 		triangleDepth.push_back(iDepth);
-		EdgeAdd(EdgeKey(iA, iB), iNewTriangle);
-		EdgeAdd(EdgeKey(iB, iC), iNewTriangle);
-		EdgeAdd(EdgeKey(iC, iA), iNewTriangle);
+		VERIFY_SUCCESS(EdgeAdd(EdgeKey(iA, iB), iNewTriangle));
+		VERIFY_SUCCESS(EdgeAdd(EdgeKey(iB, iC), iNewTriangle));
+		VERIFY_SUCCESS(EdgeAdd(EdgeKey(iC, iA), iNewTriangle));
 		return iNewTriangle;
 	}
 
@@ -178,6 +171,7 @@ struct BeachSubdivider
 		rMeshIndices.at(static_cast<size_t>(iTriangle * 3 + 2)) = UINT32_MAX;
 	}
 
+	const std::filesystem::path& rMesherGltfFile;
 	std::vector<float>& rMeshPositions;
 	std::vector<uint32_t>& rMeshIndices;
 	float fBandMinimumZ = 0.0f;
@@ -199,14 +193,24 @@ void BeachSubdivider::Run()
 	triangleAlive.assign(static_cast<size_t>(iInitialTriangleCount), 1);
 	triangleDepth.assign(static_cast<size_t>(iInitialTriangleCount), 0);
 
+	// A third input triangle on one edge is bad Mesher output; reject it here, before any split changes the mesh.
 	for (int64_t i = 0; i < iInitialTriangleCount; ++i)
 	{
-		int64_t iA = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 0);
-		int64_t iB = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 1);
-		int64_t iC = rMeshIndices.at(static_cast<int64_t>(i) * 3 + 2);
-		EdgeAdd(EdgeKey(iA, iB), i);
-		EdgeAdd(EdgeKey(iB, iC), i);
-		EdgeAdd(EdgeKey(iC, iA), i);
+		int64_t piCorners[3] =
+		{
+			rMeshIndices.at(static_cast<int64_t>(i) * 3 + 0),
+			rMeshIndices.at(static_cast<int64_t>(i) * 3 + 1),
+			rMeshIndices.at(static_cast<int64_t>(i) * 3 + 2),
+		};
+		for (int64_t j = 0; j < 3; ++j)
+		{
+			int64_t iU = piCorners[j];
+			int64_t iV = piCorners[(j + 1) % 3];
+			if (!EdgeAdd(EdgeKey(iU, iV), i))
+			{
+				throw std::runtime_error(std::format("Gaea Mesher output \"{}\" triangle {} adds a third triangle to edge ({}, {}).", rMesherGltfFile.string(), i, iU, iV));
+			}
+		}
 	}
 
 	for (int64_t i = 0; i < iInitialTriangleCount; ++i)
@@ -383,8 +387,8 @@ void BeachSubdivider::AbsorbMidpoints(int64_t iTriangle, int64_t iA, int64_t iB,
 }
 
 
-void SubdivideBeachBand(std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
+void SubdivideBeachBand(const std::filesystem::path& rMesherGltfFile, std::vector<float>& rMeshPositions, std::vector<uint32_t>& rMeshIndices, const SubdivisionConfig& rConfig, int64_t& riDepthCapHits)
 {
-	BeachSubdivider subdivider(rMeshPositions, rMeshIndices, rConfig, riDepthCapHits);
+	BeachSubdivider subdivider(rMesherGltfFile, rMeshPositions, rMeshIndices, rConfig, riDepthCapHits);
 	subdivider.Run();
 }

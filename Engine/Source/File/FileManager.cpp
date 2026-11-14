@@ -19,10 +19,7 @@ ChunkReadRequest::~ChunkReadRequest()
 
 void ChunkReadRequest::Reset()
 {
-	if (mpPackChunks != nullptr)
-	{
-		mpPackChunks->CancelChunkRead(*this);
-	}
+	gpFileManager->mpPackChunks->CancelChunkRead(*this);
 }
 
 #endif // BT_CLIENT

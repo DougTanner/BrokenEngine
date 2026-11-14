@@ -94,8 +94,8 @@ static std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, ui
 		case ReplayArtifactKind::kChecksums: return "F7.replay." + std::to_string(uiCoordinateKey) + "." + std::to_string(iActivationTick) + ".checksums";
 		case ReplayArtifactKind::kFullFrames: return "F7.replay." + std::to_string(uiCoordinateKey) + "." + std::to_string(iActivationTick) + ".fullframes";
 	}
-	DEBUG_BREAK();
-	return {};
+	ASSERT(false);
+	std::unreachable();
 }
 
 static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
@@ -368,10 +368,7 @@ void Replay::RetireCoordinate(GridCoord coordinate, std::unique_ptr<game::Frame>
 	{
 		return;
 	}
-	if (it->second.empty())
-	{
-		return;
-	}
+	ASSERT(!it->second.empty());
 	if (it->second.back().bTerminal)
 	{
 		return;
@@ -765,10 +762,6 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			{
 				const ReplayWriterState& rWriterState = rWriterGenerations.back();
 				if (rWriterState.bTerminal)
-				{
-					continue;
-				}
-				if (!game::gpGame->mCells.contains(rCoordinate))
 				{
 					continue;
 				}

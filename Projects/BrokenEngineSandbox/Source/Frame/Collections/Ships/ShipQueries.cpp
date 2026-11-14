@@ -41,12 +41,12 @@ bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, en
 	return bFound;
 }
 
-bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, bool bHorizontal, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight)
+bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight)
 {
 	auto PickDistanceSquared = [&](FXMVECTOR vecEnemyPosition)
 	{
 		XMVECTOR vecOffset = XMVectorSubtract(vecEnemyPosition, vecPickFrom);
-		return XMVectorGetX(bHorizontal ? XMVector2LengthSq(vecOffset) : XMVector3LengthSq(vecOffset));
+		return XMVectorGetX((flags & AttackTargetFlags::kHorizontal) ? XMVector2LengthSq(vecOffset) : XMVector3LengthSq(vecOffset));
 	};
 	auto RegistryId = [&](ShipLocator locator)
 	{
@@ -93,6 +93,21 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 			rRegistryTarget = {};
 		}
 		return false;
+	}
+
+	if (flags & AttackTargetFlags::kIgnoreLineOfSight)
+	{
+		if (bKept)
+		{
+			rVecResult = vecKeptPosition;
+		}
+		else
+		{
+			rRegistryTarget = nearestRegistryId;
+			rVecResult = vecNearestPosition;
+		}
+		rbInLineOfSight = false;
+		return true;
 	}
 
 	if (bKept && HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecKeptPosition))

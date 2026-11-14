@@ -31,7 +31,7 @@ constexpr float kfDeltaRotationTowardsStored = 3.0f;
 
 #if defined(BT_CLIENT)
 // Defined in Missiles.cpp, where ClientInitialize also calls it.
-void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, float fDeltaRotation, float fExhaustLength);
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, float fDeltaRotation);
 void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition);
 #endif
 
@@ -78,7 +78,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 #if defined(BT_CLIENT)
-		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, lifecycleFlags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i], rPreviousPostRender.pfExhaustLengths[i]);
+		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, lifecycleFlags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i]);
 #endif // BT_CLIENT
 	}
 }
@@ -102,7 +102,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		std::chrono::duration<float> missileTime = rPrevious.pTimes[i] + deltaTime;
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
 		std::chrono::duration<float> deltaRotationDelay = rPrevious.pDeltaRotationDelays[i];
-		float fExhaustLength = rPrevious.pfExhaustLengths[i];
 		std::chrono::duration<float> nextJitter = rPrevious.pNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
 
@@ -142,8 +141,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					fDeltaRotation += fDeltaAnglePercentExtra * (-fDeltaAngleJitter + fDeltaAngleJitter * common::Random<2.0f>(rFrame.postRender.randomEngine));
 				}
 			}
-
-			fExhaustLength = kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 
 			// Validate the retained handle against the rows the registry currently considers eligible on the lowest
 			// plane; a source that died, transferred, is still in arrival grace, or left that plane drops the handle.
@@ -208,7 +205,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pTimes[i] = missileTime;
 		rCurrent.pDeltaRotationDelays[i] = deltaRotationDelay;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
-		rCurrent.pfExhaustLengths[i] = fExhaustLength;
 		rCurrent.pNextJitter[i] = nextJitter;
 
 		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())

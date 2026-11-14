@@ -356,10 +356,12 @@ static void PopulateObjectShadowsArea(int64_t iCommandBuffer, shaders::GlobalLay
 	static RetainedAreaBasis sRetainedAreaBasis {};
 	ShiftArea(sf4HeldArea, sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate));
 
-	// Refresh on schedule, on a forced reset, or early on a teleport. Phase 2 against terrain shadow's phase 1 keeps their
-	// scheduled refreshes off the same frame whenever the two cadences share a factor above 1.
+	// Refresh on schedule, on a forced reset, or early on a teleport. Phase 1 against lighting's and smoke's phase 0 keeps
+	// their scheduled refreshes off the same frame whenever the cadences share a factor above 1; against terrain shadow's
+	// phase -1 it stays off that frame only when the two cadences share a factor above 2.
 	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
-	gbObjectShadowsRefreshFrame = gbObjectShadowsReset || (gpGraphics->miFrameCounter + 2) % gObjectShadowCadence.Get<int64_t>() == 0
+	int64_t iObjectShadowCadence = gObjectShadowCadence.Get<int64_t>();
+	gbObjectShadowsRefreshFrame = gbObjectShadowsReset || gpGraphics->miFrameCounter % iObjectShadowCadence == 1 % iObjectShadowCadence
 	                           || IsVisibleCenterOutsideArea(rf4VisibleArea, sf4HeldArea);
 	gbObjectShadowsReset = false;
 	if (gbObjectShadowsRefreshFrame)
@@ -372,12 +374,15 @@ static void PopulateObjectShadowsArea(int64_t iCommandBuffer, shaders::GlobalLay
 	// Main's recorded blur dispatches read these counts; a skip zeroes Z. As with the terrain chain, write them every
 	// frame and only iCommandBuffer's slot.
 	VkExtent3D vkObjectShadowsBlurExtent = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D;
-	int64_t iGroupsX = TileCount(vkObjectShadowsBlurExtent.width);
-	int64_t iGroupsY = TileCount(vkObjectShadowsBlurExtent.height);
+	// Each blur workgroup is one strip of kiObjectShadowsBlurStripLength texels along its blur axis.
+	int64_t iWidth = vkObjectShadowsBlurExtent.width;
+	int64_t iHeight = vkObjectShadowsBlurExtent.height;
+	int64_t iStripsX = (iWidth + shaders::kiObjectShadowsBlurStripLength - 1) / shaders::kiObjectShadowsBlurStripLength;
+	int64_t iStripsY = (iHeight + shaders::kiObjectShadowsBlurStripLength - 1) / shaders::kiObjectShadowsBlurStripLength;
 	int64_t iGroupsZ = gbObjectShadowsRefreshFrame ? 1 : 0;
 	Pipeline* pPipelines = gpPipelineManager->mpPipelines;
-	pPipelines[kPipelineObjectShadowsBlurH].WriteIndirectComputeBuffer(iCommandBuffer, iGroupsX, iGroupsY, iGroupsZ);
-	pPipelines[kPipelineObjectShadowsBlurV].WriteIndirectComputeBuffer(iCommandBuffer, iGroupsX, iGroupsY, iGroupsZ);
+	pPipelines[kPipelineObjectShadowsBlurH].WriteIndirectComputeBuffer(iCommandBuffer, iStripsX, iHeight, iGroupsZ);
+	pPipelines[kPipelineObjectShadowsBlurV].WriteIndirectComputeBuffer(iCommandBuffer, iWidth, iStripsY, iGroupsZ);
 }
 
 static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, const XMFLOAT4& rf4ShadowArea, float fSunAngle, float fWorldTexelX, float fFullWidth, float fShadowElevationTextureSizeWidth, float fShadowTextureSizeWidth, float& rfShadowSunAngle)

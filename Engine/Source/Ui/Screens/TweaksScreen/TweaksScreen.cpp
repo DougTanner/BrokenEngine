@@ -99,7 +99,7 @@ void TweaksScreen::ChevronIndexSelector(std::string_view label, Wrapper& rWrappe
 	}
 
 	int64_t iCount = std::ssize(names);
-	int64_t iIndex = std::clamp(rWrapper.GetIndex(), 0i64, iCount - 1);
+	int64_t iIndex = rWrapper.GetIndex();
 
 	// Render << and >> adjacent first, then the label — keeps button positions fixed when the displayed name changes width.
 	char pcIdentifier[128];

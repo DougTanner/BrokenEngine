@@ -112,8 +112,19 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 			continue;
 		}
 
+		// A new member takes its squadron's settings; the first member of an empty squadron starts at the default.
+		FleetMemberFlags_t flags {FleetMemberFlags::kIsDead};
+		auto squadronmateIt = std::ranges::find_if(rFleet.members, [&rRequest, uiSquadron](const FleetMember& rMember)
+		{
+			return rMember.eType == rRequest.eType && rMember.uiSquadron == uiSquadron;
+		});
+		if (squadronmateIt != rFleet.members.end())
+		{
+			SetSquadronOrderFlags(flags, squadronmateIt->flags);
+		}
+
 		engine::GlobalId memberGlobalId {.iValue = gpGame->miNextGlobalId++};
-		rFleet.members.push_back(FleetMember {.globalId = memberGlobalId, .eType = rRequest.eType, .flags = FleetMemberFlags_t {FleetMemberFlags::kIsDead}, .uiSquadron = uiSquadron, .coordinate = engine::kOriginCoordinate});
+		rFleet.members.push_back(FleetMember {.globalId = memberGlobalId, .eType = rRequest.eType, .flags = flags, .uiSquadron = uiSquadron, .coordinate = engine::kOriginCoordinate});
 		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) Type: {} Member: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, ShipTypeName(rRequest.eType), memberGlobalId.iValue);
 		SendFleetSyncToClient(guid);
 	}
@@ -162,6 +173,70 @@ void ServerFleetManager::ProcessDestroyFleetMemberRequests()
 		}
 	}
 	mPendingDestroyFleetMemberRequests.clear();
+}
+
+// Every member of the named Fighter or Omni member's squadron takes the request's settings, and each live one's row gets
+// them through its cell's frame input, so all squadron members keep equal settings.
+void ServerFleetManager::ProcessSquadronOrdersRequests()
+{
+	// Heap: cell FrameInput statusChanges grow for accepted requests.
+	ScopedSuppressAllocationTracking suppress;
+
+	for (const PendingSquadronOrdersRequest& rRequest : mPendingSquadronOrdersRequests)
+	{
+		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
+		auto it = mFleets.find(pClient->clientGuid);
+		if (it == mFleets.end())
+		{
+			continue;
+		}
+		for (Fleet& rFleet : it->second)
+		{
+			auto memberIt = std::ranges::find(rFleet.members, rRequest.globalId, &FleetMember::globalId);
+			if (memberIt == rFleet.members.end())
+			{
+				continue;
+			}
+			// A type without settings, or a setting of the other type, is ignored.
+			ShipType eType = memberIt->eType;
+			FleetMemberFlags_t typeOrderFlags = SquadronOrderFlags(eType);
+			if (typeOrderFlags.meFlags == FleetMemberFlags {})
+			{
+				break;
+			}
+
+			if (rRequest.flags.Mask(typeOrderFlags) != std::to_underlying(rRequest.flags.meFlags))
+			{
+				break;
+			}
+
+			if (memberIt->flags.Mask(typeOrderFlags) == std::to_underlying(rRequest.flags.meFlags))
+			{
+				break;
+			}
+
+			uint8_t uiSquadron = memberIt->uiSquadron;
+			ShipOrders_t orders = SquadronOrders(eType, rRequest.flags);
+			for (FleetMember& rMember : rFleet.members)
+			{
+				if (rMember.eType != eType || rMember.uiSquadron != uiSquadron)
+				{
+					continue;
+				}
+				SetSquadronOrderFlags(rMember.flags, rRequest.flags);
+				if (rMember.flags & FleetMemberFlags::kIsDead)
+				{
+					continue;
+				}
+
+				ShipUuid shipUuid = ShipUuidByGlobalId(*gpGame->mCells.at(rMember.coordinate).pCurrent, rMember.globalId);
+				gpGame->mFrameInputs.at(rMember.coordinate).statusChanges.push_back({.eType = StatusChangeType::kUpdateSquadronOrders, .data = UpdateSquadronOrdersData {.eType = shipUuid.eType, .iUuid = shipUuid.iUuid, .orders = orders}});
+			}
+			SendFleetSyncToClient(pClient->clientGuid);
+			break;
+		}
+	}
+	mPendingSquadronOrdersRequests.clear();
 }
 
 void ServerFleetManager::TickFleetTimers()
@@ -250,6 +325,7 @@ void ServerFleetManager::ClearPendingRequests()
 	mPendingCreateFleetRequests.clear();
 	mPendingSpawnIntoFleetRequests.clear();
 	mPendingDestroyFleetMemberRequests.clear();
+	mPendingSquadronOrdersRequests.clear();
 }
 
 void ServerFleetManager::OnOwnedEntityTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalId, engine::GridCoord destination)
@@ -306,6 +382,7 @@ void ServerFleetManager::OnClientDisconnected(int64_t iClientId, const engine::C
 	std::erase_if(mPendingCreateFleetRequests, IsFromClient);
 	std::erase_if(mPendingSpawnIntoFleetRequests, IsFromClient);
 	std::erase_if(mPendingDestroyFleetMemberRequests, IsFromClient);
+	std::erase_if(mPendingSquadronOrdersRequests, IsFromClient);
 }
 
 void ServerFleetManager::OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid)
@@ -395,7 +472,9 @@ void ServerFleetManager::DetectFleetMemberDeaths()
 	}
 }
 
-void ServerFleetManager::UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds)
+// Runs between ticks on the main thread, like CreateFleet's fleet RNG draws: the next tick's fleet checksum differs, so
+// replay recording captures this change, the fleet RNG state included, and playback, which refuses the request, adopts it.
+void ServerFleetManager::UpdateFleetNavigation(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds, FleetBehaviour eBehaviour, engine::GridCoord holdCoordinate)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -409,8 +488,29 @@ void ServerFleetManager::UpdateFleetNavigationDelay(const engine::ClientGuid& rG
 		return;
 	}
 
-	fleetIt->second.at(static_cast<size_t>(iFleetIndex)).navigationDelaySeconds = navigationDelaySeconds;
-	LOG(kNetwork, kDebug, "ServerFleetManager::UpdateFleetNavigationDelay Guid: ({},{}) FleetGuid: ({},{}) Delay: {}", rGuid.uiHigh, rGuid.uiLow, rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(navigationDelaySeconds.count(), 3));
+	Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleetIndex));
+	rFleet.navigationDelaySeconds = navigationDelaySeconds;
+
+	// Entering Stay in Cell holds the flagship's own cell, so the request's hold is ignored there. Fleet navigation
+	// never moves a flagship into the origin, so one at the origin holds a random neighbour of it instead.
+	if (eBehaviour == FleetBehaviour::kStayInCell && rFleet.eBehaviour != FleetBehaviour::kStayInCell)
+	{
+		holdCoordinate = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId)->coordinate;
+		if (holdCoordinate == engine::kOriginCoordinate)
+		{
+			const common::HexDirection& rDirection = engine::kCellDirections.pEntries[common::Random(common::kiHexDirectionCount - 1, mRandomEngine)];
+			holdCoordinate = engine::GridCoord {.iQ = rDirection.iDeltaQ, .iR = rDirection.iDeltaR};
+		}
+	}
+
+	// A behaviour or hold change makes the fleet pick at once instead of after its delay.
+	if (eBehaviour != rFleet.eBehaviour || !(holdCoordinate == rFleet.holdCoordinate))
+	{
+		rFleet.cellChangeTimerSeconds = std::chrono::duration<float>::zero();
+	}
+	rFleet.eBehaviour = eBehaviour;
+	rFleet.holdCoordinate = holdCoordinate;
+	LOG(kNetwork, kDebug, "ServerFleetManager::UpdateFleetNavigation Guid: ({},{}) FleetGuid: ({},{}) Delay: {} Behaviour: {} Hold: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(navigationDelaySeconds.count(), 3), kpcFleetBehaviourNames[std::to_underlying(eBehaviour)], holdCoordinate.iQ, holdCoordinate.iR);
 
 	// Resync fleet to client so UI updates
 	SendFleetSyncToClient(rGuid);
@@ -422,6 +522,7 @@ void ServerFleetManager::ResetState()
 	mPendingCreateFleetRequests.clear();
 	mPendingSpawnIntoFleetRequests.clear();
 	mPendingDestroyFleetMemberRequests.clear();
+	mPendingSquadronOrdersRequests.clear();
 	mFleets.clear();
 	mGuidToClientId.clear();
 }

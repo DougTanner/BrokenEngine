@@ -49,6 +49,18 @@ game state around the deterministic Frame tick.
   and the squadron number travels through fleet sync, the grid save, and replay
   fleet records. Squadron choice and the fleet size limit:
   `FindOpenFleetSquadron` in `../../Fleet.h`.
+- A squadron's settings are member flags (`../../Fleet.h`), equal on every
+  member of the squadron: a Fighter squadron's Patrol or Seek and Destroy and
+  Same Target are the `kFighterOrderFlags`, an Omni squadron's Escort or Patrol
+  Cell and Patrol Together the `kOmniOrderFlags`. The squadron-orders request
+  sets the whole squadron, and a member added to a non-empty squadron copies a
+  squadronmate's, so an emptied squadron's next member starts at the default.
+  They travel with the member flags through fleet sync, the grid save, and
+  replay fleet records; the server's read of the grid save and replay fleet
+  records rejects a setting flag on the wrong member type and a squadron whose
+  members disagree. They reach a row as
+  `../../Frame/Collections/Fighters/AGENTS.md` and
+  `../../Frame/Collections/Omnis/AGENTS.md` state.
 - Every member, the fleet's Battleship included, is added dead with an expired
   countdown, so its first spawn and every respawn take the same path. A member
   retained after ordinary death respawns automatically when its type's countdown
@@ -105,9 +117,12 @@ game state around the deterministic Frame tick.
   from the fleet and sends the reduced full fleet sync, even if death races the
   request. A member not marked dead also queues staged destruction using its
   current cell, ship type and UUID; a dying row ignores the destruction.
-  Battleships remain members. Paused
-  updates retain the queue; consumption,
-  disconnect, reset and load clear it through the fleet request lifecycle.
+  Battleships remain members. Squadron-orders requests drain next the same way:
+  each sets its sender-owned Fighter or Omni member's squadron settings,
+  ignoring a setting of the other type, queues `kUpdateSquadronOrders` into
+  each live squadron member's cell input, and sends the fleet sync only when a
+  setting changed. Paused updates retain both queues; consumption, disconnect,
+  reset and load clear them through the fleet request lifecycle.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the
   spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
   walk owners in GUID order, because each fleet's direction draw consumes the
@@ -126,17 +141,31 @@ game state around the deterministic Frame tick.
   flagship's cell) and so stays active. Replay playback reruns the step on every
   dispatching tick with every bookkeeping effect but no frame change and no
   queued spawn, because playback takes every frame change from the recording.
-- A flagship's pick of a new cell makes its one direction draw, then asks
-  `NavQueryEdgeReachable` whether the flagship reaches an open stretch of that
-  shared edge, on its own navigation graph from its committed position. A
-  refusal takes the same branch as a missing neighbour: the timer resets with
-  no move and no second draw, so a flagship sealed on all six edges waits and
-  redraws each delay. The step builds an unbuilt cell's navigation data there
-  and never skips or assumes the edge open, since the answer reaches the fleet
-  checksum (`../../Save/AGENTS.md`). No tick runs during the step, so that build
-  cannot race `RunFrameTick`. Only this pick checks an edge: a harness
-  `UpdateFleet` order across a sealed edge routes around it by A*, because a
-  navigation graph has no cell boundary.
+- Fleet navigation never moves a flagship into the origin (0,0): it is never a
+  pick candidate, and no order sends a fleet there. A flagship's pick of a new
+  cell follows its fleet's behaviour. Random Walk draws one direction among the
+  neighbours other than the origin, then asks `NavQueryEdgeReachable` whether
+  the flagship reaches an open stretch of that shared edge, on its own
+  navigation graph from its committed position. Explore and Stay in Cell ask
+  that of every neighbour first and draw among the reachable ones that are
+  strictly farther from the origin (Explore), or strictly closer to the hold
+  coordinate, else at equal distance from it, which carries the flagship around
+  the origin (Stay in Cell). An Explore flagship with no candidate takes the
+  Random Walk pick; a Stay in Cell flagship at its hold makes no draw. A
+  refusal, a missing neighbour, or no candidate resets the timer with no move
+  and no second draw, so a flagship sealed on all six edges waits and redraws
+  each delay. The step builds an unbuilt cell's navigation data there and never
+  skips or assumes the edge open, since the answer reaches the fleet checksum
+  (`../../Save/AGENTS.md`). No tick runs during the step, so that build cannot
+  race `RunFrameTick`. Only this pick checks an edge: a harness `UpdateFleet`
+  order across a sealed edge routes around it by A*, because a navigation graph
+  has no cell boundary.
+- A fleet navigation request applies between ticks, outside the fleet step, so
+  replay fleet records carry its change (`../../Save/AGENTS.md`). Entering Stay
+  in Cell holds the flagship's own cell, ignoring the request's hold, or, for a
+  flagship at the origin, a neighbour picked by one fleet RNG draw. A behaviour
+  or hold change expires the fleet's cell-change timer, so the flagship picks as
+  soon as it next stands at its wanted cell, without waiting out its delay.
 - Agent-injected `StatusChange`s remain queued until the first normal tick at or
   after the entry's target tick whose coordinate is active and has a committed
   current Frame: a destroy or update entry then enters that tick's input at
@@ -155,12 +184,16 @@ game state around the deterministic Frame tick.
   session base drains admitted packets and records handler throws; this layer
   supplies game contracts and handles each admitted game packet in
   `HandleGamePacket`. Side-specific bounds validate navigation timing, fleet
-  sizes, and save/replay fleet data without partially applying a request.
+  behaviour, fleet sizes, and save/replay fleet data without partially applying
+  a request.
 - While the server plays a replay, `HandleGamePacket` refuses every game request
   before dispatch with a warning, because playback takes every simulation change
   from the recording and a request sent before the client learned of playback
   still arrives. A refusal for timing is not corrupt data, so it records no
-  contract violation.
+  contract violation. The one exception is the read-only
+  `kClientMapFleetMarkersRequest`, answered before the refusal so the map works
+  during playback: the server replies inline with every live fleet flagship
+  across all owners, connected or not, and keeps no per-client map state.
 - Connect-time new-client processing begins only after the engine accepts
   `ClientHello` and marks the handshake complete, and runs after the
   owned-entity rebuild has registered the client's surviving owned entities.

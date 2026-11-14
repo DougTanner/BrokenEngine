@@ -11,6 +11,8 @@ namespace game
 
 #if defined(BT_CLIENT)
 
+// The visual-error smoothing in Run and the three position helpers below is game-agnostic apart from this function's
+// ship row read: a future project may want it moved into shared engine code, depending on its requirements.
 static bool GetClientOwnedEntityPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
 {
 	std::optional<ShipLocator> optionalClientOwnedEntity = gpGame->ClientOwnedEntity(rFrame);

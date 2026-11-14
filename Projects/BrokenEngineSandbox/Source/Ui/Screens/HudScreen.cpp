@@ -376,8 +376,12 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr && gpGame->ClientOwnedEntityIdentifier() == pFleet->flagshipGlobalId)
 	{
-		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count()});
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+		// One pending mark covers the slider, the behaviour selector, the hold button, and the map hold pick. The slider,
+		// the behaviour selector, and the pick each send the fleet's current values with only their own field changed,
+		// and only on a change, so the answering sync changes the key and clears the mark.
+		engine::NetworkUiControl<FleetNavigationKey>& rNavigationControl = gpGame->mFleetSelection.mFleetNavigationControl;
+		rNavigationControl.Update(FleetNavigationKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count(), .eBehaviour = pFleet->eBehaviour, .holdCoordinate = pFleet->holdCoordinate});
+		ImGui::BeginDisabled((rNavigationControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		static float sfNavigationDelayEditValue = 0.0f;
 		static bool sbNavigationDelaySliderWasActive = false;
 		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
@@ -402,11 +406,118 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			// An unchanged synchronized delay leaves this fleet's request pending.
 			if (sfNavigationDelayEditValue != pFleet->navigationDelaySeconds.count())
 			{
-				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
+				rNavigationControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				gpClientSession->SendFleetNavigationRequest(pFleet->guid, sfNavigationDelayEditValue, pFleet->eBehaviour, pFleet->holdCoordinate);
+			}
+		}
+
+		struct BehaviourOption
+		{
+			const char* pcLabel = nullptr;
+			FleetBehaviour eBehaviour = FleetBehaviour::kRandomWalk;
+		};
+		static constexpr BehaviourOption kpBehaviourOptions[] {{.pcLabel = "Random Walk", .eBehaviour = FleetBehaviour::kRandomWalk}, {.pcLabel = "Explore", .eBehaviour = FleetBehaviour::kExplore}, {.pcLabel = "Stay in Cell", .eBehaviour = FleetBehaviour::kStayInCell}};
+		for (const BehaviourOption& rOption : kpBehaviourOptions)
+		{
+			if (ImGui::RadioButton(rOption.pcLabel, pFleet->eBehaviour == rOption.eBehaviour) && rOption.eBehaviour != pFleet->eBehaviour)
+			{
+				rNavigationControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+				gpClientSession->SendFleetNavigationRequest(pFleet->guid, pFleet->navigationDelaySeconds.count(), rOption.eBehaviour, pFleet->holdCoordinate);
+			}
+		}
+
+		if (pFleet->eBehaviour == FleetBehaviour::kStayInCell)
+		{
+			char pcHoldLabel[48];
+			std::snprintf(pcHoldLabel, sizeof(pcHoldLabel), "Hold (%d,%d)", pFleet->holdCoordinate.iQ, pFleet->holdCoordinate.iR);
+			// Sized for the widest label, so a new hold hex never resizes the button.
+			float fHoldButtonWidth = ImGui::CalcTextSize("Hold (-2147483648,-2147483648)").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+			if (ImGui::Button(pcHoldLabel, ImVec2(fHoldButtonWidth, 0.0f)))
+			{
+				// The map takes the pick (MapScreen::Render).
+				gpGame->mFleetSelection.mHoldPickFleetGuid = pFleet->guid;
+				gpGame->ToggleMap();
 			}
 		}
 		ImGui::EndDisabled();
+	}
+
+	const FleetMember* pSquadronMember = nullptr;
+	if (pFleet != nullptr)
+	{
+		auto memberIt = std::ranges::find(pFleet->members, gpGame->ClientOwnedEntityIdentifier(), &FleetMember::globalId);
+		if (memberIt != pFleet->members.end() && (memberIt->eType == ShipType::kFighter || memberIt->eType == ShipType::kOmni))
+		{
+			pSquadronMember = &*memberIt;
+		}
+	}
+	if (pSquadronMember != nullptr)
+	{
+		engine::NetworkUiControl<int64_t>& rOrdersToggle = gpGame->mFleetSelection.mSquadronOrdersToggle;
+		rOrdersToggle.Update(gpGame->mFleetSelection.miAppliedFleetSyncCount);
+		ImGui::Text("%s Squadron %d", ShipTypeName(pSquadronMember->eType), pSquadronMember->uiSquadron + 1);
+
+		// Each control sends the squadron's settings with its one change.
+		FleetMemberFlags_t orderFlags {};
+		SetSquadronOrderFlags(orderFlags, pSquadronMember->flags);
+		bool bSend = false;
+		ImGui::BeginDisabled((rOrdersToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
+		if (pSquadronMember->eType == ShipType::kFighter)
+		{
+			bool bSeekAndDestroy = pSquadronMember->flags & FleetMemberFlags::kSeekAndDestroy;
+			bool bSameTarget = !(pSquadronMember->flags & FleetMemberFlags::kSeparateTargets);
+			ImGui::BeginDisabled(!bSeekAndDestroy);
+			if (ImGui::Button("Patrol"))
+			{
+				orderFlags.Set(FleetMemberFlags::kSeekAndDestroy, false);
+				bSend = true;
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			ImGui::BeginDisabled(bSeekAndDestroy);
+			if (ImGui::Button("Seek and Destroy"))
+			{
+				orderFlags.Set(FleetMemberFlags::kSeekAndDestroy);
+				bSend = true;
+			}
+			ImGui::EndDisabled();
+			if (ImGui::Checkbox("Same Target", &bSameTarget))
+			{
+				orderFlags.Set(FleetMemberFlags::kSeparateTargets, !bSameTarget);
+				bSend = true;
+			}
+		}
+		else
+		{
+			bool bPatrolCell = pSquadronMember->flags & FleetMemberFlags::kPatrolCell;
+			bool bPatrolTogether = pSquadronMember->flags & FleetMemberFlags::kPatrolTogether;
+			ImGui::BeginDisabled(!bPatrolCell);
+			if (ImGui::Button("Escort"))
+			{
+				orderFlags.Set(FleetMemberFlags::kPatrolCell, false);
+				bSend = true;
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			ImGui::BeginDisabled(bPatrolCell);
+			if (ImGui::Button("Patrol Cell"))
+			{
+				orderFlags.Set(FleetMemberFlags::kPatrolCell);
+				bSend = true;
+			}
+			ImGui::EndDisabled();
+			if (ImGui::Checkbox("Patrol Together", &bPatrolTogether))
+			{
+				orderFlags.Set(FleetMemberFlags::kPatrolTogether, bPatrolTogether);
+				bSend = true;
+			}
+		}
+		ImGui::EndDisabled();
+		if (bSend)
+		{
+			rOrdersToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+			gpClientSession->SendSquadronOrdersRequest(pSquadronMember->globalId, orderFlags);
+		}
 	}
 
 	ImGui::End();

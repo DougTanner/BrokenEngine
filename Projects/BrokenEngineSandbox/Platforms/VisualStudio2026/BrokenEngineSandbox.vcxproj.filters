@@ -133,6 +133,9 @@
     <Filter Include="Game\Frame\Collections\Ships">
       <UniqueIdentifier>{42dfe6e3-dbfc-4aec-b93e-b4628ac42dee}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game\Frame\Collections\Wrecks">
+      <UniqueIdentifier>{7c3e9a51-2b84-4f6d-9e0a-5d1b8c2f4a73}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Game\Ui">
       <UniqueIdentifier>{fd1606d0-4688-43e7-96d0-0a61e35fefab}</UniqueIdentifier>
     </Filter>
@@ -593,6 +596,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Wrecks\Wrecks.h">
+      <Filter>Game\Frame\Collections\Wrecks</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Ui\LightingWrappers.h">
       <Filter>Game\Ui</Filter>
@@ -1192,6 +1198,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.cpp">
       <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Wrecks\Wrecks.cpp">
+      <Filter>Game\Frame\Collections\Wrecks</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Screenshot.cpp">
       <Filter>Engine\Graphics</Filter>

@@ -135,11 +135,11 @@ The `argument-hint` value selects the Plan:
    when every required review has completed and accepted findings are resolved,
    or a missing mandatory reviewer is reported as a blocker.
 6. Unless step 10 already ran (the changes-requested row in
-   `### Post-checkpoint outcomes`), invoke step 3's claim script idempotently
-   with `-Plan '<claimed Plan path>'`, never bare, immediately before the final
-   preparation handoff: another session's `plan validate` or `plan claim-next`
-   can release this session's claim, and a bare run would then claim a
-   different Plan the user never confirmed.
+   `### Post-checkpoint outcomes`), invoke step 3's `Invoke-NextPlanClaim.ps1`
+   idempotently with `-Plan '<claimed Plan path>'`, never bare, immediately
+   before the final preparation handoff: another session's `plan validate` or
+   `plan claim-next` can release this session's claim, and a bare run would
+   then claim a different Plan the user never confirmed.
 
    On a `claim.plan-moved` result, main asks the user whether to claim
    `moved.to`; a yes reruns step 3's claim with `-Plan '<moved.to>'`, from then
@@ -224,9 +224,9 @@ The `argument-hint` value selects the Plan:
    Done when the success result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
-   `SESSION COMPLETE` as the last line only
-   when the `/finalize-changes` handoff carried it. Done when the final
-   message's last line matches that rule for the run's outcome.
+   `SESSION COMPLETE` and the `/reset-worktree?` suggestion only when the
+   `/finalize-changes` handoff carried its `SESSION COMPLETE` line. Done when
+   the final message's ending matches that rule for the run's outcome.
 
 ### Post-checkpoint outcomes
 
@@ -361,17 +361,19 @@ in its citing Plan to that stage Plan's file name.
 
 ### IMPORTANT: Session-complete marker
 
-The user closes the session tab on this line alone, so it must be
+The user decides on this line alone that the run is over, so it must be
 unambiguous. When, and only when, the `/finalize-changes` handoff carries its
 `SESSION COMPLETE` line, whose conditions that skill's `## Handoff` owns,
-main's final message of that turn ends with the bare line `SESSION COMPLETE` as
-its very last line and asks the user nothing. Every other ending — retained
-claim, blocker, refused approval, deferral, unknown claim state, or work still
-to land — never prints that line.
+main's final message of that turn ends with the bare line `SESSION COMPLETE`
+followed by the bare last line `/reset-worktree?` (order: that skill's
+`## When to use`), and asks the user nothing else. Every other ending —
+retained claim, blocker, refused approval, deferral, unknown claim state, or
+work still to land — prints neither line.
 
 ## Rules
 
-- The preparation worker must never run the mutation-capable claim script.
+- The preparation worker must never run
+  `.agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1`.
 - Every result is acted on per its `nextAction`, never by reconstructing a
   script's transitions, and for a `-Plan`-targeted invocation the manager never
   selects or claims a different candidate in that run, except for a

@@ -321,18 +321,11 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	if (rCell.iSnapshotCount == 0)
-	{
-		return;
-	}
+	ASSERT(rCell.iSnapshotCount > 0);
 
 	int64_t iTailOffset = rCell.iSnapshotCount - 1;
 	int64_t iTailPhysical = SnapshotIndex(rCell.iSnapshotHead, iTailOffset);
 	game::Frame* pTail = rCell.ppSnapshots[iTailPhysical].get();
-	if (pTail == nullptr)
-	{
-		return;
-	}
 
 	if (pTail->interpolate.iTick >= iTargetTick)
 	{

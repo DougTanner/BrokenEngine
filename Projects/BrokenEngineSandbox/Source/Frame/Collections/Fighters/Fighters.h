@@ -42,7 +42,6 @@ inline constexpr float kfFighterClimbTilt = 0.35f;
 inline constexpr HeadingMovementConstants kFighterMovement
 {
 	.fChaseAcceleration = kfFighterAcceleration,
-	.fFleeAcceleration = 12.0f,
 	.fReturnAcceleration = kfFighterAcceleration,
 	.fDrag = kfFighterDrag,
 	.fMaximumSpeed = kfFighterMaxSpeed,
@@ -175,7 +174,7 @@ using fighter_t = engine::Id<FightersInterpolate>;
 
 struct FightersPostRender : public engine::Collection<FightersPostRender>
 {
-	static constexpr int64_t kiVersion = 11;
+	static constexpr int64_t kiVersion = 12;
 
 	// Simulation keeps the beam countdown finite and at most kFighterBeamCooldown; the floor is only finite because a
 	// fighter with no target counts down without a clamp. Written as one range test so NaN and both infinities fail it too.
@@ -249,7 +248,6 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecDamageDirections = nullptr;
 	float* __restrict pfHealths = nullptr;
-	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
 	std::chrono::duration<float>* __restrict pNextBeamFireTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
@@ -262,22 +260,24 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	std::chrono::duration<float>* __restrict pCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecAiDirections = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
-	// The enemy position a Veer-off flies away from, read only while ShipFlags::kVeerOff is set.
+	// The point a Veer-off flies away from, read only while ShipFlags::kVeerOff is set: the enemy position at the start,
+	// moved sideways toward a side blocked on one side only.
 	XMVECTOR* __restrict pVecVeerOffPoints = nullptr;
 	// The kept attack target's registry id, zero for none.
 	engine::registry_id_t* __restrict pRegistryTargets = nullptr;
 #if defined(BT_CLIENT)
+	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
 	XMVECTOR* __restrict pVecDebugNavigationWaypoints = nullptr;
 #endif // BT_CLIENT
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecDebugNavigationWaypoints);
+		return std::tie(rSelf.pDestroyedExplosionTimes, rSelf.pVecDebugNavigationWaypoints);
 	}
 #endif // BT_CLIENT
 	auto Members(this auto&& rSelf)
@@ -296,7 +296,7 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	// CRC-only subset: excludes pGlobalIds and pClientGuids, which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pNextBeamFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pVecVeerOffPoints, rSelf.pRegistryTargets);
 	}
 
 	bool LogDifferences(const FightersPostRender& rOther) const;

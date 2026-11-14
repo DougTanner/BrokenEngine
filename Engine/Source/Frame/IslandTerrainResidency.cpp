@@ -155,10 +155,6 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 
 bool IslandTerrainResidency::AnyEvictionPending() const
 {
-	if (gpGraphics == nullptr || gpTextureManager == nullptr)
-	{
-		return false;
-	}
 	return std::ranges::any_of(gpIslandTerrain->mIslands, [this](const std::pair<const common::crc_t, IslandTemplate>& rIsland)
 	{
 		return IsEvictionPending(rIsland.second);
@@ -167,10 +163,6 @@ bool IslandTerrainResidency::AnyEvictionPending() const
 
 bool IslandTerrainResidency::AnyRestorationPending() const
 {
-	if (gpGraphics == nullptr || gpTextureManager == nullptr)
-	{
-		return false;
-	}
 	return std::ranges::any_of(gpIslandTerrain->mIslands, [this](const std::pair<const common::crc_t, IslandTemplate>& rIsland)
 	{
 		return IsRestorationPending(rIsland.first, rIsland.second);
@@ -284,11 +276,6 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 
 void IslandTerrainResidency::EvictionSweep()
 {
-	if (gpGraphics == nullptr || gpTextureManager == nullptr)
-	{
-		return;
-	}
-
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		EvictTemplate(rCrc, rTemplate);
@@ -297,11 +284,6 @@ void IslandTerrainResidency::EvictionSweep()
 
 void IslandTerrainResidency::RestorationSweep()
 {
-	if (gpGraphics == nullptr || gpTextureManager == nullptr)
-	{
-		return;
-	}
-
 	std::unordered_map<common::crc_t, IslandTemplate>& rIslands = gpIslandTerrain->mIslands;
 
 	// First-mint assigns the four chunk-backed pointers, while elevation remains at the slot-0

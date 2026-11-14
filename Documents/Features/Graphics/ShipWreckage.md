@@ -41,9 +41,8 @@ it. Effects outside the frame, such as GPU particles and audio one-shots, skip
 collections, and spawning one draws only from the random engine its caller
 passes (`Engine/Source/Frame/Collections/Explosions/AGENTS.md`).
 
-This feature is a more advanced version of the Battleship wreck list, `sWrecks`
-in
-`Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsRender.cpp`.
+This feature is a more advanced version of the Battleship wrecks, the Wrecks
+collection in `Projects/BrokenEngineSandbox/Source/Frame/Collections/Wrecks/`.
 
 ## Design
 

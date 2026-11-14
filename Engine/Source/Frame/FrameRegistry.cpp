@@ -97,25 +97,20 @@ bool ResolveRegistryHandle(std::span<const RegistrySourceLayer> sourceLayers, re
 	return true;
 }
 
-bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)
+void AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
-
-	if (rLayer.pGlobalIds == nullptr || rLayer.pClientGuids == nullptr)
-	{
-		return false;
-	}
 
 	for (int64_t i = 0; i < rLayer.iCount; ++i)
 	{
 		if (rLayer.pGlobalIds[i] == globalId)
 		{
 			rLayer.pClientGuids[i] = rGuid;
-			return true;
+			return;
 		}
 	}
 
-	return false;
+	ASSERT(false);
 }
 
 Uuid RegistryUuidByGlobalId(const RegistryOwnershipLayer& rLayer, GlobalId globalId)

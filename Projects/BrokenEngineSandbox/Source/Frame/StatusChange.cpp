@@ -3,6 +3,9 @@
 namespace game
 {
 
+// SpawnPosition, SpawnPositionRef, ValidateSpawnVectors, and ApplySpawnStatusChange reach a payload only through
+// SpawnTraits and its vector members, so they name no game collection: a future project may want them moved into shared
+// engine code, depending on its requirements.
 template <typename DATA>
 concept HasSpawnTraits = requires { typename SpawnTraits<DATA>::Collection; };
 

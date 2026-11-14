@@ -85,8 +85,11 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      envelopes.
    - If the session's approved plan or acceptance table includes an
      agent-harness scenario, build both client and server in the same request
-     regardless of changed-file affinity — the harness launches both executables
-     and hard-stops when either is missing.
+     in each configuration a harness run launches (the configurations the
+     request names for a game Client or Server target), regardless of
+     changed-file affinity — a harness run launches its executables in one
+     configuration ([`/agent-harness`](../../agent-harness/SKILL.md)
+     `## Inputs`) and hard-stops when one it needs is missing.
    - ThirdParty builds run only in the primary checkout
      ([`../SKILL.md`](../SKILL.md) `## Inputs`); from any other checkout
      `-Target ThirdParty` is the typed block `thirdparty.worktree-not-primary`.
@@ -208,7 +211,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      where `<snapshot>` is the envelope path with `.md` replaced by
      `.tracked.txt`; after the last build returns, run the same command with
      `-Compare` added. Its printed lines are the handoff's `Changed files`;
-     `../SKILL.md` `## Handoff` owns the result of a non-zero exit.
+     `../SKILL.md` `## Handoff` owns their definition and the result of a
+     non-zero exit.
    - Every build call has the same shape, with that path written as a literal;
      never find the file by name pattern, process id, or modification time,
      because other dispatches' files share the directory. The build script is

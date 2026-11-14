@@ -540,6 +540,16 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, ruiIndex, iVertexCount));
 		}
 	}
+	for (int64_t i = 0; i < iIndexCount; i += 3)
+	{
+		uint32_t uiA = rMeshIndices.at(static_cast<size_t>(i + 0));
+		uint32_t uiB = rMeshIndices.at(static_cast<size_t>(i + 1));
+		uint32_t uiC = rMeshIndices.at(static_cast<size_t>(i + 2));
+		if (uiA == uiB || uiB == uiC || uiC == uiA)
+		{
+			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" triangle {} repeats a vertex ({}, {}, {}).", meshGltfFile.string(), i / 3, uiA, uiB, uiC));
+		}
+	}
 
 	int64_t iInitialVertexCount = iVertexCount;
 	int64_t iInitialTriangleCount = iIndexCount / 3;
@@ -557,7 +567,7 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 		.iMaximumDepth = kiBeachSubdivisionMaxDepth,
 	};
 	int64_t iDepthCapHits = 0;
-	SubdivideBeachBand(rMeshPositions, rMeshIndices, subdivisionConfig, iDepthCapHits);
+	SubdivideBeachBand(meshGltfFile, rMeshPositions, rMeshIndices, subdivisionConfig, iDepthCapHits);
 	iVertexCount = std::ssize(rMeshPositions) / 3;
 	iIndexCount = std::ssize(rMeshIndices);
 

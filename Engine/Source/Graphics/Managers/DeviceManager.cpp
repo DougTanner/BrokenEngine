@@ -45,6 +45,8 @@ DeviceManager::DeviceManager()
 	}
 	bool bMaintenance9Available = false;
 	bool bLineRasterizationAvailable = false;
+	bool bCalibratedTimestampsAvailable = false;
+	bool bLegacyCalibratedTimestampsAvailable = false;
 	for (const VkExtensionProperties& rVkExtensionProperties : availableExtensions)
 	{
 		if (std::strcmp(rVkExtensionProperties.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0)
@@ -63,6 +65,14 @@ DeviceManager::DeviceManager()
 		{
 			bLineRasterizationAvailable = true;
 			LOG(kGraphics, kInfo, "VK_EXT_line_rasterization extension available");
+		}
+		else if (std::strcmp(rVkExtensionProperties.extensionName, VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0)
+		{
+			bCalibratedTimestampsAvailable = true;
+		}
+		else if (std::strcmp(rVkExtensionProperties.extensionName, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0)
+		{
+			bLegacyCalibratedTimestampsAvailable = true;
 		}
 	}
 
@@ -97,6 +107,27 @@ DeviceManager::DeviceManager()
 			deviceExtensions.push_back(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME);
 			LOG(kGraphics, kInfo, "VK_EXT_line_rasterization smooth lines enabled");
 		}
+	}
+
+	if constexpr (kbProfilingFrameSpike)
+	{
+		// Profile's stall timeline maps GPU timestamps onto the CPU clock, so it needs the device and QPC domains calibrated together.
+		std::string_view pcCalibratedTimestamps = "unavailable";
+		if (bCalibratedTimestampsAvailable || bLegacyCalibratedTimestampsAvailable)
+		{
+			PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR pVkGetCalibrateableTimeDomains = bCalibratedTimestampsAvailable ? vkGetPhysicalDeviceCalibrateableTimeDomainsKHR : vkGetPhysicalDeviceCalibrateableTimeDomainsEXT;
+			uint32_t uiTimeDomainCount = 0;
+			CHECK_VK(pVkGetCalibrateableTimeDomains(gpInstanceManager->mVkPhysicalDevice, &uiTimeDomainCount, nullptr));
+			std::vector<VkTimeDomainKHR> timeDomains(uiTimeDomainCount);
+			CHECK_VK(pVkGetCalibrateableTimeDomains(gpInstanceManager->mVkPhysicalDevice, &uiTimeDomainCount, timeDomains.data()));
+			if (std::ranges::contains(timeDomains, VK_TIME_DOMAIN_DEVICE_KHR) && std::ranges::contains(timeDomains, VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR))
+			{
+				deviceExtensions.push_back(bCalibratedTimestampsAvailable ? VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME : VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+				mCapabilities.Set(DeviceCapabilityFlags::kCalibratedTimestampsEnabled);
+				pcCalibratedTimestamps = bCalibratedTimestampsAvailable ? "KHR" : "EXT";
+			}
+		}
+		LOG(kGraphics, kInfo, "calibrated timestamps: {}", pcCalibratedTimestamps);
 	}
 
 	mCapabilities.Set(DeviceCapabilityFlags::kWideLinesEnabled, gpInstanceManager->mVkPhysicalDeviceFeatures2.features.wideLines == VK_TRUE);
@@ -211,6 +242,14 @@ DeviceManager::DeviceManager()
 	CHECK_VK(vkCreateDevice(gpInstanceManager->mVkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &mVkDevice));
 
 	volkLoadDevice(mVkDevice);
+
+	if constexpr (kbProfilingFrameSpike)
+	{
+		if (mCapabilities & DeviceCapabilityFlags::kCalibratedTimestampsEnabled)
+		{
+			mpVkGetCalibratedTimestamps = bCalibratedTimestampsAvailable ? vkGetCalibratedTimestampsKHR : vkGetCalibratedTimestampsEXT;
+		}
+	}
 
 	VkName(VK_OBJECT_TYPE_DEVICE, mVkDevice, "Logical");
 

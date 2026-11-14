@@ -420,6 +420,7 @@ void FightersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
+#if defined(BT_CLIENT)
 	FightersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pFighters;
 	FightersPostRender& rCurrentPostRender = *rFrame.postRender.pFighters;
 
@@ -429,13 +430,12 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		{
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kFighterDestroyExplosionInterval;
 
-#if defined(BT_CLIENT)
 			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kFighterDestroyTime;
 			XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 			SpawnFighterExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
-#endif
 		}
 	}
+#endif // BT_CLIENT
 }
 
 #if defined(BT_CLIENT)
@@ -522,7 +522,9 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfFighterHealth;
+#if defined(BT_CLIENT)
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
+#endif
 	rCurrentPostRender.pNextBeamFireTimes[iIndex] = rInfo.nextBeamFireTime;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
@@ -581,7 +583,9 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		engine::LifecycleFlags_t lifecycleFlags = rPrevious.pLifecycleFlags[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		float fHealth = rPrevious.pfHealths[i];
+#if defined(BT_CLIENT)
 		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
+#endif
 		std::chrono::duration<float> nextBeamFireTime = rPrevious.pNextBeamFireTimes[i] - deltaTime;
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
@@ -622,9 +626,11 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			{
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
-			else if (rPrevious.pController[i] == ShipController::kFleet)
+			else if (rPrevious.pController[i] == ShipController::kFleet && !(rPrevious.pOrders[i] & ShipOrders::kSeekAndDestroy))
 			{
-				ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], flags, vecVeerOffPoint, registryTarget);
+				// Patrol. A Seek and Destroy tick may have set kNoAiDirection.
+				flags.Set(ShipFlags::kNoAiDirection, false);
+				ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], flags, vecVeerOffPoint, registryTarget);
 				SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 				if (tactic.bHasDestination)
 				{
@@ -647,17 +653,38 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, movement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
+			else if (rPrevious.pController[i] == ShipController::kFleet)
+			{
+				// Seek and Destroy, in any cell: attack, or with no enemy idle in place under drag, ignoring the flagship
+				// and the fleet's wanted cell. The row stays roaming, so a switch back to Patrol recomputes its path.
+				ShipTactic tactic {};
+				bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
+				iNavigationDirection = -1;
+				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while idle.
+				flags.Set(ShipFlags::kNoAiDirection, !bHasTactic);
+				fDeltaRotation = 0.0f;
+				bool bAccelerate = false;
+				if (bHasTactic)
+				{
+					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+					AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
+					bAccelerate = IsWithinHeadingCone(vecDirection, vecAiDirection);
+					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
+				}
+				ApplyHeadingMovement(vecDirection, flags, bAccelerate, deltaTime, kFighterMovement, vecVelocity);
+				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
+			}
 			else
 			{
 				ShipTactic tactic {};
-				if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i] & ShipOrders::kTargetFlagship, flags, vecVeerOffPoint, registryTarget, tactic))
+				if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
 				{
 					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 				}
 				else
 				{
-					// No enemy in the cell: return to an island, which also clears kFlee.
-					tactic.vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
+					// No enemy in the cell: return to an island.
+					tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
 				}
 				// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
 				flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
@@ -698,7 +725,9 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pfHealths[i] = fHealth;
+#if defined(BT_CLIENT)
 		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
+#endif
 		rCurrent.pNextBeamFireTimes[i] = nextBeamFireTime;
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
@@ -752,7 +781,6 @@ bool FightersPostRender::LogDifferences(const FightersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
-		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
 		bEqual &= common::LogDifference<"pNextBeamFireTimes">(i, pNextBeamFireTimes[i], rOther.pNextBeamFireTimes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);

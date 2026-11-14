@@ -47,6 +47,7 @@ public:
 
 #if defined(BT_CLIENT)
 	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
+	ChunkReadResult PollChunkRead(ChunkReadRequest& rRequest, std::byte* pDestination);
 	void CancelChunkRead(ChunkReadRequest& rRequest);
 #endif // BT_CLIENT
 

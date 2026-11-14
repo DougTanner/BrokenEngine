@@ -27,6 +27,13 @@ struct PendingDestroyFleetMemberRequest
 	engine::GlobalId globalId {};
 };
 
+struct PendingSquadronOrdersRequest
+{
+	int64_t iClientId = 0;
+	engine::GlobalId globalId {};
+	FleetMemberFlags_t flags {};
+};
+
 class ServerFleetManager
 {
 public:
@@ -36,6 +43,7 @@ public:
 	void ProcessCreateFleetRequests();
 	void ProcessSpawnIntoFleetRequests();
 	void ProcessDestroyFleetMemberRequests();
+	void ProcessSquadronOrdersRequests();
 	void TickFleetTimers();
 	void TickRespawnTimers();
 
@@ -49,7 +57,7 @@ public:
 	void OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void RebuildFleetMembersForLoad();
 
-	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds);
+	void UpdateFleetNavigation(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds, FleetBehaviour eBehaviour, engine::GridCoord holdCoordinate);
 
 	void DetectFleetMemberDeaths();
 
@@ -84,6 +92,7 @@ public:
 	std::vector<PendingCreateFleetRequest> mPendingCreateFleetRequests;
 	std::vector<PendingSpawnIntoFleetRequest> mPendingSpawnIntoFleetRequests;
 	std::vector<PendingDestroyFleetMemberRequest> mPendingDestroyFleetMemberRequests;
+	std::vector<PendingSquadronOrdersRequest> mPendingSquadronOrdersRequests;
 };
 
 } // namespace game

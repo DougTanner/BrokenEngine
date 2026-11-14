@@ -409,6 +409,7 @@ void CameraBase::RestartOverrideEase(bool bReversing, float fPreviousEnd, float 
 
 void CameraBase::SetFramingOverride(float fTarget, float fBlendDuration)
 {
+	ASSERT(std::isfinite(fTarget) && fTarget > 0.0f);
 	if (!mbFramingOverride)
 	{
 		mfOverrideFraming = mfCameraFraming;
@@ -459,6 +460,15 @@ float XM_CALLCONV CameraBase::AddVisualErrorOffset(FXMVECTOR vecError)
 		mVecVisualErrorOffset = vecTotal;
 	}
 	return fTotal;
+}
+
+// Draw-time culling tests only the row's position against the unscaled area, so the margin keeps rows a short pan
+// would bring into view.
+constexpr float kfSpawnVisibleAreaScale = 1.2f;
+
+bool XM_CALLCONV CameraBase::InSpawnVisibleArea(GridCoord coordinate, FXMVECTOR vecLocalPosition)
+{
+	return InVisibleArea(ScaleAreaAboutCenter(mf4RenderVisibleArea, kfSpawnVisibleAreaScale), Rebase(MakeRenderBasis(coordinate, mBasisCoordinate), vecLocalPosition));
 }
 
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const

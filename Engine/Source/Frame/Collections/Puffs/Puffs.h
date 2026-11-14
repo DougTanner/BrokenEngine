@@ -90,9 +90,9 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 {
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
-	// Destroy removes expired puffs whose controller has bDestroysSelf set.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
 
+	// Destroy removes expired puffs whose controller has bDestroysSelf set.
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;

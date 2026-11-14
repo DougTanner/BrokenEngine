@@ -23,18 +23,36 @@ client skeletal rendering. Battleships mirror this collection
   none remains, and otherwise heads for the nearest island center, setting the
   return-to-island state with distance hysteresis, or only ramps its turn rate
   to zero in a cell with no island candidates.
+- A fleet fighter follows its squadron's two settings, `ShipOrders` bits on its
+  row written only as `../Ships/AGENTS.md` `## Ship Invariants` defines, so
+  client, server, and replay agree (`../../../Network/Server/AGENTS.md`
+  `## State Ownership`). Patrol (`kSeekAndDestroy` clear) is the fleet
+  behaviour above. Seek and Destroy, in any cell and ignoring its flagship and
+  the fleet's wanted cell, attacks as a random-spawn fighter does but with its
+  pick imposed even while hidden; with no enemy in its cell it idles in place
+  (`../Ships/AGENTS.md` `## Turning Invariants`). It stays roaming either way,
+  so a switch back to Patrol recomputes its path. Same Target (`kSharedTarget`)
+  gives every row in a cell of the squadron `kSquadron1` names one
+  shared target, chosen without line of sight (`FindSquadronTarget`,
+  `../Ships/FleetCoordination.cpp`). In Patrol it applies only while weapons
+  free; Seek and Destroy with Same Target off picks from the row itself. Both
+  picks run before a veer-off continues, so a veering row also stores the
+  current target.
 - Attack heads for its target and targets that enemy's nearest plane. Its
   target is its kept attack target (`../Ships/AGENTS.md` `## Ship Invariants`),
-  picked from itself in x/y for a random-spawn fighter, or the enemy flagship
-  for a `kTargetFlagship` row. Within the
-  `kfVeerOffStartDistanceSquared` x/y distance it sets `ShipFlags::kVeerOff`,
-  stores the enemy position in `pVecVeerOffPoints`, and routes away from that
-  point (`FleeRouteWaypoint`) on the point's nearest plane until the
+  picked from itself in x/y for a random-spawn fighter, by the squadron
+  settings above, or the enemy flagship for a `kTargetFlagship` row. Within
+  the `kfVeerOffStartDistanceSquared` x/y distance it sets `ShipFlags::kVeerOff`,
+  stores the enemy position, shifted so the fighter turns to the clear side
+  when only one side is blocked (`AttackOrStartVeerOff`), in
+  `pVecVeerOffPoints`, and routes away from that veer-off point
+  (`FleeRouteWaypoint`) on the point's nearest plane until the
   `kfVeerOffEndDistanceSquared` x/y distance from it, then attacks again while
   an enemy remains. An attack, veer-off, or escort tick writes its target plane
   into the current row's orders; only a fleet fighter's such tick also leaves
-  the row roaming (navigation direction -1). `kVeerOff` clears in escort,
-  outside the flagship's cell, and on spawn and transfer arrival.
+  the row roaming (navigation direction -1). `kVeerOff` clears in escort, for a
+  Patrol fighter outside the flagship's cell, and on spawn and transfer
+  arrival.
 - Steering turn rate crosses cell boundaries with the ship rather than
   restarting on arrival.
 - Direct blaster hits arrive through collision; missile splash damage arrives

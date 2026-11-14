@@ -31,7 +31,7 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 
 struct ReplayMeta
 {
-	static constexpr int64_t kiVersion = 6;
+	static constexpr int64_t kiVersion = 7;
 	engine::GridCoord clientGridCoordinate {};
 	int64_t iClientOwnedEntityIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;
@@ -100,6 +100,9 @@ public:
 
 #if defined(BT_CLIENT)
 	FleetSelection mFleetSelection;
+
+	// The server's latest map marker list, drawn by the open map; client-only, outside the Frame and the CRC.
+	std::vector<GameMessages::MapFleetMarker> mMapFleetMarkers;
 
 	// In-memory mirror of the focused fleet and ship in ClientState.bin; loaded at startup, refreshed on every focus change, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};

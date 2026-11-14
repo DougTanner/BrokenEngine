@@ -64,6 +64,9 @@ engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 	return {};
 }
 
+// The client owned-entity list (mClientOwnedEntityIdentifiers, mClientOwnedEntityCoordinates) holds only engine global
+// IDs and grid coordinates, so it is game-agnostic: a future project may want it moved into shared engine code,
+// depending on its requirements.
 void Game::AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate)
 {
 	// Heap: mClientOwnedEntityIdentifiers / mClientOwnedEntityCoordinates push_back may grow vectors
@@ -174,7 +177,7 @@ void Game::ResetGameState()
 	mClientOwnedEntityCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
-	BattleshipsInterpolate::ClearWrecks();
+	mMapFleetMarkers.clear();
 	// Close the map with no ease, so no world-hidden frame runs over the menu.
 	engine::gpCamera->mbFramingOverride = false;
 #endif

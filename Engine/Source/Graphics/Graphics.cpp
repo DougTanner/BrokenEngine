@@ -129,6 +129,7 @@ void Graphics::WaitFramebuffer(int64_t iCommandBuffer)
 	{
 		CHECK_VK(vkResult);
 	}
+	gpProfileManager->GpuFenceObserved(iCommandBuffer);
 
 	// Outside the churn gate, so a retired resource is released in the frame its last holder is waited even in a quiet scene.
 	gpTextureManager->MarkFramebufferWaited(iCommandBuffer);
@@ -184,6 +185,7 @@ void Graphics::UpdateFrameResidency(int64_t iCommandBuffer)
 			continue;
 		}
 		CHECK_VK(vkFenceResult);
+		gpProfileManager->GpuFenceObserved(i);
 		gpTextureManager->MarkFramebufferWaited(i);
 		gpIslands->MarkFramebufferWaited(i);
 		if (gpTextureManager->mTextureDescriptors.HasUnappliedPublications(i))
@@ -218,6 +220,7 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 	gpParticleManager->RenderGlobal(iCommandBuffer);
 	gpProfileManager->CpuStop(kCpuTimerRenderGlobal);
 
+	gpProfileManager->GpuSubmitted(iCommandBuffer, true, gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers);
 	gpCommandBufferManager->SubmitGlobalCommandBuffer(iCommandBuffer);
 }
 
@@ -232,7 +235,6 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	gpCommandBufferManager->SubmitMainCommandBuffer(iCommandBuffer);
 
 	gpCommandBufferManager->SubmitUiCommandBuffer(iCommandBuffer);
-	gpProfileManager->GpuSubmitted(iCommandBuffer, true);
 
 	PresentAcquire(iCommandBuffer);
 }
@@ -249,8 +251,8 @@ void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
 
 	gpImGuiManager->Prepare(iCommandBuffer);
 
+	gpProfileManager->GpuSubmitted(iCommandBuffer, false, gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers);
 	gpCommandBufferManager->SubmitUiOnlyCommandBuffer(iCommandBuffer);
-	gpProfileManager->GpuSubmitted(iCommandBuffer, false);
 
 	PresentAcquire(iCommandBuffer);
 }

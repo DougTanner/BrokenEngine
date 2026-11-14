@@ -28,6 +28,11 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 		return false;
 	}
 
+	if (!gpCamera->InSpawnVisibleArea(coordinate, rSpawnInformation.vecPosition))
+	{
+		return false;
+	}
+
 	ExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;
 	ExplosionsPostRender& rPostRender = rFrame.postRender.explosions;
 
@@ -64,13 +69,13 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 	// Fire-and-forget effects: Primary light
 	if (rType.iPrimaryLightControllerTypeIndex != kiInvalidControllerType)
 	{
-		PointLightsPostRender::AddControlled(rFrame, currentTime, rType.iPrimaryLightControllerTypeIndex, rSpawnInformation.vecPosition, fPrimaryRotation);
+		PointLightsPostRender::AddControlled(rFrame, coordinate, currentTime, rType.iPrimaryLightControllerTypeIndex, rSpawnInformation.vecPosition, fPrimaryRotation);
 	}
 
 	// Fire-and-forget effects: Primary puff
 	if (rType.iPrimaryPuffControllerTypeIndex != kiInvalidControllerType)
 	{
-		PuffsPostRender::AddControlled(rFrame, currentTime, rType.iPrimaryPuffControllerTypeIndex, rSpawnInformation.vecPosition);
+		PuffsPostRender::AddControlled(rFrame, coordinate, currentTime, rType.iPrimaryPuffControllerTypeIndex, rSpawnInformation.vecPosition);
 	}
 
 	// Fire-and-forget effects: Secondary explosions (staggered)
@@ -87,12 +92,12 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 
 		if (rType.iSecondaryLightControllerTypeIndex != kiInvalidControllerType)
 		{
-			PointLightsPostRender::AddControlled(rFrame, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
+			PointLightsPostRender::AddControlled(rFrame, coordinate, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
 		}
 
 		if (rType.iSecondaryPuffControllerTypeIndex != kiInvalidControllerType)
 		{
-			PuffsPostRender::AddControlled(rFrame, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
+			PuffsPostRender::AddControlled(rFrame, coordinate, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
 		}
 	}
 
@@ -100,7 +105,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, GridCoord coord
 	if (rType.iWindRadialControllerTypeIndex != kiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, currentTime, rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, game::gWindDepositExplosionsIntensity.mfCurrent * fWindSizePercent, game::gWindDepositExplosionsWidth.mfCurrent * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, coordinate, currentTime, rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, game::gWindDepositExplosionsIntensity.mfCurrent * fWindSizePercent, game::gWindDepositExplosionsWidth.mfCurrent * fWindSizePercent);
 	}
 
 	XMVECTOR vecDirection2dNormal = XMVector3Normalize(XMVectorMultiply(XMVectorSet(1.0f, 1.0f, 0.0f, 0.0f), rSpawnInformation.vecDirection));

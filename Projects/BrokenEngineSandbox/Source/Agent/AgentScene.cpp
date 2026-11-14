@@ -50,6 +50,26 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	{
 		names.push_back("kTargetFlagship");
 	}
+	if (orders & ShipOrders::kSquadron1)
+	{
+		names.push_back("kSquadron1");
+	}
+	if (orders & ShipOrders::kSeekAndDestroy)
+	{
+		names.push_back("kSeekAndDestroy");
+	}
+	if (orders & ShipOrders::kSharedTarget)
+	{
+		names.push_back("kSharedTarget");
+	}
+	if (orders & ShipOrders::kPatrolCell)
+	{
+		names.push_back("kPatrolCell");
+	}
+	if (orders & ShipOrders::kPatrolTogether)
+	{
+		names.push_back("kPatrolTogether");
+	}
 	if (flags & ShipFlags::kVeerOff)
 	{
 		names.push_back("kVeerOff");
@@ -69,10 +89,6 @@ static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, Shi
 	if (flags & ShipFlags::kNoAiDirection)
 	{
 		names.push_back("kNoAiDirection");
-	}
-	if (flags & ShipFlags::kFlee)
-	{
-		names.push_back("kFlee");
 	}
 	if (flags & ShipFlags::kReturnToIslandCenter)
 	{

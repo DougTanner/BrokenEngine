@@ -23,14 +23,17 @@ rather than direct collision damage.
   transfer, and destruction. Removal is idempotent.
 - Lifetime, velocity, falling state, boost-ramp delay, and turn rate cross cell
   boundaries; an arrival restores them verbatim and draws no fresh ramp delay.
-  Falling disables propulsion, homing, and exhaust random draws; terrain impact
-  at or below sea level removes the missile without explosion damage or effects.
+  Falling disables propulsion and homing random draws; terrain impact at or
+  below sea level removes the missile without explosion damage or effects.
 - Resolve the earliest entity, terrain, or boundary event before applying
   explosion or transfer behavior. All missile damage enters through the
   area-damage registration at explosion time.
-- Client-only pitch and exhaust values still draw from shared deterministic
-  state. Both builds must execute those draws under the same shared-state
-  conditions.
+- Client-only pitch draws from shared deterministic state because it crosses
+  cells with the missile (the exception in
+  `../../../../../../Engine/Source/Frame/AGENTS.md`
+  `## Simulation and Visual State`); both builds must execute that draw under
+  the same shared-state conditions. Exhaust length is not frame state: the
+  client draws it when it syncs the exhaust light.
 - Live transfer always receives a new smoke-trail identity on arrival;
   destination lights and sounds are recreated. Falling arrivals create no client
   effects.

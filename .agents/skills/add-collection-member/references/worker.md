@@ -20,6 +20,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
    | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
    | Owner-synchronized client-only pair | `/Engine/Source/Frame/Collections/Sounds/Sounds.h`, `SoundsInterpolate::Sync`, `SoundsPostRender::Add` | Whole-file `BT_CLIENT`, `Members()` only, full carry-forward copy, `SyncData`/`Sync`, Add defaults, no shared version or differences |
    | Controller-driven, fire-and-forget client-only pair | `/Engine/Source/Frame/Collections/Puffs/Puffs.h`, `PuffsInterpolate::Update`, `PuffsPostRender::AddControlled` | Whole-file `BT_CLIENT`, `Members()` only, selective controller copy, unconditional animated stores, complete Add initialization |
+   | Game-owned whole-file client-only pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Wrecks/Wrecks.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Wrecks/Wrecks.cpp`, `WrecksInterpolate::Update`, `WrecksPostRender::Spawn` | Whole-file `BT_CLIENT`, `Members()` only, carry-forward copy, unconditional animated stores, complete Spawn initialization, no shared version or differences |
 
 3. Stop and report a stale exemplar if it no longer demonstrates the claimed
    variant. Done when the chosen exemplar is confirmed or the stale exemplar is
@@ -48,12 +49,11 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
    position.
 7. Bump the version.
 
-   - Version bumps apply to every game collection and server-visible engine
-     collection.
+   - Version bumps apply to every server-visible game or engine collection.
    - Each live version-bearing struct contributes its term, so bumping the
      struct changes the sum.
-   - Pure client-only engine collections such as Sounds and Puffs have no
-     version term and do not change persisted shared layout.
+   - Pure client-only collections such as engine Sounds and Puffs and game
+     Wrecks have no version term and do not change persisted shared layout.
 
    Done when the applicable struct's version is bumped, or the collection is one
    that carries no version term.

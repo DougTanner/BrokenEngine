@@ -50,7 +50,8 @@ public:
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType);
 	void SendDestroyFleetMemberRequest(engine::GlobalId globalId);
-	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
+	void SendSquadronOrdersRequest(engine::GlobalId globalId, FleetMemberFlags_t flags);
+	void SendFleetNavigationRequest(const FleetGuid& rFleetGuid, float fDelay, FleetBehaviour eBehaviour, engine::GridCoord holdCoordinate);
 
 	std::unique_ptr<ClientReconciler> mpReconciler;
 
@@ -70,6 +71,8 @@ private:
 	void ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent);
 	void UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate);
 
+	// When the last map fleet markers request went out since the map opened; empty while the map is closed.
+	std::optional<std::chrono::steady_clock::time_point> mOptionalMapFleetMarkersRequestTime;
 };
 
 inline ClientSession* gpClientSession = nullptr;

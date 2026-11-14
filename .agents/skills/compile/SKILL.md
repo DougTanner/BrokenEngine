@@ -59,9 +59,12 @@ skill-specific inputs:
   agent-harness scenario; a delegator requesting the build states this trigger,
   counting any acceptance criterion or check settled by running `/agent-harness`
   as such a scenario. An included agent-harness scenario adds the client and
-  the server of every game built to the targets, so name both. One that
-  captures the ModelViewer adds ModelViewer Debug x64, per
-  [`model-viewer.md`](../agent-harness/references/model-viewer.md) `## Capture`;
+  the server of every game built in each configuration a harness run launches
+  (one per run, per [`/agent-harness`](../agent-harness/SKILL.md) `## Inputs`):
+  each configuration the request names for a game Client or Server target.
+  Name both in each. One that captures the ModelViewer adds ModelViewer Debug
+  x64, per [`model-viewer.md`](../agent-harness/references/model-viewer.md)
+  `## Capture`;
 - for a game build, any Gaea authorization (`-AllowGaeaExport`) that a
   user-approved plan or acceptance criterion requiring an island re-bake
   grants; the build resolves the data mode itself —
@@ -103,9 +106,12 @@ the execution and result discipline in
 - `Residuals` — one row per failed or skipped required build, counting
   `complete: false` as a failure; `none` when absent.
 
-A `builder`'s `Changed files` lists the tracked paths the builds newly
-modified, as `scripts/Get-CompileRewrittenPaths.ps1 -Compare` prints them
-(`references/worker.md` step 9), or `none`; its `Build required` is `none`.
+A `builder`'s `Changed files` lists the data-input tracked paths first
+modified during the build window, as
+`scripts/Get-CompileRewrittenPaths.ps1 -Compare` prints them
+(`references/worker.md` step 9), or `none`: every path the builds first
+modified, plus any concurrent edit to a data input; its `Build required` is
+`none`.
 When either run of that script exits non-zero, the `builder` returns
 `Status: BLOCKED` with a `Residuals` row naming that run's failure and stderr,
 because its `Changed files` is then unknown. The envelope and snapshot

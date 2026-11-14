@@ -12,17 +12,19 @@ runner applies. The purpose and the triggers live in
    each of those has been read.
 2. Decide ownership and reachability before choosing files:
    - game-owned and server-visible;
+   - game-owned, whole-file client-only;
    - engine-owned and server-visible;
    - engine-owned, whole-file client-only;
    - shared layout with additional client-owned objects.
 
-   Done when one of those four is chosen.
+   Done when one of those five is chosen.
 3. Read every file listed for the selected exemplar:
 
    | Requested variant | Live exemplar files and symbols | Pattern to preserve |
    |---|---|---|
    | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/Blasters.h`: `BlastersPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
    | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInitialize`, `ClientInitializeAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, `OwnedHandles()` on both structs, transfer payload |
+   | Game-owned whole-file client-only collection | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Wrecks/Wrecks.h`: both structs; `Wrecks.cpp`; game `Frame.h`, `Frame.cpp`, `FrameCollections.h` | outer `BT_CLIENT` guard, `Members()` only, guarded `Frame.h` members and constructors, build-local tuple entries only (absent from `GameServerInterpolateCollections()`/`GameServerPostRenderCollections()`), no `kiVersion` |
    | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h` | direct FrameBase storage, server tuple registration, index helpers, per-struct `kiVersion` declarations folded through server tuple registration |
    | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add, owner releases the row through its `OwnedHandles()` or `ReleaseIndexableElementAndClearHandle`, custom client-only identity only when required |
    | Controller-driven fire-and-forget client-only collection | `Engine/Source/Frame/Collections/Puffs/Puffs.h`: both structs; `Puffs.cpp`, `PuffsUpdate.cpp`, `PuffsRender.cpp`; `FrameBase.h` | `Members()` only, controller metadata copy, paired Add/Destroy, no owner handle or persisted version |
@@ -51,8 +53,8 @@ runner applies. The purpose and the triggers live in
      `Members()` returns `SharedMembers()`.
    - Server-visible engine collections whose whole layout is shared may expose
      `Members()` only; shared CRC/read helpers fall back to it.
-   - Pure client-only engine collections expose `Members()` only and guard the
-     entire header and implementation.
+   - Pure client-only collections expose `Members()` only and guard the entire
+     header and implementation.
 
    Done when the pair's accessors match the reachability case chosen in step 2.
 8. Create Interpolate/PostRender structs and their implementation files beside
@@ -80,10 +82,15 @@ runner applies. The purpose and the triggers live in
     - Construct both pointers in the matching `Frame.cpp` constructors.
     - Include the header and add both objects to `GameInterpolateCollections()`
       and `GamePostRenderCollections()` in `FrameCollections.h`.
+    - For server-visible state, also add both objects to
+      `GameServerInterpolateCollections()` and
+      `GameServerPostRenderCollections()`. For pure client-only state, guard
+      the forward declarations, members, constructions, include, and tuple
+      entries with `BT_CLIENT` and omit it from those two server tuples.
     - Preserve producer-before-consumer tuple order. A collection that produces
       state consumed later in the same phase must precede that consumer.
 
-    Done when each of those four is in place.
+    Done when each of those five is in place.
 12. For an engine-owned pair:
     - Include the header in `Engine/Source/Frame/FrameBase.h`.
     - Add direct members to both FrameBase structs, entries at matching
@@ -96,15 +103,16 @@ runner applies. The purpose and the triggers live in
     - Preserve producer-before-consumer order in both tuples.
 
     Done when each of those four is in place.
-13. Define `static constexpr int64_t kiVersion` on both structs for every game
-    collection pair and every server-visible engine pair.
+13. Define `static constexpr int64_t kiVersion` on both structs for every
+    server-visible game or engine pair.
 
     - `game::Frame::kiVersion` folds the versions of every collection in the
-      game `GameInterpolateTypes`/`GamePostRenderTypes` lists and the engine
-      `ServerCollections()` lists, so the registration in step 11 or 12 adds
-      both terms; add none by hand.
+      game `GameServerInterpolateTypes`/`GameServerPostRenderTypes` lists and
+      the engine `ServerCollections()` lists, so the registration in step 11
+      or 12 adds both terms; add none by hand.
 
-    Done when both declarations exist.
+    Done when both declarations exist, or the pair is client-only and declares
+    none.
 
 ### Settle and verify
 
@@ -173,12 +181,15 @@ runner applies. The purpose and the triggers live in
 - Keep client-only pointers out of `SharedMembers()`. Keep `SharedMembers()` a
   subset of `Members()` and any `SharedCrcMembers()` a subset of
   `SharedMembers()`.
-- Tuple registration supplies normal phase dispatch, allocation/copy walks,
-  build-local Write/Read, shared ServerRead/CRC, and output merging in
-  `LogDifferences`.
-- Pure client-only engine collections do not alter persisted shared layout and
-  do not contribute version terms. Sounds and Puffs are the live engine
-  examples.
+- Register server-visible state in both tuple sets (steps 11 and 12); what
+  each set drives is owned by
+  [`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`](../../../../Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md)
+  `## Invariants` for game tuples and
+  [`Engine/Source/Frame/AGENTS.md`](../../../../Engine/Source/Frame/AGENTS.md)
+  `## Collection and Serialization Invariants` for `ServerCollections()`.
+- Pure client-only collections do not alter persisted shared layout and do not
+  contribute version terms. Sounds and Puffs are the live engine examples;
+  Wrecks is the game example.
 - Use `CollectionFlags::kIdToIndex` only when external owners need a stable
   handle. Add rows with `AddIndexableElement`, which maintains the map; never
   call `RemoveIndexableElement` from collection code outside the removals the

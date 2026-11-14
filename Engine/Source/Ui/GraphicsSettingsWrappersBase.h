@@ -41,10 +41,9 @@ inline Wrapper gWindEnabled(true);
 inline Wrapper gLightingEnabled(true);
 inline Wrapper gSunAngleOverride(1.15f, 0.0f, XM_2PI);
 
-// Clamps because the backing value crosses a trust boundary (persisted GameSettings.bin) and Wrapper::Set<T> soft-falls without clamping
 inline UiTheme GetUiTheme()
 {
-	return static_cast<UiTheme>(std::clamp(gUiTheme.Get<int64_t>(), 0i64, static_cast<int64_t>(UiTheme::kCount) - 1));
+	return gUiTheme.Get<UiTheme>();
 }
 
 } // namespace engine

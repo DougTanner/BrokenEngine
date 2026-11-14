@@ -424,11 +424,11 @@ void ImGuiManager::CreateFramebuffers()
 
 void ImGuiManager::Prepare(int64_t iFramebuffer)
 {
-	// Changed() advances the single-consumer change tracking; apply re-reads via GetUiTheme() for the trust-boundary clamp
+	// Changed() advances the single-consumer change tracking
 	auto [eUiTheme, ePreviousUiTheme, bUiThemeChanged] = gUiTheme.Changed<UiTheme>();
 	if (bUiThemeChanged)
 	{
-		ApplyThemeColors(GetUiTheme());
+		ApplyThemeColors(eUiTheme);
 	}
 
 	auto [bOpaqueUi, bPreviousOpaqueUi, bOpaqueUiChanged] = gOpaqueUi.Changed<bool>();
@@ -554,10 +554,7 @@ void ImGuiManager::RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2
 		return;
 	}
 
-	if (miOpaqueRectangleCount >= kiMaxUiRectangles)
-	{
-		return;
-	}
+	ASSERT(miOpaqueRectangleCount < kiMaxUiRectangles);
 
 	float fWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
 	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
@@ -720,9 +717,19 @@ void ImGuiManager::Submit(int64_t iFramebuffer, bool bAfterMain)
 		.pClearValues = nullptr,
 	};
 
-	if (!bAfterMain)
+	if (bAfterMain)
 	{
-		// No Main resolve wrote the present image this frame, and a recreated swapchain image may never have been
+		// HDR resolve: tone-map + color-grade Main's F16 scene intermediate into the swapchain. Single DONT_CARE
+		// color attachment (fully overwritten by the fullscreen quad) — empty flags, no clear.
+		gpProfileManager->GpuStart(iFramebuffer, rCommandBuffers.mImGuiVkCommandBuffer, kGpuTimerHdrResolve);
+		Texture::RecordBeginRenderPass(rCommandBuffers.mImGuiVkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, RenderPassFlags_t {});
+		gpPipelineManager->mpPipelines[kPipelineHdrResolve].RecordDraw(iFramebuffer, rCommandBuffers.mImGuiVkCommandBuffer, 1, 0);
+		vkCmdEndRenderPass(rCommandBuffers.mImGuiVkCommandBuffer);
+		gpProfileManager->GpuStop(iFramebuffer, rCommandBuffers.mImGuiVkCommandBuffer, kGpuTimerHdrResolve);
+	}
+	else
+	{
+		// No HDR resolve wrote the present image this frame, and a recreated swapchain image may never have been
 		// written, so discard its contents into the layout the pass loads from. PRESENT_SRC_KHR takes no access mask;
 		// the pass's external dependency, chained through the shared stage, makes the image visible to its attachment accesses.
 		VkImageMemoryBarrier vkImageMemoryBarrier
@@ -752,15 +759,25 @@ void ImGuiManager::Submit(int64_t iFramebuffer, bool bAfterMain)
 
 	CHECK_VK(vkEndCommandBuffer(rCommandBuffers.mImGuiVkCommandBuffer));
 
-	VkSemaphore vkWaitSemaphore = bAfterMain ? rCommandBuffers.mMainFinishedVkSemaphore : gpSwapchainManager->mImageAvailableVkSemaphore;
-	VkPipelineStageFlags vkWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	// The resolve samples Main's HDR color and main uniforms in its fragment shader; its fullscreen vertex shader
+	// reads nothing Main writes.
+	VkSemaphore pVkWaitSemaphores[]
+	{
+		gpSwapchainManager->mImageAvailableVkSemaphore,
+		rCommandBuffers.mMainFinishedVkSemaphore,
+	};
+	VkPipelineStageFlags pVkWaitStages[]
+	{
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	};
 	VkSubmitInfo vkSubmitInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &vkWaitSemaphore,
-		.pWaitDstStageMask = &vkWaitStage,
+		.waitSemaphoreCount = bAfterMain ? 2ui32 : 1ui32,
+		.pWaitSemaphores = pVkWaitSemaphores,
+		.pWaitDstStageMask = pVkWaitStages,
 		.commandBufferCount = 1,
 		.pCommandBuffers = &rCommandBuffers.mImGuiVkCommandBuffer,
 		.signalSemaphoreCount = 1,

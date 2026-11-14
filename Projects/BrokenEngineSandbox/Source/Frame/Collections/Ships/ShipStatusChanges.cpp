@@ -52,6 +52,23 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			continue;
 		}
 
+		if (rStatusChange.eType == StatusChangeType::kUpdateSquadronOrders)
+		{
+			const UpdateSquadronOrdersData& rUpdate = std::get<UpdateSquadronOrdersData>(rStatusChange.data);
+			VisitShipByUuid(rFrame, rUpdate.eType, rUpdate.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
+			{
+				ShipOrders_t& rOrders = rPostRender.pOrders[iIndex];
+				// A Patrol Cell destination can lie outside the escort disc, where the row cannot heal, so leaving Patrol
+				// Cell clears it; an Escort destination persists.
+				if ((rOrders & ShipOrders::kPatrolCell) && !(rUpdate.orders & ShipOrders::kPatrolCell))
+				{
+					rPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
+				}
+				rOrders.meFlags = static_cast<ShipOrders>((std::to_underlying(rOrders.meFlags) & ~std::to_underlying(kSquadronOrderBits.meFlags)) | rUpdate.orders.Mask(kSquadronOrderBits));
+			});
+			continue;
+		}
+
 		if (rStatusChange.eType == StatusChangeType::kUpdateShip)
 		{
 			const UpdateShipData& rUpdate = std::get<UpdateShipData>(rStatusChange.data);

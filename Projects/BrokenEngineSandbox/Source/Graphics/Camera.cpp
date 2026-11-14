@@ -19,6 +19,9 @@ Camera::Camera()
 	ApplyPose(true);
 }
 
+// StorePose, ApplyPose, ResetMenuPose, and SunAngle are game-agnostic apart from the menu pose constants
+// (kVecMenuIslandCenter, kVecMenuCameraOffset, kfMenuCameraFraming): a future project may want them moved into shared
+// engine code, depending on its requirements.
 void Camera::StorePose(bool bMainMenu)
 {
 	if (!bMainMenu)

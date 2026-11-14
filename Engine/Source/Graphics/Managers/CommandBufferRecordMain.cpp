@@ -57,8 +57,6 @@ void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerImage);
 	RecordImageRenderPass(vkCommandBuffer, iCommandBuffer, iFramebuffer);
-	RecordHighDynamicRangeResolve(vkCommandBuffer, iCommandBuffer, iFramebuffer);
-
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerImage);
 
 	CHECK_VK(vkEndCommandBuffer(vkCommandBuffer));
@@ -566,17 +564,6 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSceneResolve);
 	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSceneResolve);
-}
-
-void CommandBufferRecordMain::RecordHighDynamicRangeResolve(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iFramebuffer)
-{
-	// HDR resolve: tone-map + color-grade the F16 scene intermediate into the swapchain. Single DONT_CARE
-	// color attachment (fully overwritten by the fullscreen quad) — empty flags, no clear.
-	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerHdrResolve);
-	Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, RenderPassFlags_t {});
-	gpPipelineManager->mpPipelines[kPipelineHdrResolve].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0);
-	vkCmdEndRenderPass(vkCommandBuffer);
-	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHdrResolve);
 }
 
 } // namespace engine

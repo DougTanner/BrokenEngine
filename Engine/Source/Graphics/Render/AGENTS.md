@@ -68,13 +68,14 @@ may feed simulation state.
   lighting that layer, smoke that plane with `gSmokeLayerStagger` on and every
   plane with it off. Terrain shadows refresh when
   `(miFrameCounter + 1) % shadowCadence == 0` and object shadows when
-  `(miFrameCounter + 2) % objectShadowCadence == 0`. Forced refreshes — resets,
-  first use, and a teleport — stay outside the schedule. A teleport is the live
-  visible area's center lying outside the area a chain's retained texture was
-  last written for (each lighting layer's and smoke plane's own), tested after
-  the `RetainedAreaBasis` shift; a view edge that only pans past that area
-  samples outside it until the next refresh. A lighting reset or first use
-  needs both layers, and a teleport each layer whose area the center left.
+  `miFrameCounter % objectShadowCadence` equals `1 % objectShadowCadence`.
+  Forced refreshes — resets, first use, and a teleport — stay outside the
+  schedule. A teleport is the live visible area's center lying outside the area
+  a chain's retained texture was last written for (each lighting layer's and
+  smoke plane's own), tested after the `RetainedAreaBasis` shift; a view edge
+  that only pans past that area samples outside it until the next refresh. A
+  lighting reset or first use needs both layers, and a teleport each layer
+  whose area the center left.
 - Disabling player-facing Lighting zeroes area-, point-, and shield-light
   deposit draws without hiding their visible sprites or shield geometry. The
   disable edge forces one reset refresh of each layer: spread draws stay off,
@@ -109,11 +110,12 @@ may feed simulation state.
 ## Precision and History
 
 - Water phase and camera-relative UV origins are computed in `double`, reduced
-  with `std::fmod`, then cast to float. Integrate reduced phase from per-frame
-  size, speed, and delta time so tunable changes do not jump. The reduction
-  consumes the absolute camera position, rebuilt as a `double` from the camera
-  cell and the camera's local position, so the pattern stays continuous when the
-  camera changes cell.
+  with `std::fmod`, then cast to float. The normal-map scroll integrates its
+  reduced phase from per-frame size, speed, and delta time so tunable changes
+  do not jump; Gerstner wave phase is not integrated, so a tunable change may
+  jump it. The reductions consume the absolute camera position, rebuilt as a
+  `double` from the camera cell and the camera's local position, so the pattern
+  stays continuous when the camera changes cell.
 - Rotate normal-map camera origins into the shader's pattern space before
   reduction, and preserve integral shader-side wrap multipliers. The stationary
   foam material layers and spawn noise each reduce camera position divided by

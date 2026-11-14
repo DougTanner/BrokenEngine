@@ -1,5 +1,7 @@
 #include "FleetCoordination.h"
 
+#include "Frame/NavQuery.h"
+
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/TerrainUtils.h"
 
@@ -19,7 +21,10 @@ constexpr float kfEscortBaseMaximumSpeed = kFighterMovement.fChaseAcceleration /
 constexpr float kfEscortGapGain = 20.0f;
 // ApplyMovement divides by the maximum speed, and 0 means the ship type's own.
 constexpr float kfEscortMinimumMaximumSpeed = 1.0f;
-constexpr float kfVeerOffStartDistanceSquared = 20.0f * 20.0f;
+constexpr float kfVeerOffStartDistance = 20.0f;
+constexpr float kfVeerOffStartDistanceSquared = kfVeerOffStartDistance * kfVeerOffStartDistance;
+// One full-speed turn diameter, the sideways reach of a Fighter reversing its heading.
+constexpr float kfVeerOffSideProbeDistance = 2.0f * kfFighterMaxSpeed / kFighterMovement.fMaxTurnRate;
 constexpr float kfVeerOffEndDistanceSquared = 150.0f * 150.0f;
 
 // XMVector2Normalize divides all four lanes by the x/y length, so every horizontal offset zeroes Z before it; a zero x/y
@@ -73,13 +78,30 @@ static ShipTactic XM_CALLCONV AttackTactic(FXMVECTOR vecEnemyPosition)
 	};
 }
 
-// Starts a veer-off from an enemy within kfVeerOffStartDistanceSquared in x/y, else attacks it on its nearest plane.
+// Starts a veer-off from an enemy within kfVeerOffStartDistanceSquared in x/y, else attacks it on its nearest plane. The
+// veer-off point is the enemy position, moved kfVeerOffStartDistance toward the blocked side when exactly one side of
+// the away direction is blocked within kfVeerOffSideProbeDistance, so the Fighter turns to the clear side. A side is
+// tested against the rectangles the board selects and, unsnapped, the terrain of the graph the veer-off route reads.
 static ShipTactic XM_CALLCONV AttackOrStartVeerOff(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecEnemyPosition, NavRectangleBoard& rNavRectangleBoard, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint)
 {
 	if (HorizontalDistanceSquared(vecPosition, vecEnemyPosition) <= kfVeerOffStartDistanceSquared)
 	{
 		rFlags.Set(ShipFlags::kVeerOff);
+
+		// The span is valid only until the next Select, which VeerOffTactic's route makes.
+		std::span<const engine::NavRectangle> rectangles = rNavRectangleBoard.Select(vecPosition, vecEnemyPosition);
+		const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iClearanceTier, NavigationFlightPlane(XMVectorGetZ(vecPosition), NearestFlightPlane(vecEnemyPosition)));
+		XMVECTOR vecLeftNormal = XMVector2Orthogonal(HorizontalNormal(XMVectorSubtract(vecPosition, vecEnemyPosition)));
+		XMVECTOR vecProbeOffset = XMVectorScale(vecLeftNormal, kfVeerOffSideProbeDistance);
+		bool bLeftBlocked = IsSegmentBlocked(rNavData, rectangles, vecPosition, XMVectorAdd(vecPosition, vecProbeOffset));
+		bool bRightBlocked = IsSegmentBlocked(rNavData, rectangles, vecPosition, XMVectorSubtract(vecPosition, vecProbeOffset));
+
 		rVecVeerOffPoint = vecEnemyPosition;
+		if (bLeftBlocked != bRightBlocked)
+		{
+			float fShift = bLeftBlocked ? kfVeerOffStartDistance : -kfVeerOffStartDistance;
+			rVecVeerOffPoint = XMVectorAdd(vecEnemyPosition, XMVectorScale(vecLeftNormal, fShift));
+		}
 		return VeerOffTactic(rStaticData, iClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard);
 	}
 
@@ -132,6 +154,47 @@ static XMVECTOR XM_CALLCONV EscortSlotPoint(const Frame& rPreviousFrame, const F
 	int64_t iPhase = (iLapTick * iCount + iSlot * kiEscortLapTicks) % iPeriod;
 	common::SinCos rotation = common::DeterministicSinCos(XM_2PI * static_cast<float>(iPhase) / static_cast<float>(iPeriod));
 	return XMVectorAdd(rView.vecFlagshipPosition, XMVectorSet(rotation.fCos * kfEscortDistance, -rotation.fSin * kfEscortDistance, 0.0f, 0.0f));
+}
+
+// The squadron's shared target, from the previous frame's non-dying Fighter rows of the fleet of flagshipGlobalId whose
+// ShipOrders::kSquadron1 bit is bSquadron1: the lowest-global-ID row's kept target among those holding one, kept
+// while it qualifies, else the enemy nearest the leader, the lowest-global-ID row, in x/y, ignoring line of sight. A
+// leader just launched or arrived holds no kept target, so the kept target does not come from the leader alone. Every
+// input is a previous-frame row, so every squadron row in the cell gets the same target. The calling row is one of the
+// rows. Writes the target into rRegistryTarget; returns false when the cell holds no enemy at or below
+// iHighestFlightPlane.
+static bool XM_CALLCONV FindSquadronTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, engine::GlobalId flagshipGlobalId, bool bSquadron1, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult)
+{
+	const FightersInterpolate& rInterpolate = *rPreviousFrame.interpolate.pFighters;
+	const FightersPostRender& rPostRender = *rPreviousFrame.postRender.pFighters;
+	int64_t iLeader = -1;
+	int64_t iKeptHolder = -1;
+	for (int64_t i = 0; i < rPostRender.iCount; ++i)
+	{
+		if (rPostRender.pFlagshipGlobalIds[i] != flagshipGlobalId || static_cast<bool>(rPostRender.pOrders[i] & ShipOrders::kSquadron1) != bSquadron1)
+		{
+			continue;
+		}
+
+		if (rPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		{
+			continue;
+		}
+		if (iLeader < 0 || rPostRender.pGlobalIds[i].iValue < rPostRender.pGlobalIds[iLeader].iValue)
+		{
+			iLeader = i;
+		}
+		if (rPostRender.pRegistryTargets[i].uuid.iValue != 0 && (iKeptHolder < 0 || rPostRender.pGlobalIds[i].iValue < rPostRender.pGlobalIds[iKeptHolder].iValue))
+		{
+			iKeptHolder = i;
+		}
+	}
+	ASSERT(iLeader >= 0);
+
+	rRegistryTarget = iKeptHolder >= 0 ? rPostRender.pRegistryTargets[iKeptHolder] : engine::registry_id_t {};
+	XMVECTOR vecLeaderPosition = rInterpolate.pVecPositions[iLeader];
+	bool bInLineOfSight = false;
+	return FindAttackTarget(rPreviousFrame, rStaticData, vecLeaderPosition, rInterpolate.puiFlightPlanes[iLeader], vecLeaderPosition, {AttackTargetFlags::kHorizontal, AttackTargetFlags::kIgnoreLineOfSight}, alignment, iHighestFlightPlane, rRegistryTarget, rVecResult, bInLineOfSight);
 }
 
 FleetBoard::FleetBoard(const Frame& rPreviousFrame)
@@ -189,7 +252,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	{
 		XMVECTOR vecTargetPosition = XMVectorZero();
 		bool bInLineOfSight = false;
-		if (FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, rView.vecFlagshipPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
+		if (FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, rView.vecFlagshipPosition, AttackTargetFlags::kHorizontal, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 		{
 			// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the type's own tier,
 			// which is the pick's when the two match.
@@ -219,12 +282,16 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 	};
 }
 
-ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
+ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
 {
 	int64_t iClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
 	if (rView.flagshipGlobalId.iValue != 0 && rView.eStance == FleetStance::kWeaponsFree)
 	{
 		ShipTactic tactic {};
+		if ((orders & ShipOrders::kSharedTarget) && ChooseAttackTactic(rPreviousFrame, rStaticData, iClearanceTier, vecPosition, rNavRectangleBoard, uiFlightPlane, alignment, HighestFlightPlane(ShipType::kFighter), orders, rView.flagshipGlobalId, rFlags, rVecVeerOffPoint, rRegistryTarget, tactic))
+		{
+			return tactic;
+		}
 		if (ContinueVeerOff(rStaticData, iClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, tactic))
 		{
 			return tactic;
@@ -240,20 +307,31 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 	return tactic;
 }
 
-bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, bool bTargetFlagship, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
+bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
 {
+	// The sight-ignoring pick runs before a veer-off continues, so a veering row also stores the current target.
+	XMVECTOR vecTargetPosition = XMVectorZero();
+	bool bInLineOfSight = false;
+	bool bPicked = false;
+	if (orders & ShipOrders::kSharedTarget)
+	{
+		bPicked = FindSquadronTarget(rPreviousFrame, rStaticData, flagshipGlobalId, orders & ShipOrders::kSquadron1, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition);
+	}
+	else if (orders & ShipOrders::kSeekAndDestroy)
+	{
+		bPicked = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, {AttackTargetFlags::kHorizontal, AttackTargetFlags::kIgnoreLineOfSight}, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight);
+	}
+
 	if (ContinueVeerOff(rStaticData, iClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, rTactic))
 	{
 		return true;
 	}
 
-	XMVECTOR vecTargetPosition = XMVectorZero();
-	bool bInLineOfSight = false;
-	if (bTargetFlagship && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition))
+	if (((orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition)) || bPicked)
 	{
 		bInLineOfSight = HasShipLineOfSight(rPreviousFrame, rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
-	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, true, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
+	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, AttackTargetFlags::kHorizontal, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 	{
 		return false;
 	}

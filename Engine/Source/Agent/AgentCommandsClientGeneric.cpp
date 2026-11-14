@@ -1003,7 +1003,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		}
 	}
 	rResult["cpuTimers"] = std::move(cpuTimers);
-	rResult["cpuTimerText"] = gpImGuiManager != nullptr ? std::string(gpImGuiManager->GetTextArea(kTextProfileCpuTimers)) : std::string();
+	rResult["cpuTimerText"] = std::string(gpImGuiManager->GetTextArea(kTextProfileCpuTimers));
 
 	engine::GpuTimer* pGpuTimers = gpProfileManager->mpGpuTimers;
 	nlohmann::json gpuTimers = nlohmann::json::array();

@@ -509,10 +509,7 @@ void TextureDescriptors::RestoreIslandSlot(common::crc_t islandCrc)
 		}
 
 		auto it = mTextureBindings.find(islandCrc);
-		if (it == mTextureBindings.end())
-		{
-			return;
-		}
+		ASSERT(it != mTextureBindings.end());
 		mrTextureManager.mRenderTargetTextures.mElevationTextures.at(iSlot) = rSlot.pElevationTexture;
 		for (TextureBinding& rBinding : it->second)
 		{

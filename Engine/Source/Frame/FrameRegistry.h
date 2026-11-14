@@ -50,11 +50,12 @@ struct RegistryOwnershipLayer
 {
 	const std::byte* pIdBytes = nullptr;     // Required; element stride sizeof(Uuid), bind via RegistryIdBytes
 	const GlobalId* pGlobalIds = nullptr; // Optional; a layer without it matches no global id
-	ClientGuid* pClientGuids = nullptr;      // Optional; sole write channel, CRC-excluded columns only
+	ClientGuid* pClientGuids = nullptr;      // Required; sole write channel, CRC-excluded columns only
 	int64_t iCount = 0; // The caller's choice of layer is the filter.
 };
 
-bool AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid);
+// The layer must hold a row for globalId; the caller proves it with RegistryUuidByGlobalId.
+void AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid);
 
 [[nodiscard]] Uuid RegistryUuidByGlobalId(const RegistryOwnershipLayer& rLayer, GlobalId globalId);
 

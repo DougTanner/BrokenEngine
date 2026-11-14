@@ -993,8 +993,8 @@ void GameBase::Render()
 	sbWorldHidden = bWorldHidden;
 	if (bWorldHidden)
 	{
-		// The skipped collection render walk also issues each model's once-only texture request and steps wrecks; the game's world-hidden
-		// step does both with no GPU write, so the textures start loading and the wrecks keep falling while the world is hidden.
+		// The skipped collection render walk also issues each model's once-only texture request; the game's world-hidden step
+		// does it with no GPU write, so the textures start loading while the world is hidden.
 		game::FrameInterpolate::UpdateWorldHidden(mRenderInterpolates, rActiveCoordinates);
 		// RenderGlobal is skipped, so drop this frame's staged spawns as the deferred-swapchain skip does.
 		gpParticleManager->DiscardStagedSpawns();
@@ -1128,11 +1128,7 @@ void GameBase::ChangeFrameToMainMenu()
 	game::gpClientSession->mpRuntime->Disconnect();
 #endif
 
-	if (mGameFlags & GameFlags::kMainMenu)
-	{
-		DEBUG_BREAK();
-		return;
-	}
+	ASSERT(!(mGameFlags & GameFlags::kMainMenu));
 
 #if defined(BT_CLIENT)
 	game::gpGame->StartMenuMusic();

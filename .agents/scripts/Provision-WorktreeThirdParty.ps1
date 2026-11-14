@@ -85,7 +85,7 @@ function Get-LinkFarmEntries([string] $Source, [string] $RelativePath, [switch] 
 	return $entries
 }
 
-function Assert-LinkFarmDestination([string] $Destination, [object[]] $Entries) {
+function Assert-LinkFarmDestination([string] $Destination, [string] $Source, [object[]] $Entries) {
 	$rootItem = Get-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
 	if ($null -eq $rootItem) { return }
 	if (-not $rootItem.PSIsContainer -or ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
@@ -93,12 +93,20 @@ function Assert-LinkFarmDestination([string] $Destination, [object[]] $Entries) 
 	}
 	$expected = @{}
 	foreach ($entry in $Entries) { $expected[$entry.Name] = $entry }
+	$staleLinks = @()
 	foreach ($item in (Get-ChildItem -LiteralPath $Destination -Force)) {
-		if (-not $expected.ContainsKey($item.Name)) {
-			throw "Submodule provisioning root contains unexpected entry '$($item.FullName)'."
-		}
 		$entry = $expected[$item.Name]
-		if (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.PSIsContainer -ne $entry.IsDirectory) {
+		if ($null -eq $entry -or -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.PSIsContainer -ne $entry.IsDirectory) {
+			# A link of exactly the shape Ensure-LinkFarm creates is left over from an older submodule pin;
+			# any other unexpected entry may be user content, so it still stops provisioning.
+			if ($item.LinkType -eq 'SymbolicLink' -and
+				(Get-LinkTarget $item).Equals((Get-AgentCanonicalPath (Join-Path $Source $item.Name)), [StringComparison]::OrdinalIgnoreCase)) {
+				$staleLinks += $item.FullName
+				continue
+			}
+			if ($null -eq $entry) {
+				throw "Submodule provisioning root contains unexpected entry '$($item.FullName)'."
+			}
 			$kind = if ($entry.IsDirectory) { 'directory' } else { 'file' }
 			throw "Submodule provisioning entry must be a $kind link: '$($item.FullName)'."
 		}
@@ -108,6 +116,7 @@ function Assert-LinkFarmDestination([string] $Destination, [object[]] $Entries) 
 			throw "Provisioning link '$($item.FullName)' targets '$actual'; expected '$expectedTarget'."
 		}
 	}
+	return $staleLinks
 }
 
 function Ensure-LinkFarm([string] $Destination, [object[]] $Entries, [System.Collections.Generic.List[object]] $CreatedArtifacts) {
@@ -253,8 +262,8 @@ foreach ($record in $pinRecords) {
 	$entries = @(Get-LinkFarmEntries $record.Source $record.RelativePath -SkipNestedScan:$skipNestedScan)
 	if (-not $root.Equals($primaryRoot, [StringComparison]::OrdinalIgnoreCase)) {
 		$destination = Join-Path $root $record.RelativePath
-		Assert-LinkFarmDestination $destination $entries
-		$linkFarmPlans += [PSCustomObject]@{ Destination = $destination; Entries = $entries }
+		$staleLinks = @(Assert-LinkFarmDestination $destination $record.Source $entries)
+		$linkFarmPlans += [PSCustomObject]@{ Destination = $destination; Entries = $entries; StaleLinks = $staleLinks }
 	}
 }
 
@@ -267,7 +276,10 @@ if (-not $root.Equals($primaryRoot, [StringComparison]::OrdinalIgnoreCase)) {
 	Assert-DirectoryLinkDestination $agentHarnessOutputDestination $primaryAgentHarnessOutput
 	$createdArtifacts = [System.Collections.Generic.List[object]]::new()
 	try {
-		foreach ($plan in $linkFarmPlans) { Ensure-LinkFarm $plan.Destination $plan.Entries $createdArtifacts }
+		foreach ($plan in $linkFarmPlans) {
+			foreach ($staleLink in $plan.StaleLinks) { Remove-Item -LiteralPath $staleLink -Force }
+			Ensure-LinkFarm $plan.Destination $plan.Entries $createdArtifacts
+		}
 		Ensure-DirectoryLink $outputDestination $primaryOutput $createdArtifacts
 		Ensure-DirectoryLink $worktreeCliOutputDestination $primaryWorktreeCliOutput $createdArtifacts
 		Ensure-DirectoryLink $agentHarnessOutputDestination $primaryAgentHarnessOutput $createdArtifacts

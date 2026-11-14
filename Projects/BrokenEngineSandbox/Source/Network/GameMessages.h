@@ -16,6 +16,17 @@ struct CreateFleetRequestMessage
 	}
 };
 
+struct MapFleetMarkersRequestMessage
+{
+	static constexpr int64_t kiSize = 0;
+	static_assert(kiSize == 0);
+
+	template <typename TVISITOR>
+	static void Visit([[maybe_unused]] TVISITOR& rVisitor, [[maybe_unused]] MapFleetMarkersRequestMessage& rMessage)
+	{
+	}
+};
+
 struct SpawnIntoFleetRequestMessage
 {
 	static constexpr int64_t kiSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint8_t);
@@ -33,20 +44,27 @@ struct SpawnIntoFleetRequestMessage
 	}
 };
 
-struct FleetNavigationDelayRequestMessage
+// Carries every fleet navigation setting; a sender changes one field and sends the fleet's current values for the rest.
+struct FleetNavigationRequestMessage
 {
-	static constexpr int64_t kiSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(float);
-	static_assert(kiSize == 20);
+	static constexpr int64_t kiSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t);
+	static_assert(kiSize == 29);
 
 	FleetGuid fleetGuid {};
 	float fNavigationDelay = 0.0f;
+	uint8_t uiBehaviour = 0;
+	int32_t iHoldQ = 0;
+	int32_t iHoldR = 0;
 
 	template <typename TVISITOR>
-	static void Visit(TVISITOR& rVisitor, FleetNavigationDelayRequestMessage& rMessage)
+	static void Visit(TVISITOR& rVisitor, FleetNavigationRequestMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.fleetGuid.uiHigh);
 		rVisitor.Field(rMessage.fleetGuid.uiLow);
 		rVisitor.Field(rMessage.fNavigationDelay);
+		rVisitor.Field(rMessage.uiBehaviour);
+		rVisitor.Field(rMessage.iHoldQ);
+		rVisitor.Field(rMessage.iHoldR);
 	}
 };
 
@@ -64,14 +82,31 @@ struct DestroyFleetMemberRequestMessage
 	}
 };
 
+// Sets the squadron setting flags (SquadronOrderFlags) of the squadron of the Fighter or Omni member globalId to uiFlags.
+struct SquadronOrdersRequestMessage
+{
+	static constexpr int64_t kiSize = sizeof(int64_t) + sizeof(uint8_t);
+	static_assert(kiSize == 9);
+
+	engine::GlobalId globalId {};
+	uint8_t uiFlags = 0;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, SquadronOrdersRequestMessage& rMessage)
+	{
+		rVisitor.Field(rMessage.globalId.iValue);
+		rVisitor.Field(rMessage.uiFlags);
+	}
+};
+
 struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
-	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float);
+	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t);
 	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t);
 
 	static_assert(kiFleetCountSize == 8);
-	static_assert(kiFleetHeaderSize == 36);
+	static_assert(kiFleetHeaderSize == 45);
 	static_assert(kiFleetMemberSize == 11);
 
 	template <typename TVISITOR, typename TFLEET>
@@ -79,13 +114,18 @@ struct FleetSyncMessage
 	{
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
-		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float));
+		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t));
 		rVisitor.Field(rFleet.flagshipGlobalId.iValue);
 		float fNavigationDelay = rFleet.navigationDelaySeconds.count();
 		rVisitor.Field(fNavigationDelay);
+		uint8_t uiBehaviour = std::to_underlying(rFleet.eBehaviour);
+		rVisitor.Field(uiBehaviour);
+		rVisitor.Field(rFleet.holdCoordinate.iQ);
+		rVisitor.Field(rFleet.holdCoordinate.iR);
 		if constexpr (!std::is_const_v<TFLEET>)
 		{
 			rFleet.navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay);
+			rFleet.eBehaviour = static_cast<FleetBehaviour>(uiBehaviour);
 		}
 	}
 
@@ -146,6 +186,64 @@ struct FleetSyncMessage
 				rMember.eType = static_cast<ShipType>(uiType);
 				rMember.flags.meFlags = static_cast<FleetMemberFlags>(uiFlags);
 			}
+		}
+	}
+};
+
+// One live fleet flagship on the hex map: its cell, its position in that cell's frame, and its flags.
+struct MapFleetMarker
+{
+	engine::GridCoord coordinate {};
+	XMFLOAT2 f2Position {};
+	uint8_t uiFlags = 0;
+};
+
+struct MapFleetMarkersMessage
+{
+	static constexpr int64_t kiMarkerCountSize = sizeof(int64_t);
+	static constexpr int64_t kiMarkerSize = sizeof(int32_t) + sizeof(int32_t) + sizeof(float) + sizeof(float) + sizeof(uint8_t);
+
+	static_assert(kiMarkerCountSize == 8);
+	static_assert(kiMarkerSize == 17);
+
+	// MapFleetMarker::uiFlags bit: the requesting client owns the marker's fleet.
+	static constexpr uint8_t kuiOwnFlag = 1 << 0;
+
+	template <typename TVISITOR, typename TMARKER>
+	static void VisitMarker(TVISITOR& rVisitor, TMARKER& rMarker)
+	{
+		rVisitor.Field(rMarker.coordinate.iQ);
+		rVisitor.Field(rMarker.coordinate.iR);
+		rVisitor.Field(rMarker.f2Position.x);
+		rVisitor.Field(rMarker.f2Position.y);
+		rVisitor.Field(rMarker.uiFlags);
+	}
+
+	static void WritePayload(common::Workbuffer& rWorkbuffer, std::span<const MapFleetMarker> markers)
+	{
+		int64_t iMarkerCount = std::ssize(markers);
+		int64_t iExpectedSize = rWorkbuffer.Count<uint8_t>() + kiMarkerCountSize + iMarkerCount * kiMarkerSize;
+		engine::NetworkMessages::MessageWriter writer(rWorkbuffer);
+		writer.BoundedCount(iMarkerCount, kiMarkerSize, 0);
+		for (const MapFleetMarker& rMarker : markers)
+		{
+			VisitMarker(writer, rMarker);
+		}
+		ASSERT(rWorkbuffer.Count<uint8_t>() == iExpectedSize);
+	}
+
+	// Only the client reads this server-to-client payload, and it trusts its server, so the decode does not check
+	// reader validity.
+	static void ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<MapFleetMarker>& rOutMarkers)
+	{
+		engine::NetworkMessages::MessageReader reader(std::span<const uint8_t>(rPayload.data(), static_cast<size_t>(std::ssize(rPayload))));
+		int64_t iMarkerCount = 0;
+		reader.BoundedCount(iMarkerCount, kiMarkerSize, 0);
+
+		rOutMarkers.resize(static_cast<size_t>(iMarkerCount));
+		for (MapFleetMarker& rMarker : rOutMarkers)
+		{
+			VisitMarker(reader, rMarker);
 		}
 	}
 };

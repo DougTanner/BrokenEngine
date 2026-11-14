@@ -228,8 +228,8 @@ world-hidden frame
 begin/render/end collection walk runs on it; `GameBase::Render` instead calls
 the game's world-hidden step, `game::FrameInterpolate::UpdateWorldHidden`,
 which runs the game collections' `RequestTextures` fold
-(`ForEachRequestTextures`) and the wreck step. No engine collection declares
-`RequestTextures`, so no engine walk precedes it.
+(`ForEachRequestTextures`). No engine collection declares `RequestTextures`, so
+no engine walk precedes it.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

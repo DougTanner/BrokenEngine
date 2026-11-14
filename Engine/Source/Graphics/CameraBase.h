@@ -225,6 +225,10 @@ public:
 		return InVisibleArea(f4VisibleArea, f4Position, fAdjustLeft, fAdjustRight, fAdjustTop, fAdjustBottom);
 	}
 
+	// Whether a position local to coordinate's cell lies inside the render visible area scaled by
+	// kfSpawnVisibleAreaScale; explosion spawns and AddControlled calls outside it spawn nothing.
+	bool XM_CALLCONV InSpawnVisibleArea(GridCoord coordinate, FXMVECTOR vecLocalPosition);
+
 protected:
 
 	void CalculateMatricesAndVisibleArea();

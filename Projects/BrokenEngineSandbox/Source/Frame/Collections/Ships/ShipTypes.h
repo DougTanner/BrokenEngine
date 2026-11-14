@@ -49,17 +49,28 @@ constexpr const char* ShipControllerName(ShipController eController)
 	return "Unknown";
 }
 
-// Set by controllers (the fleet path through the spawn and kUpdateShip, and the random-wave spawn); kUpdateShip and the
-// Fighters and Omnis PostRender Update tactics also write the target flight plane.
+// Set by controllers (the fleet path through the spawn, kUpdateShip, and kUpdateSquadronOrders, and the random-wave
+// spawn); kUpdateShip and the Fighters and Omnis PostRender Update tactics also write the target flight plane.
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
 	// A random-spawn row that chases and prefers to shoot the nearest enemy flagship in its cell.
 	kTargetFlagship     = 0x0002,
+	// Fleet Fighter and Omni rows only. Set when the row's fleet member is in squadron 1, clear for squadron 0.
+	kSquadron1          = 0x0004,
+	// Fleet Fighter rows only: the squadron's settings (SquadronOrders, Fleet.h).
+	kSeekAndDestroy     = 0x0008,
+	kSharedTarget       = 0x0010,
+	// Fleet Omni rows only: the squadron's settings (SquadronOrders, Fleet.h).
+	kPatrolCell         = 0x0020,
+	kPatrolTogether     = 0x0040,
 
 	// Target flight plane index in bits 8-15 (0 = lowest)
 };
 using ShipOrders_t = common::Flags<ShipOrders>;
+
+// Every squadron setting bit, the ones kUpdateSquadronOrders replaces.
+inline constexpr ShipOrders_t kSquadronOrderBits {ShipOrders::kSeekAndDestroy, ShipOrders::kSharedTarget, ShipOrders::kPatrolCell, ShipOrders::kPatrolTogether};
 
 inline constexpr int64_t GetTargetFlightPlane(ShipOrders_t orders)
 {
@@ -83,7 +94,6 @@ enum class ShipFlags : uint16_t
 	kBlasterSpawnLeft     = 0x0008,
 	// The AI direction is a kept value, not one the ship wants, so the Fighter and Battleship heading capture and the Omni thrust ignore it.
 	kNoAiDirection        = 0x0010,
-	kFlee                 = 0x0040,
 	kReturnToIslandCenter = 0x0080,
 
 	// Nav direction in bits 8-11 (4 bits, stored as value+1: 0-8 representing -1 to 7): -1 roaming, 0-5 the

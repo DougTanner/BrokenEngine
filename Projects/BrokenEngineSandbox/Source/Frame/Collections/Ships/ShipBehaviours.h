@@ -37,7 +37,6 @@ struct AcceleratedMovementConstants
 struct HeadingMovementConstants
 {
 	float fChaseAcceleration = 0.0f;
-	float fFleeAcceleration = 0.0f;
 	float fReturnAcceleration = 0.0f;
 	float fDrag = 0.0f;
 	float fMaximumSpeed = 0.0f;
@@ -134,9 +133,9 @@ public:
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
 
 // Random-spawn steering destination: the next route waypoint toward the nearest island center when returning or with
-// no enemy, else the nearest enemy. Updates the kFlee and kReturnToIslandCenter hysteresis, which measures the raw
-// enemy distance and island center; rbHasDestination is false in an island-free cell with no enemy.
-[[nodiscard]] XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
+// no enemy, else the nearest enemy. Updates the kReturnToIslandCenter hysteresis from the raw distance to that island
+// center; rbHasDestination is false in an island-free cell with no enemy.
+[[nodiscard]] XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
 
 // The horizontal AI bearing is inside the inclusive +/-45-degree forward cone.
 [[nodiscard]] bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection);
@@ -172,6 +171,8 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 // HasLineOfSight, and no model box of a live rFrame Battleship occupying uiFlightPlane crosses the unsnapped segment. A
 // box holding either position does not block, which spares the shooter's and the target's own.
 [[nodiscard]] bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
+// The unsnapped segment crosses a polygon edge of rNavData or the box of one of the rectangles, boundary included.
+[[nodiscard]] bool XM_CALLCONV IsSegmentBlocked(const engine::NavData& rNavData, std::span<const engine::NavRectangle> rectangles, FXMVECTOR vecStart, FXMVECTOR vecEnd);
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield);
 

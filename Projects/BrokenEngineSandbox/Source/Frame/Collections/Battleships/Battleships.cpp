@@ -31,16 +31,8 @@ template struct Collection<game::BattleshipsPostRender>;
 namespace game
 {
 
-constexpr float kfBattleshipExplosionParticleCount = 8.0f;
-constexpr float kfBattleshipExplosionSizeStart = kfBattleshipRadius * 0.625f;
-constexpr float kfBattleshipExplosionSizeEnd = kfBattleshipRadius * 0.25f;
-constexpr float kfBattleshipExplosionSmoke = 0.5f;
-constexpr float kfBattleshipExplosionPositionJitter = kfBattleshipRadius * 0.375f;
-constexpr float kfBattleshipExplosionDirectionJitter = 0.5f;
-constexpr int64_t kiBattleshipExplosionTrailCount = 5;
-
 #if defined(BT_CLIENT)
-// Shared type indices (accessible from BattleshipsCombat.cpp via extern)
+// Shared type indices: Wrecks.cpp reads the explosion type and BattleshipsCombat.cpp the hit flash controller type via extern.
 int64_t giBattleshipExplosionTypeIndex = 0xFF;
 static int64_t siBattleshipHitFlashTypeIndex = 0xFF;
 int64_t giBattleshipHitFlashControllerTypeIndex = 0xFF;
@@ -135,29 +127,6 @@ static void RegisterBattleshipHitFlashEffect()
 		.ppLightingAreaScales = {&gHitFlashLightingAreaOne, &gHitFlashLightingAreaTwo, nullptr, nullptr},
 		.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
 	});
-}
-
-void SpawnBattleshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent)
-{
-	common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
-	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfBattleshipExplosionPositionJitter>(vecPosition, randomEngine);
-	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfBattleshipExplosionDirectionJitter>(vecDirection, randomEngine);
-
-	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
-	{
-		.iTypeIndex = giBattleshipExplosionTypeIndex,
-		.vecPosition = vecJitteredPosition,
-		.vecDirection = vecJitteredDirection,
-		.flags = {engine::ExplosionFlags::kRed},
-		.lifecycleFlags = {engine::LifecycleFlags::kDying},
-		.iTrailCount = kiBattleshipExplosionTrailCount,
-		.fTrailAngle = fPercent * XM_PI,
-		.iParticleCount = static_cast<int64_t>(fPercent * kfBattleshipExplosionParticleCount),
-		.fParticleAngle = fPercent * XM_PIDIV2,
-		.fSizePercent = fPercent * kfBattleshipExplosionSizeStart + (1.0f - fPercent) * kfBattleshipExplosionSizeEnd,
-		.fSmokePercent = fPercent * kfBattleshipExplosionSmoke,
-		.fTimePercent = fPercent,
-	}, randomEngine);
 }
 
 // Battleship models, one per ShipController (defined in BattleshipsRender.cpp)
@@ -327,24 +296,6 @@ void BattleshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [
 void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpawnMissiles(rFrame, rStaticData);
-
-	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
-	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
-
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		if ((rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f)
-		{
-			rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
-
-#if defined(BT_CLIENT)
-			float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kBattleshipDestroyTime;
-			// A dying Battleship holds still, so each explosion flies away from the damage direction.
-			XMVECTOR vecDirection = XMVector3Normalize(XMVectorSetZ(XMVectorNegate(rCurrentPostRender.pVecDamageDirections[i]), 0.0f));
-			SpawnBattleshipExplosion(rFrame, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, fPercent);
-#endif
-		}
-	}
 }
 
 #if defined(BT_CLIENT)
@@ -424,9 +375,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
-	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfHealths[iIndex] = rInfo.bTransfer ? rInfo.fHealth : kfBattleshipHealth;
-	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentPostRender.pNextMissileFireTimes[iIndex] = rInfo.nextMissileFireTime;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
@@ -482,7 +431,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		engine::LifecycleFlags_t lifecycleFlags = rPrevious.pLifecycleFlags[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		float fHealth = rPrevious.pfHealths[i];
-		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
 		std::chrono::duration<float> nextMissileFireTime = rPrevious.pNextMissileFireTimes[i] - deltaTime;
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
@@ -530,10 +478,10 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = XMVectorZero();
 				bool bRouteToTarget = false;
-				if ((rPrevious.pOrders[i] & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecTarget))
+				if (FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecTarget))
 				{
-					// A flagship chase never flees or returns to an island.
-					flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
+					// A flagship chase never returns to an island.
+					flags.Set(ShipFlags::kReturnToIslandCenter, false);
 					vecDestination = vecTarget;
 					bHasDestination = true;
 					bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
@@ -541,15 +489,21 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				else
 				{
 					bool bInLineOfSight = false;
-					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
-					vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
-					if ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter))
+					bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
+					if (bEnemyFound)
 					{
-						vecDestination = FleeRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]));
+						// An attack never returns to an island.
+						flags.Set(ShipFlags::kReturnToIslandCenter, false);
+						vecDestination = vecTarget;
+						bHasDestination = true;
+						// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
+						// tier.
+						bRouteToTarget = !bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
 					}
-					// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
-					// tier.
-					bRouteToTarget = bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter) && !(flags & ShipFlags::kFlee) && (!bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget));
+					else
+					{
+						vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
+					}
 				}
 				if (bRouteToTarget)
 				{
@@ -588,7 +542,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pfHealths[i] = fHealth;
-		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
 		rCurrent.pNextMissileFireTimes[i] = nextMissileFireTime;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
@@ -639,9 +592,7 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pOrders">(i, pOrders[i], rOther.pOrders[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
-		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);
 		bEqual &= common::LogDifference<"pfHealths">(i, pfHealths[i], rOther.pfHealths[i]);
-		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
 		bEqual &= common::LogDifference<"pNextMissileFireTimes">(i, pNextMissileFireTimes[i], rOther.pNextMissileFireTimes[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);

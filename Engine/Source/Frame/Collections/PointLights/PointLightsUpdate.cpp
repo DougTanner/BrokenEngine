@@ -106,8 +106,13 @@ void PointLightsPostRender::Add(game::Frame& __restrict rFrame, point_lights_t& 
 	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = static_cast<uint8_t>(kiInvalidControllerType);
 }
 
-void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
+void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
 {
+	if (!gpCamera->InSpawnVisibleArea(coordinate, vecPosition))
+	{
+		return;
+	}
+
 	PointLightsInterpolate& rInterpolate = rFrame.interpolate.pointLights;
 	PointLightsPostRender& rPostRender = rFrame.postRender.pointLights;
 

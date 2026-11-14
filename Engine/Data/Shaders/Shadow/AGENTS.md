@@ -62,4 +62,9 @@ outside it reads the clamped edge texels until the next refresh.
   per-channel sigma rules out bilinear tap pairing, so both object passes use
   discrete output-grid taps. Both object inputs remain linear, clamp-to-edge;
   both passes blur every channel, the horizontal pass on raw coverage, and
-  vertical blur converts it to multiply-with-lighting form.
+  vertical blur converts it to multiply-with-lighting form. Each object pass
+  runs one 1-D workgroup per strip of `kiObjectShadowsBlurStripLength` texels
+  along its blur axis: the workgroup fetches the strip plus the radius on each
+  side once into a shared tap cache, then every texel blurs from that cache.
+  The cache must fit the Vulkan minimum shared-memory size, which the
+  `static_assert` beside that constant in `ShaderLayoutsBase.h` enforces.

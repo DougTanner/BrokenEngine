@@ -23,10 +23,6 @@ namespace game
 // Shared constants (used across Missiles*.cpp files)
 inline constexpr std::chrono::duration<float> kMissileDestroyTime(0.35f);
 inline constexpr std::chrono::duration<float> kMissileDeltaRotationDelay(0.5f);
-// Spawn and the flying-missile branch of PostRender Update draw exhaust length from the shared frame random engine into CRC-covered pfExhaustLengths.
-// The range stays constexpr for client/server determinism.
-inline constexpr float kfMissileExhaustLength = 1.25f;
-inline constexpr float kfMissileExhaustLengthRandom = 1.0f;
 // Spawn-time pitch range MUST stay constexpr: pfPitches[i] feeds the shared looping-voice fPitch, so the random
 // draw must be deterministic across client/server. Runtime-tweakable launch-cue pitch lives in SoundWrappers.h.
 inline constexpr float kfMissilePitchMinimum = 0.75f;
@@ -36,7 +32,6 @@ struct FrameInterpolate;
 
 enum class MissileFlags : uint8_t
 {
-	kDirectional  = 0x04,
 	kTargetFleet  = 0x08,
 	kTargetRandom = 0x10,
 	kFalling      = 0x20,
@@ -116,7 +111,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 14;
+	static constexpr int64_t kiVersion = 17;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
@@ -129,7 +124,6 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	MissileFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
-	XMVECTOR* __restrict pVecExplosionDirections = nullptr;
 	XMVECTOR* __restrict pVecStoredDirections = nullptr;
 	engine::registry_id_t* __restrict puiRegistryTargets = nullptr;
 	std::chrono::duration<float>* __restrict pTimes = nullptr;
@@ -139,14 +133,13 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	float* __restrict pfDeltaRotationMaximum = nullptr;
 	float* __restrict pfAccelerations = nullptr;
 	float* __restrict pfPitches = nullptr;
-	float* __restrict pfExhaustLengths = nullptr;
 #if defined(BT_CLIENT)
 	engine::sound_t* __restrict puiSounds = nullptr;
 #endif
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pTimes, rSelf.pDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pTimes, rSelf.pDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pAlignments);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -165,9 +158,9 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.puiSounds, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.puiSounds, rSelf.pAlignments);
 #else
-		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pAlignments);
 #endif
 	}
 	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)

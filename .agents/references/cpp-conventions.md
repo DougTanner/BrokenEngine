@@ -18,6 +18,11 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
   reject the input — drop the packet or fail the load — and never clamp,
   substitute, or normalize the value. Reject through the owning boundary's
   failure path (`Common/AGENTS.md` `## Shared Data Contracts`).
+- No early return that hides an invalid value: where code checks a value a
+  caller inside the codebase passes in, or another unit sets, the check is an
+  ASSERT, never an early return, `continue`, or silent clamp, so the bad value
+  is reported instead of hidden. The no-useless-ASSERT bullet below decides
+  whether to check at all.
 - No useless ASSERTs: an ASSERT that throws one line before the code would crash
   anyway adds false safety — remove it; prefer making the condition impossible
   in calling code. `/repo-code-review` lists the preferred fixes in order, from

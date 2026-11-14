@@ -109,6 +109,9 @@ ServerClientManager::ServerClientManager()
 	LOG(kNetwork, kInfo, "ServerClientManager fleet spawn candidates Count: {} First: ({},{})", std::ssize(mFleetSpawnCandidates), common::Wb(mFleetSpawnCandidates.front().x, 1), common::Wb(mFleetSpawnCandidates.front().y, 1));
 }
 
+// NewClients, OnClientDisconnected, and ResetState track handled clients in mProcessedClientIds, which is game-agnostic
+// apart from the mpFleetManager calls, the connecting-client diagnostic, and mNextFighterLaunchTicks: a future project
+// may want it moved into shared engine code, depending on its requirements.
 void ServerClientManager::NewClients()
 {
 	// Heap: processed-client-ID set insert
@@ -183,6 +186,11 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 	if (bIsFlagship)
 	{
 		spawnOrders.Set(ShipOrders::kIsFlagship);
+	}
+	if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
+	{
+		spawnOrders = SquadronOrders(rMember.eType, rMember.flags);
+		spawnOrders.Set(ShipOrders::kSquadron1, rMember.uiSquadron == 1);
 	}
 	SetTargetFlightPlane(spawnOrders, iTargetFlightPlane);
 

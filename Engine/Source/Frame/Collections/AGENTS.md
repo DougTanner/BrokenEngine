@@ -139,9 +139,7 @@ SOA layout change.
   pruned each frame with `EraseStaleRenderState<>()`. That is the sanctioned
   alternative to adding a client-only column to a shared collection. Client-only
   state needed per tick or owning frame rows is a client-only collection
-  (`../AGENTS.md` `## Simulation and Visual State`). State that outlives its
-  row is instead keyed by `(GridCoord, Id<T>)` and pruned when its cell leaves
-  the rendered set or the non-map visible area.
+  (`../AGENTS.md` `## Simulation and Visual State`).
 - Renderable collections use three phases. `BeginRender` sizes the GPU buffer
   once, from `AccumulateRenderCapacity()` summed over every active grid cell;
   `Render` fills it per cell; `EndRender` publishes counters and writes the

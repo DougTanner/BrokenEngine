@@ -144,10 +144,6 @@ static void BuildNavigationAdjacency(NavData& rNavigationData)
 	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
 		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
-		if (iEnd - iStart < 2)
-		{
-			continue;
-		}
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
 			adjacencyCounts.at(static_cast<size_t>(j)) += 2; // prev + next
@@ -178,10 +174,6 @@ static void BuildNavigationAdjacency(NavData& rNavigationData)
 	{
 		auto [iStart, iEnd] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 		int64_t iCount = iEnd - iStart;
-		if (iCount < 2)
-		{
-			continue;
-		}
 		for (int64_t j = 0; j < iCount; ++j)
 		{
 			AddNeighbor(iStart + j, iStart + ((j + 1) % iCount));

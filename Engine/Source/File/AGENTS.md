@@ -93,10 +93,11 @@ types it consumes.
   wins; audio and other work then alternate so neither starves. Publish every
   accepted job and shutdown through the atomic wake sequence.
 - Client streaming-audio reads use six fixed Pack-owned 16 KiB result entries.
-  The caller holds one request identity and exact range while polling; reset or
-  destruction cancels it. Generation-tagged ownership makes cancelled queued and
-  ready entries reusable at once, while an active loader keeps its entry until
-  it acknowledges cancellation. File must outlive Audio.
+  The caller polls an in-flight read by its request handle alone, since the
+  entry holds the range; reset or destruction cancels it. Generation-tagged
+  ownership makes cancelled queued and ready entries reusable at once, while an
+  active loader keeps its entry until it acknowledges cancellation. File must
+  outlive Audio.
 - Validate a streaming-audio request against its logical chunk payload before
   publishing: pack open rejects compressed audio, so that payload is the on-disk
   extent bounded at open. A lazy pack is locked against writes from before its

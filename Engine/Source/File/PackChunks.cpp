@@ -591,117 +591,53 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 
 #if defined(BT_CLIENT)
 
-ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
+ChunkReadResult PackChunks::PollChunkRead(ChunkReadRequest& rRequest, std::byte* pDestination)
 {
+	ASSERT(rRequest.miEntryIndex != kiInvalidAudioReadEntry);
+
 	auto ClearRequest = [&rRequest]
 	{
-		rRequest.mpPackChunks = nullptr;
 		rRequest.miEntryIndex = kiInvalidAudioReadEntry;
 		rRequest.muiGeneration = 0;
-		rRequest.muiCrc = 0;
-		rRequest.miOffset = 0;
-		rRequest.miLength = 0;
 	};
 
-	if (rRequest.mpPackChunks != nullptr)
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(rRequest.miEntryIndex)];
+	uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
+	if (AudioReadGeneration(uiOwnership) != rRequest.muiGeneration)
 	{
-		if (rRequest.mpPackChunks != this)
-		{
-			rRequest.Reset();
-			return ChunkReadResult::kFailed;
-		}
-		if (rRequest.muiCrc != crc)
-		{
-			rRequest.Reset();
-			return ChunkReadResult::kFailed;
-		}
-		if (rRequest.miOffset != iOffset)
-		{
-			rRequest.Reset();
-			return ChunkReadResult::kFailed;
-		}
-		if (rRequest.miLength != std::ssize(buffer))
-		{
-			rRequest.Reset();
-			return ChunkReadResult::kFailed;
-		}
-
-		AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(rRequest.miEntryIndex)];
-		uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
-		if (AudioReadGeneration(uiOwnership) != rRequest.muiGeneration)
-		{
-			ClearRequest();
-			return ChunkReadResult::kFailed;
-		}
-
-		AudioChunkReadState eState = AudioReadState(uiOwnership);
-		if (eState != AudioChunkReadState::kReady)
-		{
-			return eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kLoading
-				? ChunkReadResult::kPending
-				: ChunkReadResult::kFailed;
-		}
-
-		if (rEntry.crc != crc)
-		{
-			CancelChunkRead(rRequest);
-			return ChunkReadResult::kFailed;
-		}
-		if (rEntry.iOffset != iOffset)
-		{
-			CancelChunkRead(rRequest);
-			return ChunkReadResult::kFailed;
-		}
-		if (rEntry.iLength != std::ssize(buffer))
-		{
-			CancelChunkRead(rRequest);
-			return ChunkReadResult::kFailed;
-		}
-
-		std::memcpy(buffer.data(), rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
-#if defined(BT_DEBUG)
-		if constexpr (kbAudioStreamingHarnessRig)
-		{
-			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
-		}
-#endif
-		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration);
-		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
-		{
-			ClearRequest();
-			return ChunkReadResult::kFailed;
-		}
 		ClearRequest();
-		return ChunkReadResult::kReady;
-	}
-
-	if (buffer.empty())
-	{
-		return ChunkReadResult::kFailed;
-	}
-	if (buffer.size() > 16 * 1'024)
-	{
 		return ChunkReadResult::kFailed;
 	}
 
-	auto it = mLazyChunkMap.find(crc);
-	if (it == mLazyChunkMap.end())
+	AudioChunkReadState eState = AudioReadState(uiOwnership);
+	if (eState != AudioChunkReadState::kReady)
 	{
-		return ChunkReadResult::kFailed;
+		return eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kLoading ? ChunkReadResult::kPending : ChunkReadResult::kFailed;
 	}
-	LazyChunk& rLazyChunk = it->second;
-	if (!(rLazyChunk.header.flags & common::ChunkFlags::kChunkAudio))
+
+	std::memcpy(pDestination, rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
+#if defined(BT_DEBUG)
+	if constexpr (kbAudioStreamingHarnessRig)
 	{
-		return ChunkReadResult::kFailed;
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
 	}
-	if (static_cast<uint64_t>(iOffset) > static_cast<uint64_t>(rLazyChunk.iDataSize))
-	{
-		return ChunkReadResult::kFailed;
-	}
-	if (buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize) - static_cast<uint64_t>(iOffset))
-	{
-		return ChunkReadResult::kFailed;
-	}
+#endif
+	// Only the main thread moves an entry out of ready, so no other thread can change it before this store
+	rEntry.uiOwnership.store(PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration), std::memory_order_release);
+	ClearRequest();
+	return ChunkReadResult::kReady;
+}
+
+ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
+{
+	ASSERT(rRequest.miEntryIndex == kiInvalidAudioReadEntry);
+	ASSERT(!buffer.empty());
+	ASSERT(buffer.size() <= sizeof(AudioChunkReadEntry::data));
+
+	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
+	ASSERT(rLazyChunk.header.flags & common::ChunkFlags::kChunkAudio);
+	ASSERT(static_cast<uint64_t>(iOffset) <= static_cast<uint64_t>(rLazyChunk.iDataSize));
+	ASSERT(buffer.size() <= static_cast<uint64_t>(rLazyChunk.iDataSize) - static_cast<uint64_t>(iOffset));
 
 	if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 	{
@@ -722,18 +658,10 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		rEntry.crc = crc;
 		rEntry.iOffset = iOffset;
 		rEntry.iLength = std::ssize(buffer);
-		rRequest.mpPackChunks = this;
 		rRequest.miEntryIndex = i;
 		rRequest.muiGeneration = uiGeneration;
-		rRequest.muiCrc = crc;
-		rRequest.miOffset = iOffset;
-		rRequest.miLength = std::ssize(buffer);
-		uint64_t uiQueuedOwnership = PackAudioReadOwnership(AudioChunkReadState::kQueued, uiGeneration);
-		if (!rEntry.uiOwnership.compare_exchange_strong(uiFreeOwnership, uiQueuedOwnership, std::memory_order_release, std::memory_order_acquire))
-		{
-			ClearRequest();
-			continue;
-		}
+		// Only this main-thread path moves an entry out of free, so no other thread can change it before this store
+		rEntry.uiOwnership.store(PackAudioReadOwnership(AudioChunkReadState::kQueued, uiGeneration), std::memory_order_release);
 #if defined(BT_DEBUG)
 		if constexpr (kbAudioStreamingHarnessRig)
 		{
@@ -755,7 +683,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 {
-	if (rRequest.mpPackChunks != this)
+	if (rRequest.miEntryIndex == kiInvalidAudioReadEntry)
 	{
 		return;
 	}
@@ -780,19 +708,15 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 #if defined(BT_DEBUG)
 			if constexpr (kbAudioStreamingHarnessRig)
 			{
-				AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+				AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 			}
 #endif
 			break;
 		}
 	}
 
-	rRequest.mpPackChunks = nullptr;
 	rRequest.miEntryIndex = kiInvalidAudioReadEntry;
 	rRequest.muiGeneration = 0;
-	rRequest.muiCrc = 0;
-	rRequest.miOffset = 0;
-	rRequest.miLength = 0;
 }
 
 bool PackChunks::HasQueuedAudioRead() const

@@ -62,6 +62,8 @@ navigation dimensions.
 - `Battleships/AGENTS.md`, `Blasters/AGENTS.md`, `Fighters/AGENTS.md`,
   `Missiles/AGENTS.md`, `Omnis/AGENTS.md`
 - `Ships/AGENTS.md` - Code the three ship collections share
+- `Wrecks/` - Client-only Battleship wrecks, documented in
+  `Battleships/AGENTS.md` `## Wreck Invariants`
 
 ## See Also
 

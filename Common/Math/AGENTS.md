@@ -41,11 +41,8 @@ value as a `uint64_t` and pass it to that setter.
 Adding or removing a draw changes every later result. Keep random draws and
 mode-transition draws outside throttled or client-only branches unless divergent
 consumption is intentional and isolated from shared state. A value only a
-spawned client effect such as an explosion consumes draws from a local
-`RandomEngine` seeded from one `Uuid::GenerateVisual` mint per effect; the
-blaster terrain-impact and missile exhaust draws still use the shared
-`FramePostRenderBase::randomEngine` (`../../Engine/Source/Frame/AGENTS.md`
-`## Simulation and Visual State`).
+client effect consumes draws from a local `RandomEngine` seeded from visual
+state (`../../Engine/Source/Frame/AGENTS.md` `## Simulation and Visual State`).
 
 ## Convex Hulls
 

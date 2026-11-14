@@ -76,12 +76,20 @@ void ForEachEnemyShip(const FrameInterpolate& rInterpolate, const FramePostRende
 // Returns false when no enemy row qualifies; ties keep the first row in ForEachShipType order.
 [[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
 
+enum class AttackTargetFlags : uint8_t
+{
+	kHorizontal        = 0x01,
+	kIgnoreLineOfSight = 0x02,
+};
+using AttackTargetFlags_t = common::Flags<AttackTargetFlags>;
+
 // The kept attack target rRegistryTarget in line of sight from vecPosition on uiFlightPlane, else the enemy nearest
-// vecPickFrom in line of sight, else the kept target hidden, else the nearest enemy hidden. Nearest is x/y when bHorizontal,
-// else 3D, ties keeping the first row in ForEachShipType order; enemies above iHighestFlightPlane never qualify. Returns
-// false when the previous frame holds no such enemy, clearing rRegistryTarget when its row is above iHighestFlightPlane
-// and leaving every other output unchanged.
-[[nodiscard]] bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, bool bHorizontal, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight);
+// vecPickFrom in line of sight, else the kept target hidden, else the nearest enemy hidden. Nearest is x/y with
+// kHorizontal, else 3D, ties keeping the first row in ForEachShipType order; enemies above iHighestFlightPlane never
+// qualify. Returns false when the previous frame holds no such enemy, clearing rRegistryTarget when its row is above
+// iHighestFlightPlane and leaving every other output unchanged. With kIgnoreLineOfSight it tests no sight: the kept
+// target, else the nearest enemy, with rbInLineOfSight false.
+[[nodiscard]] bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight);
 
 // Firing and look targets from previous-frame data, ignoring enemies above iHighestFlightPlane: sets kFireBlaster for an
 // enemy within fBlasterTargetRange on the shooter's stored plane uiFlightPlane with clear line of sight, so a climbing

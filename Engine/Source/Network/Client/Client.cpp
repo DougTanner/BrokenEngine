@@ -553,31 +553,30 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 			miLastEchoedTimestampNanoseconds = rMessage.iEchoedTimestampNanoseconds;
 			int64_t iNowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 			int64_t iRttUs = (iNowNs - rMessage.iEchoedTimestampNanoseconds) / 1'000;
-			if (iRttUs >= 0)
-			{
-				mSmoothedPipelineRoundTripTimeMicroseconds = iRttUs;
-				mSmoothedPipelineRoundTripTimeMicroseconds.Update();
+			// The echo is this process's own earlier steady_clock reading, so it cannot be in the future.
+			ASSERT(iRttUs >= 0);
+			mSmoothedPipelineRoundTripTimeMicroseconds = iRttUs;
+			mSmoothedPipelineRoundTripTimeMicroseconds.Update();
 
-				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-				if (mStateFlags & ClientStateFlags::kHasLastUpdateArrival)
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+			if (mStateFlags & ClientStateFlags::kHasLastUpdateArrival)
+			{
+				if (mStateFlags & ClientStateFlags::kSkipNextJitterInterval)
 				{
-					if (mStateFlags & ClientStateFlags::kSkipNextJitterInterval)
-					{
-						mStateFlags.Set(ClientStateFlags::kSkipNextJitterInterval, false);
-					}
-					else
-					{
-						int64_t iIntervalUs = std::chrono::duration_cast<std::chrono::microseconds>(now - mLastUpdateArrival).count();
-						// Server broadcast cadence is wall-scaled by the debug timescale; expect the scaled wall interval, not the fixed sim tick period
-						int64_t iExpectedMicroseconds = mTimeState.iExpectedUpdateIntervalMicroseconds;
-						int64_t iDeviation = std::abs(iIntervalUs - iExpectedMicroseconds);
-						mSmoothedJitterMicroseconds = iDeviation;
-						mSmoothedJitterMicroseconds.Update();
-					}
+					mStateFlags.Set(ClientStateFlags::kSkipNextJitterInterval, false);
 				}
-				mLastUpdateArrival = now;
-				mStateFlags.Set(ClientStateFlags::kHasLastUpdateArrival);
+				else
+				{
+					int64_t iIntervalUs = std::chrono::duration_cast<std::chrono::microseconds>(now - mLastUpdateArrival).count();
+					// Server broadcast cadence is wall-scaled by the debug timescale; expect the scaled wall interval, not the fixed sim tick period
+					int64_t iExpectedMicroseconds = mTimeState.iExpectedUpdateIntervalMicroseconds;
+					int64_t iDeviation = std::abs(iIntervalUs - iExpectedMicroseconds);
+					mSmoothedJitterMicroseconds = iDeviation;
+					mSmoothedJitterMicroseconds.Update();
+				}
 			}
+			mLastUpdateArrival = now;
+			mStateFlags.Set(ClientStateFlags::kHasLastUpdateArrival);
 		}
 
 		ClientSubscriptions::CoordUpdateFlags_t actions = mSubscriptions.ClassifyCoordinateUpdate(rMessage.uiSlotIndex, rMessage.uiEpoch);
@@ -678,8 +677,10 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 		}
 
 		// Seed smoothed pipeline RTT from game-layer handshake measurement so the value flows through the network sim
+		// The server accepts only in reply to the Hello sent on connect.
+		ASSERT(miHelloSendTimeNanoseconds > 0);
 		int64_t iNowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		int64_t iRttUs = (miHelloSendTimeNanoseconds > 0) ? (iNowNs - miHelloSendTimeNanoseconds) / 1'000 : 0;
+		int64_t iRttUs = (iNowNs - miHelloSendTimeNanoseconds) / 1'000;
 		if (iRttUs > 0 && iRttUs < 60'000'000)
 		{
 			mSmoothedPipelineRoundTripTimeMicroseconds.Seed(iRttUs);

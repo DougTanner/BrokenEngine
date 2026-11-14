@@ -54,6 +54,10 @@ std::span<const KEY> SortedGuidKeys(const std::unordered_map<KEY, VALUE>& rMap, 
 
 void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets);
 
+// Sends iClientId one map marker per live fleet flagship among every owner's fleets in rFleets, flagging those
+// rClientGuid owns.
+void SendMapFleetMarkers(int64_t iClientId, const engine::ClientGuid& rClientGuid, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets);
+
 void WriteFleetData(std::ostream& rStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom);
 
 void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom);

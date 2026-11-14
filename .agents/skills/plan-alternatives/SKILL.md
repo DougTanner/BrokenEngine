@@ -20,8 +20,8 @@ allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion]
 Answer one question before the Plan review step: is there a materially different
 way to do this? Main dispatches one to three blind `researcher` workers on fixed
 axes, compares their candidates against the drafted approach, and reports that
-the original stands or puts every returned candidate to the user, who picks at
-most one option or combination.
+the original stands or puts every returned candidate, and any option main adds
+itself, to the user, who picks at most one option or combination.
 
 ## When to use
 
@@ -92,8 +92,17 @@ Main scores candidate zero and every returned candidate on the same criteria:
 - `Existing guarantees`: relies on what the code already guarantees instead of
   rebuilding it;
 - `Self-serving machinery`: adds none;
+- deterministic: a script or code path that decides the same way on every run
+  is better than one that leaves the decision to agent judgement or
+  instruction text;
 - codebase improved beyond the objective: removes duplication or simplifies
   the surrounding code.
+
+A requirement that neither the user nor a repository rule states — exact
+preservation of current behavior, numbers, or visuals; smoothness of a
+debug-only control; and the like — is an assumption. Main names it as an
+assumption beside the option it shapes and never counts breaking it against a
+simpler option.
 
 The scores inform main's recommendation and the pros and cons stated beside
 each option — an objective not fully met, a rebuilt existing guarantee, or
@@ -110,16 +119,17 @@ draft missed — or to narrow it when a simpler alternative meets the objective.
 Scope limits what implementation may change once the user has picked an
 approach.
 
-When no researcher returned a candidate, the original stands and the turn's
-report carries one line:
+When no researcher returned a candidate and neither main-added option below
+applies, the original stands and the turn's report carries one line:
 
 ```text
 Alternatives: original stands (<axes>)
 ```
 
 Otherwise, before the Plan review step on every route, main presents every
-returned candidate beside the drafted approach in plain language per
-`### User Interaction`, giving each option, the drafted plan included:
+returned candidate and every main-added option that applies beside the drafted
+approach in plain language per `### User Interaction`, giving each option, the
+drafted plan included:
 
 - Unique advantages: what it offers that the other options do not, each named
   with a short label, such as DRY (reuses an existing mechanism instead of
@@ -129,9 +139,32 @@ returned candidate beside the drafted approach in plain language per
 - Pros and cons: the `### Comparison` criteria stated as pros and cons,
   including what it adds and deletes and when it pays off, worded by the
   `### User Interaction` rule for comparing options.
+- Constraints: each repository rule, hook, or limit that shapes the option,
+  stated with the reason the rule exists — or `none`. Main takes each rule and
+  its reason from the handoffs already in hand; for a reason they do not carry,
+  it dispatches the `### Comparison` `locator`, and writes
+  `reason not recorded` only when that returns none.
 
-Main may also propose one combination of compatible parts of the options,
-presented as its own option with the same two entries.
+Main adds each of these options itself when its condition holds and no
+researcher returned it, each presented with the same three entries:
+
+- Change the rule: when the drafted approach exists only to work around a
+  repository rule, hook, or limit, the option is to change that rule instead.
+- Do nothing: when the problem is rare, cosmetic, or an edge case that neither
+  crashes nor breaks the simulation, the option is to drop the change (on a
+  `/next-plan` claim, the rejection route below) and document the behavior as
+  acceptable at its owning `AGENTS.md` section or code comment; main recommends
+  it when every other option adds machinery. Never offered for a reachable
+  race
+  ([`../../references/change-workflow.md`](../../references/change-workflow.md)
+  `### Resolving Ambiguity`).
+
+Main proposes one combination whenever parts of different options are
+compatible and together serve the objective better than either alone, presented
+as its own option with the same three entries. When the recommendation passes
+over a wider option that would still improve the codebase, the recommendation
+names that option as a follow-up Plan candidate; when the user asks for it,
+main routes it through `/create-follow-up-plans`.
 
 Main then gives a recommendation and asks verbatim:
 

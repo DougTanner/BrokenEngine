@@ -90,9 +90,29 @@ and invalidate pending submissions' diagnostic eligibility; query-pool teardown
 clears submission coverage and GPU diagnostic state.
 Measured totals add only non-overlapping roots; child regions overlap them.
 They exclude uninstrumented uploads and acquisition, queue waiting, and
-presentation waiting. Graphics slow-operation warnings attach the latest
-eligible completed sample as older context with its submission identity and
-age, never as same-frame CPU attribution.
+presentation waiting. A graphics slow-operation warning prints one summary
+line: the acquisition's fence-wait and `vkAcquireNextImageKHR` split when it is
+an acquisition, and the newest eligible completed sample's measured GPU total
+and age, which is older context, never same-frame CPU attribution. It marks the
+newest submission pending unless teardown or a focus change cleared its ring
+entry or an earlier pending dump is less than `kiGpuTimelineCapacity`
+submissions old. When the pending submission retires in `GpuRead`, its region
+breakdown prints if it exceeded its expected interval and was not an anomaly,
+then a stall timeline of ring frames: submit time, GPU region ticks,
+fence-observed time, and the first prior-acquisition fence wait after each
+submission. With calibrated timestamps (`DeviceManager`), one calibration per
+timeline aligns ticks to the CPU clock and the header prints `pMaxDeviation` as
+`maxDeviation=<n>ns`, without a claim about what it bounds; without them the
+cross-submission and CPU-aligned columns print `-`. `fence` and `late` come
+from the once-per-frame non-blocking poll unless the fence was waited, so they
+are upper bounds including up to one frame of poll delay. A hint naming
+`/analyze-gpu-stall` prints only when a world row without
+acquire-command-buffer work shows a gap with no measured region running and
+queued work, both above the hint threshold (`fQuarterIntervalMilliseconds` in
+`ProfileManager.cpp`, derived from the pending submission's expected interval).
+When that interval is zero, the breakdown and the hint are skipped and only
+the timeline rows print. Focus changes and teardown drop a pending stall
+timeline without printing it.
 
 ## Presentation and Dumps
 

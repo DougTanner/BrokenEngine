@@ -48,6 +48,10 @@ Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
   resets coordinate, reconciler, and unwanted-timestamp state through
   `engine::ClientSessionBase::ResetCoordinateStatesForResynchronization`, clears
   all received update vectors, and returns false.
+- While the map is open, the session requests the map fleet marker list at once,
+  then every `kMapFleetMarkersRequestInterval` on a wall-clock timer, so the
+  poll keeps its rate while the simulation is paused or time-scaled; it stops
+  when the map closes, and the next open requests at once.
 - LAN discovery stops after recording a found address. A scan timeout records
   the timeout, replaces the scanner, and immediately starts a fresh scan.
 
@@ -61,11 +65,12 @@ Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
 - Server-load notification clears coord (kept while the harness viewer pin is
   set), clock, identity, fleet, subscription, and reconciler state before the
   client accepts post-load data.
-- Owned-entity event application and the fleet-sync handler have independent
+- Owned-entity event application and the game packet handlers have independent
   exception boundaries. Owned-entity states are decoded in the engine
   `Client::Receive`, so the engine application loop's one catch logs an
-  ordinary local failure as a warning; the fleet-sync handler splits corrupt
-  data from an ordinary local failure under the hub's corrupt-input policy
+  ordinary local failure as a warning; the fleet-sync and map fleet marker
+  handlers share one boundary that splits corrupt data from an ordinary local
+  failure under the hub's corrupt-input policy
   (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data application
   and per-frame gameplay hydration remain outside those catches.
 - Desired subscriptions stay sticky to reduce visible churn. During a real

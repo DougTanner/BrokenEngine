@@ -29,7 +29,9 @@ Execution card:
   line and the case it mishandles; a criterion compared against the unedited
   tree, such as a result that must stay unchanged, names that pre-change
   baseline run, which for that instruction prose may be a read at the session
-  baseline commit; the card marks each red run on a build of the unedited tree
+  baseline commit; a change editing a data input takes that run in the data
+  mode `.agents/skills/agent-harness/SKILL.md` `## Handoff` sets;
+  the card marks each red run on a build of the unedited tree
   and each pre-change baseline run other than a read at the session baseline
   commit `before the first edit`, the literal text the Change Workflow
   Implement and propagate step's pre-edit bullets key on to record that run

@@ -41,7 +41,8 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   `git grep` does not see them (uninitialized submodule). Search them with Grep
   on an explicit file path, Read on a known path, or `rg -L` from the shell.
   `.claude/skills` is likewise a symbolic link to `.agents/skills`; search
-  `.agents/skills` instead.
+  `.agents/skills` instead. A Grep `glob` containing `/` matches nothing
+  without a leading `**/` (`**/plan-*/SKILL.md`).
 
 ## IMPORTANT: Session rules
 
@@ -118,8 +119,8 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   AGENTS.md/docs/comments > current code behavior. When a plan's own decision
   declarations bind, and how to phrase a choice a plan makes, is in
   `.agents/references/authority-order.md`. Never silently make one side match
-  another — surface the contradiction as a residual (footer line) naming both
-  sides and which was trusted.
+  another — surface the contradiction as a residual naming both sides and which
+  was trusted, in the message that reports the task.
 
 ## Directory Structure
 
@@ -170,7 +171,9 @@ membership, filter, and exception rules. Build commands: `/compile`.
 
 ## Acronyms
 
-DP - DataPacker
-MV - ModelViewer
-BES - BrokenEngineSandbox
-CT - Coretide
+DP - DataPacker/
+MV - Projects/ModelViewer/
+BES - Projects/BrokenEngineSandbox/
+CT - Projects/Coretide/ (private repo, gitignored, present only in the primary
+checkout; design docs under `Projects/Coretide/Documents/Design/`; this repo is
+public, so never copy CT content into it)

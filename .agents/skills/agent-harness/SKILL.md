@@ -125,14 +125,19 @@ data mode again
 ([`../compile/references/runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
 `## Mode selection`) and may resolve Local, whose data the Shared data
 comparison does not check. A new harness dispatch, its claim and launch, is the
-test of whether the refusal cleared. No comparison is made against a pre-change
-baseline run taken in a data mode other than the one in that build's
-`/p:DataBuildMode` `Decisive checks` row: before the first slice, that run is
-taken again in the build's mode through `runtime-data-mode.md`
-`## Mode selection`; after it, the comparison is not run and is reported as a
-residual naming the data-mode mismatch. A claim the worker ended `BLOCKED` at
-its claim cap is a user stop: main tells the user which session (`currentOwner`)
-or server (its PIDs) holds the lock and asks, and never redispatches on its own.
+test of whether the refusal cleared. No comparison is made across data modes. A
+change whose slices edit a data input of the game project the harness runs
+builds Local (the `inputs-differ` outcome in `runtime-data-mode.md`
+`## Mode selection`), so its pre-change baseline run is taken Local before the
+first slice through that section's untracked temporary file. When a pre-change
+baseline run's data mode still differs from the one in the `/p:DataBuildMode`
+`Decisive checks` row of the build it is compared against (the build of the
+change's slices, or the `/compile` for a `shared-data.*` residual), then before
+the first slice that run is taken again in that build's mode through the same
+section; after it, the comparison is not run and is reported as a residual
+naming the data-mode mismatch. A claim the worker ended `BLOCKED` at its claim
+cap is a user stop: main tells the user which session (`currentOwner`) or
+server (its PIDs) holds the lock and asks, and never redispatches on its own.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:

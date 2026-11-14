@@ -2,7 +2,7 @@
 
 #include "ShaderLayouts.h"
 
-layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+layout (local_size_x = kiObjectShadowsBlurStripLength) in;
 
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
@@ -13,28 +13,40 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsBlurIntermediateSampler;
 layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurTexture; // kVkFormatObjectShadows
 
+// The workgroup's column strip plus iRadius taps on each side, as in ObjectShadowsBlurH.comp.
+shared vec4 sf4Taps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
+
 void main()
 {
-	uint uiX = gl_GlobalInvocationID.x;
-	uint uiY = gl_GlobalInvocationID.y;
+	int iStripStart = int(gl_WorkGroupID.y) * kiObjectShadowsBlurStripLength;
+	int iLocal = int(gl_LocalInvocationID.x);
+	int iX = int(gl_WorkGroupID.x);
+	int iY = iStripStart + iLocal;
 
 	ivec2 i2Size = imageSize(objectShadowsBlurTexture);
-	if (uiX >= i2Size.x || uiY >= i2Size.y)
-		return;
-
 	int iRadius = globalLayout.iObjectShadowsBlurRadius;
 	vec2 f2InvSize = 1.0f / vec2(i2Size);
-	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvSize;
+	float fU = (float(iX) + 0.5f) * f2InvSize.x;
+
+	// Tail invocations past the image edge still load and reach the barrier; taps outside the texture clamp to its edge.
+	for (int j = iLocal; j < kiObjectShadowsBlurStripLength + 2 * iRadius; j += kiObjectShadowsBlurStripLength)
+	{
+		float fV = (float(iStripStart - iRadius + j) + 0.5f) * f2InvSize.y;
+		sf4Taps[j] = textureLod(objectShadowsBlurIntermediateSampler, vec2(fU, fV), 0.0f);
+	}
+	barrier();
+
+	if (iY >= i2Size.y)
+		return;
 
 	// Per-channel sigma rules out bilinear tap pairing, as in ObjectShadowsBlurH.comp.
 	vec4 f4Total = vec4(0.0f);
 	for (int j = -iRadius; j <= iRadius; ++j)
 	{
-		vec2 f2Offset = vec2(0.0f, float(j)) * f2InvSize;
-		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(j)] * textureLod(objectShadowsBlurIntermediateSampler, f2Uv + f2Offset, 0.0f);
+		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(j)] * sf4Taps[iLocal + iRadius + j];
 	}
 	// R takes the whole ground coverage so terrain and water read R alone; overlapping ships cap at full coverage.
 	f4Total.x = min(f4Total.x + f4Total.y, 1.0f);
 
-	imageStore(objectShadowsBlurTexture, ivec2(uiX, uiY), 1.0f - globalLayout.fObjectShadowsIntensity * f4Total);
+	imageStore(objectShadowsBlurTexture, ivec2(iX, iY), 1.0f - globalLayout.fObjectShadowsIntensity * f4Total);
 }

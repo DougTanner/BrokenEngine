@@ -37,7 +37,9 @@ constexpr float kpfObjectShadowsBlurMultipliers[] {0.6f, 1.0f};
 
 static int64_t LevelIndex(const engine::Wrapper& rWrapper)
 {
-	return std::clamp(rWrapper.Get<int64_t>(), 0i64, static_cast<int64_t>(kiLevelCount) - 1);
+	int64_t iLevel = rWrapper.Get<int64_t>();
+	ASSERT(iLevel >= 0 && iLevel < kiLevelCount);
+	return iLevel;
 }
 
 void ApplyTerrainShadowsLevel()

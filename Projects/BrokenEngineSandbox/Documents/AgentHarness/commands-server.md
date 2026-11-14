@@ -38,11 +38,12 @@ adding the fields below; the other entries are its own commands. For the engine
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship`, 2 `kTargetFlagship`, and the target flight plane index in
-  bits 8-15), `targetFlightPlane` that index (0 the lowest plane; a Fighter
-  or an Omni allows 0-1, a Battleship 0), `flags` the integer `ShipFlags`
-  mask, `lifecycleFlags` the integer lifecycle mask, and `arrivalGrace`
-  seconds. `registryId` is the ship's frame registry handle
+  `kIsFlagship`, 2 `kTargetFlagship`, 4 `kSquadron1`, 8 `kSeekAndDestroy`, 16
+  `kSharedTarget`, 32 `kPatrolCell`, 64 `kPatrolTogether`, and the target
+  flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
+  lowest plane; a Fighter or an Omni allows 0-1, a Battleship 0), `flags` the
+  integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
+  `arrivalGrace` seconds. `registryId` is the ship's frame registry handle
   and `registryTargetId` is the registry handle the missile is homing on, so a
   live missile's nonzero `registryTargetId` matches a ship `registryId` in
   the same cell, or one that ship cleared later in the same tick (death,
@@ -62,9 +63,10 @@ adding the fields below; the other entries are its own commands. For the engine
   with an error naming it), and its `writes` keys may name any column of that
   collection's Interpolate and PostRender structs; a `frame` edit takes no
   `index` and its keys are `fSpawnTimer`, `randomEngine`, `uiNextUuid`,
-  `uiFrameIdentifier`, `uiPinned`, `alignments`, `randomAlignment`, and
-  `fleetAlignment` (`uiPinned` nonzero pins the cell and 0 releases it, as the
-  engine
+  `uiFrameIdentifier`, `uiPinned`, `alignments`, `randomAlignment`,
+  `fleetAlignment`, `uiMirrorFleet0FirstUuid`, `uiMirrorFleet0EndUuid`,
+  `uiMirrorFleet1FirstUuid`, and `uiMirrorFleet1EndUuid` (`uiPinned` nonzero
+  pins the cell and 0 releases it, as the engine
   [`create_cell`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands)
   describes); `iTick` and `fDeltaTime` are named but refused as clock values.
   Collection keys are the C++ member names, verbatim, as listed in
@@ -237,6 +239,7 @@ adding the fields below; the other entries are its own commands. For the engine
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
   | `UpdateShip` | `eType` (required), `iUuid` (required), `navigationDelaySeconds`, `uiTargetFlightPlane` |
   | `UpdateFleet` | `eType` (required), `iUuid` (required), `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
+  | `UpdateSquadronOrders` | `eType` (required), `iUuid` (required), `orders` (required; only its `kSeekAndDestroy`, `kSharedTarget`, `kPatrolCell`, and `kPatrolTogether` bits apply) |
 
   `iUuid` is the `uuid` of a `query_collection` row in the collection `eType`
   names, which changes when the ship crosses cells. An omitted field takes its
@@ -287,14 +290,17 @@ adding the fields below; the other entries are its own commands. For the engine
   `kfShipHeadingUnitTolerance` (`IsShipHeadingUnit`, `ShipBehaviours.h`), on a
   `nextBlasterFireTime` outside `[0,kBlasterFireInterval]`, on a
   `nextBeamFireTime` above `kFighterBeamCooldown` or a `nextMissileFireTime`
-  above `kBattleshipMissileCooldown` (`'<field>' is out of range`), and on a
-  `DestroyShip` whose `iUuid` names a fleet-controlled Battleship in its
-  `coord`'s current frame. The command makes no terrain check; a blaster
-  destroys itself on terrain contact, so a `SpawnBlaster` that must survive
-  needs a terrain-clear `vecPosition` (the probe in
-  [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
-  bound on how many entries one cell's tick receives: every due entry of a
-  coordinate joins that tick's one published batch. A batch over 1,024 status
+  above `kBattleshipMissileCooldown` (`'<field>' is out of range`), on an
+  `UpdateFleet` whose `fleetWantedCoordinate` is the origin
+  (`'fleetWantedCoordinate' must not be the origin (0,0)`; reason in
+  `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md`
+  `## Deterministic Tick Contracts`), and on a `DestroyShip` whose `iUuid` names
+  a fleet-controlled Battleship in its `coord`'s current frame. The command
+  makes no terrain check; a blaster destroys itself on terrain contact, so a
+  `SpawnBlaster` that must survive needs a terrain-clear `vecPosition` (the
+  probe in [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also
+  puts no bound on how many entries one cell's tick receives: every due entry of
+  a coordinate joins that tick's one published batch. A batch over 1,024 status
   changes per cell tick (`engine::kiMaximumStatusChangesPerCell`) is still
   published and applied whole, but the server and every subscribed client log a
   warning and hit a debug break as their status-change buffers grow past that

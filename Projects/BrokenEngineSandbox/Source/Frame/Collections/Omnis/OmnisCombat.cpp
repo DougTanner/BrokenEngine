@@ -100,7 +100,9 @@ void OmnisPostRender::BeginExplosion(Frame& rFrame, OmnisInterpolate& rCurrentIn
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
 	rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
+#if defined(BT_CLIENT)
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
+#endif
 
 	// Clear the registry id so missiles stop tracking
 	rCurrentInterpolate.pRegistryIds[i] = {};
@@ -111,6 +113,12 @@ static void HandleArmorDepleted(Frame& rFrame, OmnisInterpolate& rCurrentInterpo
 {
 	if (rCurrentPostRender.pController[i] == ShipController::kFleet)
 	{
+		// A healing row escorts, and a Patrol Cell destination outside the escort disc would keep it from healing until
+		// arrival.
+		if (!(rCurrentPostRender.pFlags[i] & ShipFlags::kHealing) && (rCurrentPostRender.pOrders[i] & ShipOrders::kPatrolCell))
+		{
+			rCurrentPostRender.pVecIslandDestinations[i] = XMVectorZero();
+		}
 		rCurrentPostRender.pfArmors[i] = 0.0f;
 		rCurrentPostRender.pFlags[i].Set(ShipFlags::kHealing);
 		return;
@@ -138,8 +146,8 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
 #if defined(BT_CLIENT)
-				engine::PuffsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPuffControllerTypeIndex, rResult.vecContactPoint);
-				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+				engine::PuffsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPuffControllerTypeIndex, rResult.vecContactPoint);
+				engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 			}
 		}
@@ -277,6 +285,7 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 
 void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
 {
+#if defined(BT_CLIENT)
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
@@ -289,7 +298,6 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 
 		rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 
-#if defined(BT_CLIENT)
 		float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kDestroyTime;
 
 		common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
@@ -316,8 +324,8 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 			.fSmokePercent = fPercent * kfExplosionSmoke,
 			.fTimePercent = fPercent,
 		}, randomEngine);
-#endif
 	}
+#endif // BT_CLIENT
 }
 
 } // namespace game

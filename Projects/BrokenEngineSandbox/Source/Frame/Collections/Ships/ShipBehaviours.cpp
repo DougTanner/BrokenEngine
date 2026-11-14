@@ -40,9 +40,7 @@ constexpr float kfNavRectangleReachScale = 4.0f;
 // pick succeeds.
 constexpr float kfOmniPatrolCellInset = 60.0f;
 
-// Flee/return hysteresis
-constexpr float kfFleeStartDistance = 15.0f;
-constexpr float kfFleeEndDistance = 25.0f;
+// Return hysteresis
 constexpr float kfReturnDistance = 180.0f;
 constexpr float kfReturnedDistance = kfReturnDistance - 20.0f;
 
@@ -205,6 +203,58 @@ static int64_t SelectIslandPlacement(std::span<const engine::IslandPlacement> ce
 		}
 	}
 	return iSelected;
+}
+
+// A point uniform in the fRadius disc around vecCenter in x/y, on the lowest plane: two draws, the angle first.
+static XMVECTOR XM_CALLCONV OmniPatrolDiscPoint(FXMVECTOR vecCenter, float fRadius, common::RandomEngine& rRandomEngine)
+{
+	float fAngle = common::Random<XM_2PI>(rRandomEngine);
+	float fDistance = fRadius * std::sqrt(common::Random<1.0f>(rRandomEngine));
+	common::SinCos rotation = common::DeterministicSinCos(fAngle);
+	return XMVectorSetZ(XMVectorAdd(vecCenter, XMVectorSet(rotation.fCos * fDistance, rotation.fSin * fDistance, 0.0f, 0.0f)), engine::gpFlightPlanes->Lowest().fHeightMeters);
+}
+
+// Patrol Together: a squadron's leader is its lowest-global-ID non-dying, non-healing Omni in the previous frame whose
+// orders carry kPatrolCell and kPatrolTogether, the squadron named by the flagship and kSquadron1. True, with the
+// leader's destination, when that leader is another row.
+static bool FindPatrolTogetherLeaderDestination(const Frame& rPreviousFrame, engine::GlobalId flagshipGlobalId, ShipOrders_t orders, engine::GlobalId globalId, XMVECTOR& rVecLeaderDestination)
+{
+	const OmnisPostRender& rOmnis = *rPreviousFrame.postRender.pOmnis;
+	int64_t iLeader = -1;
+	for (int64_t i = 0; i < rOmnis.iCount; ++i)
+	{
+		ShipOrders_t rowOrders = rOmnis.pOrders[i];
+		if (rOmnis.pFlagshipGlobalIds[i] != flagshipGlobalId || (rowOrders & ShipOrders::kSquadron1) != (orders & ShipOrders::kSquadron1))
+		{
+			continue;
+		}
+		if (!(rowOrders & ShipOrders::kPatrolCell) || !(rowOrders & ShipOrders::kPatrolTogether))
+		{
+			continue;
+		}
+		if (rOmnis.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		{
+			continue;
+		}
+		if (rOmnis.pFlags[i] & ShipFlags::kHealing)
+		{
+			continue;
+		}
+		if (iLeader < 0 || rOmnis.pGlobalIds[i].iValue < rOmnis.pGlobalIds[iLeader].iValue)
+		{
+			iLeader = i;
+		}
+	}
+	if (iLeader < 0)
+	{
+		return false;
+	}
+	if (rOmnis.pGlobalIds[iLeader] == globalId)
+	{
+		return false;
+	}
+	rVecLeaderDestination = rOmnis.pVecIslandDestinations[iLeader];
+	return true;
 }
 
 // A non-flagship in its fleet's wanted cell follows its own flagship, resolved by global ID on the previous frame. A
@@ -528,8 +578,9 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, ShipTypeClearanceTier(self.eType), iNavigationPlane);
 
-	// A fleet Omni with its flagship in the cell patrols around it in mode 6, preempting fleet navigation as the in-cell
-	// fleet tactic does; running the fleet override first would reset the mode and destination every tick.
+	// A fleet Omni with its flagship in the cell patrols in mode 6, around the flagship (Escort) or across the cell (Patrol
+	// Cell), preempting fleet navigation as the in-cell fleet tactic does; running the fleet override first would reset
+	// the mode and destination every tick, and without the forced mode FollowFlagship would pull it back to the flagship.
 	std::optional<ShipLocator> optionalPatrolFlagship;
 	if (self.eType == ShipType::kOmni)
 	{
@@ -570,24 +621,60 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	}
 	else if (riNavigationDirection == 6)
 	{
+		// OmnisPostRender::Update passes a healing row's orders without Patrol Cell, so it escorts and is neither leader nor
+		// follower.
+		bool bPatrolCell = optionalPatrolFlagship && (orders & ShipOrders::kPatrolCell);
+		XMVECTOR vecLeaderDestination = XMVectorZero();
+		bool bPatrolFollower = bPatrolCell && (orders & ShipOrders::kPatrolTogether) && FindPatrolTogetherLeaderDestination(rPreviousFrame, flagshipGlobalId, orders, globalId, vecLeaderDestination);
+
 		// Navigate to island destination
-		if (XMVectorGetW(rVecIslandDestination) == 0.0f)
+		if (bPatrolFollower)
 		{
-			// A patrolling fleet Omni samples a point uniformly in the kfOmniPatrolRadius disc around its flagship, two
-			// draws per attempt in any cell. Otherwise waypoints select the largest, smallest, then random centred
-			// island by quad-footprint area, always drawing the island pick before the two footprint draws; a cell with
-			// no centred island skips them and targets the cell center. A patrol point outside the cell inset, or an
-			// island point or snap past the cell edge (the island's quad-footprint AABB can pass it), is dropped and
-			// the next tick draws again; a dropped largest or smallest pick still advances to the next, and the tick
-			// keeps its cached steering because a recompute would aim at the zero destination.
+			// A Patrol Together follower draws nothing: it takes its leader's previous-frame destination whenever that is
+			// set and differs, and skips the off-plane snap and the arrival reset, since a snapped or cleared copy would
+			// differ from the leader's and be recopied and repathed every tick. With no destination of its own and none
+			// from the leader it keeps its cached steering, as a dropped pick does.
+			if (XMVectorGetW(vecLeaderDestination) != 0.0f && !XMVector4Equal(vecLeaderDestination, rVecIslandDestination))
+			{
+				rVecIslandDestination = vecLeaderDestination;
+				bRecompute = true;
+			}
+			else if (XMVectorGetW(rVecIslandDestination) == 0.0f)
+			{
+				bRecompute = false;
+			}
+		}
+		else if (XMVectorGetW(rVecIslandDestination) == 0.0f)
+		{
+			// A patrolling fleet Omni draws a point per attempt: in Escort two draws in the kfOmniPatrolRadius disc around
+			// its flagship; in Patrol Cell the island pick then two footprint draws on a random centred island, or with
+			// none two draws in the disc around the cell center reaching the hexagon's corners. Any other ship's waypoints
+			// pick the largest, smallest, then random centred island by quad-footprint area, drawing the pick before two
+			// footprint draws; with no centred island they target the cell center. A patrol point outside the cell inset,
+			// or an island point or snap past the cell edge (a footprint can pass it), is dropped and the next tick
+			// redraws; a dropped largest or smallest pick still advances, and the tick keeps its cached steering since a
+			// recompute would aim at the zero destination.
 			std::span<const engine::IslandPlacement> centredIslands = engine::CentredIslands(rStaticData.islands);
 			if (optionalPatrolFlagship)
 			{
-				XMVECTOR vecFlagshipPosition = ShipPosition(rPreviousFrame.interpolate, *optionalPatrolFlagship);
-				float fAngle = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
-				float fRadius = kfOmniPatrolRadius * std::sqrt(common::Random<1.0f>(rFrame.postRender.randomEngine));
-				common::SinCos rotation = common::DeterministicSinCos(fAngle);
-				XMVECTOR vecPatrolPoint = XMVectorSetZ(XMVectorAdd(vecFlagshipPosition, XMVectorSet(rotation.fCos * fRadius, rotation.fSin * fRadius, 0.0f, 0.0f)), engine::gpFlightPlanes->Lowest().fHeightMeters);
+				XMVECTOR vecPatrolPoint = XMVectorZero();
+				if (!bPatrolCell)
+				{
+					vecPatrolPoint = OmniPatrolDiscPoint(ShipPosition(rPreviousFrame.interpolate, *optionalPatrolFlagship), kfOmniPatrolRadius, rFrame.postRender.randomEngine);
+				}
+				else if (centredIslands.empty())
+				{
+					vecPatrolPoint = OmniPatrolDiscPoint(vecCellCenter, engine::kfCellHalfWidth, rFrame.postRender.randomEngine);
+				}
+				else
+				{
+					int64_t iPlacement = common::Random(std::ssize(centredIslands) - 1, rFrame.postRender.randomEngine);
+					const engine::IslandPlacement& rPlacement = rStaticData.islands.at(static_cast<size_t>(iPlacement));
+					const engine::IslandTemplate& rTemplate = engine::gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
+					float fX = rPlacement.f2WorldPosition.x - 0.5f * rTemplate.fQuadFootprintX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
+					float fY = rPlacement.f2WorldPosition.y - 0.5f * rTemplate.fQuadFootprintY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
+					vecPatrolPoint = XMVectorSet(fX, fY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+				}
 				vecPatrolPoint = engine::NavQuerySnapToNavigable(vecPatrolPoint, rNavData);
 				if (common::IsInsideHex(vecPatrolPoint, engine::kCellDirections, kfOmniPatrolCellInset))
 				{
@@ -661,7 +748,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		// tour progressing; the fleet still leaves the cell when the server cell-change timer fires.
 		// Horizontal, so a ship above the destination's height can still arrive.
 		float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
-		if (fDistanceSquared < 100.0f)
+		if (!bPatrolFollower && fDistanceSquared < 100.0f)
 		{
 			LOG(kNavData, kVerbose, "{} {} NavSwitch: arrived at island dest pos={} dest={}", ShipTypeName(self.eType), self.iRow, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
 			rVecIslandDestination = XMVectorZero();
@@ -699,19 +786,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	}
 }
 
-XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination)
+XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination)
 {
-	XMVECTOR vecToEnemy = bEnemyFound ? XMVectorSubtract(vecNearestEnemy, vecPosition) : XMVectorZero();
-	float fEnemyDistance = bEnemyFound ? XMVectorGetX(XMVector3Length(vecToEnemy)) : kfFleeEndDistance + 1.0f;
-	if (fEnemyDistance < kfFleeStartDistance)
-	{
-		rFlags.Set(ShipFlags::kFlee);
-	}
-	else if (fEnemyDistance > kfFleeEndDistance)
-	{
-		rFlags.Set(ShipFlags::kFlee, false);
-	}
-
 	if (islandCandidates.empty())
 	{
 		rFlags.Set(ShipFlags::kReturnToIslandCenter, false);
@@ -805,7 +881,6 @@ void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags,
 {
 	float fAcceleration = !bAllowAcceleration ? 0.0f
 	                    : flags & ShipFlags::kReturnToIslandCenter ? rConstants.fReturnAcceleration
-	                    : flags & ShipFlags::kFlee ? rConstants.fFleeAcceleration
 	                    : rConstants.fChaseAcceleration;
 	rVecVelocity = engine::ApplyMovement<true>(rVecVelocity, vecDirection, deltaTime.count(), fAcceleration, rConstants.fDrag, rConstants.fMaximumSpeed, rConstants.fVelocityToDirection);
 }
@@ -944,6 +1019,28 @@ bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStati
 		}
 	}
 	return true;
+}
+
+bool XM_CALLCONV IsSegmentBlocked(const engine::NavData& rNavData, std::span<const engine::NavRectangle> rectangles, FXMVECTOR vecStart, FXMVECTOR vecEnd)
+{
+	if (engine::NavQuerySegmentBlocked(vecStart, vecEnd, rNavData))
+	{
+		return true;
+	}
+
+	// A zero Z range at Z 0 makes the prism clip 2D.
+	XMFLOAT3A f3Start {XMVectorGetX(vecStart), XMVectorGetY(vecStart), 0.0f};
+	XMFLOAT3A f3Delta {XMVectorGetX(vecEnd) - f3Start.x, XMVectorGetY(vecEnd) - f3Start.y, 0.0f};
+	for (const engine::NavRectangle& rRectangle : rectangles)
+	{
+		float fEnter = 0.0f;
+		float fExit = 1.0f;
+		if (common::ClipSegmentToPrism(f3Start, f3Delta, rRectangle.pf2Box, 0.0f, 0.0f, fEnter, fExit))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float fMaximumShield, float fRegeneration, float& rfShield)

@@ -19,9 +19,9 @@ is engine-owned here.
   prior value intact so the next poll observes a change. `Reset` updates both
   values and is for initialization or capability clamping that must not trigger
   rebuilds.
-- A discrete wrapper stores a persisted value outside its allowed set as-is, and
-  `GetIndex()` reports index 0 for it, so every returned index is in range.
-  Capability clamps write only allowed values. Float wrappers may snap to a
+- A discrete wrapper holds only allowed values: loading follows
+  `## Settings Persistence`, capability clamps write only allowed values, and
+  `GetIndex()` asserts on any other value. Float wrappers may snap to a
   configured grid.
 - One-argument construction is Boolean-only. Non-Boolean numeric and enum
   constructors are deleted so a scalar cannot silently convert to the Boolean
@@ -100,12 +100,12 @@ is engine-owned here.
   Water Foam, Break Repetition and Orthographic Projection are validated Boolean
   bytes; any value other than zero or one rejects the whole file before
   application.
-- The loaders check every persisted language index, float, quality level, and
-  graphics sample count before applying any. A non-finite or out-of-range value,
-  or a sample count that is not one of `gSampleCount`'s allowed values, rejects
-  the whole file with one warning, and every setting it holds stays at its
-  default, as when the file is missing. Accepted floats keep the wrapper's
-  normal snapping.
+- The loaders check every persisted language index, float, quality level,
+  present mode, sample count, and UI theme before applying any. A non-finite or
+  out-of-range value, or a present mode, sample count, or UI theme that is not
+  one of its wrapper's allowed values, rejects the whole file with one warning,
+  and every setting it holds stays at its default, as when the file is missing.
+  Accepted floats keep the wrapper's normal snapping.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI
   toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language
   is stored as a fixed-width `int32_t` so the `Language` enum's underlying type

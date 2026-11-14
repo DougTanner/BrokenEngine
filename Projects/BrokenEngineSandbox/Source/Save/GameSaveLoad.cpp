@@ -12,6 +12,10 @@
 namespace game
 {
 
+// The replay fleet record log (ReplayFleetLog) is a list of tick-stamped records plus one checksum per tick, which is
+// game-agnostic apart from the record contents (ReplayFleetRecordBytes, ReadReplayFleetRecord) and their adoption in
+// PrepareReplayPlaybackTick: a future project may want the log moved into shared engine code, depending on its
+// requirements. It is part of the replay metadata file format, so its byte layout must stay identical if it moves.
 // Layout after the ReplayMeta version header and value: the replay fleet record count, each record's tick and bytes,
 // the first fleet checksum tick, the fleet checksum count, and the fleet checksums.
 bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename)

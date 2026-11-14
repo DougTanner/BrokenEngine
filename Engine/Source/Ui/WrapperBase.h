@@ -171,13 +171,8 @@ public:
 			++i;
 		}
 
-		// Intentional soft-fall: an off-grid value is legitimately reachable — a corrupt/hand-edited persisted
-		// gPresentMode or gUiTheme (settings-file load) — so this never throws. Returns index 0, which is valid for
-		// every return-consuming caller; the graphics path re-clamps present mode against device support, and
-		// GetUiTheme() clamps the theme. DEBUG_BREAK logs a warning in every build and breaks
-		// only when kbDebugBreak is enabled and a debugger is attached.
-		DEBUG_BREAK();
-		return 0;
+		ASSERT(false);
+		std::unreachable();
 	}
 
 	void SetIndex(int64_t iIndex)

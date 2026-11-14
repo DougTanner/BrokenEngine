@@ -21,6 +21,10 @@ status-change batch envelope, ordering, and framing are owned by
 - Fleet synchronization consumes matching raw packets and replaces the whole
   destination with each decoded sync; an empty fleet list is still an applied
   result.
+- The server sends a map fleet marker list only in answer to a client's
+  `kClientMapFleetMarkersRequest`, on the unreliable channel; the client
+  replaces its whole marker list with each one it decodes, so the next request's
+  reply replaces a lost one.
 
 ## Status-Change Wire Format
 

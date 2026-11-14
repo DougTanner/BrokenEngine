@@ -113,7 +113,7 @@ What main does with each field:
 | `Decisive checks` | Feed the acceptance table. |
 | `Build required` | Goes to a `builder`. |
 | `Evidence` | Passed on to later workers as path plus selector; main reads it only when a decision needs it or when it must act on moved material, such as dispatching or presenting its rows, and then only at the cited selector, not the file whole. |
-| `Residuals` | Go to the message footer or to `/create-follow-up-plans`. |
+| `Residuals` | Go into the message that reports the task, or to `/create-follow-up-plans`. A contradiction main must decide before work continues, and that a code read settles, goes to a `researcher` brief naming the cited files and rules, per [change-workflow.md `### Resolving Ambiguity`](change-workflow.md#resolving-ambiguity), instead of main reading the cited source, including at an `Evidence` selector. |
 
 ## Whether a worker is still running, and interruption
 

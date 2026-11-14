@@ -125,17 +125,19 @@ collision, terrain sampling, navigation, and generic collections.
 ## Simulation and Visual State
 
 - Simulation state is what a simulation decision reads: every
-  `ServerCollections()` collection, every `SharedMembers()` column, and every
-  frame value not marked `kbClientOnlyValue`. It is saved, replayed, and sent,
-  and CRC'd through `SharedCrcMembers()` where a collection declares one. A
-  row, column, or value no simulation decision reads is visual and does not
-  belong there.
+  `ServerCollections()` collection, every collection in the game's server tuples
+  (the game project's own `Source/Frame/AGENTS.md`), every `SharedMembers()`
+  column, and every frame value not marked `kbClientOnlyValue`. It is saved,
+  replayed, and sent, and CRC'd through `SharedCrcMembers()` where a collection
+  declares one. A row, column, or value no simulation decision reads is visual
+  and does not belong there.
 - Visual state is what a client shows or plays. It compiles only under
   `BT_CLIENT`. Visual state that must exist per tick, roll back with its cell,
   or own frame rows lives in the client-only part of the Frame: the
-  collections `Collections()` adds to `ServerCollections()`, `ClientMembers()`
-  columns, and `kbClientOnlyValue` values. It ticks, rolls back, re-simulates,
-  and interpolates with its cell, and carries no determinism guarantee. A cache
+  collections `Collections()` adds to `ServerCollections()` and the game's
+  build-local tuples add to its server tuples, `ClientMembers()` columns, and
+  `kbClientOnlyValue` values. It ticks, rolls back, re-simulates, and
+  interpolates with its cell, and carries no determinism guarantee. A cache
   derived once per rendered frame stays file-scope render state
   (`Collections/AGENTS.md` `## Runtime Rules`).
 - Data flows one way. Visual code may read simulation state, the camera, and
@@ -146,15 +148,17 @@ collision, terrain sampling, navigation, and generic collections.
   `OmnisPostRender::pShieldDownSoundCooldowns`: it travels in the transfer
   payload, so it is simulation state.
 - Random draws: a value simulation reads comes from
-  `FramePostRenderBase::randomEngine`. A value only a spawned client effect
-  such as an explosion consumes comes from a local `common::RandomEngine`
-  seeded from one `Uuid::GenerateVisual` mint per spawned effect, inside the
-  `BT_CLIENT` guard; its sequence may differ between clients and after a
-  re-simulated tick. The blaster terrain-impact jitter and crater rotation and
-  the missile exhaust length are client-only values that still draw from
-  `FramePostRenderBase::randomEngine`.
+  `FramePostRenderBase::randomEngine`. A value only a client effect consumes
+  comes from a local `common::RandomEngine` inside the `BT_CLIENT` guard,
+  seeded from one `Uuid::GenerateVisual` mint per spawned effect, or, for a
+  value an effect row redraws every tick, such as a missile's exhaust length,
+  from that row's existing visual UUID mixed with the frame tick; its sequence
+  may differ between clients and after a re-simulated tick.
 - A tick's effect outside the Frame (a GPU particle, a one-shot sound) is
   skipped on a `FrameFlags::kRecalculated` frame.
+- Off-screen: an explosion, and a point light, puff, or wind radial added
+  through `AddControlled`, is not spawned when its position lies outside the
+  camera's render visible area scaled by `kfSpawnVisibleAreaScale`.
 
 ## Frame Registry
 

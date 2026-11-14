@@ -53,8 +53,7 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 			continue;
 		}
 
-		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mpuiBuffers[i]), mpiSlotBytesRead[i]);
-		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mpReadRequests[i], mpLazyChunk->location.crc, mpiSlotOffsets[i], destination);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->PollChunkRead(mpReadRequests[i], reinterpret_cast<std::byte*>(mpuiBuffers[i]));
 		if (eResult == ChunkReadResult::kReady)
 		{
 			mpeSlotStates[i] = SlotState::kReady;
@@ -98,16 +97,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mpReadRequests[iSlot], mpLazyChunk->location.crc, miNextReadOffset, destination);
 		if (eResult == ChunkReadResult::kRetry)
 		{
-			return;
-		}
-		if (eResult == ChunkReadResult::kFailed)
-		{
-			mpiSlotBytesRead[iSlot] = 0;
-			mpiSlotOffsets[iSlot] = miNextReadOffset;
-			mpbSlotLastBuffer[iSlot] = true;
-			mbReadDone = true;
-			mpeSlotStates[iSlot] = SlotState::kReady;
-			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", miNextReadOffset);
 			return;
 		}
 

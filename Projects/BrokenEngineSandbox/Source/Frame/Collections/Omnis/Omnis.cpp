@@ -301,7 +301,9 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pfArmors[iIndex] = rInfo.bTransfer ? rInfo.fArmor : kfOmniArmor;
 	rCurrentPostRender.pfShields[iIndex] = rInfo.bTransfer ? rInfo.fShield : kfOmniShield;
 	rCurrentPostRender.pShieldCooldowns[iIndex] = rInfo.shieldCooldown;
+#if defined(BT_CLIENT)
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
+#endif
 	rCurrentPostRender.pShieldDownSoundCooldowns[iIndex] = rInfo.shieldDownSoundCooldown;
 	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pTransferLockTimers[iIndex] = rInfo.transferLockTimer;
@@ -591,7 +593,9 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		float fArmor = rPrevious.pfArmors[i];
 		float fShield = rPrevious.pfShields[i];
 		std::chrono::duration<float> shieldCooldown = std::max(std::chrono::duration<float>::zero(), rPrevious.pShieldCooldowns[i] - deltaTime);
+#if defined(BT_CLIENT)
 		std::chrono::duration<float> destroyedExplosionTime = std::max(std::chrono::duration<float>::zero(), rPrevious.pDestroyedExplosionTimes[i] - deltaTime);
+#endif
 		std::chrono::duration<float> shieldDownSoundCooldown = std::max(std::chrono::duration<float>::zero(), rPrevious.pShieldDownSoundCooldowns[i] - deltaTime);
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		std::chrono::duration<float> transferLockTimer = rPrevious.pTransferLockTimers[i];
@@ -651,16 +655,20 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				}
 				else
 				{
-					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					// A healing omni escorts whatever its squadron setting, so it stays where it can heal; its stored orders
+					// keep kPatrolCell.
+					ShipOrders_t navigationOrders = orders;
+					navigationOrders.Set(ShipOrders::kPatrolCell, (orders & ShipOrders::kPatrolCell) && !(flags & ShipFlags::kHealing));
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, navigationOrders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
 				flags.Set(ShipFlags::kNoAiDirection, false);
 				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
 			}
 			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
 			{
-				// A flagship chase never flees or returns to an island.
+				// A flagship chase never returns to an island.
 				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
-				flags.Clear({ShipFlags::kFlee, ShipFlags::kReturnToIslandCenter});
+				flags.Set(ShipFlags::kReturnToIslandCenter, false);
 				bool bFinalWaypoint = false;
 				XMVECTOR vecDestination = HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
 				AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
@@ -670,7 +678,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			{
 				XMVECTOR vecTarget = XMVectorZero();
 				bool bInLineOfSight = false;
-				bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, false, rPrevious.pAlignments[i], kiOmniHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
+				bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiOmniHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
 				if (bEnemyFound)
 				{
 					SetTargetFlightPlane(orders, NearestFlightPlane(vecTarget));
@@ -680,7 +688,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					SetTargetFlightPlane(orders, DefaultFlightPlane(ShipType::kOmni));
 				}
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
+				XMVECTOR vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
 					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.
@@ -767,7 +775,9 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		rCurrent.pfArmors[i] = fArmor;
 		rCurrent.pfShields[i] = fShield;
 		rCurrent.pShieldCooldowns[i] = shieldCooldown;
+#if defined(BT_CLIENT)
 		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
+#endif
 		rCurrent.pShieldDownSoundCooldowns[i] = shieldDownSoundCooldown;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pTransferLockTimers[i] = transferLockTimer;
@@ -820,7 +830,6 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pfArmors">(i, pfArmors[i], rOther.pfArmors[i]);
 		bEqual &= common::LogDifference<"pfShields">(i, pfShields[i], rOther.pfShields[i]);
 		bEqual &= common::LogDifference<"pShieldCooldowns">(i, pShieldCooldowns[i], rOther.pShieldCooldowns[i]);
-		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
 		bEqual &= common::LogDifference<"pShieldDownSoundCooldowns">(i, pShieldDownSoundCooldowns[i], rOther.pShieldDownSoundCooldowns[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pTransferLockTimers">(i, pTransferLockTimers[i], rOther.pTransferLockTimers[i]);

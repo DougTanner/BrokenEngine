@@ -62,10 +62,7 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 		return;
 	}
 
-	if (!(memberGlobalId.iValue != 0))
-	{
-		return;
-	}
+	ASSERT(memberGlobalId.iValue != 0);
 	auto memberIt = std::ranges::find(pFleet->members, memberGlobalId, &FleetMember::globalId);
 	if (memberIt == pFleet->members.end())
 	{
@@ -235,6 +232,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		mFocusedMemberGlobalId = {};
 		mSpawnIntoFleetToggle.Reset();
 		mDestroyMemberToggle.Reset();
+		mSquadronOrdersToggle.Reset();
 	}
 
 	engine::GlobalId focusedId = gpGame->ClientOwnedEntityIdentifier();
@@ -271,7 +269,9 @@ void FleetSelection::Clear()
 	mCreateFleetToggle.Reset();
 	mSpawnIntoFleetToggle.Reset();
 	mDestroyMemberToggle.Reset();
-	mNavigationDelayControl.Reset();
+	mSquadronOrdersToggle.Reset();
+	mFleetNavigationControl.Reset();
+	mHoldPickFleetGuid = {};
 }
 
 } // namespace game

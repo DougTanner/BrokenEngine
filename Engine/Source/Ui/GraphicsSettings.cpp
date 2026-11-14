@@ -137,6 +137,11 @@ static bool IsValidGraphicsQualityLevel(int64_t iLevel)
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
 static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
+	if (!std::ranges::contains(gPresentMode.mAllowed, static_cast<float>(rGraphicsSettings.vkPresentMode)))
+	{
+		return "vkPresentMode";
+	}
+
 	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.vkSampleCount)))
 	{
 		return "eSampleCount";

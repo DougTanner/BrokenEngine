@@ -86,7 +86,7 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex);
 
 	// Fire-and-forget keyframe animation; the controller's bDestroysSelf enables removal after the final keyframe.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
 
 
 	// Destroy handles auto-removal of expired controlled lights

@@ -17,6 +17,15 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 	return fSpawnTimer;
 }
 
+// Requires uiNextUuid already read.
+static void AdmitMirrorFleetUuids(const FramePostRender& rPostRender)
+{
+	if (rPostRender.uiMirrorFleet0FirstUuid > rPostRender.uiMirrorFleet0EndUuid || rPostRender.uiMirrorFleet0EndUuid > rPostRender.uiNextUuid || rPostRender.uiMirrorFleet1FirstUuid > rPostRender.uiMirrorFleet1EndUuid || rPostRender.uiMirrorFleet1EndUuid > rPostRender.uiNextUuid)
+	{
+		throw std::ios_base::failure("FramePostRender mirror fleet uuids");
+	}
+}
+
 // Requires the Pushers id map already rebuilt from the read ids; that rebuild rejects id 0, so the map lookup also
 // rejects a living ship's zero handle. Released pushers must be compacted before the frame is persisted.
 static void ValidatePusherOwners(const Frame& rFrame)
@@ -102,7 +111,7 @@ static void ValidateFlyingMissiles(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 181i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 188i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameServerInterpolateTypes {}) + engine::SumVersions(GameServerPostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -110,6 +119,9 @@ FrameInterpolate::FrameInterpolate()
 , pFighters(std::make_unique<FightersInterpolate>())
 , pOmnis(std::make_unique<OmnisInterpolate>())
 , pBattleships(std::make_unique<BattleshipsInterpolate>())
+#if defined(BT_CLIENT)
+, pWrecks(std::make_unique<WrecksInterpolate>())
+#endif
 {
 }
 
@@ -123,6 +135,9 @@ FramePostRender::FramePostRender()
 , pFighters(std::make_unique<FightersPostRender>())
 , pOmnis(std::make_unique<OmnisPostRender>())
 , pBattleships(std::make_unique<BattleshipsPostRender>())
+#if defined(BT_CLIENT)
+, pWrecks(std::make_unique<WrecksPostRender>())
+#endif
 {
 }
 
@@ -135,6 +150,10 @@ Frame::~Frame() = default;
 Frame::Frame(Frame&&) noexcept = default;
 Frame& Frame::operator=(Frame&&) noexcept = default;
 
+// Most of the phase functions, Crcs, LogDifferences, Write, Read, and ServerRead in this file only forward to the
+// engine ForEach and collection helpers over the game's collection tuples and frame-wide values, which is
+// game-agnostic: a future project may want that forwarding moved into shared engine code, depending on its
+// requirements. The CRC fold order and the Write/Read byte order must stay identical if it moves.
 void FrameInterpolate::Register()
 {
 	engine::ForEachRegister(GameInterpolateTypes {});
@@ -187,6 +206,10 @@ void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict r
 
 	rFrame.postRender.randomAlignment = rPreviousFrame.postRender.randomAlignment;
 	rFrame.postRender.fleetAlignment = rPreviousFrame.postRender.fleetAlignment;
+	rFrame.postRender.uiMirrorFleet0FirstUuid = rPreviousFrame.postRender.uiMirrorFleet0FirstUuid;
+	rFrame.postRender.uiMirrorFleet0EndUuid = rPreviousFrame.postRender.uiMirrorFleet0EndUuid;
+	rFrame.postRender.uiMirrorFleet1FirstUuid = rPreviousFrame.postRender.uiMirrorFleet1FirstUuid;
+	rFrame.postRender.uiMirrorFleet1EndUuid = rPreviousFrame.postRender.uiMirrorFleet1EndUuid;
 
 	engine::ForEachPostRenderUpdate(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 
@@ -207,74 +230,40 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	engine::CompactCollections(rFrame, std::tuple_cat(rFrame.interpolate.Collections(), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.Collections(), GamePostRenderCollections(rFrame.postRender)));
 }
 
-// Each wave is one ship type picked at random, spaced by that type's radius, anchored where the most of its ships fit
-// and among those nearest kfPreferredFleetDistance from the reference fleet ship, which it faces. Only fleet ships,
-// never random-spawn rows, place and repel a wave.
-static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
+constexpr int64_t kiMaximumFleetSize = 16;
+
+static float ShipRadius(ShipType eType)
+{
+	return eType == ShipType::kFighter ? kfFighterRadius : eType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
+}
+
+// The uuid MakeUuid mints from counter value uiCounter, leaving uiNextUuid unchanged.
+static int64_t CounterUuid(FramePostRender& rPostRender, uint64_t uiCounter)
+{
+	return rPostRender.MakeUuid(uiCounter);
+}
+
+// A wave is iShipCount ships of one type, spaced by that type's radius, anchored where the most of its ships fit and
+// among those nearest kfPreferredFleetDistance from the reference fleet ship, which it faces.
+static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData, ShipType eWaveType, int64_t iShipCount, FXMVECTOR vecFleetPosition)
 {
 	static constexpr int64_t kiGridDimension = 20;
-	static constexpr int64_t kiMaximumFleetSize = 16;
-	static constexpr int64_t kiRandomSpawnsPerFleetShip = 2;
 	static constexpr float kfMinimumFleetDistance = 120.0f;
 	static constexpr float kfPreferredFleetDistance = 300.0f;
 
-	// Count non-exploding fleet and random-spawn ships per type; the reference fleet ship is the first fleet ship's
-	// flagship when it is in the cell, else that first fleet ship
-	std::array<int64_t, std::to_underlying(ShipType::kCount)> fleetCounts {};
-	std::array<int64_t, std::to_underlying(ShipType::kCount)> randomSpawnCounts {};
-	auto vecFleetPosition = XMVectorZero();
-	engine::GlobalId flagshipGlobalId {};
-	bool bFoundFleetShip = false;
-	ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
-	{
-		for (int64_t i = 0; i < rShipPostRender.iCount; ++i)
-		{
-			if (rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
-			{
-				continue;
-			}
-			if (rShipPostRender.pController[i] != ShipController::kFleet)
-			{
-				++randomSpawnCounts[std::to_underlying(eType)];
-				continue;
-			}
-			if (!bFoundFleetShip)
-			{
-				vecFleetPosition = rShipInterpolate.pVecPositions[i];
-				flagshipGlobalId = rShipPostRender.pFlagshipGlobalIds[i];
-				bFoundFleetShip = true;
-			}
-			++fleetCounts[std::to_underlying(eType)];
-		}
-	});
-	if (!bFoundFleetShip)
-	{
-		return;
-	}
-	std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFrame, flagshipGlobalId);
-	if (optionalFlagship)
-	{
-		vecFleetPosition = ShipPosition(rFrame.interpolate, *optionalFlagship);
-	}
-
-	// The wave's type: one equal-odds draw over the three types, whose radius sets the wave's clearance and spacing.
-	ShipType eWaveType = static_cast<ShipType>(common::Random(2i64, rFrame.postRender.randomEngine));
+	// Every id the cell minted earlier is lower, so a row at or above this one was placed by this wave.
+	int64_t iWaveFirstUuid = CounterUuid(rFrame.postRender, rFrame.postRender.uiNextUuid);
 	// The wave starts settled on its type's default flight plane.
 	int64_t iWaveFlightPlane = DefaultFlightPlane(eWaveType);
-	// The type draw happens even when it has no room, so a full type does not shift later draws.
-	int64_t iShipCount = std::clamp(kiRandomSpawnsPerFleetShip * fleetCounts[std::to_underlying(eWaveType)] - randomSpawnCounts[std::to_underlying(eWaveType)], 0i64, kiMaximumFleetSize);
-	if (iShipCount == 0)
-	{
-		return;
-	}
 	const engine::FlightPlane& rWaveFlightPlane = engine::gpFlightPlanes->Plane(iWaveFlightPlane);
-	float fWaveRadius = eWaveType == ShipType::kFighter ? kfFighterRadius : eWaveType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
+	float fWaveRadius = ShipRadius(eWaveType);
 	float fTerrainClearance = fWaveRadius * 2.0f;
 	float fChevronStagger = fWaveRadius * 2.0f;
 	float fShipSideSpacing = fWaveRadius * 3.0f;
 
 	// Reject positions outside the cell, inside terrain at the wave's plane (with full body clearance; none on a plane
-	// without terrain collision), or within horizontal visible range of any alive fleet ship on any plane
+	// without terrain collision), within horizontal visible range of any alive fleet ship on any plane, or horizontally
+	// closer than the wave's side spacing plus the row's radius to any alive random-spawn row placed before the wave
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
 		if (!engine::IsInsideCell(vecPosition))
@@ -285,25 +274,29 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 		{
 			return false;
 		}
-		bool bNearFleetShip = false;
-		ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
+		bool bNearShip = false;
+		ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 		{
-			for (int64_t j = 0; j < rShipPostRender.iCount && !bNearFleetShip; ++j)
+			for (int64_t j = 0; j < rShipPostRender.iCount && !bNearShip; ++j)
 			{
-				if (rShipPostRender.pController[j] != ShipController::kFleet)
-				{
-					continue;
-				}
-
 				if (rShipPostRender.pLifecycleFlags[j] & engine::LifecycleFlags::kDying)
 				{
 					continue;
 				}
 				XMVECTOR vecDelta = XMVectorSubtract(vecPosition, rShipInterpolate.pVecPositions[j]);
-				bNearFleetShip = XMVectorGetX(XMVector2LengthSq(vecDelta)) < kfMinimumFleetDistance * kfMinimumFleetDistance;
+				float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(vecDelta));
+				if (rShipPostRender.pController[j] == ShipController::kFleet)
+				{
+					bNearShip = fDistanceSquared < kfMinimumFleetDistance * kfMinimumFleetDistance;
+				}
+				else if (rShipInterpolate.pRegistryIds[j].uuid.iValue < iWaveFirstUuid)
+				{
+					float fClearance = fShipSideSpacing + ShipRadius(eType);
+					bNearShip = fDistanceSquared < fClearance * fClearance;
+				}
 			}
 		});
-		return !bNearFleetShip;
+		return !bNearShip;
 	};
 
 	// The grid spans the cell's bounding rectangle; IsSpawnPositionValid rejects the corners outside the hexagon.
@@ -419,7 +412,8 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 
 		// Flattened because the reference fleet ship may fly another plane; the validity check keeps its horizontal part nonzero.
 		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFleetPosition, vecSpawnPosition), 0.0f));
-		// A coin toss per placed ship, drawn before its Spawn draws, picks the ships that target the enemy flagship.
+		// A coin toss per placed ship, drawn before its Spawn draws, picks the Fighters and Omnis that target the enemy
+		// flagship; Battleships chase it whatever the toss.
 		ShipOrders_t orders = waveOrders;
 		orders.Set(ShipOrders::kTargetFlagship, common::Random(1i64, rFrame.postRender.randomEngine) == 1);
 		switch (eWaveType)
@@ -463,6 +457,91 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	}
 }
 
+// A cell's random-spawn ships form two mirror fleets, each one ship per non-dying fleet ship in the cell of that ship's
+// type, at most kiMaximumFleetSize per type. A fleet is the rows whose registry ids lie in its FramePostRender uuid
+// range; a fleet with no non-dying row there respawns whole, one wave per type, and is never refilled before then.
+static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
+{
+	struct MirrorFleet
+	{
+		uint64_t& ruiFirstUuid;
+		uint64_t& ruiEndUuid;
+		int64_t iFirstUuid = 0;
+		int64_t iEndUuid = 0;
+		bool bAlive = false;
+	};
+	FramePostRender& rPostRender = rFrame.postRender;
+	std::array<MirrorFleet, 2> mirrorFleets {{{.ruiFirstUuid = rPostRender.uiMirrorFleet0FirstUuid, .ruiEndUuid = rPostRender.uiMirrorFleet0EndUuid}, {.ruiFirstUuid = rPostRender.uiMirrorFleet1FirstUuid, .ruiEndUuid = rPostRender.uiMirrorFleet1EndUuid}}};
+	for (MirrorFleet& rFleet : mirrorFleets)
+	{
+		rFleet.iFirstUuid = CounterUuid(rPostRender, rFleet.ruiFirstUuid);
+		rFleet.iEndUuid = CounterUuid(rPostRender, rFleet.ruiEndUuid);
+	}
+
+	// Count non-exploding fleet ships per type and mark each mirror fleet holding a non-exploding row; the reference
+	// fleet ship is the first fleet ship's flagship when it is in the cell, else that first fleet ship
+	std::array<int64_t, std::to_underlying(ShipType::kCount)> fleetCounts {};
+	auto vecFleetPosition = XMVectorZero();
+	engine::GlobalId flagshipGlobalId {};
+	bool bFoundFleetShip = false;
+	ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
+	{
+		for (int64_t i = 0; i < rShipPostRender.iCount; ++i)
+		{
+			if (rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+			{
+				continue;
+			}
+			if (rShipPostRender.pController[i] != ShipController::kFleet)
+			{
+				int64_t iRegistryUuid = rShipInterpolate.pRegistryIds[i].uuid.iValue;
+				for (MirrorFleet& rFleet : mirrorFleets)
+				{
+					if (iRegistryUuid >= rFleet.iFirstUuid && iRegistryUuid < rFleet.iEndUuid)
+					{
+						rFleet.bAlive = true;
+					}
+				}
+				continue;
+			}
+			if (!bFoundFleetShip)
+			{
+				vecFleetPosition = rShipInterpolate.pVecPositions[i];
+				flagshipGlobalId = rShipPostRender.pFlagshipGlobalIds[i];
+				bFoundFleetShip = true;
+			}
+			++fleetCounts[std::to_underlying(eType)];
+		}
+	});
+	if (!bFoundFleetShip)
+	{
+		return;
+	}
+	std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFrame, flagshipGlobalId);
+	if (optionalFlagship)
+	{
+		vecFleetPosition = ShipPosition(rFrame.interpolate, *optionalFlagship);
+	}
+
+	for (MirrorFleet& rFleet : mirrorFleets)
+	{
+		if (rFleet.bAlive)
+		{
+			continue;
+		}
+		rFleet.ruiFirstUuid = rPostRender.uiNextUuid;
+		for (int64_t i = 0; i < std::to_underlying(ShipType::kCount); ++i)
+		{
+			int64_t iShipCount = std::min(fleetCounts[i], kiMaximumFleetSize);
+			if (iShipCount > 0)
+			{
+				SpawnRandomShipWave(rFrame, rStaticData, static_cast<ShipType>(i), iShipCount, vecFleetPosition);
+			}
+		}
+		rFleet.ruiEndUuid = rPostRender.uiNextUuid;
+	}
+}
+
 void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderSpawn);
@@ -471,7 +550,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 
-	// Each interval attempts one wave; invalid positions are skipped.
+	// Each interval is one mirror-fleet spawn attempt; invalid positions are skipped.
 	while (rInterpolate.fSpawnTimer >= kfShipSpawnInterval)
 	{
 		rInterpolate.fSpawnTimer -= kfShipSpawnInterval;
@@ -591,7 +670,6 @@ void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 void FrameInterpolate::UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	engine::ForEachRequestTextures(GameInterpolateTypes {}, rRenderInterpolates, rActiveCoordinates);
-	BattleshipsInterpolate::UpdateWrecks(rRenderInterpolates, rActiveCoordinates);
 }
 
 void FrameInterpolate::DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
@@ -616,7 +694,7 @@ common::crc_t FrameInterpolate::Crcs(const FrameInterpolate& rCurrent)
 
 	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.fSpawnTimer)) * common::kCrcMultiplier;
 
-	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GameInterpolateCollections(rCurrent));
+	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GameServerInterpolateCollections(rCurrent));
 
 	return uiSharedCrc;
 }
@@ -627,7 +705,7 @@ bool FrameInterpolate::LogDifferences(const FrameInterpolate& rOther) const
 	bool bEqual = true;
 	bEqual &= static_cast<const engine::FrameInterpolateBase&>(*this).LogDifferences(static_cast<const engine::FrameInterpolateBase&>(rOther));
 	bEqual &= common::LogDifference<"fSpawnTimer">(fSpawnTimer, rOther.fSpawnTimer);
-	bEqual &= engine::LogDifferencesCollections(GameInterpolateCollections(*this), GameInterpolateCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameInterpolateCollections(*this))>)> {});
+	bEqual &= engine::LogDifferencesCollections(GameServerInterpolateCollections(*this), GameServerInterpolateCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameServerInterpolateCollections(*this))>)> {});
 	return bEqual;
 }
 
@@ -656,7 +734,7 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 
 	engine::FrameValuesRead<true>(rStream, *this, Values());
 
-	engine::SharedCollectionsRead(rStream, GameInterpolateCollections(*this));
+	engine::SharedCollectionsRead(rStream, GameServerInterpolateCollections(*this));
 }
 
 common::crc_t FramePostRender::Crcs(const FramePostRender& rCurrent)
@@ -665,8 +743,12 @@ common::crc_t FramePostRender::Crcs(const FramePostRender& rCurrent)
 
 	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.randomAlignment)) * common::kCrcMultiplier;
 	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.fleetAlignment)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.uiMirrorFleet0FirstUuid)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.uiMirrorFleet0EndUuid)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.uiMirrorFleet1FirstUuid)) * common::kCrcMultiplier;
+	uiSharedCrc = (uiSharedCrc ^ common::Crc(rCurrent.uiMirrorFleet1EndUuid)) * common::kCrcMultiplier;
 
-	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GamePostRenderCollections(rCurrent));
+	uiSharedCrc = engine::CollectionsCrc(uiSharedCrc, GameServerPostRenderCollections(rCurrent));
 
 	return uiSharedCrc;
 }
@@ -678,7 +760,11 @@ bool FramePostRender::LogDifferences(const FramePostRender& rOther) const
 	bEqual &= static_cast<const engine::FramePostRenderBase&>(*this).LogDifferences(static_cast<const engine::FramePostRenderBase&>(rOther));
 	bEqual &= common::LogDifference<"randomAlignment">(randomAlignment, rOther.randomAlignment);
 	bEqual &= common::LogDifference<"fleetAlignment">(fleetAlignment, rOther.fleetAlignment);
-	bEqual &= engine::LogDifferencesCollections(GamePostRenderCollections(*this), GamePostRenderCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GamePostRenderCollections(*this))>)> {});
+	bEqual &= common::LogDifference<"uiMirrorFleet0FirstUuid">(uiMirrorFleet0FirstUuid, rOther.uiMirrorFleet0FirstUuid);
+	bEqual &= common::LogDifference<"uiMirrorFleet0EndUuid">(uiMirrorFleet0EndUuid, rOther.uiMirrorFleet0EndUuid);
+	bEqual &= common::LogDifference<"uiMirrorFleet1FirstUuid">(uiMirrorFleet1FirstUuid, rOther.uiMirrorFleet1FirstUuid);
+	bEqual &= common::LogDifference<"uiMirrorFleet1EndUuid">(uiMirrorFleet1EndUuid, rOther.uiMirrorFleet1EndUuid);
+	bEqual &= engine::LogDifferencesCollections(GameServerPostRenderCollections(*this), GameServerPostRenderCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameServerPostRenderCollections(*this))>)> {});
 	return bEqual;
 }
 
@@ -696,6 +782,7 @@ void FramePostRender::Read(std::istream& rStream)
 	static_cast<engine::FramePostRenderBase&>(*this).Read(rStream);
 
 	engine::FrameValuesRead<false>(rStream, *this, Values());
+	AdmitMirrorFleetUuids(*this);
 
 	engine::CollectionsRead(rStream, GamePostRenderCollections(*this));
 }
@@ -706,7 +793,7 @@ void FramePostRender::ServerRead(std::istream& rStream)
 
 	engine::FrameValuesRead<true>(rStream, *this, Values());
 
-	engine::SharedCollectionsRead(rStream, GamePostRenderCollections(*this));
+	engine::SharedCollectionsRead(rStream, GameServerPostRenderCollections(*this));
 }
 
 common::crc_t Frame::Crc() const
@@ -730,7 +817,7 @@ void Frame::ServerRead(std::istream& rStream)
 	postRender.ServerRead(rStream);
 
 	engine::ValidateBaseServerCollectionPairs(interpolate, postRender);
-	engine::ValidateCollectionPairs(GameInterpolateCollections(interpolate), GamePostRenderCollections(postRender));
+	engine::ValidateCollectionPairs(GameServerInterpolateCollections(interpolate), GameServerPostRenderCollections(postRender));
 }
 
 std::ostream& operator<<(std::ostream& rStream, const Frame& rCurrent)

@@ -14,6 +14,7 @@ void RenderWaterSection(TweaksScreen& rScreen)
 	int64_t iSection = giTweakSectionWater;
 
 	rScreen.WrapperSlider("Water Scale", gWaterScale, iSection);
+	rScreen.WrapperSlider("Water Wave Time Scale", gWaterWaveTimeScale, iSection);
 
 	if (ImGui::BeginTabBar("WaterTabs"))
 	{
@@ -97,17 +98,12 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.RenderWaveCountRadioButtons(gWaterLowCount);
 
 			rScreen.WrapperSeparatorText("Wave");
-			rScreen.WrapperSlider("Water Low Angle", gWaterLowAngle, iSection);
-			rScreen.WrapperSlider("Water Low Wavelength", gWaterLowWavelength, iSection);
-			rScreen.WrapperSlider("Water Low Amplitude", gWaterLowAmplitude, iSection);
-			rScreen.WrapperSlider("Water Low Speed", gWaterLowSpeed, iSection);
-			rScreen.WrapperSlider("Water Low Steepness", gWaterLowSteepness, iSection);
-
-			rScreen.WrapperSeparatorText("Adjustments");
-			rScreen.WrapperSlider("Water Low Angle Adjust", gWaterLowAngleAdjust, iSection);
-			rScreen.WrapperSlider("Water Low Wavelength Adjust", gWaterLowWavelengthAdjust, iSection);
-			rScreen.WrapperSlider("Water Low Amplitude Adjust", gWaterLowAmplitudeAdjust, iSection);
-			rScreen.WrapperSlider("Water Low Speed Adjust", gWaterLowSpeedAdjust, iSection);
+			rScreen.WrapperSlider("Water Low Direction Degrees", gWaterLowDirectionDegrees, iSection);
+			rScreen.WrapperSlider("Water Low Spread Degrees", gWaterLowSpreadDegrees, iSection);
+			rScreen.WrapperSlider("Water Low Wavelength Shortest", gWaterLowWavelengthShortest, iSection);
+			rScreen.WrapperSlider("Water Low Wavelength Longest", gWaterLowWavelengthLongest, iSection);
+			rScreen.WrapperSlider("Water Low Slope", gWaterLowSlope, iSection);
+			rScreen.WrapperSlider("Water Low Choppiness", gWaterLowChoppiness, iSection);
 
 			rScreen.WrapperSeparatorText("Camera Fade");
 			rScreen.WrapperSlider("Water Low Amplitude Fade Start", gWaterLowAmplitudeFadeStart, iSection);
@@ -120,16 +116,12 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.RenderWaveCountRadioButtons(gWaterMediumCount);
 
 			rScreen.WrapperSeparatorText("Wave");
-			rScreen.WrapperSlider("Water Medium Wavelength", gWaterMediumWavelength, iSection);
-			rScreen.WrapperSlider("Water Medium Amplitude", gWaterMediumAmplitude, iSection);
-			rScreen.WrapperSlider("Water Medium Speed", gWaterMediumSpeed, iSection);
-			rScreen.WrapperSlider("Water Medium Steepness", gWaterMediumSteepness, iSection);
-
-			rScreen.WrapperSeparatorText("Adjustments");
-			rScreen.WrapperSlider("Water Medium Angle Adjust", gWaterMediumAngleAdjust, iSection);
-			rScreen.WrapperSlider("Water Medium Wavelength Adjust", gWaterMediumWavelengthAdjust, iSection);
-			rScreen.WrapperSlider("Water Medium Amplitude Adjust", gWaterMediumAmplitudeAdjust, iSection);
-			rScreen.WrapperSlider("Water Medium Speed Adjust", gWaterMediumSpeedAdjust, iSection);
+			rScreen.WrapperSlider("Water Medium Direction Degrees", gWaterMediumDirectionDegrees, iSection);
+			rScreen.WrapperSlider("Water Medium Spread Degrees", gWaterMediumSpreadDegrees, iSection);
+			rScreen.WrapperSlider("Water Medium Wavelength Shortest", gWaterMediumWavelengthShortest, iSection);
+			rScreen.WrapperSlider("Water Medium Wavelength Longest", gWaterMediumWavelengthLongest, iSection);
+			rScreen.WrapperSlider("Water Medium Slope", gWaterMediumSlope, iSection);
+			rScreen.WrapperSlider("Water Medium Choppiness", gWaterMediumChoppiness, iSection);
 
 			rScreen.WrapperSeparatorText("Camera Fade");
 			rScreen.WrapperSlider("Water Medium Amplitude Fade Start", gWaterMediumAmplitudeFadeStart, iSection);

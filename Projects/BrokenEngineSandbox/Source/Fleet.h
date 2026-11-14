@@ -20,6 +20,7 @@ static_assert(std::is_standard_layout_v<FleetGuid>, "FleetGuid must stay standar
 // Bounds per-client fleet storage against request spam.
 inline constexpr int64_t kiMaximumFleetsPerClient = 4;
 inline constexpr int64_t kiMaximumFleetSquadronsPerType = 2;
+static_assert(kiMaximumFleetSquadronsPerType == 2, "ShipOrders::kSquadron1 is the one bit naming a Fighter or Omni row's squadron");
 // Members one squadron holds, indexed by ShipType.
 inline constexpr int64_t kpiFleetSquadronCapacities[] {9, 2, 1};
 static_assert(std::ssize(kpiFleetSquadronCapacities) == std::to_underlying(ShipType::kCount), "kpiFleetSquadronCapacities needs one entry per ShipType");
@@ -29,8 +30,55 @@ inline constexpr int64_t kiMaximumFleetMembers = kiMaximumFleetSquadronsPerType 
 enum class FleetMemberFlags : uint8_t
 {
 	kIsDead = 1 << 0,
+	// Fighter squadron settings, equal on every member of the squadron; both clear is Patrol with Same Target on.
+	kSeekAndDestroy  = 1 << 1,
+	kSeparateTargets = 1 << 2,
+	// Omni squadron settings, equal on every member of the squadron; both clear is Escort with Patrol Together off.
+	kPatrolCell      = 1 << 3,
+	// Patrol Cell only: the squadron flies to one shared destination.
+	kPatrolTogether  = 1 << 4,
 };
 using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
+
+inline constexpr FleetMemberFlags_t kFighterOrderFlags {FleetMemberFlags::kSeekAndDestroy, FleetMemberFlags::kSeparateTargets};
+inline constexpr FleetMemberFlags_t kOmniOrderFlags {FleetMemberFlags::kPatrolCell, FleetMemberFlags::kPatrolTogether};
+inline constexpr FleetMemberFlags_t kSquadronOrderFlags {FleetMemberFlags::kSeekAndDestroy, FleetMemberFlags::kSeparateTargets, FleetMemberFlags::kPatrolCell, FleetMemberFlags::kPatrolTogether};
+
+// The squadron setting flags a member of eType may hold.
+inline FleetMemberFlags_t SquadronOrderFlags(ShipType eType)
+{
+	switch (eType)
+	{
+		case ShipType::kFighter:    return kFighterOrderFlags;
+		case ShipType::kOmni:       return kOmniOrderFlags;
+		case ShipType::kBattleship: break;
+		case ShipType::kCount:      break;
+	}
+	return {};
+}
+
+// Replaces the kSquadronOrderFlags bits of rFlags with those of orderFlags, keeping every other bit.
+inline void SetSquadronOrderFlags(FleetMemberFlags_t& rFlags, FleetMemberFlags_t orderFlags)
+{
+	rFlags.meFlags = static_cast<FleetMemberFlags>((std::to_underlying(rFlags.meFlags) & ~std::to_underlying(kSquadronOrderFlags.meFlags)) | orderFlags.Mask(kSquadronOrderFlags));
+}
+
+// The row ShipOrders a Fighter or Omni member's settings give.
+inline ShipOrders_t SquadronOrders(ShipType eType, FleetMemberFlags_t flags)
+{
+	ShipOrders_t orders {};
+	if (eType == ShipType::kFighter)
+	{
+		orders.Set(ShipOrders::kSeekAndDestroy, flags & FleetMemberFlags::kSeekAndDestroy);
+		orders.Set(ShipOrders::kSharedTarget, !(flags & FleetMemberFlags::kSeparateTargets));
+	}
+	else
+	{
+		orders.Set(ShipOrders::kPatrolCell, flags & FleetMemberFlags::kPatrolCell);
+		orders.Set(ShipOrders::kPatrolTogether, flags & FleetMemberFlags::kPatrolTogether);
+	}
+	return orders;
+}
 
 struct FleetMember
 {
@@ -48,6 +96,19 @@ struct FleetMember
 	std::chrono::duration<float> respawnTimerSeconds = std::chrono::duration<float>::zero();
 };
 
+// How the flagship picks its next cell; the player selects it per fleet.
+enum class FleetBehaviour : uint8_t
+{
+	kRandomWalk,
+	kExplore,
+	kStayInCell,
+	kCount,
+};
+
+// Log names, indexed by FleetBehaviour.
+inline constexpr const char* kpcFleetBehaviourNames[] {"RandomWalk", "Explore", "StayInCell"};
+static_assert(std::ssize(kpcFleetBehaviourNames) == std::to_underlying(FleetBehaviour::kCount), "kpcFleetBehaviourNames needs one entry per FleetBehaviour");
+
 struct Fleet
 {
 	FleetGuid guid {};
@@ -58,6 +119,10 @@ struct Fleet
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	std::chrono::duration<float> cellChangeTimerSeconds = std::chrono::duration<float>::zero();
+	FleetBehaviour eBehaviour = FleetBehaviour::kRandomWalk;
+	// The hex kStayInCell travels to and holds. Never the origin: the server refuses an origin hold, and entering
+	// kStayInCell overwrites this default before it is navigated to.
+	engine::GridCoord holdCoordinate {.iQ = 1, .iR = 0};
 };
 
 inline int64_t CountFleetSquadronMembers(const Fleet& rFleet, ShipType eType, uint8_t uiSquadron)

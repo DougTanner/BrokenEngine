@@ -8,9 +8,6 @@ effects. They render no projectile geometry directly.
 - Resolve exactly one earliest event over swept entity collision, terrain
   impact, and cell-boundary transfer. Terrain and boundary events win exact-time
   ties through the collision layer cutoff.
-- Shared impact-jitter and crater-rotation draws remain outside client guards
-  even when only client effects consume them. Moving these draws changes the
-  deterministic random stream.
 - Each blaster uses either an area light or a camera-aligned point light. Sync
   and teardown must preserve that exclusive ownership.
 - Wind-trail tuning belongs to the blaster type, not the row: the client reads

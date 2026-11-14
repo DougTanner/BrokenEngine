@@ -188,6 +188,11 @@ CONSTEXPR int kiShadowTextureExecutionSize = 64;
 
 CONSTEXPR int kiShadowBlurRadius = 5;
 CONSTEXPR int kiMaxObjectShadowsBlurRadius = 128; // gObjectShadowsBlurRadiusNoon/Sunset slider maximum; sizes the GlobalLayout object-shadow blur half-kernel
+CONSTEXPR int kiObjectShadowsBlurStripLength = 64; // ObjectShadowsBlurH/V workgroup size: output texels per strip along the blur axis
+#if defined(BT_ENGINE)
+// The strip's vec4 tap cache must fit the Vulkan minimum maxComputeSharedMemorySize.
+static_assert((kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius) * 16 <= 16'384);
+#endif
 
 CONSTEXPR int kiComputeTileSize = 8;
 // Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes

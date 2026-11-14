@@ -18,10 +18,13 @@ step.
 
    - Reuse — an existing repository mechanism or pattern that already solves
      this shape, or a restructure of existing data or ownership that makes the
-     problem disappear.
+     problem disappear. For a defect, check first whether the state involved is
+     stored away from its owner or discarded before its consumer reads it;
+     moving it to its owner is then the candidate.
    - Remove the need — fix at the origin instead of the symptom, delete the
-     requirement, narrow the scope, or do nothing; doing nothing is itself a
-     candidate on this axis.
+     requirement, narrow the scope, change a repository rule, hook, or limit
+     the drafted mechanism only works around, or do nothing; doing nothing is
+     itself a candidate on this axis.
    - Reshape — the same objective in a different place: another layer, frame
      phase, executable, or data layout.
 

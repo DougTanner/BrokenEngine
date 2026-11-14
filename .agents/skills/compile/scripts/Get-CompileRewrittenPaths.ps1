@@ -1,8 +1,11 @@
-# Lists the tracked paths /compile builds newly modified. Without -Compare, writes the set of paths
-# `git status --porcelain=v1 -z --untracked-files=no` reports in the current directory's worktree
-# to -SnapshotPath, one per line. With -Compare, prints in ordinal order, one per line, each path
-# the current read reports that the snapshot lacks, and nothing when none. A path modified before
-# the snapshot is never printed, even when a build rewrote it again.
+# Lists the data-input tracked paths first modified during a /compile build window. Without -Compare,
+# writes the set of paths `git status --porcelain=v1 -z --untracked-files=no` reports in the current
+# directory's worktree to -SnapshotPath, one per line. With -Compare, prints in ordinal order, one per
+# line, each path the current read reports that the snapshot lacks and that Test-AgentDataInputPath
+# accepts for some game project, and nothing when none. A build writes tracked files only under those
+# data inputs, so every path it rewrites is printed, but so is a concurrent edit to another data input;
+# a concurrent edit elsewhere is not. A path modified before the snapshot is never printed, even when a
+# build rewrote it again.
 # Git runs with GIT_OPTIONAL_LOCKS=0 so the read never takes the index lock a concurrent build or
 # Git call needs. Changes nothing but the snapshot file. Exit 0 on success, 1 with stderr on any
 # failure.
@@ -57,8 +60,10 @@ try {
 		if ($line.Length -gt 0) { [void] $snapshot.Add($line) }
 	}
 
+	$projects = Get-AgentGameProjects $workingDirectory
 	foreach ($path in $current) {
-		if (-not $snapshot.Contains($path)) { [Console]::Out.WriteLine($path) }
+		if ($snapshot.Contains($path)) { continue }
+		if (@($projects | Where-Object { Test-AgentDataInputPath $path $_ }).Count -gt 0) { [Console]::Out.WriteLine($path) }
 	}
 
 	exit 0

@@ -24,7 +24,6 @@ namespace game
 {
 
 inline constexpr std::chrono::duration<float> kBattleshipDestroyTime = std::chrono::duration<float>(0.25f);
-inline constexpr std::chrono::duration<float> kBattleshipDestroyExplosionInterval = std::chrono::duration<float>(0.024f);
 
 inline constexpr float kfBattleshipRadius = 4.5f;
 
@@ -39,7 +38,6 @@ static_assert(kiBattleshipHighestFlightPlane < std::ssize(kFlightPlanes));
 inline constexpr HeadingMovementConstants kBattleshipMovement
 {
 	.fChaseAcceleration = 4.0f,
-	.fFleeAcceleration = 6.0f,
 	.fReturnAcceleration = kfBattleshipAcceleration,
 	.fDrag = kfBattleshipDrag,
 	.fMaximumSpeed = kfBattleshipMaxSpeed,
@@ -67,8 +65,8 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 
 	static void AllocateAndCopy(BattleshipsInterpolate& rCurrent, const BattleshipsInterpolate& rPrevious);
 
-	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kBattleshipDestroyTime]; reject anything else as a corrupt stream, since a
-	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kBattleshipDestroyTime]; reject anything else as a corrupt stream. Written
+	// as one range test so NaN and both infinities fail it too.
 	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
 	// The stored flight plane is kuiNoFlightPlane or a plane the type flies, and every simulation write and ship spawn stores a horizontal unit heading.
 	static void PostRead(const BattleshipsInterpolate& rCurrent)
@@ -162,20 +160,13 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
-#if defined(BT_CLIENT)
-	// Drops the wrecks whose cell left view and the sunk ones, captures each visible dying row, then advances every wreck
-	// by the sim-scaled render delta, or not at all while paused. Called from BeginRender and on world-hidden frames.
-	static void UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
-	// Drops every wreck; called where cell-local Ids restart (session reset, server load).
-	static void ClearWrecks();
-#endif
 };
 
 using battleship_t = engine::Id<BattleshipsInterpolate>;
 
 struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 {
-	static constexpr int64_t kiVersion = 8;
+	static constexpr int64_t kiVersion = 9;
 
 	// Simulation keeps the missile countdown finite and at most kBattleshipMissileCooldown; the floor is only finite
 	// because a battleship with no target counts down without a clamp. Written as one range test so NaN and both
@@ -236,7 +227,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
-	// Called first from the Spawn hook. Defined in BattleshipsCombat.cpp.
+	// Called from the Spawn hook. Defined in BattleshipsCombat.cpp.
 	static void SpawnMissiles(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
 	// A beam hit of fDamage from vecShooterPosition, applied during PostCollision.
@@ -248,9 +239,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	ShipOrders_t* __restrict pOrders = nullptr;
 	ShipFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
-	XMVECTOR* __restrict pVecDamageDirections = nullptr;
 	float* __restrict pfHealths = nullptr;
-	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
 	std::chrono::duration<float>* __restrict pNextMissileFireTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
@@ -271,7 +260,7 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pRegistryTargets);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pfHealths, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pRegistryTargets);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -289,13 +278,13 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pVecDamageDirections, rSelf.pAlignments, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pAlignments, rSelf.pGlobalIds, rSelf.pClientGuids, rSelf.pFlagshipGlobalIds);
 	}
 
 	// CRC-only subset: excludes pGlobalIds and pClientGuids, which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pRegistryTargets);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pfHealths, rSelf.pNextMissileFireTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods, rSelf.pFlagshipGlobalIds, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.pNavigationDelays, rSelf.pCellChangeTimers, rSelf.pVecAiDirections, rSelf.pVecIslandDestinations, rSelf.pRegistryTargets);
 	}
 
 	bool LogDifferences(const BattleshipsPostRender& rOther) const;

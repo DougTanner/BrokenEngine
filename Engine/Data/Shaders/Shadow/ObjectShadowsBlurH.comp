@@ -2,7 +2,7 @@
 
 #include "ShaderLayouts.h"
 
-layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+layout (local_size_x = kiObjectShadowsBlurStripLength) in;
 
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
@@ -13,27 +13,39 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 layout (set = 1, binding = 1) uniform sampler2D objectShadowsTextureSampler;
 layout (set = 1, binding = 2, rgba16f) uniform writeonly image2D objectShadowsBlurIntermediateTexture; // kVkFormatObjectShadows
 
+// The workgroup's row strip plus iRadius taps on each side, each texel fetched once.
+shared vec4 sf4Taps[kiObjectShadowsBlurStripLength + 2 * kiMaxObjectShadowsBlurRadius];
+
 void main()
 {
-	uint uiX = gl_GlobalInvocationID.x;
-	uint uiY = gl_GlobalInvocationID.y;
+	int iStripStart = int(gl_WorkGroupID.x) * kiObjectShadowsBlurStripLength;
+	int iLocal = int(gl_LocalInvocationID.x);
+	int iX = iStripStart + iLocal;
+	int iY = int(gl_WorkGroupID.y);
 
 	ivec2 i2OutputSize = imageSize(objectShadowsBlurIntermediateTexture);
-	if (uiX >= i2OutputSize.x || uiY >= i2OutputSize.y)
-		return;
-
 	int iRadius = globalLayout.iObjectShadowsBlurRadius;
 	vec2 f2InvOutputSize = 1.0f / vec2(i2OutputSize);
-	vec2 f2Uv = (vec2(uiX, uiY) + 0.5f) * f2InvOutputSize;
+	float fV = (float(iY) + 0.5f) * f2InvOutputSize.y;
+
+	// Tail invocations past the image edge still load and reach the barrier; taps outside the texture clamp to its edge.
+	for (int i = iLocal; i < kiObjectShadowsBlurStripLength + 2 * iRadius; i += kiObjectShadowsBlurStripLength)
+	{
+		float fU = (float(iStripStart - iRadius + i) + 0.5f) * f2InvOutputSize.x;
+		sf4Taps[i] = textureLod(objectShadowsTextureSampler, vec2(fU, fV), 0.0f);
+	}
+	barrier();
+
+	if (iX >= i2OutputSize.x)
+		return;
 
 	// Each channel blurs with its own sigma, so taps are discrete: bilinear pairing would need one shared offset per
 	// tap pair.
 	vec4 f4Total = vec4(0.0f);
 	for (int i = -iRadius; i <= iRadius; ++i)
 	{
-		vec2 f2Offset = vec2(float(i), 0.0f) * f2InvOutputSize;
-		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(i)] * textureLod(objectShadowsTextureSampler, f2Uv + f2Offset, 0.0f);
+		f4Total += globalLayout.pf4ObjectShadowsBlurWeights[abs(i)] * sf4Taps[iLocal + iRadius + i];
 	}
 
-	imageStore(objectShadowsBlurIntermediateTexture, ivec2(uiX, uiY), f4Total);
+	imageStore(objectShadowsBlurIntermediateTexture, ivec2(iX, iY), f4Total);
 }

@@ -9,13 +9,16 @@
 namespace game
 {
 
-// The fleet GUID is part of the key so a pending request clears when focus moves to another fleet, even one with the same delay.
-struct NavigationDelayKey
+// The fleet GUID is part of the key so a pending request clears when focus moves to another fleet, even one with the same
+// navigation settings.
+struct FleetNavigationKey
 {
 	FleetGuid fleetGuid {};
 	float fNavigationDelay = 0.0f;
+	FleetBehaviour eBehaviour = FleetBehaviour::kRandomWalk;
+	engine::GridCoord holdCoordinate {};
 
-	bool operator==(const NavigationDelayKey&) const = default;
+	bool operator==(const FleetNavigationKey&) const = default;
 };
 
 // Fleet focus controls the camera cell; gpGame provides owned-entity lists and client-state persistence.
@@ -33,11 +36,16 @@ public:
 
 	engine::NetworkUiControl<int64_t> mCreateFleetToggle;
 	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle;
-	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl;
+	// Shared by the HUD's nav-delay slider, behaviour selector, and hold button and by the map hold pick.
+	engine::NetworkUiControl<FleetNavigationKey> mFleetNavigationControl;
 	engine::NetworkUiControl<int64_t> mDestroyMemberToggle;
+	engine::NetworkUiControl<int64_t> mSquadronOrdersToggle;
+	// The fleet whose hold hex the open map picks; zero when no pick is active.
+	FleetGuid mHoldPickFleetGuid {};
 
 	std::vector<Fleet> mClientFleets;
-	// Advances on every SynchronizeFleets call and never resets; the spawn-into-fleet and destroy-member toggles key on it.
+	// Advances on every SynchronizeFleets call and never resets; the spawn-into-fleet, destroy-member, and squadron-orders
+	// toggles key on it.
 	int64_t miAppliedFleetSyncCount = 0;
 	int64_t miFocusedFleetIndex = -1;
 	engine::GlobalId mFocusedMemberGlobalId {};

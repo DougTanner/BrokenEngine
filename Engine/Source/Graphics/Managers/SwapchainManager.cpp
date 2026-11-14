@@ -26,7 +26,7 @@ void SwapchainManager::CreateRenderPass()
 	// highlights are not clamped by the UNORM swapchain. The fullscreen HDR-resolve pass (kPipelineHdrResolve)
 	// then tone-maps + color-grades the whole frame into the swapchain via the simplified mVkRenderPass below.
 
-	// The HDR pass uses F16 color, a depth attachment, and optional multisampling; color ends in SHADER_READ_ONLY for the same-command-buffer resolve pass.
+	// The HDR color ends in SHADER_READ_ONLY for the resolve pass in the ImGui submission.
 	VkFormat vkHdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 	VkAttachmentDescription pVkHdrAttachmentDescriptions[]
 	{
@@ -98,14 +98,14 @@ void SwapchainManager::CreateRenderPass()
 		.pPreserveAttachments = nullptr,
 	};
 
-	// Incoming: WAR against the previous frame's resolve pass sampling this HDR color (FRAGMENT_SHADER read),
-	// plus the acquire-time color/depth transition. Outgoing: order the same-command-buffer resolve pass's
-	// sampling (COLOR_ATTACHMENT_WRITE -> FRAGMENT_SHADER SHADER_READ).
-	// Incoming also covers a depth WAW: the depth attachment is the single mDepthTexture reused every frame with
-	// UNDEFINED initial layout + CLEAR loadOp, so the previous frame's DEPTH_STENCIL_ATTACHMENT_WRITEs (at the
-	// EARLY/LATE_FRAGMENT_TESTS stages) must be made available before this frame's automatic
-	// UNDEFINED -> DEPTH_STENCIL_ATTACHMENT_OPTIMAL transition/clear -- otherwise a latent write-after-write the
-	// sync-validation layer flags.
+	// Incoming: WAR against the previous frame's resolve pass sampling this HDR color (FRAGMENT_SHADER read;
+	// submission order puts the previous ImGui submission in the source scope), the acquire-time color/depth
+	// transition, and a depth WAW: the single mDepthTexture is reused every frame with UNDEFINED initial layout +
+	// CLEAR loadOp, so the previous frame's DEPTH_STENCIL_ATTACHMENT_WRITEs (EARLY/LATE_FRAGMENT_TESTS) must be
+	// available before this frame's automatic UNDEFINED -> DEPTH_STENCIL_ATTACHMENT_OPTIMAL transition/clear, or sync
+	// validation flags the WAW. Outgoing: make the color write available to the resolve pass's sampling
+	// (COLOR_ATTACHMENT_WRITE -> FRAGMENT_SHADER SHADER_READ); the ImGui submission's FRAGMENT_SHADER wait on Main's
+	// finished semaphore orders that sampling after Main.
 	VkSubpassDependency pVkHdrSubpassDependencies[]
 	{
 		VkSubpassDependency
@@ -552,11 +552,17 @@ void SwapchainManager::AcquireNextImage()
 			callStart = std::chrono::steady_clock::now();
 		}
 		VkResult vkFenceResult = vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mCurrentImageAvailableVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count());
+		std::chrono::steady_clock::time_point waitEnd;
 		if constexpr (kbProfilingFrameSpike)
 		{
-			acquisitionDiagnostics.optionalFenceNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - callStart).count();
+			waitEnd = std::chrono::steady_clock::now();
+			acquisitionDiagnostics.optionalFenceNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(waitEnd - callStart).count();
 		}
 		CHECK_VK(vkFenceResult);
+		if constexpr (kbProfilingFrameSpike)
+		{
+			gpProfileManager->GpuImageWait(callStart, waitEnd);
+		}
 		mCurrentImageAvailableVkFence = VK_NULL_HANDLE;
 	}
 
@@ -571,8 +577,7 @@ void SwapchainManager::AcquireNextImage()
 	VkResult vkResult = vkAcquireNextImageKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, UINT64_MAX, mImageAvailableVkSemaphore, mCurrentImageAvailableVkFence, &uiFramebufferIndex);
 	if constexpr (kbProfilingFrameSpike)
 	{
-		acquisitionDiagnostics.optionalAcquireNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - callStart).count();
-		acquisitionDiagnostics.optionalResult = vkResult;
+		acquisitionDiagnostics.optionalAcquireCall = AcquisitionDiagnostics::AcquireCall {.iNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - callStart).count(), .vkResult = vkResult};
 		if (vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR)
 		{
 			acquisitionDiagnostics.optionalImageIndex = uiFramebufferIndex;

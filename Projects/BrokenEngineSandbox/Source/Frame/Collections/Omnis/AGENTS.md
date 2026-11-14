@@ -22,16 +22,20 @@ sizing derives from the shared omni radius.
   arrival. A stored point stays until arrival even when the flagship moves, or
   when it lies inside the flagship's navigation rectangle, which that query then
   leaves out (`../Ships/AGENTS.md` `## Ship Invariants`). A route around a
-  rectangle can still pass the inset and transfer the Omni out. Weapons free it
-  attacks its kept attack target (`../Ships/AGENTS.md` `## Ship Invariants`) on
-  that enemy's nearest plane, ignoring enemies above the highest Omni plane,
-  routes to it while it is hidden, and while it is in line of sight within
-  `kfOmniCirclingDistance` of it in x/y circles it clockwise by chasing a point
-  on that circle ahead of itself (`OmniCirclingPoint`), with no coordination
-  among Omnis. Outside its flagship's cell it keeps the shared fleet navigation
-  on the lowest plane. Outside transfer lock every tick writes its tactic's
-  target plane into its orders, overriding a spawn plane and a `kUpdateShip`
-  plane.
+  rectangle can still pass the inset and transfer the Omni out. That is the
+  Escort behaviour; a squadron the player sets to Patrol Cell (the squadron
+  settings in `../Ships/AGENTS.md` `## Ship Invariants`) patrols across the
+  cell instead, its picks and its Patrol Together leader in
+  `../Ships/AGENTS.md` `## Fleet Navigation Invariants`, under the same inset
+  and arrival rules. Weapons free it attacks its kept attack target
+  (`../Ships/AGENTS.md` `## Ship Invariants`) on that enemy's nearest plane,
+  ignoring enemies above the highest Omni plane, routes to it while it is
+  hidden, and while it is in line of sight within `kfOmniCirclingDistance` of
+  it in x/y circles it clockwise by chasing a point on that circle ahead of
+  itself (`OmniCirclingPoint`), with no coordination among Omnis. Outside its
+  flagship's cell it keeps the shared fleet navigation on the lowest plane.
+  Outside transfer lock every tick writes its tactic's target plane into its
+  orders, overriding a spawn plane and a `kUpdateShip` plane.
 - A random-spawn Omni chases its kept attack target (`../Ships/AGENTS.md`
   `## Ship Invariants`), picked from itself in 3D among enemies on an Omni
   plane, circling it while it is in line of sight as a fleet Omni circles its
@@ -39,8 +43,7 @@ sizing derives from the shared omni radius.
   enemy's plane into its orders; with no such enemy it targets the lowest plane.
   A `kTargetFlagship` row (`../Ships/AGENTS.md`) whose enemy flagship is at or
   below the highest Omni plane keeps that flagship as its kept attack target
-  instead and chases and circles it the same way, with no flee or return to an
-  island.
+  instead and chases and circles it the same way, with no return to an island.
 - An Omni enters a cell, by spawn or transfer arrival, with its heading as its
   AI direction and `ShipFlags::kNoAiDirection` set (`../Ships/AGENTS.md`
   `## Ship Invariants`). The first tick outside transfer lock that gives it a
@@ -58,12 +61,15 @@ sizing derives from the shared omni radius.
   follows the shared destroy-status contract (`../Ships/AGENTS.md`
   `## Ship Invariants`).
 - While `kHealing` is set an Omni fires nothing and patrols whatever its
-  fleet's stance. On a tick outside transfer lock on which its flagship is in
-  the cell and it is within `kfOmniPatrolRadius` of that flagship in x/y, its
-  armor and its shield each rise by `kfOmniHealRate` per second up to
-  `kfOmniArmor` and `kfOmniShield`; both full clears `kHealing`, and it fires
-  again in the same tick's Spawn phase. `kHealing` carries across a transfer.
-  The shield also keeps its passive regeneration.
+  fleet's stance, in Escort whatever its squadron setting: its navigation reads
+  its orders without `kPatrolCell`, which its stored orders keep. Setting
+  `kHealing`, and a `kUpdateSquadronOrders` that turns Patrol Cell off, clears
+  a Patrol Cell row's stored destination. On a tick outside transfer lock on
+  which its flagship is in the cell and it is within `kfOmniPatrolRadius` of
+  that flagship in x/y, its armor and its shield each rise by `kfOmniHealRate`
+  per second up to `kfOmniArmor` and `kfOmniShield`; both full clears
+  `kHealing`, and it fires again in the same tick's Spawn phase. `kHealing`
+  carries across a transfer. The shield also keeps its passive regeneration.
 
 ## Heal Beam
 

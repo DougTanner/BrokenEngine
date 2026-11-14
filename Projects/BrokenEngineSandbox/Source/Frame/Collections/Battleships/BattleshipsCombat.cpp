@@ -22,18 +22,14 @@ namespace game
 static thread_local int64_t siCollisionLayerIndex = 0;
 
 #if defined(BT_CLIENT)
-// Shared type indices (defined in Battleships.cpp, set during Register())
-extern int64_t giBattleshipExplosionTypeIndex;
+// Shared type index (defined in Battleships.cpp, set during Register())
 extern int64_t giBattleshipHitFlashControllerTypeIndex;
-
-// Defined in Battleships.cpp.
-void SpawnBattleshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
 #endif
 
 constexpr float kfBattleshipMissileInitialVelocity = 30.0f;
 constexpr float kfBattleshipMissileAcceleration = 40.0f;
 
-static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
+static void BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i)
 {
 	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
@@ -41,29 +37,20 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPushers[i]);
 	rCurrentInterpolate.pDestroyedTimes[i] = kBattleshipDestroyTime;
-	rCurrentPostRender.pDestroyedExplosionTimes[i] = kBattleshipDestroyExplosionInterval;
-
-	// The staggered death explosions in the Spawn hook fly away from this direction.
-	rCurrentPostRender.pVecDamageDirections[i] = vecDamageDirection;
 
 	// Clear the registry id so missiles stop tracking
 	rCurrentInterpolate.pRegistryIds[i] = {};
 
 #if defined(BT_CLIENT)
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], gFighterDeathVolume.mfCurrent, gFighterDeathPitchMinimum.mfCurrent, gFighterDeathPitchRandom.mfCurrent);
-
-	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
 #endif
 	// The dying ship holds still from its death tick on.
 	rCurrentPostRender.pVecVelocities[i] = XMVectorZero();
-#if defined(BT_CLIENT)
-	SpawnBattleshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
-#endif
 }
 
-void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecShooterPosition, float fDamage)
+// The Fighters beam calls every ship type's ApplyBeamDamage through one generic call, so the shooter position stays in the signature.
+void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, [[maybe_unused]] FXMVECTOR vecShooterPosition, float fDamage)
 {
-	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
 	rCurrentPostRender.pfHealths[i] -= fDamage;
@@ -76,8 +63,7 @@ void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::G
 			rCurrentPostRender.pfHealths[i] = 0.0f;
 			return;
 		}
-		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecShooterPosition, rCurrentInterpolate.pVecPositions[i]));
-		BeginExplosion(rFrame, emitterCoordinate, i, vecDamageDirection);
+		BeginExplosion(rFrame, emitterCoordinate, i);
 	}
 }
 
@@ -148,7 +134,7 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 #endif
 
 #if defined(BT_CLIENT)
-				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giBattleshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+				engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), giBattleshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 				if (rCurrentPostRender.pfHealths[i] <= 0.0f)
@@ -159,8 +145,7 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 						rCurrentPostRender.pfHealths[i] = 0.0f;
 						continue;
 					}
-					XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
-					BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
+					BeginExplosion(rFrame, rStaticData.coordinate, i);
 					break;
 				}
 			}
@@ -209,8 +194,7 @@ void BattleshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame
 				rCurrentPostRender.pfHealths[i] = 0.0f;
 				continue;
 			}
-			XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecClosestSource, rCurrentInterpolate.pVecPositions[i]));
-			BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
+			BeginExplosion(rFrame, rStaticData.coordinate, i);
 		}
 	}
 }
@@ -258,51 +242,73 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 
+		std::span<const common::PackedModelHardpoint> tubes = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rCurrentPostRender.pController[i])].missileTubes;
+		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
+
+		// Every (enemy, tube) pair is a candidate, measured from the tube; an exact tie keeps the first enemy, then its first
+		// authored tube.
 		std::optional<engine::registry_id_t> optionalTarget;
 		float fNearestDistanceSquared = 0.0f;
 		XMVECTOR vecTargetPosition = XMVectorZero();
+		int64_t iLaunchTube = 0;
+		XMVECTOR vecTubePosition = XMVectorZero();
 		ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecEnemyVelocity)
 		{
-			if (NearestFlightPlane(vecEnemyPosition) != uiFlightPlane)
+			int64_t iEnemyFlightPlane = NearestFlightPlane(vecEnemyPosition);
+			// Set once the per-target cap has passed for this enemy.
+			std::optional<engine::registry_id_t> optionalEnemy;
+			for (const auto& [k, rTube] : std::views::enumerate(tubes))
 			{
-				return;
-			}
-			float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecEnemyPosition, vecShipPosition)));
-			if (fDistanceSquared > kfMissileRangeSquared)
-			{
-				return;
-			}
-			if (optionalTarget && !(fDistanceSquared < fNearestDistanceSquared))
-			{
-				return;
-			}
-
-			engine::registry_id_t target = VisitShip(rFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
-			{
-				return rInterpolate.pRegistryIds[iRow];
-			});
-
-			const MissilesPostRender& rMissiles = *rFrame.postRender.pMissiles;
-			int64_t iTargetingCount = 0;
-			for (int64_t j = 0; j < rMissiles.iCount; ++j)
-			{
-				if (rMissiles.puiRegistryTargets[j] == target)
+				const XMFLOAT3& rf3Position = rTube.f3Position;
+				XMVECTOR vecPosition = XMVectorSetW(XMVectorSetZ(RotateByHeading(vecHullDirection, XMLoadFloat3(&rf3Position), vecShipPosition), fShipHeight + rf3Position.z), 1.0f);
+				int64_t iTubeFlightPlane = NearestFlightPlane(vecPosition);
+				if (iEnemyFlightPlane != iTubeFlightPlane)
 				{
-					++iTargetingCount;
+					continue;
 				}
-			}
-			if (iTargetingCount >= kiMissilesPerTarget[std::to_underlying(locator.eType)])
-			{
-				return;
-			}
-			if (!HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShipPosition, vecEnemyPosition))
-			{
-				return;
-			}
+				float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecEnemyPosition, vecPosition)));
+				if (fDistanceSquared > kfMissileRangeSquared)
+				{
+					continue;
+				}
+				if (optionalTarget && !(fDistanceSquared < fNearestDistanceSquared))
+				{
+					continue;
+				}
 
-			optionalTarget = target;
-			fNearestDistanceSquared = fDistanceSquared;
-			vecTargetPosition = vecEnemyPosition;
+				if (!optionalEnemy)
+				{
+					engine::registry_id_t target = VisitShip(rFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
+					{
+						return rInterpolate.pRegistryIds[iRow];
+					});
+
+					const MissilesPostRender& rMissiles = *rFrame.postRender.pMissiles;
+					int64_t iTargetingCount = 0;
+					for (int64_t j = 0; j < rMissiles.iCount; ++j)
+					{
+						if (rMissiles.puiRegistryTargets[j] == target)
+						{
+							++iTargetingCount;
+						}
+					}
+					if (iTargetingCount >= kiMissilesPerTarget[std::to_underlying(locator.eType)])
+					{
+						return;
+					}
+					optionalEnemy = target;
+				}
+				if (!HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, static_cast<uint8_t>(iTubeFlightPlane), vecPosition, vecEnemyPosition))
+				{
+					continue;
+				}
+
+				optionalTarget = optionalEnemy;
+				fNearestDistanceSquared = fDistanceSquared;
+				vecTargetPosition = vecEnemyPosition;
+				iLaunchTube = k;
+				vecTubePosition = vecPosition;
+			}
 		});
 
 		if (!optionalTarget)
@@ -310,27 +316,9 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			continue;
 		}
 
-		std::span<const common::PackedModelHardpoint> tubes = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rCurrentPostRender.pController[i])].missileTubes;
-
-		XMVECTOR vecHullDirection = rCurrentInterpolate.pVecDirections[i];
 		float fCos = XMVectorGetX(vecHullDirection);
 		float fSin = XMVectorGetY(vecHullDirection);
-		int64_t iNearestTube = 0;
-		float fNearestTubeDistanceSquared = 0.0f;
-		XMVECTOR vecTubePosition = XMVectorZero();
-		for (int64_t j = 0; j < std::ssize(tubes); ++j)
-		{
-			const XMFLOAT3& rf3Position = tubes[static_cast<size_t>(j)].f3Position;
-			XMVECTOR vecPosition = XMVectorSetW(XMVectorSetZ(RotateByHeading(vecHullDirection, XMLoadFloat3(&rf3Position), vecShipPosition), fShipHeight + rf3Position.z), 1.0f);
-			float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecTargetPosition, vecPosition)));
-			if (j == 0 || fDistanceSquared < fNearestTubeDistanceSquared)
-			{
-				iNearestTube = j;
-				fNearestTubeDistanceSquared = fDistanceSquared;
-				vecTubePosition = vecPosition;
-			}
-		}
-		XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&tubes[static_cast<size_t>(iNearestTube)].f3Direction), 0.0f));
+		XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&tubes[static_cast<size_t>(iLaunchTube)].f3Direction), 0.0f));
 		XMVECTOR vecTubeDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
 		MissileFlags_t missileFlags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;

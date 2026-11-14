@@ -2,8 +2,10 @@
 
 The client sometimes waits one or more extra display refreshes for its next
 swapchain image. This record keeps what was traced, what was ruled out, and what
-is still open, so a later session can start from it. No engine defect was found,
-and no engine change was made for this symptom.
+is still open, so a later session can start from it. The first traced stalls
+showed no engine defect. A later focused trace found the engine's own GPU work
+late, with Main's GPU work held by its wait on the swapchain image; that wait
+was moved off Main (`### Engine frame finished 92 us before a vsync`).
 
 Each claim carries one of three proof labels:
 
@@ -18,13 +20,15 @@ Each claim carries one of three proof labels:
   presentation, the Profile build, and the expected frame interval were
   recorded; its window mode, the other running programs, and the exact actions
   and timestamps were not.
-- Every other measurement below: one AMD Radeon RX 9070 XT, display 3840x2160 at
-  120 Hz (8.3 ms per refresh), FIFO present mode, three swapchain images,
-  Profile client and server. The automated runs were borderless fullscreen at
-  3840x2160; the focused session's window mode was not recorded.
+- Every other measurement below, except the capture in
+  `### Engine frame finished 92 us before a vsync`, which states its own: one
+  AMD Radeon RX 9070 XT, display 3840x2160 at 120 Hz (8.3 ms per refresh), FIFO
+  present mode, three swapchain images, Profile client and server. The
+  automated runs were borderless fullscreen at 3840x2160; the focused session's
+  window mode was not recorded.
 - Another fullscreen-size program was presenting on the same GPU through the
-  desktop compositor (DWM) during every run after the user's original stall. It
-  was left running.
+  desktop compositor (DWM) during every run after the user's original stall,
+  except that capture. It was left running.
 - The traces were non-elevated DxgKrnl sessions: present, queue, flip, and vsync
   events, but no CPU context switches. An agent cannot start the kernel logger
   without elevation.
@@ -178,11 +182,41 @@ s after the trace started.
   coincident only.
 - This is a different shape from the one-extra-refresh signature.
 
+### Engine frame finished 92 us before a vsync
+
+- One stall, a 15.9 ms prior acquisition fence wait, in a focused manual
+  session in which the user, after clearing the world, spawned the most
+  Fighters and Omnis in all four fleets.
+  Proven in a trace: late GPU completion of the engine's own work.
+- Run conditions: the same GPU, display, and FIFO present mode, Profile client
+  and server, the client focused for the whole capture. The kernel flipped the
+  client directly (independent flip) on every present; it was not composed.
+  Whether another program was presenting was not recorded.
+- The frame whose image the stalled acquisition waited for finished its GPU
+  work 92 us before a vsync. Its flip took the next refresh, so its image came
+  back, and the fence signalled, one refresh late.
+- The GPU ran back to back: each frame's GPU work started when the previous
+  frame's ended, frame GPU spans alternated between about 7 and 10.5 ms against
+  the 8.3 ms refresh, and each frame's work sat 10 to 15 ms in the queue.
+- Engine-side hold: Main's submission waited on the image-available semaphore,
+  and that wait held all of Main's GPU work, not only the swapchain write,
+  until the image came back. In the stall the queue sat idle 1.9 ms with Main
+  queued behind it, and Main started at the release. From 166.0 to 167.5 s,
+  ending about 0.36 s before the stall, the same wait held the queue on half or
+  more of the frames, typically 2 to 3 ms.
+- Engine change made: Main no longer waits on image availability. The HDR
+  resolve, Main's one swapchain write, moved into the ImGui submission, which
+  takes that wait (`Engine/Source/Graphics/Managers/AGENTS.md`
+  `### CommandBufferManager`). The main thread's acquisition fence wait, and so
+  its warning, keeps its length.
+
 ## Ruled out for the traced stalls
 
-- Late GPU work of an earlier frame: in the idle-scene stalls the engine's frame
-  was ready 1.3 to 1.6 ms before the missed vsync, and GPU root regions were
-  normal around every stall in the action runs and in the focused stall.
+- Late GPU work of an earlier frame, except in
+  `### Engine frame finished 92 us before a vsync`: in the idle-scene stalls
+  the engine's frame was ready 1.3 to 1.6 ms before the missed vsync, and GPU
+  root regions were normal around every stall in the action runs and in the
+  31.3 ms focused stall.
 - Late CPU submit or present: render start and present calls stayed on the 8.3
   ms cadence for the 15 acquisitions before every automated fence stall.
 - Late main-thread wake: the wait returned 21 us after the kernel released it
@@ -198,7 +232,7 @@ s after the trace started.
 
 - That Plan was completed with this record.
 - No engine defect was found in `AcquireNextImage`, `PresentToQueue`, or
-  `Present`, and no engine change was made for this symptom.
+  `Present`, and that Plan made no engine change for this symptom.
 - Not met: "the symptom no longer reproduces". There is no fix, and the stall
   still occurs.
 - Not met: "a changed runtime passes its Profile builds and harness checks".
@@ -219,9 +253,17 @@ s after the trace started.
   were spaced at multiples of about 158 s; later starts were not.
 - The two unclassified stalls (no flip for two refreshes; acquire-signal packet
   held) need CPU and GPU scheduling data from an elevated capture.
-- A focused, directly flipped client was not captured stalling. The focused
-  session's second capture ran 9 minutes, all after the window had lost focus,
-  so its detector was off and it caught nothing.
+- A focused, directly flipped client was captured stalling only once, from late
+  engine GPU work (`### Engine frame finished 92 us before a vsync`). The first
+  focused session's second capture ran 9 minutes, all after the window had lost
+  focus, so its detector was off and it caught nothing.
+- Swapchain configuration lead, for a follow-up Plan: in that capture, under
+  FIFO with an independent flip, a frame finishing 92 us before a vsync cost a
+  whole refresh while the GPU ran back to back near the refresh budget. Whether
+  another swapchain image or another present mode absorbs such a slip is not
+  tested; that run's swapchain image count was not recorded.
+- The alternating long and short frame GPU cost is left to a separate
+  follow-up Plan.
 - Whether the map and fleet actions or tracing raise the stall rate. Without a
   trace, the action run and its idle control both had 2 stalls in 200 s, a small
   sample. Whether tracing raises it is not tested: there is no traced idle

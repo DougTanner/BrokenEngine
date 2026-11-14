@@ -20,8 +20,10 @@ the primary tip and rerunning the setup session creation runs.
 ## When to use
 
 - The user explicitly invokes this skill in a session worktree whose last run
-  has landed. The order after a landing is: start a fresh conversation
-  (`/clear` in Claude Code), then `/reset-worktree`, then `/next-plan`.
+  has landed. The order after a landing is: `/reset-worktree` in the same
+  conversation, right after its `SESSION COMPLETE` line, so the reset stays out
+  of the next run's context; then a fresh conversation (`/clear` in Claude
+  Code); then `/next-plan`.
 
 ## Steps
 

@@ -16,6 +16,9 @@ namespace game
 
 #if defined(BT_CLIENT)
 
+// Wall clock: the poll keeps its rate when the simulation is paused or time-scaled.
+constexpr std::chrono::steady_clock::duration kMapFleetMarkersRequestInterval = 1s;
+
 const char* ToString(SubscriptionChangeReason eReason)
 {
 	switch (eReason)
@@ -71,8 +74,31 @@ static bool ParseFleetSynchronization(std::vector<std::pair<int64_t, std::vector
 	return bApplied;
 }
 
+// Each list replaces the whole previous one, so the last one received wins.
+static void ParseMapFleetMarkers(std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, std::vector<GameMessages::MapFleetMarker>& rOutputMarkers)
+{
+	for (auto it = rRawPackets.begin(); it != rRawPackets.end(); )
+	{
+		if (static_cast<GamePacketType>(it->first) != GamePacketType::kServerMapFleetMarkers)
+		{
+			++it;
+			continue;
+		}
+
+		GameMessages::MapFleetMarkersMessage::ReadPayload(it->second, rOutputMarkers);
+		LOG(kNetwork, kDebug, "ClientSession received map fleet markers Markers: {}", std::ssize(rOutputMarkers));
+		for (const GameMessages::MapFleetMarker& rMarker : rOutputMarkers)
+		{
+			LOG(kNetwork, kDebug, "ClientSession received map fleet marker Cell: ({},{}) Own: {}", rMarker.coordinate.iQ, rMarker.coordinate.iR, rMarker.uiFlags & GameMessages::MapFleetMarkersMessage::kuiOwnFlag);
+		}
+
+		it = rRawPackets.erase(it);
+	}
+}
+
 void ClientSession::ProcessReceivedGamePackets()
 {
+	GamePacketType eParsingType = GamePacketType::kServerFleetSync;
 	try
 	{
 		std::vector<Fleet> receivedFleets;
@@ -85,6 +111,9 @@ void ClientSession::ProcessReceivedGamePackets()
 				mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kFleetSynchronization));
 			}
 		}
+
+		eParsingType = GamePacketType::kServerMapFleetMarkers;
+		ParseMapFleetMarkers(mpRuntime->mpClient->mReceivedGamePackets, gpGame->mMapFleetMarkers);
 	}
 	catch (const std::ios_base::failure& rException)
 	{
@@ -92,16 +121,37 @@ void ClientSession::ProcessReceivedGamePackets()
 		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
 		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
 		// the peer.
-		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(GamePacketType::kServerFleetSync), rException.what());
+		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(eParsingType), rException.what());
 		ASSERT(false);
 	}
 	catch (const std::exception& rException)
 	{
-		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing fleet sync: {}", rException.what());
+		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing packet (type {}): {}", static_cast<uint8_t>(eParsingType), rException.what());
 	}
 
+	// The poll is timed on the client, so the server keeps no map state; a closed map clears the time so the next open
+	// requests at once.
+	if (!gpGame->MapOpen())
+	{
+		mOptionalMapFleetMarkersRequestTime.reset();
+		return;
+	}
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	if (mOptionalMapFleetMarkersRequestTime && now - *mOptionalMapFleetMarkersRequestTime < kMapFleetMarkersRequestInterval)
+	{
+		return;
+	}
+	mOptionalMapFleetMarkersRequestTime = now;
+	mpRuntime->SendGameRequest(GamePacketType::kClientMapFleetMarkersRequest, []
+	{
+		LOG(kNetwork, kDebug, "ClientSession::ProcessReceivedGamePackets map fleet markers request");
+	}, GameMessages::MapFleetMarkersRequestMessage {});
 }
 
+// Applying an owned-entity event to the client owned-entity list is game-agnostic apart from two steps, the
+// mFleetSelection pending-focus step and the client-cell move for the focused entity (ClientOwnedEntityIdentifier):
+// a future project may want it and UpdateOwnedEntityCoordinate moved into shared engine code, depending on its
+// requirements.
 void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent)
 {
 	if (rEvent.eState == engine::OwnedEntityState::kDied)
@@ -201,9 +251,6 @@ void ClientSession::OnServerLoad()
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();
-
-	// The loaded cells restart their Ids, so a kept wreck could block capturing a new row.
-	BattleshipsInterpolate::ClearWrecks();
 }
 
 void ClientSession::SendCreateFleetRequest()
@@ -230,12 +277,20 @@ void ClientSession::SendDestroyFleetMemberRequest(engine::GlobalId globalId)
 	}, GameMessages::DestroyFleetMemberRequestMessage {.globalId = globalId});
 }
 
-void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay)
+void ClientSession::SendSquadronOrdersRequest(engine::GlobalId globalId, FleetMemberFlags_t flags)
 {
-	mpRuntime->SendGameRequest(GamePacketType::kClientFleetNavigationDelay, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientSquadronOrdersRequest, [&]
 	{
-		LOG(kNetwork, kDebug, "ClientSession::SendFleetNavigationDelayRequest Fleet: ({},{}) Delay: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(fDelay, 3));
-	}, GameMessages::FleetNavigationDelayRequestMessage {.fleetGuid = rFleetGuid, .fNavigationDelay = fDelay});
+		LOG(kNetwork, kDebug, "ClientSession::SendSquadronOrdersRequest Member: {} Flags: {}", globalId.iValue, std::to_underlying(flags.meFlags));
+	}, GameMessages::SquadronOrdersRequestMessage {.globalId = globalId, .uiFlags = std::to_underlying(flags.meFlags)});
+}
+
+void ClientSession::SendFleetNavigationRequest(const FleetGuid& rFleetGuid, float fDelay, FleetBehaviour eBehaviour, engine::GridCoord holdCoordinate)
+{
+	mpRuntime->SendGameRequest(GamePacketType::kClientFleetNavigation, [&]
+	{
+		LOG(kNetwork, kDebug, "ClientSession::SendFleetNavigationRequest Fleet: ({},{}) Delay: {} Behaviour: {} Hold: ({},{})", rFleetGuid.uiHigh, rFleetGuid.uiLow, common::Wb(fDelay, 3), kpcFleetBehaviourNames[std::to_underlying(eBehaviour)], holdCoordinate.iQ, holdCoordinate.iR);
+	}, GameMessages::FleetNavigationRequestMessage {.fleetGuid = rFleetGuid, .fNavigationDelay = fDelay, .uiBehaviour = std::to_underlying(eBehaviour), .iHoldQ = holdCoordinate.iQ, .iHoldR = holdCoordinate.iR});
 }
 
 void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail)

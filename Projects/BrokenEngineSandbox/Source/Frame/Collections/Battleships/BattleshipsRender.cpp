@@ -6,6 +6,7 @@
 #include "File/PackChunks.h"
 
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Frame/Collections/Wrecks/Wrecks.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -55,166 +56,20 @@ struct [[nodiscard]] BattleshipsRenderActiveGuard
 	}
 };
 
-constexpr std::chrono::duration<float> kBattleshipWreckPowerLossTime = std::chrono::duration<float>(1.0f);
-constexpr float kfBattleshipWreckGravity = 9.8f;
-constexpr float kfBattleshipWreckWaterDeceleration = 30.0f;
-constexpr float kfBattleshipWreckSinkSpeed = 0.5f;
-
-// A dying Battleship's model, drawn from capture and kept after its row is removed; client-only, outside every Frame.
-struct BattleshipWreck
-{
-	engine::GridCoord coordinate {};
-	battleship_t id {};
-	ShipController eController {};
-	XMVECTOR vecPosition {};    // Cell-local, W = 1.
-	XMVECTOR vecDirection {};
-	XMVECTOR vecTilt {};        // Quaternion from +Z to the terrain normal at the center; identity while bSinks.
-	float fStartZ = 0.0f;
-	float fRestZ = 0.0f;        // Unused while bSinks.
-	float fTopOffset = 0.0f;    // Hull top above vecPosition.
-	float fFallSpeed = 0.0f;
-	std::chrono::duration<float> fallTime {};
-	std::chrono::duration<float> animationTime {};  // Frozen at capture.
-	bool bSinks = false;
-};
-
-static std::vector<BattleshipWreck> sWrecks;
 static int64_t siWrecksRendered = 0;
-
-void BattleshipsInterpolate::UpdateWrecks(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
-{
-	// The sim-scaled render delta keeps running while paused; only the render clock stops.
-	float fSeconds = (gpGame->mGameFlags & engine::GameFlags::kPaused) ? 0.0f : static_cast<float>(gpGame->mfLastRenderFrameSeconds);
-
-	// The client subscription's cell loaded area, or during a camera jump the previous cell loaded area too; map view
-	// leaves both unchanged.
-	auto OverlapsCellLoadedArea = [](engine::GridCoord coordinate)
-	{
-		XMVECTOR vecCellCenter = engine::CellCenterOffset(engine::gpCamera->mBasisCoordinate, coordinate);
-		return common::RectangleOverlapsHex(engine::gpCamera->mf4CellLoadedArea, vecCellCenter, engine::kCellDirections) || (engine::gpCamera->mbPreviousCellLoadedAreaValid && common::RectangleOverlapsHex(engine::gpCamera->mf4PreviousCellLoadedArea, vecCellCenter, engine::kCellDirections));
-	};
-
-	std::erase_if(sWrecks, [&](const BattleshipWreck& rWreck)
-	{
-		bool bVisible = std::ranges::contains(rActiveCoordinates, rWreck.coordinate) && rRenderInterpolates.contains(rWreck.coordinate) && OverlapsCellLoadedArea(rWreck.coordinate);
-		return !bVisible || (rWreck.bSinks && XMVectorGetZ(rWreck.vecPosition) + rWreck.fTopOffset < 0.0f);
-	});
-
-	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
-	{
-		auto it = rRenderInterpolates.find(rCoordinate);
-		if (it == rRenderInterpolates.end())
-		{
-			continue;
-		}
-
-		if (!OverlapsCellLoadedArea(rCoordinate))
-		{
-			continue;
-		}
-
-		const BattleshipsInterpolate& rBattleships = *it->second.pBattleships;
-		// The interpolated rows align with the snapshot they were interpolated from, which holds each row's Id and controller.
-		const BattleshipsPostRender& rPostRender = *gpGame->RenderFrame(rCoordinate).postRender.pBattleships;
-		const engine::CellStaticData& rStaticData = gpGame->mCells.at(rCoordinate).staticData;
-		engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData);
-
-		for (int64_t i = 0; i < rBattleships.iCount; ++i)
-		{
-			if (rBattleships.pDestroyedTimes[i].count() < 0.0f)
-			{
-				continue;
-			}
-
-			battleship_t id = rPostRender.pIds[i];
-			bool bCaptured = std::ranges::any_of(sWrecks, [&](const BattleshipWreck& rWreck)
-			{
-				return rWreck.coordinate == rCoordinate && rWreck.id == id;
-			});
-			if (bCaptured)
-			{
-				continue;
-			}
-
-			XMVECTOR vecPosition = rBattleships.pVecPositions[i];
-			engine::CollisionHitbox hitbox {};
-			BuildShipHitbox(ShipType::kBattleship, rPostRender.pController[i], vecPosition, rBattleships.pVecDirections[i], hitbox);
-			ASSERT(hitbox.eHitboxLevel >= common::ModelHitboxLevel::kBox);
-
-			// The box rests on the highest terrain or seafloor under its center and four corners.
-			XMVECTOR vecCenter = XMVectorSetZ(vecPosition, 0.0f);
-			float fHighestElevation = sampler.Sample(vecCenter);
-			for (const XMFLOAT2& rf2Corner : hitbox.pf2BoxVertices)
-			{
-				fHighestElevation = std::max(fHighestElevation, sampler.Sample(XMVectorSet(rf2Corner.x, rf2Corner.y, 0.0f, 1.0f)));
-			}
-
-			float fStartZ = XMVectorGetZ(vecPosition);
-			BattleshipWreck wreck
-			{
-				.coordinate = rCoordinate,
-				.id = id,
-				.eController = rPostRender.pController[i],
-				.vecPosition = vecPosition,
-				.vecDirection = rBattleships.pVecDirections[i],
-				.vecTilt = XMQuaternionIdentity(),
-				.fStartZ = fStartZ,
-				.fTopOffset = hitbox.fMaximumZ - fStartZ,
-				.animationTime = rBattleships.pAnimationTimes[i],
-				.bSinks = fHighestElevation <= sampler.fSeaFloor,
-			};
-			if (!wreck.bSinks)
-			{
-				wreck.fRestZ = std::min(fStartZ, fHighestElevation + (fStartZ - hitbox.fMinimumZ));
-				wreck.vecTilt = common::QuaternionFromDirection(engine::gpIslandTerrain->CellNormal(rStaticData, vecCenter), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
-			}
-
-			// Heap: the wreck list grows past its largest size so far
-			ScopedSuppressAllocationTracking suppress;
-			sWrecks.push_back(wreck);
-		}
-	}
-
-	for (BattleshipWreck& rWreck : sWrecks)
-	{
-		// Gravity ramps up as the ship loses power, the water brakes the fall to a slow sink, and the terrain stops it.
-		rWreck.fallTime += std::chrono::duration<float>(fSeconds);
-		float fGravity = kfBattleshipWreckGravity * std::min(rWreck.fallTime / kBattleshipWreckPowerLossTime, 1.0f);
-		float fZ = XMVectorGetZ(rWreck.vecPosition);
-		if (fZ > 0.0f)
-		{
-			rWreck.fFallSpeed += fGravity * fSeconds;
-		}
-		else
-		{
-			rWreck.fFallSpeed = std::max(rWreck.fFallSpeed - kfBattleshipWreckWaterDeceleration * fSeconds, kfBattleshipWreckSinkSpeed);
-		}
-		fZ -= rWreck.fFallSpeed * fSeconds;
-		if (!rWreck.bSinks && fZ <= rWreck.fRestZ)
-		{
-			fZ = rWreck.fRestZ;
-			rWreck.fFallSpeed = 0.0f;
-		}
-		rWreck.vecPosition = XMVectorSetZ(rWreck.vecPosition, fZ);
-	}
-}
-
-void BattleshipsInterpolate::ClearWrecks()
-{
-	sWrecks.clear();
-}
 
 void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = {};
 	siWrecksRendered = 0;
 
-	UpdateWrecks(rRenderInterpolates, rActiveCoordinates);
-
 	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BattleshipsInterpolate&
 	{
 		return *rInterpolate.pBattleships;
-	}) + std::ssize(sWrecks);
+	}) + engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const WrecksInterpolate&
+	{
+		return *rInterpolate.pWrecks;
+	});
 
 	if (iTotalCapacity == 0)
 	{
@@ -289,7 +144,7 @@ static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, cons
 
 // Draws the rows and wrecks whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for
 // every row and wreck.
-static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
+static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const WrecksInterpolate& __restrict rWrecks, const WrecksPostRender& __restrict rWrecksPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
 {
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
@@ -329,22 +184,16 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	}
 
 	// Visible wrecks follow the rows: the n-th takes visible slot and skinning instance iVisibleCount + n, and its slot
-	// stores the wreck's index into sWrecks.
+	// stores the wreck's row index.
 	int64_t iWreckCount = 0;
-	for (int64_t k = 0; k < std::ssize(sWrecks); ++k)
+	for (int64_t k = 0; k < rWrecks.iCount; ++k)
 	{
-		const BattleshipWreck& rWreck = sWrecks.at(k);
-		if (rWreck.coordinate != rBasis.coordinate)
+		if (std::to_underlying(rWrecksPostRender.pController[k]) != iPipeline)
 		{
 			continue;
 		}
 
-		if (std::to_underlying(rWreck.eController) != iPipeline)
-		{
-			continue;
-		}
-
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::Rebase(rBasis, rWreck.vecPosition), fRadius, fRadius, fRadius, fRadius))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::Rebase(rBasis, rWrecks.pVecPositions[k]), fRadius, fRadius, fRadius, fRadius))
 		{
 			continue;
 		}
@@ -383,22 +232,9 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	ASSERT(iRenderedOffset + iVisibleCount + iWreckCount <= iBufferCapacity);
 	for (int64_t k = 0; k < iWreckCount; ++k)
 	{
-		const BattleshipWreck& rWreck = sWrecks.at(piVisibleIndices[iVisibleCount + k]);
-
-		// The tilt toward the terrain normal grows with the fall and is complete at rest.
-		XMVECTOR vecTilt = XMQuaternionIdentity();
-		if (!rWreck.bSinks)
-		{
-			float fTiltPercent = 1.0f;
-			if (rWreck.fStartZ != rWreck.fRestZ)
-			{
-				fTiltPercent = std::clamp((rWreck.fStartZ - XMVectorGetZ(rWreck.vecPosition)) / (rWreck.fStartZ - rWreck.fRestZ), 0.0f, 1.0f);
-			}
-			vecTilt = XMQuaternionSlerp(XMQuaternionIdentity(), rWreck.vecTilt, fTiltPercent);
-		}
-
+		int64_t iWreck = piVisibleIndices[iVisibleCount + k];
 		int64_t iInstance = iVisibleCount + k;
-		WriteModelLayout(rBasis, shadowBounds, matAlignment, rWreck.vecPosition, rWreck.vecDirection, vecTilt, pAnimationData, skinningReservation, iInstance, rWreck.animationTime, pLayouts[iRenderedOffset + iInstance]);
+		WriteModelLayout(rBasis, shadowBounds, matAlignment, rWrecks.pVecPositions[iWreck], rWrecks.pVecDirections[iWreck], WreckTilt(rWrecks, rWrecksPostRender, iWreck), pAnimationData, skinningReservation, iInstance, rWrecks.pAnimationTimes[iWreck], pLayouts[iRenderedOffset + iInstance]);
 	}
 
 	siRendered[iPipeline] += iVisibleCount + iWreckCount;
@@ -410,13 +246,10 @@ void BattleshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInt
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderBattleships);
 
 	const BattleshipsInterpolate& rCurrent = *rFrameInterpolate.pBattleships;
+	const WrecksInterpolate& rWrecks = *rFrameInterpolate.pWrecks;
 	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
-	bool bHasWrecks = std::ranges::any_of(sWrecks, [&](const BattleshipWreck& rWreck)
-	{
-		return rWreck.coordinate == rBasis.coordinate;
-	});
-	if (rCurrent.iCount == 0 && !bHasWrecks)
+	if (rCurrent.iCount == 0 && rWrecks.iCount == 0)
 	{
 		return;
 	}
@@ -424,13 +257,15 @@ void BattleshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInt
 	BattleshipsRenderActiveGuard renderActiveGuard;
 
 	// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
-	const BattleshipsPostRender& rPostRender = *gpGame->RenderFrame(rBasis.coordinate).postRender.pBattleships;
+	const Frame& rRenderFrame = gpGame->RenderFrame(rBasis.coordinate);
+	const BattleshipsPostRender& rPostRender = *rRenderFrame.postRender.pBattleships;
+	const WrecksPostRender& rWrecksPostRender = *rRenderFrame.postRender.pWrecks;
 
-	auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>((rCurrent.iCount + std::ssize(sWrecks)) * static_cast<int64_t>(sizeof(int64_t)));
+	auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>((rCurrent.iCount + rWrecks.iCount) * static_cast<int64_t>(sizeof(int64_t)));
 
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		RenderPipeline(rCurrent, rPostRender, rBasis, i, visibleIndicesAllocation.mpData, iCommandBuffer);
+		RenderPipeline(rCurrent, rPostRender, rWrecks, rWrecksPostRender, rBasis, i, visibleIndicesAllocation.mpData, iCommandBuffer);
 	}
 }
 

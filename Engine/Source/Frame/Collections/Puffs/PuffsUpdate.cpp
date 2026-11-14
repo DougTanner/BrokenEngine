@@ -56,8 +56,13 @@ void PuffsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[
 {
 }
 
-void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition)
+void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition)
 {
+	if (!gpCamera->InSpawnVisibleArea(coordinate, vecPosition))
+	{
+		return;
+	}
+
 	PuffsInterpolate& rInterpolate = rFrame.interpolate.puffs;
 	PuffsPostRender& rPostRender = rFrame.postRender.puffs;
 

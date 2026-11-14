@@ -94,7 +94,9 @@ every core and Vulkan 1.2 feature `InstanceManager` validated. Initializes VMA
 and the Global descriptor pool with both `FREE_DESCRIPTOR_SET_BIT` and
 `UPDATE_AFTER_BIND_BIT`. Graphics, presentation, and transfer queue handles are
 deduplicated. Queries `VK_KHR_maintenance9` for optional queue-family ownership
-transfer.
+transfer. Profile builds enable calibrated timestamps (KHR, else EXT) when the
+device and QPC time domains are both calibrateable, for
+[Profile's stall timeline](../../Profile/AGENTS.md#gpu-timing).
 
 Owns the one command pool and fence shared by every `OneShotCommandBuffer`.
 Because they are shared, two such lifetimes must never overlap; an in-use flag
@@ -113,6 +115,8 @@ acquisition fence wait and `vkAcquireNextImageKHR` separately to
 [Profile's slow-operation diagnostics](../../Profile/AGENTS.md#slow-operation-diagnostics).
 The outer duration includes setup and other scope work; a skipped fence wait
 or unavailable result stays explicit rather than borrowing a smoothed timer.
+The prior-acquisition fence wait also reports its start and end to
+[Profile's stall timeline](../../Profile/AGENTS.md#gpu-timing).
 
 Owns two render passes. The scene pass (all default pipelines, plus the F16
 multisample attachment) renders into an F16 (`R16G16B16A16_SFLOAT`) HDR target;
@@ -124,7 +128,9 @@ tone mapping and grading.
 The HDR attachments (color, depth, MSAA) are single images reused every frame in
 flight, so the incoming `EXTERNAL -> 0` subpass dependency must keep depth stage
 and access (`EARLY|LATE_FRAGMENT_TESTS` + `DEPTH_STENCIL_ATTACHMENT_WRITE`) in
-its src scopes against the previous frame's depth write.
+its src scopes against the previous frame's depth write. Its `FRAGMENT_SHADER`
+src stage covers, by submission order, the previous frame's HDR resolve, which
+samples the color attachment.
 
 ### CommandBufferManager
 
@@ -134,8 +140,12 @@ The per-framebuffer recorded flag is an idempotence guard, not a runtime
 re-record mechanism.
 
 - Global may prepend the texture manager's acquire command buffer, then signals
-  Main. Main waits on both Global completion and swapchain image availability;
-  swapchain acquisition therefore gates Main rather than Global.
+  Main. Main waits only on Global completion and never writes the swapchain
+  image. The ImGui submission waits on Main and alone waits on swapchain image
+  availability, so a late image release holds only the HDR resolve and
+  overlay, not Main's work.
+  `SwapchainManager::AcquireNextImage`'s fence wait, observing the same
+  release, orders the next frame's Main after it; keep that wait.
 - Main signals the particle semaphore consumed by the next frame's Global
   submission. Preserve this cross-frame edge when changing particle compute,
   retained water foam, or rendering order.
@@ -169,7 +179,7 @@ re-record mechanism.
   itself, submits the acquire command buffer alone when that frame recorded into
   it, then submits ImGui, waiting on swapchain image availability after
   discarding the present image into the ImGui pass's load layout, because no
-  Main resolve wrote it and a recreated swapchain image may never have been
+  HDR resolve wrote it and a recreated swapchain image may never have been
   written.
 
 ### BufferManager
@@ -365,9 +375,11 @@ every allocated particle by the whole-cell offset in the update pass.
 ### ImGuiManager
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records
-the UI command buffer each frame, waits for Main (or, on a world-hidden frame,
-for swapchain image availability), signals presentation, and signals the
-per-framebuffer fence as the frame's final graphics submission.
+the UI command buffer each frame; on a world frame that buffer records the HDR
+resolve, which writes the scene into the swapchain image, into the present
+pass. Its submission waits as `### CommandBufferManager` states, then signals
+presentation and the per-framebuffer fence as the frame's final graphics
+submission.
 
 - The manager owns ImGui setup, submission, and the Tweaks screen. It calls
   three UI functions `ImGuiManager.h` declares and each client program defines

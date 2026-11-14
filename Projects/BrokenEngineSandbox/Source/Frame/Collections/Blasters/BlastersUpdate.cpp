@@ -224,18 +224,15 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		if (outcome.eType == engine::CollisionOutcomeType::kTerrain) [[unlikely]]
 		{
 			engine::MarkDestroy(rCurrentPostRender.pLifecycleFlags[i]);
+#if defined(BT_CLIENT)
+			common::RandomEngine randomEngine(static_cast<uint64_t>(engine::Uuid::GenerateVisual(rFrame.postRender).iValue));
 			XMVECTOR vecCollisionPosition = outcome.vecTerrainPosition;
 
-			// Add jitter for visual variety
-			vecCollisionPosition = common::RandomPositionJitter<kfTerrainImpactJitter>(vecCollisionPosition, rFrame.postRender.randomEngine);
+			vecCollisionPosition = common::RandomPositionJitter<kfTerrainImpactJitter>(vecCollisionPosition, randomEngine);
 
-			[[maybe_unused]] float fRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
-#if defined(BT_CLIENT)
-			engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
-			engine::PuffsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainPuffControllerIndex, vecCollisionPosition);
-#endif
-
-#if defined(BT_CLIENT)
+			float fRotation = common::Random<XM_2PI>(randomEngine);
+			engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
+			engine::PuffsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainPuffControllerIndex, vecCollisionPosition);
 			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster16793__pushtobreak__earth1wavCrc, rStaticData.coordinate, vecCollisionPosition, gTerrainImpactVolume.mfCurrent);
 #endif
 		}

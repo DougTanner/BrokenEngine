@@ -26,6 +26,10 @@ struct OmnisInterpolate;
 struct OmnisPostRender;
 struct BattleshipsInterpolate;
 struct BattleshipsPostRender;
+#if defined(BT_CLIENT)
+struct WrecksInterpolate;
+struct WrecksPostRender;
+#endif
 
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
@@ -44,8 +48,8 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
-	// Runs on a world-hidden frame instead of the render walk: requests the textures of the model pipelines present and
-	// advances the wrecks, writing no GPU buffer.
+	// Runs on a world-hidden frame instead of the render walk: requests the textures of the model pipelines present,
+	// writing no GPU buffer.
 	static void UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 #endif
@@ -62,6 +66,9 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	std::unique_ptr<FightersInterpolate> pFighters;
 	std::unique_ptr<OmnisInterpolate> pOmnis;
 	std::unique_ptr<BattleshipsInterpolate> pBattleships;
+#if defined(BT_CLIENT)
+	std::unique_ptr<WrecksInterpolate> pWrecks;
+#endif
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> Values()
@@ -101,15 +108,24 @@ struct FramePostRender : public engine::FramePostRenderBase
 
 	engine::AlignmentIdentifier randomAlignment {};
 	engine::AlignmentIdentifier fleetAlignment {};
+	// Each of the cell's two mirror fleets' [first, end) range of uiNextUuid counter values from its last spawn; equal
+	// means none spawned.
+	uint64_t uiMirrorFleet0FirstUuid = 0;
+	uint64_t uiMirrorFleet0EndUuid = 0;
+	uint64_t uiMirrorFleet1FirstUuid = 0;
+	uint64_t uiMirrorFleet1EndUuid = 0;
 
 	std::unique_ptr<BlastersPostRender> pBlasters;
 	std::unique_ptr<MissilesPostRender> pMissiles;
 	std::unique_ptr<FightersPostRender> pFighters;
 	std::unique_ptr<OmnisPostRender> pOmnis;
 	std::unique_ptr<BattleshipsPostRender> pBattleships;
+#if defined(BT_CLIENT)
+	std::unique_ptr<WrecksPostRender> pWrecks;
+#endif
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
-	static engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> Values()
+	static engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment), FRAME_COLUMN(FramePostRender, uiMirrorFleet0FirstUuid), FRAME_COLUMN(FramePostRender, uiMirrorFleet0EndUuid), FRAME_COLUMN(FramePostRender, uiMirrorFleet1FirstUuid), FRAME_COLUMN(FramePostRender, uiMirrorFleet1EndUuid)> Values()
 	{
 		return {};
 	}

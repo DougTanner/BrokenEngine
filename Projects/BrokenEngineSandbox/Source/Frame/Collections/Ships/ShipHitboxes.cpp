@@ -8,6 +8,10 @@
 namespace game
 {
 
+// Building an engine::CollisionHitbox from a model's baked common::ModelOutline, here and in BuildShipHitbox, is
+// game-agnostic apart from the kShipHitboxTypes table and the missile tube and Fighter launch bay spans: a future
+// project may want it moved into shared engine code, depending on its requirements. The hitboxes and radii feed
+// collision and pushers, so they are CRC-visible and must stay identical if it moves.
 void InitializeShipHitboxes()
 {
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();

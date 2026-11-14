@@ -25,6 +25,10 @@ struct ScheduledStatusChange
 	StatusChange change;
 };
 
+// The pendingAgentStatusChanges queue and its QueueAgentStatusChange, DrainPendingAgentStatusChanges,
+// ResetPendingAgentStatusChanges, and CountPendingAgentStatusChanges functions read nothing of a StatusChange but its
+// eType, so they are game-agnostic: a future project may want them moved into shared engine code, depending on its
+// requirements. The drain writes FrameInput, which replay records, so its order must stay identical if it moves.
 struct ServerSimulationHarnessRigState
 {
 	const ServerSession* pSession = nullptr;
@@ -234,7 +238,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 			return eType;
 		}
 	}
-	throw std::runtime_error("'type' must be SpawnFighter|SpawnOmni|SpawnBattleship|SpawnBlaster|SpawnMissile|DestroyShip|UpdateShip|UpdateFleet");
+	throw std::runtime_error("'type' must be SpawnFighter|SpawnOmni|SpawnBattleship|SpawnBlaster|SpawnMissile|DestroyShip|UpdateShip|UpdateFleet|UpdateSquadronOrders");
 }
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
@@ -420,6 +424,15 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			}
 			break;
 		}
+		case StatusChangeType::kUpdateSquadronOrders:
+		{
+			UpdateSquadronOrdersData& rData = std::get<UpdateSquadronOrdersData>(scheduled.change.data);
+			RequireEntryKey<FRAME_COLUMN(UpdateSquadronOrdersData, eType)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateSquadronOrdersData, iUuid)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateSquadronOrdersData, orders)>(rEntry);
+			ParseStatusChangeFields(rEntry, rData);
+			break;
+		}
 		default:
 		{
 			UpdateFleetData& rData = std::get<UpdateFleetData>(scheduled.change.data);
@@ -428,6 +441,11 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, iUuid)>(rEntry);
 			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate)>(rEntry);
 			ParseStatusChangeFields(rEntry, rData);
+			// Fleet navigation never moves a flagship into the origin, so no order sends a fleet there.
+			if (rData.fleetWantedCoordinate == engine::kOriginCoordinate)
+			{
+				throw std::runtime_error(std::format("'{}' must not be the origin (0,0)", FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate)::kName));
+			}
 			break;
 		}
 	}
