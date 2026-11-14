@@ -1,5 +1,6 @@
 #include "Frame.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/Collections/Ships/ShipStatusChanges.h"

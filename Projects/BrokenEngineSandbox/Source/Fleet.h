@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/Collections/Ships/ShipTypes.h"
 
 namespace game
 {

@@ -67,7 +67,7 @@ float EffectiveShipFlightHeight(ShipType eType, ShipController eController, int6
 	return std::max(engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
 }
 
-std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
+static std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
 {
 	for (int64_t i = 0; i < engine::gpFlightPlanes->Count(); ++i)
 	{

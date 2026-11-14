@@ -76,9 +76,10 @@ Removal, applied to all three ship types together:
    function already tests at line 275, so the heading check still runs for the
    three ship spawns only. Drop the navigation delay from the function's
    comment (lines 252-253).
-6. Keep `IsNavigationDelayInRange` (`Ships/ShipBehaviours.h:181`): the
-   `UpdateShip` harness check (`ServerSimulationHarnessRigs.cpp:416`) and the
-   fleet-level delay admissions still call it.
+6. Keep `IsNavigationDelayInRange` (`Ships/ShipTypes.h:184`; it moved there
+   from `Ships/ShipBehaviours.h` after `022915b6`): the `UpdateShip` harness
+   check (`ServerSimulationHarnessRigs.cpp:416`) and the fleet-level delay
+   admissions still call it.
 7. Documents: `Ships/AGENTS.md` `## Ship Invariants`, the bullet that starts
    "Every ship type's `pNavigationDelays`" (lines 92-95 name the column and
    the `PostRead` rejection); and

@@ -96,4 +96,15 @@ workbuffer releases blocks in reverse order.
 
 ## Coordination
 
-No directional dependencies or mandatory nondirectional coordination.
+`Documents/Plans/Game/ShipNavigationDerivesCallerInvariantInputs.md` removes
+three `ComputeNavigation` parameters in `ShipBehaviours.h` and
+`ShipBehaviours.cpp`, and in the three PostRender `Update` bodies removes the
+`vecCellCenter` local, a few lines from the island candidate block this Plan
+replaces there, and three `ComputeNavigation` arguments. The two Plans edit
+different lines of the same five files; whichever lands second re-derives its
+sites from the landed source.
+
+`Documents/Plans/Game/ReduceShipBehavioursCpp.md` may move functions out of
+`ShipBehaviours.cpp`. If that reduction lands first, this Plan places the new
+owning type from the landed source, in the files that then hold
+`NavRectangleBoard` and `ComputeReturnDestination`.

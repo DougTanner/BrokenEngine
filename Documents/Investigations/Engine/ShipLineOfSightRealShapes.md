@@ -11,8 +11,8 @@ option is chosen.
   snaps both ends with `NavQuerySnapToNavigable` and tests the 2D segment with
   `NavQuerySegmentBlocked` (`Engine/Source/Frame/NavQuery.h`) against the
   shooter's plane graph. Firing and target picking pass `kiFiringClearanceTier`
-  (`ShipBehaviours.h`), tier 0, whose polygons are each plane's threshold
-  contour inflated by `kfOmniRadius` plus `kfPushMargin`
+  (`ShipTypes.h`), tier 0, whose polygons are each plane's threshold contour
+  inflated by `kfOmniRadius` plus `kfPushMargin`
   (`Projects/BrokenEngineSandbox/Source/Frame/TerrainUtils.h`).
 - Firing and target-pick call sites: `AcquireTarget` (`ShipQueries.cpp`, Omni
   firing and facing), `FindAttackTarget` (`ShipQueries.cpp`, every type), the

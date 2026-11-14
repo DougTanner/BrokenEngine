@@ -11,7 +11,7 @@
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/Collections/Ships/ShipTypes.h"
 #include "Frame/FlightPlaneTable.h"
 
 namespace engine

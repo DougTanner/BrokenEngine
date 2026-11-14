@@ -140,4 +140,59 @@ struct ShipLocator
 	int64_t iRow = 0;
 };
 
+// Tuning for ApplyAcceleratedMovement, instantiated as kOmniMovement in Omnis.h.
+struct AcceleratedMovementConstants
+{
+	float fAcceleration = 0.0f;
+	float fCatchUpAcceleration = 0.0f;
+	float fDrag = 0.0f;
+	float fMaximumSpeed = 0.0f;
+	float fCatchUpMaximumSpeed = 0.0f;
+};
+
+// Tuning for ApplyHeadingMovement and the ramped turn (RampHeadingTurnRate, SteerHeading, CaptureHeading), instantiated in
+// Fighters.h and Battleships.h.
+struct HeadingMovementConstants
+{
+	float fChaseAcceleration = 0.0f;
+	float fReturnAcceleration = 0.0f;
+	float fDrag = 0.0f;
+	float fMaximumSpeed = 0.0f;
+	// Velocity-to-direction blend (airplane constraint)
+	float fVelocityToDirection = 0.0f;
+	float fMaxTurnRate = 0.0f;
+	float fTurnAcceleration = 0.0f;
+	// Within this angle of its wanted heading a ship stops turning and Interpolate Update rotates it the rest of the way.
+	float fCaptureAngle = 0.0f;
+	float fCaptureRate = 0.0f;
+};
+
+// A ship's stored flight plane while it climbs between planes.
+inline constexpr uint8_t kuiNoFlightPlane = 255;
+
+// Every ship type climbs at this fraction of its maximum speed.
+inline constexpr float kfShipClimbSpeedFraction = 0.25f;
+
+// Firing and target picking test line of sight on this clearance tier's graphs for every shooter; movement decisions use
+// the ship type's own tier (ShipTypeClearanceTier, TerrainUtils.h).
+inline constexpr int64_t kiFiringClearanceTier = 0;
+
+[[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
+
+// Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both
+// infinities fail it too.
+[[nodiscard]] constexpr bool IsNavigationDelayInRange(float fDelay)
+{
+	return fDelay >= 0.0f && fDelay <= 60.0f;
+}
+
+// A ship heading or AI direction has Z and W exactly 0 and an x/y length squared in [0.25, 4]: a coarse corruption test
+// far wider than the rounding of the unit vectors every simulation write and ship spawn stores, and the only bound on
+// an edit_frame write. The length is one range test so NaN and both infinities in any lane fail it.
+[[nodiscard]] inline bool XM_CALLCONV IsShipHeadingValid(FXMVECTOR vecDirection)
+{
+	float fLengthSquared = XMVectorGetX(XMVector2LengthSq(vecDirection));
+	return XMVectorGetZ(vecDirection) == 0.0f && XMVectorGetW(vecDirection) == 0.0f && fLengthSquared >= 0.25f && fLengthSquared <= 4.0f;
+}
+
 } // namespace game

@@ -2,6 +2,7 @@
 
 #include "Frame/NavQuery.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/TerrainUtils.h"
 

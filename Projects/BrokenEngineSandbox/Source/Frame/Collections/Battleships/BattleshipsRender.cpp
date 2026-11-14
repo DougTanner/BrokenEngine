@@ -5,6 +5,7 @@
 #include "Data/Scene.h"
 #include "File/PackChunks.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Wrecks/Wrecks.h"
 #include "Profile/ProfileRows.h"

@@ -5,6 +5,7 @@
 #include "Frame/IslandChainPlacement.h"
 #include "Network/Server/ServerTransferManager.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"

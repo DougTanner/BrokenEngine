@@ -12,6 +12,7 @@
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 

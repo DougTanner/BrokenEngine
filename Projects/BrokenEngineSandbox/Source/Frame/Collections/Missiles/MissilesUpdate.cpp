@@ -4,6 +4,7 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Battleships/Battleships.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 

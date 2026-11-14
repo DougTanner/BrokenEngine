@@ -1,5 +1,7 @@
 #include "ShipQueries.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
+
 namespace game
 {
 

@@ -6,6 +6,7 @@
 #include "File/PackChunks.h"
 #include "Graphics/Debug/DebugRender.h"
 
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Profile/ProfileRows.h"
