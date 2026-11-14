@@ -8,10 +8,8 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/HealthDamage.h"
-#include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #if defined(BT_CLIENT)
-#include "Data/Scene.h"
 #include "Data/Texture.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"

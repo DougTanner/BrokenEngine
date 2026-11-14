@@ -6,7 +6,6 @@
 #include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
-#include "Frame/TerrainUtils.h"
 
 
 namespace game
