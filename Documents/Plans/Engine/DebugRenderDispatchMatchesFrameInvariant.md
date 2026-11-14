@@ -6,26 +6,26 @@
 Found by the architecture phase of a deep analysis of
 `Projects/BrokenEngineSandbox/Source/Frame` (direct files only), and verified
 independently. Pre-existing at commit `022915b6`; line numbers are from that
-commit, except the `Frame.cpp` ones, which are from the commit that added this
-Plan, so locate by symbol if they moved. `BES/` abbreviates
-`Projects/BrokenEngineSandbox/Source/`.
+commit, except the `Frame.cpp` and collection-header ones, which are from the
+commit that last edited this Plan, so locate by symbol if they moved. `BES/`
+abbreviates `Projects/BrokenEngineSandbox/Source/`.
 
 `BES/Frame/AGENTS.md` `## Invariants` (lines 21-22) says: "Every game
 collection pair registers in the tuples in `FrameCollections.h`; no collection
 has explicit per-collection dispatch."
 
-`FrameInterpolate::DebugRender` (`BES/Frame/Frame.cpp:636-648`) dispatches by
+`FrameInterpolate::DebugRender` (`BES/Frame/Frame.cpp:637-649`) dispatches by
 name: inside its loop over the active coordinates it calls
 `FightersInterpolate::DebugRender`, `OmnisInterpolate::DebugRender`, and
-`BattleshipsInterpolate::DebugRender` (`:643-645`). Every other render entry
+`BattleshipsInterpolate::DebugRender` (`:644-646`). Every other render entry
 point in the same file walks the tuple through an engine helper
 (`ForEachBeginRender`, `ForEachInterpolateRender`, `ForEachEndRender`,
 `ForEachRequestTextures`; `Engine/Source/Frame/FrameUtils.h:174-220`).
 `FrameUtils.h` holds no walker for `DebugRender`.
 
 Only those three collections declare `DebugRender`
-(`BES/Frame/Collections/Fighters/Fighters.h:170`, `Omnis/Omnis.h:199`,
-`Battleships/Battleships.h:162`); Blasters, Missiles, and Wrecks do not. The
+(`BES/Frame/Collections/Fighters/Fighters.h:171`, `Omnis/Omnis.h:203`,
+`Battleships/Battleships.h:163`); Blasters, Missiles, and Wrecks do not. The
 one caller of `FrameInterpolate::DebugRender` is
 `Engine/Source/Graphics/Render/MainUniforms.cpp:299`, under `kbDebugRender`.
 
@@ -57,7 +57,7 @@ this Plan.
   `static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)`.
 - In `FrameInterpolate::DebugRender`, keep the loop over the active
   coordinates and its `rRenderInterpolates` lookup. Replace the three named
-  calls (`Frame.cpp:643-645`) with one `engine::ForEachDebugRender` call over
+  calls (`Frame.cpp:644-646`) with one `engine::ForEachDebugRender` call over
   `GameInterpolateTypes {}`, passing `it->second` and `rCoordinate`.
 - The drawn result does not change. `FrameInterpolate::DebugRender` compiles
   under `BT_CLIENT` only, and the client tuple order is Blasters, Missiles,

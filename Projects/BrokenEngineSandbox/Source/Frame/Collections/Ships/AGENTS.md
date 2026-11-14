@@ -342,7 +342,8 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   random-spawn row, or an idle Seek and Destroy fleet Fighter
   (`../Fighters/AGENTS.md`), keeps its previous wanted heading with
   `ShipFlags::kNoAiDirection` set, and its wanted rate is zero; the flag is
-  clear while it has one.
+  clear while it has one. The idle fleet Fighter's kept wanted heading still
+  gates its terrain avoidance (`## Fleet Navigation Invariants`).
 - Interpolate Update, while the previous turn rate is exactly 0, the previous
   row does not carry `ShipFlags::kNoAiDirection`, and the previous wanted
   heading is within the capture angle, rotates the direction a fixed percent

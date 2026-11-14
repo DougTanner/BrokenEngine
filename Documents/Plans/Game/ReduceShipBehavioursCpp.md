@@ -79,11 +79,12 @@ membership only through `/update-vcxproj`.
   move.
 - The navigation hints above as work items of their own.
 - Two neighbours the originating analysis recorded as investigations of their
-  own, each with a choice still open for the user: `pGlobalIds` as a simulation
-  input outside the CRC
-  (`Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md`), and
+  own: `pGlobalIds` as a simulation input outside the CRC
+  (`Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md`, whose
+  choice `Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` now carries), and
   the mode 6 and mode 7 random-draw rule in the folder's `AGENTS.md`
-  `## Fleet Navigation Invariants` against the code
+  `## Fleet Navigation Invariants` against the code, with a choice still open
+  for the user
   (`Documents/Investigations/Engine/ResolveModeSixSevenRandomDrawRule.md`).
 
 ## Acceptance criteria
@@ -101,7 +102,8 @@ in `ShipBehaviours.cpp` and lists it as one of three critical files its diff
 stays inside. If this reduction lands first and moves a renamed function, that
 Plan's sites follow the function into its new file.
 
-`Documents/Plans/Game/ShipIslandCandidatesBuiltOnce.md` adds an owning type to
-`ShipBehaviours.h` and `ShipBehaviours.cpp`. If this reduction lands first,
-that Plan places the type from the landed source; if that Plan lands first,
-this reduction treats the type as part of the file it measures.
+`Documents/Plans/Game/ReturnDestinationReadsCentredIslands.md` edits
+`ComputeReturnDestination` in `ShipBehaviours.h` and `ShipBehaviours.cpp`. If
+this reduction lands first and moves that function, that Plan's sites follow
+it into its new file; if that Plan lands first, this reduction measures the
+file with that edit in it.

@@ -8,7 +8,6 @@
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
-#include "Frame/TerrainUtils.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"

@@ -160,6 +160,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 
 	bool LogDifferences(const FightersInterpolate& rOther) const;
 
+#if defined(BT_CLIENT)
 	static void GraphicsResources();
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
@@ -168,6 +169,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
+#endif // BT_CLIENT
 };
 
 using fighter_t = engine::Id<FightersInterpolate>;

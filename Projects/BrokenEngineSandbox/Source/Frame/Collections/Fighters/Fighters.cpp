@@ -1,6 +1,5 @@
 #include "Fighters.h"
 
-#include "Data/Audio.h"
 #include "Data/Texture.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Pushers/Pushers.h"
@@ -11,17 +10,14 @@
 #include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
-#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)
-#include "Data/Scene.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Ui/LightingWrappers.h"
-#include "Ui/SoundWrappers.h"
 #endif
 
 namespace engine
@@ -46,8 +42,8 @@ constexpr float kfFighterExplosionDirectionJitter = 0.5f;
 constexpr int64_t kiFighterExplosionTrailCount = 5;
 
 #if defined(BT_CLIENT)
-// Shared type indices (accessible from FightersCombat.cpp via extern)
-int64_t giFighterExplosionTypeIndex = 0xFF;
+// Type indices set during Register(); FightersCombat.cpp reads the g-prefixed ones via extern.
+static int64_t siFighterExplosionTypeIndex = 0xFF;
 static int64_t siFighterHitFlashTypeIndex = 0xFF;
 int64_t giFighterHitFlashControllerTypeIndex = 0xFF;
 static int64_t siFighterBeamImpactTypeIndex = 0xFF;
@@ -79,7 +75,7 @@ constexpr float kfFighterBeamStartOffset = 1.0f;
 void FightersInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::ExplosionsInterpolate::RegisterType(giFighterExplosionTypeIndex,
+	engine::ExplosionsInterpolate::RegisterType(siFighterExplosionTypeIndex,
 	{
 		.iBaseParticleCount = kiFighterExplosionBaseParticleCount,
 		.uiParticleColor = kuiFighterExplosionParticleColor,
@@ -217,7 +213,7 @@ void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCo
 
 	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 	{
-		.iTypeIndex = giFighterExplosionTypeIndex,
+		.iTypeIndex = siFighterExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
 		.vecDirection = vecJitteredDirection,
 		.flags = {engine::ExplosionFlags::kRed},
@@ -658,7 +654,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					ShipTactic tactic {};
 					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
 					iNavigationDirection = -1;
-					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while idle.
+					// The stored wanted heading feeds the heading capture, which kNoAiDirection gates while idle, and the fleet
+					// cone test in AvoidTerrain, which reads it ungated.
 					flags.Set(ShipFlags::kNoAiDirection, !bHasTactic);
 					fDeltaRotation = 0.0f;
 					bool bAccelerate = false;
@@ -783,8 +780,6 @@ bool FightersPostRender::LogDifferences(const FightersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
-		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
-		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pFlagshipGlobalIds">(i, pFlagshipGlobalIds[i], rOther.pFlagshipGlobalIds[i]);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);

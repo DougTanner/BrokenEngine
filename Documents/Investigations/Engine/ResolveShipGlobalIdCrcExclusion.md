@@ -1,9 +1,9 @@
 # Resolve the Ship Global ID's Exclusion From the Shared CRC
 
-This is an Investigation, not a Plan: it becomes a Plan under
-`Documents/Plans/Game/` once the user chooses one of the two options under
-`### Open choice for the user`. The user may instead close it with no change,
-as that section says.
+This is an Investigation, not a Plan. It is the options record for a choice
+the user has since made: `### Open choice for the user` records that choice,
+and `Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` is the Plan that
+carries it.
 
 ## Context
 
@@ -87,16 +87,16 @@ documents that write as unchecked apart from the fleet-controlled ship rule.
 
 ### Open choice for the user
 
-The comments no longer say anything false, so what is left to choose is
+The comments no longer say anything false, so what was left to choose was
 whether the exclusion stays or ends. The user was shown an earlier form of the
 two options, in which option 1 also rewrote the three comments, before commit
-`7dae9a27` made that rewrite separately, and has chosen nothing. This
-investigation chooses neither. The session that takes it up presents both
-options below to the user, with the author's recommendation marked as a
-recommendation, and the Plan written from it implements only the one the user
-picks. Because the comments now give the reason for the exclusion, the user may
-also close this investigation with no change: the exclusion stays, nothing is
-edited, and no Plan is written.
+`7dae9a27` made that rewrite separately, and chose nothing then. This
+investigation chooses neither. The authoring agent's record of what the user
+chose afterwards, on 2026-11-14, when the session that authored
+`Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` asked: `pGlobalIds` goes
+into `SharedCrcMembers()` for Fighters, Battleships, and Omnis, which is
+option 2 below. That Plan carries the choice, so no further Plan is written
+from this investigation, which stays as the record of the options.
 
 Author's recommendation: option 2. Rationale: it would catch a client/server
 `pGlobalIds` mismatch on its own tick instead of ticks later through downstream
@@ -221,7 +221,7 @@ bullet of `Omnis/AGENTS.md` `## State Boundaries`, which this investigation
 rewords under its option 2. A Plan written from this investigation after that
 lands re-derives that bullet from the landed source.
 
-`Documents/Plans/Game/RemoveUnreadShipNavigationDelayColumn.md` removes
+`Documents/Plans/Game/RemoveShipNavigationDelayColumn.md` removes
 `pNavigationDelays` from the three `SharedCrcMembers()` tuples this
 investigation's option 2 adds `pGlobalIds` to, and edits another bullet of
 `Ships/AGENTS.md` `## Ship Invariants`, the section its option 1 edits. A Plan

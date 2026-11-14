@@ -86,7 +86,9 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	static void Register();
 
+#if defined(BT_CLIENT)
 	static void GraphicsResources();
+#endif // BT_CLIENT
 
 	static inline int64_t siAreaLightTypeIndex = 0xFF;
 	static inline int64_t siBlasterTypeIndex = 0xFF;
@@ -192,12 +194,14 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 #endif
 	}
 
+#if defined(BT_CLIENT)
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	// Requests the textures of each controller's model pipeline that has a row in an active cell.
 	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
+#endif // BT_CLIENT
 
 	bool LogDifferences(const OmnisInterpolate& rOther) const;
 };

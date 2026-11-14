@@ -7,7 +7,6 @@
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
-#include "Frame/TerrainUtils.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
@@ -26,7 +25,6 @@ constexpr float kfFighterBeamAimAngle = 0.1f;
 
 #if defined(BT_CLIENT)
 // Shared type indices (defined in Fighters.cpp, set during Register())
-extern int64_t giFighterExplosionTypeIndex;
 extern int64_t giFighterHitFlashControllerTypeIndex;
 extern int64_t giFighterBeamImpactControllerTypeIndex;
 extern int64_t giFighterBeamAreaLightTypeIndex;

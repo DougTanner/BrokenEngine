@@ -76,7 +76,7 @@ parallel pair `Battleships/AGENTS.md` (opening paragraph) describes.
 
 - The island candidate list each ship script builds and passes to
   `ComputeReturnDestination`, which
-  `Documents/Plans/Game/ShipIslandCandidatesBuiltOnce.md` owns.
+  `Documents/Plans/Game/ReturnDestinationReadsCentredIslands.md` owns.
 - Any change to the navigation modes, random draws, arrival checks, or the
   path-query cadence in `ComputeNavigation`.
 - The other `ComputeNavigation` parameters.
@@ -86,11 +86,12 @@ parallel pair `Battleships/AGENTS.md` (opening paragraph) describes.
 - The definition's `rVecArtificialIntelligenceDirection` parameter name, which
   `Documents/Plans/Game/RenameArtificialIntelligenceToAi.md` owns.
 - Two neighbours the originating analysis recorded as investigations of their
-  own, each with a choice still open for the user: `pGlobalIds` as a simulation
-  input outside the CRC
-  (`Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md`), and
+  own: `pGlobalIds` as a simulation input outside the CRC
+  (`Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md`, whose
+  choice `Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` now carries), and
   the mode 6 and mode 7 random-draw rule in `Ships/AGENTS.md`
-  `## Fleet Navigation Invariants` against the code
+  `## Fleet Navigation Invariants` against the code, with a choice still open
+  for the user
   (`Documents/Investigations/Engine/ResolveModeSixSevenRandomDrawRule.md`).
 
 ## Acceptance criteria
@@ -116,8 +117,9 @@ Whichever lands second re-derives its sites from the landed source. That Plan
 also renames identifiers on the `ComputeArtificialIntelligenceSteering` call
 line, which this Plan does not edit.
 
-`Documents/Plans/Game/ShipIslandCandidatesBuiltOnce.md` adds an owning type to
-`ShipBehaviours.h` and `ShipBehaviours.cpp` and replaces the island candidate
+`Documents/Plans/Game/ReturnDestinationReadsCentredIslands.md` removes the
+`islandCandidates` parameter of `ComputeReturnDestination` in
+`ShipBehaviours.h` and `ShipBehaviours.cpp` and deletes the island candidate
 block in the three PostRender `Update` bodies, a few lines from the
 `vecCellCenter` local this Plan removes there. The two Plans edit different
 lines of the same five files; whichever lands second re-derives its sites from
