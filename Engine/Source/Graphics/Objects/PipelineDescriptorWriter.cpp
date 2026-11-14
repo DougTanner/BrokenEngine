@@ -320,22 +320,12 @@ static void RegisterCombinedSamplerBindings(Pipeline& rPipeline, const Descripto
 
 static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<VkWriteDescriptorSet> writeDescriptorSets)
 {
-	bool bCompute = rPipeline.mInfo.flags & PipelineFlags::kCompute;
-	Shader* pFirstShader = rPipeline.mInfo.ppShaders[0];
-	Shader* pSecondShader = bCompute ? nullptr : rPipeline.mInfo.ppShaders[1];
-
 	int64_t iValidCount = 0;
 	for (const VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
 	{
-		int64_t iBinding = static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding);
-		if (iBinding < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
+		if (PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding)))
 		{
-			const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < pFirstShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pFirstShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
-			const VkDescriptorSetLayoutBinding& rVkSecondBinding = pSecondShader != nullptr && iBinding < pSecondShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pSecondShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
-			if (rVkFirstBinding.descriptorCount > 0 || rVkSecondBinding.descriptorCount > 0)
-			{
-				writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
-			}
+			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 		}
 	}
 	return iValidCount;

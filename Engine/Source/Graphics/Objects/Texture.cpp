@@ -43,10 +43,10 @@ VkImageLayout ToVkImageLayout(TextureLayout eLayout)
 	return kpLayoutMappings[static_cast<int>(eLayout)].vkImageLayout;
 }
 
-static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRenderPass, VkImageView& rVkImageView)
+static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, VkImageView& rVkImageView)
 {
 	VkComponentMapping vkComponentMapping {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_G, .b = VK_COMPONENT_SWIZZLE_B, .a = VK_COMPONENT_SWIZZLE_A};
-	if ((!bCheckRenderPass || !(rInfo.textureFlags & kRenderPass)) && rInfo.vkFormat == VK_FORMAT_BC4_UNORM_BLOCK)
+	if (rInfo.vkFormat == VK_FORMAT_BC4_UNORM_BLOCK)
 	{
 		vkComponentMapping = {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_R, .b = VK_COMPONENT_SWIZZLE_R, .a = VK_COMPONENT_SWIZZLE_R};
 	}
@@ -127,7 +127,7 @@ void Texture::AdoptTransferredImage(VkImage& rVkImage, VmaAllocation& rVmaAlloca
 	mVkImage = std::exchange(rVkImage, VK_NULL_HANDLE);
 	mVmaAllocation = std::exchange(rVmaAllocation, VK_NULL_HANDLE);
 
-	CreateImageView(mVkImage, mInfo, false, mVkImageView);
+	CreateImageView(mVkImage, mInfo, mVkImageView);
 	++miGeneration;
 }
 
@@ -225,7 +225,7 @@ void Texture::CreateImage(const TextureInfo& rInfo)
 	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &mVkImage, &mVmaAllocation, nullptr));
 	VkName(VK_OBJECT_TYPE_IMAGE, mVkImage, mInfo.name.data());
 
-	CreateImageView(mVkImage, mInfo, true, mVkImageView);
+	CreateImageView(mVkImage, mInfo, mVkImageView);
 	++miGeneration;
 }
 
