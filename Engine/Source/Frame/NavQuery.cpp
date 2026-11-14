@@ -169,7 +169,7 @@ bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavDat
 		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rNavData.polygonOffsets, i, std::ssize(rNavData.vertices)));
 		int64_t iCount = iEnd - iStart;
 
-		if (iCount > 0 && common::PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
+		if (common::PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
 		{
 			return true;
 		}
@@ -581,11 +581,6 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			if (!SegmentBlockedByObstacle(f2End, pVertices[iCurrent], pVertices, rNavData))
 			{
 				TryNeighbor(iEndNode);
-			}
-
-			if (rMemory.pStartVisible[iCurrent])
-			{
-				TryNeighbor(iStartNode);
 			}
 
 			TryVisibleNeighbors(iVertexCount, iStartNode);

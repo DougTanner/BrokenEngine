@@ -142,6 +142,7 @@ void CellStaticData::Read(std::istream& rStream)
 	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 }
 
+#if defined(BT_CLIENT)
 void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
 {
 	islandRenderQueries.resize(static_cast<size_t>(std::ssize(islands)));
@@ -164,5 +165,6 @@ void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerra
 		rQuery.iHeightmapHeight = rTemplate.iHeightmapHeight;
 	}
 }
+#endif
 
 } // namespace engine

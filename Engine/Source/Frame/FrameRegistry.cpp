@@ -3,37 +3,6 @@
 namespace engine
 {
 
-struct EligibleRowReference
-{
-	const RegistrySourceLayer* pLayer = nullptr;
-	int64_t iRow = 0;
-};
-
-static EligibleRowReference FindEligibleRow(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id)
-{
-	for (const RegistrySourceLayer& rLayer : sourceLayers)
-	{
-		for (int64_t iRow : rLayer.rows)
-		{
-			if (rLayer.pIds[iRow] == id)
-			{
-				return {.pLayer = &rLayer, .iRow = iRow};
-			}
-		}
-	}
-
-	return {};
-}
-
-static RegistryResult MakeResult(const RegistrySourceLayer& rLayer, int64_t iRow)
-{
-	RegistryResult result {};
-	result.id = rLayer.pIds[iRow];
-	result.vecCurrentPosition = rLayer.pVecCurrentPositions[iRow];
-	result.vecPreviousPosition = rLayer.pVecPreviousPositions[iRow];
-	return result;
-}
-
 static Uuid OwnershipUuid(const RegistryOwnershipLayer& rLayer, int64_t iIndex)
 {
 	Uuid uuid {};
@@ -87,14 +56,21 @@ void ValidateRegistrySourceLayers(std::span<const RegistrySourceLayer> sourceLay
 
 bool ResolveRegistryHandle(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id, RegistryResult& rResult)
 {
-	EligibleRowReference found = FindEligibleRow(sourceLayers, id);
-	if (found.pLayer == nullptr)
+	for (const RegistrySourceLayer& rLayer : sourceLayers)
 	{
-		return false;
+		for (int64_t iRow : rLayer.rows)
+		{
+			if (rLayer.pIds[iRow] == id)
+			{
+				rResult.id = rLayer.pIds[iRow];
+				rResult.vecCurrentPosition = rLayer.pVecCurrentPositions[iRow];
+				rResult.vecPreviousPosition = rLayer.pVecPreviousPositions[iRow];
+				return true;
+			}
+		}
 	}
 
-	rResult = MakeResult(*found.pLayer, found.iRow);
-	return true;
+	return false;
 }
 
 void AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)

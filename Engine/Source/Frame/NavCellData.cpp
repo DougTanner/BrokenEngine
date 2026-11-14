@@ -6,6 +6,8 @@
 namespace engine
 {
 
+#if defined(BT_SERVER)
+
 // Proper intersections between non-adjacent edges indicate self-intersecting contours.
 // Cross-placement overlap is allowed: visibility building and runtime queries test every polygon
 // in the shared cell-local frame. This O(edges^2) diagnostic is enabled by kbDebugNavigationCrossingCheck.
@@ -19,10 +21,6 @@ static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationD
 		{
 			auto [iStartA, iEndA] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, i, iVertexCount)};
 			int64_t iCountA = iEndA - iStartA;
-			if (iCountA < 2)
-			{
-				continue;
-			}
 
 			for (int64_t j = 0; j < iCountA; ++j)
 			{
@@ -35,10 +33,6 @@ static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationD
 				{
 					auto [iStartB, iEndB] = std::pair<int64_t, int64_t> {PolygonRange(rNavigationData.polygonOffsets, k, iVertexCount)};
 					int64_t iCountB = iEndB - iStartB;
-					if (iCountB < 2)
-					{
-						continue;
-					}
 
 					int64_t iFirstEdgeB = (k == i) ? (j + 1) : 0;
 					for (int64_t l = iFirstEdgeB; l < iCountB; ++l)
@@ -59,6 +53,8 @@ static void DebugCheckCrossingEdges([[maybe_unused]] const NavData& rNavigationD
 		}
 	}
 }
+
+#endif // BT_SERVER
 
 // Edge grid (CSR): bucket each obstacle edge into every cell its AABB overlaps (conservative). Reads
 // the global vertex AABB off rNavigationData.f2GridMinimum/f2GridMaximum (set by the caller). The gridEdges fill is
@@ -189,6 +185,8 @@ static void BuildNavigationAdjacency(NavData& rNavigationData)
 	}
 }
 
+#if defined(BT_SERVER)
+
 // Emit non-adjacent convex-vertex pairs only when SegmentBlockedByObstacle finds no crossing
 // and the midpoint lies outside every polygon. Fixed pair order makes emission deterministic;
 // the crossing predicate's boolean OR is order-independent. Requires nonempty vertices and
@@ -210,9 +208,8 @@ static void BuildCellVisibilityGraph(NavData& rNavigationData)
 
 		// BuildCellNavigationData mirrors Y; rotation preserves orientation, so the CCW template contours
 		// asserted in NavBuild.cpp become clockwise in the cell frame. Use measured winding for the
-		// convexity sign. Fewer than three vertices have no interior and produce zero cross products;
-		// skip IsPolygonCcw for them.
-		bool bCounterClockwise = (iCount >= 3) && common::IsPolygonCcw(std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount)));
+		// convexity sign.
+		bool bCounterClockwise = common::IsPolygonCcw(std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount)));
 		ASSERT(!bCounterClockwise);
 		float fConvexSign = bCounterClockwise ? 1.0f : -1.0f;
 
@@ -348,7 +345,7 @@ static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector
 		BuildNavigationAdjacency(rNavigationData);
 	}
 
-	LOG(kNavData, kInfo, "BuildCellNavData: graph={} placements={} vertices={} polygons={} visEdges={} wireBytes={} elapsedUs={}", iGraph, std::ssize(rPlacements), std::ssize(rNavigationData.vertices), std::ssize(rNavigationData.polygonOffsets), std::ssize(rNavigationData.visibilityEdgeA), std::ssize(rNavigationData.visibilityEdgeA) * (sizeof(int32_t) + sizeof(int32_t)), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
+	LOG(kNavData, kInfo, "BuildPlaneNavigationData: graph={} placements={} vertices={} polygons={} visEdges={} elapsedUs={}", iGraph, std::ssize(rPlacements), std::ssize(rNavigationData.vertices), std::ssize(rNavigationData.polygonOffsets), std::ssize(rNavigationData.visibilityEdgeA), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
 }
 
 void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements)
@@ -360,6 +357,8 @@ void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::v
 		BuildPlaneNavigationData(rGraphNavigationData, rPlacements, i);
 	}
 }
+
+#endif // BT_SERVER
 
 void BuildNavigationAcceleration(NavData& rNavigationData)
 {

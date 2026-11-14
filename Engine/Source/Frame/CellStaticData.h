@@ -9,6 +9,7 @@ namespace engine
 
 class IslandTerrain;
 
+#if defined(BT_CLIENT)
 struct IslandRenderQuery
 {
 	float fCosine = 1.0f;
@@ -20,6 +21,7 @@ struct IslandRenderQuery
 	int64_t iHeightmapWidth = 0;
 	int64_t iHeightmapHeight = 0;
 };
+#endif
 
 enum class CellStaticDataFlags : uint8_t
 {
@@ -49,16 +51,20 @@ struct CellStaticData
 	// before publication; server and menu ticks fill it through ActiveFrameReference's const static data.
 	mutable std::vector<float> elevationGrid;
 
-	// Client-only queries for GlobalElevation (ProjectToBaseHeight), index-parallel to islands.
+#if defined(BT_CLIENT)
+	// Queries for GlobalElevation (ProjectToBaseHeight), index-parallel to islands.
 	// Prepared alongside elevationGrid, avoiding per-island hash lookups and trigonometry. Menu placement edits
 	// clear the cache for the next synchronous tick. Derived from shared templates and never serialized.
 	mutable std::vector<IslandRenderQuery> islandRenderQueries;
+#endif
 
 	// Network-only compact geometry and server-built visibility; Read rebuilds navigation acceleration.
 	void Write(std::ostream& rStream) const;
 	void Read(std::istream& rStream);
 
+#if defined(BT_CLIENT)
 	void BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const;
+#endif
 };
 
 } // namespace engine

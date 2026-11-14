@@ -29,6 +29,20 @@ static bool IsElevationUploadedByTransferQueue()
 	return gpDeviceManager->mTransferVkQueue != gpDeviceManager->mGraphicsVkQueue;
 }
 
+// The index selects the channel in TextureDescriptors::MintIslandSlot, so the order is fixed.
+static void GetChannelCrcs(const common::IslandHeader& rIslandHeader, common::crc_t (&rChannelCrcs)[4])
+{
+	rChannelCrcs[0] = rIslandHeader.colorsCrc;
+	rChannelCrcs[1] = rIslandHeader.normalsCrc;
+	rChannelCrcs[2] = rIslandHeader.ambientOcclusionCrc;
+	rChannelCrcs[3] = rIslandHeader.masksCrc;
+}
+
+static bool IsArenaEvictionCandidate(common::crc_t uiCrc, const IslandTemplate& rTemplate, common::crc_t uiExcludedCrc)
+{
+	return uiCrc != uiExcludedCrc && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0;
+}
+
 static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate)
 {
 	if (rTemplate.bGpuResident)
@@ -45,13 +59,8 @@ static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandT
 		return false;
 	}
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
-	common::crc_t pResidencyCrcs[4] =
-	{
-		rLazyChunk.header.islandHeader.colorsCrc,
-		rLazyChunk.header.islandHeader.normalsCrc,
-		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
-		rLazyChunk.header.islandHeader.masksCrc,
-	};
+	common::crc_t pResidencyCrcs[4] {};
+	GetChannelCrcs(rLazyChunk.header.islandHeader, pResidencyCrcs);
 	return std::ranges::all_of(pResidencyCrcs, [](const common::crc_t& rTextureCrc)
 	{
 		return gpFileManager->mpPackChunks->IsChunkReady(rTextureCrc);
@@ -117,7 +126,6 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 {
 	IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(uiIslandCrc);
 
-	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
 	{
 		rTemplate.eMeshResidency = IslandMeshResidency::kCpuReady;
@@ -130,15 +138,11 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 		return rTemplate.iTextureSlot;
 	}
 
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	// Color / Normals / AO / Masks ship as standalone lazy-texture chunks. Elevation lives on the template
 	// (elevationTexture) and is uploaded from the island chunk's resident heightmap.
-	common::crc_t pTextureCrcs[4] =
-	{
-		rLazyChunk.header.islandHeader.colorsCrc,
-		rLazyChunk.header.islandHeader.normalsCrc,
-		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
-		rLazyChunk.header.islandHeader.masksCrc,
-	};
+	common::crc_t pTextureCrcs[4] {};
+	GetChannelCrcs(rLazyChunk.header.islandHeader, pTextureCrcs);
 
 	if (rTemplate.iTextureSlot < 0)
 	{
@@ -171,7 +175,7 @@ bool IslandTerrainResidency::AnyRestorationPending() const
 
 bool IslandTerrainResidency::IsEvictionPending(const IslandTemplate& rTemplate) const
 {
-	return rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0
+	return rTemplate.bGpuResident && rTemplate.iReferenceCount == 0
 	    && (gpGraphics->miFrameCounter - rTemplate.iLastUsedRenderFrame) > kiGraceRenderFrames;
 }
 
@@ -187,19 +191,24 @@ bool IslandTerrainResidency::IsRestorationPending(common::crc_t uiIslandCrc, con
 		case IslandMeshResidency::kCpuReady:
 			return rTemplate.bGpuResident;
 		case IslandMeshResidency::kArenaBlocked:
-			return rTemplate.bGpuResident && (gpIslands->miMeshArenaCapacityGeneration != rTemplate.iMeshArenaBlockedGeneration || (HasArenaEvictionCandidate(uiIslandCrc) && !gpIslands->HasRetiredMeshRanges()));
+			return rTemplate.bGpuResident && IsArenaRetryDue(uiIslandCrc, rTemplate);
 		case IslandMeshResidency::kNonresident:
 		case IslandMeshResidency::kResident:
-			return false;
+			break;
 	}
 	return false;
+}
+
+bool IslandTerrainResidency::IsArenaRetryDue(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const
+{
+	return gpIslands->miMeshArenaCapacityGeneration != rTemplate.iMeshArenaBlockedGeneration || (HasArenaEvictionCandidate(uiIslandCrc) && !gpIslands->HasRetiredMeshRanges());
 }
 
 bool IslandTerrainResidency::HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const
 {
 	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
-		if (rCrc != uiExcludedCrc && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0)
+		if (IsArenaEvictionCandidate(rCrc, rTemplate, uiExcludedCrc))
 		{
 			return true;
 		}
@@ -209,7 +218,7 @@ bool IslandTerrainResidency::HasArenaEvictionCandidate(common::crc_t uiExcludedC
 
 bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason)
 {
-	bool bEligible = eReason == MeshEvictionReason::kGrace ? IsEvictionPending(rTemplate) : rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.iReferenceCount == 0;
+	bool bEligible = eReason == MeshEvictionReason::kGrace ? IsEvictionPending(rTemplate) : rTemplate.bGpuResident && rTemplate.eMeshResidency == IslandMeshResidency::kResident && rTemplate.iReferenceCount == 0;
 	if (!bEligible)
 	{
 		return false;
@@ -218,13 +227,8 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	// The 4 chunk-backed channels (color/normals/AO/masks); elevation is template-owned with no chunk CRC and is
 	// evicted separately below.
-	common::crc_t pEvictCrcs[4] =
-	{
-		rLazyChunk.header.islandHeader.colorsCrc,
-		rLazyChunk.header.islandHeader.normalsCrc,
-		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
-		rLazyChunk.header.islandHeader.masksCrc,
-	};
+	common::crc_t pEvictCrcs[4] {};
+	GetChannelCrcs(rLazyChunk.header.islandHeader, pEvictCrcs);
 
 	LOG(kGraphics, kVerbose, "Evicting islandCrc={} slot={} (refCount=0, framesSinceUse={})", uiIslandCrc, rTemplate.iTextureSlot, gpGraphics->miFrameCounter - rTemplate.iLastUsedRenderFrame);
 
@@ -320,7 +324,7 @@ void IslandTerrainResidency::RestorationSweep()
 			{
 				continue;
 			}
-			if (gpIslands->miMeshArenaCapacityGeneration == rTemplate.iMeshArenaBlockedGeneration && (!HasArenaEvictionCandidate(rCrc) || gpIslands->HasRetiredMeshRanges()))
+			if (!IsArenaRetryDue(rCrc, rTemplate))
 			{
 				continue;
 			}
@@ -355,8 +359,7 @@ void IslandTerrainResidency::RestorationSweep()
 			IslandTemplate* pEvictTemplate = nullptr;
 			for (auto& [rCandidateCrc, rCandidate] : rIslands)
 			{
-				if (rCandidateCrc != rCrc && rCandidate.eMeshResidency == IslandMeshResidency::kResident && rCandidate.bGpuResident
-				 && rCandidate.iReferenceCount == 0
+				if (IsArenaEvictionCandidate(rCandidateCrc, rCandidate, rCrc)
 				 && (pEvictTemplate == nullptr || static_cast<uint64_t>(rCandidate.iLastUsedRenderFrame) < static_cast<uint64_t>(pEvictTemplate->iLastUsedRenderFrame)))
 				{
 					uiEvictCrc = rCandidateCrc;
@@ -373,10 +376,6 @@ void IslandTerrainResidency::RestorationSweep()
 			continue;
 		}
 
-		ASSERT(rTemplate.pfMeshPositions != nullptr);
-		ASSERT(rTemplate.puiMeshIndices != nullptr);
-		ASSERT(rTemplate.iMeshVertexCount > 0);
-		ASSERT(rTemplate.iMeshIndexCount > 0);
 		{
 			// Heap: the recorded upload allocates its staging buffer inside Graphics::UpdateFrameResidency's residency sweep.
 			ScopedSuppressAllocationTracking suppress;

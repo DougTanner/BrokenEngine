@@ -16,12 +16,6 @@ constexpr float kfHugeIslandAreaMeters = 120'000.0f * common::kfIslandScale * co
 constexpr float kfLargeIslandAreaMeters = 48'000.0f * common::kfIslandScale * common::kfIslandScale;   // 2x1/3x1 strips    = 53k-80k
 constexpr float kfMediumIslandAreaMeters = 16'000.0f * common::kfIslandScale * common::kfIslandScale;  // mid tiles; 4x4 (10k) falls below -> Small
 
-// The elevation grid spans the bounding rectangle grown by kfCellLandMarginMeters.
-constexpr float kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
-constexpr float kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
-constexpr float kfCellOriginX = -kfElevationGridHalfWidth;
-constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
-
 IslandTerrain::IslandTerrain()
 : common::Singleton<IslandTerrain>(gpIslandTerrain, this)
 {
@@ -52,11 +46,11 @@ IslandTerrain::IslandTerrain()
 
 		IslandTemplate& rTemplate = mIslands.try_emplace(rCrc).first->second;
 		rTemplate.islandCrc = rCrc;
-		rTemplate.fWorldFootprintXMeters = rLazyChunk.header.islandHeader.fWorldFootprintXMeters;
-		rTemplate.fWorldFootprintYMeters = rLazyChunk.header.islandHeader.fWorldFootprintYMeters;
+		rTemplate.fQuadFootprintX = rLazyChunk.header.islandHeader.fWorldFootprintXMeters;
+		rTemplate.fQuadFootprintY = rLazyChunk.header.islandHeader.fWorldFootprintYMeters;
 		rTemplate.fWorldElevationMeters = rLazyChunk.header.islandHeader.fWorldElevationMeters;
-		ASSERT(rTemplate.fWorldFootprintXMeters > 0.0f);
-		ASSERT(rTemplate.fWorldFootprintYMeters > 0.0f);
+		ASSERT(rTemplate.fQuadFootprintX > 0.0f);
+		ASSERT(rTemplate.fQuadFootprintY > 0.0f);
 		const common::IslandHeader& rIslandHeader = rLazyChunk.header.islandHeader;
 		rTemplate.fPeakHeightMeters = rIslandHeader.fPeakHeightMeters;
 		rTemplate.iPeakTexelX = rIslandHeader.uiPeakTexelX;
@@ -64,8 +58,6 @@ IslandTerrain::IslandTerrain()
 		ASSERT(std::isfinite(rTemplate.fPeakHeightMeters));
 		ASSERT(rTemplate.iPeakTexelX < rIslandHeader.iHeightmapWidth);
 		ASSERT(rTemplate.iPeakTexelY < rIslandHeader.iHeightmapHeight);
-		rTemplate.fQuadFootprintX = rTemplate.fWorldFootprintXMeters;
-		rTemplate.fQuadFootprintY = rTemplate.fWorldFootprintYMeters;
 	}
 
 	// Stable, deterministic iteration order for slot assignment.
@@ -86,8 +78,8 @@ IslandTerrain::IslandTerrain()
 		{
 			const IslandTemplate& rTemplateA = mIslands.at(crcA);
 			const IslandTemplate& rTemplateB = mIslands.at(crcB);
-			float fAreaA = rTemplateA.fWorldFootprintXMeters * rTemplateA.fWorldFootprintYMeters;
-			float fAreaB = rTemplateB.fWorldFootprintXMeters * rTemplateB.fWorldFootprintYMeters;
+			float fAreaA = rTemplateA.fQuadFootprintX * rTemplateA.fQuadFootprintY;
+			float fAreaB = rTemplateB.fQuadFootprintX * rTemplateB.fQuadFootprintY;
 			if (fAreaA != fAreaB)
 			{
 				return fAreaA > fAreaB;
@@ -98,7 +90,7 @@ IslandTerrain::IslandTerrain()
 	for (common::crc_t islandCrc : mIslandCrcsSorted)
 	{
 		const IslandTemplate& rTemplate = mIslands.at(islandCrc);
-		float fAreaMeters = rTemplate.fWorldFootprintXMeters * rTemplate.fWorldFootprintYMeters;
+		float fAreaMeters = rTemplate.fQuadFootprintX * rTemplate.fQuadFootprintY;
 
 		if (fAreaMeters >= kfHugeIslandAreaMeters)
 		{
@@ -257,20 +249,13 @@ void IslandTerrain::WaitForElevationMaps()
 #endif
 }
 
-template <bool MULTIPLY_UV, bool HOISTED_HEIGHTMAP_MAXIMUM>
+template <bool MULTIPLY_UV>
 static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine, float fSine, float fFootprintX, float fFootprintY, float fHalfX, float fHalfY, const uint16_t* puiHeightmapHalf, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fInverseFootprintX, float fInverseFootprintY, float fHeightmapMaximumU, float fHeightmapMaximumV, float& rfSample)
 {
 	float fLocalX = fDeltaX * fCosine - fDeltaY * fSine;
 	float fLocalY = fDeltaX * fSine + fDeltaY * fCosine;
 
-	if constexpr (MULTIPLY_UV)
-	{
-		if (std::abs(fLocalX) > fHalfX || std::abs(fLocalY) > fHalfY)
-		{
-			return false;
-		}
-	}
-	else if (std::abs(fLocalX) > 0.5f * fFootprintX || std::abs(fLocalY) > 0.5f * fFootprintY)
+	if (std::abs(fLocalX) > fHalfX || std::abs(fLocalY) > fHalfY)
 	{
 		return false;
 	}
@@ -289,18 +274,8 @@ static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine
 		fV = 0.5f - fLocalY / fFootprintY;
 	}
 
-	int64_t iX = 0;
-	int64_t iY = 0;
-	if constexpr (HOISTED_HEIGHTMAP_MAXIMUM)
-	{
-		iX = static_cast<int64_t>(fU * fHeightmapMaximumU);
-		iY = static_cast<int64_t>(fV * fHeightmapMaximumV);
-	}
-	else
-	{
-		iX = static_cast<int64_t>(fU * static_cast<float>(iHeightmapWidth - 1));
-		iY = static_cast<int64_t>(fV * static_cast<float>(iHeightmapHeight - 1));
-	}
+	int64_t iX = static_cast<int64_t>(fU * fHeightmapMaximumU);
+	int64_t iY = static_cast<int64_t>(fV * fHeightmapMaximumV);
 	iX = std::clamp(iX, 0i64, static_cast<int64_t>(iHeightmapWidth - 1));
 	iY = std::clamp(iY, 0i64, static_cast<int64_t>(iHeightmapHeight - 1));
 
@@ -308,21 +283,7 @@ static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine
 	return true;
 }
 
-template <typename ELEVATION_CALLABLE>
-static XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEVATION_CALLABLE&& rElevation)
-{
-	auto vecTopLeft = XMVectorAdd(vecPosition, XMVectorSet(-fDistance, fDistance, 0.0f, 0.0f));
-	vecTopLeft = XMVectorSetZ(vecTopLeft, rElevation(vecTopLeft));
-	auto vecTopRight = XMVectorAdd(vecPosition, XMVectorSet(fDistance, fDistance, 0.0f, 0.0f));
-	vecTopRight = XMVectorSetZ(vecTopRight, rElevation(vecTopRight));
-	auto vecBottomLeft = XMVectorAdd(vecPosition, XMVectorSet(-fDistance, -fDistance, 0.0f, 0.0f));
-	vecBottomLeft = XMVectorSetZ(vecBottomLeft, rElevation(vecBottomLeft));
-	auto vecBottomRight = XMVectorAdd(vecPosition, XMVectorSet(fDistance, -fDistance, 0.0f, 0.0f));
-	vecBottomRight = XMVectorSetZ(vecBottomRight, rElevation(vecBottomRight));
-
-	return XMVector3Normalize(XMVector3Cross(XMVectorSubtract(vecTopRight, vecBottomLeft), XMVectorSubtract(vecTopLeft, vecBottomRight)));
-}
-
+#if defined(BT_CLIENT)
 // CellElevation takes the MAX elevation over a resolved cell for GlobalElevation. Hull-based placement permits
 // overlapping footprint rectangles, so the highest terrain wins, matching the GPU prepass and remaining
 // order-independent and deterministic. BuildRenderPlacementCache stores inverse rotation, footprint, and heightmap
@@ -365,7 +326,7 @@ float IslandTerrain::CellElevation(const CellStaticData& rStaticData, const XMFL
 		float fDeltaX = rf4Position.x - rQuery.f2WorldPosition.x;
 		float fDeltaY = rf4Position.y - rQuery.f2WorldPosition.y;
 		float fSample = 0.0f;
-		if (!SamplePlacementHeightmap<false, false>(fDeltaX, fDeltaY, rQuery.fCosine, rQuery.fSine, rQuery.fFootprintX, rQuery.fFootprintY, 0.0f, 0.0f, rQuery.puiHeightmapHalf, rQuery.iHeightmapWidth, rQuery.iHeightmapHeight, 0.0f, 0.0f, 0.0f, 0.0f, fSample))
+		if (!SamplePlacementHeightmap<false>(fDeltaX, fDeltaY, rQuery.fCosine, rQuery.fSine, rQuery.fFootprintX, rQuery.fFootprintY, 0.5f * rQuery.fFootprintX, 0.5f * rQuery.fFootprintY, rQuery.puiHeightmapHalf, rQuery.iHeightmapWidth, rQuery.iHeightmapHeight, 0.0f, 0.0f, static_cast<float>(rQuery.iHeightmapWidth - 1), static_cast<float>(rQuery.iHeightmapHeight - 1), fSample))
 		{
 			continue;
 		}
@@ -375,6 +336,7 @@ float IslandTerrain::CellElevation(const CellStaticData& rStaticData, const XMFL
 
 	return fMaximumElevation;
 }
+#endif
 
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds CellElevationSampler::Sample, which steers CRC'd sim
@@ -431,7 +393,7 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 			float fTexelX = kfCellOriginX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
 			float fDeltaX = fTexelX - rPlacement.f2WorldPosition.x;
 			float fSample = 0.0f;
-			if (!SamplePlacementHeightmap<true, true>(fDeltaX, fDeltaY, fCosine, fSine, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.puiHeightmapHalf, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fInverseFootprintX, fInverseFootprintY, fHeightmapMaximumU, fHeightmapMaximumV, fSample))
+			if (!SamplePlacementHeightmap<true>(fDeltaX, fDeltaY, fCosine, fSine, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.puiHeightmapHalf, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fInverseFootprintX, fInverseFootprintY, fHeightmapMaximumU, fHeightmapMaximumV, fSample))
 			{
 				continue;
 			}
@@ -509,11 +471,18 @@ XMVECTOR XM_CALLCONV IslandTerrain::CellNormal(const CellStaticData& rStaticData
 	// 4-tap finite-difference over CellElevationSampler::Sample, each tap offset +/-2 units on X and Y (2 m, since
 	// islands use 1 m = 1 engine unit); that spacing captures normals without falling below per-pixel heightmap noise.
 	float fDistance = 2.0f;
+	CellElevationSampler sampler = MakeCellElevationSampler(rStaticData);
 
-	return NormalFromElevation(vecLocalPosition, fDistance, [&](FXMVECTOR vecTap)
-	{
-		return MakeCellElevationSampler(rStaticData).Sample(vecTap);
-	});
+	auto vecTopLeft = XMVectorAdd(vecLocalPosition, XMVectorSet(-fDistance, fDistance, 0.0f, 0.0f));
+	vecTopLeft = XMVectorSetZ(vecTopLeft, sampler.Sample(vecTopLeft));
+	auto vecTopRight = XMVectorAdd(vecLocalPosition, XMVectorSet(fDistance, fDistance, 0.0f, 0.0f));
+	vecTopRight = XMVectorSetZ(vecTopRight, sampler.Sample(vecTopRight));
+	auto vecBottomLeft = XMVectorAdd(vecLocalPosition, XMVectorSet(-fDistance, -fDistance, 0.0f, 0.0f));
+	vecBottomLeft = XMVectorSetZ(vecBottomLeft, sampler.Sample(vecBottomLeft));
+	auto vecBottomRight = XMVectorAdd(vecLocalPosition, XMVectorSet(fDistance, -fDistance, 0.0f, 0.0f));
+	vecBottomRight = XMVectorSetZ(vecBottomRight, sampler.Sample(vecBottomRight));
+
+	return XMVector3Normalize(XMVector3Cross(XMVectorSubtract(vecTopRight, vecBottomLeft), XMVectorSubtract(vecTopLeft, vecBottomRight)));
 }
 
 } // namespace engine

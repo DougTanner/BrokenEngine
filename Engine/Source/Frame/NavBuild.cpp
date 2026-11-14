@@ -5,6 +5,8 @@
 namespace engine
 {
 
+#if defined(BT_SERVER)
+
 struct ContourEdge
 {
 	XMFLOAT2 f2A {};
@@ -179,23 +181,14 @@ static void ExtractContourEdges(std::vector<ContourEdge>& rEdges, std::span<cons
 static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons, const std::vector<ContourEdge>& rEdges)
 {
 	// Cell-edge identifiers join shared crossings without position quantization.
-	struct EdgeReference
-	{
-		int64_t iEdgeIndex = 0;
-		bool bIsEndpointB = false; // false = matched on f2A / uiKeyA, true = matched on f2B / uiKeyB
-	};
-	std::unordered_multimap<uint64_t, EdgeReference> vertexToEdge;
-	vertexToEdge.reserve(static_cast<size_t>(std::ssize(rEdges) * 2));
+	std::unordered_map<uint64_t, int64_t> keyAToEdge;
+	keyAToEdge.reserve(static_cast<size_t>(std::ssize(rEdges)));
 	for (int64_t i = 0; i < std::ssize(rEdges); ++i)
 	{
-		vertexToEdge.insert({rEdges.at(i).uiKeyA, {.iEdgeIndex = i, .bIsEndpointB = false}});
-		vertexToEdge.insert({rEdges.at(i).uiKeyB, {.iEdgeIndex = i, .bIsEndpointB = true}});
-
-		// Each cell-edge key has at most two entries, one per side; boundary edges have one. This makes
-		// the unused chain candidate unique regardless of bucket order. Duplicate ExtractContourEdges
-		// entries make NavData depend on hash-bucket order and diverge across builds.
-		ASSERT(vertexToEdge.count(rEdges.at(i).uiKeyA) <= 2);
-		ASSERT(vertexToEdge.count(rEdges.at(i).uiKeyB) <= 2);
+		// Every edge ExtractContourEdges emits keeps the obstacle on the same side, so a cell-edge key is
+		// the A end of at most one edge, and a chain's tail has one successor regardless of bucket order.
+		ASSERT(!keyAToEdge.contains(rEdges.at(i).uiKeyA));
+		keyAToEdge.insert({rEdges.at(i).uiKeyA, i});
 	}
 
 	std::vector<bool> used(static_cast<size_t>(std::ssize(rEdges)), false);
@@ -212,44 +205,25 @@ static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons
 		uint64_t uiHeadKey = rEdges.at(i).uiKeyA;
 		uint64_t uiTailKey = rEdges.at(i).uiKeyB;
 
-		bool bGrowing = true;
-		while (bGrowing)
+		for (auto it = keyAToEdge.find(uiTailKey); it != keyAToEdge.end() && !used.at(it->second); it = keyAToEdge.find(uiTailKey))
 		{
-			bGrowing = false;
-			auto [itBegin, itEnd] = vertexToEdge.equal_range(uiTailKey);
-			for (auto it = itBegin; it != itEnd; ++it)
-			{
-				int64_t j = it->second.iEdgeIndex;
-				if (used.at(j))
-				{
-					continue;
-				}
-
-				if (it->second.bIsEndpointB)
-				{
-					polygon.push_back(rEdges.at(j).f2A);
-					uiTailKey = rEdges.at(j).uiKeyA;
-				}
-				else
-				{
-					polygon.push_back(rEdges.at(j).f2B);
-					uiTailKey = rEdges.at(j).uiKeyB;
-				}
-				used.at(j) = true;
-				bGrowing = true;
-				break;
-			}
+			int64_t j = it->second;
+			polygon.push_back(rEdges.at(j).f2B);
+			uiTailKey = rEdges.at(j).uiKeyB;
+			used.at(j) = true;
 		}
 
 		// Closed iff the chain returned to the head's cell-edge. Integer-exact compare — no
 		// epsilon needed, since cell-edge keys are derived from cell indices, not float positions.
-		if (std::ssize(polygon) >= 3 && uiTailKey == uiHeadKey)
+		if (uiTailKey == uiHeadKey)
 		{
 			polygon.pop_back();
 			rPolygons.push_back(std::move(polygon));
 		}
 	}
 }
+
+#endif // BT_SERVER
 
 // Shared segment intersection test for NavCellData's crossing diagnostic and NavQuery's edge test; it
 // accepts proper interior crossings only, not endpoint touching.
@@ -275,6 +249,8 @@ bool SegmentsIntersect(XMFLOAT2 f2A1, XMFLOAT2 f2A2, XMFLOAT2 f2B1, XMFLOAT2 f2B
 	static constexpr float kfSegmentEpsilon = 1.0e-6f;
 	return fT > kfSegmentEpsilon && fT < (1.0f - kfSegmentEpsilon) && fU > kfSegmentEpsilon && fU < (1.0f - kfSegmentEpsilon);
 }
+
+#if defined(BT_SERVER)
 
 void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
 {
@@ -309,10 +285,6 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	obstacles.reserve(static_cast<size_t>(std::ssize(polygons)));
 	for (const std::vector<XMFLOAT2>& rPolygon : polygons)
 	{
-		if (std::ssize(rPolygon) < 3)
-		{
-			continue;
-		}
 		Clipper2Lib::PathD path;
 		path.reserve(static_cast<size_t>(std::ssize(rPolygon)));
 		for (const XMFLOAT2& rVertex : rPolygon)
@@ -390,5 +362,7 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(&rContour.vertices.at(static_cast<size_t>(iStart)), static_cast<size_t>(iCount))));
 	}
 }
+
+#endif // BT_SERVER
 
 } // namespace engine

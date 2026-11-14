@@ -87,12 +87,13 @@ adding the fields below; the other entries are its own commands. For the engine
   `engine::GridCoord` a `[q,r]` grid coordinate; `randomEngine` a nonzero
   integer within `uint64_t`; `alignments` an array of `{"a","b","flags"}`
   objects (`a` and `b` integers within `uint32_t`, `flags` an integer within
-  `uint8_t`: 1 enemies, 2 allies, 3 both) that replaces the alignment table,
-  rebuilt in sorted order, so an empty array clears it. `edit_frame` never adds
-  or removes a row itself: an agent adds rows through `inject_payload` spawn
-  entries and removes one by writing its kill state (below), or for a ship by
-  an `inject_payload` `DestroyShip` entry. Identity and handle columns
-  (`engine::Id<T>`, such as `pIds`, `pPushers`, and `pRegistryIds`) are refused.
+  `uint8_t`, stored as given: bit 0x01 marks the pair as enemies and no other
+  bit has a meaning) that replaces the alignment table, rebuilt in sorted order,
+  so an empty array clears it. `edit_frame` never adds or removes a row itself:
+  an agent adds rows through `inject_payload` spawn entries and removes one by
+  writing its kill state (below), or for a ship by an `inject_payload`
+  `DestroyShip` entry. Identity and handle columns (`engine::Id<T>`, such as
+  `pIds`, `pPushers`, and `pRegistryIds`) are refused.
 
   `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked,
   apart from a ship's `pGlobalIds` and `pClientGuids` under the

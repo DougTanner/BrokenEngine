@@ -62,6 +62,11 @@ inline constexpr float kfElevationGridHalfHeight = kfCellHalfHeight + kfCellLand
 // IslandTerrain::BuildElevationGrid fills the grid.
 inline constexpr int64_t kiElevationGridDimension = 1'024;
 
+inline constexpr float kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
+inline constexpr float kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
+inline constexpr float kfCellOriginX = -kfElevationGridHalfWidth;
+inline constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
+
 #if defined(BT_CLIENT)
 // Client-only presentation basis: the cell a value's positions are local to, plus the offset from the camera
 // cell's origin to that cell's origin. coordinate answers cross-cell queries such as GlobalElevation, which need

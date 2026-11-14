@@ -9,11 +9,6 @@ namespace engine
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
 {
-	static constexpr float kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
-	static constexpr float kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
-	static constexpr float kfCellOriginX = -kfElevationGridHalfWidth;
-	static constexpr float kfCellOriginY = -kfElevationGridHalfHeight;
-
 	CellElevationSampler sampler = gpIslandTerrain->MakeCellElevationSampler(rStaticData);
 	XMFLOAT4A f4Start {};
 	XMFLOAT4A f4End {};
@@ -155,13 +150,9 @@ SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticDat
 // an overlap.
 constexpr float kfDiscOverlapTolerance = 0.001f;
 
-constexpr double kfGridPitchX = 2.0f * kfElevationGridHalfWidth / static_cast<float>(kiElevationGridDimension);
-constexpr double kfGridPitchY = 2.0f * kfElevationGridHalfHeight / static_cast<float>(kiElevationGridDimension);
-constexpr double kfCellOriginX = -kfElevationGridHalfWidth;
-constexpr double kfCellOriginY = -kfElevationGridHalfHeight;
-
 // One elevation grid cell's square in cell-local meters. The disc query computes in double, where float positions,
-// the grid pitch, and every cell edge are exact.
+// the grid pitch, and every cell edge are exact. kfGridPitchX/Y and kfCellOriginX/Y are floats that every use here
+// promotes through a double operand; an expression combining two of them alone would evaluate in float.
 struct DiscGridSquare
 {
 	double fMinimumX = 0.0;

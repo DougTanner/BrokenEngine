@@ -19,12 +19,7 @@ common::crc_t FrameInterpolateBase::Crcs() const
 	uiSharedCrc = (uiSharedCrc ^ common::Crc(iTick)) * common::kCrcMultiplier;
 	uiSharedCrc = (uiSharedCrc ^ common::Crc(fDeltaTime)) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... rCollections)
-	{
-		((uiSharedCrc = (uiSharedCrc ^ SharedCollectionCrc(rCollections)) * common::kCrcMultiplier), ...);
-	}, ServerCollections());
-
-	return uiSharedCrc;
+	return CollectionsCrc(uiSharedCrc, ServerCollections());
 }
 
 bool FrameInterpolateBase::LogDifferences(const FrameInterpolateBase& rOther) const
@@ -41,30 +36,21 @@ void FrameInterpolateBase::Write(std::ostream& rStream) const
 {
 	FrameValuesWrite(rStream, *this, Values());
 
-	std::apply([&](const auto&... rCollections)
-	{
-		(CollectionWrite(rStream, rCollections, rCollections.Members()), ...);
-	}, Collections());
+	CollectionsWrite(rStream, Collections());
 }
 
 void FrameInterpolateBase::Read(std::istream& rStream)
 {
 	FrameValuesRead<false>(rStream, *this, Values());
 
-	std::apply([&](auto&... rCollections)
-	{
-		(CollectionRead(rStream, rCollections, rCollections.Members()), ...);
-	}, Collections());
+	CollectionsRead(rStream, Collections());
 }
 
 void FrameInterpolateBase::ServerRead(std::istream& rStream)
 {
 	FrameValuesRead<true>(rStream, *this, Values());
 
-	std::apply([&](auto&... rCollections)
-	{
-		(SharedCollectionRead(rStream, rCollections), ...);
-	}, ServerCollections());
+	SharedCollectionsRead(rStream, ServerCollections());
 }
 
 FramePostRenderBase::FramePostRenderBase()
@@ -82,12 +68,7 @@ common::crc_t FramePostRenderBase::Crcs() const
 	uiCrc = (uiCrc ^ common::Crc(uiPinned)) * common::kCrcMultiplier;
 	uiCrc = (uiCrc ^ alignments.Crc()) * common::kCrcMultiplier;
 
-	std::apply([&](const auto&... rCollections)
-	{
-		((uiCrc = (uiCrc ^ SharedCollectionCrc(rCollections)) * common::kCrcMultiplier), ...);
-	}, ServerCollections());
-
-	return uiCrc;
+	return CollectionsCrc(uiCrc, ServerCollections());
 }
 
 bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) const
@@ -115,30 +96,21 @@ void FramePostRenderBase::Write(std::ostream& rStream) const
 {
 	FrameValuesWrite(rStream, *this, Values());
 
-	std::apply([&](const auto&... rCollections)
-	{
-		(CollectionWrite(rStream, rCollections, rCollections.Members()), ...);
-	}, Collections());
+	CollectionsWrite(rStream, Collections());
 }
 
 void FramePostRenderBase::Read(std::istream& rStream)
 {
 	FrameValuesRead<false>(rStream, *this, Values());
 
-	std::apply([&](auto&... rCollections)
-	{
-		(CollectionRead(rStream, rCollections, rCollections.Members()), ...);
-	}, Collections());
+	CollectionsRead(rStream, Collections());
 }
 
 void FramePostRenderBase::ServerRead(std::istream& rStream)
 {
 	FrameValuesRead<true>(rStream, *this, Values());
 
-	std::apply([&](auto&... rCollections)
-	{
-		(SharedCollectionRead(rStream, rCollections), ...);
-	}, ServerCollections());
+	SharedCollectionsRead(rStream, ServerCollections());
 }
 
 bool FramePostRenderBase::PrepareTransferRequest(game::TransferRequest& rRequest) const
@@ -285,11 +257,12 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 
 #if defined(BT_SERVER)
 	// NavData is derived from placements + per-template NavContour. Build it here on the
-	// per-coord dispatch thread (naturally parallel across coords) on the first tick after
-	// a coord is created or reloaded from save. Client receives prebuilt navigationData over the
+	// per-coord dispatch thread (naturally parallel across coords) when a coord reaches a tick
+	// with it not yet built. Client receives prebuilt navigationData over the
 	// wire and never enters this branch (server-only NavContour).
 	if (!(rStaticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
 	{
+		// Heap: one-time build per cell grows each graph's vertex, polygon, and visibility-edge vectors in proportion to the cell's islands
 		ScopedSuppressAllocationTracking suppress;
 		BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
 		rStaticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
@@ -305,6 +278,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 #endif
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
+		// Heap: BuildElevationGrid sizes the cell's elevation grid on its first menu or server tick, and again after a menu island change clears it
 		ScopedSuppressAllocationTracking suppress;
 #if defined(BT_CLIENT)
 		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
@@ -318,6 +292,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 #if defined(BT_CLIENT)
 	if (rStaticData.islandRenderQueries.empty() && !rStaticData.islands.empty())
 	{
+		// Heap: BuildRenderPlacementCache sizes one query per island on a menu tick, and again after a menu island change clears the cache
 		ScopedSuppressAllocationTracking suppress;
 		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
 		rStaticData.BuildRenderPlacementCache(*gpIslandTerrain);

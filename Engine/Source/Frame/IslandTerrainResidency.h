@@ -64,6 +64,9 @@ private:
 	bool EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, MeshEvictionReason eReason = MeshEvictionReason::kGrace);
 	bool IsEvictionPending(const IslandTemplate& rTemplate) const;
 	bool IsRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const;
+	// True when an arena-blocked template should retry its mesh allocation: arena capacity changed since it
+	// blocked, or another template can be evicted for room and no earlier eviction is still retiring.
+	bool IsArenaRetryDue(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const;
 	bool HasArenaEvictionCandidate(common::crc_t uiExcludedCrc) const;
 
 	// Starts at 1: slot 0 is reserved as a permanent neutral placeholder anchor, never adopted

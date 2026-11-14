@@ -41,8 +41,6 @@ struct IslandTemplate
 	int64_t iHeightmapWidth = 0;
 	int64_t iHeightmapHeight = 0;
 
-	float fWorldFootprintXMeters = 0.0f;
-	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
 
 	// Highest full-precision elevation sample and its heightmap texel, copied from the chunk header in ctor.
@@ -50,12 +48,14 @@ struct IslandTemplate
 	int64_t iPeakTexelX = 0;
 	int64_t iPeakTexelY = 0;
 
-	// Anisotropic quad footprint in engine units (islands use 1 m = 1 engine unit), so a
-	// direct copy of fWorldFootprint{X,Y}Meters; set in ctor.
+	// Anisotropic quad footprint in engine units (islands use 1 m = 1 engine unit), copied in ctor from the
+	// chunk header's fWorldFootprint{X,Y}Meters.
 	float fQuadFootprintX = 0.0f;
 	float fQuadFootprintY = 0.0f;
 
+#if defined(BT_SERVER)
 	std::vector<NavContour> navContours;   // one per baked graph, index-parallel with the server's NavigationGraphBake entries; empty on a plane without kTerrainCollision
+#endif
 
 	int64_t iTextureSlot = -1;
 
@@ -156,9 +156,11 @@ public:
 	// that would query.
 	[[nodiscard]] XMVECTOR XM_CALLCONV CellNormal(const CellStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 
+#if defined(BT_CLIENT)
 	// Render path. Highest elevation of the cell's island placements at rf4Position, local to that cell; sea floor
 	// where no placement covers it.
 	[[nodiscard]] float CellElevation(const CellStaticData& rStaticData, const XMFLOAT4A& rf4Position) const;
+#endif
 
 	[[nodiscard]] CellElevationSampler XM_CALLCONV MakeCellElevationSampler(const CellStaticData& rStaticData) const;
 
@@ -175,8 +177,8 @@ public:
 	std::unordered_map<common::crc_t, IslandTemplate> mIslands;
 	std::vector<common::crc_t> mIslandCrcsSorted;
 
-	// Same CRCs as mIslandCrcsSorted, ordered by footprint area (fWorldFootprintXMeters *
-	// fWorldFootprintYMeters) descending, CRC ascending as a stable tiebreak. Drives only the
+	// Same CRCs as mIslandCrcsSorted, ordered by footprint area (fQuadFootprintX *
+	// fQuadFootprintY) descending, CRC ascending as a stable tiebreak. Drives only the
 	// debug main-menu island browser (GameBase::BuildMenuIslandPlacement) so it cycles largest-first.
 	// Kept separate from mIslandCrcsSorted, whose CRC order is load-bearing (template slot
 	// assignment + world-gen placement RNG) and must not change.
@@ -196,9 +198,10 @@ public:
 	// Island heightmaps already store negative depths in engine meters.
 	float mfSeaFloorElevation = common::kfSeaBottomMeters;
 
-	// Number of cell navigation graphs, one per NavigationGraphBake entry. Declared in both builds because BuildCellNavigationData
-	// compiles in both; only the server's WaitForElevationMaps writes it.
+#if defined(BT_SERVER)
+	// Number of cell navigation graphs, one per NavigationGraphBake entry.
 	int64_t miNavigationGraphCount = 0;
+#endif
 
 	// Constructor-derived accepted columns avoid repeating the hex predicate for each placement's samples.
 	std::array<std::pair<int64_t, int64_t>, kiElevationGridDimension> mElevationRowSpans;

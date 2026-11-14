@@ -15,25 +15,12 @@ struct AlignmentIdentifier
 
 	constexpr bool operator==(const AlignmentIdentifier&) const = default;
 	constexpr std::strong_ordering operator<=>(const AlignmentIdentifier&) const = default;
-
-	void Write(std::ostream& rStream) const
-	{
-		common::Write(rStream, uiValue);
-	}
-	void Read(std::istream& rStream)
-	{
-		common::Read(rStream, uiValue);
-	}
 };
-
-inline constexpr AlignmentIdentifier kInvalidAlignment {};
 
 namespace AlignmentFlags
 {
 
-inline constexpr uint8_t kuiNone = 0x00;
 inline constexpr uint8_t kuiEnemies = 0x01;
-inline constexpr uint8_t kuiAllies = 0x02;
 
 } // namespace AlignmentFlags
 

@@ -114,7 +114,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	for (const IslandPlacement& rPlacement : staticData.islands)
 	{
 		const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-		islands.push_back({{"crc", rPlacement.islandCrc}, {"x", rPlacement.f2WorldPosition.x}, {"y", rPlacement.f2WorldPosition.y}, {"rotation", rPlacement.fRotation}, {"footprint", {rTemplate.fWorldFootprintXMeters, rTemplate.fWorldFootprintYMeters}}, {"peak", rTemplate.fPeakHeightMeters}});
+		islands.push_back({{"crc", rPlacement.islandCrc}, {"x", rPlacement.f2WorldPosition.x}, {"y", rPlacement.f2WorldPosition.y}, {"rotation", rPlacement.fRotation}, {"footprint", {rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY}}, {"peak", rTemplate.fPeakHeightMeters}});
 	}
 	rResult["islands"] = std::move(islands);
 	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(staticData.elevationGrid.data(), static_cast<size_t>(std::ssize(staticData.elevationGrid))))}};

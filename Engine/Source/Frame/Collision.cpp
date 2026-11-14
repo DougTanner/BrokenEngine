@@ -106,6 +106,7 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 	ASSERT(rLayer.pVecVelocities != nullptr);
 	if (sLayers.empty())
 	{
+		// Heap: sized once per thread on first use and never grown; a thread_local constructor runs before the allocator is ready
 		ScopedSuppressAllocationTracking suppress;
 		sLayers.resize(kiCollisionLayerPreallocate);
 	}
