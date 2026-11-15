@@ -105,20 +105,18 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, vec3 f3LocalTan
 	iOutLayer = int(model.f4PositionLayer.w);
 
 	int iRenderingMode = int(pushConstantsLayout.f4Pipeline.y);
-	if (iRenderingMode == 0)
+	if (iRenderingMode == kiModelRenderingModeCamera)
 	{
-		// Mode 0: Camera rendering
 		gl_Position = Transform(vec4(f3WorldPosition, 1.0f), mainLayout.f4x4ModelViewProjection);
 	}
-	else if (iRenderingMode == 1)
+	else if (iRenderingMode == kiModelRenderingModeVisibleArea)
 	{
-		// Mode 1: Visible area projection
 		vec2 f2VisibleAreaUV = WorldToVisibleArea(f3WorldPosition, globalLayout.f4VisibleArea);
 		gl_Position = vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 	}
 	else
 	{
-		// Mode 2: Shadow projection. The object-shadow blur measures height from the ground under the model centre (sea level
+		// kiModelRenderingModeShadow: shadow projection. The object-shadow blur measures height from the ground under the model centre (sea level
 		// over water) rather than from sea level, so a ship over high terrain blurs like a low one.
 		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4PositionLayer.xyz, model.f2ShadowWorldXRange);
 		float fGroundHeight = max(textureLod(elevationTextureSampler, WorldToVisibleArea(model.f4PositionLayer.xyz, globalLayout.f4VisibleArea), 0.0f).x, 0.0f);

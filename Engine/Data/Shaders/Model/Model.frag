@@ -47,21 +47,21 @@ layout (set = 0, binding = kiGlobalBindingSamplerRepeat) uniform sampler sampler
 layout (set = 0, binding = kiGlobalBindingBindlessTextures) uniform texture2D pTextures[];
 
 // IBL textures
-layout (set = 1, binding = 5) uniform samplerCube samplerIrradiance;
-layout (set = 1, binding = 6) uniform samplerCube prefilteredMap;
-layout (set = 1, binding = 7) uniform sampler2D samplerBRDFLUT;
+layout (set = 1, binding = kiModelBindingIrradiance) uniform samplerCube samplerIrradiance;
+layout (set = 1, binding = kiModelBindingPrefiltered) uniform samplerCube prefilteredMap;
+layout (set = 1, binding = kiModelBindingBrdfLookupTable) uniform sampler2D samplerBRDFLUT;
 
 // Material buffer (per-material, Set 2)
-layout (scalar, set = 2, binding = 8) buffer readonly pbrMaterialsUniform
+layout (scalar, set = 2, binding = kiModelBindingMaterials) buffer readonly pbrMaterialsUniform
 {
 	PbrMaterialLayout pMaterials[];
 };
 
 // Engine-specific textures
-layout (set = 1, binding = 9) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
-layout (set = 1, binding = 10) uniform sampler2D shadowTextureSampler;
-layout (set = 1, binding = 11) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
-layout (set = 1, binding = 12) uniform sampler2D objectShadowsTextureSampler;
+layout (set = 1, binding = kiModelBindingLighting) uniform sampler2D pLightingSamplers[kiLightingLayers * 3];
+layout (set = 1, binding = kiModelBindingShadow) uniform sampler2D shadowTextureSampler;
+layout (set = 1, binding = kiModelBindingSmoke) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
+layout (set = 1, binding = kiModelBindingObjectShadows) uniform sampler2D objectShadowsTextureSampler;
 
 // Vertex inputs
 layout (location = 0) in vec3 f3InWorldPosition;

@@ -33,7 +33,9 @@ single-sourced. GLSL indents with tabs and aligns with spaces after them, as
   indexed by a dynamically uniform value, such as a loop counter bounded by a
   uniform, relies instead on the required
   `shaderSampledImageArrayDynamicIndexing` device feature. Push constants select
-  projection/render modes where command buffers are recorded once.
+  projection/render modes where command buffers are recorded once; the selector
+  values are named constants in the shared layout header, which C++ recording
+  and GLSL decoding both use.
 - `ShaderFunctions.h` owns shared transforms, projection, normal mapping,
   randomized patch blending, smoke blending, wind magnitude factor, and lighting
   helpers. `ShaderRandom.h` mirrors the engine's 32-bit RNG family.

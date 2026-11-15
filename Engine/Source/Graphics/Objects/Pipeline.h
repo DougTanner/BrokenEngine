@@ -14,7 +14,6 @@ enum class DescriptorFlags : uint64_t
 {
 	kEmpty                          = 0x0001,
 
-	kTextures                       = 0x0002,
 	kCombinedSamplers               = 0x0008,
 		kSamplerClamp               = 0x0010,
 		kSamplerBorder              = 0x0020,
@@ -27,9 +26,6 @@ enum class DescriptorFlags : uint64_t
 		kSamplerClampLinear          = 0x400000,
 		kSamplerRepeatLinear         = 0x800000,
 		kSamplerMirroredRepeatLinear = 0x1000000,
-		// PipelineDescriptorWriter::Write uses this any-bit mask for standalone samplers and excludes kCombinedSamplers.
-		// kSamplerBorderWhite is used only with kCombinedSamplers.
-		kSamplerAny                 = 0x00010 | 0x00020 | 0x00040 | 0x00080 | 0x00100 | 0x00200 | 0x10000 | 0x20000 | 0x400000 | 0x800000 | 0x1000000,
 	kStorageImages                  = 0x0400,
 
 	// One plain buffer shared by every frame in flight — correct only for data the CPU does not rewrite per frame.
@@ -42,8 +38,6 @@ enum class DescriptorFlags : uint64_t
 	kPerCommandBufferStorageBuffers = 0x4000,
 	kGlobalLayoutUniformBuffers     = 0x100000, // The renderer's own per-framebuffer global layout buffers
 	kMainLayoutUniformBuffers       = 0x200000, // The renderer's own per-framebuffer main layout buffers
-
-	kModel                          = 0x8000,
 
 	// Marks a bindless texture-array descriptor whose per-slot binding key is supplied lazily by the
 	// data subsystem (e.g., IslandTerrainResidency) rather than derivable from ppTextures[k]->mInfo.uiCrc.
@@ -65,7 +59,6 @@ struct DescriptorInfo
 	Texture** ppTextures = nullptr;
 	Buffer* pBuffers = nullptr;
 	VkBuffer* pVkBuffers = nullptr;
-	common::crc_t crc = 0;
 };
 
 enum class PipelineFlags : uint64_t
@@ -179,8 +172,6 @@ public:
 	VkDrawIndexedIndirectCommand* mpIndirectVkDrawIndexedIndirectCommand = nullptr;
 	VkDispatchIndirectCommand* mpIndirectComputeVkDispatchIndirectCommand = nullptr; // Host-visible dispatch map (kIndirectHostVisible | kCompute); mutually exclusive with the draw map above
 	int64_t miIndirectSlotCount = 0; // Indirect buffer slot capacity bounding the Record*Indirect command-buffer index. Set only for indirect pipelines: the host-visible / graphics-device-local branches stamp max(framebufferCount, 3), the kIndirectDeviceLocal compute branch stamps 1. Stays 0 on non-indirect pipelines, which never read it (every Record*Indirect ASSERT is gated behind an indirect-flag ASSERT)
-
-	Buffer mModelMaterialsStorageBuffer;
 
 	// Texture CRCs collected during descriptor set creation for demand-driven loading
 	std::vector<common::crc_t> mTextureCrcs;

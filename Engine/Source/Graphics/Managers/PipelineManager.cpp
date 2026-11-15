@@ -408,8 +408,6 @@ void PipelineManager::CreateParticlePipelines()
 				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kStorageBuffer, .pBuffers = rDescription.pStorageBuffer},
 				{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
-				{.flags = DescriptorFlags::kSamplerClamp},
-				{.flags = DescriptorFlags::kTextures},
 			},
 		});
 

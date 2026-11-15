@@ -12,53 +12,35 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 {
 	PipelineInfo pipelineInfo = rPipelineInfo;
 
-	static constexpr int64_t kiModelAdditionalDescriptors = 7; // +1 lighting, +2 shadow, +3 smoke, +4 object shadows, +5 mesh data, +6 joint matrices, +7 terrain elevation
-
-	// Grow by the model descriptor plus its seven appended slots before the scan, so the slots the loop
-	// writes in place exist. Grown entries default to kEmpty, so the scan still stops at the first of them.
-	int64_t iDescriptorInfoCount = std::ssize(pipelineInfo.descriptorInfos) + kiModelAdditionalDescriptors + 1;
-	pipelineInfo.descriptorInfos.resize(iDescriptorInfoCount);
-
-	for (int64_t i = 0; i < iDescriptorInfoCount; ++i)
+	pipelineInfo.descriptorInfos.insert(pipelineInfo.descriptorInfos.end(),
 	{
-		DescriptorInfo& rDescriptorInfo = pipelineInfo.descriptorInfos.at(i);
-		if (rDescriptorInfo.flags & DescriptorFlags::kEmpty)
-		{
-			rDescriptorInfo.flags = DescriptorFlags::kModel;
-			rDescriptorInfo.crc = sceneCrc;
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .iExplicitBinding = shaders::kiModelBindingIrradiance, .textureCrc = TextureManager::kIrradianceCrc},
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .iExplicitBinding = shaders::kiModelBindingPrefiltered, .textureCrc = TextureManager::kPrefilteredCrc},
 
-			ASSERT(pipelineInfo.descriptorInfos.at(i + 1).flags == DescriptorFlags::kEmpty);
+		// Generated at runtime, not packed, so it binds through pTexture rather than a texture CRC.
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .iExplicitBinding = shaders::kiModelBindingBrdfLookupTable, .pTexture = &gpTextureManager->mTextureCache.mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture},
 
-			pipelineInfo.descriptorInfos.at(i + 1).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder};
-			pipelineInfo.descriptorInfos.at(i + 1).iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures));
-			pipelineInfo.descriptorInfos.at(i + 1).ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures;
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures)), .iExplicitBinding = shaders::kiModelBindingLighting, .ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures},
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite}, .iExplicitBinding = shaders::kiModelBindingShadow, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
 
-			pipelineInfo.descriptorInfos.at(i + 2).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite};
-			pipelineInfo.descriptorInfos.at(i + 2).pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture;
+		// The smoke sampler (kSamplerSmoke) uses LINEAR filtering for R16_SFLOAT smoke ping-pong textures. Same CLAMP_TO_BORDER + INT_TRANSPARENT_BLACK as the border sampler; aniso is a no-op at mipLevels = 1.
+		{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .iExplicitBinding = shaders::kiModelBindingSmoke, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
 
-			// The smoke sampler (kSamplerSmoke) uses LINEAR filtering for R16_SFLOAT smoke ping-pong textures. Same CLAMP_TO_BORDER + INT_TRANSPARENT_BLACK as the border sampler; aniso is a no-op at mipLevels = 1.
-			pipelineInfo.descriptorInfos.at(i + 3).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke};
-			pipelineInfo.descriptorInfos.at(i + 3).iCount = shaders::kiMaxFlightPlanes;
-			pipelineInfo.descriptorInfos.at(i + 3).ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne;
+		{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiModelBindingObjectShadows, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture},
 
-			pipelineInfo.descriptorInfos.at(i + 4).flags = DescriptorFlags::kCombinedSamplers;
-			pipelineInfo.descriptorInfos.at(i + 4).pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture;
+		// Per-mesh data (matrix, normal matrix, joint count/offset)
+		{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .iExplicitBinding = shaders::kiModelBindingMeshData, .pBuffers = gpBufferManager->mMeshDataStorageBuffers.data()},
 
-			// Binding 15: Per-mesh data (matrix, normal matrix, joint count/offset)
-			pipelineInfo.descriptorInfos.at(i + 5).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
-			pipelineInfo.descriptorInfos.at(i + 5).iExplicitBinding = shaders::kiModelBindingMeshData;
-			pipelineInfo.descriptorInfos.at(i + 5).pBuffers = gpBufferManager->mMeshDataStorageBuffers.data();
+		// Joint matrices (separate dynamically-sized buffer; MeshData stays fixed-size)
+		{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .iExplicitBinding = shaders::kiModelBindingJointMatrix, .pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data()},
 
-			// Binding 16: Joint matrices (separate dynamically-sized buffer; MeshData stays fixed-size)
-			pipelineInfo.descriptorInfos.at(i + 6).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;
-			pipelineInfo.descriptorInfos.at(i + 6).iExplicitBinding = shaders::kiModelBindingJointMatrix;
-			pipelineInfo.descriptorInfos.at(i + 6).pBuffers = gpBufferManager->mJointMatrixStorageBuffers.data();
+		{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiModelBindingTerrainElevation, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+	});
 
-			pipelineInfo.descriptorInfos.at(i + 7).flags = DescriptorFlags::kCombinedSamplers;
-			pipelineInfo.descriptorInfos.at(i + 7).iExplicitBinding = shaders::kiModelBindingTerrainElevation;
-			pipelineInfo.descriptorInfos.at(i + 7).pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture;
-			break;
-		}
+	// mMaterialsStorageBuffer is created below, before any material pipeline writes it.
+	if (!bIsShadow)
+	{
+		pipelineInfo.descriptorInfos.push_back({.flags = DescriptorFlags::kStorageBuffer, .iExplicitBinding = shaders::kiModelBindingMaterials, .pBuffers = &mMaterialsStorageBuffer});
 	}
 
 	mSceneCrc = sceneCrc;
@@ -105,6 +87,45 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 			throw std::ios_base::failure("ModelPipeline::Create");
 		}
 		iPreviousIndexStart = iIndexStart;
+	}
+
+	if (!bIsShadow)
+	{
+		mMaterialsStorageBuffer.Create(
+		{
+			.name = "Materials",
+			.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
+			.iDataSize = miMaterialCount * static_cast<int64_t>(sizeof(shaders::PbrMaterialLayout)),
+		}, [&](void* pData)
+		{
+			const common::crc_t* pTextureCrcs = reinterpret_cast<const common::crc_t*>(rChunk.pData);
+			shaders::PbrMaterialLayout* pCurrent = static_cast<shaders::PbrMaterialLayout*>(pData);
+			static constexpr int64_t kiOldMaterialSize = offsetof(shaders::PbrMaterialLayout, fColorTextureIndex);
+			// A present texture selector's index is a pack trust boundary; an absent selector leaves its index unused.
+			auto ResolveTextureIndex = [&](int64_t iTextureSet, int64_t iTextureIndex)
+			{
+				if (iTextureSet < 0)
+				{
+					return 0.0f;
+				}
+				if (iTextureIndex >= rSceneHeader.uiTextureCount)
+				{
+					throw std::ios_base::failure("ModelPipeline::Create material");
+				}
+				return static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[iTextureIndex]));
+			};
+			for (int64_t i = 0; i < miMaterialCount; ++i)
+			{
+				const common::MaterialShaderData& rMaterial = pMaterials[i];
+				std::memcpy(pCurrent, &rMaterial.f4BaseColorFactor, kiOldMaterialSize);
+				pCurrent->fColorTextureIndex = ResolveTextureIndex(rMaterial.iColorTextureSet, rMaterial.uiColorTextureIndex);
+				pCurrent->fPhysicalDescriptorTextureIndex = ResolveTextureIndex(rMaterial.iPhysicalDescriptorTextureSet, rMaterial.uiPhysicalDescriptorTextureIndex);
+				pCurrent->fNormalTextureIndex = ResolveTextureIndex(rMaterial.iNormalTextureSet, rMaterial.uiNormalTextureIndex);
+				pCurrent->fOcclusionTextureIndex = ResolveTextureIndex(rMaterial.iOcclusionTextureSet, rMaterial.uiOcclusionTextureIndex);
+				pCurrent->fEmissiveTextureIndex = ResolveTextureIndex(rMaterial.iEmissiveTextureSet, rMaterial.uiEmissiveTextureIndex);
+				pCurrent++;
+			}
+		});
 	}
 
 	bool bMultiSet = pipelineInfo.flags & PipelineFlags::kMultiSet;

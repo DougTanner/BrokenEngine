@@ -82,7 +82,7 @@ void main()
 	// World position
 	f3OutPosition += pHexShields[i].f4Position.xyz;
 
-	if (int(pushConstantsLayout.f4Pipeline.x) == 0)
+	if (int(pushConstantsLayout.f4Pipeline.x) == kiAreaSelectorVisible)
 	{
 		gl_Position = Transform(vec4(f3OutPosition, 1.0f), mainLayout.f4x4ViewProjection);
 	}

@@ -16,7 +16,7 @@ layout (scalar, set = 1, binding = 2) buffer readonly visibleLightsUniform
 	VisibleLightQuadLayout pQuads[];
 };
 
-layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = kiVisibleLightBindingElevation) uniform sampler2D elevationTextureSampler;
 layout (set = 0, binding = kiGlobalBindingSamplerRepeat) uniform sampler texturesSampler;
 layout (set = 0, binding = kiGlobalBindingBindlessTextures) uniform texture2D pTextures[];
 

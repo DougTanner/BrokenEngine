@@ -114,7 +114,7 @@ struct SceneHeader
 
 	// Chunk payload layout: [textureCrcs ALIGN16] [indexStarts ALIGN16] [MaterialShaderData ALIGN16] [AnimationData].
 	// Single source for the writer (ExportScene.cpp) and readers (ModelPipeline.cpp,
-	// PipelineDescriptorWriter.cpp, AnimationData.cpp) offset math.
+	// AnimationData.cpp) offset math.
 	static constexpr int64_t IndexStartsOffset(int64_t iTextureCount)
 	{
 		return RoundUp<int64_t, kiAlignmentBytes>(iTextureCount * static_cast<int64_t>(sizeof(crc_t)));

@@ -182,7 +182,7 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 	}
 }
 
-void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
+void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc)
 {
 	if (mpPipelineMaps[eType].contains(crc))
 	{
@@ -201,8 +201,6 @@ void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, com
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
-			{.flags = eSamplerFlag},
-			{.flags = DescriptorFlags::kTextures},
 		},
 	});
 }
@@ -225,9 +223,7 @@ void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::strin
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = pStorageBuffers},
-			{.flags = DescriptorFlags::kSamplerRepeat},
-			{.flags = DescriptorFlags::kTextures},
-			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiVisibleLightBindingElevation, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 		},
 	});
 }
@@ -250,8 +246,6 @@ void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_v
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
-			{.flags = DescriptorFlags::kSamplerClamp},
-			{.flags = DescriptorFlags::kTextures},
 		},
 	});
 }

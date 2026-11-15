@@ -66,7 +66,7 @@ void CommandBufferRecordGlobal::RecordShadowPasses(VkCommandBuffer vkCommandBuff
 	gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.RecordBeginRenderPass(vkCommandBuffer);
 	// The refresh-frame prepass covers the shared global placement arena populated by
 	// Islands::UpdateActiveIslands; cleared slots beyond the written total remain degenerate.
-	pPipelines[kPipelineShadowElevation].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {1.0f, 0.0f, 0.0f, 0.0f});
+	pPipelines[kPipelineShadowElevation].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorShadow), 0.0f, 0.0f, 0.0f});
 	vkCmdEndRenderPass(vkCommandBuffer);
 	pPipelines[kPipelineShadow].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mShadowTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);

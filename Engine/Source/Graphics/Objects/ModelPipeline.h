@@ -41,6 +41,8 @@ public:
 	common::crc_t mSceneCrc = 0;
 	std::vector<bool> mpbTransparentMaterials;
 	ModelPipelineFlags_t mFlags;
+	// The scene's materials, shared by every material pipeline of the main variant; the shadow variant creates none.
+	Buffer mMaterialsStorageBuffer;
 };
 
 } // namespace engine

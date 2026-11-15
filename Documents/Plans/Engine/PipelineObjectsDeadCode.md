@@ -102,8 +102,7 @@ Four enum values have no producer, and one sampler slot is reached only
 through one of them:
 
 - `DescriptorFlags::kSamplerClampLinear` and `kSamplerRepeatLinear`
-  (`Objects/Pipeline.h:27-28`). Their only other uses are two literals of the
-  `kSamplerAny` mask (`Objects/Pipeline.h:32`) and two rows of the
+  (`Objects/Pipeline.h:27-28`). Their only other uses are two rows of the
   flag-to-slot table in `TextureManager::GetSampler`
   (`Managers/TextureManager.cpp:436-437`). No `DescriptorInfo` sets either.
   The sibling `kSamplerMirroredRepeatLinear` is live
@@ -188,9 +187,8 @@ unchanged.
      `## Resource Contracts` names, and every input is accepted or rejected as
      before.
 5. Unproduced flag and layout values:
-   - Delete `kSamplerClampLinear` and `kSamplerRepeatLinear`, remove exactly
-     their two literals from `kSamplerAny`, and delete their two rows from the
-     `GetSampler` table.
+   - Delete `kSamplerClampLinear` and `kSamplerRepeatLinear`, and delete their
+     two rows from the `GetSampler` table.
    - Delete `kSamplerSlotRepeatLinear` and the sampler creation that fills it.
      The create-info state those three address-mode assignments set is used by
      nothing after them.
@@ -232,8 +230,8 @@ unchanged.
 
 - `Pipeline.h`: `PipelineInfo::iPushConstantBytes`,
   `PipelineInfo::vkExternalDescriptorSetLayout`, and their comments;
-  `DescriptorFlags::kSamplerClampLinear`, `kSamplerRepeatLinear`, and the
-  `kSamplerAny` mask; `PipelineFlags::kCullFront`; the
+  `DescriptorFlags::kSamplerClampLinear` and `kSamplerRepeatLinear`;
+  `PipelineFlags::kCullFront`; the
   `BindComputeDescriptorSets` declaration and its comment.
 - `Pipeline.cpp`: `BindGraphicsDescriptorSets` and
   `BindComputeDescriptorSets`, merged into one file-static function; the
@@ -358,10 +356,11 @@ serialization, `.pack`, replay, threading, or shader exposure.
 
 ## Coordination
 
-`Documents/Plans/Engine/DescriptorBindingsAndShaderLayout.md` also edits
-`Pipeline.h`, `Pipeline.cpp`, and `ModelPipeline::Create`
-(`ModelPipeline.cpp`). Neither Plan depends on the other; whichever lands
-second re-finds those lines by symbol from the landed files.
+`Documents/Plans/Engine/RetireModelMaterialsDescriptorSet2.md` edits other
+regions of `PipelineCreator.cpp`, `Pipeline.h`, `Pipeline.cpp`, and
+`ModelPipeline.cpp`. Neither Plan depends on the other; whichever lands second
+re-finds its lines by symbol and adapts to the landed helper signatures and
+function name.
 
 ## Notes
 

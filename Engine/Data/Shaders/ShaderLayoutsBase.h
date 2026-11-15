@@ -95,8 +95,6 @@ layout(scalar) uniform;
 #define INIT
 #define STD
 
-#define ELEVATION_FORMAT r16f
-
 struct VkDrawIndexedIndirectCommand
 {
 	uint32_t indexCount;
@@ -126,10 +124,10 @@ CONSTEXPR int kiGlobalBindingSamplerRepeat = 3;
 CONSTEXPR int kiGlobalBindingBindlessTextures = 4;
 CONSTEXPR int kiGlobalBindingSamplerClamp = 12;
 
-// Set-1 per-pipeline descriptor binding numbers. Single-sourced here (dual-language) like the Set-0
-// block above, so the C++ pipeline setup (ModelPipeline kModel descriptor append, BufferManager mesh/joint
-// storage-buffer updates, PipelineManager water displacement descriptors) and the GLSL
-// layout(set = 1, binding = N) qualifiers (ModelCommon.h, Water.vert) stay in lockstep.
+// Per-pipeline descriptor binding numbers (Set 1, plus the model materials binding in Set 2). Single-sourced here
+// (dual-language) like the Set-0 block above, so C++ descriptor writes and the GLSL layout qualifiers stay in
+// lockstep.
+CONSTEXPR int kiVisibleLightBindingElevation = 5;
 CONSTEXPR int kiWaterFoamBindingSpawnNoise = 6;
 CONSTEXPR int kiWaterBindingDisplacement = 13;
 CONSTEXPR int kiWaterBindingDisplacementNormal = 14;
@@ -144,9 +142,28 @@ CONSTEXPR int kiWaterFoamBreakupTextureCount = 3;
 CONSTEXPR int kiWaterFoamWidth = 1024;
 CONSTEXPR int kiWaterFoamHeight = 512;
 CONSTEXPR int kiWaterFoamMipLevels = 11;
+CONSTEXPR int kiModelBindingIrradiance = 5;
+CONSTEXPR int kiModelBindingPrefiltered = 6;
+CONSTEXPR int kiModelBindingBrdfLookupTable = 7;
+CONSTEXPR int kiModelBindingMaterials = 8;
+CONSTEXPR int kiModelBindingLighting = 9;
+CONSTEXPR int kiModelBindingShadow = 10;
+CONSTEXPR int kiModelBindingSmoke = 11;
+CONSTEXPR int kiModelBindingObjectShadows = 12;
 CONSTEXPR int kiModelBindingMeshData = 15;
 CONSTEXPR int kiModelBindingJointMatrix = 16;
 CONSTEXPR int kiModelBindingTerrainElevation = 17;
+
+// Push-constant selectors for record-once command buffers. The area selector (f4Pipeline.x) picks the projection area of
+// the quad and hex-shield shaders, which reach the lighting area through their fallthrough branch rather than a
+// comparison. The model rendering mode (f4Pipeline.y) picks the model projection.
+CONSTEXPR int kiAreaSelectorVisible = 0;
+CONSTEXPR int kiAreaSelectorShadow = 1;
+CONSTEXPR int kiAreaSelectorSmoke = 2;
+CONSTEXPR int kiAreaSelectorLighting = 3;
+CONSTEXPR int kiModelRenderingModeCamera = 0;
+CONSTEXPR int kiModelRenderingModeVisibleArea = 1;
+CONSTEXPR int kiModelRenderingModeShadow = 2;
 
 // Water normal map atlas size. Shared by C++ (PipelineManager mppWaterNormalTextures array,
 // TextureManager kpWaterNormalCrcs/kpWaterNormalNames tables) and the water shader

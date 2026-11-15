@@ -549,13 +549,6 @@ void TextureDescriptors::RegisterTextureBinding(const TextureBindingInfo& rInfo)
 	mTextureBindings.try_emplace(rInfo.crc).first->second.push_back({.pPipeline = rInfo.pPipeline, .iBinding = rInfo.iBinding, .samplerFlags = rInfo.samplerFlags, .pTexture = pTexture, .textures = std::move(textures), .iTextureGeneration = iTextureGeneration, .iTextureGenerations = std::move(iTextureGenerations), .bTextureUsesPlaceholder = bTextureUsesPlaceholder, .iArrayIndex = rInfo.iArrayIndex});
 }
 
-void TextureDescriptors::RegisterStandaloneSamplerBinding(Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags)
-{
-	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, iBinding));
-
-	mStandaloneSamplerBindings.push_back({.pPipeline = pPipeline, .iBinding = iBinding, .samplerFlags = samplerFlags});
-}
-
 void TextureDescriptors::UnregisterPipeline(const Pipeline* pPipeline)
 {
 	std::erase_if(mTextureBindings, [pPipeline](std::pair<const common::crc_t, std::vector<TextureBinding>>& rEntry)
@@ -574,11 +567,6 @@ void TextureDescriptors::UnregisterPipeline(const Pipeline* pPipeline)
 			return rConsumer.pPipeline == pPipeline;
 		});
 		return rEntry.second.empty();
-	});
-
-	std::erase_if(mStandaloneSamplerBindings, [pPipeline](const StandaloneSamplerBinding& rBinding)
-	{
-		return rBinding.pPipeline == pPipeline;
 	});
 }
 
@@ -604,12 +592,6 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc, const Te
 void TextureDescriptors::RewriteSamplerDescriptors()
 {
 	AssertSetsWritable(kiAllFramebuffers);
-	for (const StandaloneSamplerBinding& rBinding : mStandaloneSamplerBindings)
-	{
-		VkSampler vkSampler = mrTextureManager.GetSampler(rBinding.samplerFlags);
-		PipelineDescriptorWriter::UpdateImageDescriptor(*rBinding.pPipeline, rBinding.iBinding, vkSampler, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_SAMPLER);
-	}
-
 	for ([[maybe_unused]] auto& [rCrc, rBindings] : mTextureBindings)
 	{
 		for (TextureBinding& rBinding : rBindings)
@@ -671,7 +653,6 @@ void TextureDescriptors::ClearTextureBindings()
 	// RegisterBindlessArrayConsumer can rebuild per-element records for lazy channels still loading.
 	mTextureBindings.clear();
 	mBindlessArrayConsumers.clear();
-	mStandaloneSamplerBindings.clear();
 }
 
 int64_t TextureDescriptors::CrcToIndex(common::crc_t crc)

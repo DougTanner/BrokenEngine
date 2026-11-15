@@ -61,7 +61,6 @@ public:
 	};
 	void RegisterTextureBinding(const TextureBindingInfo& rInfo);
 	void RegisterBindlessArrayConsumer(std::span<Texture*> textures, Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
-	void RegisterStandaloneSamplerBinding(Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
 	void UnregisterPipeline(const Pipeline* pPipeline);
 	void UpdateDescriptorsForTexture(common::crc_t crc, const Texture& rTexture);
 	// Island slots own five coordinated array elements: template-owned elevation plus four lazy
@@ -110,13 +109,6 @@ private:
 		int64_t iArrayIndex = -1;
 	};
 
-	struct StandaloneSamplerBinding
-	{
-		Pipeline* pPipeline = nullptr;
-		int64_t iBinding = -1;
-		DescriptorFlags_t samplerFlags;
-	};
-
 	// Writes rBinding into Set 1 copy iSet from live state. A full-array binding writes only the elements holding
 	// pKeyTexture, or every element when pKeyTexture is null; a single-texture binding always holds a non-null texture.
 	void WriteBindingToSet(const TextureBinding& rBinding, int64_t iSet, const Texture* pKeyTexture);
@@ -149,7 +141,6 @@ private:
 	std::unordered_map<common::crc_t, std::vector<TextureBinding>> mTextureBindings;
 	std::unordered_map<Texture* const*, std::vector<BindlessArrayConsumer>> mBindlessArrayConsumers;
 	std::unordered_map<int64_t, IslandSlot> mIslandSlots;
-	std::vector<StandaloneSamplerBinding> mStandaloneSamplerBindings;
 
 	std::unordered_map<common::crc_t, int64_t> mImageInfosMap;
 	int64_t miNextTextureIndex = 0;

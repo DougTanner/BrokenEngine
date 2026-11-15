@@ -78,15 +78,15 @@ void CommandBufferRecordMain::RecordLightingDeposit(VkCommandBuffer vkCommandBuf
 	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineLighting])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {3.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorLighting), 0.0f, 0.0f, 0.0f});
 	}
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {3.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorLighting), 0.0f, 0.0f, 0.0f});
 	}
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {3.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorLighting), 0.0f, 0.0f, 0.0f});
 	}
 	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingDeposit);
@@ -228,8 +228,8 @@ void CommandBufferRecordMain::RecordSmokeEmit(VkCommandBuffer vkCommandBuffer, i
 		rSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
 		// The deposit maps hold one pipeline per (collection, plane); each targets its own plane's render pass. Push
-		// constant x 2 selects the smoke area and y the plane, so each plane deposits through its own published area.
-		XMFLOAT4 f4DepositPushConstants {2.0f, static_cast<float>(i), 0.0f, 0.0f};
+		// constant x selects the smoke area and y the plane, so each plane deposits through its own published area.
+		XMFLOAT4 f4DepositPushConstants {static_cast<float>(shaders::kiAreaSelectorSmoke), static_cast<float>(i), 0.0f, 0.0f};
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmokeAxisAligned])
 		{
 			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
@@ -257,11 +257,11 @@ void CommandBufferRecordMain::RecordWindDeposits(VkCommandBuffer vkCommandBuffer
 	gpTextureManager->mRenderTargetTextures.mWindTextureOne.RecordBeginRenderPass(vkCommandBuffer);
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositA])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorSmoke), 0.0f, 0.0f, 0.0f});
 	}
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorSmoke), 0.0f, 0.0f, 0.0f});
 	}
 	vkCmdEndRenderPass(vkCommandBuffer);
 
@@ -269,11 +269,11 @@ void CommandBufferRecordMain::RecordWindDeposits(VkCommandBuffer vkCommandBuffer
 	gpTextureManager->mRenderTargetTextures.mWindTextureTwo.RecordBeginRenderPass(vkCommandBuffer);
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositB])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorSmoke), 0.0f, 0.0f, 0.0f});
 	}
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorSmoke), 0.0f, 0.0f, 0.0f});
 	}
 	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWindDeposit);
@@ -286,7 +286,7 @@ void CommandBufferRecordMain::RecordObjectShadows(VkCommandBuffer vkCommandBuffe
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.RecordBeginRenderPass(vkCommandBuffer);
 	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModelShadow])
 	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 2.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
+		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, static_cast<float>(shaders::kiModelRenderingModeShadow), 0.0f, 0.0f}, ModelDrawPass::kOpaque);
 	}
 	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadows);
@@ -441,7 +441,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModel])
 		{
-			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
+			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, static_cast<float>(shaders::kiModelRenderingModeCamera), 0.0f, 0.0f}, ModelDrawPass::kOpaque);
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 	};
@@ -486,7 +486,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields])
 		{
-			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
+			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {static_cast<float>(shaders::kiAreaSelectorVisible), 0.0f, 0.0f, 0.0f});
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
 
@@ -514,7 +514,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		{
 			if (pPipeline->mFlags & ModelPipelineFlags::kHasTransparentMaterials)
 			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kTransparent);
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, static_cast<float>(shaders::kiModelRenderingModeCamera), 0.0f, 0.0f}, ModelDrawPass::kTransparent);
 			}
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);

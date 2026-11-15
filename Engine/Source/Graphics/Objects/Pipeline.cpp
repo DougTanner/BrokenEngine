@@ -23,13 +23,9 @@ static void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayou
 
 // Descriptor publication (TextureDescriptors) rewrites a combined-sampler binding registered under an mTextureMap CRC, or a
 // bindless array consumer, one framebuffer at a time; its pipeline needs one Set 1 per framebuffer so no write reaches a set
-// an in-flight frame binds. Model descriptors register their image-based-lighting bindings under mTextureMap CRCs.
+// an in-flight frame binds.
 static bool IsPublishedTextureDescriptor(const DescriptorInfo& rDescriptorInfo)
 {
-	if (rDescriptorInfo.flags & kModel)
-	{
-		return true;
-	}
 	if (!(rDescriptorInfo.flags & kCombinedSamplers))
 	{
 		return false;
@@ -129,8 +125,7 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers || IsPublishedTextureDescriptor(rDescriptorInfo);
 	}) || mbPerCommandBuffer;
 
-	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap. A
-	// kModel entry expands into several writes, guarded by per-push cursor assertions.
+	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap.
 	ASSERT(std::ssize(mInfo.descriptorInfos) <= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 
 	if (mInfo.flags & kCompute)
@@ -208,10 +203,6 @@ void Pipeline::Destroy() noexcept
 		mIndirectVkBuffer = VK_NULL_HANDLE;
 		mIndirectVmaAllocation = VK_NULL_HANDLE;
 	}
-
-	// WriteModelDescriptor's null-handle guard creates mModelMaterialsStorageBuffer once across the per-framebuffer loop; the member Buffer
-	// destructor releases it. Model pipelines require fresh objects: Destroy on a pipeline holding this buffer is followed by object
-	// destruction, and in-place recreation retains stale materials.
 }
 
 void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& rf4PushConstants)

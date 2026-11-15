@@ -41,15 +41,15 @@ void main()
 	                     (1.0f - f2InQuadVertex.y) * pQuads[gl_InstanceIndex].f4TextureRect.y + f2InQuadVertex.y * pQuads[gl_InstanceIndex].f4TextureRect.w);
 
 	vec4 f4VisibleArea;
-	if (int(pushConstantsLayout.f4Pipeline.x) == 0)
+	if (int(pushConstantsLayout.f4Pipeline.x) == kiAreaSelectorVisible)
 	{
 		f4VisibleArea = globalLayout.f4VisibleArea;
 	}
-	else if (int(pushConstantsLayout.f4Pipeline.x) == 1)
+	else if (int(pushConstantsLayout.f4Pipeline.x) == kiAreaSelectorShadow)
 	{
 		f4VisibleArea = globalLayout.f4ShadowAreaExtra;
 	}
-	else if (int(pushConstantsLayout.f4Pipeline.x) == 2)
+	else if (int(pushConstantsLayout.f4Pipeline.x) == kiAreaSelectorSmoke)
 	{
 		f4VisibleArea = globalLayout.pf4SmokeAreas[int(pushConstantsLayout.f4Pipeline.y)];
 	}
