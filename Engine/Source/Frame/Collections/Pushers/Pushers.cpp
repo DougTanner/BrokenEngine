@@ -1,9 +1,5 @@
 #include "Pushers.h"
 
-#if defined(BT_CLIENT)
-#include "Profile/ProfileRows.h"
-#endif
-
 namespace engine
 {
 
@@ -47,29 +43,5 @@ bool PushersPostRender::LogDifferences(const PushersPostRender& rOther) const
 
 	return bEqual;
 }
-
-#if defined(BT_CLIENT)
-
-static int64_t siTotalCount = 0;
-
-void PushersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, [[maybe_unused]] const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoords)
-{
-	siTotalCount = 0;
-}
-
-void PushersInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
-{
-	siTotalCount += rFrameInterpolate.pushers.iCount;
-}
-
-void PushersInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
-{
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterPushers).iCount = siTotalCount;
-	}
-}
-
-#endif // BT_CLIENT
 
 } // namespace engine

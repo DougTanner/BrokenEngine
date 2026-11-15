@@ -1,8 +1,7 @@
 # Pushers - Physics Force Fields
 
 Radial repulsion force fields for entity separation (anti-stacking), owned by
-game entities via the hub's Sync pattern. Render path is client-only
-profile-counter tracking — no pipeline, no draw calls.
+game entities via the hub's Sync pattern. Pushers has no render path.
 
 ## Unique Aspects
 

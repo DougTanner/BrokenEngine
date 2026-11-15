@@ -611,7 +611,6 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 	}
 	gpProfileManager->GetCpuCounter(kCpuCounterOmnis).iCount = iTotalOmnis;
 	gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
-	gpProfileManager->GetCpuCounter(kCpuCounterBlastersRendered).iCount = iTotalBlasters;
 	gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
 	gpProfileManager->GetCpuCounter(kCpuCounterFighters).iCount = iTotalFighters;
 	gpProfileManager->GetCpuCounter(kCpuCounterBattleships).iCount = iTotalBattleships;

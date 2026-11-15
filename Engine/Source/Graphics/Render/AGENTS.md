@@ -22,10 +22,12 @@ may feed simulation state.
   areas.
 - Gameplay main rendering runs collection `BeginRender`, per-coord `Render`,
   collection `EndRender`, lighting-spread gate publication, then debug
-  publication, with the camera coord first. The no-renderable-coord path,
-  including an empty active set, still runs begin/end publication so every
-  indirect count and per-render profile counter reaches zero instead of
-  ghost-drawing or reporting prior-frame instances.
+  publication, with the camera coord first, on one path every frame. With no
+  renderable coord, including an empty active set, no per-coord `Render` runs,
+  but begin/end publication still zeroes every indirect count and per-render
+  profile counter instead of ghost-drawing or reporting prior-frame instances,
+  and the `MainLayout` camera block and hex-shield fields are written from the
+  camera's held state.
 - Lighting deposit clears its attachments through the render pass load operation
   every frame, so no separate clear pass is recorded.
 - World lighting has one layer per flight plane. Each layer keeps its own

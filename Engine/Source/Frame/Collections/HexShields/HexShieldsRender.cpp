@@ -26,12 +26,10 @@ void HexShieldsInterpolate::GraphicsResources()
 }
 
 static int64_t spiRendered[shaders::kiLightingLayers] {}; // Cursor per lighting layer
-static int64_t siTotalCount = 0;
 
 void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	std::ranges::fill(spiRendered, 0);
-	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const HexShieldsInterpolate&
 	{
@@ -59,7 +57,6 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 {
 	const HexShieldsInterpolate& rCurrent = rFrameInterpolate.hexShields;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
 	{
@@ -121,10 +118,6 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterHexShields).iCount = siTotalCount;
-	}
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});

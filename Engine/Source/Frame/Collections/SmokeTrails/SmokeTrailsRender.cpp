@@ -15,7 +15,6 @@ namespace engine
 constexpr int64_t kiDynamicBufferInitialCapacity = 2'048;
 
 static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
-static int64_t siTotalCount = 0;
 
 void SmokeTrailsInterpolate::GraphicsResources()
 {
@@ -30,7 +29,6 @@ void SmokeTrailsInterpolate::GraphicsResources()
 void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	std::ranges::fill(spiRendered, 0);
-	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const SmokeTrailsInterpolate&
 	{
@@ -57,7 +55,6 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 {
 	const SmokeTrailsInterpolate& rCurrent = rFrameInterpolate.smokeTrails;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	siTotalCount += rCurrent.iCount;
 
 	if (gbGameplayPaused || rCurrent.iCount == 0)
 	{
@@ -155,10 +152,6 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void SmokeTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterSmokeTrails).iCount = siTotalCount;
-	}
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterSmokeTrailsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});

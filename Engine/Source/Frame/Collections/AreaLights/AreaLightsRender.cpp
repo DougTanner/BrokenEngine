@@ -28,13 +28,11 @@ void AreaLightsInterpolate::GraphicsResources()
 
 static int64_t siRendered = 0; // Visible-light cursor
 static int64_t spiDepositsRendered[shaders::kiLightingLayers] {}; // Deposit cursor per lighting layer
-static int64_t siTotalCount = 0;
 
 void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 	std::ranges::fill(spiDepositsRendered, 0);
-	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const AreaLightsInterpolate&
 	{
@@ -65,7 +63,6 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 {
 	const AreaLightsInterpolate& rCurrent = rFrameInterpolate.areaLights;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
 	{
@@ -175,10 +172,6 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void AreaLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterAreaLights).iCount = siTotalCount;
-	}
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterAreaLightsRendered).iCount = siRendered;

@@ -109,8 +109,6 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	// Register default explosion effect types (called from ForEachRegister)
 	static void Register();
 
-	static inline int64_t siTotalCount = 0;
-
 	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTypeIndex;
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);

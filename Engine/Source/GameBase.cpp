@@ -766,6 +766,18 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 {
 	// Per-frame render interpolates and camera update before RenderGlobal so that
 	// mf4RenderVisibleArea and lighting area are computed from the current camera position
+	{
+		ScopedSuppressAllocationTracking suppress;
+
+		// Remove render interpolates for deactivated coords AND coords whose snapshot ring is empty, so
+		// mRenderInterpolates holds entries for exactly the renderable (iSnapshotCount > 0) active coords.
+		// This must run even when the active set is empty or bHaveRenderableCamera is false so no stale
+		// entry survives to be rendered by RenderFrameMain.
+		std::erase_if(mRenderInterpolates, [&](const std::pair<const GridCoord, game::FrameInterpolate>& rPair)
+		{
+			return !std::ranges::contains(rActiveCoordinates, rPair.first) || !IsCoordinateRenderable(rPair.first);
+		});
+	}
 	if (rActiveCoordinates.empty())
 	{
 		return;
@@ -786,7 +798,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	// Only advance the render clock and sample the source frame when a renderable camera coord exists.
 	// On the failed-reconnect all-empty-rings frame (bHaveRenderableCamera == false) fDeltaTime stays 0
 	// and none of mCells.at(cameraCoordinate) / RenderFrame(cameraCoordinate) / the clock math runs; the
-	// prune and per-coord interpolate below still run so mRenderInterpolates ends renderable-only.
+	// per-coord interpolate below still runs.
 	float fDeltaTime = 0.0f;
 	float fSunDeltaTime = 0.0f;
 	if (bHaveRenderableCamera)
@@ -812,15 +824,6 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		ScopedSuppressAllocationTracking suppress;
 
 		// Heap: try_emplace can allocate frame-interpolation entries, so allocation tracking stays suppressed in this scope.
-		// Remove render interpolates for deactivated coords AND coords whose snapshot ring is empty, so
-		// mRenderInterpolates holds entries for exactly the renderable (iSnapshotCount > 0) active coords.
-		// This must run even when bHaveRenderableCamera is false so no stale empty-ring entry survives
-		// into RenderFrameMain (whose RenderFrame(coordinate) asserts iSnapshotCount > 0).
-		std::erase_if(mRenderInterpolates, [&](const std::pair<const GridCoord, game::FrameInterpolate>& rPair)
-		{
-			return !std::ranges::contains(rActiveCoordinates, rPair.first) || !IsCoordinateRenderable(rPair.first);
-		});
-
 		// AllocateAndCopy + Update each active frame's render interpolate (camera frame first).
 		// Per-coord fDt override: a coord with fewer than kiRenderBehindTicks + 1 snapshots cannot
 		// fill the render window, so force fDt=0 for that coord regardless of the camera-anchored

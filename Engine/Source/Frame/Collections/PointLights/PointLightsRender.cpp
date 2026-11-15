@@ -28,13 +28,11 @@ void PointLightsInterpolate::GraphicsResources()
 
 static int64_t siRendered = 0; // Visible-sprite cursor
 static int64_t spiDepositsRendered[shaders::kiLightingLayers] {}; // Deposit cursor per lighting layer
-static int64_t siTotalCount = 0;
 
 void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
 {
 	siRendered = 0;
 	std::ranges::fill(spiDepositsRendered, 0);
-	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate&
 	{
@@ -65,7 +63,6 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 {
 	const PointLightsInterpolate& rCurrent = rFrameInterpolate.pointLights;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	siTotalCount += rCurrent.iCount;
 
 	if (rCurrent.iCount == 0)
 	{
@@ -174,10 +171,6 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void PointLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterPointLights).iCount = siTotalCount;
-	}
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterPointLightsRendered).iCount = siRendered;

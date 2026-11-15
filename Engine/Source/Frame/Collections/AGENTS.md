@@ -127,9 +127,9 @@ SOA layout change.
 ## Runtime Rules
 
 - Main-loop allocation uses paired collection storage or persistent owned state,
-  not transient heap containers. Rendering may publish counters only where that
-  collection actually owns them; counter publication is not a universal
-  collection contract.
+  not transient heap containers. On the client render path, total counts are
+  published from the engine's or the game's one counter block, and Rendered
+  counts stay in the collection's render code.
 - Controlled collections declare persistent controller metadata through
   `PersistentMembers()`. Audit allocation/copy, spawn, transfer, serialization,
   and difference logging whenever persistent fields change.
@@ -143,10 +143,10 @@ SOA layout change.
   (`../AGENTS.md` `## Simulation and Visual State`).
 - Renderable collections use three phases. `BeginRender` sizes the GPU buffer
   once, from `AccumulateRenderCapacity()` summed over every active grid cell;
-  `Render` fills it per cell; `EndRender` publishes counters and writes the
-  indirect draw count. Sizing from a single cell's count overflows the buffer as
-  soon as a second cell activates. `kbManualRender` collections opt out and own
-  their own path.
+  `Render` fills it per cell; `EndRender` publishes Rendered counters and writes
+  the indirect draw count. Sizing from a single cell's count overflows the
+  buffer as soon as a second cell activates. `kbManualRender` collections opt
+  out and own their own path.
   A collection whose `EndRender` writes a model pipeline also declares a
   static `RequestTextures(rRenderInterpolates, rActiveCoordinates)` beside
   `BeginRender` that calls `DynamicPipelines::RequestModelPipelineTextures`

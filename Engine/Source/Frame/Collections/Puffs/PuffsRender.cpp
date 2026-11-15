@@ -24,12 +24,10 @@ void PuffsInterpolate::GraphicsResources()
 }
 
 static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
-static int64_t siTotalCount = 0;
 
 void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
 	std::ranges::fill(spiRendered, 0);
-	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate&
 	{
@@ -56,7 +54,6 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 {
 	const PuffsInterpolate& rCurrent = rFrameInterpolate.puffs;
 	const RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-	siTotalCount += rCurrent.iCount;
 
 	if (gbGameplayPaused || rCurrent.iCount == 0)
 	{
@@ -111,10 +108,6 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 
 void PuffsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterPuffs).iCount = siTotalCount;
-	}
 	if constexpr (kbProfiling)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterPuffsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});

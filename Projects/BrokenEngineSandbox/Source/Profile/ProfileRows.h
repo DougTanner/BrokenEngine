@@ -10,7 +10,6 @@ enum GameCpuCounters : int64_t
 
 	kCpuCounterOmnis = kGameCpuCounterFirst,
 	kCpuCounterBlasters,
-		kCpuCounterBlastersRendered,
 	kCpuCounterMissiles,
 		kCpuCounterMissilesRendered,
 	kCpuCounterFighters,
@@ -61,7 +60,6 @@ inline constexpr std::string_view kpGameCpuCounterNames[]
 {
 	"Omnis",
 	"Blasters",
-	"    Rendered",
 	"Missiles",
 	"    Rendered",
 	"Fighters",

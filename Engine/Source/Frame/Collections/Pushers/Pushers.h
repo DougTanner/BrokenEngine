@@ -60,12 +60,6 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// rfPositionCorrectionX, which the caller initializes, instead of force.
 	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, id_t selfPusher, float& rfPositionCorrectionX, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);
 
-#if defined(BT_CLIENT)
-	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords);
-	static void Render(const game::FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
-	static void EndRender(int64_t iCommandBuffer);
-#endif
-
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	float* __restrict pfRadii = nullptr;
 	float* __restrict pfIntensities = nullptr;

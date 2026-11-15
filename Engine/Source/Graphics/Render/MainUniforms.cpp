@@ -213,20 +213,58 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.mfCurrent;
 }
 
+// Population counters: one sum over the cells this transaction renders, published once so a render with no renderable
+// cell reads zero.
+static void PublishPopulationCounters(const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
+{
+	if constexpr (!kbProfiling)
+	{
+		return;
+	}
+
+	int64_t iTotalExplosions = 0;
+	int64_t iTotalPushers = 0;
+	int64_t iTotalBillboards = 0;
+	int64_t iTotalPuffs = 0;
+	int64_t iTotalSmokeTrails = 0;
+	int64_t iTotalPointLights = 0;
+	int64_t iTotalAreaLights = 0;
+	int64_t iTotalHexShields = 0;
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
+	{
+		auto it = rRenderInterpolates.find(rCoordinate);
+		if (it != rRenderInterpolates.end())
+		{
+			iTotalExplosions += it->second.explosions.iCount;
+			iTotalPushers += it->second.pushers.iCount;
+			iTotalBillboards += it->second.billboards.iCount;
+			iTotalPuffs += it->second.puffs.iCount;
+			iTotalSmokeTrails += it->second.smokeTrails.iCount;
+			iTotalPointLights += it->second.pointLights.iCount;
+			iTotalAreaLights += it->second.areaLights.iCount;
+			iTotalHexShields += it->second.hexShields.iCount;
+		}
+	}
+	gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = iTotalExplosions;
+	gpProfileManager->GetCpuCounter(kCpuCounterPushers).iCount = iTotalPushers;
+	gpProfileManager->GetCpuCounter(kCpuCounterBillboards).iCount = iTotalBillboards;
+	gpProfileManager->GetCpuCounter(kCpuCounterPuffs).iCount = iTotalPuffs;
+	gpProfileManager->GetCpuCounter(kCpuCounterSmokeTrails).iCount = iTotalSmokeTrails;
+	gpProfileManager->GetCpuCounter(kCpuCounterPointLights).iCount = iTotalPointLights;
+	gpProfileManager->GetCpuCounter(kCpuCounterAreaLights).iCount = iTotalAreaLights;
+	gpProfileManager->GetCpuCounter(kCpuCounterHexShields).iCount = iTotalHexShields;
+}
+
 // The engine collections begin and end each render transaction ahead of the game's.
 static void BeginFrameInterpolateRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
-	ExplosionsInterpolate::siTotalCount = 0;
+	PublishPopulationCounters(rRenderInterpolates, rActiveCoordinates);
 	ForEachBeginRender(InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 }
 
 static void EndFrameInterpolateRender(int64_t iCommandBuffer)
 {
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = ExplosionsInterpolate::siTotalCount;
-	}
 	ForEachEndRender(InterpolateTypes {}, iCommandBuffer);
 	game::FrameInterpolate::EndRender(iCommandBuffer);
 }
@@ -237,24 +275,10 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	RenderWaterMain(iCommandBuffer, currentTime);
 	RenderLightingMain(iCommandBuffer);
 
-	if (rActiveCoordinates.empty() || !rRenderInterpolates.contains(cameraCoordinate))
+	if (!rRenderInterpolates.contains(cameraCoordinate))
 	{
 		gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 0);
-		// Active-set computation and reset include the client cell, and boot prerender seeds the origin; the empty-set check is defensive.
-		// A missing camera interpolate can coexist with other renderable cells. Begin/end publication without per-cell Render clears indirect counts and per-transaction profile counters; collection BeginRender skips missing interpolates.
-		// Return before accessing the absent camera interpolate.
-		BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
-		EndFrameInterpolateRender(iCommandBuffer);
-		RenderLightingSpreadIndirect(iCommandBuffer);
-		if constexpr (kbDebugRender)
-		{
-			DebugRender::BeginRender(iCommandBuffer);
-			DebugRender::EndRender(iCommandBuffer);
-		}
-		return;
 	}
-
-	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoordinate);
 
 	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 
@@ -270,7 +294,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		}
 		const game::FrameInterpolate& rFrameInterpolate = it->second;
 		// Automatically dispatched main collections
-		ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
 		ForEachInterpolateRender(InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 		game::FrameInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 		// Manually rendered trail collections
@@ -306,8 +329,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	DebugRender::BeginRender(iCommandBuffer);
 	DebugRender::EndRender(iCommandBuffer);
 
-	const game::FrameInterpolate& rFrameInterpolate = rCameraInterpolate;
-
 	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
 	rMainLayout.iRenderNumber = static_cast<int32_t>(gpGraphics->miFrameCounter);
 
@@ -319,7 +340,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	static siv::BasicPerlinNoise<float> sPerlinRoll(0);
 	static siv::BasicPerlinNoise<float> sPerlinPitch(1);
 	static siv::BasicPerlinNoise<float> sPerlinYaw(2);
-	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(rFrameInterpolate.iTick).time_since_epoch());
+	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(engine::gpCamera->miFrame).time_since_epoch());
 	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
 
 	XMMATRIX matViewProjection = XMMatrixTranspose(XMMatrixMultiply(engine::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatProjection)));
