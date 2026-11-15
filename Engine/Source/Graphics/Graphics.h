@@ -155,8 +155,6 @@ public:
 	std::optional<ScreenshotRequest> mOptionalScreenshotRequest;
 	std::optional<DumpRenderTargetRequest> mOptionalDumpRenderTargetRequest;
 
-	std::unordered_set<std::string> mDebugNames;
-
 private:
 
 	// Queries surface caps into rVkSurfaceCapabilitiesKHR and returns true when the swapchain recreate must defer: a

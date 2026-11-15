@@ -322,7 +322,7 @@ void RenderTargetTextures::CreateLightingTextures()
 			.layers = 1,
 		};
 		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkSpreadFramebufferCreateInfo, nullptr, &mpSpreadVkFramebuffers[i]));
-		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mpSpreadVkFramebuffers[i], std::format("SpreadMRT_{}", i));
+		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mpSpreadVkFramebuffers[i], std::format("SpreadMRT_{}", i).c_str());
 	}
 
 	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the

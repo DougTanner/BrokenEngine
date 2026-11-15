@@ -41,7 +41,7 @@ by field.
   `BufferManager.cpp:623`, `:624`, `:648`), `miWindActiveTileBufferSize`
   (`BufferManager.h:80`; `BufferManager.cpp:667`, `:673`, `:695`), and
   `InstanceManager::mMaxMultisampleCountVkSampleCountFlagBits`
-  (`InstanceManager.h:49`; `InstanceManager.cpp:529-531`).
+  (`InstanceManager.h:49`; `InstanceManager.cpp:492-494`).
   `.agents/references/cpp-conventions.md` (derived members) applies. The two
   occupancy sizes are read elsewhere
   (`CommandBufferRecordGlobal.cpp:206-207`, `RenderTargetTextures.cpp:355`)
@@ -178,7 +178,7 @@ Recommended, in this order:
    stay at the call sites, so the recorded commands are unchanged.
 2. BufferManager dead members and duplicates:
    - Turn each of the three members into a local at its write site and
-     delete the zeroing stores. The `ASSERT` at `InstanceManager.cpp:531`
+     delete the zeroing stores. The `ASSERT` at `InstanceManager.cpp:494`
      keeps working on the local.
    - The constructor calls `CreateSwapchainDependentBuffers` at the position
      of its three statements, between the model loop and the particle
@@ -318,14 +318,6 @@ render state outside the simulation CRC.
    inscribed circle, at the default alpha and at alpha 1.0, and the
    in-circle texels equal a dump taken before the change. The supplied
    evidence records no harness setup.
-
-## Coordination
-
-`Documents/Plans/Engine/InstanceValidationLayerCleanup.md` adds rows to the
-required-feature table at `InstanceManager.cpp:475-484`, in the same function
-as the multisample lines at `:529-531`. Neither Plan depends on the other;
-whichever lands second re-finds that function and its lines by symbol from
-the landed files.
 
 ## Notes
 

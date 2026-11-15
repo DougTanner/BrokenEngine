@@ -61,37 +61,19 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 	throw std::runtime_error(exceptionAllocation.mpData);
 }
 
-void SetVkObjectName([[maybe_unused]] VkObjectType vkObjectType, [[maybe_unused]] uint64_t uiHandle, [[maybe_unused]] std::string_view name)
+void SetVkObjectName(VkObjectType vkObjectType, uint64_t uiHandle, const char* pcName)
 {
-	if constexpr (kbVulkanDebugLayers)
+	if (vkSetDebugUtilsObjectNameEXT != nullptr)
 	{
-		if (vkSetDebugUtilsObjectNameEXT != nullptr)
+		VkDebugUtilsObjectNameInfoEXT vkDebugUtilsObjectNameInfoEXT =
 		{
-			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-			// string_VkObjectType returns "Unhandled VkObjectType" for unrecognized types (no "VK_OBJECT_TYPE_"
-			// prefix); strip the prefix only when present, else the fixed skip mis-truncates the fallback into a garbage tail.
-			const char* pcTypeName = string_VkObjectType(vkObjectType);
-			int64_t iPrefixLength = static_cast<int64_t>(std::char_traits<char>::length("VK_OBJECT_TYPE_"));
-			const char* pcPrefix = std::char_traits<char>::compare(pcTypeName, "VK_OBJECT_TYPE_", static_cast<size_t>(iPrefixLength)) == 0 ? pcTypeName + iPrefixLength : pcTypeName;
-			common::ScopedWorkbufferArena innerArena = rWorkbuffer.Push();
-			rWorkbuffer.Append(pcPrefix);
-			rWorkbuffer.Append(" ");
-			rWorkbuffer.Append(name);
-
-			// Heap: caching debug names in mDebugNames can allocate string storage and unordered_set nodes.
-			ScopedSuppressAllocationTracking suppress;
-
-			auto [it, bInserted] = gpGraphics->mDebugNames.emplace(rWorkbuffer.View());
-			VkDebugUtilsObjectNameInfoEXT vkDebugUtilsObjectNameInfoEXT =
-			{
-				.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-				.pNext = nullptr,
-				.objectType = vkObjectType,
-				.objectHandle = uiHandle,
-				.pObjectName = it->c_str(),
-			};
-			vkSetDebugUtilsObjectNameEXT(gpDeviceManager->mVkDevice, &vkDebugUtilsObjectNameInfoEXT);
-		}
+			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+			.pNext = nullptr,
+			.objectType = vkObjectType,
+			.objectHandle = uiHandle,
+			.pObjectName = pcName,
+		};
+		vkSetDebugUtilsObjectNameEXT(gpDeviceManager->mVkDevice, &vkDebugUtilsObjectNameInfoEXT);
 	}
 }
 

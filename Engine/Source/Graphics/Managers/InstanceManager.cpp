@@ -31,7 +31,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 {
 	if constexpr (kbVulkanDebugLayers)
 	{
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "TransitionUndefinedToReadOnly") != nullptr)
+		const char* pcMessageIdName = pVkCallbackData->pMessageIdName != nullptr ? pVkCallbackData->pMessageIdName : "";
+
+		if (std::strstr(pcMessageIdName, "TransitionUndefinedToReadOnly") != nullptr)
 		{
 			// Lazy-loaded textures transition from UNDEFINED to SHADER_READ_ONLY before their contents are uploaded.
 			return VK_FALSE;
@@ -40,12 +42,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 		// VK_KHR_maintenance9 permits sampled/transfer images to omit queue-family ownership transfers;
 		// ConcurrentUsageOfExclusiveImage does not account for that extension. Startup's GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable draws
 		// reference transfer-uploaded textures; regular-render commands are recorded before texture adoption.
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "ConcurrentUsageOfExclusiveImage") != nullptr)
+		if (std::strstr(pcMessageIdName, "ConcurrentUsageOfExclusiveImage") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "VkDescriptorSetAllocateInfo-descriptorCount") != nullptr)
+		if (std::strstr(pcMessageIdName, "VkDescriptorSetAllocateInfo-descriptorCount") != nullptr)
 		{
 			LOG(kDefault, kError, "Double the number of descriptor sets in DeviceManager::DeviceManager() {}", pVkCallbackData->pMessage);
 			// DEBUG_BREAK, not ASSERT: the Vulkan C callback frame is not a supported unwind path, so a throw here
@@ -55,18 +57,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 		}
 
 		// VK_SUBOPTIMAL_KHR from present is expected while a window resize / fullscreen transition races the surface: presentation still succeeds and the next frame's swapchain recreate resolves it. Suppress the best-practices warning; the recreate path already handles the result code.
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "SuboptimalSwapchain") != nullptr)
+		if (std::strstr(pcMessageIdName, "SuboptimalSwapchain") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
 		// GPU-AV adjusts settings for unsupported rayTracingInvocationReorder/meshShader features at vkCreateDevice; BuildValidationLayerSettings disables those checks.
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "WARNING-Setting-Limit-Adjusted") != nullptr)
+		if (std::strstr(pcMessageIdName, "WARNING-Setting-Limit-Adjusted") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
-		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "DEBUG-PRINTF") != nullptr)
+		if (std::strstr(pcMessageIdName, "DEBUG-PRINTF") != nullptr)
 		{
 			// Zero-alloc: log the last line of the message (the printf output) without splitting into heap strings — this
 			// callback is reachable at per-draw frequency in kbDebugPrintf builds with allocation tracking live.
@@ -82,7 +84,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 			return VK_FALSE;
 		}
 
-		LOG(kDefault, kError, "DebugUtilsCallback {} {} \"{}\" \"{}\"", static_cast<uint64_t>(vkMessageSeverity), static_cast<uint64_t>(vkMessageType), pVkCallbackData->pMessageIdName, pVkCallbackData->pMessage);
+		LOG(kDefault, kError, "DebugUtilsCallback {} {} \"{}\" \"{}\"", static_cast<uint64_t>(vkMessageSeverity), static_cast<uint64_t>(vkMessageType), pcMessageIdName, pVkCallbackData->pMessage);
 		DEBUG_BREAK();
 	}
 
@@ -111,80 +113,36 @@ VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountF
 [[maybe_unused]] constexpr VkBool32 kVkLayerSettingTrue = VK_TRUE;
 [[maybe_unused]] constexpr VkBool32 kVkLayerSettingFalse = VK_FALSE;
 
+static VkLayerSettingEXT KhronosValidationBoolSetting(const char* pcSettingName, const VkBool32* pVkValue)
+{
+	return
+	{
+		.pLayerName = kpcKhronosValidation,
+		.pSettingName = pcSettingName,
+		.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+		.valueCount = 1,
+		.pValues = pVkValue,
+	};
+}
+
 // The caller-owned settings array must remain alive until vkCreateInstance returns.
 static int64_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSettings)[7])
 {
-	rVkLayerSettings[0] =
-	{
-		.pLayerName = kpcKhronosValidation,
-		.pSettingName = "validate_best_practices",
-		.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-		.valueCount = 1,
-		.pValues = &kVkLayerSettingTrue,
-	};
-	rVkLayerSettings[1] =
-	{
-		.pLayerName = kpcKhronosValidation,
-		.pSettingName = "validate_sync",
-		.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-		.valueCount = 1,
-		.pValues = &kVkLayerSettingTrue,
-	};
+	rVkLayerSettings[0] = KhronosValidationBoolSetting("validate_best_practices", &kVkLayerSettingTrue);
+	rVkLayerSettings[1] = KhronosValidationBoolSetting("validate_sync", &kVkLayerSettingTrue);
 	int64_t iLayerSettingCount = 2;
 	if constexpr (kbGraphicsProcessingUnitAssistedValidation)
 	{
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "gpuav_enable",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingTrue,
-		};
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "gpuav_shader_instrumentation",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingTrue,
-		};
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "gpuav_validate_ray_query",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingFalse,
-		};
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("gpuav_enable", &kVkLayerSettingTrue);
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("gpuav_shader_instrumentation", &kVkLayerSettingTrue);
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("gpuav_validate_ray_query", &kVkLayerSettingFalse);
 		// Disable GPU-AV sub-checks whose device features this hardware lacks (rayTracingInvocationReorder / meshShader). Otherwise GPU-AV defaults them on and the layer logs a WARNING-Setting-Limit-Adjusted at vkCreateDevice while auto-disabling them. gpuav_validate_ray_hit_object is a valid internal key (the layer prints it) but is absent from the JSON manifest.
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "gpuav_validate_ray_hit_object",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingFalse,
-		};
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "gpuav_mesh_shading",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingFalse,
-		};
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("gpuav_validate_ray_hit_object", &kVkLayerSettingFalse);
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("gpuav_mesh_shading", &kVkLayerSettingFalse);
 	}
 	else if constexpr (kbDebugPrintf)
 	{
-		rVkLayerSettings[iLayerSettingCount++] =
-		{
-			.pLayerName = kpcKhronosValidation,
-			.pSettingName = "printf_enable",
-			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-			.valueCount = 1,
-			.pValues = &kVkLayerSettingTrue,
-		};
+		rVkLayerSettings[iLayerSettingCount++] = KhronosValidationBoolSetting("printf_enable", &kVkLayerSettingTrue);
 	}
 
 	ASSERT(iLayerSettingCount <= std::ssize(rVkLayerSettings));
@@ -201,44 +159,46 @@ static void TryLoadRenderDocDll()
 			return;
 		}
 
+		if (GetModuleHandle("renderdoc.dll") != nullptr)
+		{
+			return;
+		}
+
+		// Default RenderDoc installer doesn't add itself to PATH, so plain LoadLibrary("renderdoc.dll") fails. Read the install dir from the Vulkan loader's implicit-layer JSON registration — renderdoc.dll lives in the same folder.
+		HKEY hkey = nullptr;
+		if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Khronos\Vulkan\ImplicitLayers)", 0, KEY_READ, &hkey) == ERROR_SUCCESS)
+		{
+			char pcValueName[MAX_PATH] {};
+			for (int64_t i = 0; ; ++i)
+			{
+				DWORD uiValueNameCharacterCount = MAX_PATH;
+				if (RegEnumValue(hkey, static_cast<DWORD>(i), pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+				{
+					break;
+				}
+				if (std::strstr(pcValueName, "renderdoc.json") != nullptr)
+				{
+					char* pcLastSeparator = std::strrchr(pcValueName, '\\');
+					if (pcLastSeparator != nullptr)
+					{
+						strcpy_s(pcLastSeparator + 1, MAX_PATH - (pcLastSeparator + 1 - pcValueName), "renderdoc.dll");
+						LoadLibrary(pcValueName);
+					}
+					break;
+				}
+			}
+			RegCloseKey(hkey);
+		}
+
+		// PATH-relative fallback for users who manually added RenderDoc to PATH
 		if (GetModuleHandle("renderdoc.dll") == nullptr)
 		{
-			// Default RenderDoc installer doesn't add itself to PATH, so plain LoadLibrary("renderdoc.dll") fails. Read the install dir from the Vulkan loader's implicit-layer JSON registration — renderdoc.dll lives in the same folder.
-			HKEY hkey = nullptr;
-			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Khronos\Vulkan\ImplicitLayers)", 0, KEY_READ, &hkey) == ERROR_SUCCESS)
-			{
-				char pcValueName[MAX_PATH] {};
-				for (int64_t i = 0; ; ++i)
-				{
-					DWORD uiValueNameCharacterCount = MAX_PATH;
-					if (RegEnumValue(hkey, static_cast<DWORD>(i), pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
-					{
-						break;
-					}
-					if (std::strstr(pcValueName, "renderdoc.json") != nullptr)
-					{
-						char* pcLastSeparator = std::strrchr(pcValueName, '\\');
-						if (pcLastSeparator != nullptr)
-						{
-							strcpy_s(pcLastSeparator + 1, MAX_PATH - (pcLastSeparator + 1 - pcValueName), "renderdoc.dll");
-							LoadLibrary(pcValueName);
-						}
-						break;
-					}
-				}
-				RegCloseKey(hkey);
-			}
+			LoadLibrary("renderdoc.dll");
+		}
 
-			// PATH-relative fallback for users who manually added RenderDoc to PATH
-			if (GetModuleHandle("renderdoc.dll") == nullptr)
-			{
-				LoadLibrary("renderdoc.dll");
-			}
-
-			if (GetModuleHandle("renderdoc.dll") == nullptr)
-			{
-				LOG(kGraphics, kWarning, R"(--renderdoc requested but renderdoc.dll could not be loaded. Confirm RenderDoc is installed and registered in HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers.)");
-			}
+		if (GetModuleHandle("renderdoc.dll") == nullptr)
+		{
+			LOG(kGraphics, kWarning, R"(--renderdoc requested but renderdoc.dll could not be loaded. Confirm RenderDoc is installed and registered in HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers.)");
 		}
 	}
 }
@@ -481,6 +441,9 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind, .pcName = "descriptorBindingSampledImageUpdateAfterBind", .pcReason = "texture streaming"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingPartiallyBound, .pcName = "descriptorBindingPartiallyBound", .pcReason = "bindless texture arrays"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.runtimeDescriptorArray, .pcName = "runtimeDescriptorArray", .pcReason = "bindless texture arrays"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.scalarBlockLayout, .pcName = "scalarBlockLayout", .pcReason = "scalar block layouts in shared shader layouts"},
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.drawIndirectFirstInstance, .pcName = "drawIndirectFirstInstance", .pcReason = "nonzero firstInstance in terrain indirect records"},
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics, .pcName = "fragmentStoresAndAtomics", .pcReason = "fragment-stage atomicOr in smoke and wind deposit occupancy"},
 	};
 	for (const RequiredFeature& rRequiredFeature : pRequiredFeatures)
 	{
