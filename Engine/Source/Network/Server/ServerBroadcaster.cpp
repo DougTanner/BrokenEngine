@@ -41,7 +41,7 @@ void ServerBroadcaster::PrepareTickStatusChanges()
 	// Runs once per normal-play tick, so an agent-injected StatusChange can enter any tick of a multi-tick update and
 	// rides the same broadcast / CRC / replay channel as natural status changes. An entry stays queued until its
 	// scheduled tick and until its coord is one the tick will simulate (active, with a committed pCurrent frame).
-	game::DrainPendingAgentStatusChanges(*game::gpServerSession);
+	game::DrainPendingAgentStatusChanges();
 
 	// Save this tick's StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)
 	for (const auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
@@ -190,7 +190,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 void ServerBroadcaster::ResetState()
 {
 	mBroadcastStatusChanges.clear();
-	game::ResetPendingAgentStatusChanges(*game::gpServerSession);
+	game::ResetPendingAgentStatusChanges();
 }
 
 } // namespace engine

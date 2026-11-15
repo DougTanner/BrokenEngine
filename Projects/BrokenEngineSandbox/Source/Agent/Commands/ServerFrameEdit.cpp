@@ -116,7 +116,7 @@ static int64_t ApplyEdit(Frame& rFrame, const nlohmann::json& rEdit)
 		static constexpr std::array<std::string_view, sizeof...(INDICES)> kNames {engine::FrameCollectionAt<Interpolates, INDICES>::kName...};
 		static_assert(engine::AreDistinct(kNames), "FrameCollection names must be distinct; rename the repeated FrameCollection specialization");
 		int64_t iEdited = 0;
-		bool bKnown = ((collection == kNames[INDICES] && (iEdited = engine::WriteRow(typename engine::FrameCollectionAt<Interpolates, INDICES>::Columns {}, std::get<INDICES>(postRenders).iCount, std::get<INDICES>(interpolates), std::get<INDICES>(postRenders), rEdit, collection), true)) || ...);
+		bool bKnown = ((collection == kNames[INDICES] && (iEdited = engine::WriteRow(typename engine::FrameCollectionAt<Interpolates, INDICES>::Columns {}, std::get<INDICES>(interpolates), std::get<INDICES>(postRenders), rEdit, collection), true)) || ...);
 		if (!bKnown)
 		{
 			ThrowUnknownCollection(kNames);

@@ -30,8 +30,8 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   through `game::gpGame`. Focused Commands
   modules own the `crash_report_harness_rig` and the read-only
   `cell_coordinate_probe`, and `AgentCommandsShared.h` defines the one agent
-  position shape and the checked grid-coordinate and float readers that engine
-  and game commands share; the harness command reference
+  position shape and the checked grid-coordinate, integer, and float readers
+  that engine and game commands share; the harness command reference
   (`../../../.agents/skills/agent-harness/references/command-reference.md`)
   defines their schemas.
 - The game dispatcher tries the shared handlers first, then its own side

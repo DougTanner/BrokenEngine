@@ -27,4 +27,27 @@ GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string
 // Read one JSON number as a float; name prefixes the thrown message.
 float AgentFloatValue(const nlohmann::json& rValue, std::string_view name);
 
+// Read one JSON integer representable by INTEGER; name prefixes the thrown message.
+template <typename INTEGER>
+INTEGER IntegerFromValue(const nlohmann::json& rValue, std::string_view name)
+{
+	if (rValue.is_number_unsigned())
+	{
+		uint64_t uiValue = rValue.get<uint64_t>();
+		if (std::in_range<INTEGER>(uiValue))
+		{
+			return static_cast<INTEGER>(uiValue);
+		}
+	}
+	else if (rValue.is_number_integer())
+	{
+		int64_t iValue = rValue.get<int64_t>();
+		if (std::in_range<INTEGER>(iValue))
+		{
+			return static_cast<INTEGER>(iValue);
+		}
+	}
+	throw std::runtime_error(std::format("'{}' must be an integer in [{},{}]", name, std::numeric_limits<INTEGER>::min(), std::numeric_limits<INTEGER>::max()));
+}
+
 } // namespace engine

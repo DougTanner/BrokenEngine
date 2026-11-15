@@ -4,7 +4,6 @@
 
 #include "Network/Server/ServerSession.h"
 
-#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
@@ -25,7 +24,6 @@ ServerSession::ServerSession()
 
 ServerSession::~ServerSession()
 {
-	DetachServerSimulationHarnessRigs(*this);
 	mpRuntime.reset();
 }
 

@@ -183,13 +183,12 @@ the engine calls by name.
   `game::ResetPendingAgentStatusChanges`,
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.
-- The harness rig status-change queue comes from the game Agent's session-bound
-  state (the game project's own `Source/Agent/AGENTS.md` `## Contracts`). The
-  broadcaster drains injected changes and takes its snapshot once per
-  normal-play tick, so an injected change can enter any tick of a multi-tick
-  update, and its reset clears that queue. The transfer manager drains its spawn
-  queue after natural collection and before deterministic sorting, and its reset
-  clears that queue.
+- The harness rig status-change queue is owned by the game Agent (the game
+  project's own `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster
+  drains injected changes and takes its snapshot once per normal-play tick, so
+  an injected change can enter any tick of a multi-tick update, and its reset
+  clears that queue. The transfer manager drains its spawn queue after natural
+  collection and before deterministic sorting, and its reset clears that queue.
   Each accepted transfer batch goes to the engine replay owner before live
   application (`../../File/AGENTS.md#replay-streams`); capture failure
   invalidates recording but never vetoes the accepted batch.

@@ -85,28 +85,6 @@ consteval bool HasDistinctNames(FrameColumnList<COLUMNS...>)
 static_assert(HasDistinctNames(FrameValueColumns {}), "The frame Values() lists repeat a name; rename the value");
 static_assert(ContainsRefusedFrameValues(FrameValueColumns {}), "kRefusedFrameValues names a value missing from the frame Values() lists; update kRefusedFrameValues");
 
-template <typename INTEGER>
-INTEGER IntegerFromValue(const nlohmann::json& rValue, std::string_view name)
-{
-	if (rValue.is_number_unsigned())
-	{
-		uint64_t uiValue = rValue.get<uint64_t>();
-		if (std::in_range<INTEGER>(uiValue))
-		{
-			return static_cast<INTEGER>(uiValue);
-		}
-	}
-	else if (rValue.is_number_integer())
-	{
-		int64_t iValue = rValue.get<int64_t>();
-		if (std::in_range<INTEGER>(iValue))
-		{
-			return static_cast<INTEGER>(iValue);
-		}
-	}
-	throw std::runtime_error(std::format("'{}' must be an integer in [{},{}]", name, std::numeric_limits<INTEGER>::min(), std::numeric_limits<INTEGER>::max()));
-}
-
 template <typename ELEMENT>
 void ReadElement(const nlohmann::json& rWrites, std::string_view name, ELEMENT& rElement)
 {
@@ -275,7 +253,7 @@ inline const nlohmann::json& WritesFromEdit(const nlohmann::json& rEdit)
 }
 
 template <typename COLUMNS, typename INTERPOLATE, typename POST_RENDER>
-int64_t WriteRow(COLUMNS columns, int64_t iCount, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, const nlohmann::json& rEdit, std::string_view collection)
+int64_t WriteRow(COLUMNS columns, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, const nlohmann::json& rEdit, std::string_view collection)
 {
 	static_assert(MatchesServerMembers<INTERPOLATE, POST_RENDER>(COLUMNS {}), "FrameCollection column list must list its pair's server Members() in order; update the column list its FrameCollection specialization names");
 	static_assert(HasDistinctNames(COLUMNS {}), "FrameCollection column list repeats a name; update the column list its FrameCollection specialization names");
@@ -286,6 +264,7 @@ int64_t WriteRow(COLUMNS columns, int64_t iCount, INTERPOLATE& rInterpolate, POS
 			throw std::runtime_error(std::format("'{}' edit takes only 'collection', 'index', and 'writes'", collection));
 		}
 	}
+	int64_t iCount = rPostRender.iCount;
 	if (!rEdit.contains("index") || !rEdit.at("index").is_number_integer())
 	{
 		throw std::runtime_error(std::format("'{}' edit requires integer 'index' in [0,{})", collection, iCount));

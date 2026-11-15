@@ -66,9 +66,9 @@ game state around the deterministic Frame tick.
   retained after ordinary death respawns automatically when its type's countdown
   ends — zero for a Fighter, `kRespawnDelay` for an Omni or Battleship — and the
   countdown drains whether or not its owner is connected.
-- The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound
-  harness rig slot and its clearing semantics; teardown detaches it before
-  destroying the runtime.
+- The [game Agent](../../Agent/AGENTS.md#contracts) owns the status-change
+  queue; `../../../Documents/AgentHarness/commands-server.md` states which
+  events clear it.
 
 ## Timing and Paused Availability
 

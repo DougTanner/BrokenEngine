@@ -34,11 +34,9 @@ and orchestration for `inject_payload` and the
   query, `create_cell`, and the replay commands. Game server handlers own
   status-change injection, frame queries, frame edits and reads, and the
   `status` and `replay_transfer_capture` take-overs. Their focused
-  simulation-harness-rig module owns one state slot bound to the live
-  `ServerSession`, including the coordinate-keyed status-change queue that
-  `inject_payload` destroy and update entries fill; replacing or destroying the
-  bound session clears that state. `inject_payload` spawn entries go to the
-  engine `ServerTransferManager` spawn queue instead
+  simulation-harness-rig module owns the coordinate-keyed status-change queue
+  that `inject_payload` destroy and update entries fill. `inject_payload` spawn
+  entries go to the engine `ServerTransferManager` spawn queue instead
   (`../../Documents/AgentHarness/commands-server.md`).
 - The game Agent owns replay transfer type classification, capture-count storage
   shape, and the count fields its `replay_transfer_capture` take-over writes.

@@ -222,20 +222,21 @@ adding the fields below; the other entries are its own commands. For the engine
   payload, verbatim: the collection's `SpawnInfo` for a spawn type
   (`Frame/Collections/<Collection>/<Collection>.h`) and the destroy and update
   payloads in `Frame/StatusChange.h`. Values by member type: `bool` a
-  JSON boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in `[0,255]`;
-  `float` a finite number; `std::chrono::duration<float>` a finite number of
-  seconds; `engine::GridCoord` a `[q,r]` grid coordinate; `XMVECTOR` an `[x,y]`
-  pair of finite numbers in the cell's local frame, a position being meters from
-  the cell's center: a ship spawn's `vecPosition` takes z at the height of its
-  `orders` target flight plane (`orders` 256 names plane 1) and its
-  `uiFlightPlane` that plane whatever the entry supplies, any other
-  `vecPosition` z at the lowest flight plane, both w 1, and every other vector z
-  0 and w 0; `engine::AlignmentIdentifier` `"fleet"` or `"random"`, the game's
-  two alignments; a ship's `eController` `"Fleet"` or `"RandomSpawn"`; an
-  `eType` `"Fighter"`, `"Omni"`, or `"Battleship"`; a flags member, such as a
-  ship's `orders` or an omni's `flags`, the whole mask as an integer within its
-  underlying type, replacing the default mask; `flagshipGlobalId` an integer;
-  and a ship's own `globalId` is refused, because the server mints it.
+  JSON boolean; `int64_t` a JSON integer within `int64_t`; `uint8_t` a JSON
+  integer in `[0,255]`; `float` a finite number; `std::chrono::duration<float>`
+  a finite number of seconds; `engine::GridCoord` a `[q,r]` grid coordinate;
+  `XMVECTOR` an `[x,y]` pair of finite numbers in the cell's local frame, a
+  position being meters from the cell's center: a ship spawn's `vecPosition`
+  takes z at the height of its `orders` target flight plane (`orders` 256 names
+  plane 1) and its `uiFlightPlane` that plane whatever the entry supplies, any
+  other `vecPosition` z at the lowest flight plane, both w 1, and every other
+  vector z 0 and w 0; `engine::AlignmentIdentifier` `"fleet"` or `"random"`,
+  the game's two alignments; a ship's `eController` `"Fleet"` or
+  `"RandomSpawn"`; an `eType` `"Fighter"`, `"Omni"`, or `"Battleship"`; a
+  flags member, such as a ship's `orders` or an omni's `flags`, the whole
+  mask as an integer within its underlying type, replacing the default mask;
+  `flagshipGlobalId` an integer within `int64_t`; and a ship's own `globalId`
+  is refused, because the server mints it.
 
   | `type` | Fields |
   |--------|--------|
@@ -344,10 +345,10 @@ adding the fields below; the other entries are its own commands. For the engine
   is not ready at its target tick stays queued and applies with the first later
   tick that can take it. An active recording captures released entries as it
   captures natural ones: spawns in their tick's post-dispatch channel, destroy
-  and update entries in their tick's input. Load, `reset`, and session
-  replacement clear both queues, and so do a replay playback start and abort,
-  which replace state as `load` does. Recording start, stop, failure, and
-  cancellation and a replay transient-state clear drop no queued entry.
+  and update entries in their tick's input. Load and `reset` clear both
+  queues, and so do a replay playback start and abort, which replace state as
+  `load` does. Recording start, stop, failure, and cancellation and a replay
+  transient-state clear drop no queued entry.
 
   `pauseAfterWriterInput` requires `kbDebugInput` and must be a JSON boolean
   whenever present; the response echoes it. `false` imposes nothing further and

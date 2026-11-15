@@ -15,7 +15,7 @@ namespace game
 static void CommandStatus(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	engine::CommandStatus(rParameters, rResult);
-	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession) + gpServerSession->mpTransferManager->PendingSpawnCount();
+	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges() + gpServerSession->mpTransferManager->PendingSpawnCount();
 }
 
 bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)

@@ -26,26 +26,15 @@ struct ScheduledStatusChange
 	StatusChange change;
 };
 
-// The pendingAgentStatusChanges queue and its QueueAgentStatusChange, DrainPendingAgentStatusChanges,
-// ResetPendingAgentStatusChanges, and CountPendingAgentStatusChanges functions read nothing of a StatusChange but its
-// eType, so they are game-agnostic: a future project may want them moved into shared engine code, depending on its
-// requirements. The drain writes FrameInput, which replay records, so its order must stay identical if it moves.
+// The pendingAgentStatusChanges queue and its DrainPendingAgentStatusChanges, ResetPendingAgentStatusChanges, and
+// CountPendingAgentStatusChanges functions read nothing of a StatusChange but its eType, so they are game-agnostic.
+// The drain writes FrameInput, which replay records, so its order must stay identical.
 struct ServerSimulationHarnessRigState
 {
-	const ServerSession* pSession = nullptr;
 	std::unordered_map<engine::GridCoord, std::vector<ScheduledStatusChange>> pendingAgentStatusChanges;
 };
 
 static ServerSimulationHarnessRigState sHarnessRig;
-
-static void Bind(const ServerSession& rSession)
-{
-	if (sHarnessRig.pSession != &rSession)
-	{
-		sHarnessRig = {};
-		sHarnessRig.pSession = &rSession;
-	}
-}
 
 static bool IsCoordinateActive(engine::GridCoord coordinate)
 {
@@ -90,24 +79,11 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 	}
 	else if constexpr (std::is_same_v<Member, int64_t>)
 	{
-		if (!rValue.is_number_integer())
-		{
-			throw std::runtime_error(std::format("'{}' must be an integer", kName));
-		}
-		rMember = rValue.get<int64_t>();
+		rMember = engine::IntegerFromValue<Member>(rValue, kName);
 	}
 	else if constexpr (std::is_same_v<Member, uint8_t>)
 	{
-		if (!rValue.is_number_integer())
-		{
-			throw std::runtime_error(std::format("'{}' must be an integer in [0,255]", kName));
-		}
-		int64_t iValue = rValue.get<int64_t>();
-		if (!std::in_range<uint8_t>(iValue))
-		{
-			throw std::runtime_error(std::format("'{}' must be an integer in [0,255]", kName));
-		}
-		rMember = static_cast<uint8_t>(iValue);
+		rMember = engine::IntegerFromValue<Member>(rValue, kName);
 	}
 	else if constexpr (std::is_same_v<Member, float>)
 	{
@@ -155,16 +131,7 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 	{
 		using Enum = decltype(rMember.meFlags);
 		using Underlying = std::underlying_type_t<Enum>;
-		if (!rValue.is_number_integer())
-		{
-			throw std::runtime_error(std::format("'{}' must be an integer in [0,{}]", kName, std::numeric_limits<Underlying>::max()));
-		}
-		int64_t iValue = rValue.get<int64_t>();
-		if (!std::in_range<Underlying>(iValue))
-		{
-			throw std::runtime_error(std::format("'{}' must be an integer in [0,{}]", kName, std::numeric_limits<Underlying>::max()));
-		}
-		rMember.meFlags = static_cast<Enum>(iValue);
+		rMember.meFlags = static_cast<Enum>(engine::IntegerFromValue<Underlying>(rValue, kName));
 	}
 	else if constexpr (std::is_enum_v<Member>)
 	{
@@ -179,11 +146,7 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		}
 		else
 		{
-			if (!rValue.is_number_integer())
-			{
-				throw std::runtime_error(std::format("'{}' must be an integer", kName));
-			}
-			rMember.iValue = rValue.get<int64_t>();
+			rMember.iValue = engine::IntegerFromValue<int64_t>(rValue, kName);
 		}
 	}
 	else
@@ -567,7 +530,8 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		}
 		else
 		{
-			QueueAgentStatusChange(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change);
+			// Runs at the agent command drain point under AgentCommandServer::Drain's allocation suppression.
+			sHarnessRig.pendingAgentStatusChanges.try_emplace(rCoordinate).first->second.push_back(rScheduled);
 		}
 	}
 	if (bPauseAfterWriterInput)
@@ -581,11 +545,6 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command != "replay_transfer_capture" && command != "inject_payload")
-	{
-		return false;
-	}
-	Bind(*gpServerSession);
 	if (command == "replay_transfer_capture")
 	{
 		CommandReplayTransferCapture(rParameters, rResult);
@@ -599,20 +558,8 @@ bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nl
 	return false;
 }
 
-void QueueAgentStatusChange(const ServerSession& rSession, engine::GridCoord coordinate, int64_t iTick, const StatusChange& rChange)
+void DrainPendingAgentStatusChanges()
 {
-	// Runs at the agent command drain point under AgentCommandServer::Drain's allocation suppression.
-	Bind(rSession);
-	sHarnessRig.pendingAgentStatusChanges.try_emplace(coordinate).first->second.push_back({.iTick = iTick, .change = rChange});
-}
-
-void DrainPendingAgentStatusChanges(const ServerSession& rSession)
-{
-	if (sHarnessRig.pSession != &rSession)
-	{
-		return;
-	}
-
 	int64_t iTick = gpGame->miTickCounter;
 	auto IsReleased = [iTick](const ScheduledStatusChange& rScheduled)
 	{
@@ -653,35 +600,19 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 	}
 }
 
-void ResetPendingAgentStatusChanges(const ServerSession& rSession)
+void ResetPendingAgentStatusChanges()
 {
-	if (sHarnessRig.pSession == &rSession)
-	{
-		sHarnessRig.pendingAgentStatusChanges.clear();
-	}
+	sHarnessRig.pendingAgentStatusChanges.clear();
 }
 
-int64_t CountPendingAgentStatusChanges(const ServerSession& rSession)
+int64_t CountPendingAgentStatusChanges()
 {
-	if (sHarnessRig.pSession != &rSession)
-	{
-		return 0;
-	}
-
 	int64_t iCount = 0;
 	for (const auto& [rCoordinate, rChanges] : sHarnessRig.pendingAgentStatusChanges)
 	{
 		iCount += std::ssize(rChanges);
 	}
 	return iCount;
-}
-
-void DetachServerSimulationHarnessRigs(const ServerSession& rSession)
-{
-	if (sHarnessRig.pSession == &rSession)
-	{
-		sHarnessRig = {};
-	}
 }
 
 void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, ReplayTransferCaptureCounts& rCounts)
