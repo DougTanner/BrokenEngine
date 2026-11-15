@@ -285,7 +285,7 @@ void Replay::ClearReplayAbortState()
 	ClearReplayTransientState();
 	game::gpServerSession->mpTransferManager->mTransfers.clear();
 	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
-	game::OnStateReplaced();
+	game::gpServerSession->ResetForLoad();
 }
 
 void Replay::ResetStreams()
@@ -549,7 +549,7 @@ void Replay::SaveLoadReplay()
 				game::gpGame->miTickCounter = iTickCounter;
 
 				game::AdoptReplayMetadata(std::move(stagedMeta));
-				game::OnStateReplaced();
+				game::gpServerSession->ResetForLoad();
 
 				// Replay owns each active generation until its reader reaches the recorded end. Rebuild directly from
 				// the successfully loaded readers so normal subscription/owned-entity pruning cannot erase an empty coord.

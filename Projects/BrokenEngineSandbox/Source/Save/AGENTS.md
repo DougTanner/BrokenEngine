@@ -45,10 +45,11 @@ grid file uses. This subsystem owns the game half of that contract.
   frames. An abort therefore keeps the last dispatched tick's fleets, including
   fleets and members added during the recording.
 - After a successful save load, a fresh reset, replay adoption, a replay
-  playback abort, or an agent frame edit with a connected client, one game entry
-  point runs the engine session load reset, which rebuilds client ownership and
-  resynchronizes connected clients. It is the sole caller of that load reset, so
-  every one of these paths shares identical ordering.
+  playback abort, or an agent frame edit with a connected client, the path
+  calls the engine session load reset
+  (`engine::ServerSessionBase::ResetForLoad`), which rebuilds client ownership
+  and resynchronizes connected clients. Its ordering lives inside that one
+  function, so every one of these paths shares it.
 - Replay capture diagnostics use the game Agent's transfer-count contract
   (`../Agent/AGENTS.md`) and the engine Agent's replay-timed observations
   (`../../../../Engine/Source/Agent/AGENTS.md`).

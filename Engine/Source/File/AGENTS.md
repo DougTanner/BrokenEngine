@@ -44,11 +44,13 @@ owns it (game Network Server: the game project's own
   creates is in [Frame](../Frame/AGENTS.md) `## Terrain and Navigation`.
 - `ServerSaveLoad` (`GameBase::mServerSaveLoad`) owns when a save, load, reset,
   or autosave runs and what happens around it, and returns the actual commit
-  result to callers. A successful load keeps the saved simulation clock and
+  result to callers. A load that fails to read — a missing file, a save of
+  another format, or damaged contents — returns `false` and changes nothing in
+  the running game. A successful load keeps the saved simulation clock and
   resynchronizes clients to that state; a reset clears the game save state
   explicitly, since a fresh game has no save to restore it from. Load and reset
-  discard pending raw profile samples before mutating or restoring frame state;
-  this diagnostic cleanup does not alter the persisted payload.
+  discard pending raw profile samples before changing frame state; this
+  diagnostic cleanup does not alter the persisted payload.
 
 ## Packed Assets
 
@@ -168,10 +170,11 @@ then resimulates against recorded tick checksums.
 - Loop completion and abort both stop the current fixed-tick iteration before
   dispatch, then diverge: completion reloads the initial state, abort keeps the
   current frames, restores the pre-tick clock, and resumes live simulation.
-  Abort also runs the game state-replacement hook (the game project's own
-  `Source/Save/AGENTS.md` `## Replay Contract`).
+  Abort also runs the engine session load reset
+  ([Network Server](../Network/Server/AGENTS.md)).
 - The game keeps replay state the frames do not hold through calls at recording
   start, on each playback tick, and after each recorded or replayed tick
-  completes (the same game `## Replay Contract`). The playback call comes after
-  every abort and loop-completion return, so it runs only on a tick that
-  dispatches and an abort leaves that state matching the kept frames.
+  completes (the game project's own `Source/Save/AGENTS.md`
+  `## Replay Contract`). The playback call comes after every abort and
+  loop-completion return, so it runs only on a tick that dispatches and an
+  abort leaves that state matching the kept frames.

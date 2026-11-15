@@ -12,7 +12,7 @@
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/FrameCollections.h"
-#include "Save/GameSaveLoad.h"
+#include "Network/Server/ServerSession.h"
 
 namespace game
 {
@@ -210,7 +210,7 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 		// and the queued inject_payload entries.
 		if (iClientCount > 0)
 		{
-			OnStateReplaced();
+			gpServerSession->ResetForLoad();
 		}
 		rResult["edited"] = iEdited;
 		rResult["resynchronizedClients"] = iClientCount;

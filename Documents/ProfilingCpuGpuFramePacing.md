@@ -565,11 +565,10 @@ bounded OS event-query results.
 Use fresh processes/atlases, identical language/scale seeds, admitted scene and
 camera controls, cache seeds, warmup and input schedule on both sides. If exact
 world equality matters, existing save/load and pause controls can prepare a
-fixture; verify actual loaded state and ownership before timing. A successful
-load envelope alone can conceal a reset-to-fresh fallback. Do not let one side's
-runtime caches seed the other. Retained binaries still require a supported,
-receipt-bound harness launch; copying EXEs into current Output is not a launch
-override.
+fixture; verify actual loaded state and ownership before timing. Do not let one
+side's runtime caches seed the other. Retained binaries still require a
+supported, receipt-bound harness launch; copying EXEs into current Output is not
+a launch override.
 
 Record diagnostic asymmetry and actual texture events: old sampled upload stacks
 do not establish WantCreate versus WantUpdates, update rectangles or exact

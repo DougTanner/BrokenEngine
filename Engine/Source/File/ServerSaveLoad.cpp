@@ -25,22 +25,21 @@ bool ServerSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 
 bool ServerSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 {
-	// Heap: grid save file I/O, the staged snapshot's frames, and the session reset that follows adoption
+	// Heap: grid save file I/O, the staged snapshot's frames, and the session reset that precedes adoption
 	ScopedSuppressAllocationTracking suppress;
 	gpProfileManager->LatchRawCpuTimers(false);
 
-	engine::GridCoord loadedClientGridCoordinate {};
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoordinate))
+	engine::StagedGridSave stagedGrid;
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, stagedGrid))
 	{
 		return false;
 	}
 
-	int64_t iLoadedTick = game::gpGame->miTickCounter;
+	engine::GridCoord loadedClientGridCoordinate = stagedGrid.clientGridCoordinate;
 	game::gpGame->ResetSession();
-	// ResetSession clears the tick counter; restore the saved tick before client resynchronization.
-	game::gpGame->miTickCounter = iLoadedTick;
+	engine::AdoptGridSave(std::move(stagedGrid));
 	game::gpGame->SetClientGridCoordinate(loadedClientGridCoordinate);
-	game::OnStateReplaced();
+	game::gpServerSession->ResetForLoad();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
 
 	return true;
@@ -55,10 +54,10 @@ void ServerSaveLoad::ServerReset()
 	game::gpGame->CreateNewFrame();
 	game::gpGame->miNextGlobalId = 1;
 	game::gpGame->ResetSession();
-	// Fresh-game wipe of the game save state. A load leaves it populated by ReadGridSave;
+	// Fresh-game wipe of the game save state. A load leaves it populated by AdoptGridSave;
 	// a fresh game has no save to restore from, so explicitly clear it before ResetForLoad runs.
 	game::ResetSaveState();
-	game::OnStateReplaced();
+	game::gpServerSession->ResetForLoad();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
 }
 
@@ -125,12 +124,14 @@ bool ServerSaveLoad::Autoload()
 		return false;
 	}
 
-	engine::GridCoord loadedClientGridCoordinate {};
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename), loadedClientGridCoordinate))
+	engine::StagedGridSave stagedGrid;
+	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename), stagedGrid))
 	{
 		return false;
 	}
 
+	engine::GridCoord loadedClientGridCoordinate = stagedGrid.clientGridCoordinate;
+	engine::AdoptGridSave(std::move(stagedGrid));
 	game::gpGame->SetClientGridCoordinate(loadedClientGridCoordinate);
 	return true;
 }

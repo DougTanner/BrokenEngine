@@ -142,20 +142,15 @@ void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResult)
 	bool bPauseAfterLoad = rParameters.value("pauseAfterLoad", false);
 	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
 
-	bool bResetToFresh = false;
 	if (!game::gpGame->mServerSaveLoad.ServerLoad(file))
 	{
-		// A load failure after header validation clears the grid without running ServerLoad's success tail.
-		// Rebuild a fresh game as kClientLoadRequest does before simulation resumes.
-		game::gpGame->mServerSaveLoad.ServerReset();
-		bResetToFresh = true;
+		throw std::runtime_error("load failed to read '" + common::ToString(file.native()) + "'");
 	}
 	if (bPauseAfterLoad)
 	{
 		game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused);
 	}
 	rResult["file"] = common::ToString(file.native());
-	rResult["resetToFresh"] = bResetToFresh;
 	rResult["paused"] = static_cast<bool>(game::gpGame->mGameFlags & engine::GameFlags::kPaused);
 }
 

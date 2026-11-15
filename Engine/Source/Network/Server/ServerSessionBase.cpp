@@ -131,11 +131,7 @@ void ServerSessionBase::HandleDebugControlPacket(const DeferredClientPacket& rPa
 			LOG(kDefault, kDebug, "ServerSessionBase::kClientLoadRequest Client: {}", rPacket.iClientId);
 			if (!game::gpGame->mServerSaveLoad.ServerLoad(std::filesystem::path("ServerQuicksave.save")))
 			{
-				// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success
-				// tail (client reset + active-set recompute) never ran. Fall back exactly like ServerReset
-				// (fresh frame + reset connected clients for load) rather than ticking a torn grid.
-				LOG(kDefault, kError, "ServerSessionBase::kClientLoadRequest ServerLoad failed; resetting to fresh game");
-				game::gpGame->mServerSaveLoad.ServerReset();
+				LOG(kDefault, kWarning, "ServerSessionBase::kClientLoadRequest ServerLoad failed; the running game is unchanged");
 			}
 			break;
 		}

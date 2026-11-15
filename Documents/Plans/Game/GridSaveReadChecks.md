@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T22:54:12.417Z","dependsOn":["Documents/Plans/Engine/ServerGridSaveLoadCleanup.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T22:54:12.417Z","dependsOn":[]} -->
 # Grid-save read checks: Transfer flag and non-finite Omni armor and shield
 
 ## Context
@@ -139,9 +139,9 @@ First confirm the open point above by reading: the tick phase order
 a `game::Frame` to a stream. If a written frame can hold `kTransfer`, stop and
 surface it for re-planning: the rule below would then reject a valid save.
 
-`Documents/Plans/Engine/ServerGridSaveLoadCleanup.md` lands first and rewrites
-wording in `Engine/Source/File/AGENTS.md` that this step relies on; the
-executing session re-reads `## Grid Saves` there before relying on it.
+`Engine/Source/File/AGENTS.md` `## Grid Saves` states that a grid save that
+fails to read fails the load and leaves the running game unchanged; the
+executing session re-reads that section before relying on it.
 
 Recommended (the author's recommendation): in the game `operator>>`
 (`Frame.cpp:792-804`), beside `ValidatePusherOwners`, reject any row of
@@ -271,7 +271,5 @@ Non-finite Omni armor and shield:
 
 ## Coordination
 
-- `Documents/Plans/Engine/ServerGridSaveLoadCleanup.md` (metadata edge) lands
-  first; see `## Design` step 1.
 - Other Plans edit other passages of `commands-server.md`; line numbers here
   shift once one lands.

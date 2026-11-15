@@ -19,6 +19,14 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
+  Engine/Source/File/ServerSaveLoad.cpp:117 — `Autoload` adopts a save
+  without the `ResetSession`, `ResetForLoad`, and `ComputeActiveSet` tail that
+  `ServerLoad` and `ServerReset` run, and its caller in the game `Game.cpp`
+  owns its own fresh-world fallback, so startup and runtime loads follow
+  different sequences — route startup through one load-or-reset entry point
+  in `ServerSaveLoad` that shares that tail (needs a harness check of
+  `ResetForLoad` during the `Game` constructor)
 - 2026-11-15 claude/a2c7596c-10a1-435c-b437-17d460d78832 —
   Engine/Source/Graphics/Objects/Pipeline.h:156 — `mExternalVkDescriptorSetLayout`
   is always assigned the global Set 0 layout in `Pipeline::Create` and read

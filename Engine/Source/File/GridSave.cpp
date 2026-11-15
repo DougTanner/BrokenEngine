@@ -47,25 +47,6 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 	return bWritten;
 }
 
-bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord& rClientGridCoordinate)
-{
-	StagedGridSave stagedGrid;
-	if (!ReadGridSave(rFlags, rFilename, stagedGrid))
-	{
-		if (stagedGrid.bHeaderValidated)
-		{
-			// Keep the established save-load failure state for callers that rebuild a fresh game after false.
-			game::gpGame->mCells.clear();
-			game::ResetSaveState();
-		}
-		return false;
-	}
-
-	rClientGridCoordinate = stagedGrid.clientGridCoordinate;
-	AdoptGridSave(std::move(stagedGrid));
-	return true;
-}
-
 bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, StagedGridSave& rStagedGrid)
 {
 	std::fstream fileStream = engine::gpFileManager->OpenFile(rFlags, rFilename);
@@ -77,7 +58,6 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		LOG(kDefault, kError, "ReadGrid {} failed: version {} != {}", rFilename, iVersion, game::Frame::kiVersion);
 		return false;
 	}
-	rStagedGrid.bHeaderValidated = true;
 
 	int64_t iFrameCount = 0;
 	common::Read(fileStream, iFrameCount);
@@ -93,7 +73,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		common::Read(fileStream, rStagedGrid.iNextGlobalId);
 		// Trust boundary (save file): the global-id counter is a monotonic positive int64 (fresh games start at
 		// 1). Validate now but apply only past the stream-good gate below, so a failed or silently-torn load
-		// leaves the fresh-fallback game minting from a clean base rather than a garbage/advanced one.
+		// leaves the running game's counter unchanged.
 		if (rStagedGrid.iNextGlobalId <= 0)
 		{
 			throw std::ios_base::failure("iNextGlobalId");

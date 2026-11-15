@@ -71,10 +71,9 @@ the owning subsystem's established failure channel; there is no universal
   inbound packet; `Server::Receive` (`/Engine/Source/Network/Server/Server.cpp`)
   additionally records the contract violation. Keep their handshake, budget, and
   packet-specific policies distinct.
-- Invalid persisted grid data follows
-  `engine::ReadGridSave` (`/Engine/Source/File/GridSave.cpp`):
-  clear partial grid/fleet state, log, and return `false`; apply the global-ID
-  counter only after the complete read succeeds.
+- Invalid persisted grid data follows `engine::ReadGridSave`
+  (`/Engine/Source/File/GridSave.cpp`): log and return `false`; staging and
+  adoption follow `/Engine/Source/File/AGENTS.md` `## Grid Saves`.
 - Corrupt boot-required eager animation data follows
   `LoadAnimationDataFromEagerChunks`
   (`/Engine/Source/Graphics/AnimationData.cpp`): log the asset identity at

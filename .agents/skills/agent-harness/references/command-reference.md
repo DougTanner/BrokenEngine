@@ -431,14 +431,12 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns
   `{"file"}`.
 - `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`
-  must be Boolean when present; invalid parameters fail before loading or
-  resetting and do not change pause state. Missing/corrupt/truncated data resets
-  fresh while returning success, as does a save written under another game
-  frame version, such as an older build's (`resetToFresh:true`).
-  Absent/false leaves the normal post-load state unpaused; true atomically
-  pauses after a successful load or completed fresh fallback, before frame
-  inputs can be constructed. Returns
-  `{"file","resetToFresh":bool,"paused":bool}`.
+  must be Boolean when present; invalid parameters fail before loading and do
+  not change pause state. A missing, damaged, or truncated save, or one written
+  under another game frame version, such as an older build's, fails with the
+  error envelope and changes nothing. Absent/false leaves the normal post-load
+  state unpaused; true atomically pauses after a successful load, before frame
+  inputs can be constructed. Returns `{"file","paused":bool}`.
 - `reset`: no params. Resets the server to a fresh game, game-owned server state
   included. Returns `{}`.
 - `create_cell`: `{"coord":[q,r]}`; `coord` is the only key. Creates a fresh

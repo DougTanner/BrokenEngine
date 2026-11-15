@@ -86,11 +86,6 @@ void AdoptReplayMetadata(ReplayStagedMeta&& rStagedMetadata)
 	rReplayLog.checksums = std::move(rStagedMetadata.fleetChecksums);
 }
 
-void OnStateReplaced()
-{
-	game::gpServerSession->ResetForLoad();
-}
-
 void StartReplayRecording()
 {
 	ReplayFleetLog& rReplayLog = gpServerSession->mpFleetManager->mReplayLog;
