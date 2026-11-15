@@ -91,7 +91,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 				{
 					if (common::gpMultithreading->IsMainThread())
 					{
-						AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kQueued, 0, false);
+						AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kExistingQueued, kiAudioStreamingHarnessRigNoPoolIndex, crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kQueued, 0, false);
 					}
 				}
 #endif
@@ -240,7 +240,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			if (!bAudioRead)
 			{
 				const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-				AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kReady, 0, false);
+				AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, kiAudioStreamingHarnessRigNoPoolIndex, loadRequest.crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kReady, 0, false);
 			}
 		}
 #endif

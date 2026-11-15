@@ -214,7 +214,7 @@ bool AudioStreamingHarnessRig::BeginHistory()
 
 bool AudioStreamingHarnessRig::ArmHold(AudioStreamingHarnessRigHoldOwner eOwner, common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
-	if (miHeldIndex.load(std::memory_order_seq_cst) != 4'294'967'295i64)
+	if (miHeldIndex.load(std::memory_order_seq_cst) != kiAudioStreamingHarnessRigNoPoolIndex)
 	{
 		return false;
 	}
@@ -500,7 +500,7 @@ bool AudioStreamingHarnessRig::HoldAudioRead(common::crc_t crc, int64_t iOffset,
 		return false;
 	}
 	// Claiming the held index before consuming the token means only its claimant ever resets it, so a loader that loses the token to a re-armed hold cannot clear the winner's index.
-	int64_t iExpectedIndex = 4'294'967'295i64;
+	int64_t iExpectedIndex = kiAudioStreamingHarnessRigNoPoolIndex;
 	if (!pHarnessRig->miHeldIndex.compare_exchange_strong(iExpectedIndex, iIndex, std::memory_order_seq_cst))
 	{
 		return false;
@@ -510,7 +510,7 @@ bool AudioStreamingHarnessRig::HoldAudioRead(common::crc_t crc, int64_t iOffset,
 	if (!pHarnessRig->muiHoldToken.compare_exchange_strong(uiHoldToken, uiConsumedToken, std::memory_order_seq_cst))
 	{
 		pHarnessRig->miHeldGeneration.store(0, std::memory_order_seq_cst);
-		pHarnessRig->miHeldIndex.store(4'294'967'295i64, std::memory_order_seq_cst);
+		pHarnessRig->miHeldIndex.store(kiAudioStreamingHarnessRigNoPoolIndex, std::memory_order_seq_cst);
 		return false;
 	}
 	uiHoldToken = uiConsumedToken;
@@ -530,7 +530,7 @@ void AudioStreamingHarnessRig::CompleteAudioRead(bool bHeld)
 	if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr)
 	{
 		pHarnessRig->miHeldGeneration.store(0, std::memory_order_seq_cst);
-		pHarnessRig->miHeldIndex.store(4'294'967'295i64, std::memory_order_seq_cst);
+		pHarnessRig->miHeldIndex.store(kiAudioStreamingHarnessRigNoPoolIndex, std::memory_order_seq_cst);
 	}
 }
 

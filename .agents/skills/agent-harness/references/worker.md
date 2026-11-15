@@ -437,9 +437,9 @@ and the handoff this run returns.
       `reportPath`, `headline`, `exitCode`, and `evidencePath` (the retained
       evidence directory).
     - `exitCode` is the registered process's exit code, or `null` when the exit
-      code was not captured — usually because the watcher could not bind it, a
-      process that had already exited when `Register` ran. Step 33 owns the
-      expected exit after `crash_report_harness_rig`; never prove it from a
+      code was not captured, usually because the watcher never bound the
+      process, such as after the launcher's handle was released. Step 33 owns
+      the expected exit after `crash_report_harness_rig`; never prove it from a
       second launch.
     - Exit `0` means every registered role still holds its registered exact
       identity — the registered PID plus its registered start time, never a

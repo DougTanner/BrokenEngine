@@ -900,8 +900,8 @@ function or its file, and `FC/Ships/AGENTS.md` `## Ship Invariants` and
 
 - 1: error text, action names, required fields, and the order of side
   effects; the two deferred poll lambdas beyond staying in their branches;
-  the sentinel literal at `:347`; every other dispatch chain under
-  `Engine/Source/Agent`.
+  the `kiAudioStreamingHarnessRigNoPoolIndex` comparison at `:347`; every
+  other dispatch chain under `Engine/Source/Agent`.
 - 2: every tuning row's value and the other two switches; the drop
   simulation and its log, `DelayedPacket`, and `NetworkSimulationState`; the
   committed value and location of `keNetworkSimulation`; both callers of
@@ -1177,8 +1177,6 @@ Other Plans that edit the same regions, with no ordering required unless
 stated; whichever lands second re-derives its sites by symbol from the landed
 tree:
 
-- `Documents/Plans/Engine/AudioHarnessRigCleanup.md` names the sentinel at
-  `:347`, inside the `release_read` branch item 1 moves.
 - `Documents/Plans/Engine/RemoveDeadNetworkSymbols.md` edits
   `NetworkSimulation.h` and needs the same temporary non-disabled build as
   item 2.

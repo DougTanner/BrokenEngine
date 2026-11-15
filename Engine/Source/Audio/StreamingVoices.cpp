@@ -165,7 +165,7 @@ void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 	{
 		mpCurrentStream = std::make_unique<StreamingVoice>(mpAudioEngine, pVoice, &rLazyChunk);
 #if defined(BT_DEBUG)
-		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, rLazyChunk.header.iSize, AudioStreamingHarnessRigQueueState::kFree, 0, false);
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kStartup, kiAudioStreamingHarnessRigNoPoolIndex, uiAudioCrc, 0, rLazyChunk.header.iSize, AudioStreamingHarnessRigQueueState::kFree, 0, false);
 #endif
 	}
 	else

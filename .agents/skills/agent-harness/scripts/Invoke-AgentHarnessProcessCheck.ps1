@@ -7,8 +7,9 @@
 # does not match the registered one is a recycled PID, not the registered process, and a live value
 # alone never establishes identity. There is no process-name search anywhere.
 # Register also starts a detached watcher that holds a limited-query handle on the registered
-# process, because only a handle opened while the process is still alive lets a separate process
-# read its exit code; a watcher that cannot bind the registered identity records no exit code and
+# process, because only a handle lets a separate process read its exit code, and the watcher's
+# handle can open even after the process exits while another handle (the launcher's) still holds
+# the process; a watcher that cannot bind the registered identity records no exit code and
 # Check then reports the code as unknown.
 [CmdletBinding()]
 param(
@@ -432,14 +433,27 @@ public static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 public static extern bool GetExitCodeProcess(IntPtr handle, out int exitCode);
 [DllImport("kernel32.dll", SetLastError = true)]
 [return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool GetProcessTimes(IntPtr handle, out long creationTime, out long exitTime, out long kernelTime, out long userTime);
+[DllImport("kernel32.dll", SetLastError = true)]
+[return: MarshalAs(UnmanagedType.Bool)]
 public static extern bool CloseHandle(IntPtr handle);
 '@
-				# PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE. Opening the handle before the
-				# identity is verified keeps the PID from being recycled between that check and the
-				# wait, and the open handle keeps the exit code readable after the process ends.
+				# PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE. The identity is checked on the opened
+				# handle's creation time, so the PID cannot be recycled between that check and the wait,
+				# and a process that already exited still binds while another handle keeps its object.
 				$handle = [BrokenEngineHarness.NativeProcess]::OpenProcess(0x1000 -bor 0x00100000, $false, [uint32]$ProcessId)
 				if ($handle -ne [IntPtr]::Zero) {
-					if (Test-RegisteredProcessAlive $ProcessId $StartTimeUtc) {
+					$registeredStart = ConvertTo-UtcDateTime $StartTimeUtc
+					$creationFileTime = 0L
+					$unusedFileTime = 0L
+					$identityMatches = $false
+					if ($null -ne $registeredStart -and
+						[BrokenEngineHarness.NativeProcess]::GetProcessTimes($handle, [ref]$creationFileTime, [ref]$unusedFileTime,
+							[ref]$unusedFileTime, [ref]$unusedFileTime)) {
+						$creationUtc = [datetime]::FromFileTimeUtc($creationFileTime)
+						$identityMatches = ([Math]::Abs(($creationUtc - $registeredStart).TotalMilliseconds) -le $IdentityToleranceMilliseconds)
+					}
+					if ($identityMatches) {
 						$exitRecord.bound = $true
 						Write-ExitSidecar $sidecarPath $exitRecord
 						[void][BrokenEngineHarness.NativeProcess]::WaitForSingleObject($handle, [uint32]::MaxValue)

@@ -219,13 +219,14 @@ static int64_t MainThread(HINSTANCE hinstance)
 	// Before the game, so its startup list holds no report stored in this run and it outlives Server, which posts through it.
 	auto pCrashReportPoster = std::make_unique<CrashReportPoster>();
 
-	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
-	auto pIslandTerrain = std::make_unique<IslandTerrain>();
-	auto pFlightPlanes = std::make_unique<FlightPlanes>();
 	if (HandleEagerLoadCompletion() != 0)
 	{
 		return 1;
 	}
+
+	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
+	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	auto pFlightPlanes = std::make_unique<FlightPlanes>();
 	std::vector<NavigationGraphBake> navigationGraphs(game::kNavigationGraphs.size());
 	for (const auto& [i, rGraph] : std::views::enumerate(game::kNavigationGraphs))
 	{
@@ -303,6 +304,14 @@ static int64_t MainThread(HINSTANCE hinstance)
 		gpAudioManager->Suspend();
 	}
 
+	// Checked before any lazy chunk is queued, so a failed eager load leaves the loader queue empty and teardown's
+	// loader drain returns at once.
+	gpProfileManager->BootStart(kBootTimerWaitForIslands);
+	if (HandleEagerLoadCompletion() != 0)
+	{
+		return 1;
+	}
+
 	// Create terrain collision data (before Graphics, which creates Islands that reads beach elevation)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
 	auto pFlightPlanes = std::make_unique<FlightPlanes>();
@@ -310,11 +319,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Graphics records its
 	// stable empty arena at boot.
-	gpProfileManager->BootStart(kBootTimerWaitForIslands);
-	if (HandleEagerLoadCompletion() != 0)
-	{
-		return 1;
-	}
 	gpIslandTerrain->WaitForElevationMaps();
 	gpProfileManager->BootStop(kBootTimerWaitForIslands);
 

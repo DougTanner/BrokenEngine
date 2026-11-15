@@ -74,6 +74,8 @@ enum class AudioStreamingHarnessRigAudioSnapshotFlags : uint8_t
 };
 using AudioStreamingHarnessRigAudioSnapshotFlags_t = common::Flags<AudioStreamingHarnessRigAudioSnapshotFlags>;
 
+inline constexpr int64_t kiAudioStreamingHarnessRigNoPoolIndex = 4'294'967'295i64;
+
 struct AudioStreamingHarnessRigRecord
 {
 	int64_t iSequence = 0;
@@ -81,7 +83,7 @@ struct AudioStreamingHarnessRigRecord
 	int64_t iGeneration = 0;
 	int64_t iThreadId = 0;
 	int64_t iThreadPriority = 0;
-	int64_t iPoolIndex = 4'294'967'295i64;
+	int64_t iPoolIndex = kiAudioStreamingHarnessRigNoPoolIndex;
 	common::crc_t crc = 0;
 	int64_t iOffset = 0;
 	int64_t iLength = 0;
@@ -112,7 +114,7 @@ struct AudioStreamingHarnessRigSnapshot
 	AudioStreamingHarnessRigHoldOwner eHoldOwner = AudioStreamingHarnessRigHoldOwner::kNone;
 	AudioStreamingHarnessRigHoldState eHoldState = AudioStreamingHarnessRigHoldState::kIdle;
 	AudioStreamingHarnessRigSnapshotFlags_t flags;
-	int64_t iHeldIndex = 4'294'967'295i64;
+	int64_t iHeldIndex = kiAudioStreamingHarnessRigNoPoolIndex;
 	int64_t iHeldGeneration = 0;
 	AudioStreamingHarnessRigQueueState eHeldState = AudioStreamingHarnessRigQueueState::kFree;
 	int64_t iMainHead = 0;
@@ -220,7 +222,7 @@ private:
 	std::atomic<common::crc_t> mHoldCrc = 0;
 	std::atomic<int64_t> miHoldOffset = 0;
 	std::atomic<int64_t> miHoldLength = 0;
-	std::atomic<int64_t> miHeldIndex = 4'294'967'295i64;
+	std::atomic<int64_t> miHeldIndex = kiAudioStreamingHarnessRigNoPoolIndex;
 	std::atomic<int64_t> miHeldGeneration = 0;
 };
 
