@@ -17,9 +17,6 @@ void TextureUploadManager::InitializeTransferResources()
 	RethrowException();
 
 	mbShutdown = false;
-	// Reset the drain handshake with mbShutdown so a recreated upload thread starts clean.
-	mbDrainRequested = false;
-	mbDrained = false;
 	mbThreadExited.store(false, std::memory_order_release);
 
 	VkCommandPoolCreateInfo vkCommandPoolCreateInfo
@@ -64,9 +61,9 @@ void TextureUploadManager::DestroyTransferResources()
 		return;
 	}
 
-	// Join upload thread first. Drain any pending permit before the release: a WaitIdle that returned early via
-	//   mbThreadExited (device-loss or fatal-error thread-exit path) can leave its probe permit pending, and an unguarded release
-	//   would push the binary_semaphore past its max of 1 (UB). Same drain-then-release idiom as WaitIdle.
+	// Join upload thread first. Drain any pending permit before the release: a frame signal the thread has not consumed, or
+	//   never will because it exited, can still be pending, and an unguarded release would push the binary_semaphore past its
+	//   max of 1 (UB). Same drain-then-release idiom as SignalFrame.
 	mbShutdown = true;
 	std::ignore = mFrameSignal.try_acquire();
 	mFrameSignal.release();
@@ -157,39 +154,16 @@ std::vector<common::crc_t> TextureUploadManager::TakeCompletedElevations()
 
 void TextureUploadManager::WaitIdle()
 {
-	// No upload thread can acknowledge a drain after shutdown/exit or before startup. First-boot Create calls Destroy before TextureManager
-	// starts the thread, while mbShutdown is false. This thread is the sole starter/joiner, so joinable() is main-thread-only state.
-	if (mbShutdown || mbThreadExited)
-	{
-		return;
-	}
-
-	if (!mUploadThread.joinable())
-	{
-		return;
-	}
-
-	// UploadThread consumes mFrameSignal before taking mWorkMutex, so locking alone cannot prevent a pending submit from racing teardown's vkDeviceWaitIdle.
-	// Each iteration holds mWorkMutex through submission. A drain probe waits for an active iteration and makes the next iteration acknowledge without submitting.
-	// Binary-semaphore frame signals resume uploads; the condition variable is used only for teardown.
-	{
-		std::unique_lock lock(mWorkMutex);
-		mbDrained = false;
-		mbDrainRequested = true;
-	}
-
-	// Ensure exactly one wake is pending (binary_semaphore max count is 1) so a parked thread observes the
-	//   request; try_acquire first so the release cannot exceed the max.
-	std::ignore = mFrameSignal.try_acquire();
-	mFrameSignal.release();
-
+	// Each iteration holds mWorkMutex through its submit, so taking it waits out any submit in flight. Every later iteration reads
+	//   the pause flag under the same mutex and skips without submitting until SignalFrame clears it.
 	std::unique_lock lock(mWorkMutex);
-	mIdleConditionVariable.wait(lock, [this] { return mbDrained || mbThreadExited; });
-	mbDrainRequested = false;
+	mbUploadPaused = true;
 }
 
 void TextureUploadManager::SignalFrame()
 {
+	// Clear the pause before the release so the woken iteration, synchronized by acquire(), sees it cleared.
+	mbUploadPaused = false;
 	// Drain before releasing so the binary semaphore cannot exceed its maximum count of 1 while the upload thread is mid-iteration.
 	// A dropped wake is posted again by the next frame signal.
 	std::ignore = mFrameSignal.try_acquire();
@@ -223,30 +197,14 @@ void TextureUploadManager::UploadThread()
 		mFrameSignal.acquire();
 		if (mbShutdown)
 		{
-			// mWorkMutex is not yet held here (workLock is taken below), so lock it to set the exit flag and
-			//   notify under the lock -- a WaitIdle parked on mIdleConditionVariable then sees no lost wakeup.
-			{
-				std::unique_lock exitLock(mWorkMutex);
-				mbThreadExited.store(true, std::memory_order_release);
-				mIdleConditionVariable.notify_all();
-			}
 			break;
 		}
 
 		std::unique_lock workLock(mWorkMutex);
 
-		// WaitIdle() drain probe: any real iteration in flight when WaitIdle took mWorkMutex already finished
-		//   its submit (we hold mWorkMutex across each iteration), so ack from this quiescent point and re-park
-		//   without submitting. Queued requests persist and resume on the next frame's signal.
-		if (mbDrainRequested)
+		// WaitIdle pauses uploads for teardown. Skipping before DequeueNextUpload keeps queued requests and the in-progress texture.
+		if (mbUploadPaused)
 		{
-			mbDrainRequested = false;
-			mbDrained = true;
-			mIdleConditionVariable.notify_all();
-			// Swallow the pending probe permit so it can't drive one more acquire() -> vkQueueSubmit after
-			//   WaitIdle returns (the stray permit would race teardown's vkDeviceWaitIdle). Same idiom as
-			//   TextureManager::WaitForTextures; a real frame signal re-posts next frame by design.
-			std::ignore = mFrameSignal.try_acquire();
 			continue;
 		}
 
@@ -351,7 +309,6 @@ void TextureUploadManager::UploadThread()
 			{
 				mException = std::current_exception();
 				mbThreadExited.store(true, std::memory_order_release);
-				mIdleConditionVariable.notify_all();
 				break;
 			}
 
@@ -364,10 +321,6 @@ void TextureUploadManager::UploadThread()
 				miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
 			}
 			mCurrentCrc = 0;
-			// workLock already holds the non-recursive mWorkMutex; locking it again would self-deadlock.
-			// Publish the exit and notify the drain waiter before leaving the thread, since it cannot acknowledge another probe.
-			mbThreadExited.store(true, std::memory_order_release);
-			mIdleConditionVariable.notify_all();
 			break;
 		}
 		catch (...)
@@ -376,7 +329,6 @@ void TextureUploadManager::UploadThread()
 			// Graphics teardown waits for the device before DestroyTransferResources destroys that image.
 			mException = std::current_exception();
 			mbThreadExited.store(true, std::memory_order_release);
-			mIdleConditionVariable.notify_all();
 			break;
 		}
 	}

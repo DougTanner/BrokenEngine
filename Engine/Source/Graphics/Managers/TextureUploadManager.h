@@ -83,11 +83,9 @@ private:
 
 	std::thread mUploadThread;
 	std::mutex mWorkMutex;
-	std::condition_variable mIdleConditionVariable; // WaitIdle() waits on this; UploadThread notifies when it acks a drain probe (guarded by mWorkMutex)
-	bool mbDrainRequested = false; // WaitIdle() sets this; UploadThread acks instead of submitting (guarded by mWorkMutex)
-	bool mbDrained = false; // UploadThread sets this to confirm it reached a quiescent point (guarded by mWorkMutex)
+	std::atomic<bool> mbUploadPaused = false; // Set by WaitIdle under mWorkMutex, cleared by SignalFrame; UploadThread skips iterations while set
 	std::exception_ptr mException; // Unexpected upload-thread failure, published before mbThreadExited while mWorkMutex is held
-	std::atomic<bool> mbThreadExited = false; // Shutdown-wake and exception exits publish this flag under mWorkMutex before notifying mIdleConditionVariable.
+	std::atomic<bool> mbThreadExited = false; // Set by fatal upload-thread exits; RethrowException's lock-free check reads it.
 	static_assert(decltype(mbThreadExited)::is_always_lock_free);
 	std::mutex mUploadMutex;
 	std::priority_queue<LoadRequest> mUploadQueue;

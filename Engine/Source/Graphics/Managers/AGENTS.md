@@ -309,12 +309,11 @@ present family, so concurrent submissions do not share that queue.
 - Distinct transfer queues release image ownership for the matching graphics
   acquire; maintenance9-capable devices may use the simplified path. Device loss
   preserves CPU data for re-upload.
-- `WaitIdle` is a teardown drain handshake: the upload thread acknowledges only
-  from a no-submit-in-flight point, and every exit path publishes exit state so
-  a waiter cannot deadlock. Frame permits remain binary and must be drained
-  before release. Fatal upload failures are published for the main thread and
-  survive transfer-resource recreation; device loss remains a separate recovery
-  path.
+- `WaitIdle` pauses uploads for teardown: when it returns, no upload submit is
+  in flight and none starts until the next `SignalFrame`. Frame permits remain
+  binary and must be drained before release. Fatal upload failures are
+  published for the main thread and survive transfer-resource recreation;
+  device loss remains a separate recovery path.
 - Pack texture headers and derived copy ranges are validated before the upload
   thread may hand work to foreground adoption, and again before foreground
   fallback allocation or copy: positive signed dimensions and mip counts, the

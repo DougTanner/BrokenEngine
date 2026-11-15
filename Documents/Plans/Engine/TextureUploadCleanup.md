@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T23:19:55.721Z","dependsOn":["Documents/Plans/Engine/PostUploadDrainPermitUnderLock.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T23:19:55.721Z","dependsOn":[]} -->
 # Clean up TextureUploadManager and TextureManager duplicate and dead code
 
 ## Context
@@ -29,10 +29,9 @@ TextureUploadManager:
   `:539-549`): the same `memcpy`, the same seven `VkBufferImageCopy` field
   writes, and the same `vkCmdCopyBufferToImage`, differing only in the
   height and the byte count.
-- `TextureManager.cpp:642-643` spells out the body of
-  `TextureUploadManager::SignalFrame` (`TextureUploadManager.cpp:195-196`)
-  on `gpTextureUploadManager->mFrameSignal`. That site is the only reason
-  `mFrameSignal` is public (`TextureUploadManager.h:48`).
+- `mFrameSignal` is public (`TextureUploadManager.h:48`) though no code
+  outside `TextureUploadManager` touches it: `TextureManager::WaitForTextures`
+  calls `SignalFrame()`.
 - `DestroyTransferResources` binds each map entry `const` (`:103`) and looks
   the same entry up again with `.at(rCrc)` to get it mutable (`:107`).
 
@@ -81,7 +80,7 @@ Unmet criteria:
 2. `SubmitChunkUpload` holds only the two barrier variants the upload thread
    can run.
 3. The staging copy region is written once.
-4. No code outside `TextureUploadManager` touches `mFrameSignal`.
+4. `mFrameSignal` is private.
 5. One site owns the free, descriptor update, `kReady` store, counter
    decrement, and first blur.
 6. The detail minimum and clamp are written once.
@@ -106,8 +105,7 @@ TextureUploadManager:
   `:572-573` may stay.
 - In `RecordStagingCopies`, compute the height and byte count in each branch
   and write the copy once; cursor updates stay in their branches.
-- `TextureManager.cpp:642-643` calls `SignalFrame()`, and `mFrameSignal`
-  becomes private.
+- `mFrameSignal` becomes private.
 - In `DestroyTransferResources`, bind the entry mutable and drop the second
   lookup. This edit is cosmetic alone and is included only because the
   staging change already edits that function.
@@ -131,9 +129,10 @@ TextureManager:
   the criterion but keeps a stored copy, so the author does not recommend
   it.
 
-`Documents/Plans/Engine/PostUploadDrainPermitUnderLock.md` lands first and
-rewrites `WaitIdle` in `TextureUploadManager.cpp`; re-derive this Plan's
-`TextureUploadManager.cpp` lines by symbol from the landed file.
+`WaitIdle` sets an upload pause flag under `mWorkMutex` and posts no permit,
+`SignalFrame` clears it, and `TextureManager::WaitForTextures` already calls
+`SignalFrame`; re-derive this Plan's `TextureUploadManager.cpp` lines by
+symbol from the current file.
 
 ## Critical files
 
@@ -160,7 +159,6 @@ rewrites `WaitIdle` in `TextureUploadManager.cpp`; re-derive this Plan's
 `TextureManager.cpp` / `.h`, `TextureCache.h`, `CommandBufferManager.cpp`,
 `LightingUniforms.cpp`:
 
-- The frame-signal site `TextureManager.cpp:640-643`.
 - The two adoption-completion blocks and one new private member function.
 - `DetailTextureSize`, `WaterDetailTextureSize`, and one new file-local
   function.
@@ -170,11 +168,9 @@ rewrites `WaitIdle` in `TextureUploadManager.cpp`; re-derive this Plan's
 
 ## Out of scope
 
-- `WaitIdle` (`:158-189`, whose `:175-184`
-  `Documents/Plans/Engine/PostUploadDrainPermitUnderLock.md` rewrites) and the
-  drain-then-release pairs at `:71-72` and `:183-184`. At those two teardown
-  sites the call is not a frame signal, and `SignalFrame`'s comment does not
-  hold for them.
+- `WaitIdle` and the `DestroyTransferResources` drain-then-release pair. At
+  that teardown site the call is not a frame signal, and `SignalFrame`'s
+  comment does not hold for it.
 - `SelectQueueFamilies` and the queue-alias rule.
 - The upload budget, the chunk order, and the copy-region rule described at
   `TextureUploadManager.cpp:521-527`.
@@ -194,13 +190,11 @@ Tier 2 — scoped behavior. Triggers: member declarations change in headers
 `Engine.h` aggregates (a static removed, a member removed, an accessor added,
 `mFrameSignal` made private), which Tier 1's "no public signature" excludes.
 
-Invariants: the semaphore operations at the `TextureManager.cpp` frame-signal
-site are the same two calls through `SignalFrame`; the staging buffer is
-created and destroyed at the same two points with the upload thread not
-running or joined; the live barrier branches are unchanged; adoption order,
-the pending-adoption counter, and the points where the acquire buffer is read
-are unchanged. There is no threading change and no determinism, layout, or
-wire exposure.
+Invariants: the staging buffer is created and destroyed at the same two
+points with the upload thread not running or joined; the live barrier
+branches are unchanged; adoption order, the pending-adoption counter, and the
+points where the acquire buffer is read are unchanged. There is no threading
+change and no determinism, layout, or wire exposure.
 
 ## Acceptance criteria
 

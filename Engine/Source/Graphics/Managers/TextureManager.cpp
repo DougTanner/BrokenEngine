@@ -635,10 +635,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 		{
 			gpTextureUploadManager->RethrowException();
 
-			// Signal upload thread to process one chunk (drain then release to avoid binary_semaphore double-release UB)
-			// Return value intentionally discarded: we only need to drain the semaphore to 0 before release()
-			std::ignore = gpTextureUploadManager->mFrameSignal.try_acquire();
-			gpTextureUploadManager->mFrameSignal.release();
+			gpTextureUploadManager->SignalFrame();
 
 			std::this_thread::yield();
 			ProcessPendingTextures(0);
