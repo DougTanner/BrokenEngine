@@ -16,7 +16,7 @@ enum class UiTheme : uint8_t
 };
 
 inline Wrapper gFullscreen(true);
-inline Wrapper gPresentMode(VK_PRESENT_MODE_FIFO_KHR, std::vector<VkPresentModeKHR> {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_FIFO_LATEST_READY_KHR});
+inline Wrapper gPresentMode(VK_PRESENT_MODE_FIFO_KHR, std::vector<VkPresentModeKHR> {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR});
 inline Wrapper gMultisampling(true);
 inline Wrapper gSampleCount(VK_SAMPLE_COUNT_2_BIT, std::vector<VkSampleCountFlagBits> {VK_SAMPLE_COUNT_2_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_16_BIT, VK_SAMPLE_COUNT_32_BIT, VK_SAMPLE_COUNT_64_BIT});
 inline Wrapper gAnisotropy(true);

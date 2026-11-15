@@ -6,7 +6,7 @@ namespace engine
 {
 
 void SaveGraphicsSettings();
-bool LoadGraphicsSettings();
+void LoadGraphicsSettings();
 void ResetGraphicsSettings();
 
 } // namespace engine

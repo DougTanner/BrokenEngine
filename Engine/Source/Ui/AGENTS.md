@@ -89,8 +89,8 @@ is engine-owned here.
 - `GraphicsSettings.cpp` persists the engine-owned player-facing quality levels
   declared in `GraphicsQualityWrappersBase.h` in `GraphicsSettings.bin`. A
   selected level is the persisted source of truth; derived renderer wrapper
-  values are not serialized. Water mesh detail is fixed at `0.25` and is not
-  persisted.
+  values are not serialized. Water mesh detail is fixed at the
+  `gWaterShapeDetail` default and is not persisted.
 - `GraphicsSettings.bin`, versioned by `GraphicsSettings::kiVersion`, persists
   the fields of `struct GraphicsSettings` in `GraphicsSettings.cpp`, which owns
   what is persisted. Lighting, Water Foam and Break Repetition default on, and
@@ -100,10 +100,11 @@ is engine-owned here.
   file before application.
 - The game, sound, and graphics loaders check every persisted language index,
   float, quality level, present mode, sample count, and UI theme before applying
-  any. A non-finite or out-of-range value, or a present mode, sample count, or
-  UI theme that is not one of its wrapper's allowed values, rejects the whole
-  file with one warning, and every setting it holds stays at its default, as
-  when the file is missing. Accepted floats keep the wrapper's normal snapping.
+  any. A non-finite or out-of-range value, or a discrete value (present mode,
+  sample count, quality level, UI theme) that its wrapper's `IsAllowed` rejects,
+  rejects the whole file with one warning, and every setting it holds stays at
+  its default, as when the file is missing. Accepted floats keep the wrapper's
+  normal snapping.
   The Tweaks layout is gated instead as `Screens/TweaksScreen/AGENTS.md`
   `## Registration and Layout Contracts` states.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI

@@ -56,9 +56,9 @@ runtime contracts that code changes must preserve.
   exception: turning Multisampling off also turns Sample Shading off, which has
   no effect at one sample per pixel. The ModelViewer's Render quality panel does
   the same.
-- Water quality keeps the mesh-detail scale fixed at `0.25`: Low disables vertex
-  displacement, Medium uses the fixed low-wave band, High the low- and
-  medium-wave bands.
+- Water quality keeps the mesh-detail scale fixed at the `gWaterShapeDetail`
+  default: Low disables vertex displacement, Medium uses the fixed low-wave
+  band, High the low- and medium-wave bands.
 - Anisotropy applies to visible image passes such as models, terrain, and water;
   TextureManager (`../../Graphics/Managers/AGENTS.md` `### TextureManager`)
   lists which samplers omit anisotropy.

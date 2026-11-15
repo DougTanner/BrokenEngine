@@ -102,6 +102,11 @@ public:
 		return fValue >= mfMin && fValue <= mfMax;
 	}
 
+	bool IsAllowed(float fValue) const
+	{
+		return std::ranges::contains(mAllowed, fValue);
+	}
+
 	template <typename T>
 	T Get() const
 	{
@@ -185,9 +190,7 @@ private:
 	}
 
 	// All wrapper flavors store floats; integer-backed values need exact float representation (every integer through
-	// 2^24 is exact). gPresentMode includes FIFO_LATEST_READY_KHR (1000361000 rounds to 1000361024.0f). Settings can
-	// load that value; SwapchainManager compares supported Mailbox/Immediate choices, defaults to FIFO, and resets the
-	// wrapper before submitting the Vulkan swapchain request. The UI exposes only these three modes.
+	// 2^24 is exact).
 	float mfStep = 0.0f;
 
 public:

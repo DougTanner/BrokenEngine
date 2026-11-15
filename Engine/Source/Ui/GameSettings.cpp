@@ -66,7 +66,7 @@ static const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
 		return "fUiOpacity";
 	}
 
-	if (!std::ranges::contains(gUiTheme.mAllowed, static_cast<float>(rGameSettings.eUiTheme)))
+	if (!gUiTheme.IsAllowed(static_cast<float>(rGameSettings.eUiTheme)))
 	{
 		return "eUiTheme";
 	}

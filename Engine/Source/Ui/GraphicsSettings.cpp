@@ -129,32 +129,27 @@ void SaveGraphicsSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
 }
 
-static bool IsValidGraphicsQualityLevel(int64_t iLevel)
-{
-	return iLevel < static_cast<int64_t>(GraphicsQualityLevel::kCount);
-}
-
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
 static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
-	if (!std::ranges::contains(gPresentMode.mAllowed, static_cast<float>(rGraphicsSettings.vkPresentMode)))
+	if (!gPresentMode.IsAllowed(static_cast<float>(rGraphicsSettings.vkPresentMode)))
 	{
 		return "vkPresentMode";
 	}
 
-	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.vkSampleCount)))
+	if (!gSampleCount.IsAllowed(static_cast<float>(rGraphicsSettings.vkSampleCount)))
 	{
-		return "eSampleCount";
+		return "vkSampleCount";
 	}
 
 	if (!gMaximumAnisotropy.IsInRange(rGraphicsSettings.fMaximumAnisotropy))
 	{
-		return "fMaxAnisotropy";
+		return "fMaximumAnisotropy";
 	}
 
 	if (!gMinimumSampleShading.IsInRange(rGraphicsSettings.fMinimumSampleShading))
 	{
-		return "fMinSampleShading";
+		return "fMinimumSampleShading";
 	}
 
 	if (!gSmokeSimulationArea.IsInRange(rGraphicsSettings.fSmokeSimulationArea))
@@ -192,32 +187,32 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "fSmokeUpdateCadence";
 	}
 
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiWaterLevel))
+	if (!gWaterLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiWaterLevel)))
 	{
 		return "uiWaterLevel";
 	}
 
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiTerrainShadowsLevel))
+	if (!gTerrainShadowsLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiTerrainShadowsLevel)))
 	{
 		return "uiTerrainShadowsLevel";
 	}
 
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiObjectShadowsLevel))
+	if (!gObjectShadowsLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiObjectShadowsLevel)))
 	{
 		return "uiObjectShadowsLevel";
 	}
 
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiLightingLevel))
+	if (!gLightingLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiLightingLevel)))
 	{
 		return "uiLightingLevel";
 	}
 
-	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiSmokeDetailLevel))
+	if (!gSmokeDetailLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiSmokeDetailLevel)))
 	{
 		return "uiSmokeDetailLevel";
 	}
 
-	if (rGraphicsSettings.uiObjectShadowsBlurLevel > 1)
+	if (!gObjectShadowsBlurLevel.IsAllowed(static_cast<float>(rGraphicsSettings.uiObjectShadowsBlurLevel)))
 	{
 		return "uiObjectShadowsBlurLevel";
 	}
@@ -256,10 +251,9 @@ static void LoadGraphicsQualityLevel(Wrapper& rLevel, int64_t iLevel)
 	rLevel.Reset<int64_t>(iLevel);
 }
 
-bool LoadGraphicsSettings()
+void LoadGraphicsSettings()
 {
 	GraphicsSettings graphicsSettings {};
-	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 
 	bool bRead = ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGraphicsSettingsPath, graphicsSettings);
 	if (bRead)
@@ -309,8 +303,6 @@ bool LoadGraphicsSettings()
 	// Also on a failed read: the default levels still have to drive their underlying wrappers, otherwise a fresh
 	// install shows a level the rendering values do not match.
 	ApplyAllGraphicsQualityLevels();
-
-	return bRead;
 }
 
 void ResetGraphicsSettings()
@@ -326,7 +318,6 @@ void ResetGraphicsSettings()
 	gOrthographicProjection.mfCurrent = gOrthographicProjection.mfDefault;
 	gFieldOfView.mfCurrent = gFieldOfView.mfDefault;
 	gCameraTilt.mfCurrent = gCameraTilt.mfDefault;
-	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
 	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;
 	gBreakRepetition.mfCurrent = gBreakRepetition.mfDefault;
