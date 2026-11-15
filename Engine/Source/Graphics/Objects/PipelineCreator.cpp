@@ -13,14 +13,7 @@ constexpr float kfDepthBiasConstantFactor = -3.0f;
 constexpr float kfDepthBiasSlopeFactor = -3.0f;
 constexpr int64_t kiMaxColorAttachments = 6;
 
-// Push-constant range size for a pipeline's layout: the per-pipeline override when set, else the default
-// 16-byte PushConstantsLayout. It must match the shader's declared push-constant block.
-static int64_t ResolvePushConstantBytes(const Pipeline& rPipeline)
-{
-	return rPipeline.mInfo.iPushConstantBytes > 0 ? rPipeline.mInfo.iPushConstantBytes : static_cast<int64_t>(sizeof(shaders::PushConstantsLayout));
-}
-
-// Configures update-after-bind for storage buffer bindings in dynamic pipelines
+// When bUpdateAfterBind is set, marks storage buffer, combined image sampler, and sampled image bindings update-after-bind.
 static void ConfigureUpdateAfterBind(VkDescriptorSetLayoutCreateInfo& rVkLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding> bindings, std::span<VkDescriptorBindingFlags> bindingFlags, VkDescriptorSetLayoutBindingFlagsCreateInfo& rVkBindingFlagsCreateInfo, bool bUpdateAfterBind)
 {
 	rVkBindingFlagsCreateInfo = VkDescriptorSetLayoutBindingFlagsCreateInfo
@@ -75,7 +68,7 @@ static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rVkLa
 	VkPushConstantRange vkPushConstantRange {};
 	vkPushConstantRange.stageFlags = vkPushConstantStageFlags;
 	vkPushConstantRange.offset = 0;
-	vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
+	vkPushConstantRange.size = static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
 	rVkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
 	CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &rVkPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
 	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
@@ -150,8 +143,8 @@ static int64_t MergeReflectedBindings(const Shader& rVertexShader, const Shader&
 	return iDescriptorCount;
 }
 
-// CreateDescriptorSetLayouts stage 2: partition the merged bindings into the per-pipeline Set 1 / Set 2
-// arrays by shader-reflected set index. Set 0 bindings are handled by the global descriptor set and dropped.
+// Partition the merged bindings into the per-pipeline Set 1 / Set 2 arrays by shader-reflected set index;
+// Set 0 bindings go into neither.
 static void SplitBindingsBySet(const Pipeline& rPipeline, std::span<const VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings, VkDescriptorSetLayoutBinding* pVkSet1Bindings, int64_t& riSet1Count, VkDescriptorSetLayoutBinding* pVkSet2Bindings, int64_t& riSet2Count)
 {
 	riSet1Count = 0;
@@ -172,8 +165,7 @@ static void SplitBindingsBySet(const Pipeline& rPipeline, std::span<const VkDesc
 	}
 }
 
-// CreateDescriptorSetLayouts stage 3: create the per-pipeline Set 1 (+ optional Set 2) descriptor set
-// layouts and assemble the [global Set 0, Set 1, optional Set 2] pipeline layout.
+// Create the per-pipeline Set 1 (+ optional Set 2) descriptor set layouts and assemble the [global Set 0, Set 1, optional Set 2] pipeline layout.
 static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLayoutCreateInfo& rVkLayoutCreateInfo, VkPipelineLayoutCreateInfo& rVkPipelineLayoutCreateInfo, const VkPushConstantRange& rVkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding> set1Bindings, std::span<const VkDescriptorSetLayoutBinding> set2Bindings)
 {
 	// Create Set 1 layout (unless using external layout from first ModelPipeline material)
@@ -223,22 +215,14 @@ static void CreateDescriptorSetLayouts(Pipeline& rPipeline, VkDescriptorSetLayou
 	VkPushConstantRange vkPushConstantRange {};
 	vkPushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	vkPushConstantRange.offset = 0;
-	vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
+	vkPushConstantRange.size = static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
 
-	if (rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE)
-	{
-		// Graphics pipeline with global Set 0: split bindings by shader reflection set index
-		VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
-		VkDescriptorSetLayoutBinding pVkSet2Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
-		int64_t iSet1Count = 0;
-		int64_t iSet2Count = 0;
-		SplitBindingsBySet(rPipeline, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), pVkSet1Bindings, iSet1Count, pVkSet2Bindings, iSet2Count);
-		CreateMultiSetPipelineLayout(rPipeline, rVkLayoutCreateInfo, rVkPipelineLayoutCreateInfo, vkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), std::span<const VkDescriptorSetLayoutBinding>(pVkSet2Bindings, iSet2Count));
-	}
-	else
-	{
-		CreateSingleSetPipelineLayout(rVkLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), rPipeline, rVkPipelineLayoutCreateInfo, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-	}
+	VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
+	VkDescriptorSetLayoutBinding pVkSet2Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
+	int64_t iSet1Count = 0;
+	int64_t iSet2Count = 0;
+	SplitBindingsBySet(rPipeline, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), pVkSet1Bindings, iSet1Count, pVkSet2Bindings, iSet2Count);
+	CreateMultiSetPipelineLayout(rPipeline, rVkLayoutCreateInfo, rVkPipelineLayoutCreateInfo, vkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), std::span<const VkDescriptorSetLayoutBinding>(pVkSet2Bindings, iSet2Count));
 }
 
 // Owns the Vk*StateCreateInfo structs (and the sub-structs / arrays they point at) for one graphics
@@ -385,7 +369,7 @@ static void ConfigureRasterization(GraphicsPipelineState& rState, const Pipeline
 	{
 		rState.vkPipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	}
-	rState.vkPipelineRasterizationStateCreateInfo.cullMode = rPipeline.mInfo.flags & PipelineFlags::kCullBack ? VK_CULL_MODE_BACK_BIT : (rPipeline.mInfo.flags & PipelineFlags::kCullFront ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_NONE);
+	rState.vkPipelineRasterizationStateCreateInfo.cullMode = rPipeline.mInfo.flags & PipelineFlags::kCullBack ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE;
 	if (rPipeline.mInfo.flags & PipelineFlags::kDepthBias)
 	{
 		rState.vkPipelineRasterizationStateCreateInfo.depthBiasEnable = VK_TRUE;
@@ -591,7 +575,6 @@ void PipelineCreator::CreateGraphicsPipeline(Pipeline& rPipeline)
 
 	CreateDescriptorSetLayouts(rPipeline, vkUniformTextureDescriptorSetLayoutCreateInfo, vkPipelineLayoutCreateInfo);
 
-	// Setup pipeline (modules + layout/renderPass resolved after CreateDescriptorSetLayouts)
 	pVkPipelineShaderStageCreateInfos[0].module = rPipeline.mInfo.ppShaders[0]->mVkShaderModule;
 	pVkPipelineShaderStageCreateInfos[1].module = rPipeline.mInfo.ppShaders[1]->mVkShaderModule;
 
@@ -656,49 +639,25 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		pVkDescriptorSetLayoutBindings[iDescriptorCount++] = rVkBinding;
 	}
 
-	// Compute uses global Set 0 and per-pipeline Set 1 when an external layout and Set 1 bindings exist.
-	// Otherwise all reflected bindings use a standalone set, with the external layout cleared for binder and writer.
+	VkPushConstantRange vkPushConstantRange {};
+	vkPushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	vkPushConstantRange.offset = 0;
+	vkPushConstantRange.size = static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
+
+	// Compute uses global Set 0 and per-pipeline Set 1 when Set 1 bindings exist.
 	VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
+	VkDescriptorSetLayoutBinding pVkSet2Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	int64_t iSet1Count = 0;
-	for (int64_t i = 0; i < iDescriptorCount; ++i)
-	{
-		int64_t iBinding = pVkDescriptorSetLayoutBindings[i].binding;
-		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding);
-		if (iSet == 1)
-		{
-			pVkSet1Bindings[iSet1Count++] = pVkDescriptorSetLayoutBindings[i];
-		}
-	}
+	int64_t iSet2Count = 0;
+	SplitBindingsBySet(rPipeline, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), pVkSet1Bindings, iSet1Count, pVkSet2Bindings, iSet2Count);
 
-	if (rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE && iSet1Count > 0)
+	if (iSet1Count > 0)
 	{
-		vkUniformTextureDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(iSet1Count);
-		vkUniformTextureDescriptorSetLayoutCreateInfo.pBindings = pVkSet1Bindings;
-		VkDescriptorBindingFlags pVkBindingFlagsSet1[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
-		VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfoSet1 {};
-		ConfigureUpdateAfterBind(vkUniformTextureDescriptorSetLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), pVkBindingFlagsSet1, vkBindingFlagsCreateInfoSet1, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
-		CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &vkUniformTextureDescriptorSetLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
-		VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
-
-		VkDescriptorSetLayout pVkSetLayouts[2] =
-		{
-			rPipeline.mExternalVkDescriptorSetLayout,
-			rPipeline.mVkDescriptorSetLayout,
-		};
-		VkPushConstantRange vkPushConstantRange {};
-		vkPushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-		vkPushConstantRange.offset = 0;
-		vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
-		vkPipelineLayoutCreateInfo.setLayoutCount = 2;
-		vkPipelineLayoutCreateInfo.pSetLayouts = pVkSetLayouts;
-		vkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
-		vkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
-		CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &vkPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
-		VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
+		CreateMultiSetPipelineLayout(rPipeline, vkUniformTextureDescriptorSetLayoutCreateInfo, vkPipelineLayoutCreateInfo, vkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), std::span<const VkDescriptorSetLayoutBinding>());
 	}
 	else
 	{
-		// Standalone compute, including when global Set 0 is unavailable: shader set-0 bindings form the per-pipeline set. Clear the
+		// Standalone compute: shader set-0 bindings form the per-pipeline set. Clear the
 		// external-layout pointer so binder and writer treat it as standalone.
 		rPipeline.mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
 		CreateSingleSetPipelineLayout(vkUniformTextureDescriptorSetLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), rPipeline, vkPipelineLayoutCreateInfo, VK_SHADER_STAGE_COMPUTE_BIT);

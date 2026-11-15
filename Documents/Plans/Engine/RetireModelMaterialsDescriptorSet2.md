@@ -77,10 +77,10 @@ Recommended:
    not change.
 2. Remove Set 2 from layout creation: `SplitBindingsBySet` fills only Set 1;
    `CreateMultiSetPipelineLayout` creates no Set 2 layout and always builds the
-   two-set layout. Update every caller of the two helpers, including the
-   compute path if
-   `Documents/Plans/Engine/PipelineObjectsDeadCode.md` has landed and calls
-   them there.
+   two-set layout. Update every caller of the two helpers, including
+   `PipelineCreator::CreateComputePipeline`, which calls `SplitBindingsBySet`
+   with scratch Set 2 storage and `CreateMultiSetPipelineLayout` with an empty
+   Set 2 span.
 3. Remove Set 2 from the writer: `PipelineDescriptorWriter::Write` allocates
    no Set 2 and `RouteWritesBySet` loses its `vkDestinationSet2` parameter and
    its set-2 branch.
@@ -207,16 +207,6 @@ files' client paths.
      the change.
 
    The supplied evidence records no harness setup.
-
-## Coordination
-
-`Documents/Plans/Engine/PipelineObjectsDeadCode.md` edits other regions of
-`PipelineCreator.cpp`, `Pipeline.h`, `Pipeline.cpp`, and `ModelPipeline.cpp`,
-calls `SplitBindingsBySet` and `CreateMultiSetPipelineLayout` from
-`PipelineCreator::CreateComputePipeline` with scratch Set 2 storage, and
-deletes an ASSERT in `RecordDrawIndirectSet2`. Neither Plan depends on the
-other; whichever lands second re-finds its lines by symbol and adapts to the
-landed helper signatures and function name.
 
 ## Notes
 

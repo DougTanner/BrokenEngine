@@ -81,7 +81,7 @@ public:
 	// XOR salt shared by TextureManager's blur writes and CrcToBlurredIndex for pre-blurred bindless-array entries.
 	static constexpr common::crc_t kBlurSalt = 0x424C5552; // "BLUR"
 
-	// Global descriptor Set 0 shared by all graphics pipelines
+	// Global descriptor Set 0 shared by graphics and compute pipelines
 	VkDescriptorSetLayout mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mGlobalDescriptorSets;
 

@@ -184,7 +184,6 @@ public:
 		kSamplerSlotElevation,
 		kSamplerSlotRepeat,
 		kSamplerSlotMirroredRepeat,
-		kSamplerSlotRepeatLinear,
 		kSamplerSlotMirroredRepeatLinear,
 		kSamplerSlotCount,
 	};

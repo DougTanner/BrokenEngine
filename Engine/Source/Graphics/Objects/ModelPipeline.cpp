@@ -82,7 +82,7 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 	for (int64_t i = 0; i < miMaterialCount; ++i)
 	{
 		int64_t iIndexStart = puiIndexStarts[i];
-		if ((i > 0 && iIndexStart < iPreviousIndexStart) || iIndexStart > pipelineInfo.pVertexBuffer->mInfo.iCount)
+		if (iIndexStart < iPreviousIndexStart || iIndexStart > pipelineInfo.pVertexBuffer->mInfo.iCount)
 		{
 			throw std::ios_base::failure("ModelPipeline::Create");
 		}
@@ -150,8 +150,6 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		{
 			pipelineInfo.flags = originalFlags;
 		}
-
-		pipelineInfo.vkExternalDescriptorSetLayout = gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
 
 		// Multi-set: Pipeline 0 owns Set 1; inner Pipelines 1..N share its layout
 		pipelineInfo.vkExternalSet1DescriptorSetLayout = VK_NULL_HANDLE;

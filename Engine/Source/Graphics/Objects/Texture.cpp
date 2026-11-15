@@ -27,8 +27,6 @@ constexpr LayoutMapping kpLayoutMappings[]
 	{.vkImageLayout = VK_IMAGE_LAYOUT_GENERAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
 	// kFragmentShaderReadOnly
 	{.vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT},
-	// kGeneral
-	{.vkImageLayout = VK_IMAGE_LAYOUT_GENERAL, .vkAccessFlags = VK_ACCESS_MEMORY_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT},
 	// kShaderReadOnly
 	{.vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
 	// kTransferDestination
@@ -158,7 +156,7 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::spa
 
 	if (rDataFunction != nullptr)
 	{
-		UploadImageData(rDataFunction, kUndefined, mInfo.eTextureLayout);
+		UploadImageData(rDataFunction);
 	}
 
 	if (mInfo.textureFlags & kRenderPass)
@@ -181,7 +179,7 @@ std::unique_ptr<StagingBuffer> Texture::RecordCreate(VkCommandBuffer vkCommandBu
 
 	int64_t iSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.iMipLevels, mInfo.iArrayLayers, mInfo.vkExtent3D.depth);
 	std::unique_ptr<StagingBuffer> pStagingBuffer = std::make_unique<StagingBuffer>(mInfo.name, iSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-	RecordImageData(vkCommandBuffer, *pStagingBuffer, iSize, rDataFunction, kUndefined, mInfo.eTextureLayout);
+	RecordImageData(vkCommandBuffer, *pStagingBuffer, iSize, rDataFunction);
 	return pStagingBuffer;
 }
 
@@ -229,28 +227,22 @@ void Texture::CreateImage(const TextureInfo& rInfo)
 	++miGeneration;
 }
 
-void Texture::UpdateData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
-{
-	ASSERT(mVkImage != VK_NULL_HANDLE);
-	UploadImageData(rDataFunction, kShaderReadOnly, kShaderReadOnly);
-}
-
-void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
+void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
 {
 	int64_t iSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.iMipLevels, mInfo.iArrayLayers, mInfo.vkExtent3D.depth);
 
 	StagingBuffer stagingBuffer(mInfo.name, iSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 	OneShotCommandBuffer oneShotCommandBuffer;
-	RecordImageData(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer, iSize, rDataFunction, eOldLayout, eFinalLayout);
+	RecordImageData(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer, iSize, rDataFunction);
 	oneShotCommandBuffer.Execute();
 }
 
-void Texture::RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
+void Texture::RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
 {
 	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(rStagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(iSize)), 0);
 
-	TransitionImageLayout(vkCommandBuffer, eOldLayout, kTransferDestination);
+	TransitionImageLayout(vkCommandBuffer, kUndefined, kTransferDestination);
 
 	int64_t iOffset = 0;
 	for (int64_t i = 0; i < mInfo.iArrayLayers; ++i)
@@ -277,9 +269,9 @@ void Texture::RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuff
 		}
 	}
 
-	if (eFinalLayout != kUndefined)
+	if (mInfo.eTextureLayout != kUndefined)
 	{
-		TransitionImageLayout(vkCommandBuffer, kTransferDestination, eFinalLayout);
+		TransitionImageLayout(vkCommandBuffer, kTransferDestination, mInfo.eTextureLayout);
 	}
 }
 

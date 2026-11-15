@@ -23,8 +23,6 @@ enum class DescriptorFlags : uint64_t
 		kSamplerBorderWhite         = 0x0200, // CLAMP_TO_BORDER + opaque white (1.0) — shadow's "no shadow" beyond coverage
 		kSamplerWindClamp           = 0x10000,
 		kSamplerElevation           = 0x20000,
-		kSamplerClampLinear          = 0x400000,
-		kSamplerRepeatLinear         = 0x800000,
 		kSamplerMirroredRepeatLinear = 0x1000000,
 	kStorageImages                  = 0x0400,
 
@@ -68,7 +66,6 @@ enum class PipelineFlags : uint64_t
 	kCompute                   = 0x0004,
 	kAlphaBlend                = 0x0008,
 	kAdd                       = 0x0010,
-	kCullFront                 = 0x0020,
 	kCullBack                  = 0x0040,
 	kDepthTest                 = 0x0080,
 	kDepthWrite                = 0x0100,
@@ -95,8 +92,6 @@ struct PipelineInfo
 	PipelineFlags_t flags;
 	Shader* ppShaders[2] {};
 	Buffer* pVertexBuffer = nullptr;
-	// External Set 0 layout (global descriptor set from TextureManager, not owned)
-	VkDescriptorSetLayout vkExternalDescriptorSetLayout = VK_NULL_HANDLE;
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
 	VkDescriptorSetLayout vkExternalSet1DescriptorSetLayout = VK_NULL_HANDLE;
 
@@ -104,10 +99,6 @@ struct PipelineInfo
 	VkRenderPass vkTargetRenderPass = VK_NULL_HANDLE;
 	VkExtent3D vkExtent3D {};
 	int64_t iColorAttachmentCount = 1;
-
-	// Push-constant range size in bytes; 0 => default sizeof(shaders::PushConstantsLayout). Override only
-	// for pipelines whose shader declares a smaller push-constant block (e.g. LightCombine).
-	int64_t iPushConstantBytes = 0;
 
 	// Entry count is capped at common::ShaderHeader::kiMaxDescriptorSetLayoutBindings by Pipeline::Create.
 	std::vector<DescriptorInfo> descriptorInfos;
@@ -121,7 +112,7 @@ public:
 	static constexpr VkDescriptorSetLayoutBinding kEmptyVkDescriptorSetLayoutBinding {};
 
 	// Resolve which descriptor set a binding belongs to from shader reflection (puiDescriptorSetIndices),
-	// defaulting to set 0 when neither shader declares it. Single source for the four set-partition /
+	// defaulting to set 0 when neither shader declares it. Single source for the set-partition /
 	// set-routing sites in PipelineCreator / PipelineDescriptorWriter.
 	static int64_t ResolveBindingSetIndex(const PipelineInfo& rPipelineInfo, int64_t iBinding);
 
@@ -177,9 +168,6 @@ public:
 	std::vector<common::crc_t> mTextureCrcs;
 	bool mbTexturesRequested = false;
 };
-
-// Global set 0 uses the framebuffer index iCommandBuffer; per-pipeline set 1 uses iDescriptorSetIndex according to mbPerCommandBuffer.
-void BindComputeDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iCommandBuffer, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets);
 
 } // namespace engine
 

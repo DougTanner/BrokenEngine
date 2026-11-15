@@ -394,12 +394,6 @@ void TextureManager::CreateSamplers()
 	vkSamplerCreateInfo.maxAnisotropy = 1.0f;
 	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear]));
 	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear], "MirroredRepeatLinear");
-
-	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatLinear]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatLinear], "RepeatLinear");
 }
 
 VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
@@ -418,8 +412,6 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 		{.eFlag = DescriptorFlags::kSamplerBorderWhite, .eSlot = kSamplerSlotBorderWhite},
 		{.eFlag = DescriptorFlags::kSamplerRepeat, .eSlot = kSamplerSlotRepeat},
 		{.eFlag = DescriptorFlags::kSamplerMirroredRepeat, .eSlot = kSamplerSlotMirroredRepeat},
-		{.eFlag = DescriptorFlags::kSamplerClampLinear, .eSlot = kSamplerSlotLinearClamp},
-		{.eFlag = DescriptorFlags::kSamplerRepeatLinear, .eSlot = kSamplerSlotRepeatLinear},
 		{.eFlag = DescriptorFlags::kSamplerMirroredRepeatLinear, .eSlot = kSamplerSlotMirroredRepeatLinear},
 		{.eFlag = DescriptorFlags::kSamplerSmoke, .eSlot = kSamplerSlotSmoke},
 		{.eFlag = DescriptorFlags::kSamplerWindClamp, .eSlot = kSamplerSlotWindClamp},

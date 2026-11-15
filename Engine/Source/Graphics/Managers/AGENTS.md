@@ -253,11 +253,11 @@ the placeholder.
   registry for adoption and sampler recreation; picker changes publish indices
   without rebuilding descriptors.
 - Explicit repeat/clamp samplers cover authored/generated deposit lookup and
-  visible-light textures. Unflagged combined samplers, explicit offscreen linear
-  variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged
-  render-target reads such as object shadows and terrain elevation stay
-  non-anisotropic; the border samplers follow the player's anisotropy setting.
-  The format-specific elevation variant remains separate.
+  visible-light textures. Unflagged combined samplers, the explicit offscreen
+  linear variant, and dedicated smoke/wind variants all omit anisotropy, so
+  unflagged render-target reads such as object shadows and terrain elevation
+  stay non-anisotropic; the border samplers follow the player's anisotropy
+  setting. The format-specific elevation variant remains separate.
 - Light-type textures consume a fixed reservation of bindless slots for
   pre-blurred results. Grow that reservation if the registered lighting-texture
   count exceeds its capacity.

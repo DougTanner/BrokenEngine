@@ -30,7 +30,6 @@ enum class TextureLayout
 	kComputeReadOnly,
 	kComputeReadWrite,
 	kFragmentShaderReadOnly,
-	kGeneral,
 	kShaderReadOnly,
 	kTransferDestination,
 	kTransferSource,
@@ -103,7 +102,6 @@ public:
 	void InitDeferred(const TextureInfo& rInfo, VkImageView vkPlaceholderImageView);
 	void AdoptTransferredImage(VkImage& rVkImage, VmaAllocation& rVmaAllocation);
 	void RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer);
-	void UpdateData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction);
 	void Destroy() noexcept;
 
 	void TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayout eOldLayout, TextureLayout eNewLayout);
@@ -116,8 +114,8 @@ public:
 private:
 
 	void CreateImage(const TextureInfo& rInfo);
-	void UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
-	void RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
+	void UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction);
+	void RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction);
 	void CreateRenderTarget();
 
 public:
