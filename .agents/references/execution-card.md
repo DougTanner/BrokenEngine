@@ -29,15 +29,22 @@ Execution card:
   line and the case it mishandles; a criterion compared against the unedited
   tree, such as a result that must stay unchanged, names that pre-change
   baseline run, which for that instruction prose may be a read at the session
-  baseline commit; a change editing a data input takes that run in the data
-  mode `.agents/skills/agent-harness/SKILL.md` `## Handoff` sets; the card
-  marks each red run on a build of the unedited tree and each pre-change
-  baseline run other than a read at the session baseline commit
-  `before the first edit`, the literal text the Change Workflow Implement
-  and propagate step's pre-edit bullets key on to record that run before the
-  first slice, kept whole on one line so a line-based search finds every
-  marked run, and cites a Reproducing signal or a read at the session
-  baseline commit as-is, unmarked; when
+  baseline commit; the card marks each red run on a build of the unedited tree
+  and each pre-change baseline run other than a read at the session baseline
+  commit `before the first edit`, the literal text the Change Workflow
+  Implement and propagate step's pre-edit bullets key on to record that run
+  before the first slice, kept whole on one line and placed on the first line
+  of the check it marks so a line-based search finds every marked run; within
+  a card the literal appears only as that mark, so a card with no marked check
+  says so without it; when any file a slice may edit is a data input as
+  `Test-AgentDataInputPath` in `.agents/scripts/AgentScriptCommon.psm1`
+  reports it for the game project the check targets, counting as a data input
+  a scope entry broader than a data-input root that can match one, such as
+  `Engine/**` or `**/*.frag`, the marked line also carries the word Local and
+  the form, no-effect or export, it takes under
+  `.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`;
+  the card cites a Reproducing signal or a read at the session baseline commit
+  as-is, unmarked; when
   the proven cause is a general rule, the bug-fix check also covers one input
   beyond the reported case that a patch for only that case would still fail,
   settled by a code read of the general fix when the agent settling it is

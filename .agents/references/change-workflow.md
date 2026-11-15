@@ -262,12 +262,20 @@ handoffs, then presents the resolved plan for approval per `/next-plan`
 
 Order: the acceptance checks the execution card marks `before the first edit`
 run first, on the unedited tree; then the slices run in parallel;
-`/update-affected-code` runs after them.
+`/update-affected-code` runs after them. Main finds the marked checks by one
+line search for that literal limited to the card's `Acceptance checks` field,
+the lines from its `- Acceptance checks:` line up to its `- Roles:` line. It
+reads only each marked check, from its marked line to the check's end, never
+the rest of the card body or the `Slices`, and from that text takes the
+executor, the build (project and configuration, or none), and the scenario
+steps for the `builder` and `runner` briefs.
 
 - `builder` runs `/compile` for the unedited-tree build a check marked
-  `before the first edit` needs — when it needs one; a check whose steps
-  interleave file edits with builds follows the `/compile` `## Purpose`
-  exception instead.
+  `before the first edit` needs — when it needs one — in the Local form its
+  marked line names, through
+  `.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`,
+  when it names one; a check whose steps interleave file edits with builds
+  follows the `/compile` `## Purpose` exception instead.
 - `runner` runs each acceptance check the execution card marks
   `before the first edit` that is an `/agent-harness` scenario, and
   `implementer` records the others, on the unedited tree — a card with none
