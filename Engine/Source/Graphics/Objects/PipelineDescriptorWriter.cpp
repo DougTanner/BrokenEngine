@@ -170,7 +170,7 @@ static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<V
 	return iValidCount;
 }
 
-static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkWriteDescriptorSet> writeDescriptorSets, bool bHasExternalSet1)
+static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkWriteDescriptorSet> writeDescriptorSets)
 {
 	int64_t iValidCount = 0;
 	for (const VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
@@ -178,7 +178,7 @@ static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkW
 		int64_t iBinding = static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding);
 		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipelineInfo, iBinding);
 
-		if (iSet == 1 && !bHasExternalSet1)
+		if (iSet == 1)
 		{
 			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 		}
@@ -310,8 +310,7 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 		// Reflected layouts can be sparse (e.g. GLTF shadow bindings 0, 1, 2, 15).
 		cursor.iDescriptorCount = FilterWritesByShaderLayout(rPipeline, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)));
 
-		// Route writes by set index: drop Set 0 (global), keep an owned Set 1 and drop an external one.
-		cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)), bHasExternalSet1);
+		cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)));
 
 		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(cursor.iDescriptorCount), cursor.pVkWriteDescriptorSets, 0, nullptr);
 	}

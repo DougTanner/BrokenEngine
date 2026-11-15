@@ -151,11 +151,12 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 			pipelineInfo.flags = originalFlags;
 		}
 
-		// Multi-set: Pipeline 0 owns Set 1; inner Pipelines 1..N share its layout
+		// Multi-set: Pipeline 0 owns and writes Set 1; inner Pipelines 1..N share its layout and set, so they take no descriptors
 		pipelineInfo.vkExternalSet1DescriptorSetLayout = VK_NULL_HANDLE;
 		if (bMultiSet && i > 0)
 		{
 			pipelineInfo.vkExternalSet1DescriptorSetLayout = mpPipelines.at(0).mVkDescriptorSetLayout;
+			pipelineInfo.descriptorInfos.clear();
 		}
 
 		mpPipelines.at(i).Create(pipelineInfo);

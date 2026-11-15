@@ -222,11 +222,6 @@ void TextureDescriptors::InitializeIslandSlots()
 
 void TextureDescriptors::WriteBindingToSet(const TextureBinding& rBinding, int64_t iSet, const Texture* pKeyTexture)
 {
-	// A multi-set model's inner pipelines borrow pipeline 0's Set 1, which pipeline 0's own registration writes.
-	if (rBinding.pPipeline->mVkDescriptorSets.empty())
-	{
-		return;
-	}
 	VkSampler vkSampler = mrTextureManager.GetSampler(rBinding.samplerFlags);
 	VkDescriptorSet vkDescriptorSet = rBinding.pPipeline->mVkDescriptorSets.at(iSet);
 
