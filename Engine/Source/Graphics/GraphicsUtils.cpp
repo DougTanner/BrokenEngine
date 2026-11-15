@@ -54,6 +54,8 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	if (vkResult == VK_ERROR_DEVICE_LOST)
 	{
+		// Heap: std::system_error composes its message in std::string.
+		ScopedSuppressAllocationTracking suppress;
 		throw std::system_error(VkErrorCode(vkResult), exceptionAllocation.mpData);
 	}
 

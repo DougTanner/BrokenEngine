@@ -487,6 +487,8 @@ static int64_t MainThread(HINSTANCE hinstance)
 						throw;
 					}
 					LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
+					// Heap: device recovery replaces the Graphics owner and all its GPU managers.
+					ScopedSuppressAllocationTracking suppress;
 					pGraphics.reset();
 					pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
 				}
