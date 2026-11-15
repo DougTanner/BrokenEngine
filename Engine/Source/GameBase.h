@@ -221,6 +221,7 @@ public:
 	void CreateNewFrame();
 #if defined(BT_CLIENT)
 	void ChangeFrameToMainMenu();
+	void LeaveSettingsScreen();
 
 	static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput);
 	// Developer main-menu island browser index into gpIslandTerrain->mIslandCrcsByArea (largest footprint first);

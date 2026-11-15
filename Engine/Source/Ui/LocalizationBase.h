@@ -38,21 +38,12 @@ inline Language geLanguage = Language::kEnglish;
 
 enum class StandardString : uint8_t
 {
-	kStringComplete,
 	kStringDefaults,
-	kStringGameOver,
-	kStringGamepad,
 	kStringGameSettings,
 	kStringMainMenu,
-	kStringMouse,
-	kStringMoveWith,
 	kStringGraphics,
-	kStringOr,
 	kStringLocalServer,
 	kStringRemoteServer,
-	kStringStart,
-	kStringReady,
-	kStringRespawn,
 	kStringResume,
 	kStringAudio,
 	kStringQuit,

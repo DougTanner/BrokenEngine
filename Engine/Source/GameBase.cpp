@@ -14,7 +14,10 @@
 #endif
 #include "Frame/FrameBase.h"
 #include "Input/Input.h"
+#include "Ui/GameSettings.h"
+#include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/SoundSettings.h"
 
 #include "Profile/ProfileRows.h"
 
@@ -94,7 +97,11 @@ void GameBase::ProcessInput(bool bLostFocus)
 
 	if (menuInput.flags & MenuInputFlags::kPauseMenu) [[unlikely]]
 	{
-		if (meUiState == UiState::kNone || meUiState == UiState::kGameSettings || meUiState == UiState::kGraphicsSettings || meUiState == UiState::kSound)
+		if (meUiState == UiState::kGameSettings || meUiState == UiState::kGraphicsSettings || meUiState == UiState::kSound)
+		{
+			LeaveSettingsScreen();
+		}
+		else if (meUiState == UiState::kNone)
 		{
 			meUiState = UiState::kPause;
 		}
@@ -1143,6 +1150,24 @@ void GameBase::ChangeFrameToMainMenu()
 	CreateNewFrame();
 	ResetSession();
 	static_cast<game::Camera&>(*gpCamera).ApplyPose(true);
+}
+
+void GameBase::LeaveSettingsScreen()
+{
+	if (meUiState == UiState::kGameSettings)
+	{
+		SaveGameSettings();
+	}
+	else if (meUiState == UiState::kGraphicsSettings)
+	{
+		SaveGraphicsSettings();
+	}
+	else if (meUiState == UiState::kSound)
+	{
+		SaveSoundSettings();
+	}
+
+	meUiState = UiState::kPause;
 }
 #endif // BT_CLIENT
 

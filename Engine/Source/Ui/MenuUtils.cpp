@@ -75,8 +75,11 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 	return bChanged;
 }
 
-bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> options)
+bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, std::initializer_list<std::pair<const char*, float>> options)
 {
+	// A click's Set changes mfCurrent mid-loop; the pre-click value keeps the drawn checked option stable this frame
+	float fCurrent = pWrapper->mfCurrent;
+
 	if (pcHeader != nullptr)
 	{
 		ImGui::TextUnformatted(pcHeader);
@@ -294,10 +297,10 @@ float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels)
 	return fWidth + ImGui::GetStyle().FramePadding.x * 4.0f;
 }
 
-void MenuHeading(std::string_view label, float fHeadingScale)
+void MenuHeading(std::string_view label)
 {
 	{
-		ScopedMenuFont headingFont(kfMenuUiScale * fHeadingScale);
+		ScopedMenuFont headingFont(kfMenuUiScale * kfMainMenuHeadingScale);
 		ImGui::TextUnformatted(label.data(), label.data() + label.size());
 	}
 	ImGui::Dummy(ImVec2(0.0f, kfHeadingGapPixels * engine::UiScale()));

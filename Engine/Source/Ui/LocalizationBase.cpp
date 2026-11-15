@@ -6,36 +6,9 @@ namespace engine
 // The deduced outer extent lets the row-count assertion detect missing or extra string rows.
 static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 {
-	// kStringComplete
-	{
-		U"COMPLETE", // English
-		U"", // Chinese
-		U"", // Spanish
-		U"", // Portuguese
-		U"", // French
-		U"", // German
-	},
 	// kStringDefaults
 	{
 		U"RESET TO DEFAULT", // English
-		U"", // Chinese
-		U"", // Spanish
-		U"", // Portuguese
-		U"", // French
-		U"", // German
-	},
-	// kStringGameOver
-	{
-		U"GAME OVER", // English
-		U"游戏结束", // Chinese
-		U"JUEGO TERMINADO", // Spanish
-		U"FIM DE JOGO", // Portuguese
-		U"JEU TERMINÉ", // French
-		U"SPIEL IST AUS", // German
-	},
-	// kStringGamepad
-	{
-		U"GAMEPAD", // English
 		U"", // Chinese
 		U"", // Spanish
 		U"", // Portuguese
@@ -60,24 +33,6 @@ static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 		U"MENU PRINCIPAL", // French
 		U"HAUPTMENÜ", // German
 	},
-	// kStringMouse
-	{
-		U"MOUSE", // English
-		U"", // Chinese
-		U"", // Spanish
-		U"", // Portuguese
-		U"", // French
-		U"", // German
-	},
-	// kStringMoveWith
-	{
-		U"MOVE WITH", // English
-		U"", // Chinese
-		U"", // Spanish
-		U"", // Portuguese
-		U"", // French
-		U"", // German
-	},
 	// kStringGraphics
 	{
 		U"GRAPHICS", // English
@@ -86,15 +41,6 @@ static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 		U"GRÁFICOS", // Portuguese
 		U"GRAPHIQUE", // French
 		U"GRAFIK", // German
-	},
-	// kStringOr
-	{
-		U"OR", // English
-		U"或者", // Chinese
-		U"O", // Spanish
-		U"Ou", // Portuguese
-		U"Ou", // French
-		U"Oder", // German
 	},
 	// kStringLocalServer
 	{
@@ -113,33 +59,6 @@ static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 		U"SERVIDOR REMOTO", // Portuguese
 		U"SERVEUR DISTANT", // French
 		U"REMOTE-SERVER", // German
-	},
-	// kStringStart
-	{
-		U"Start", // English
-		U"开始", // Chinese
-		U"Comenzar", // Spanish
-		U"Começar", // Portuguese
-		U"Commencer", // French
-		U"Start", // German
-	},
-	// kStringReady
-	{
-		U"I'm Ready", // English
-		U"我准备好了", // Chinese
-		U"Estoy lista", // Spanish
-		U"Estou pronto", // Portuguese
-		U"Je suis prêt", // French
-		U"Ich bin bereit", // German
-	},
-	// kStringRespawn
-	{
-		U"Respawn", // English
-		U"重生", // Chinese
-		U"Reaparecer", // Spanish
-		U"Renascer", // Portuguese
-		U"Réapparaître", // French
-		U"Wiederbeleben", // German
 	},
 	// kStringResume
 	{

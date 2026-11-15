@@ -8,7 +8,6 @@ class Wrapper;
 inline constexpr float kfMenuUiScale = 2.0f;
 
 // Heading scale multiplier on top of kfMenuUiScale for menu/panel titles
-inline constexpr float kfMenuHeadingScale = 1.6f;
 inline constexpr float kfMainMenuHeadingScale = 1.3f;
 
 // Language-row utility tier: absolute font scale plus a multiplier on the already menu-scaled geometry
@@ -60,11 +59,11 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper);
 
 // RadioRow draws an optional header and wraps option buttons to the available width. Present mode, sample count, quality, and
-// theme share this enum/index mapping; exact discrete float equality selects the checked option, and a click writes
-// its value. Wrapper-address ID scopes keep repeated labels distinct. With a header, each option's label is
-// "<option>##<header>", its harness name; ImGui draws only the option text. Header/button labels are the harness API
-// and must stay stable; return true on the click frame.
-bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> options);
+// theme share this enum/index mapping; exact discrete float equality with the wrapper's current value selects the
+// checked option, and a click writes its value. Wrapper-address ID scopes keep repeated labels distinct. With a header,
+// each option's label is "<option>##<header>", its harness name; ImGui draws only the option text. Header/button labels
+// are the harness API and must stay stable; return true on the click frame.
+bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, std::initializer_list<std::pair<const char*, float>> options);
 
 #if defined(BT_CLIENT)
 
@@ -94,9 +93,9 @@ public:
 // Main-menu, pause, and modal callers clamp the width to their minimum-width pixel constant multiplied by UiScale().
 float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels);
 
-// One menu/panel heading: pushes the heading font (kfMenuUiScale * fHeadingScale), emits label, then a
-// standard kfHeadingGapPixels * UiScale() gap below it. Screens override the scale when their hierarchy requires it.
-void MenuHeading(std::string_view label, float fHeadingScale = kfMenuHeadingScale);
+// One menu/panel heading: pushes the heading font (kfMenuUiScale * kfMainMenuHeadingScale), emits label, then a
+// standard kfHeadingGapPixels * UiScale() gap below it.
+void MenuHeading(std::string_view label);
 
 // Full-screen dim behind pause-style overlays (background draw list, behind all windows)
 void DrawFullScreenDim();

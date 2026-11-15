@@ -40,7 +40,7 @@ void SoundMenuScreen::Render()
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)).mpData, kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringAudio)).mpData);
 
 	float fSliderWidth = kfSoundSliderWidthPixels * UiScale();
 	ImGui::SetNextItemWidth(fSliderWidth);
@@ -67,7 +67,7 @@ void SoundMenuScreen::Render()
 
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnimation))
 	{
-		game::gpGame->meUiState = UiState::kPause;
+		game::gpGame->LeaveSettingsScreen();
 	}
 
 	ImGui::End();

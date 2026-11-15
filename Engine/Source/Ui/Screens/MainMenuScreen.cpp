@@ -106,7 +106,7 @@ void MainMenuScreen::Render()
 	float fContentStartX = ImGui::GetCursorPosX();
 	float fContentWidth = std::max(fHeadingWidth, fButtonWidth);
 	CenterMenuItem(fContentStartX, fContentWidth, fHeadingWidth);
-	MenuHeading(model.pcTitle, kfMainMenuHeadingScale);
+	MenuHeading(model.pcTitle);
 
 	if (model.features & StandardMenuFeature::kLocalServer)
 	{

@@ -62,16 +62,17 @@ Documented exception: TweaksScreen is a denser debug tool and deliberately
 uses its own kfUiScale = 1.5, pushing the font directly rather than through
 ScopedMenuFont. It is not a player screen and is not bound by this contract.
 
-Documented exceptions: MainMenu, Pause, Audio, and Game Settings use
-kfMainMenuHeadingScale rather than the larger shared settings heading scale,
-so their titles lead without overwhelming their actions. The Game Settings
-language row uses kfLanguageMenuFontScale and kfLanguageMenuGeometryScale to
-keep both text and padding subordinate to the primary action tier. Graphics is
-the densest player-facing menu: its local base-font curve decreases from 2.0 to
-1.2 across the supported Font Size preference while preserving a monotonic
-increase in rendered text size, and it retains the theme's base geometry
-rather than applying ScopedMenuScale a second time. These are the sanctioned
-player-menu scale exceptions.
+MenuHeading always applies kfMainMenuHeadingScale to the titles it draws (Main
+Menu, Pause, Game Settings, and Sound), so they lead without overwhelming their
+actions. Documented exceptions: the Game Settings language row uses
+kfLanguageMenuFontScale and kfLanguageMenuGeometryScale to keep both text and
+padding subordinate to the primary action tier. Graphics is the densest
+player-facing menu: it draws its own title in its header row at
+kfGraphicsHeadingScale rather than through MenuHeading, its local base-font
+curve decreases from 2.0 to 1.2 across the supported Font Size preference while
+preserving a monotonic increase in rendered text size, and it retains the
+theme's base geometry rather than applying ScopedMenuScale a second time. These
+are the sanctioned player-menu scale exceptions.
 
 Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         Noto Sans SC Light default font load
@@ -80,7 +81,7 @@ Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:15   kfMinimumStyleGeometryFactor = 0.25f;
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:160  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:187  rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
-  Engine/Source/Ui/MenuUtils.h:6   inline constexpr float kfMenuUiScale = 2.0f;
+  Engine/Source/Ui/MenuUtils.h:8   inline constexpr float kfMenuUiScale = 2.0f;
   Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:23  constexpr float kfUiScale = 1.5f;  (sanctioned exception)
   Engine/Source/Ui/MenuUtils.h
     kfMainMenuHeadingScale, kfLanguageMenuFontScale, kfLanguageMenuGeometryScale
@@ -109,7 +110,7 @@ They can diagnose a layout, but only the rendered result can validate it.
 
 Files:
   Engine/Source/Ui/Screens/AGENTS.md  "Shared Authoring Rules"  (consumer; links here, where the standard is owned)
-  Engine/Source/Ui/MenuUtils.cpp:285  float MenuButtonsWidth(...)  (text-driven width precedent)
+  Engine/Source/Ui/MenuUtils.cpp:288  float MenuButtonsWidth(...)  (text-driven width precedent)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:134  float HudScreen::PanelWidth()
 
 
@@ -124,7 +125,7 @@ local blocks both separate DisplaySize fractions (content-independent extents)
 from 4K-authored pixel constants (multiplied by UiScale() at use).
 
 Files:
-  Engine/Source/Ui/MenuUtils.h:7-31
+  Engine/Source/Ui/MenuUtils.h:8-31
     kfMainMenuCenterFractionX = 1/3, kfMainMenuCenterFractionY = 0.5
     kfMainMenuOpticalOffsetYPixels = 20
     kfGraphicsMaximumHeightFraction = 0.9f, kfModalAnchorFractionY = 0.4f
@@ -231,27 +232,26 @@ takes its width from its full label set, so no such change reflows its column.
 A button sits above any list that grows.
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:320  bool MenuButton(...)
-  Engine/Source/Ui/MenuUtils.cpp:285  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
-  Engine/Source/Ui/MenuUtils.h:29-30  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
+  Engine/Source/Ui/MenuUtils.cpp:323  bool MenuButton(...)
+  Engine/Source/Ui/MenuUtils.cpp:288  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
+  Engine/Source/Ui/MenuUtils.h:30-31  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
   Engine/Source/Ui/Screens/ModalScreen.cpp:49  MenuButton("OK", ...)  (themed button)
 
 
 9. Vertical Rhythm
 ------------------
-One heading helper owns menu/panel titles: MenuHeading pushes the heading font,
-emits the label, and follows it with a standard kfHeadingGapPixels gap. Its
-default kfMenuHeadingScale remains available for settings headings; MainMenu,
-Pause, Audio, and Game Settings pass kfMainMenuHeadingScale to keep title
-weight restrained.
-Graphics composes its title, FPS, and Back action in one header row under its
-local density curve. All gaps are named 4K-pixel constants times UiScale(); no
-screen emits Dummy(DisplaySize.y * <magic fraction>).
+One heading helper owns menu titles: MenuHeading pushes the heading font at
+kfMenuUiScale * kfMainMenuHeadingScale, emits the label, and follows it with a
+standard kfHeadingGapPixels gap; its callers never choose the scale, which
+keeps title weight restrained. Documented exception: Graphics does not call
+MenuHeading; it composes its title (drawn at kfGraphicsHeadingScale), FPS, and
+Back action in one header row under its local density curve. All gaps are named
+4K-pixel constants times UiScale(); no screen emits
+Dummy(DisplaySize.y * <magic fraction>).
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:297  void MenuHeading(std::string_view label, float fHeadingScale)
-  Engine/Source/Ui/MenuUtils.h:9  kfMenuHeadingScale = 1.6f
-  Engine/Source/Ui/MenuUtils.h:27  kfHeadingGapPixels
+  Engine/Source/Ui/MenuUtils.cpp:300  void MenuHeading(std::string_view label)
+  Engine/Source/Ui/MenuUtils.h:28  kfHeadingGapPixels
 
 
 10. Harness Addressability
@@ -359,7 +359,7 @@ Screen-specific commitments this contract makes, each verified visually:
     The three option labels repeat verbatim down the column.
 
 Files:
-  Engine/Source/Ui/MenuUtils.cpp:238  ComputeMouseOpennessTarget (full-height edge strip hover zone)
+  Engine/Source/Ui/MenuUtils.cpp:241  ComputeMouseOpennessTarget (full-height edge strip hover zone)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:120-121  (left/right hover targets)
   Engine/Source/Ui/Screens/AGENTS.md  (consumer; links to this document for layout)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md  (HUD layout notes)

@@ -39,7 +39,7 @@ void GameSettingsScreen::Render()
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)).mpData, kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringGameSettings)).mpData);
 
 	// Language row: the six labels stay in their own language, so they are never localized through the string table.
 	// Font and geometry are stepped down to the utility tier so a six-button row reads below the primary controls.
@@ -86,7 +86,7 @@ void GameSettingsScreen::Render()
 	ImGui::SetNextItemWidth(kfUiOpacitySliderWidthPixels * UiScale());
 	WrapperSlider("UI Opacity", &gUiOpacity);
 
-	RadioRow("Theme", &gUiTheme, static_cast<float>(GetUiTheme()), {{"Naval Steel", static_cast<float>(UiTheme::kNavalSteel)}, {"Dark Amber", static_cast<float>(UiTheme::kDarkAmber)}, {"Midnight Mauve", static_cast<float>(UiTheme::kMidnightMauve)}});
+	RadioRow("Theme", &gUiTheme, {{"Naval Steel", static_cast<float>(UiTheme::kNavalSteel)}, {"Dark Amber", static_cast<float>(UiTheme::kDarkAmber)}, {"Midnight Mauve", static_cast<float>(UiTheme::kMidnightMauve)}});
 
 	ImGui::Separator();
 
@@ -102,8 +102,7 @@ void GameSettingsScreen::Render()
 
 	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnimation))
 	{
-		SaveGameSettings();
-		game::gpGame->meUiState = UiState::kPause;
+		game::gpGame->LeaveSettingsScreen();
 	}
 
 	ImGui::End();

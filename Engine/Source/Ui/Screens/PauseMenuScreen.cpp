@@ -43,7 +43,7 @@ void PauseMenuScreen::Render()
 
 	float fContentStartX = ImGui::GetCursorPosX();
 	ImGui::SetCursorPosX(fContentStartX + (fButtonWidth - fHeadingWidth) * 0.5f);
-	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringPaused)).mpData, kfMainMenuHeadingScale);
+	MenuHeading(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringPaused)).mpData);
 	ImGui::SetCursorPosX(fContentStartX);
 
 	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringResume)).mpData, ImVec2(fButtonWidth, 0.0f), mpfButtonHoverAnimations[0]))

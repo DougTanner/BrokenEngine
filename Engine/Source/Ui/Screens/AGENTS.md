@@ -23,8 +23,10 @@ runtime contracts that code changes must preserve.
   `game::gpGame`, including the quit flag; calls `GetStandardMenuModel()` for
   the title, offered features, and live client/discovery state; and routes
   game-owned side effects through `ApplyStandardMenuAction()`. Engine-owned
-  game, sound, and graphics settings save/reset are called directly, never as
-  actions.
+  game, sound, and graphics settings reset is called directly, and a settings
+  screen's Back and the pause input leave through
+  `GameBase::LeaveSettingsScreen`, which saves that screen's settings; neither
+  is an action.
 - `StandardMenuModel` is a snapshot taken at entry, so a screen rereads the
   model after any action a later decision in the same render pass depends on;
   Main Menu does that after starting discovery and after connecting.

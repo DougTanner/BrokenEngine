@@ -134,7 +134,7 @@ void GraphicsMenuScreen::Render()
 
 		WrapperToggle("Fullscreen", &gFullscreen);
 
-		RadioRow("Presentation Mode", &gPresentMode, gPresentMode.mfCurrent, {{"Immediate", static_cast<float>(VK_PRESENT_MODE_IMMEDIATE_KHR)}, {"Mailbox", static_cast<float>(VK_PRESENT_MODE_MAILBOX_KHR)}, {"FIFO", static_cast<float>(VK_PRESENT_MODE_FIFO_KHR)}});
+		RadioRow("Presentation Mode", &gPresentMode, {{"Immediate", static_cast<float>(VK_PRESENT_MODE_IMMEDIATE_KHR)}, {"Mailbox", static_cast<float>(VK_PRESENT_MODE_MAILBOX_KHR)}, {"FIFO", static_cast<float>(VK_PRESENT_MODE_FIFO_KHR)}});
 
 		ImGui::Separator();
 
@@ -143,7 +143,7 @@ void GraphicsMenuScreen::Render()
 			gSampleShading.Set(false);
 		}
 		ImGui::BeginDisabled(!gMultisampling.Get<bool>());
-		RadioRow(nullptr, &gSampleCount, gSampleCount.mfCurrent, {{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
+		RadioRow(nullptr, &gSampleCount, {{"2x", static_cast<float>(VK_SAMPLE_COUNT_2_BIT)}, {"4x", static_cast<float>(VK_SAMPLE_COUNT_4_BIT)}, {"8x", static_cast<float>(VK_SAMPLE_COUNT_8_BIT)}, {"16x", static_cast<float>(VK_SAMPLE_COUNT_16_BIT)}});
 
 		ImGui::Separator();
 
@@ -162,13 +162,13 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::TableNextColumn();
 
-		RadioRow("Water", &gWaterLevel, gWaterLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}});
+		RadioRow("Water", &gWaterLevel, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}});
 		WrapperToggle("Water Foam", &gWaterFoamSystemEnabled);
 		WrapperToggle("Break Repetition", &gBreakRepetition);
 
 		ImGui::Separator();
 
-		if (RadioRow("Terrain Shadows", &gTerrainShadowsLevel, gTerrainShadowsLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Terrain Shadows", &gTerrainShadowsLevel, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			ApplyTerrainShadowsLevel();
 		}
@@ -176,7 +176,7 @@ void GraphicsMenuScreen::Render()
 
 		ImGui::Separator();
 
-		if (RadioRow("Object Shadows Blur Level", &gObjectShadowsBlurLevel, gObjectShadowsBlurLevel.mfCurrent, {{"Low", 0.0f}, {"High", 1.0f}}))
+		if (RadioRow("Object Shadows Blur Level", &gObjectShadowsBlurLevel, {{"Low", 0.0f}, {"High", 1.0f}}))
 		{
 			ApplyObjectShadowsBlurLevel();
 		}
@@ -186,7 +186,7 @@ void GraphicsMenuScreen::Render()
 
 		WrapperToggle("Lighting", &gLightingEnabled);
 		ImGui::BeginDisabled(!gLightingEnabled.Get<bool>());
-		if (RadioRow("Lighting", &gLightingLevel, gLightingLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Lighting", &gLightingLevel, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			ApplyLightingLevel();
 		}
@@ -197,7 +197,7 @@ void GraphicsMenuScreen::Render()
 
 		WrapperToggle("Smoke", &gSmokeEnabled);
 		ImGui::BeginDisabled(!gSmokeEnabled.Get<bool>());
-		if (RadioRow("Smoke Detail", &gSmokeDetailLevel, gSmokeDetailLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
+		if (RadioRow("Smoke Detail", &gSmokeDetailLevel, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
 		{
 			ApplySmokeDetailLevel();
 		}
@@ -216,8 +216,7 @@ void GraphicsMenuScreen::Render()
 
 	if (bBackPressed)
 	{
-		SaveGraphicsSettings();
-		game::gpGame->meUiState = UiState::kPause;
+		game::gpGame->LeaveSettingsScreen();
 	}
 
 	ImGui::End();
