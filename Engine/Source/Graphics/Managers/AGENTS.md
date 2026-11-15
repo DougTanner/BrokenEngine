@@ -163,9 +163,9 @@ re-record mechanism.
   depth clear, an untimed UI depth prepass and opaque models. Transparent models
   follow in both cases. Only the first UI depth prepass writes its timer
   queries.
-- Submission workers publish work through `PersistentWorker` wake/wait edges:
-  Main waits for Global, and UI waits for Main. Data read by a worker must be
-  written before its wake.
+- Global submission runs on a `PersistentWorker`; the main thread waits for it
+  before submitting Main and then ImGui. Data the worker reads must be written
+  before its wake.
 - Per-frame uniform copies need no host-write barrier of their own:
   `Buffer::RecordCopy` supplies barriers on both sides of the copy, and
   `vkQueueSubmit` implicitly makes the CPU's earlier host-visible writes

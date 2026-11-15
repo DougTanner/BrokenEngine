@@ -561,7 +561,6 @@ void SwapchainManager::AcquireNextImage()
 		{
 			gpProfileManager->GpuImageWait(callStart, waitEnd);
 		}
-		mCurrentImageAvailableVkFence = VK_NULL_HANDLE;
 	}
 
 	mCurrentImageAvailableVkFence = GetNextImageAvailableFence();
@@ -638,7 +637,6 @@ void SwapchainManager::Present(int64_t iFramebufferIndex)
 	{
 		mPresent.Wake([this, iFramebufferIndex]()
 		{
-			gpCommandBufferManager->mSubmitMain.Wait();
 			PresentToQueue(iFramebufferIndex);
 		});
 	}

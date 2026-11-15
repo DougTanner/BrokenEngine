@@ -54,7 +54,6 @@ void CommandBufferManager::RecordCommandBuffer(int64_t iFramebuffer)
 		return;
 	}
 	rCommandBuffers.mFlags.Set(CommandBufferFlags::kRecorded);
-	rCommandBuffers.mFlags.Set(CommandBufferFlags::kExecuted, false);
 
 	LOG(kGraphics, kDebug, "Record command buffer: {}", iFramebuffer);
 
@@ -70,7 +69,7 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 	// kPendingAcquireBarriers and miAcquireFramebufferIndex are written on the main thread in TextureManager's
 	// ProcessPendingTextures and EndAcquireCommandBuffer; under
 	// kbRenderThread this read runs on the mSubmitGlobal worker, safe only because SubmitGlobalCommandBuffer's
-	// mSubmitGlobal.Wake() edge published those writes first. Same family as CommandBuffers.h (mFlags/mVkFence).
+	// mSubmitGlobal.Wake() edge published those writes first.
 	VkCommandBuffer pVkCommandBuffers[2] {};
 	int64_t iCommandBufferCount = 0;
 	VkCommandBuffer vkAcquireCommandBuffer = gpTextureManager->PendingAcquireCommandBuffer();
@@ -108,8 +107,6 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 	gpProfileManager->CpuStart(kCpuTimerSubmitGlobal);
 	CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, VK_NULL_HANDLE));
 	gpProfileManager->CpuStop(kCpuTimerSubmitGlobal);
-
-	rCommandBuffers.mFlags.Set(CommandBufferFlags::kExecuted);
 }
 
 void CommandBufferManager::SubmitGlobalCommandBuffer(int64_t iFramebufferIndex)
@@ -162,31 +159,18 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 	// mParticleSyncVkSemaphore (signaled above via pVkSignalSemaphores) is waited by the NEXT frame's
 	// SubmitGlobalToQueue, gated on mbParticleSemaphoreSignaled — a cross-frame, cross-method pairing that
 	// holds only because a Main submit always precedes the next Global submit. Same "plain member published across
-	// a PersistentWorker Wake/Wait edge" family as SwapchainManager::PresentToQueue (meDestroyType) and CommandBuffers.h
-	// (mFlags/mVkFence).
+	// a PersistentWorker Wake/Wait edge" family as SwapchainManager::PresentToQueue (meDestroyType).
 	mbParticleSemaphoreSignaled = true;
 }
 
 void CommandBufferManager::SubmitMainCommandBuffer(int64_t iFramebufferIndex)
 {
-	if constexpr (kbRenderThread)
-	{
-		mSubmitMain.Wake([this, iFramebufferIndex]()
-		{
-			mSubmitGlobal.Wait();
-			SubmitMainToQueue(iFramebufferIndex);
-		});
-	}
-	else
-	{
-		SubmitMainToQueue(iFramebufferIndex);
-	}
+	mSubmitGlobal.Wait();
+	SubmitMainToQueue(iFramebufferIndex);
 }
 
 void CommandBufferManager::SubmitUiCommandBuffer(int64_t iFramebufferIndex)
 {
-	mSubmitMain.Wait();
-
 	gpImGuiManager->Submit(iFramebufferIndex, true);
 }
 

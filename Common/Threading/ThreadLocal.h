@@ -14,7 +14,6 @@ enum Threads
 	kThreadTextureUpload,
 	kThreadDxDiag,
 	kThreadSubmitGlobal,
-	kThreadSubmitMain,
 	kThreadPresent,
 	kThreadScreenshot,
 	kThreadStreamingVoiceFill,

@@ -698,7 +698,6 @@ void Graphics::Destroy()
 	}
 	if (gpCommandBufferManager != nullptr)
 	{
-		gpCommandBufferManager->mSubmitMain.Wait();
 		gpCommandBufferManager->mSubmitGlobal.Wait();
 	}
 	if (meDestroyType >= DestroyType::kSurface)

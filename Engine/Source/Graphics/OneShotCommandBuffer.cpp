@@ -8,7 +8,7 @@ namespace engine
 // Instances share gpDeviceManager->mOneShotVkCommandPool / mOneShotVkFence ("single-threaded, graphics queue
 // only" — DeviceManager.cpp), so lifetimes must never overlap; the sbInUse atomic enforces that. The screenshot
 // capture path constructs one in Graphics::PresentAcquire on the main thread, between the UI submit and
-// Present, with the mSubmitMain/mSubmitGlobal workers parked.
+// Present, with the mSubmitGlobal worker parked.
 static std::atomic<bool> sbInUse = false;
 
 OneShotCommandBuffer::OneShotCommandBuffer()
