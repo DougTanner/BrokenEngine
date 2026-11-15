@@ -20,6 +20,13 @@ top of the file. A session reviewing the log removes each row it handles.
 ## Entries
 
 - 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
+  Engine/Data/Shaders/Shadow/Shadow.comp:38 — the terrain shadow march's end
+  index is published per direction by the CPU (iShadowElevationSize, written
+  in GlobalUniforms.cpp PopulateShadowSunExtension), so each direction's stop
+  can be set wrong independently — have the shader stop when the unsigned
+  index leaves the elevation width and drop the layout field (needs a shader
+  repack)
+- 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
   Engine/Source/Graphics/Managers/RenderTargetTexturesLighting.cpp:24 — the
   `class RenderTargetTextures` defines members in a second .cpp, breaking
   C++StyleGuide rule 67 — move the lighting-texture functions into a stateless

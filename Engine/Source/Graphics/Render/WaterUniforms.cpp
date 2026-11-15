@@ -24,20 +24,6 @@ static void PopulateWaterSunsetFade(shaders::GlobalLayout& rGlobalLayout, float 
 	rGlobalLayout.fWaterDepthLookupTableSunsetFade = gWaterDepthLookupTableSunsetFadeIntensity.mfCurrent * std::pow(fSunsetFade, gWaterDepthLookupTableSunsetFadePower.mfCurrent);
 }
 
-static void PopulateWaterDirectional(shaders::GlobalLayout& rGlobalLayout, float fSunAngle)
-{
-	float fDirectional = 1.0f;
-	if (fSunAngle >= 0.0f && fSunAngle < XM_PIDIV2)
-	{
-		fDirectional = 1.0f - (fSunAngle) / XM_PIDIV2;
-	}
-	else if (fSunAngle >= XM_PIDIV2 && fSunAngle < XM_PI)
-	{
-		fDirectional = (fSunAngle - XM_PIDIV2) / XM_PIDIV2;
-	}
-	rGlobalLayout.fWaterDirectional = std::pow(fDirectional, 2.0f);
-}
-
 bool WaterFoamActive()
 {
 	return gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
@@ -287,7 +273,7 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterColorNoiseMultiplierOne = gWaterColorNoiseMultiplierOne.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseMultiplierTwo = gWaterColorNoiseMultiplierTwo.mfCurrent;
 
-	PopulateWaterDirectional(rGlobalLayout, fSunAngle);
+	rGlobalLayout.fWaterDirectional = std::pow(1.0f - fDayPercent, 2.0f);
 
 	float fBreakStart = gWaterBreakStartDepth.mfCurrent;
 	float fBreakEnd = gWaterBreakEndDepth.mfCurrent;

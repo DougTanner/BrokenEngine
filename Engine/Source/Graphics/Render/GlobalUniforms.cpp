@@ -419,7 +419,7 @@ static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, con
 		rfShadowSunAngle = fSunAngle >= XM_PI ? fSunAngle - XM_PI : XM_PI - fSunAngle;
 		rGlobalLayout.fShadowDirectionMultiplier = -1.0f;
 
-		rGlobalLayout.iShadowElevationSize = 0;
+		rGlobalLayout.iShadowElevationSize = 0; // Each corner sample blends two columns, so ending at 0 still reaches column 0, mirroring the eastward march.
 		rGlobalLayout.iShadowIncrement = -1;
 		rGlobalLayout.iShadowStartOffset = static_cast<int32_t>(fShadowElevationTextureSizeWidth - fShadowTextureSizeWidth); // Elevation extension half-width, from real extents.
 	}
