@@ -1,11 +1,11 @@
 #pragma once
 
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingHarnessRig.h"
-#endif
-
 namespace engine
 {
+
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+class AudioStreamingHarnessRig;
+#endif
 
 // Loopback-only (127.0.0.1) TCP JSON command channel embedded in both executables. Transport only — knows no
 // dispatch semantics; the listener thread reads length-framed request frames, parses them, and hands each to the main
@@ -45,7 +45,7 @@ public:
 	void ClearDeferredResponse();
 
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-	std::unique_ptr<AudioStreamingHarnessRig> mpAudioStreamingHarnessRig = std::make_unique<AudioStreamingHarnessRig>();
+	std::unique_ptr<AudioStreamingHarnessRig> mpAudioStreamingHarnessRig;
 #endif
 
 private:

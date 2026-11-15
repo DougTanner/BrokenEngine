@@ -12,9 +12,6 @@ namespace engine
 // Throws on invalid params; AgentCommandServer::Drain() converts to the failure envelope.
 bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult);
 
-const char* UiStateName(UiState eState);
-nlohmann::json GameFlagNames(GameFlags_t flags);
-
 // The connected client once the server has accepted it; otherwise throws, named by command.
 Client& RequireAcceptedClient(std::string_view command);
 

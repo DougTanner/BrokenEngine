@@ -1117,7 +1117,7 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 	rResult["clientGridCoord"] = AgentCoordinateJson(game::gpGame->mClientGridCoordinate);
 }
 
-const char* UiStateName(UiState eState)
+static const char* UiStateName(UiState eState)
 {
 	switch (eState)
 	{
@@ -1131,7 +1131,7 @@ const char* UiStateName(UiState eState)
 	return "kNone";
 }
 
-nlohmann::json GameFlagNames(GameFlags_t flags)
+static nlohmann::json GameFlagNames(GameFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
 	if (flags & GameFlags::kQuit)

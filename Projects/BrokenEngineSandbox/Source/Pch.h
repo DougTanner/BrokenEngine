@@ -24,13 +24,4 @@ inline constexpr bool kbDrawModelsOverWorld = false;
 #include "Frame/Frame.h"
 #include "Engine.h"
 #include "GameBase.h"
-
-#if defined(BT_CLIENT)
-// Generic client agent commands: declared after GameBase.h because the interface names its UiState and GameFlags types.
-#include "Agent/AgentCommandsClientGeneric.h"
-#endif // BT_CLIENT
-
-#if defined(BT_SERVER)
-#include "Agent/AgentCommandsServerGeneric.h"
-#endif // BT_SERVER
 #include "Network/GameMessages.h"

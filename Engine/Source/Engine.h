@@ -64,6 +64,7 @@
 
 #include "Network/NetworkDiscoveryScanner.h"
 #include "Network/Client/Client.h"
+#include "Agent/AgentCommandsClientGeneric.h"
 #include "Network/Client/ClientSessionRuntime.h"
 
 #include "Graphics/Islands.h"
@@ -83,6 +84,7 @@
 #include "Network/Server/OwnedEntityRegistry.h"
 #include "Network/Server/Server.h"
 #include "Network/Server/ServerSessionRuntime.h"
+#include "Agent/AgentCommandsServerGeneric.h"
 #endif
 
 // Formatters for engine types used by LogDifference.

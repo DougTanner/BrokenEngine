@@ -4,6 +4,10 @@
 
 #include "Agent/AgentCommands.h"
 
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
+#endif
+
 namespace engine
 {
 
@@ -89,6 +93,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		ListenerLoop(std::move(stopToken));
 	}, 64 * 1'024));
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
+	mpAudioStreamingHarnessRig = std::make_unique<AudioStreamingHarnessRig>();
 	AudioStreamingHarnessRig::Attach(*mpAudioStreamingHarnessRig);
 #endif
 }
