@@ -415,8 +415,7 @@ void Graphics::Create()
 	bool bSwapchainRecreated = (mpSwapchainManager == nullptr);
 	if (mpSwapchainManager == nullptr)
 	{
-		mpSwapchainManager = std::make_unique<SwapchainManager>(mOldVkSwapchainKHR);
-		mOldVkSwapchainKHR = VK_NULL_HANDLE;
+		mpSwapchainManager = std::make_unique<SwapchainManager>();
 	}
 	if constexpr (kbProfiling)
 	{
@@ -775,11 +774,6 @@ void Graphics::Destroy()
 		if constexpr (kbProfiling)
 		{
 			gpProfileManager->Destroy();
-		}
-		// Save old swapchain handle for seamless transition (only during recreation, not final shutdown)
-		if (mpSwapchainManager != nullptr && meDestroyType < DestroyType::kSurface)
-		{
-			mOldVkSwapchainKHR = mpSwapchainManager->ReleaseHandleForRecreation();
 		}
 		mpSwapchainManager.reset();
 	}

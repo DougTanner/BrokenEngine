@@ -23,14 +23,11 @@ class SwapchainManager : public common::Singleton<SwapchainManager>
 {
 public:
 
-	SwapchainManager(VkSwapchainKHR vkOldSwapchain = VK_NULL_HANDLE);
+	SwapchainManager();
 	~SwapchainManager();
 
 	void AcquireNextImage();
 	void Present(int64_t iFramebufferIndex);
-
-	// The transferred handle remains live across swapchain recreation.
-	VkSwapchainKHR ReleaseHandleForRecreation();
 
 	float mfAspectRatio = 1.0f;
 
@@ -57,7 +54,7 @@ public:
 private:
 
 	void CreateRenderPass();
-	void CreateSwapchain(VkSwapchainKHR vkOldSwapchain);
+	void CreateSwapchain();
 	void CreateFramebuffers();
 	void CreateSynchronizationObjects();
 

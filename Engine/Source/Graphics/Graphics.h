@@ -126,7 +126,6 @@ public:
 
 	DestroyType meDestroyType = DestroyType::kNone;
 	DestroyFlags_t mDestroyFlags;
-	VkSwapchainKHR mOldVkSwapchainKHR = VK_NULL_HANDLE;
 	// Latch so a swapchain recreate deferred while the window is off-screen/minimized logs once per transition, not per frame.
 	bool mbSwapchainRecreateDeferred = false;
 

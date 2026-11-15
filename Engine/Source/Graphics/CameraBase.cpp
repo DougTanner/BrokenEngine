@@ -509,7 +509,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	static constexpr float kfFarClipPerEyeDistance = 2.667f;
 	float fNearClip = fEyeDistance * kfNearClipPerEyeDistance;
 	float fFarClip = std::max(kfMinimumFarClip, fEyeDistance * kfFarClipPerEyeDistance);
-	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
+	float fAspectRatio = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	mMatProjection = mbOrthographicProjection ? XMMatrixOrthographicRH(2.0f * fFramingHalfHeight * fAspectRatio, 2.0f * fFramingHalfHeight, fNearClip, fFarClip) : XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent), fAspectRatio, fNearClip, fFarClip);
 
 	// Normalize the raw footprint by the reference-angle framing dimensions used to size both texel grids.

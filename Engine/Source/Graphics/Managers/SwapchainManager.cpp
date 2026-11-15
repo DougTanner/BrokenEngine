@@ -7,15 +7,24 @@
 namespace engine
 {
 
-SwapchainManager::SwapchainManager(VkSwapchainKHR vkOldSwapchain)
+SwapchainManager::SwapchainManager()
 : common::Singleton<SwapchainManager>(gpSwapchainManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerSwapchainManager);
 
 	CreateRenderPass();
-	CreateSwapchain(vkOldSwapchain);
-	CreateFramebuffers();
-	CreateSynchronizationObjects();
+	CreateSwapchain();
+	try
+	{
+		CreateFramebuffers();
+		CreateSynchronizationObjects();
+	}
+	catch (...)
+	{
+		// A throwing constructor runs no destructor, so this swapchain would outlive its device.
+		ASSERT(mVkSwapchainKHR == VK_NULL_HANDLE);
+		throw;
+	}
 }
 
 void SwapchainManager::CreateRenderPass()
@@ -202,7 +211,7 @@ void SwapchainManager::CreateRenderPass()
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mVkRenderPass, "SwapchainManager");
 }
 
-void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
+void SwapchainManager::CreateSwapchain()
 {
 	VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
 	CHECK_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &vkSurfaceCapabilitiesKHR));
@@ -308,15 +317,9 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 		.compositeAlpha = (vkSurfaceCapabilitiesKHR.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) != 0 ? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR : VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
 		.presentMode = gPresentMode.Get<VkPresentModeKHR>(),
 		.clipped = VK_TRUE,
-		.oldSwapchain = vkOldSwapchain,
+		.oldSwapchain = VK_NULL_HANDLE,
 	};
 	CHECK_VK(vkCreateSwapchainKHR(gpDeviceManager->mVkDevice, &vkSwapchainCreateInfoKHR, nullptr, &mVkSwapchainKHR));
-
-	// Destroy old swapchain after successfully creating new one
-	if (vkOldSwapchain != VK_NULL_HANDLE)
-	{
-		vkDestroySwapchainKHR(gpDeviceManager->mVkDevice, vkOldSwapchain, nullptr);
-	}
 	VkName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, mVkSwapchainKHR, "");
 }
 
@@ -517,13 +520,6 @@ SwapchainManager::~SwapchainManager()
 	vkDestroyFramebuffer(gpDeviceManager->mVkDevice, mHdrVkFramebuffer, nullptr);
 	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mHdrVkRenderPass, nullptr);
 	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mVkRenderPass, nullptr);
-}
-
-VkSwapchainKHR SwapchainManager::ReleaseHandleForRecreation()
-{
-	VkSwapchainKHR vkSwapchainKHR = mVkSwapchainKHR;
-	mVkSwapchainKHR = VK_NULL_HANDLE;
-	return vkSwapchainKHR;
 }
 
 void SwapchainManager::AcquireNextImage()

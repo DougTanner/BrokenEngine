@@ -107,7 +107,9 @@ recording.
 Swapchain creation and recreation, framebuffers, depth and multisampling
 textures, and frame synchronization. Out-of-date and suboptimal swapchains defer
 recreation. Presentation is async through a `PersistentWorker` at time-critical
-priority.
+priority. A constructor failure after the swapchain is created is deliberately
+fatal through an `ASSERT`, so a device loss in that window skips device-loss
+recovery.
 
 Acquisition warnings supply per-invocation raw wall times for the prior
 acquisition fence wait and `vkAcquireNextImageKHR` separately to
