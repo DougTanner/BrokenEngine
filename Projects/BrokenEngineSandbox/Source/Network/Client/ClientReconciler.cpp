@@ -51,7 +51,7 @@ static bool GetClientReplayedPosition(std::span<const engine::CoordWork> works, 
 			continue;
 		}
 		const engine::CoordScratch& rScratch = rWork.scratch;
-		for (int64_t i = 0; i < rScratch.iReplayStackCount; ++i)
+		for (int64_t i = 0; i < std::ssize(rScratch.replayStack); ++i)
 		{
 			const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 			if (rFrame.interpolate.iTick == iTick)
@@ -100,7 +100,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	// Owned-entity transfer migration updates previous client armor.
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
-	std::span<const engine::CoordWork> activeWorks(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount));
+	std::span<const engine::CoordWork> activeWorks(mDispatcher.mWorks.data(), static_cast<size_t>(dispatch.iActiveCount));
 	ReconcileUpdateClientState(activeWorks, dispatch.bAnyFullReplay, newConfirmedClientState);
 
 	if (bCapturedPrePosition && dispatch.bAnyFullReplay)

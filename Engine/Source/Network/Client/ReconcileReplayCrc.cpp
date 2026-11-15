@@ -10,12 +10,12 @@
 namespace engine
 {
 
-static int64_t FindSnapshotIndex(const std::unique_ptr<game::Frame> (&rSnapshots)[engine::kiNetworkBufferSize], int64_t iHead, int64_t iCount, int64_t iTick)
+int64_t FindSnapshotIndex(const engine::Cell& rCell, int64_t iTick)
 {
-	for (int64_t i = 0; i < iCount; ++i)
+	for (int64_t i = 0; i < rCell.iSnapshotCount; ++i)
 	{
-		int64_t iPhysical = SnapshotIndex(iHead, i);
-		if (rSnapshots[iPhysical] != nullptr && rSnapshots[iPhysical]->interpolate.iTick == iTick)
+		int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, i);
+		if (rCell.ppSnapshots[iPhysical] != nullptr && rCell.ppSnapshots[iPhysical]->interpolate.iTick == iTick)
 		{
 			return i;
 		}
@@ -62,7 +62,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 	for (int64_t iTick : ticks)
 	{
 		auto it = rCell.serverUpdates.find(iTick);
-		int64_t iIndex = FindSnapshotIndex(rCell.ppSnapshots, rCell.iSnapshotHead, rCell.iSnapshotCount, iTick);
+		int64_t iIndex = FindSnapshotIndex(rCell, iTick);
 		if (iIndex < 0)
 		{
 			continue;
@@ -199,7 +199,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	// Compute log suppression: if confirmed tick and first mismatch tick are unchanged from
 	// last frame, this is a repeat stuck state — suppress per-tick mismatch detail logging.
 	bool bSameState = (rCell.iConfirmedTick == rCell.iLastLoggedConfirmedTick);
-	if (bSameState && !rCell.serverUpdates.empty())
+	if (bSameState)
 	{
 		auto it = rCell.serverUpdates.end();
 		for (auto candidateIt = rCell.serverUpdates.begin(); candidateIt != rCell.serverUpdates.end(); ++candidateIt)
@@ -245,12 +245,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 
 	// Gap at confirmed+1 with no matches/mismatches: first server update is non-consecutive
 	// and nothing was validatable. Nothing for the fast path or full replay to do this cycle.
-	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && !rCell.serverUpdates.empty() && std::ranges::min_element(rCell.serverUpdates, {}, [](const auto& rEntry) { return rEntry.first; })->first != rCell.iConfirmedTick + 1)
-	{
-		return result;
-	}
-
-	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && rCell.iConfirmedTick >= iTargetTick)
+	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && std::ranges::min_element(rCell.serverUpdates, {}, [](const auto& rEntry) { return rEntry.first; })->first != rCell.iConfirmedTick + 1)
 	{
 		return result;
 	}

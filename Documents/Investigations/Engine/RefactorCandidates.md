@@ -19,6 +19,11 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-15 claude/041e27c6-7b5f-4879-840f-1df103133526 —
+  Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp:103 —
+  the game builds its active-work span from ReconcileDispatcher's public mWorks
+  plus the dispatch result's iActiveCount — have ReconcileDispatchResult carry
+  the span over the active works and make mWorks private
 - 2026-11-14 claude/179efbf3-916e-4701-9a2c-e96ffd751f75 —
   Engine/Source/Graphics/Managers/DeviceManager.cpp:400 — drop the
   std::filesystem::exists pre-check and its filesystem_error catch and let the

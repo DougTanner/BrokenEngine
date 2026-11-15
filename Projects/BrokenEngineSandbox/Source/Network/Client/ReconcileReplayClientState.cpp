@@ -26,7 +26,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 			}
 
 			// replayStack[0] is the confirmed frame; scan from index 1 onwards
-			for (int64_t i = 1; i < rScratch.iReplayStackCount; ++i)
+			for (int64_t i = 1; i < std::ssize(rScratch.replayStack); ++i)
 			{
 				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)

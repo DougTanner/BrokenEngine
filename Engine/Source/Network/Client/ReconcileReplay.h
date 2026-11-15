@@ -69,7 +69,6 @@ constexpr RingLayout ComputeRetention(int64_t iHeadPhysical, int64_t iSnapshotCo
 struct CoordScratch
 {
 	std::vector<game::Frame*> replayStack;
-	int64_t iReplayStackCount = 0;
 	int64_t iReplayWriteHead = 0;
 	int64_t iReplayWriteCount = 0;
 	int64_t iLastValidatedIndex = -1;
@@ -92,7 +91,6 @@ struct CoordScratch
 	void Reset()
 	{
 		replayStack.clear();
-		iReplayStackCount = 0;
 		iReplayWriteHead = 0;
 		iReplayWriteCount = 0;
 		iLastValidatedIndex = -1;
@@ -106,6 +104,15 @@ struct CoordScratch
 		desyncExpectedCrc = 0;
 		desyncActualCrc = 0;
 		pDesyncClientFrame.reset();
+	}
+
+	// Restart the replay stack at a base frame; replay writes begin in the slot after iBaseSlot.
+	void ResetReplayBase(game::Frame* pBaseFrame, int64_t iBaseSlot)
+	{
+		replayStack.clear();
+		replayStack.push_back(pBaseFrame);
+		iReplayWriteHead = SnapshotIndex(iBaseSlot, 1);
+		iReplayWriteCount = 0;
 	}
 };
 
@@ -136,10 +143,10 @@ inline engine::Cell::PendingFullState* FindDuePendingFullState(engine::Cell& rCe
 	return &*rCell.optionalPendingFullState;
 }
 
+int64_t FindSnapshotIndex(const engine::Cell& rCell, int64_t iTick);
 CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTargetTick);
 
-void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs);
-void ReconcileInjectPendingFullState(CoordWork& rWork);
+void ReconcileInjectPendingFullState(CoordWork& rWork, engine::Cell::PendingFullState& rPending);
 
 void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset);
 int64_t ReconcileFindReplayRangeCoord(const CoordWork& rWork, int64_t iReplayStart);
@@ -175,7 +182,6 @@ public:
 	void Reset();
 
 	std::vector<CoordWork> mWorks;
-	int64_t miActiveCount = 0;
 };
 
 } // namespace engine

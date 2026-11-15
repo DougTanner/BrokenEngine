@@ -12,25 +12,16 @@
 namespace engine
 {
 
-void ReconcileInjectPendingFullState(CoordWork& rWork)
+void ReconcileInjectPendingFullState(CoordWork& rWork, engine::Cell::PendingFullState& rPending)
 {
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	if (!rCell.optionalPendingFullState)
-	{
-		return;
-	}
-	engine::Cell::PendingFullState& rPending = *rCell.optionalPendingFullState;
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
 	rCell.ppSnapshots[iSlot] = std::move(rPending.pFrame);
-	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rCell.ppSnapshots[iSlot].get());
-	rScratch.iReplayStackCount = 1;
-	rScratch.iReplayWriteHead = SnapshotIndex(iSlot, 1);
-	rScratch.iReplayWriteCount = 0;
+	rScratch.ResetReplayBase(rCell.ppSnapshots[iSlot].get(), iSlot);
 	rScratch.iInjectedBaseSlot = iSlot;
 	// Full state replaces the timeline; a prior higher high-water mark was against a discarded timeline.
 	rCell.iHighWaterValidatedTick = rPending.iTick;
@@ -60,31 +51,11 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork, engine::Cell::Pen
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	ASSERT(rPending.pFrame != nullptr);
-	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
-
+	// Injection destroys rPending, so its tick is read first.
 	int64_t iAdoptedTick = rPending.iTick;
-	int64_t iAdoptedSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
-	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
-	rCell.ppSnapshots[iAdoptedSlot] = std::move(rPending.pFrame);
-
-	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rCell.ppSnapshots[iAdoptedSlot].get());
-	rScratch.iReplayStackCount = 1;
-	rScratch.iReplayWriteHead = SnapshotIndex(iAdoptedSlot, 1);
-	rScratch.iReplayWriteCount = 0;
-	rScratch.iLastValidatedIndex = -1;
+	ReconcileInjectPendingFullState(rWork, rPending);
 	rScratch.iNewConfirmedTick = iAdoptedTick;
-	rScratch.outputLayout =
-	{
-		.iHead = iAdoptedSlot,
-		.iCount = 1,
-		.iConfirmedInner = 0,
-	};
 
-	rCell.iHighWaterValidatedTick = iAdoptedTick;
-	rCell.iLastFullStateTick = iAdoptedTick;
-	rCell.optionalPendingFullState.reset();
 	std::erase_if(rCell.serverUpdates, [iAdoptedTick](const auto& rEntry) { return rEntry.first <= iAdoptedTick; });
 	rCell.iLastReplayConfirmedTick = -1;
 	rCell.iLastReplayServerUpdateCount = -1;
@@ -164,16 +135,7 @@ static void DetermineRollbackBase(CoordWork& rWork, const ReconcileInputs& rInpu
 		int64_t iShrunkTick = rFastPathResult.iLowestUnresolvedMismatch - 1;
 		if (iShrunkTick <= rCell.iHighWaterValidatedTick)
 		{
-			int64_t iShrunkIndex = -1;
-			for (int64_t i = 0; i < rCell.iSnapshotCount; ++i)
-			{
-				int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, i);
-				if (rCell.ppSnapshots[iPhysical] != nullptr && rCell.ppSnapshots[iPhysical]->interpolate.iTick == iShrunkTick)
-				{
-					iShrunkIndex = i;
-					break;
-				}
-			}
+			int64_t iShrunkIndex = FindSnapshotIndex(rCell, iShrunkTick);
 			if (iShrunkIndex >= 0)
 			{
 				riRollbackTick = iShrunkTick;
@@ -187,14 +149,14 @@ static void DetermineRollbackBase(CoordWork& rWork, const ReconcileInputs& rInpu
 
 // Roll back to the selected base, inject a reachable pending full state, and replay the consecutive
 // range. The fallback retries from the typed full-confirmed layout after a provisional shrunk-base
-// desync; only its empty range resolves the coord here.
+// desync; its range always holds the update at the tick after the confirmed one.
 enum class ReplayMode
 {
 	kPrimary,
 	kFallback,
 };
 
-static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const RingLayout& rPreWritebackLayout, int64_t& riRollbackTick, int64_t& riRollbackOffset, bool& rbShrunkRollback, ReplayMode eMode, int64_t& riReplayStart)
+static void RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const RingLayout& rPreWritebackLayout, int64_t& riRollbackTick, int64_t& riRollbackOffset, ReplayMode eMode, int64_t& riReplayStart)
 {
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
@@ -213,7 +175,6 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 
 		riRollbackTick = rCell.iConfirmedTick;
 		riRollbackOffset = rPreWritebackLayout.iConfirmedInner;
-		rbShrunkRollback = false;
 		rScratch.flags.Set(ReconcileScratchFlags::kShrunkRollback, false);
 	}
 
@@ -223,7 +184,7 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	engine::Cell::PendingFullState* pDuePendingFullState = FindDuePendingFullState(rCell, rInputs.iTargetTick);
 	if (pDuePendingFullState != nullptr && pDuePendingFullState->iTick == rCell.iConfirmedTick)
 	{
-		ReconcileInjectPendingFullState(rWork);
+		ReconcileInjectPendingFullState(rWork, *pDuePendingFullState);
 		if (eMode == ReplayMode::kPrimary)
 		{
 			LOG(kNetwork, kVerbose, "ReconcileCoord Injected pending full state Coord: ({},{}) AtTick: {}", rWork.coord.iQ, rWork.coord.iR, rCell.iConfirmedTick);
@@ -240,32 +201,23 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	pDuePendingFullState = FindDuePendingFullState(rCell, rInputs.iTargetTick);
 	if (eMode == ReplayMode::kPrimary && pDuePendingFullState != nullptr && pDuePendingFullState->iTick > iUncappedMaximumConsecutive)
 	{
-		int64_t iAdoptedTick = pDuePendingFullState->iTick;
 		AdoptUnreachablePendingFullState(rWork, *pDuePendingFullState);
-		riReplayStart = iAdoptedTick + 1;
-		return false;
+		return;
 	}
 	int64_t iMaximumConsecutive = std::min(iUncappedMaximumConsecutive, rInputs.iTargetTick);
 
-	if (eMode == ReplayMode::kFallback && iMaximumConsecutive < riReplayStart && pDuePendingFullState == nullptr)
+	if (eMode == ReplayMode::kFallback)
 	{
-		if (rScratch.iNewConfirmedTick >= 0)
-		{
-			rScratch.outputLayout = ComputeRetention(rPreWritebackLayout.iHead, rPreWritebackLayout.iCount, rPreWritebackLayout.iConfirmedInner);
-			ApplyCoordWriteback(rWork);
-		}
-		ReconcileFastPathCatchUp(rWork, rInputs.iTargetTick);
-		return true;
+		ASSERT(iMaximumConsecutive >= riReplayStart);
 	}
 
 	ReconcileReplayCoord(rWork, riReplayStart, iMaximumConsecutive);
-	return false;
 }
 
 // Compute output layout: confirmed frame + remaining replay/catch-up frames, plus up to
-// kiRenderBehindTicks frames below the confirmed frame after validation past the base. Four
-// subcases fold together: validation past the base, validation at the base, walk advanced
-// confirmed but replay didn't validate further, and catch-up after a gap.
+// kiRenderBehindTicks frames below the confirmed frame after validation past the base. Three
+// cases: validation past the base; a new confirmed tick with no validation past the base; and
+// catch-up after a gap.
 static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 {
 	engine::Cell& rCell = *rWork.pCell;
@@ -293,14 +245,10 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 			rScratch.outputLayout.iConfirmedInner -= iExcess;
 		}
 	}
-	else if (rScratch.iLastValidatedIndex == 0)
-	{
-		rScratch.outputLayout.iCount = rScratch.iReplayWriteCount + 1;
-	}
 	else if (rScratch.iNewConfirmedTick >= 0)
 	{
-		// Walk advanced iConfirmedTick but full replay didn't validate anything further.
-		// Preserve walk's confirmed frame as the base and include new catch-up frames.
+		// The confirmed frame is the replay base: the walk's confirmed frame, a frame validated at
+		// the base, or an injected full state. Keep it as the base and include new catch-up frames.
 		rScratch.outputLayout.iCount = rScratch.iReplayWriteCount + 1;
 	}
 	else
@@ -325,11 +273,10 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 		rScratch.outputLayout.iConfirmedInner = 0;
 	}
 
-	rScratch.outputLayout.iCount = std::min(rScratch.outputLayout.iCount, static_cast<int64_t>(engine::kiNetworkBufferSize));
 	ASSERT(rScratch.outputLayout.iCount >= 0 && rScratch.outputLayout.iCount <= engine::kiNetworkBufferSize);
 }
 
-void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
+static void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 {
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
@@ -371,14 +318,11 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	DetermineRollbackBase(rWork, rInputs, fastPathResult, iRollbackTick, iRollbackOffset, bShrunkRollback);
 
 	int64_t iReplayStart = 0;
-	RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kPrimary, iReplayStart);
+	RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, ReplayMode::kPrimary, iReplayStart);
 
 	if (rScratch.iDesyncTick >= 0 && bShrunkRollback && rScratch.iDesyncTick == iReplayStart)
 	{
-		if (RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kFallback, iReplayStart))
-		{
-			return;
-		}
+		RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, ReplayMode::kFallback, iReplayStart);
 	}
 
 	if (rScratch.iDesyncTick >= 0)
@@ -390,7 +334,7 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 
 	ComputeOutputLayout(rWork, iRollbackOffset);
 
-	ASSERT(rScratch.replayStack.at(rScratch.iReplayStackCount - 1)->interpolate.iTick <= rInputs.iTargetTick);
+	ASSERT(rScratch.replayStack.back()->interpolate.iTick <= rInputs.iTargetTick);
 
 	ApplyCoordWriteback(rWork);
 }
@@ -431,10 +375,9 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		rWork.scratch.Reset();
 	}
 	int64_t iActiveCount = iSlot;
-	miActiveCount = iActiveCount;
 
 	ReconcileDispatchResult result;
-	result.iActiveCount = miActiveCount;
+	result.iActiveCount = iActiveCount;
 	auto PublishDiagnostics = [&]()
 	{
 		if constexpr (kbProfilingFrameSpike)
@@ -474,8 +417,9 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	};
 	common::gpMultithreading->Dispatch(iCount, ProcessRange);
 
-	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay
+	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay, full-state injection
 	CoordWork* pDesyncWork = nullptr;
+	bool bAnyInjectedFullState = false;
 	for (CoordWork& rWork : activeWorks)
 	{
 		const CoordScratch& rScratch = rWork.scratch;
@@ -508,6 +452,11 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 			result.bAnyFullReplay = true;
 		}
 
+		if (rScratch.iInjectedBaseSlot >= 0)
+		{
+			bAnyInjectedFullState = true;
+		}
+
 		if (rScratch.iDesyncTick >= 0 || ((rScratch.flags & kReplayed) && (rScratch.flags & kResimulationOccurred)))
 		{
 			bool bLogThis = !(rScratch.flags & kSuppressRepeatLogs) || (rWork.pCell->iStuckFrameCount % engine::Cell::kiStuckLogInterval == 0);
@@ -515,14 +464,21 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 			{
 				if (rScratch.iDesyncTick >= 0)
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, std::ssize(rScratch.replayStack), static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 				else
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, std::ssize(rScratch.replayStack), static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 			}
 		}
+	}
+
+	// An injected full state reissues its trails' visual ids, so cached previous positions would pair
+	// trails with other trails' positions. Cleared here, after the join, because workers must not touch it.
+	if (bAnyInjectedFullState)
+	{
+		WindTrailsInterpolate::sPreviousPositions.clear();
 	}
 
 	if (pDesyncWork != nullptr)
@@ -531,7 +487,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		char pcExpected[20] {}, pcActual[20] {};
 		common::ToHex(std::span<char, 20>(pcExpected), rScratch.desyncExpectedCrc);
 		common::ToHex(std::span<char, 20>(pcActual), rScratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iQ, pDesyncWork->coord.iR, rScratch.iDesyncTick, pcExpected, pcActual, rScratch.iReplayStackCount, rScratch.iNewConfirmedTick);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iQ, pDesyncWork->coord.iR, rScratch.iDesyncTick, pcExpected, pcActual, std::ssize(rScratch.replayStack), rScratch.iNewConfirmedTick);
 
 		result.desync.bDesync = true;
 		result.desync.iDesyncTick = rScratch.iDesyncTick;
@@ -568,7 +524,6 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 void ReconcileDispatcher::Reset()
 {
 	mWorks.clear();
-	miActiveCount = 0;
 }
 
 } // namespace engine

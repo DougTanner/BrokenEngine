@@ -28,6 +28,10 @@ the ping-pong wind texture. Sync pattern (parent owns lifetime).
   snapshots every current trail position for CPU cache maintenance under
   allocation suppression and generates no quads. `sPreviousPositions.clear()`
   clears cached previous positions on world reset.
+- `ReconcileDispatcher::Run` also clears `sPreviousPositions` on the main
+  thread after the dispatch joins whenever any coord injects or adopts a pending
+  full state; reconcile workers never touch it. Every trail then deposits
+  nothing for one rendered frame.
 
 ## See Also
 - `../WindRadials/AGENTS.md` - Stationary sibling; same deposit shader and
