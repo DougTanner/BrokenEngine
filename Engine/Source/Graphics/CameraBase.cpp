@@ -499,8 +499,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(mVecToEyeNormal, fEyeDistance));
 	mVecWaterEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, fRenderFraming, 0.0f));
 
-	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
-	auto vecUpNormal = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
+	auto vecUpNormal = XMVector3Cross(mVecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, vecUpNormal);
 
 	// The near clip scales with eye distance so conventional-Z depth precision at the look-at stays bounded at narrow

@@ -583,7 +583,7 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 			matrices.mpData[i] = iParent < 0 ? rAnimation.mpBindPoseLocalMatrices[i] : rAnimation.mpBindPoseLocalMatrices[i] * matrices.mpData[iParent];
 		}
 		rPreview.meshData.resize(rSceneHeader.uiMaterialCount);
-		rPreview.jointMatrices.resize(rAnimation.SkinnedMaterialCount(rSceneHeader.uiMaterialCount) * rAnimation.mHeader.skeleton.uiSkinJointCount);
+		rPreview.jointMatrices.resize(rAnimation.miJointsPerInstance);
 		int64_t iJointOffset = 0;
 		for (int64_t i = 0; std::cmp_less(i, rSceneHeader.uiMaterialCount); ++i)
 		{

@@ -116,6 +116,7 @@ void AnimationData::Load(std::span<const std::byte> animationData, int64_t iMate
 			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
+	int64_t iSkinnedMaterialCount = 0;
 	for (int64_t i = 0; i < iMaterialCount; ++i)
 	{
 		if (static_cast<int32_t>(mpMaterialInfos[i].iParentNodeIndex) >= static_cast<int32_t>(mHeader.skeleton.uiNodeCount))
@@ -124,7 +125,12 @@ void AnimationData::Load(std::span<const std::byte> animationData, int64_t iMate
 		}
 		// Corrupt chunk: a skinned material in a skeleton with no skin joints
 		ASSERT(!(mpMaterialInfos[i].flags & common::MaterialFlags::kSkinned) || mHeader.skeleton.uiSkinJointCount > 0);
+		if (mpMaterialInfos[i].flags & common::MaterialFlags::kSkinned)
+		{
+			++iSkinnedMaterialCount;
+		}
 	}
+	miJointsPerInstance = iSkinnedMaterialCount * mHeader.skeleton.uiSkinJointCount;
 	for (int64_t i = 0; i < mHeader.uiChannelCount; ++i)
 	{
 		const common::AnimationChannel& rChannel = mpChannels[i];
@@ -189,19 +195,6 @@ void AnimationData::Load(std::span<const std::byte> animationData, int64_t iMate
 	}
 }
 
-int64_t AnimationData::SkinnedMaterialCount(int64_t iMaterialCount) const
-{
-	int64_t iSkinnedMaterialCount = 0;
-	for (int64_t i = 0; i < iMaterialCount; ++i)
-	{
-		if (mpMaterialInfos[i].flags & common::MaterialFlags::kSkinned)
-		{
-			++iSkinnedMaterialCount;
-		}
-	}
-	return iSkinnedMaterialCount;
-}
-
 SkinningReservation AnimationData::ReserveSkinning(int64_t iCommandBuffer, int64_t iInstanceCount) const
 {
 	SkinningReservation reservation {};
@@ -209,7 +202,7 @@ SkinningReservation AnimationData::ReserveSkinning(int64_t iCommandBuffer, int64
 	reservation.iMeshDataBase = gpBufferManager->AllocateMeshData(iCommandBuffer, iInstanceCount * miMaterialCount);
 
 	// No joint reservation when no material is skinned: EvaluateMaterial then writes joint offset 0, which no shader reads.
-	reservation.iJointsPerInstance = SkinnedMaterialCount(miMaterialCount) * mHeader.skeleton.uiSkinJointCount;
+	reservation.iJointsPerInstance = miJointsPerInstance;
 	int64_t iJointCount = iInstanceCount * reservation.iJointsPerInstance;
 	if (iJointCount > 0)
 	{
@@ -430,16 +423,16 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pma
 
 	XMStoreFloat4x4(&pMeshData->matrix, matMeshWorld);
 
+	XMMATRIX matMeshWorldInverse = XMMatrixInverse(nullptr, matMeshWorld);
+
 	// Compute normal matrix: transpose(inverse(mat3(meshWorld)))
-	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(nullptr, matMeshWorld));
+	XMMATRIX matNormal = XMMatrixTranspose(matMeshWorldInverse);
 	XMStoreFloat4(&pMeshData->pf4NormalMatrix[0], matNormal.r[0]);
 	XMStoreFloat4(&pMeshData->pf4NormalMatrix[1], matNormal.r[1]);
 	XMStoreFloat4(&pMeshData->pf4NormalMatrix[2], matNormal.r[2]);
 
 	if (rMaterialInfo.flags & common::MaterialFlags::kSkinned)
 	{
-		XMMATRIX matMeshWorldInverse = XMMatrixInverse(nullptr, matMeshWorld);
-
 		for (int64_t i = 0; i < mHeader.skeleton.uiSkinJointCount; ++i)
 		{
 			int64_t iNodeIndex = mpuiSkinJointToNode[i];

@@ -24,7 +24,6 @@ public:
 	void EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, XMMATRIX* pmatWorldMatrices) const;
 	void EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pmatWorldMatrices, common::MeshData* pMeshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
 	void EvaluateAnimation(int64_t iAnimationIndex, float fTime, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
-	int64_t SkinnedMaterialCount(int64_t iMaterialCount) const;
 	// Main thread only: it bump-allocates from the command buffer's skinning buffers. The mapped pointers it returns stay
 	// valid only until the next skinning allocation on that command buffer, which can grow and move those buffers.
 	SkinningReservation ReserveSkinning(int64_t iCommandBuffer, int64_t iInstanceCount) const;
@@ -35,6 +34,7 @@ public:
 	common::crc_t mCrc = 0;
 	common::AnimationHeader mHeader {};
 	int64_t miMaterialCount = 0;
+	int64_t miJointsPerInstance = 0;
 
 	// Pointers into eagerly-loaded pack memory (zero-copy)
 	const common::ModelNode* mpNodes = nullptr;

@@ -34,13 +34,13 @@ runtime; every path below was traced by reading only.
 ### Defect 1: camera reads a torn-down swapchain manager
 
 `CameraBase::CalculateMatricesAndVisibleArea` reads
-`gpSwapchainManager->mfAspectRatio` (`G/CameraBase.cpp:513`). On the next loop
+`gpSwapchainManager->mfAspectRatio` (`G/CameraBase.cpp:512`). On the next loop
 iteration after the deferral, `Engine/Source/Main.cpp:477` calls
 `GameBase::Render`, which runs `UpdateRenderInterpolation`
-(`Engine/Source/GameBase.cpp:978`) -> `UpdateCamera` (`:872-874`, needs
+(`Engine/Source/GameBase.cpp:985`) -> `UpdateCamera` (`:879-881`, needs
 non-empty active coordinates and a renderable camera) -> `CameraBase::Update`
-(`G/CameraBase.cpp:226`) -> line 513, all before `HandleDeferredSwapchain`
-(`GameBase.cpp:980`), the only skip. No early return in `CameraBase::Update`
+(`G/CameraBase.cpp:226`) -> line 512, all before `HandleDeferredSwapchain`
+(`GameBase.cpp:987`), the only skip. No early return in `CameraBase::Update`
 precedes it. Every later minimized frame repeats it, because the retry defers
 at the pre-Destroy gate with the manager still absent.
 
@@ -56,7 +56,7 @@ state (`G/Graphics.cpp:302-309`); the camera read is not.
 
 Still open (the investigation portion): the readers that run before the skip
 in `GameBase::Render` other than the camera — `game::FrameInterpolate::Update`
-at `GameBase.cpp:837` and the client tick — were not checked against the
+at `GameBase.cpp:844` and the client tick — were not checked against the
 post-Destroy state, where the command-buffer and pipeline managers are also
 null (`G/Graphics.cpp:762-770`).
 
@@ -89,7 +89,7 @@ swapchain still alive:
 2. Device-loss recovery, which destroys `Graphics`
    (`Engine/Source/Main.cpp:486`, `Projects/ModelViewer/Source/Main.cpp:341`).
 3. A surface loss raised by the `CHECK_VK` at `:326` during a retry
-   (`Engine/Source/GameBase.cpp:903`): the same `Graphics` object continues to
+   (`Engine/Source/GameBase.cpp:910`): the same `Graphics` object continues to
    `:406` and passes the stale handle, created on the destroyed device, to the
    new `SwapchainManager` as `oldSwapchain`.
 
@@ -115,16 +115,16 @@ its device.
    `gpSwapchainManager`, `gpCommandBufferManager`, and `gpPipelineManager` are
    null. Record each reader found and whether it dereferences one of them.
 2. Camera fix, the smallest that removes the manager-lifetime dependency:
-   compute the aspect ratio at `G/CameraBase.cpp:513` from
+   compute the aspect ratio at `G/CameraBase.cpp:512` from
    `gpGraphics->mFramebufferVkExtent2D`, the same quotient
    `G/Managers/SwapchainManager.cpp:274` computes over the same member, so the
-   settled value is unchanged. The function already reads that member (`:556`,
-   `:616`). At the deferral it holds the last nonzero extent: it is
+   settled value is unchanged. The function already reads that member (`:555`,
+   `:613`). At the deferral it holds the last nonzero extent: it is
    initialised from the wanted extent (`G/Graphics.h:125`), copied only when
    both dimensions are nonzero (`G/Graphics.cpp:584-589`), and otherwise
    written only by `CreateSwapchain`. `gpGraphics` and `gpBufferManager` stay
    alive at the swapchain tier, so the rest of the function completes.
-3. A reader step 1 finds outside `CameraBase.cpp:513` is surfaced for
+3. A reader step 1 finds outside `CameraBase.cpp:512` is surfaced for
    re-planning, not fixed here. The alternative of running the
    deferred-swapchain check before the camera update in `GameBase::Render`
    was not evaluated and belongs to that re-planning if other readers exist.
@@ -146,7 +146,7 @@ its device.
 - The root-cause investigation of step 1: readers ahead of
   `HandleDeferredSwapchain` in `GameBase::Render` and the client tick.
 - The aspect-ratio read in `CameraBase::CalculateMatricesAndVisibleArea`
-  (`CameraBase.cpp:513`), which bounds the camera fix.
+  (`CameraBase.cpp:512`), which bounds the camera fix.
 - The `kSurface` branch of `Graphics::Destroy`, before
   `mpDeviceManager.reset()`.
 
@@ -194,12 +194,6 @@ threading exposure.
   layers report no device destroyed with a live swapchain. The supplied
   evidence records no harness setup that forces it; report it as not observed
   if it cannot be forced.
-
-## Coordination
-
-- `Documents/Plans/Engine/AnimationDataCleanup.md` edits other lines of
-  `CameraBase::CalculateMatricesAndVisibleArea`; whichever lands second
-  re-derives its regions by symbol from the landed files.
 
 ## Notes
 
