@@ -20,4 +20,9 @@ constexpr float LerpAtHeight(float fFraming, float fStartHeight, float fEndHeigh
 	return std::lerp(fLow, fHigh, fInterpolationFactor);
 }
 
+inline float LerpAtHeight(float fFraming, const HeightLerpWrapperQuartet& rQuartet)
+{
+	return LerpAtHeight(fFraming, rQuartet.startHeight.mfCurrent, rQuartet.endHeight.mfCurrent, rQuartet.low.mfCurrent, rQuartet.high.mfCurrent);
+}
+
 } // namespace engine

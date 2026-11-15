@@ -194,7 +194,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	// Spread End (interpolation targets for last spread pass)
 	rGlobalLayout.fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.mfCurrent;
 	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.mfCurrent;
-	rGlobalLayout.fSpreadDistanceEnd = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), gSpreadDistanceEnd.startHeight.mfCurrent, gSpreadDistanceEnd.endHeight.mfCurrent, gSpreadDistanceEnd.low.mfCurrent, gSpreadDistanceEnd.high.mfCurrent);
+	rGlobalLayout.fSpreadDistanceEnd = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), gSpreadDistanceEnd);
 	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.mfCurrent;
 	rGlobalLayout.fSpreadJitterEnd = gSpreadJitterEnd.mfCurrent;
 	rGlobalLayout.fSpreadSampleJitterRangeEnd = gSpreadSampleJitterRangeEnd.mfCurrent;

@@ -592,10 +592,10 @@ void StaticVoices::UpdateListenerPosition()
 	// (ApplyThreeDimensionalVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (above the
 	// highest flight plane); the bands widen with framing as the camera zooms out.
 	float fFraming = engine::gpCamera->mfCameraFraming;
-	mfEffectiveFadeStart = engine::LerpAtHeight(fFraming, gListenerDistanceStart.startHeight.mfCurrent, gListenerDistanceStart.endHeight.mfCurrent, gListenerDistanceStart.low.mfCurrent, gListenerDistanceStart.high.mfCurrent);
-	mfEffectiveFadeEnd = engine::LerpAtHeight(fFraming, gListenerDistanceEnd.startHeight.mfCurrent, gListenerDistanceEnd.endHeight.mfCurrent, gListenerDistanceEnd.low.mfCurrent, gListenerDistanceEnd.high.mfCurrent);
-	mfCurveDistanceScaler = engine::LerpAtHeight(fFraming, gListenerCurve.startHeight.mfCurrent, gListenerCurve.endHeight.mfCurrent, gListenerCurve.low.mfCurrent, gListenerCurve.high.mfCurrent);
-	mfManualFadeVolume = engine::LerpAtHeight(fFraming, gListenerAudibleFloor.startHeight.mfCurrent, gListenerAudibleFloor.endHeight.mfCurrent, gListenerAudibleFloor.low.mfCurrent, gListenerAudibleFloor.high.mfCurrent);
+	mfEffectiveFadeStart = engine::LerpAtHeight(fFraming, gListenerDistanceStart);
+	mfEffectiveFadeEnd = engine::LerpAtHeight(fFraming, gListenerDistanceEnd);
+	mfCurveDistanceScaler = engine::LerpAtHeight(fFraming, gListenerCurve);
+	mfManualFadeVolume = engine::LerpAtHeight(fFraming, gListenerAudibleFloor);
 }
 
 void StaticVoices::UpdateVolumes()
