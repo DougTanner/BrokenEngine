@@ -858,7 +858,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 				continue;
 			}
 			// Skip empty-ring coords: RenderFrame(rCoordinate) inside InterpolateFrame asserts iSnapshotCount > 0
-			// (mirrors GameBase::UpdateActiveIslands' empty-ring skip).
+			// (mirrors the island-cell empty-ring skip in GameBase::Render).
 			if (!IsCoordinateRenderable(rCoordinate))
 			{
 				continue;
@@ -993,8 +993,18 @@ void GameBase::Render()
 		return;
 	}
 
-	// Pack island instances after the current camera update and only once the acquired framebuffer index is valid.
-	UpdateActiveIslands();
+	// Island cells: confirmed cells and the local render camera, skipping empty-ring cells that have nothing rendered. The
+	// pointers use per-frame workbuffer storage that must stay open through the render call that writes them.
+	common::ScopedWorkbufferArena islandCellsArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
+	{
+		auto it = mCells.find(rCoordinate);
+		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || (bHaveRenderableCamera && rCoordinate == cameraCoordinate)) && it->second.iSnapshotCount != 0)
+		{
+			islandCellsArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
+		}
+	}
+	std::span<const CellStaticData* const> activeIslandCells = islandCellsArena.mBuffer.Span<const CellStaticData* const>();
 
 	// Behind an opaque map overlay no world pass is recorded or submitted; the frame still runs the game's world-hidden step and the
 	// residency step, then submits the acquire command buffer when recorded and the UI.
@@ -1012,12 +1022,12 @@ void GameBase::Render()
 		game::FrameInterpolate::UpdateWorldHidden(mRenderInterpolates, rActiveCoordinates);
 		// RenderGlobal is skipped, so drop this frame's staged spawns as the deferred-swapchain skip does.
 		gpParticleManager->DiscardStagedSpawns();
-		gpGraphics->RenderUiPresentAcquire(gpSwapchainManager->miFramebufferIndex);
+		gpGraphics->RenderUiPresentAcquire(activeIslandCells, gpSwapchainManager->miFramebufferIndex);
 		return;
 	}
 
 	gbGameplayPaused = mGameFlags & GameFlags::kPaused;
-	gpGraphics->RenderGlobal(elapsedTime);
+	gpGraphics->RenderGlobal(activeIslandCells, elapsedTime);
 
 	// Capture command buffer index before async launch to avoid re-reading in async thread
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
@@ -1237,27 +1247,6 @@ void GameBase::ResetSession()
 #endif
 	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
-
-#if defined(BT_CLIENT)
-void GameBase::UpdateActiveIslands()
-{
-	// Include confirmed cells and the local render camera, skipping empty-ring cells that have nothing rendered.
-	// The filtered static data pointers use per-frame workbuffer storage; Islands::UpdateActiveIslands' nested reservation pops before this arena.
-	GridCoord cameraCoordinate = mClientGridCoordinate;
-	bool bHaveRenderableCamera = false;
-	SelectRenderCamera(mActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
-	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const GridCoord& rCoordinate : mActiveCoordinates)
-	{
-		auto it = mCells.find(rCoordinate);
-		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || (bHaveRenderableCamera && rCoordinate == cameraCoordinate)) && it->second.iSnapshotCount != 0)
-		{
-			subscribedArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
-		}
-	}
-	gpIslands->UpdateActiveIslands(subscribedArena.mBuffer.Span<const CellStaticData* const>());
-}
-#endif // BT_CLIENT
 
 #if defined(BT_SERVER)
 void GameBase::SwapFrames()

@@ -12,6 +12,8 @@ struct FrameInterpolate;
 namespace engine
 {
 
+struct CellStaticData;
+
 class BufferManager;
 class CommandBufferManager;
 class DeviceManager;
@@ -105,11 +107,11 @@ public:
 
 	Graphics() = delete;
 
-	void RenderGlobal(std::chrono::duration<float> currentTime);
+	void RenderGlobal(std::span<const CellStaticData* const> activeIslandCells, std::chrono::duration<float> currentTime);
 	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
-	// A world-hidden frame: waits only this framebuffer's fence, runs the same residency step as RenderGlobal, and submits
-	// only the acquire command buffer, when recorded, and the UI, recording no Global or Main work.
-	void RenderUiPresentAcquire(int64_t iCommandBuffer);
+	// A world-hidden frame: waits only this framebuffer's fence, writes the active islands and runs the residency step as
+	// RenderGlobal does, and submits only the acquire command buffer, when recorded, and the UI, recording no Global or Main work.
+	void RenderUiPresentAcquire(std::span<const CellStaticData* const> activeIslandCells, int64_t iCommandBuffer);
 	void Create();
 	void Refresh();
 	void Destroy();

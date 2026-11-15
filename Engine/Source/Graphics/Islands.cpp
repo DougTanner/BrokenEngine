@@ -89,8 +89,6 @@ Islands::~Islands()
 
 bool Islands::AllocateMeshRanges(int64_t iIndexSize, int64_t iVertexSize, VmaVirtualAllocation& rIndexAllocation, int64_t& riIndexOffset, VmaVirtualAllocation& rVertexAllocation, int64_t& riVertexOffset)
 {
-	ASSERT(mIslandMeshVirtualBlock != VK_NULL_HANDLE);
-
 	VmaVirtualAllocation vmaIndexAllocation = VK_NULL_HANDLE;
 	VkDeviceSize vkIndexOffset = 0;
 	VmaVirtualAllocationCreateInfo indexAllocationCreateInfo
@@ -125,7 +123,6 @@ bool Islands::AllocateMeshRanges(int64_t iIndexSize, int64_t iVertexSize, VmaVir
 
 void Islands::FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation)
 {
-	ASSERT(mIslandMeshVirtualBlock != VK_NULL_HANDLE);
 	ASSERT(vmaIndexAllocation != VK_NULL_HANDLE);
 	ASSERT(vmaVertexAllocation != VK_NULL_HANDLE);
 	vmaVirtualFree(mIslandMeshVirtualBlock, vmaIndexAllocation);
@@ -194,8 +191,8 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 	// Write only the framebuffer instance the current frame's world draw consumes; a world-hidden frame writes it but draws nothing.
 	// miFramebufferIndex was set by the trailing AcquireNextImage of the prior render (Graphics.cpp); it is the index RenderGlobal
 	// reads on a world frame and the record-once CB for that framebuffer binds, and is stable until this frame's
-	// submission. Re-acquiring this image index implies the prior frame that used it has presented, so its
-	// GPU read of this instance has finished; this frame's render is not yet submitted — hence no host/GPU race.
+	// submission. The caller, RenderGlobal or RenderUiPresentAcquire, has just waited this framebuffer's fence, so the prior
+	// frame's GPU read of this instance has finished; this frame's render is not yet submitted — hence no host/GPU race.
 	int64_t iFramebuffer = gpSwapchainManager->miFramebufferIndex;
 	Buffer& rStorageBuffer = mIslandsStorageBuffers.at(iFramebuffer);
 	VkDrawIndexedIndirectCommand* pVkIndirect = mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(iFramebuffer);
@@ -222,15 +219,17 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 	// derived pointer is taken; the first two counts then stay immutable through emission so the indirect
 	// record and final stale-tail clear use the same totals that established each run's base.
 	int64_t iTemplateArrayBytes = miTemplateCount * static_cast<int64_t>(sizeof(uint32_t));
-	auto perTemplateScratch = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint32_t*>(4 * iTemplateArrayBytes);
+	auto perTemplateScratch = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint32_t*>(5 * iTemplateArrayBytes);
 	uint32_t* puiPerTemplateMeshVisibleCount = perTemplateScratch.mpData;
 	uint32_t* puiPerTemplateTotalCount = perTemplateScratch.mpData + miTemplateCount;
 	uint32_t* puiPerTemplateBase = puiPerTemplateTotalCount + miTemplateCount;
-	uint32_t* puiPerTemplateEmitCount = puiPerTemplateBase + miTemplateCount;
+	uint32_t* puiPerTemplateVisibleEmitCount = puiPerTemplateBase + miTemplateCount;
+	uint32_t* puiPerTemplateOffscreenEmitCount = puiPerTemplateVisibleEmitCount + miTemplateCount;
 	std::memset(puiPerTemplateMeshVisibleCount, 0, static_cast<size_t>(iTemplateArrayBytes));
 	std::memset(puiPerTemplateTotalCount, 0, static_cast<size_t>(iTemplateArrayBytes));
 	std::memset(puiPerTemplateBase, 0, static_cast<size_t>(iTemplateArrayBytes));
-	std::memset(puiPerTemplateEmitCount, 0, static_cast<size_t>(iTemplateArrayBytes));
+	std::memset(puiPerTemplateVisibleEmitCount, 0, static_cast<size_t>(iTemplateArrayBytes));
+	std::memset(puiPerTemplateOffscreenEmitCount, 0, static_cast<size_t>(iTemplateArrayBytes));
 
 	// mf4RenderVisibleArea bounds Z=0 and above; scaling it about the eye XY maps it onto the sea floor. Under tilt the
 	// eye XY can lie outside the rectangle, so each edge takes the outer of both, covering every vertex in between.
@@ -252,7 +251,7 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
-	// Count each active placement, and the mesh-visible ones with the visibility predicate both emission passes use.
+	// Count each active placement, and the mesh-visible ones with the visibility predicate the emission pass uses.
 	// Acquire residency and texture slots once per placement; write placements after all per-template bases are known.
 	for (const CellStaticData* pStaticData : activeCells)
 	{
@@ -295,11 +294,15 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 		iCurrentWrittenOffset += puiPerTemplateTotalCount[i];
 	}
 
-	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, int64_t iTextureSlot, XMFLOAT2 f2Offset)
+	// A mesh-visible placement takes the next slot of its template's mesh-visible prefix, so the indirect terrain draw consumes
+	// exactly that prefix; an offscreen one takes the next slot after it. Mesh-visible placements always remain in the prefix so
+	// TerrainElevation covers every terrain mesh instance, while the full subscribed set remains available to ShadowElevation.
+	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, XMFLOAT2 f2Offset, bool bMeshVisible)
 	{
 		int64_t iTemplate = rTemplate.iTemplateArrayIndex;
 		ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
-		int64_t iSlotInTemplate = puiPerTemplateEmitCount[iTemplate];
+		uint32_t& ruiEmitCount = bMeshVisible ? puiPerTemplateVisibleEmitCount[iTemplate] : puiPerTemplateOffscreenEmitCount[iTemplate];
+		int64_t iSlotInTemplate = bMeshVisible ? ruiEmitCount : puiPerTemplateMeshVisibleCount[iTemplate] + ruiEmitCount;
 		int64_t iStorageBufferIndex = static_cast<int64_t>(puiPerTemplateBase[iTemplate]) + iSlotInTemplate;
 		if (iStorageBufferIndex >= kiMaxActivePlacements)
 		{
@@ -322,13 +325,12 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 
 		rQuad.f4Parameters.x = 0.0f;
 		rQuad.fRotation = rPlacement.fRotation;
-		rQuad.uiTextureSlot = static_cast<uint32_t>(iTextureSlot);
+		// Texture slots were acquired in the counting loop; reuse the template-owned slot without touching residency.
+		rQuad.uiTextureSlot = static_cast<uint32_t>(rTemplate.iTextureSlot);
 
-		++puiPerTemplateEmitCount[iTemplate];
+		++ruiEmitCount;
 	};
 
-	// First emission pass packs the mesh-visible prefix for every template. Visible placements receive the
-	// beginning of each template's run so the indirect terrain draw consumes exactly this prefix.
 	for (const CellStaticData* pStaticData : activeCells)
 	{
 		const CellStaticData& rStaticData = *pStaticData;
@@ -336,34 +338,13 @@ void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeC
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
-			{
-				EmitPlacement(rPlacement, rTemplate, rTemplate.iTextureSlot, f2Offset);
-			}
-		}
-	}
-
-	// Second pass appends every offscreen placement. Texture slots were acquired in the first pass; reuse the
-	// template-owned slot without touching residency. Mesh-visible placements always remain in the prefix so
-	// TerrainElevation covers every terrain mesh instance, while the full subscribed set remains available to
-	// ShadowElevation.
-	for (const CellStaticData* pStaticData : activeCells)
-	{
-		const CellStaticData& rStaticData = *pStaticData;
-		XMFLOAT2 f2Offset = MakeRenderBasis(rStaticData.coordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
-		for (const IslandPlacement& rPlacement : rStaticData.islands)
-		{
-			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (!IsMeshVisible(rPlacement, rTemplate, f2Offset))
-			{
-				EmitPlacement(rPlacement, rTemplate, rTemplate.iTextureSlot, f2Offset);
-			}
+			EmitPlacement(rPlacement, rTemplate, f2Offset, IsMeshVisible(rPlacement, rTemplate, f2Offset));
 		}
 	}
 
 	for (int64_t i = 0; i < miTemplateCount; ++i)
 	{
-		ASSERT(puiPerTemplateEmitCount[i] == puiPerTemplateTotalCount[i]);
+		ASSERT(puiPerTemplateVisibleEmitCount[i] == puiPerTemplateMeshVisibleCount[i] && puiPerTemplateMeshVisibleCount[i] + puiPerTemplateOffscreenEmitCount[i] == puiPerTemplateTotalCount[i]);
 	}
 
 	if (iCurrentWrittenTotal < iPreviousWrittenTotal)

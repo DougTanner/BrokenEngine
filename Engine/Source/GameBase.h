@@ -299,7 +299,6 @@ public:
 
 private:
 
-	void UpdateActiveIslands();
 	bool IsCoordinateRenderable(GridCoord coordinate) const;
 	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const;
 	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);

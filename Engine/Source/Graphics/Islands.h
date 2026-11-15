@@ -17,10 +17,11 @@ inline constexpr int64_t kiMaxActivePlacements = (kiCoordinateSlots + 1) * kiMax
 // Sized for every island template mesh resident at once.
 inline constexpr int64_t kiIslandMeshArenaBytes = 128i64 * 1'024i64 * 1'024i64;
 
-// SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
-// RenderGlobal, or on a world-hidden frame before RenderUiPresentAcquire, and writes only the re-acquired instance: its prior
-// frame has presented and completed its GPU read, while this frame has not submitted. All instances are allocated at boot and
-// indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain recreation.
+// SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs inside
+// Graphics::RenderGlobal, or on a world-hidden frame Graphics::RenderUiPresentAcquire, right after that framebuffer's fence wait,
+// and writes only that instance: the wait guarantees the prior frame's GPU read of it has finished, while this frame has not
+// submitted. All instances are allocated at boot and indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain
+// recreation.
 
 class Islands : public common::Singleton<Islands>
 {

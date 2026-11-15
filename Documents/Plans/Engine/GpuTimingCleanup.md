@@ -374,11 +374,6 @@ decisive checks for the extraction.
 
 ## Coordination
 
-- `Documents/Plans/Engine/IslandsUpdateOrderingAndEmission.md` may move the
-  `Graphics::WaitFramebuffer` calls this Plan cites by line
-  (`Graphics.cpp:213-216`, `244-247`); it keeps the fence wait ahead of
-  `GpuRead` on the same framebuffer, the order this Plan relies on. Whichever
-  lands second re-derives its regions by symbol from the landed file.
 - Another logged candidate proposes a behavior change near
   `ProfileManager.cpp:378` (`GpuStop`). It is separate work in a function this
   Plan does not touch; whichever lands second rebases over the other.

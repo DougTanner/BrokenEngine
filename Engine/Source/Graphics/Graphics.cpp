@@ -215,11 +215,13 @@ void Graphics::UpdateFrameResidency(int64_t iCommandBuffer)
 	++miFrameCounter;
 }
 
-void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
+void Graphics::RenderGlobal(std::span<const CellStaticData* const> activeIslandCells, std::chrono::duration<float> currentTime)
 {
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
 
 	WaitFramebuffer(iCommandBuffer);
+	// Before the residency step, which reads the reference counts and last-used stamps this write sets.
+	gpIslands->UpdateActiveIslands(activeIslandCells);
 	UpdateFrameResidency(iCommandBuffer);
 
 	gpProfileManager->GpuRead(iCommandBuffer);
@@ -248,9 +250,10 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	PresentAcquire(iCommandBuffer);
 }
 
-void Graphics::RenderUiPresentAcquire(int64_t iCommandBuffer)
+void Graphics::RenderUiPresentAcquire(std::span<const CellStaticData* const> activeIslandCells, int64_t iCommandBuffer)
 {
 	WaitFramebuffer(iCommandBuffer);
+	gpIslands->UpdateActiveIslands(activeIslandCells);
 	UpdateFrameResidency(iCommandBuffer);
 
 	gpProfileManager->GpuRead(iCommandBuffer);

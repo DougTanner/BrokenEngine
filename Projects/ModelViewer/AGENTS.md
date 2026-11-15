@@ -251,9 +251,9 @@ at the default engine framing over the water anchor, with a separate model orbit
 pose used only for model draws. Flight uses the engine's tracked camera and
 world model matrices and eye position; retain orbit fitting and rotation across
 toggles. The seed only selects the layout; its owning cell stays at the origin
-without a game session. Publish one cell when the world is effectively visible
-and an empty span otherwise, once per acquired framebuffer after camera update
-and before RenderGlobal. Preserve the seed, mode, body, visual transforms, model
+without a game session. Pass `RenderGlobal` one cell when the world is
+effectively visible and an empty span otherwise, once per acquired framebuffer
+after camera update. Preserve the seed, mode, body, visual transforms, model
 selection and animation state through Graphics recreation. The viewer supplies a
 presentation frame and sun input, and writes `mModelSunRotation` inherited from
 `engine::CameraBase`. Model illumination uses the game's shared sun/day cycle,

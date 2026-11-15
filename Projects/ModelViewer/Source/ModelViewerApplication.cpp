@@ -925,8 +925,6 @@ bool ModelViewerApplication::Render()
 		pCamera->mVecPosition = mVecWaterAnchor;
 		pCamera->Update();
 	}
-	const engine::CellStaticData* pIslandCell = &mIslandCell;
-	engine::gpIslands->UpdateActiveIslands(std::span<const engine::CellStaticData* const>(&pIslandCell, WorldVisible() ? 1 : 0));
 	FrameInterpolate& rFrame = mRenderInterpolates.at(engine::kOriginCoordinate);
 	rFrame.iFrame = miFrame++;
 	std::chrono::nanoseconds frameTime = mTimer.GetDeltaNs(true);
@@ -935,7 +933,8 @@ bool ModelViewerApplication::Render()
 		mElapsedTime += frameTime;
 	}
 	std::chrono::duration<float> elapsedTime(mElapsedTime);
-	engine::gpGraphics->RenderGlobal(elapsedTime);
+	const engine::CellStaticData* pIslandCell = &mIslandCell;
+	engine::gpGraphics->RenderGlobal(std::span<const engine::CellStaticData* const>(&pIslandCell, WorldVisible() ? 1 : 0), elapsedTime);
 	if ((mFlags & ViewerFlags::kPlaying) && !(mFlags & ViewerFlags::kPaused))
 	{
 		const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(mPreviews.at(miSelected).crc);

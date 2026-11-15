@@ -364,7 +364,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 			continue;
 		}
 		std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.iTick).time_since_epoch()));
-		gpGraphics->RenderGlobal(elapsedTime);
+		gpGraphics->RenderGlobal({}, elapsedTime);
 		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, elapsedTime);
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
