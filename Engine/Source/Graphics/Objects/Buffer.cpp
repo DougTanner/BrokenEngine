@@ -85,18 +85,7 @@ std::unique_ptr<StagingBuffer> Buffer::RecordUploadToDeviceLocal(VkCommandBuffer
 
 	vkCmdCopyBuffer(vkCommandBuffer, pStagingBuffer->vkStagingBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), copiesAllocation.mpData);
 
-	VkBufferMemoryBarrier vkBufferMemoryBarrier
-	{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-		.pNext = nullptr,
-		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
-		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.buffer = vkDeviceLocalBuffer,
-		.offset = 0,
-		.size = VK_WHOLE_SIZE,
-	};
+	VkBufferMemoryBarrier vkBufferMemoryBarrier = WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, vkDeviceLocalBuffer);
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &vkBufferMemoryBarrier, 0, nullptr);
 
 	return pStagingBuffer;
@@ -157,6 +146,22 @@ void Buffer::RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const Bar
 
 	auto bufferBarriers = common::gpThreadLocal->mWorkbuffer.Span<VkBufferMemoryBarrier>();
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vkCombinedDestinationStage, 0, 0, nullptr, static_cast<uint32_t>(bufferBarriers.size()), bufferBarriers.data(), 0, nullptr);
+}
+
+VkBufferMemoryBarrier Buffer::WholeBufferBarrier(VkAccessFlags vkSourceAccessMask, VkAccessFlags vkDestinationAccessMask, VkBuffer vkBuffer)
+{
+	return
+	{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.pNext = nullptr,
+		.srcAccessMask = vkSourceAccessMask,
+		.dstAccessMask = vkDestinationAccessMask,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.buffer = vkBuffer,
+		.offset = 0,
+		.size = VK_WHOLE_SIZE,
+	};
 }
 
 Buffer::Buffer(const BufferInfo& rInfo, const std::function<void(void*)>& rDataFunction)

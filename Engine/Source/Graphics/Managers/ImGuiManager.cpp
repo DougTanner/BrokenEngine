@@ -291,11 +291,6 @@ void ImGuiManager::DestroyScreenDependentResources()
 	// Callers drain the device first, so every retired texture and staging buffer is free
 	mTextureRetirements.clear();
 
-	vmaDestroyBuffer(gpDeviceManager->mpAllocator, mUiPrepassIndirectVkBuffer, mUiPrepassIndirectVmaAllocation);
-	mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
-	mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
-	mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
-
 	for (VkFramebuffer vkFramebuffer : mImGuiFramebuffers)
 	{
 		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, vkFramebuffer, nullptr);
@@ -307,34 +302,6 @@ void ImGuiManager::CreateScreenDependentResources()
 {
 	CreateFramebuffers();
 	mTextureRetirements.resize(static_cast<size_t>(std::ssize(mImGuiFramebuffers)));
-	CreateUiPrepassIndirectBuffer();
-}
-
-void ImGuiManager::CreateUiPrepassIndirectBuffer()
-{
-	int64_t iFramebufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
-	VkBufferCreateInfo vkBufferCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = static_cast<VkDeviceSize>(iFramebufferCount * sizeof(VkDrawIndirectCommand)),
-		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-	};
-	VmaAllocationCreateInfo vmaAllocationCreateInfo
-	{
-		.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
-		.usage = VMA_MEMORY_USAGE_AUTO,
-		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	};
-	VmaAllocationInfo vmaAllocationInfo {};
-	CHECK_VK(vmaCreateBuffer(gpDeviceManager->mpAllocator, &vkBufferCreateInfo, &vmaAllocationCreateInfo, &mUiPrepassIndirectVkBuffer, &mUiPrepassIndirectVmaAllocation, &vmaAllocationInfo));
-	VkName(VK_OBJECT_TYPE_BUFFER, mUiPrepassIndirectVkBuffer, "UiPrepassIndirect");
-	mpUiPrepassIndirectMappedVkDrawIndirectCommand = static_cast<VkDrawIndirectCommand*>(vmaAllocationInfo.pMappedData);
-	ASSERT(mpUiPrepassIndirectMappedVkDrawIndirectCommand != nullptr);
-	for (int64_t i = 0; i < iFramebufferCount; ++i)
-	{
-		mpUiPrepassIndirectMappedVkDrawIndirectCommand[i] = {.vertexCount = 6, .instanceCount = 0, .firstVertex = 0, .firstInstance = 0};
-	}
 }
 
 void ImGuiManager::CreateRenderPass()
@@ -571,14 +538,11 @@ void ImGuiManager::RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2
 
 void ImGuiManager::UpdateUiRectangleBuffers(int64_t iFramebuffer)
 {
-	if (miOpaqueRectangleCount > 0)
-	{
-		Buffer& rStorageBuffer = gpBufferManager->mUiRectangleStorageBuffers.at(iFramebuffer);
-		XMFLOAT4* pf4Rectangles = reinterpret_cast<XMFLOAT4*>(rStorageBuffer.mpMappedMemory);
-		std::memcpy(pf4Rectangles, mpf4OpaqueRectangles, static_cast<size_t>(miOpaqueRectangleCount) * sizeof(XMFLOAT4));
-	}
-
-	mpUiPrepassIndirectMappedVkDrawIndirectCommand[iFramebuffer] = {.vertexCount = 6, .instanceCount = static_cast<uint32_t>(miOpaqueRectangleCount), .firstVertex = 0, .firstInstance = 0};
+	// The UI depth prepass draws every slot, so unused slots hold a zero rectangle, which covers no pixels.
+	Buffer& rStorageBuffer = gpBufferManager->mUiRectangleStorageBuffers.at(iFramebuffer);
+	XMFLOAT4* pf4Rectangles = reinterpret_cast<XMFLOAT4*>(rStorageBuffer.mpMappedMemory);
+	std::memcpy(pf4Rectangles, mpf4OpaqueRectangles, static_cast<size_t>(miOpaqueRectangleCount) * sizeof(XMFLOAT4));
+	std::memset(pf4Rectangles + miOpaqueRectangleCount, 0, static_cast<size_t>(kiMaxUiRectangles - miOpaqueRectangleCount) * sizeof(XMFLOAT4));
 	miOpaqueRectangleCount = 0;
 }
 

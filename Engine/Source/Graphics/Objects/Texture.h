@@ -108,6 +108,7 @@ public:
 
 	void TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayout eOldLayout, TextureLayout eNewLayout);
 	void RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture& rSource); // Caller transitions source->kTransferSource, this->kTransferDestination first
+	void RecordClearToZero(VkCommandBuffer vkCommandBuffer); // Mip 0, layer 0; starts and ends in kShaderReadOnly
 	void RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer);
 
 	TextureInfo mInfo {};

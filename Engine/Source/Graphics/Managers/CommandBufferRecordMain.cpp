@@ -423,14 +423,14 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mHdrVkRenderPass, gpSwapchainManager->mHdrVkFramebuffer, gpGraphics->mFramebufferVkExtent2D, gpGraphics->mHdrVkClearColorValue, renderPassFlags);
 	}
 
-	// UI depth pre-pass: depth-only quads at ImGui window positions (instanceCount=0 when disabled)
+	// UI depth pre-pass: depth-only quads at ImGui window positions; every unused slot holds a zero rectangle
 	auto RecordUiDepth = [&]()
 	{
 		Pipeline& rUiPrepass = pPipelines[kPipelineUiDepthPrepass];
 		vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipeline);
 		VkDescriptorSet pVkUiPrepassSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iCommandBuffer), rUiPrepass.mVkDescriptorSets.at(iCommandBuffer)};
 		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipelineLayout, 0, 2, pVkUiPrepassSets, 0, nullptr);
-		vkCmdDrawIndirect(vkCommandBuffer, gpImGuiManager->mUiPrepassIndirectVkBuffer, static_cast<VkDeviceSize>(iCommandBuffer) * sizeof(VkDrawIndirectCommand), 1, sizeof(VkDrawIndirectCommand));
+		vkCmdDraw(vkCommandBuffer, 6, static_cast<uint32_t>(ImGuiManager::kiMaxUiRectangles), 0, 0);
 	};
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
 	RecordUiDepth();

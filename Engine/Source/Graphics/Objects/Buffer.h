@@ -61,6 +61,7 @@ public:
 	// The caller keeps the returned staging buffer alive until that command buffer's execution completes.
 	static std::unique_ptr<StagingBuffer> RecordUploadToDeviceLocal(VkCommandBuffer vkCommandBuffer, VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
 	static void RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const BarrierInfo> barriers);
+	static VkBufferMemoryBarrier WholeBufferBarrier(VkAccessFlags vkSourceAccessMask, VkAccessFlags vkDestinationAccessMask, VkBuffer vkBuffer);
 
 	Buffer() = default;
 	Buffer(const Buffer&) = delete;

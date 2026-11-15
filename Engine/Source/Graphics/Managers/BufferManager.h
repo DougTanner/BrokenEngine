@@ -67,7 +67,6 @@ public:
 	int64_t miSmokeOccupancyBufferSize = 0;
 	VkBuffer mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;
-	int64_t miSmokeActiveTileBufferSize = 0;
 	void CreateSmokeHierarchicalBuffers();
 	void DestroySmokeHierarchicalBuffers();
 
@@ -77,7 +76,6 @@ public:
 	int64_t miWindOccupancyBufferSize = 0;
 	VkBuffer mpWindActiveTileVkBuffers[2] = {};
 	VmaAllocation mpWindActiveTileVmaAllocations[2] = {};
-	int64_t miWindActiveTileBufferSize = 0;
 	void CreateWindHierarchicalBuffers();
 	void DestroyWindHierarchicalBuffers();
 

@@ -39,7 +39,7 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 	// Both water pipelines sample Gerstner displacement and normals computed by WaterDisplacement.comp.
 	// The texel grid matches the LOD0 vertex grid built in BufferManager::CreateWaterMesh via WaterDetailTextureSize.
 	auto [iWaterX, iWaterY] = TextureManager::WaterDetailTextureSize(gWaterShapeDetail.mfCurrent);
-	mWaterDisplacementTexture.Create(
+	TextureInfo waterTextureInfo
 	{
 		.textureFlags = {},
 		.name = "WaterDisplacement",
@@ -53,22 +53,10 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
-	mWaterDisplacementNormalTexture.Create(
-	{
-		.textureFlags = {},
-		.name = "WaterDisplacementNormal",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatWaterDisplacement,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iWaterX), .height = static_cast<uint32_t>(iWaterY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
+	};
+	mWaterDisplacementTexture.Create(waterTextureInfo);
+	waterTextureInfo.name = "WaterDisplacementNormal";
+	mWaterDisplacementNormalTexture.Create(waterTextureInfo);
 }
 
 void RenderTargetTextures::CreateWaterFoamTextures()
@@ -134,7 +122,7 @@ void RenderTargetTextures::CreateShadowTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 		.vkRenderPassDestinationStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 	});
-	mShadowTexture.Create(
+	TextureInfo shadowTextureInfo
 	{
 		.textureFlags = {},
 		.name = "Shadow",
@@ -148,52 +136,15 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kComputeReadWrite,
-	});
-	mShadowBlurTexture.Create(
-	{
-		.textureFlags = {},
-		.name = "ShadowBlur",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
-	mShadowBlurIntermediateTexture.Create(
-	{
-		.textureFlags = {},
-		.name = "ShadowBlurIntermediate",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
-	mShadowHistoryTexture.Create(
-	{
-		.textureFlags = {},
-		.name = "ShadowHistory",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatShadow,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
+	};
+	mShadowTexture.Create(shadowTextureInfo);
+	shadowTextureInfo.eTextureLayout = TextureLayout::kShaderReadOnly;
+	shadowTextureInfo.name = "ShadowBlur";
+	mShadowBlurTexture.Create(shadowTextureInfo);
+	shadowTextureInfo.name = "ShadowBlurIntermediate";
+	mShadowBlurIntermediateTexture.Create(shadowTextureInfo);
+	shadowTextureInfo.name = "ShadowHistory";
+	mShadowHistoryTexture.Create(shadowTextureInfo);
 }
 
 void RenderTargetTextures::CreateSmokeTextures()
@@ -228,7 +179,8 @@ void RenderTargetTextures::CreateSmokeTextures()
 			{
 				float fX = -fCenter + 0.5f + static_cast<float>(i);
 				float fY = fCenter - 0.5f - static_cast<float>(j);
-				float fDistance = std::sqrt(fX * fX + fY * fY) / fCenter;
+				// Texels outside the inscribed circle take the edge value; unclamped, 1 - fDistance is a negative pow base.
+				float fDistance = std::min(std::sqrt(fX * fX + fY * fY) / fCenter, 1.0f);
 				float fIntensity = 1.0f - std::pow(fDistance, fAlpha) / (std::pow(fDistance, fAlpha) + std::pow((1.0f - fDistance), fAlpha));
 
 				int64_t iRed = static_cast<int64_t>(static_cast<float>(std::numeric_limits<uint16_t>::max()) * fIntensity);
@@ -236,8 +188,6 @@ void RenderTargetTextures::CreateSmokeTextures()
 			}
 		}
 	});
-
-	ASSERT(gpFlightPlanes->Count() <= shaders::kiMaxFlightPlanes);
 
 	TextureInfo smokeTextureInfo
 	{
@@ -275,16 +225,10 @@ void RenderTargetTextures::CreateSmokeTextures()
 
 	// Smoke spread only rewrites occupancy-active tiles, so every ping-pong texture must start at zero.
 	OneShotCommandBuffer oneShotCommandBuffer;
-	VkClearColorValue vkSmokeClearColor {{0.0f, 0.0f, 0.0f, 0.0f}};
-	VkImageSubresourceRange vkSmokeSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		for (Texture* pSmokeTexture : {&mSmokeTexturesOne[i], &mSmokeTexturesTwo[i]})
-		{
-			pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
-			vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pSmokeTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkSmokeClearColor, 1, &vkSmokeSubresource);
-			pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
-		}
+		mSmokeTexturesOne[i].RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
+		mSmokeTexturesTwo[i].RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
 	}
 	oneShotCommandBuffer.Execute();
 }
@@ -310,25 +254,8 @@ void RenderTargetTextures::CreateWindTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 	mWindTextureOne.Create(windTextureInfo);
-
-	mWindTextureTwo.Create(TextureInfo
-	{
-		.textureFlags = {TextureFlags::kRenderPass},
-		.name = "WindTwo",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatWind,
-		.vkExtent3D = windTextureInfo.vkExtent3D,
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.vkRenderPassAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-		.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		.vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
+	windTextureInfo.name = "WindTwo";
+	mWindTextureTwo.Create(windTextureInfo);
 
 	// Occupancy describes these textures' contents, so it is replaced exactly when they are and sized from their new extent.
 	gpBufferManager->CreateWindHierarchicalBuffers();
@@ -341,30 +268,13 @@ void RenderTargetTextures::CreateWindTextures()
 void RenderTargetTextures::ClearWindTextures()
 {
 	OneShotCommandBuffer oneShotCommandBuffer;
-	VkClearColorValue vkWindClearColor {{0.0f, 0.0f, 0.0f, 0.0f}};
-	VkImageSubresourceRange vkWindSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-	for (Texture* pWindTexture : {&mWindTextureOne, &mWindTextureTwo})
-	{
-		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
-		vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pWindTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkWindClearColor, 1, &vkWindSubresource);
-		pWindTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
-	}
+	mWindTextureOne.RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
+	mWindTextureTwo.RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
 	VkBufferMemoryBarrier pVkWindOccupancyInitializationBarriers[2] {};
 	for (int64_t i = 0; i < 2; ++i)
 	{
 		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mpWindOccupancyVkBuffers[i], 0, static_cast<VkDeviceSize>(gpBufferManager->miWindOccupancyBufferSize), 0);
-		pVkWindOccupancyInitializationBarriers[i] =
-		{
-			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-			.pNext = nullptr,
-			.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.buffer = gpBufferManager->mpWindOccupancyVkBuffers[i],
-			.offset = 0,
-			.size = VK_WHOLE_SIZE,
-		};
+		pVkWindOccupancyInitializationBarriers[i] = Buffer::WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, gpBufferManager->mpWindOccupancyVkBuffers[i]);
 	}
 	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindOccupancyInitializationBarriers)), pVkWindOccupancyInitializationBarriers, 0, nullptr);
 	oneShotCommandBuffer.Execute();
@@ -396,7 +306,7 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 	});
 
 	auto [iObjectShadowsBlurTextureX, iObjectShadowsBlurTextureY] = TextureManager::ExtraAreaDetailTextureSize(gObjectShadowsBlurMultiplier.mfCurrent);
-	mObjectShadowsBlurTexture.Create(
+	TextureInfo objectShadowsBlurTextureInfo
 	{
 		.textureFlags = {},
 		.name = "ObjectShadowsBlur",
@@ -410,22 +320,10 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
-	mObjectShadowsBlurIntermediateTexture.Create(
-	{
-		.textureFlags = {},
-		.name = "ObjectShadowsBlurIntermediate",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatObjectShadows,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsBlurTextureX), .height = static_cast<uint32_t>(iObjectShadowsBlurTextureY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
+	};
+	mObjectShadowsBlurTexture.Create(objectShadowsBlurTextureInfo);
+	objectShadowsBlurTextureInfo.name = "ObjectShadowsBlurIntermediate";
+	mObjectShadowsBlurIntermediateTexture.Create(objectShadowsBlurTextureInfo);
 }
 
 void RenderTargetTextures::CreateTerrainTextures()

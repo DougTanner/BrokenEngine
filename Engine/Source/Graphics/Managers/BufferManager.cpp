@@ -8,6 +8,24 @@
 namespace engine
 {
 
+static void CreateIndexVertexBuffer(Buffer& rBuffer, std::string_view name, std::span<const uint16_t> indices, std::span<const float> vertices, int64_t iVertexStride)
+{
+	rBuffer.Create(
+	{
+		.name = name,
+		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
+		.iCount = std::ssize(indices),
+		.vkIndexType = VK_INDEX_TYPE_UINT16,
+		.iVertexStride = iVertexStride,
+		.iDataSize = static_cast<int64_t>(indices.size_bytes() + vertices.size_bytes()),
+	},
+	[&](void* pData)
+	{
+		std::memcpy(pData, indices.data(), indices.size_bytes());
+		std::memcpy(static_cast<char*>(pData) + indices.size_bytes(), vertices.data(), vertices.size_bytes());
+	});
+}
+
 BufferManager::BufferManager()
 : common::Singleton<BufferManager>(gpBufferManager, this)
 {
@@ -17,20 +35,7 @@ BufferManager::BufferManager()
 
 	uint16_t puiQuads[] = {0, 1, 3, 2, 3, 1};
 	float pfQuads[] = {0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
-	mQuadsVertexBuffer.Create(
-	{
-		.name = "Quads",
-		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
-		.iCount = 6,
-		.vkIndexType = VK_INDEX_TYPE_UINT16,
-		.iVertexStride = sizeof(float) * 2,
-		.iDataSize = sizeof(puiQuads) + sizeof(pfQuads),
-	},
-	[&](void* pData)
-	{
-		std::memcpy(pData, puiQuads, sizeof(puiQuads));
-		std::memcpy(static_cast<char*>(pData) + sizeof(puiQuads), pfQuads, sizeof(pfQuads));
-	});
+	CreateIndexVertexBuffer(mQuadsVertexBuffer, "Quads", puiQuads, pfQuads, sizeof(float) * 2);
 
 	CreateDebugMeshBuffers();
 
@@ -87,10 +92,7 @@ BufferManager::BufferManager()
 		ASSERT(bInserted);
 	}
 
-	int64_t iCommandBufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
-	ASSERT(iCommandBufferCount <= kiMaxFramebuffers);
-
-	InitializePerCommandBufferBuffers(iCommandBufferCount);
+	CreateSwapchainDependentBuffers();
 
 	mLongParticlesStorageBuffer.Create(
 	{
@@ -133,20 +135,7 @@ void BufferManager::CreateDebugMeshBuffers()
 				4, 5, 5, 6, 6, 7, 7, 4,
 				0, 4, 1, 5, 2, 6, 3, 7,
 			};
-			mDebugBoxVertexBuffer.Create(
-			{
-				.name = "DebugBox",
-				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
-				.iCount = std::size(puiIndices),
-				.vkIndexType = VK_INDEX_TYPE_UINT16,
-				.iVertexStride = sizeof(float) * 3,
-				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
-			},
-			[&](void* pData)
-			{
-				std::memcpy(pData, puiIndices, sizeof(puiIndices));
-				std::memcpy(static_cast<char*>(pData) + sizeof(puiIndices), pfVertices, sizeof(pfVertices));
-			});
+			CreateIndexVertexBuffer(mDebugBoxVertexBuffer, "DebugBox", puiIndices, pfVertices, sizeof(float) * 3);
 		}
 
 		// Sphere: 3 great circles (XY, XZ, YZ), 32 segments each
@@ -176,20 +165,7 @@ void BufferManager::CreateDebugMeshBuffers()
 					puiIndices[iIndex + 1] = static_cast<uint16_t>(i * kiSegments + ((j + 1) % kiSegments));
 				}
 			}
-			mDebugSphereVertexBuffer.Create(
-			{
-				.name = "DebugSphere",
-				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
-				.iCount = std::size(puiIndices),
-				.vkIndexType = VK_INDEX_TYPE_UINT16,
-				.iVertexStride = sizeof(float) * 3,
-				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
-			},
-			[&](void* pData)
-			{
-				std::memcpy(pData, puiIndices, sizeof(puiIndices));
-				std::memcpy(static_cast<char*>(pData) + sizeof(puiIndices), pfVertices, sizeof(pfVertices));
-			});
+			CreateIndexVertexBuffer(mDebugSphereVertexBuffer, "DebugSphere", puiIndices, pfVertices, sizeof(float) * 3);
 		}
 
 		// Circle: 1 circle in XY plane, 32 segments
@@ -209,40 +185,14 @@ void BufferManager::CreateDebugMeshBuffers()
 				puiIndices[iIndex] = static_cast<uint16_t>(i);
 				puiIndices[iIndex + 1] = static_cast<uint16_t>((i + 1) % kiSegments);
 			}
-			mDebugCircleVertexBuffer.Create(
-			{
-				.name = "DebugCircle",
-				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
-				.iCount = std::size(puiIndices),
-				.vkIndexType = VK_INDEX_TYPE_UINT16,
-				.iVertexStride = sizeof(float) * 3,
-				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
-			},
-			[&](void* pData)
-			{
-				std::memcpy(pData, puiIndices, sizeof(puiIndices));
-				std::memcpy(static_cast<char*>(pData) + sizeof(puiIndices), pfVertices, sizeof(pfVertices));
-			});
+			CreateIndexVertexBuffer(mDebugCircleVertexBuffer, "DebugCircle", puiIndices, pfVertices, sizeof(float) * 3);
 		}
 
 		// Line: 2 vertices along +X
 		{
 			float pfVertices[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
 			uint16_t puiIndices[] = {0, 1};
-			mDebugLineVertexBuffer.Create(
-			{
-				.name = "DebugLine",
-				.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
-				.iCount = std::size(puiIndices),
-				.vkIndexType = VK_INDEX_TYPE_UINT16,
-				.iVertexStride = sizeof(float) * 3,
-				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
-			},
-			[&](void* pData)
-			{
-				std::memcpy(pData, puiIndices, sizeof(puiIndices));
-				std::memcpy(static_cast<char*>(pData) + sizeof(puiIndices), pfVertices, sizeof(pfVertices));
-			});
+			CreateIndexVertexBuffer(mDebugLineVertexBuffer, "DebugLine", puiIndices, pfVertices, sizeof(float) * 3);
 		}
 	}
 }
@@ -601,26 +551,15 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 		for (int64_t j = 0; j < 2; ++j)
 		{
 			vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, mpSmokeOccupancyVkBuffers[i][j], 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
-			pVkSmokeOccupancyInitializationBarriers[i * 2 + j] =
-			{
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-				.pNext = nullptr,
-				.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-				.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.buffer = mpSmokeOccupancyVkBuffers[i][j],
-				.offset = 0,
-				.size = VK_WHOLE_SIZE,
-			};
+			pVkSmokeOccupancyInitializationBarriers[i * 2 + j] = Buffer::WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, mpSmokeOccupancyVkBuffers[i][j]);
 		}
 	}
 	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(iPlaneCount * 2), pVkSmokeOccupancyInitializationBarriers, 0, nullptr);
 	oneShotCommandBuffer.Execute();
 
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
-	miSmokeActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
-	Buffer::CreateBuffer("SmokeActiveTile", miSmokeActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
+	int64_t iActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
+	Buffer::CreateBuffer("SmokeActiveTile", iActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
 	gbSmokeClear = true;
 }
 
@@ -644,7 +583,6 @@ void BufferManager::DestroySmokeHierarchicalBuffers()
 		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
 		mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 		mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;
-		miSmokeActiveTileBufferSize = 0;
 	}
 }
 
@@ -663,13 +601,13 @@ void BufferManager::CreateWindHierarchicalBuffers()
 	miWindOccupancyBufferSize = iOccupancyWordCount * static_cast<int64_t>(sizeof(uint32_t));
 
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
-	miWindActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
+	int64_t iActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
 
 	for (int64_t i = 0; i < 2; ++i)
 	{
 		Buffer::CreateBuffer(i == 0 ? "WindOccupancyA" : "WindOccupancyB", miWindOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpWindOccupancyVkBuffers[i], mpWindOccupancyVmaAllocations[i]);
 
-		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", miWindActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpWindActiveTileVkBuffers[i], mpWindActiveTileVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", iActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpWindActiveTileVkBuffers[i], mpWindActiveTileVmaAllocations[i]);
 	}
 }
 
@@ -691,7 +629,6 @@ void BufferManager::DestroyWindHierarchicalBuffers()
 		}
 	}
 	miWindOccupancyBufferSize = 0;
-	miWindActiveTileBufferSize = 0;
 }
 
 static void CreateVisibleAreaMesh(int64_t iMeshX, int64_t iMeshY, uint32_t* puiIndices, std::byte* pVertices)

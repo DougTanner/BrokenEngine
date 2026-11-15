@@ -46,7 +46,6 @@ public:
 	VkExtent3D mTransferImageGranularityVkExtent3D {.width = 1, .height = 1, .depth = 1};
 
 	VkSurfaceKHR mVkSurfaceKHR = VK_NULL_HANDLE;
-	VkSampleCountFlagBits mMaxMultisampleCountVkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT;
 	VkFormat mFramebufferVkFormat = VK_FORMAT_UNDEFINED;
 	VkColorSpaceKHR mFramebufferVkColorSpaceKHR = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 	VkFormat mDepthVkFormat = VK_FORMAT_UNDEFINED;

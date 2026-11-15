@@ -392,11 +392,11 @@ submission.
   `RenderUiScreens` while `gbShowImGui` is set, so a replacement saves then
   reloads them.
 - A swapchain-tier recreation, deferred or not, keeps the manager: only its
-  swapchain-image framebuffers, texture retirements, and UI prepass indirect
-  buffer are destroyed and rebuilt, while the ImGui context, backends, font
-  atlas, UI screens, and text areas persist. Only the surface tier replaces it,
-  so `gpImGuiManager` is never null on the main loop; window messages can still
-  arrive while no ImGui context exists.
+  swapchain-image framebuffers and texture retirements are destroyed and
+  rebuilt, while the ImGui context, backends, font atlas, UI screens, and text
+  areas persist. Only the surface tier replaces it, so `gpImGuiManager` is never
+  null on the main loop; window messages can still arrive while no ImGui
+  context exists.
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied
   safely. Font scale composes `UiScale()` and user scaling. `UiScale()` is
   framebuffer height divided by the program's `game::kfUiReferenceHeight` (2160

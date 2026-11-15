@@ -54,8 +54,6 @@ public:
 
 	float mfUiScale = 1.0f;
 
-	VkBuffer mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
-
 private:
 
 	struct TextureResource
@@ -74,7 +72,6 @@ private:
 
 	void CreateRenderPass();
 	void CreateFramebuffers();
-	void CreateUiPrepassIndirectBuffer();
 	void UpdateUiRectangleBuffers(int64_t iFramebuffer);
 	void SetupThemeGeometry(float fUiScale);
 	void ApplyThemeColors(UiTheme eTheme);
@@ -86,9 +83,6 @@ private:
 	VkRenderPass mImGuiVkRenderPass = VK_NULL_HANDLE;
 	std::vector<VkFramebuffer> mImGuiFramebuffers;
 	ImDrawData* mpDrawData = nullptr;
-
-	VmaAllocation mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
-	VkDrawIndirectCommand* mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
 
 	int64_t miOpaqueRectangleCount = 0;
 	XMFLOAT4 mpf4OpaqueRectangles[kiMaxUiRectangles] {};
