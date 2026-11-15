@@ -160,5 +160,5 @@ files.
 
 - `ModelViewerApplication.cpp` is also edited by
   `Documents/Plans/Game/EngineModelRenderHelpers.md` and
-  `Documents/Plans/Game/ModelViewerSharedPchAndTweakDeclarations.md`, in
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md`, in
   other functions.

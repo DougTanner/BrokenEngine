@@ -196,8 +196,7 @@ executing session builds the scenes for criteria 4 and 5.
 Other Plans bump the same versions or edit neighbouring code, with no ordering
 required: `Documents/Plans/Game/FleetOwnedSquadronState.md`
 (`engine::kiProtocolVersion`, `FC/Ships/AGENTS.md` `## Ship Invariants`),
-`Documents/Plans/Game/OmniAnimationTimeClientOnly.md` and
-`Documents/Plans/Game/DeriveDeathExplosionCadence.md` (ship collection
+`Documents/Plans/Game/OmniAnimationTimeClientOnly.md` (ship collection
 versions, `FrameInput::kiVersion`), and
 `Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` (the same
 `SharedCrcMembers()` tuples). Each bump is relative to the tree the executing
@@ -229,14 +228,13 @@ More Plans from the same analysis edit files this Plan edits. No ordering is
 required; whichever lands second merges. Each name is a Plan under
 `Documents/Plans/Game/`:
 
-- `Fighters.cpp`: `ReduceFightersCpp.md` (which depends on this Plan),
-  `ReturnDestinationReadsCentredIslands.md`, and `ShareShipAvoidTerrain.md`.
+- `Fighters.cpp`: `ReturnDestinationReadsCentredIslands.md` and
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md`.
 - `Battleships.cpp`: `ReturnDestinationReadsCentredIslands.md` and
-  `ShareShipAvoidTerrain.md`.
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md`.
 - `Omnis.cpp`: `ReturnDestinationReadsCentredIslands.md`.
-- `Fighters.h` and `Battleships.h`: `ShareShipAvoidTerrain.md`.
-- `Fighters.h`: `ReduceFightersCpp.md`, as far as its reduction adds a
-  declaration.
+- `Fighters.h` and `Battleships.h`:
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md`.
 
 A Plan from another analysis overlaps the same way, with no ordering required:
 `Documents/Plans/Game/SyncFighterBeamHalfWidthParameter.md` edits
@@ -244,9 +242,9 @@ A Plan from another analysis overlaps the same way, with no ordering required:
 
 ## Coordination
 
-`Documents/Plans/Game/NameNavigationDelayRangeBounds.md` edits the body and
-comment of `IsNavigationDelayInRange`, which this Plan keeps, and leaves the
-`SpawnInfo::navigationDelay` defaults this Plan deletes untouched. Neither Plan
-depends on the other. That Plan keeps the predicate's name and signature.
-Whichever lands second re-derives its sites from the landed tree: here, the
-predicate and its callers as they then read.
+`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 14)
+edits the body and comment of `IsNavigationDelayInRange`, which this Plan
+keeps, and leaves the `SpawnInfo::navigationDelay` defaults this Plan deletes
+untouched. Neither Plan depends on the other. That Plan keeps the predicate's
+name and signature. Whichever lands second re-derives its sites from the
+landed tree: here, the predicate and its callers as they then read.

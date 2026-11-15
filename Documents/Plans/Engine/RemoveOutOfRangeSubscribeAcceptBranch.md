@@ -130,7 +130,4 @@ involved. The executing session derives the tier again.
 
 ## Coordination
 
-`Documents/Plans/Engine/ReduceClientCpp.md` may move
-`Client::ServerSubscribeAccept` to another file. Neither Plan depends on the
-other. Whichever lands second re-derives its region by symbol from the landed
-file.
+No directional dependencies or mandatory nondirectional coordination.

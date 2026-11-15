@@ -1,7 +1,13 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-11-13T23:18:25.128Z","dependsOn":[]} -->
-# Publish area-to-UV inverse extents for WorldToVisibleArea
+# Publish area-to-UV inverse extents and remove unread day-cycle layout fields
 
 ## Context
+
+This Plan carries two shared CPU/GLSL layout changes that share one shader
+re-export and one layout review: the `WorldToVisibleArea` inverse extents,
+and the removal of three unread day-cycle fields folded in from the former
+`RemoveUnreadSunMoonPbrSunLayoutFields` Plan (`### Unread day-cycle fields`
+below).
 
 `WorldToVisibleArea` (`Engine/Data/Shaders/ShaderFunctions.h:21-26`) maps a
 world position into the [0,1] UV of a world rectangle. On every call it
@@ -49,6 +55,42 @@ Verified at baseline `213d2577`:
   `f2WaterFoamPreviousAreaInverseSize`, and `pf2PreviousSmokeAreaSizeInverses`
   belong to the foam and smoke areas, which no `WorldToVisibleArea` call
   passes (the smoke one also has the opposite Y sign), so none can be reused.
+
+### Unread day-cycle fields
+
+Found by the architecture review phase of a deep analysis of
+`Engine/Source/Graphics/Render` (the directory, not its subdirectories). Line
+numbers are from commit `c675b6b2`; locate by symbol if they moved. `R/`
+abbreviates `Engine/Source/Graphics/Render/` and `S/` abbreviates
+`Engine/Data/Shaders/`.
+
+Three layout fields are written every frame and read by nothing:
+
+- `GlobalLayout::f4SunColor` (`S/ShaderGlobalLayout.h:38`), written at
+  `R/GlobalUniforms.cpp:136`.
+- `GlobalLayout::f4MoonColor` (`S/ShaderGlobalLayout.h:39`), written at
+  `R/GlobalUniforms.cpp:142`.
+- `MainLayout::fPbrSun` (`S/ShaderMainLayout.h:125`), written in
+  `RenderLightingMain` (`R/LightingUniforms.cpp:343`).
+
+A search of the repository for `SunColor`, `MoonColor`, and `PbrSun` across
+all file types finds, besides those declarations and writes, only: the folded
+fields and their readers (`f4SunColorTerrain`, `f4MoonColorTerrain` at
+`S/ShaderFunctions.h:249-250`; the `f4PhysicallyBasedRendering*` fields at
+`S/Model/Model.frag:289-300`), derivation comments
+(`S/ShaderGlobalLayout.h:45-68`, `S/Water/Water.frag:139`,
+`S/Model/Model.frag:254-257`), and the `gPbrSun` tunable with its CPU fold
+(`R/GlobalUniforms.cpp:194-197`). No shader, C++ reader, or alias reads the
+three raw fields. `Projects/BrokenEngineSandbox` and `Projects/ModelViewer`
+hold no match. The shaders consume the CPU-folded products instead, as
+`R/AGENTS.md` `## Ordering and Publication` requires of day-cycle terms.
+
+The private game project is absent from session worktrees. The authoring
+session's search of the primary checkout's working tree found no non-Markdown
+match for the three names there, not pinned to a commit.
+
+Unmet criterion: every `GlobalLayout` and `MainLayout` field has a shader
+reader.
 
 ## Design
 
@@ -194,6 +236,28 @@ computes today, and floating-point exceptions are masked.
   cheaper, but it changes the arithmetic form and its rounding where the
   temporal passes reproject.
 
+### Unread day-cycle fields
+
+Delete the declarations of `f4SunColor`, `f4MoonColor`, and `fPbrSun` and
+their three writes. `vecSunMoon` and `vecMoon` stay as CPU locals in
+`PopulateDayCycleColors`, since the folded products are built from them;
+`gPbrSun` and its Tweaks slider stay. Reword the derivation comments that name
+`f4SunColor`, `f4MoonColor`, or `fPbrSun` as layout fields
+(`S/ShaderGlobalLayout.h:45-68`, `S/Water/Water.frag:139`,
+`S/Model/Model.frag:254-257`, and the comment at
+`R/GlobalUniforms.cpp:190-192`) so they name the CPU terms.
+
+`MainLayout` is a shared CPU/GLSL header too, so this part extends the shader
+re-export `## Risk tier` requires to the Main-set shaders; the same Local
+generation build covers it.
+
+The executing session also builds and repacks the private game from the
+primary checkout, where its shaders are present; a reader of a removed field
+there would fail its shader compile at pack time. Not verified by the
+authoring session: whether an existing mechanism rejects stale packed shaders
+after a layout change, or whether a normal build always repacks. The
+executing session checks this before relying on an incremental build.
+
 ### Size and documentation
 
 `ShaderGlobalLayout.h` measures 5244 `bt-token-v1` tokens (343 lines) with
@@ -216,6 +280,9 @@ Documentation through `/update-claude-docs`: field names that change in
 - `Engine/Source/Graphics/Render/Render.h`
 - `Engine/Source/Graphics/Render/GlobalUniforms.cpp`
 - `Engine/Source/Graphics/Render/LightingUniforms.cpp`
+- `Engine/Data/Shaders/ShaderMainLayout.h`
+- `Engine/Data/Shaders/Water/Water.frag` and
+  `Engine/Data/Shaders/Model/Model.frag` (also day-cycle comments)
 - `Engine/Data/Shaders/Lighting/AGENTS.md`, `Engine/Data/Shaders/Shadow/AGENTS.md`,
   `Engine/Source/Graphics/Render/AGENTS.md`
 
@@ -235,6 +302,10 @@ Documentation through `/update-claude-docs`: field names that change in
   the `f4VisibleArea` write in `RenderFrameGlobal`.
 - `LightingUniforms.cpp`: `PopulateLightingParameters`, lines 77-105.
 - The three `AGENTS.md` field-name mentions.
+- The declarations of `GlobalLayout::f4SunColor`, `GlobalLayout::f4MoonColor`,
+  and `MainLayout::fPbrSun`; their writes in `PopulateDayCycleColors` and
+  `RenderLightingMain`; and the comments listed in `### Unread day-cycle
+  fields` of `## Design` that name them.
 
 ## Out of scope
 
@@ -250,13 +321,17 @@ Documentation through `/update-claude-docs`: field names that change in
 - Splitting or reducing `ShaderGlobalLayout.h` or `ShaderFunctions.h`.
 - A clamp or guard on the reciprocals.
 - Renaming `WorldToVisibleArea`.
+- `gPbrSun`, its slider, and every folded day-cycle product field.
+- Reordering, packing, or renaming any `MainLayout` field, or any
+  `GlobalLayout` field beyond the changes `## In scope` names.
+- Any other possibly unread layout field; only the three named were proven.
 
 ## Risk tier
 
 Tier 3, per `.agents/references/risk-tiers.md`. Trigger: data layout — the
-change alters the shared CPU/GLSL scalar layout of `GlobalLayout` (fields
-added, removed, and reordered), which every Global-set shader and the Render
-populators must agree on.
+change alters the shared CPU/GLSL scalar layouts of `GlobalLayout` (fields
+added, removed, and reordered) and `MainLayout` (one field removed), which
+every shader of both sets and the Render populators must agree on.
 
 Exposure:
 
@@ -284,19 +359,23 @@ Exposure:
 - A search of `Engine/` and `Projects/` finds no `f4ObjectShadowsArea`,
   `f4ShadowAreaPrevious`, `f4LightingAreaPrevious`, `pf4LightingAreas`, or
   `f2LightingAreaExtentInverse`.
+- A repository search for `f4SunColor`, `f4MoonColor`, and `fPbrSun` finds no
+  declaration, write, or comment naming them as layout fields.
 - Every `AreaToUvLayout` field of `GlobalLayout` is written only through
   `PopulateAreaToUv`, and no argument to it reads `rGlobalLayout`.
 - The Local generation build through `/compile` exports every shader with no
   error and builds the client, server, and ModelViewer; a missed call site
   fails here because the `vec4` overload is gone.
+- The private game builds and repacks from the primary checkout, or the
+  executing session reports it as unconfirmed with the reason.
 - `/glsl-review` reports no CPU/GLSL layout finding for the change.
 - Live check through `/agent-harness`: screenshots of one scene taken before
   and after the change, at the same camera and time of day, show no visible
   difference in terrain shadow, object shadows, lighting on terrain, water, and
-  models, smoke shadow, and the shoreline elevation effects on water. The
-  evidence behind this Plan records no harness setup; the executing session
-  picks a scene with an island, ships, and active lights, and waits for every
-  chain to refresh after launch.
+  models, smoke shadow and lighting, and the shoreline elevation effects on
+  water. The evidence behind this Plan records no harness setup; the executing
+  session picks a scene with an island, ships, and active lights, and waits
+  for every chain to refresh after launch.
 
 ## Notes
 
@@ -308,3 +387,7 @@ Exposure:
 - The choices in `## Design` are the author's recommendation, not a user
   decision; the user's decision is that the reciprocals move to the CPU for
   every area.
+- `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 8)
+  also changes `GlobalLayout` fields, at other positions. No ordering is
+  needed; whichever lands later applies its edit to the layout then in the
+  tree.

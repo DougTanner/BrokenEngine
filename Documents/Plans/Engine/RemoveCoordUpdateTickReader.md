@@ -100,22 +100,16 @@ threading exposure.
 
 ## Coordination
 
-`Documents/Plans/Engine/RemoveUnreferencedNetworkWireSymbols.md`,
-`Documents/Plans/Engine/RequireClientHelloStringTerminator.md`, and
-`Documents/Plans/Engine/SeparateNetworkProtocolHeaderResponsibilities.md`
-edit `NetworkMessages.h` or `NetworkProtocol.h` too. The last moves the
-identifier half of `NetworkProtocol.h` (`:1-112`) into a new
-`NetworkProtocolIdentifiers.h`, and that half holds one symbol each of the
-other three edits: `PacketTypeName` (`:46-81`), `kiProtocolVersion` (`:83`),
-and `kiMaximumPacketSize` (`:108`). None of the four depends on another.
-Whichever lands later re-derives the file as well as the lines of its
-references from the landed headers: once the header Plan has landed,
-`NetworkProtocolIdentifiers.h` is the critical file for those three symbols.
+`Documents/Plans/Engine/RemoveUnreferencedNetworkWireSymbols.md` and
+`Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md` edit
+`NetworkMessages.h` or `NetworkProtocol.h` too. None of the three depends on
+another. Whichever lands later re-derives the lines of its references from the
+landed headers.
 
-`Documents/Plans/Engine/MergeNetworkSimulationDuplicateCode.md` edits
-`NetworkSimulation.h` too and needs the same temporary non-disabled build.
-Neither depends on the other. Whichever lands later re-derives its regions
-from the landed tree. `keNetworkSimulation` is defined in
+`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 2)
+edits `NetworkSimulation.h` too and needs the same temporary non-disabled
+build. Neither depends on the other. Whichever lands later re-derives its
+regions from the landed tree. `keNetworkSimulation` is defined in
 `Engine/Source/EngineSwitches.h`, moved there after commit `c675b6b2`; the
 `NetworkSimulation.h` and `EngineSwitches.h` lines cited here are those after
 that move.

@@ -112,10 +112,11 @@ today.
 
 ## Coordination
 
-`Documents/Plans/Game/ShipNavigationDerivesCallerInvariantInputs.md` removes
-parameters on the `ComputeNavigation` definition line, which this Plan also
-edits. Whichever lands second re-derives its sites from the landed source. That
-Plan does not edit the `ComputeArtificialIntelligenceSteering` call line.
+`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 16)
+removes parameters on the `ComputeNavigation` definition line, which this
+Plan also edits. Whichever lands second re-derives its sites from the landed
+source. That Plan does not edit the `ComputeArtificialIntelligenceSteering`
+call line.
 
 `Documents/Plans/Game/ReduceShipBehavioursCpp.md` may move functions out of
 `ShipBehaviours.cpp`. If that reduction lands first and moves a renamed

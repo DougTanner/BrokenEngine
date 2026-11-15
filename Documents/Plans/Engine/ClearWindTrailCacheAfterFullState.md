@@ -110,8 +110,6 @@ injection and adoption functions in `ReconcileReplay.cpp`
 this Plan adds its signal; whichever lands second re-derives its regions by
 symbol from the landed file.
 
-- `Documents/Plans/Engine/RemoveRedundantReconcileReplayState.md` makes
-  adoption call injection. Once it has landed, a signal set in injection
-  covers both.
-- `Documents/Plans/Engine/ShareReconcileSnapshotSearchAndBaseReset.md` moves
-  the replay-base reset statements of both functions into one helper.
+- `Documents/Plans/Engine/ReconcileReplayCleanup.md` makes adoption call
+  injection, so once it has landed a signal set in injection covers both, and
+  moves the replay-base reset statements into one helper.

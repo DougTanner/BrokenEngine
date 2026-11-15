@@ -41,6 +41,42 @@ rule and against the Fighters and Battleships pattern. Originating gap: a
 user-requested investigation of client-only state in the game Frame code; the
 user approved this change as a follow-up Plan.
 
+### Never-set shield members
+
+Folded in from the former `RemoveUnsetOmniSpawnShieldMembers` Plan, because it
+edits the same `SpawnInfo`, `Spawn`, and `bTransfer` comment and needs the same
+`FrameInput::kiVersion` bump. Line numbers are from commit `629ced2e`; locate
+by symbol if they moved.
+
+`OmnisPostRender::SpawnInfo` declares `fShieldRotation` (`Omnis.h:371`,
+default `0.0f`) and `fShieldShrink` (`:372`, default `1.0f`). Nothing assigns
+either: a search of `Projects/BrokenEngineSandbox` finds no write, and the
+Transfer literal (`OmnisNavigation.cpp:24-49`) names neither. Neither is in
+`Fields()` (`Omnis.h:388`), so neither travels in a wire status-change
+payload. Their only reads are `Omnis.cpp:287-288`, under `BT_CLIENT`, which
+store them into the client-only columns `pfShieldRotations` and
+`pfShieldShrinks`. So every spawn and every transfer arrival stores the two
+defaults, and the members are configuration no caller can use.
+
+Both members are still bytes in a replay. They are declared in both builds,
+outside any `BT_CLIENT` guard, and the replay difference stream writes every
+`SpawnInfo` as a raw image
+(`Projects/BrokenEngineSandbox/Source/Frame/StatusChange.h:198`):
+`WriteFrameInput` (`Engine/Source/Frame/FrameBase.cpp:352-361`) passes each
+payload to `common::Write`, which writes `sizeof(T)` bytes
+(`Common/Serialization.h:99-103`). Removing them changes the Omni spawn and
+transfer payload image a server build writes, which
+`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md` `## Invariants` guards
+only by a `FrameInput::kiVersion` bump: the difference stream checks no
+payload size. Their removal alone changes no wire payload, since `Fields()`
+lists neither.
+
+Originating gap: the architecture phase (client/server and data shape lens)
+of a findings-only deep analysis of
+`Projects/BrokenEngineSandbox/Source/Frame/Collections/` (recursive),
+confirmed by an independent verification read. Unmet criterion: `SpawnInfo`
+holds no member that nothing sets.
+
 ## Design
 
 Recommended direction: move the column to client-only state, matching
@@ -63,6 +99,14 @@ advance a visual clock or documenting a new exception.
   `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`.
 - Update `Omnis/AGENTS.md` `## State Boundaries`, whose first bullet names
   client animation time among the CRC-excluded state.
+- Delete `SpawnInfo::fShieldRotation` and `fShieldShrink`. In
+  `OmnisPostRender::Spawn`, the two `BT_CLIENT` stores into
+  `pfShieldRotations` and `pfShieldShrinks` store `0.0f` and `1.0f`, the
+  values the defaults supply today. Reword the `bTransfer` comment and the
+  `Fields()` comment so neither names the removed members.
+  `Projects/BrokenEngineSandbox/Source/Frame/Collections/AGENTS.md`
+  `## Game-Specific Rules` stays true: client-only shield animation state
+  still starts from canonical client defaults on a transfer arrival.
 
 Apply `/add-collection-member`'s layout checklist in reverse for the removed
 shared column.
@@ -83,6 +127,11 @@ Risk tier: Tier 3. Triggers:
   `engine::kiProtocolVersion` under
   `Projects/BrokenEngineSandbox/Source/Network/AGENTS.md`
   `## Status-Change Wire Format`.
+- Replay compatibility: removing the two shield members changes the raw
+  `SpawnInfo` image the replay difference stream writes for every Omni spawn
+  and transfer; the same `FrameInput::kiVersion` bump covers it. They are no
+  collection column and are read only by the two client-only stores, so they
+  add no determinism/CRC exposure and no `Frame::kiVersion` bump of their own.
 - No backward compatibility: older saves, replays, and peers are rejected by
   those versions.
 
@@ -115,9 +164,16 @@ the column.
 - `Omnis/AGENTS.md` `## State Boundaries`, first bullet.
 - `OmnisInterpolate::kiVersion`, `FrameInput::kiVersion`, and
   `engine::kiProtocolVersion`.
+- `OmnisPostRender::SpawnInfo::fShieldRotation` and `fShieldShrink`; the two
+  stores from them in `OmnisPostRender::Spawn`; the `Fields()` comment that
+  names them.
 
 ## Out of scope
 
+- The `pfShieldRotations` and `pfShieldShrinks` columns and their Update
+  (`Omnis.cpp:400-405`).
+- Every other `SpawnInfo` member, and every `Fields()` entry except
+  `animationTime`.
 - `OmnisPostRender::pDestroyedExplosionTimes`,
   `OmnisInterpolate::pfRotationAccelerationXs` and `pfRotationAccelerationYs`,
   and any other client-only column or `BT_CLIENT` guard change.
@@ -132,10 +188,16 @@ the column.
 - `OmnisInterpolate::SharedMembers()` and `OmnisPostRender::SpawnInfo::Fields()`
   no longer name the animation time, and the column is declared and used only
   under `BT_CLIENT`.
+- No `fShieldRotation` or `fShieldShrink` member remains in `SpawnInfo`, and
+  `Fields()` loses only its `animationTime` entry.
+- `FrameInput::kiVersion` is higher than at the start of the change.
 - The client and server builds succeed, and the collection-layout auditor run
   `/add-collection-member` documents is clean.
 - A live client run shows Omnis animating. The supplied evidence records no
   harness setup; the executing session picks one through `/agent-harness`.
+- Through `/agent-harness`, a replay recorded on the changed build, with
+  Omnis spawning and transferring between cells, plays back with no per-tick
+  CRC mismatch; the executing session builds the scene.
 
 ## Notes
 

@@ -68,9 +68,12 @@ was never read, and the collection layout is untouched.
 
 ## Acceptance criteria
 
-- No `fDeltaRotation` identifier remains in `Missiles.cpp` or
-  `MissilesUpdate.cpp`, and `SynchronizeMissile` has eleven parameters at its
-  definition, forward declaration, and both calls.
+- The `SynchronizeMissile` definition (`Missiles.cpp`) and forward
+  declaration (`MissilesUpdate.cpp`) declare no `fDeltaRotation` parameter and
+  have eleven parameters, ending at `float fPitch`; its two calls pass eleven
+  arguments, ending at the `pfPitches` element, and pass no `pfDeltaRotations`
+  element. Other `fDeltaRotation` names in both files, such as the local in
+  `MissilesUpdate.cpp` and the `SpawnInfo` designator in `Missiles.cpp`, stay.
 - The BrokenEngineSandbox client and server build without errors or new
   warnings.
 

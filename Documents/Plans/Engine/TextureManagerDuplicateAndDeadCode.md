@@ -119,9 +119,6 @@ there is no threading change; no determinism, layout, or wire exposure.
 None of these Plans depends on another. Whichever lands later re-derives its
 lines by symbol from the landed files:
 
-- `Documents/Plans/Engine/ReduceTextureManagerCpp.md` may move these
-  functions to another file. The author recommends landing this Plan first,
-  so the reduction does not carry the duplicate and dead code along.
 - `Documents/Plans/Engine/TextureUploadManagerCleanup.md` edits the
   frame-signal site at `TextureManager.cpp:640-643`, just above the acquire
   lookup at `:650-661`.

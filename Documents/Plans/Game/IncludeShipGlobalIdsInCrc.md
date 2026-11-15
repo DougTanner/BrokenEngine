@@ -165,13 +165,9 @@ work of its option 2.
 tuples; neither Plan needs the other, and whichever lands second merges one
 tuple entry.
 
-Other Plans from the same analysis edit the same headers elsewhere. No
-ordering is required; whichever lands second merges. Each name is a Plan under
-`Documents/Plans/Game/`:
-
-- `Fighters.h` and `Battleships.h`: `ShareShipAvoidTerrain.md`.
-- `Fighters.h`: `ReduceFightersCpp.md`, as far as its reduction adds a
-  declaration.
+`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (item 15), from
+the same analysis, edits `Fighters.h` and `Battleships.h` elsewhere. No
+ordering is required; whichever lands second merges.
 
 ## Coordination
 

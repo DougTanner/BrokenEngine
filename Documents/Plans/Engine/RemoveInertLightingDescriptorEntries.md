@@ -142,9 +142,6 @@ data-layout, determinism, wire, or threading exposure.
 
 ## Coordination
 
-`Documents/Plans/Engine/AssertUnwrittenPipelineBindings.md` depends on this
-Plan (metadata): its check is added after the dropped writes are gone.
-
 `Documents/Plans/Engine/NamePushConstantSelectors.md` also edits
 `Engine/Data/Shaders/ShaderLayoutsBase.h`, on other lines: it adds two
 selector constant groups and deletes the `ELEVATION_FORMAT` line. Neither

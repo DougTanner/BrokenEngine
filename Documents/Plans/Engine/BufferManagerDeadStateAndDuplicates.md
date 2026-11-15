@@ -95,9 +95,6 @@ lines by symbol from the landed files:
 
 - `Documents/Plans/Engine/ShareWholeBufferBarrierBuilder.md` rewrites the
   barrier at `BufferManager.cpp:605-616`, next to the smoke active-tile size.
-- `Documents/Plans/Engine/RemoveSkinningCreationIdentityFill.md` edits
-  `InitializePerCommandBufferBuffers` (`:359-407`), the function the merged
-  call reaches.
 - `Documents/Plans/Engine/ValidateEnabledOptionalDeviceFeatures.md` adds rows
   to the required-feature table at `InstanceManager.cpp:475-484`, in the same
   function as the multisample lines at `:529-531`.

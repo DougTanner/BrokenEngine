@@ -97,6 +97,5 @@ second re-derives its regions by symbol from the landed files.
 
 ## Notes
 
-- `Documents/Plans/Engine/SkinnedMaterialCountReadsMember.md` and
-  `Documents/Plans/Engine/AnimationDataLoadRejectsCorruptChannelFields.md`
-  edit other functions of `AnimationData.cpp`.
+- `Documents/Plans/Engine/SkinnedMaterialCountReadsMember.md` edits other
+  functions of `AnimationData.cpp`.

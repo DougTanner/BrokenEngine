@@ -66,9 +66,8 @@ No directional dependencies or mandatory nondirectional coordination.
 
 ## Notes
 
-- `Documents/Plans/Engine/ReuseComputedInverseAndEyeNormal.md` and
-  `Documents/Plans/Engine/AnimationDataLoadRejectsCorruptChannelFields.md`
-  edit other functions of `AnimationData.cpp`.
+- `Documents/Plans/Engine/ReuseComputedInverseAndEyeNormal.md` edits other
+  functions of `AnimationData.cpp`.
 - `Projects/Coretide` was not searched for a caller: the private game's
   source was not available to the authoring session. The executing session
   checks it where that source is available and reports it as unconfirmed

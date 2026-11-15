@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T17:09:56.569Z","dependsOn":["Documents/Plans/Game/ShipNavigationDerivesCallerInvariantInputs.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T17:09:56.569Z","dependsOn":["Documents/Plans/Engine/ConsolidatedSmallDeduplications.md"]} -->
 # Reduce ShipBehaviours.cpp With /reduce-file
 
 ## Context

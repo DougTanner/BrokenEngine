@@ -127,12 +127,13 @@ Other Plans from the same analysis edit files this Plan edits. No ordering is
 required; whichever lands second merges. Each name is a Plan under
 `Documents/Plans/Game/`:
 
-- `Fighters.cpp`: `ReduceFightersCpp.md` (which depends on this Plan),
-  `RemoveShipNavigationDelayColumn.md`, and `ShareShipAvoidTerrain.md`.
+- `Fighters.cpp`: `RemoveShipNavigationDelayColumn.md` and
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (item 15).
 - `Battleships.cpp`: `RemoveShipNavigationDelayColumn.md` and
-  `ShareShipAvoidTerrain.md`.
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (item 15).
 - `Omnis.cpp`: `RemoveShipNavigationDelayColumn.md`.
-- `FC/Ships/ShipBehaviours.h` and `.cpp`: `ShareShipAvoidTerrain.md`.
+- `FC/Ships/ShipBehaviours.h` and `.cpp`:
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (item 15).
 
 Plans from other analyses overlap the same way, with no ordering required:
 `Documents/Plans/Game/ShareShipPreCollision.md` edits `PreCollision` in
@@ -142,9 +143,9 @@ edits `Fighters.cpp` and `Omnis.cpp`.
 Two Plans from an analysis of the `FC/Ships` directory overlap the same way,
 with no ordering required; whichever lands second re-derives its sites from
 the landed source.
-`Documents/Plans/Game/ShipNavigationDerivesCallerInvariantInputs.md` removes
-the `vecCellCenter` local, a few lines from the island-candidates block in the
-three `Update` functions, and edits `ComputeNavigation` in
+`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 16)
+removes the `vecCellCenter` local, a few lines from the island-candidates
+block in the three `Update` functions, and edits `ComputeNavigation` in
 `FC/Ships/ShipBehaviours.h` and `.cpp`.
 `Documents/Plans/Game/ReduceShipBehavioursCpp.md` reduces
 `FC/Ships/ShipBehaviours.cpp` and may move `ComputeReturnDestination` to a new

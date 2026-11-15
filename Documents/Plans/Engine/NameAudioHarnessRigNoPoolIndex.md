@@ -98,8 +98,8 @@ not compile `Rig.cpp`, `AgentCommandsAudioStreaming.cpp`, or
 
 ## Coordination
 
-- `Documents/Plans/Engine/AssignAudioHarnessRigSnapshotOnce.md` rewrites the
-  action chain of `CommandAudioStreamingHarnessRig` around the sentinel site
-  at `AgentCommandsAudioStreaming.cpp:347`. Neither Plan needs the other
-  first; whichever lands second applies its edit to that function as the
-  other left it.
+- `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 1)
+  rewrites the action chain of `CommandAudioStreamingHarnessRig` around the
+  sentinel site at `AgentCommandsAudioStreaming.cpp:347`. Neither Plan needs
+  the other first; whichever lands second applies its edit to that function
+  as the other left it.

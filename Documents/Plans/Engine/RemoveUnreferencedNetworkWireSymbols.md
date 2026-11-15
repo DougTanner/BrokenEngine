@@ -49,9 +49,9 @@ Recommended: delete each listed definition.
   `static_assert` text at `NetworkCursor.h:165`, which names `GridCoord` as
   supported, is corrected in the same edit.
 - `MessageReader::AtEnd` is deleted with the rest.
-  `Documents/Plans/Engine/RequireClientHelloStringTerminator.md` keeps both
-  `AtEnd` and a trailing-byte check out of its scope, so it gives `AtEnd` no
-  reader.
+  `Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md` keeps
+  both `AtEnd` and a trailing-byte check out of its scope, so it gives
+  `AtEnd` no reader.
 
 No wire layout or contract row changes, so `kiProtocolVersion` stays.
 
@@ -94,17 +94,11 @@ exposure: every removed name is unread.
 
 ## Coordination
 
-`Documents/Plans/Engine/RemoveCoordUpdateTickReader.md`,
-`Documents/Plans/Engine/RequireClientHelloStringTerminator.md`, and
-`Documents/Plans/Engine/SeparateNetworkProtocolHeaderResponsibilities.md`
-edit `NetworkMessages.h` or `NetworkProtocol.h` too. The last moves the
-identifier half of `NetworkProtocol.h` (`:1-112`) into a new
-`NetworkProtocolIdentifiers.h`, and that half holds one symbol each of the
-other three edits: `PacketTypeName` (`:46-81`), `kiProtocolVersion` (`:83`),
-and `kiMaximumPacketSize` (`:108`). None of the four depends on another.
-Whichever lands later re-derives the file as well as the lines of its
-references from the landed headers: once the header Plan has landed,
-`NetworkProtocolIdentifiers.h` is the critical file for those three symbols.
+`Documents/Plans/Engine/RemoveCoordUpdateTickReader.md` and
+`Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md` edit
+`NetworkMessages.h` or `NetworkProtocol.h` too. None of the three depends on
+another. Whichever lands later re-derives the lines of its references from the
+landed headers.
 
 ## Notes
 

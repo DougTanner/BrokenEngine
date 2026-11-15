@@ -115,7 +115,6 @@ lines by symbol from the landed files:
 - `Documents/Plans/Engine/PostUploadDrainPermitUnderLock.md` rewrites
   `WaitIdle` `:175-184`, which this Plan leaves alone. The author recommends
   landing that Plan first: it fixes a race and this Plan is clean-up.
-- `Documents/Plans/Engine/ReduceTextureManagerCpp.md` may move the
-  `TextureManager.cpp` site to another file.
 - `Documents/Plans/Engine/TextureManagerDuplicateAndDeadCode.md` edits the
-  acquire lookup at `TextureManager.cpp:650-661`, just below that site.
+  acquire lookup at `TextureManager.cpp:650-661`, just below this Plan's
+  `TextureManager.cpp` site.

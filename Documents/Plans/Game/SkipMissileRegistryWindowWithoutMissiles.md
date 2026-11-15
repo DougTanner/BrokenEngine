@@ -78,7 +78,7 @@ reservation is thread-local scratch, not frame state.
 - `BuildShipRegistryWindow`, `ValidateRegistrySourceLayers`, and the engine
   frame registry.
 - The row loop of `MissilesPostRender::Update`, including the steering arms
-  `Documents/Plans/Game/MergeMissileSteeringArms.md` owns.
+  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` owns.
 - The `iCount == 0` guard in Missiles `PreCollision`.
 
 ## Acceptance criteria

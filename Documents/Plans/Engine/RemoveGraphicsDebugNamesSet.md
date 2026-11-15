@@ -90,8 +90,3 @@ threading exposure.
 ## Coordination
 
 No directional dependencies or mandatory nondirectional coordination.
-
-## Notes
-
-- `Documents/Plans/Engine/IsPointVisibleCallsInVisibleArea.md` edits another
-  function of `GraphicsUtils.cpp`.
