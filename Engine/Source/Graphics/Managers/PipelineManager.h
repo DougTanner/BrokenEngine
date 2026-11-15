@@ -3,7 +3,6 @@
 #if defined(BT_CLIENT)
 
 #include "DynamicPipelines.h"
-#include "WorldLightingShadowPipelines.h"
 
 namespace engine
 {
@@ -112,8 +111,6 @@ public:
 	Pipeline mpLightingHistoryCopyPipelines[shaders::kiLightingLayers];
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
-
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mpCombinePipelines, mpLightingTemporalPipelines, mpLightingHistoryCopyPipelines, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;

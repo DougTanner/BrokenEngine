@@ -15,20 +15,6 @@ constexpr std::string_view kpCombinePipelineNames[shaders::kiLightingLayers] {"L
 constexpr std::string_view kpLightingTemporalPipelineNames[shaders::kiLightingLayers] {"LightingTemporal0", "LightingTemporal1"};
 constexpr std::string_view kpLightingHistoryCopyPipelineNames[shaders::kiLightingLayers] {"LightingHistoryCopy0", "LightingHistoryCopy1"};
 
-WorldLightingShadowPipelines::WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline* pCombinePipelines, Pipeline* pLightingTemporalPipelines, Pipeline* pLightingHistoryCopyPipelines, Texture** ppWaterNormalTextures, Texture** ppWaterFoamTextures, Texture** ppWaterFoamBreakupTextures)
-: mrShaders(rShaders)
-, mpPipelines(pPipelines)
-, mpSpreadPipelines(pSpreadPipelines)
-, mpSpreadPipelineNames(pSpreadPipelineNames)
-, mpCombinePipelines(pCombinePipelines)
-, mpLightingTemporalPipelines(pLightingTemporalPipelines)
-, mpLightingHistoryCopyPipelines(pLightingHistoryCopyPipelines)
-, mppWaterNormalTextures(ppWaterNormalTextures)
-, mppWaterFoamTextures(ppWaterFoamTextures)
-, mppWaterFoamBreakupTextures(ppWaterFoamBreakupTextures)
-{
-}
-
 void WorldLightingShadowPipelines::CreateLightingPipelines()
 {
 	RenderTargetTextures& rTextures = gpTextureManager->mRenderTargetTextures;
@@ -41,12 +27,12 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 	// only render-target textures, never disk-loaded chunks.
 	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		mpSpreadPipelineNames[i] = std::format("LightingSpread{}", i);
-		mpSpreadPipelines[i].Create(
+		gpPipelineManager->mpSpreadPipelineNames[i] = std::format("LightingSpread{}", i);
+		gpPipelineManager->mpSpreadPipelines[i].Create(
 		{
-			.name = mpSpreadPipelineNames[i],
+			.name = gpPipelineManager->mpSpreadPipelineNames[i],
 			.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mrShaders.at(data::kShadersLightingLightingSpreadfragCrc)},
+			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &gpPipelineManager->mShaders.at(data::kShadersLightingLightingSpreadfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 			.vkTargetRenderPass = rTextures.mSpreadVkRenderPass,
 			.vkExtent3D = rTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D,
@@ -76,11 +62,11 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 	// write only that layer's combine outputs and history.
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		mpCombinePipelines[i].Create(
+		gpPipelineManager->mpCombinePipelines[i].Create(
 		{
 			.name = kpCombinePipelineNames[i],
 			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&mrShaders.at(data::kShadersLightingLightCombinecompCrc)},
+			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightCombinecompCrc)},
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -96,11 +82,11 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 
 		// Temporal pass: 4 history samplers + the 4 combine outputs (read-write storage images), reprojected and
 		// EMA-blended in place. No push constants — the shader reads the combine extent via imageSize().
-		mpLightingTemporalPipelines[i].Create(
+		gpPipelineManager->mpLightingTemporalPipelines[i].Create(
 		{
 			.name = kpLightingTemporalPipelineNames[i],
 			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&mrShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
+			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -115,11 +101,11 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 			},
 		});
 
-		mpLightingHistoryCopyPipelines[i].Create(
+		gpPipelineManager->mpLightingHistoryCopyPipelines[i].Create(
 		{
 			.name = kpLightingHistoryCopyPipelineNames[i],
 			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&mrShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
+			.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -138,7 +124,7 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 
 void WorldLightingShadowPipelines::CreatePipelineShadows()
 {
-	mpPipelines[kPipelineShadowElevation].Create(
+	gpPipelineManager->mpPipelines[kPipelineShadowElevation].Create(
 	{
 		.name = "ShadowElevation",
 		// kMax: islands' bounding rectangles may overlap (chain packs by hull); MAX-blend the per-island
@@ -146,7 +132,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		// mfSeaFloorElevation (the shared ocean floor, the lowest any heightmap reaches), so single-island
 		// pixels are unchanged (max(floor, v) == v).
 		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mrShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &gpPipelineManager->mShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
 		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mInfo.vkExtent3D,
@@ -181,11 +167,11 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	};
 	for (const ShadowComputePipelineDescription& rDescription : pShadowComputePipelineDescriptions)
 	{
-		mpPipelines[rDescription.ePipeline].Create(
+		gpPipelineManager->mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
 			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-			.ppShaders = {&mrShaders.at(rDescription.shaderCrc)},
+			.ppShaders = {&gpPipelineManager->mShaders.at(rDescription.shaderCrc)},
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -195,11 +181,11 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		});
 	}
 
-	mpPipelines[kPipelineShadowHistoryCopy].Create(
+	gpPipelineManager->mpPipelines[kPipelineShadowHistoryCopy].Create(
 	{
 		.name = "ShadowHistoryCopy",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowHistoryCopycompCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersShadowShadowHistoryCopycompCrc)},
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -213,11 +199,11 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 {
 	// Lighting texture pre-blur pipelines (descriptors rebound per-texture at blur time, one set per framebuffer so a blur
 	// recorded for one framebuffer never rewrites a set another in-flight frame binds)
-	mpPipelines[kPipelineLightingBlurH].Create(
+	gpPipelineManager->mpPipelines[kPipelineLightingBlurH].Create(
 	{
 		.name = "LightingBlurH",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants, PipelineFlags::kPerCommandBuffer},
-		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurHcompCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingBlurHcompCrc)},
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
@@ -225,11 +211,11 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 		},
 	});
 
-	mpPipelines[kPipelineLightingBlurV].Create(
+	gpPipelineManager->mpPipelines[kPipelineLightingBlurV].Create(
 	{
 		.name = "LightingBlurV",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants, PipelineFlags::kPerCommandBuffer},
-		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurVcompCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersLightingLightingBlurVcompCrc)},
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
@@ -243,23 +229,23 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	// Resolve the water normal atlas Texture* pointers from kpWaterNormalCrcs. mTextureMap (unordered_map) is pointer-stable.
 	for (int64_t i = 0; i < TextureManager::kiWaterNormalCount; ++i)
 	{
-		mppWaterNormalTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterNormalCrcs[i]);
+		gpPipelineManager->mppWaterNormalTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterNormalCrcs[i]);
 	}
 	for (int64_t i = 0; i < TextureManager::kiWaterFoamTextureCount; ++i)
 	{
-		mppWaterFoamTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamCrcs[i]);
+		gpPipelineManager->mppWaterFoamTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamCrcs[i]);
 	}
 	for (int64_t i = 0; i < TextureManager::kiWaterFoamBreakupTextureCount; ++i)
 	{
-		mppWaterFoamBreakupTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamBreakupCrcs[i]);
+		gpPipelineManager->mppWaterFoamBreakupTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamBreakupCrcs[i]);
 	}
 
-	mpPipelines[kPipelineTerrain].Create(
+	gpPipelineManager->mpPipelines[kPipelineTerrain].Create(
 	{
 		.name = "Terrain",
 		// Terrain records one vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain from Islands' per-template indirect buffers.
 		.flags = {PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kCullBack, PipelineFlags::kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(data::kShadersTerrainTerrainvertCrc), &mrShaders.at(data::kShadersTerrainTerrainfragCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersTerrainTerrainvertCrc), &gpPipelineManager->mShaders.at(data::kShadersTerrainTerrainfragCrc)},
 		// pVertexBuffer is null: vertex buffer is per-island and bound at draw time. Vertex input
 		// stride and attribute layout come from shader reflection (Terrain.vert declares vec2 f2InPosition).
 		.descriptorInfos =
@@ -306,11 +292,11 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	// Water.vert (kPipelineWater) via texelFetch per vertex. MainUniforms writes the indirect dispatch dimensions
 	// each frame through WriteIndirectComputeBuffer to cover the active LOD region; the shader also bounds-checks
 	// each thread against iWaterActiveQuad*.
-	mpPipelines[kPipelineWaterDisplacement].Create(
+	gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].Create(
 	{
 		.name = "WaterDisplacement",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersWaterWaterDisplacementcompCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersWaterWaterDisplacementcompCrc)},
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -321,11 +307,11 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		},
 	});
 
-	mpPipelines[kPipelineWaterFoam].Create(
+	gpPipelineManager->mpPipelines[kPipelineWaterFoam].Create(
 	{
 		.name = "WaterFoam",
 		.flags = {PipelineFlags::kCompute},
-		.ppShaders = {&mrShaders.at(data::kShadersWaterWaterFoamcompCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersWaterWaterFoamcompCrc)},
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
@@ -338,11 +324,11 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		},
 	});
 
-	mpPipelines[kPipelineWater].Create(
+	gpPipelineManager->mpPipelines[kPipelineWater].Create(
 	{
 		.name = "Water",
 		.flags = {PipelineFlags::kAlphaBlend, PipelineFlags::kCullBack, PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kDepthBias, PipelineFlags::kUpdateAfterBind, PipelineFlags::kIndirectHostVisible},
-		.ppShaders = {&mrShaders.at(data::kShadersWaterWatervertCrc), &mrShaders.at(data::kShadersWaterWaterfragCrc)},
+		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersWaterWatervertCrc), &gpPipelineManager->mShaders.at(data::kShadersWaterWaterfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mWaterMeshBuffer,
 		.descriptorInfos =
 		{
@@ -354,7 +340,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = TextureManager::kPrefilteredWaterCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerRepeat}, .textureCrc = data::kTexturesWaterBC4NoisepngCrc},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterNormalCount, .ppTextures = mppWaterNormalTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterNormalCount, .ppTextures = gpPipelineManager->mppWaterNormalTextures},
 			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = data::kTexturesWaterDepthLutpngCrc},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke}, .iCount = shaders::kiMaxFlightPlanes, .ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne},
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures)), .ppTextures = gpTextureManager->mRenderTargetTextures.mppAmbientCombineTextures},
@@ -364,8 +350,8 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingFoam, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamColor, .ppTextures = mppWaterFoamTextures},
-			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamBreakupTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamBreakup, .ppTextures = mppWaterFoamBreakupTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamColor, .ppTextures = gpPipelineManager->mppWaterFoamTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamBreakupTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamBreakup, .ppTextures = gpPipelineManager->mppWaterFoamBreakupTextures},
 		},
 	});
 }

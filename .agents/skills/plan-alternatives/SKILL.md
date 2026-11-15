@@ -102,7 +102,9 @@ A requirement that neither the user nor a repository rule states — exact
 preservation of current behavior, numbers, or visuals; smoothness of a
 debug-only control; and the like — is an assumption. Main names it as an
 assumption beside the option it shapes and never counts breaking it against a
-simpler option.
+simpler option. A repository fact a researcher row reports as unmeasured is
+also an assumption: main names it beside the option it shapes and does not
+settle it with its own source reads.
 
 The scores inform main's recommendation and the pros and cons stated beside
 each option — an objective not fully met, a rebuilt existing guarantee, or

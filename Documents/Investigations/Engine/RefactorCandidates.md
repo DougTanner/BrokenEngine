@@ -19,6 +19,12 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
+  Engine/Source/Graphics/Managers/RenderTargetTexturesLighting.cpp:24 — the
+  `class RenderTargetTextures` defines members in a second .cpp, breaking
+  C++StyleGuide rule 67 — move the lighting-texture functions into a stateless
+  static-function struct, as WorldLightingShadowPipelines now is, or merge them
+  into RenderTargetTextures.cpp if it stays under the /reduce-file threshold
 - 2026-11-15 claude/041e27c6-7b5f-4879-840f-1df103133526 —
   Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp:103 —
   the game builds its active-work span from ReconcileDispatcher's public mWorks

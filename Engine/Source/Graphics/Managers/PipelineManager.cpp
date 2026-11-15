@@ -5,6 +5,7 @@
 #include "Data/Shader.h"
 #include "Data/Texture.h"
 #include "File/PackChunks.h"
+#include "Graphics/Managers/WorldLightingShadowPipelines.h"
 
 namespace engine
 {
@@ -79,10 +80,10 @@ PipelineManager::PipelineManager()
 	// Clear stale pipeline pointers before pipelines are recreated
 	gpTextureManager->mTextureDescriptors.ClearTextureBindings();
 
-	mWorldLightingShadowPipelines.CreateLightingPipelines();
-	mWorldLightingShadowPipelines.CreateLightingBlurPipelines();
-	mWorldLightingShadowPipelines.CreatePipelineShadows();
-	mWorldLightingShadowPipelines.CreateLightingShadowDependentPipelines();
+	WorldLightingShadowPipelines::CreateLightingPipelines();
+	WorldLightingShadowPipelines::CreateLightingBlurPipelines();
+	WorldLightingShadowPipelines::CreatePipelineShadows();
+	WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines();
 
 	if constexpr (kbDebugPrintf)
 	{
