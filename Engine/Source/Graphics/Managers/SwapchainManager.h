@@ -57,6 +57,7 @@ private:
 	void CreateSwapchain();
 	void CreateFramebuffers();
 	void CreateSynchronizationObjects();
+	void DestroyVulkanObjects();
 
 	// Round-robin acquire sync objects, advanced by the GetNext* accessors below.
 	std::vector<VkSemaphore> mImageAvailableSemaphores;

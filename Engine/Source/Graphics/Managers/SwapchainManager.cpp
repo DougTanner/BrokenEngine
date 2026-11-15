@@ -12,17 +12,17 @@ SwapchainManager::SwapchainManager()
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerSwapchainManager);
 
-	CreateRenderPass();
-	CreateSwapchain();
 	try
 	{
+		CreateRenderPass();
+		CreateSwapchain();
 		CreateFramebuffers();
 		CreateSynchronizationObjects();
 	}
 	catch (...)
 	{
-		// A throwing constructor runs no destructor, so this swapchain would outlive its device.
-		ASSERT(mVkSwapchainKHR == VK_NULL_HANDLE);
+		// A constructor failure skips ~SwapchainManager, so this catch runs its teardown.
+		DestroyVulkanObjects();
 		throw;
 	}
 }
@@ -149,7 +149,9 @@ void SwapchainManager::CreateRenderPass()
 		.dependencyCount = static_cast<uint32_t>(std::size(pVkHdrSubpassDependencies)),
 		.pDependencies = pVkHdrSubpassDependencies,
 	};
-	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkHdrRenderPassCreateInfo, nullptr, &mHdrVkRenderPass));
+	VkRenderPass vkHdrRenderPass = VK_NULL_HANDLE;
+	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkHdrRenderPassCreateInfo, nullptr, &vkHdrRenderPass));
+	mHdrVkRenderPass = vkHdrRenderPass;
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mHdrVkRenderPass, "SwapchainManagerHdr");
 
 	// Present render pass: one single-sample color attachment for the resolve quad; scene pipelines target the HDR pass, so no depth/MSAA. Full
@@ -207,7 +209,9 @@ void SwapchainManager::CreateRenderPass()
 		.dependencyCount = 1,
 		.pDependencies = &vkPresentSubpassDependency,
 	};
-	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mVkRenderPass));
+	VkRenderPass vkRenderPass = VK_NULL_HANDLE;
+	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &vkRenderPass));
+	mVkRenderPass = vkRenderPass;
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mVkRenderPass, "SwapchainManager");
 }
 
@@ -319,7 +323,9 @@ void SwapchainManager::CreateSwapchain()
 		.clipped = VK_TRUE,
 		.oldSwapchain = VK_NULL_HANDLE,
 	};
-	CHECK_VK(vkCreateSwapchainKHR(gpDeviceManager->mVkDevice, &vkSwapchainCreateInfoKHR, nullptr, &mVkSwapchainKHR));
+	VkSwapchainKHR vkSwapchainKHR = VK_NULL_HANDLE;
+	CHECK_VK(vkCreateSwapchainKHR(gpDeviceManager->mVkDevice, &vkSwapchainCreateInfoKHR, nullptr, &vkSwapchainKHR));
+	mVkSwapchainKHR = vkSwapchainKHR;
 	VkName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, mVkSwapchainKHR, "");
 }
 
@@ -406,7 +412,9 @@ void SwapchainManager::CreateFramebuffers()
 		.height = gpGraphics->mFramebufferVkExtent2D.height,
 		.layers = 1,
 	};
-	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkHdrFramebufferCreateInfo, nullptr, &mHdrVkFramebuffer));
+	VkFramebuffer vkHdrFramebuffer = VK_NULL_HANDLE;
+	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkHdrFramebufferCreateInfo, nullptr, &vkHdrFramebuffer));
+	mHdrVkFramebuffer = vkHdrFramebuffer;
 	VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mHdrVkFramebuffer, "Hdr");
 
 	mFramebuffers.resize(static_cast<size_t>(iImageCount));
@@ -439,7 +447,9 @@ void SwapchainManager::CreateFramebuffers()
 				.layerCount = 1,
 			},
 		};
-		CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rFrameBuffer.vkPresentImageView));
+		VkImageView vkPresentImageView = VK_NULL_HANDLE;
+		CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &vkPresentImageView));
+		rFrameBuffer.vkPresentImageView = vkPresentImageView;
 		VkName(VK_OBJECT_TYPE_IMAGE, rFrameBuffer.vkPresentImage, std::format("Present {}", i - 1).c_str());
 		VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rFrameBuffer.vkPresentImageView, std::format("Present {}", i - 1).c_str());
 
@@ -458,7 +468,9 @@ void SwapchainManager::CreateFramebuffers()
 			.height = gpGraphics->mFramebufferVkExtent2D.height,
 			.layers = 1,
 		};
-		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &rFrameBuffer.vkPresentFramebuffer));
+		VkFramebuffer vkPresentFramebuffer = VK_NULL_HANDLE;
+		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &vkPresentFramebuffer));
+		rFrameBuffer.vkPresentFramebuffer = vkPresentFramebuffer;
 		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, rFrameBuffer.vkPresentFramebuffer, std::format("Present {}", i - 1).c_str());
 	}
 }
@@ -475,7 +487,9 @@ void SwapchainManager::CreateSynchronizationObjects()
 			.pNext = nullptr,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
-		CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &rVkFence));
+		VkFence vkFence = VK_NULL_HANDLE;
+		CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &vkFence));
+		rVkFence = vkFence;
 		VkName(VK_OBJECT_TYPE_FENCE, rVkFence, std::format("ImageAvailable {}", i++).c_str());
 	}
 
@@ -489,12 +503,19 @@ void SwapchainManager::CreateSynchronizationObjects()
 			.pNext = nullptr,
 			.flags = 0,
 		};
-		CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &rVkSemaphore));
+		VkSemaphore vkSemaphore = VK_NULL_HANDLE;
+		CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &vkSemaphore));
+		rVkSemaphore = vkSemaphore;
 		VkName(VK_OBJECT_TYPE_SEMAPHORE, rVkSemaphore, std::format("ImageAvailable {}", i++).c_str());
 	}
 }
 
 SwapchainManager::~SwapchainManager()
+{
+	DestroyVulkanObjects();
+}
+
+void SwapchainManager::DestroyVulkanObjects()
 {
 	for (const VkFence& rVkFence : mImageAvailableFences)
 	{
