@@ -10,6 +10,7 @@ class CurveData
 public:
 
 	static constexpr int64_t kiMaximumControlPoints = 16;
+	static constexpr float kfSeparation = 1.0e-4f;
 
 	CurveData() = delete;
 
@@ -34,7 +35,8 @@ public:
 	}
 
 	// Add a new control point. Clamps X to (0, 1) (endpoints stay reserved at exactly 0 and 1).
-	// Returns index of the new point, or -1 if at cap.
+	// Clamps X to kfSeparation inside both neighbors, as MovePoint does. Returns index of the new
+	// point, or -1 if at cap or the neighbors leave no room.
 	int64_t AddPoint(ImVec2 point)
 	{
 		if (std::ssize(mPoints) >= kiMaximumControlPoints)
@@ -48,6 +50,13 @@ public:
 		{
 			++iInsert;
 		}
+		float fMinimumX = mPoints.at(iInsert - 1).x + kfSeparation;
+		float fMaximumX = mPoints.at(iInsert).x - kfSeparation;
+		if (fMinimumX > fMaximumX)
+		{
+			return -1;
+		}
+		point.x = std::clamp(point.x, fMinimumX, fMaximumX);
 		mPoints.insert(mPoints.begin() + iInsert, point);
 		return iInsert;
 	}
@@ -73,7 +82,6 @@ public:
 			mPoints.at(iIndex) = ImVec2(1.0f, point.y);
 			return;
 		}
-		static constexpr float kfSeparation = 1.0e-4f;
 		float fMinimumX = mPoints.at(iIndex - 1).x + kfSeparation;
 		float fMaximumX = mPoints.at(iIndex + 1).x - kfSeparation;
 		point.x = std::clamp(point.x, fMinimumX, fMaximumX);

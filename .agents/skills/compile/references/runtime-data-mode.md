@@ -38,6 +38,11 @@ authorization:
     stamp for as long as its export runs, so a game build during a running
     refresh resolves Local; when no data input of the worktree changed,
     waiting for the refresh to finish and rebuilding resolves Shared again.
+    That refresh can come from another session
+    (`## Wrapper bootstrap Shared-data refresh`), and Windows keeps a file's
+    creation time when it is deleted and quickly recreated (NTFS file-name
+    tunneling), so a stamp creation time older than the build does not prove
+    the stamp existed when the build resolved its mode.
   - `stamp-unresolvable` — the stamp's text does not resolve to a commit:
     Local.
 

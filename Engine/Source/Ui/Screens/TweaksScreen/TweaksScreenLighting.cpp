@@ -126,7 +126,7 @@ void RenderLightingSection(TweaksScreen& rScreen)
 					for (int64_t i = 0; i < std::ssize(rActiveCurve.mPoints); ++i)
 					{
 						const ImVec2& rPoint = rActiveCurve.mPoints.at(i);
-						curveText += std::format("{}ImVec2({:.4f}f, {:.4f}f)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
+						curveText += std::format("{}ImVec2({:#}f, {:#}f)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
 					}
 					curveText += std::format("}}, {:.4f}f, {:.4f}f);", rActiveCurve.mfYMinimum, rActiveCurve.mfYMaximum);
 					ImGui::SetClipboardText(curveText.c_str());
