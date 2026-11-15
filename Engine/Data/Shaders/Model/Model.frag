@@ -51,8 +51,8 @@ layout (set = 1, binding = kiModelBindingIrradiance) uniform samplerCube sampler
 layout (set = 1, binding = kiModelBindingPrefiltered) uniform samplerCube prefilteredMap;
 layout (set = 1, binding = kiModelBindingBrdfLookupTable) uniform sampler2D samplerBRDFLUT;
 
-// Material buffer (per-material, Set 2)
-layout (scalar, set = 2, binding = kiModelBindingMaterials) buffer readonly pbrMaterialsUniform
+// Material buffer, indexed by the push-constant material index
+layout (scalar, set = 1, binding = kiModelBindingMaterials) buffer readonly pbrMaterialsUniform
 {
 	PbrMaterialLayout pMaterials[];
 };

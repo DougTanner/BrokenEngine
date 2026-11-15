@@ -119,9 +119,9 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
   scalar layout explicitly by block or shader default. Flag introduced
   `std140`/`std430`, unqualified storage blocks, and CPU/GLSL size or order
   mismatches.
-- Enforce descriptor roles: set 0 global, set 1 per-pipeline, set 2
-  per-material. Verify shared binding constants against C++ layout creation and
-  writes.
+- Enforce the descriptor-ownership rule in `Engine/Data/Shaders/AGENTS.md`
+  `## Shared Contract`. Verify shared binding constants against C++ layout
+  creation and writes.
 - Require `nonuniformEXT(index)` when a descriptor-array index may vary between
   invocations. Prove compile-time or dynamically uniform indices before
   exempting them.

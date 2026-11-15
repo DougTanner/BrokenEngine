@@ -170,20 +170,15 @@ static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<V
 	return iValidCount;
 }
 
-static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkWriteDescriptorSet> writeDescriptorSets, VkDescriptorSet vkDestinationSet2, bool bHasExternalSet1)
+static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkWriteDescriptorSet> writeDescriptorSets, bool bHasExternalSet1)
 {
 	int64_t iValidCount = 0;
-	for (VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
+	for (const VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
 	{
 		int64_t iBinding = static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding);
 		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipelineInfo, iBinding);
 
-		if (iSet == 2)
-		{
-			rVkWriteDescriptorSet.dstSet = vkDestinationSet2;
-			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
-		}
-		else if (iSet == 1 && !bHasExternalSet1)
+		if (iSet == 1 && !bHasExternalSet1)
 		{
 			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 		}
@@ -209,17 +204,12 @@ bool PipelineDescriptorWriter::BindingExistsInShaderLayout(const Pipeline& rPipe
 
 void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 {
-	bool bMultiSet = rPipeline.mInfo.flags & PipelineFlags::kMultiSet;
 	bool bHasExternalSet1 = rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE;
 
 	int64_t iPerCommandBuffer = rPipeline.mbPerCommandBuffer ? std::ssize(gpSwapchainManager->mFramebuffers) : 1;
 	if (!bHasExternalSet1)
 	{
 		rPipeline.mVkDescriptorSets.resize(iPerCommandBuffer);
-	}
-	if (bMultiSet)
-	{
-		rPipeline.mVkDescriptorSetsSet2.resize(iPerCommandBuffer);
 	}
 
 	// Upper bound on the image-infos this pipeline's descriptors push into the per-Write() buffer below.
@@ -255,23 +245,6 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfo, &rPipeline.mVkDescriptorSets.at(j)));
 			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSets.at(j), std::format("{}{}", rPipeline.mInfo.name.data(), j).c_str());
 			vkDescriptorSet = rPipeline.mVkDescriptorSets.at(j);
-		}
-
-		// Allocate Set 2 descriptor set (multi-set models only)
-		VkDescriptorSet vkDestinationSet2 = VK_NULL_HANDLE;
-		if (bMultiSet)
-		{
-			VkDescriptorSetAllocateInfo vkDescriptorSetAllocateInfoSet2
-			{
-				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.pNext = nullptr,
-				.descriptorPool = vkDescriptorPool,
-				.descriptorSetCount = 1,
-				.pSetLayouts = &rPipeline.mSet2VkDescriptorSetLayout,
-			};
-			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfoSet2, &rPipeline.mVkDescriptorSetsSet2.at(j)));
-			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSetsSet2.at(j), std::format("{}Set2{}", rPipeline.mInfo.name.data(), j).c_str());
-			vkDestinationSet2 = rPipeline.mVkDescriptorSetsSet2.at(j);
 		}
 
 		VkWriteDescriptorSet pVkWriteDescriptorSets[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
@@ -337,8 +310,8 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 		// Reflected layouts can be sparse (e.g. GLTF shadow bindings 0, 1, 2, 15).
 		cursor.iDescriptorCount = FilterWritesByShaderLayout(rPipeline, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)));
 
-		// Route writes by set index: drop Set 0 (global), keep Set 1 and Set 2
-		cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)), vkDestinationSet2, bHasExternalSet1);
+		// Route writes by set index: drop Set 0 (global), keep an owned Set 1 and drop an external one.
+		cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)), bHasExternalSet1);
 
 		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(cursor.iDescriptorCount), cursor.pVkWriteDescriptorSets, 0, nullptr);
 	}

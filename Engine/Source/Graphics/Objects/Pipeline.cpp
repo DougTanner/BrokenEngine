@@ -143,12 +143,6 @@ void Pipeline::Destroy() noexcept
 	}
 	mVkDescriptorSets.clear();
 
-	if (!mVkDescriptorSetsSet2.empty())
-	{
-		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, vkDescriptorPool, static_cast<uint32_t>(std::ssize(mVkDescriptorSetsSet2)), mVkDescriptorSetsSet2.data());
-	}
-	mVkDescriptorSetsSet2.clear();
-
 	vkDestroyPipeline(gpDeviceManager->mVkDevice, mVkPipeline, nullptr);
 	mVkPipeline = VK_NULL_HANDLE;
 
@@ -161,12 +155,6 @@ void Pipeline::Destroy() noexcept
 		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mVkDescriptorSetLayout, nullptr);
 	}
 	mVkDescriptorSetLayout = VK_NULL_HANDLE;
-
-	if (mSet2VkDescriptorSetLayout != VK_NULL_HANDLE)
-	{
-		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mSet2VkDescriptorSetLayout, nullptr);
-		mSet2VkDescriptorSetLayout = VK_NULL_HANDLE;
-	}
 
 	if (mIndirectVkBuffer != VK_NULL_HANDLE)
 	{
@@ -232,7 +220,7 @@ void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkComm
 	vkCmdDrawIndexedIndirect(vkCommandBuffer, mIndirectVkBuffer, static_cast<VkDeviceSize>(iIndirectOffset), 1, sizeof(VkDrawIndexedIndirectCommand));
 }
 
-void Pipeline::RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
+void Pipeline::RecordDrawIndirectMaterial(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT(mInfo.flags & kMultiSet);
 	ASSERT((mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && !(mInfo.flags & kCompute));
@@ -242,9 +230,8 @@ void Pipeline::RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vk
 		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, rf4PushConstants);
 	}
 
-	// Bind pipeline and Set 2 only (Set 0, Set 1, and vertex buffer already bound by ModelPipeline)
+	// Bind pipeline only (Set 0, Set 1, and vertex buffer already bound by ModelPipeline)
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipelineLayout, 2, 1, &mVkDescriptorSetsSet2.at(iCommandBuffer), 0, nullptr);
 	// Device-local reads slot 0; host-visible indexes per-framebuffer
 	int64_t iIndirectSlot = mInfo.flags & kIndirectDeviceLocal ? 0 : iCommandBuffer;
 	int64_t iIndirectOffset = iIndirectSlot * static_cast<int64_t>(sizeof(VkDrawIndexedIndirectCommand));

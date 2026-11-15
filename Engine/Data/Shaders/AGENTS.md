@@ -26,9 +26,9 @@ single-sourced. GLSL indents with tabs and aligns with spaces after them, as
   rather than recomputing it per invocation. Route new such math to the
   populator, not the shader; shared layout field comments own the reason each
   term was merged CPU-side and the operands deliberately left raw.
-- Descriptor ownership is semantic: Set 0 is global, Set 1 is per-pipeline, and
-  Set 2 is per-material. Binding constants live in the shared layout header and
-  must match C++ layout/writes.
+- Descriptor ownership is semantic: Set 0 is global and Set 1 is per-pipeline.
+  Binding constants live in the shared layout header and must match C++
+  layout/writes.
 - Bindless texture indices require `nonuniformEXT()`. A fixed-size sampler array
   indexed by a dynamically uniform value, such as a loop counter bounded by a
   uniform, relies instead on the required

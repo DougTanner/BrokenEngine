@@ -124,9 +124,7 @@ CONSTEXPR int kiGlobalBindingSamplerRepeat = 3;
 CONSTEXPR int kiGlobalBindingBindlessTextures = 4;
 CONSTEXPR int kiGlobalBindingSamplerClamp = 12;
 
-// Per-pipeline descriptor binding numbers (Set 1, plus the model materials binding in Set 2). Single-sourced here
-// (dual-language) like the Set-0 block above, so C++ descriptor writes and the GLSL layout qualifiers stay in
-// lockstep.
+// Per-pipeline (Set 1) descriptor binding numbers, shared by C++ and GLSL like the Set-0 block above.
 CONSTEXPR int kiVisibleLightBindingElevation = 5;
 CONSTEXPR int kiWaterFoamBindingSpawnNoise = 6;
 CONSTEXPR int kiWaterBindingDisplacement = 13;

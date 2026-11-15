@@ -162,4 +162,4 @@ type only.
   installer builds without `pymodules` that path exits 2 and names
   `qrenderdoc --python`.
 - `renderdoccmd convert` — for a raw structured dump outside these scripts:
-  `renderdoccmd convert --input <capture.rdc> --output <capture.xml>`.
+  `renderdoccmd convert -f <capture.rdc> -o <capture.xml> -c xml`.

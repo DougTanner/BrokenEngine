@@ -131,7 +131,7 @@ public:
 	// loops (e.g., per-island terrain meshes) that bind their own vertex/index buffer and issue
 	// vkCmdDrawIndexed themselves.
 	void RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
-	void RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants);
+	void RecordDrawIndirectMaterial(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants);
 	void RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY = 1, int64_t iGroupCountZ = 1, const XMFLOAT4& rf4PushConstants = {});
 	void RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
 	void RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, int64_t iIndirectOffset, const XMFLOAT4& rf4PushConstants = {});
@@ -149,9 +149,6 @@ public:
 	VkPipelineLayout mVkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline mVkPipeline = VK_NULL_HANDLE;
 
-	// Multi-set: Set 2 layout and descriptor sets (per-material bindings)
-	VkDescriptorSetLayout mSet2VkDescriptorSetLayout = VK_NULL_HANDLE;
-	std::vector<VkDescriptorSet> mVkDescriptorSetsSet2;
 	// External Set 0 layout (global descriptor set from TextureManager, not owned)
 	VkDescriptorSetLayout mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)

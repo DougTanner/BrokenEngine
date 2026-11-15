@@ -193,7 +193,7 @@ void ModelPipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer v
 		f4PushConstants.w = static_cast<float>(i);
 		if (bMultiSet)
 		{
-			mpPipelines.at(i).RecordDrawIndirectSet2(iCommandBuffer, vkCommandBuffer, f4PushConstants);
+			mpPipelines.at(i).RecordDrawIndirectMaterial(iCommandBuffer, vkCommandBuffer, f4PushConstants);
 		}
 		else
 		{
