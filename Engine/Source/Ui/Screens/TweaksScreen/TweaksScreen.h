@@ -73,7 +73,6 @@ public:
 	void RenderToggleBar();
 	void RenderSectionWindow(int64_t iSection);
 
-	void RenderWaveCountRadioButtons(Wrapper& rCountWrapper);
 	bool BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab);
 	void WrapperSlider(std::string_view label, Wrapper& rWrapper, int64_t iSection, float fWidthMultiplier = 2.0f);
 	void WrapperSeparatorText(std::string_view label);

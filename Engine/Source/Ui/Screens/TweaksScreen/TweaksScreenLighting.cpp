@@ -111,7 +111,7 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				}
 
 				CurveData& rActiveCurve = gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld;
-				if (CurveWidget("Pass Contribution Curve", rActiveCurve))
+				if (CurveWidget("Pass Contribution Curve", rActiveCurve) && ImGui::GetIO().MouseDown[0])
 				{
 					rScreen.mActiveSlider = "Combine Curve";
 					rScreen.miActiveSliderSection = iSection;

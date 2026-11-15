@@ -68,27 +68,6 @@ TweaksScreen::TweaksScreen()
 	}
 }
 
-void TweaksScreen::RenderWaveCountRadioButtons(Wrapper& rCountWrapper)
-{
-	if (!mActiveSlider.empty())
-	{
-		return;
-	}
-
-	ImGui::Text("Wave Count");
-	ImGui::SameLine();
-	int64_t iCurrent = rCountWrapper.Get<int64_t>();
-	for (const std::pair<const char*, int64_t>& rPair : std::initializer_list<std::pair<const char*, int64_t>> {{"15", 15}, {"31", 31}, {"63", 63}, {"127", 127}, {"255", 255}})
-	{
-		if (ImGui::RadioButton(rPair.first, iCurrent == rPair.second))
-		{
-			rCountWrapper.Set(rPair.second);
-		}
-		ImGui::SameLine();
-	}
-	ImGui::NewLine();
-}
-
 void TweaksScreen::ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, std::span<const std::string_view> names)
 {
 	// Match WrapperSlider's alpha-fade-while-dragging behavior so this widget keeps its layout slot when another slider is active.
@@ -175,7 +154,7 @@ void TweaksScreen::WrapperSlider(std::string_view label, Wrapper& rWrapper, int6
 	{
 		rWrapper.Set(fValue);
 	}
-	if (ImGui::IsItemActive())
+	if (ImGui::IsItemActive() && ImGui::GetIO().MouseDown[0])
 	{
 		mActiveSlider = label;
 		miActiveSliderSection = iSection;
@@ -302,7 +281,7 @@ void TweaksScreen::RenderToggleBar()
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
 	ImGui::SetNextItemWidth(fContentWidth);
 	ImGui::SliderFloat(kpcSunAngleLabel, &gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.6f", ImGuiSliderFlags_AlwaysClamp);
-	if (ImGui::IsItemActive())
+	if (ImGui::IsItemActive() && rInputOutput.MouseDown[0])
 	{
 		mActiveSlider = kpcSunAngleLabel;
 		miActiveSliderSection = -1;
@@ -382,8 +361,7 @@ void TweaksScreen::RenderSectionWindow(int64_t iSection)
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 	}
 
-	static constexpr float kfStartX = 10.0f;
-	ImVec2 f2InitialPosition = (mpWindowPositions[iSection].y > 0.0f) ? mpWindowPositions[iSection] : ImVec2 {kfStartX * UiScale(), mfToggleBarBottom};
+	ImVec2 f2InitialPosition = (mpWindowPositions[iSection].y > 0.0f) ? mpWindowPositions[iSection] : ImVec2 {mpWindowPositions[iSection].x, mfToggleBarBottom};
 	ImGui::SetNextWindowPos(f2InitialPosition, ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowCollapsed(mSectionCollapsed & SectionFlag(iSection), ImGuiCond_FirstUseEver);
 	// Cap the height to the space below the toggle bar so a window dragged up against it still ends on screen.

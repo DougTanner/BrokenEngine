@@ -11,11 +11,6 @@ inline Wrapper gPbrBrdfDiffuse(4.0f, 0.0f, 20.0f);
 inline Wrapper gPbrBrdfDiffusePower(0.795f, 0.5f, 2.0f);
 inline Wrapper gPbrBrdfSpecular(0.822f, 0.0f, 2.0f);
 inline Wrapper gPbrBrdfSpecularPower(0.349f, 0.1f, 2.0f);
-inline Wrapper gPbrExposure(1.0f, 0.0f, 2.0f);
-inline Wrapper gPbrGamma(0.558f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPbrGamma.mfCurrent as the HdrResolve.frag pow exponent.
-inline Wrapper gColorGradingSaturation(1.207f, 0.0f, 2.0f);
-inline Wrapper gColorGradingContrast(1.205f, 0.5f, 2.0f);
-inline Wrapper gColorGradingTemperature(-0.205f, -1.0f, 1.0f);
 inline Wrapper gPbrLightingSpecular(0.5f, 0.0f, 1.0f);
 inline Wrapper gPbrLightingSpecularPower(0.5f, 0.1f, 1.0f);
 inline Wrapper gPbrLighting(0.2f, 0.0f, 0.3f);
@@ -31,5 +26,10 @@ inline Wrapper gPbrCubemapLodOffset(0.000f, 0.0f, 100.0f);
 inline Wrapper gPbrShadowFloor(0.3f, 0.0f, 1.0f);
 inline Wrapper gPbrSmoke(0.5f, 0.0f, 1.0f);
 inline Wrapper gPbrEmissive(0.687f, 0.0f, 5.0f);
+inline Wrapper gPbrExposure(1.0f, 0.0f, 2.0f);
+inline Wrapper gPbrGamma(0.558f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPbrGamma.mfCurrent as the HdrResolve.frag pow exponent.
+inline Wrapper gColorGradingSaturation(1.207f, 0.0f, 2.0f);
+inline Wrapper gColorGradingContrast(1.205f, 0.5f, 2.0f);
+inline Wrapper gColorGradingTemperature(-0.205f, -1.0f, 1.0f);
 
 } // namespace engine

@@ -80,7 +80,7 @@ inline Wrapper gWaterHeightDarkenTarget(1.0f, 0.0f, 2.0f);
 inline Wrapper gWaterHeightDarkenLighting(0.1f, 0.0f, 1.0f);
 
 // Low frequency waves
-inline Wrapper gWaterLowCount(31i64, std::vector<int64_t> {15, 31, 63, 127, 255}); // wave-count radio selector, not slider-mapped
+inline Wrapper gWaterLowCount(31i64, std::vector<int64_t> {15, 31, 63, 127, 255});
 inline Wrapper gWaterLowDirectionDegrees(104.0f, 0.0f, 360.0f);
 inline Wrapper gWaterLowSpreadDegrees(10.2f, 0.0f, 45.0f);
 inline Wrapper gWaterLowWavelengthShortest(0.61f, 0.25f, 2.0f);
@@ -92,7 +92,7 @@ inline Wrapper gWaterLowAmplitudeFadeStart(203.0f, 0.0f, 1'200.0f);
 inline Wrapper gWaterLowAmplitudeFadeEnd(604.0f, 0.0f, 1'200.0f);
 
 // Medium frequency waves
-inline Wrapper gWaterMediumCount(255i64, std::vector<int64_t> {15, 31, 63, 127, 255}); // wave-count radio selector, not slider-mapped
+inline Wrapper gWaterMediumCount(255i64, std::vector<int64_t> {15, 31, 63, 127, 255});
 inline Wrapper gWaterMediumDirectionDegrees(0.0f, 0.0f, 360.0f);
 inline Wrapper gWaterMediumSpreadDegrees(180.0f, 0.0f, 180.0f);
 inline Wrapper gWaterMediumWavelengthShortest(1.0f, 0.5f, 8.0f);
