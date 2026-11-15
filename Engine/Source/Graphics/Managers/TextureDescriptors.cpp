@@ -489,11 +489,10 @@ void TextureDescriptors::EvictIslandSlot(int64_t iSlot, common::crc_t islandCrc,
 	}
 	AppendPublication(0, iSlot);
 
-	ScopedSuppressAllocationTracking suppress;
-	UnregisterBindingsForKey(islandCrc);
+	mTextureBindings.erase(islandCrc);
 	for (common::crc_t textureCrc : textureCrcs)
 	{
-		UnregisterBindingsForKey(textureCrc);
+		mTextureBindings.erase(textureCrc);
 	}
 	mIslandSlots.erase(it);
 }
@@ -559,37 +558,23 @@ void TextureDescriptors::RegisterStandaloneSamplerBinding(Pipeline* pPipeline, i
 
 void TextureDescriptors::UnregisterPipeline(const Pipeline* pPipeline)
 {
-	for (auto it = mTextureBindings.begin(); it != mTextureBindings.end();)
+	std::erase_if(mTextureBindings, [pPipeline](std::pair<const common::crc_t, std::vector<TextureBinding>>& rEntry)
 	{
-		std::erase_if(it->second, [pPipeline](const TextureBinding& rBinding)
+		std::erase_if(rEntry.second, [pPipeline](const TextureBinding& rBinding)
 		{
 			return rBinding.pPipeline == pPipeline;
 		});
-		if (it->second.empty())
-		{
-			it = mTextureBindings.erase(it);
-		}
-		else
-		{
-			++it;
-		}
-	}
+		return rEntry.second.empty();
+	});
 
-	for (auto it = mBindlessArrayConsumers.begin(); it != mBindlessArrayConsumers.end();)
+	std::erase_if(mBindlessArrayConsumers, [pPipeline](std::pair<Texture* const* const, std::vector<BindlessArrayConsumer>>& rEntry)
 	{
-		std::erase_if(it->second, [pPipeline](const BindlessArrayConsumer& rConsumer)
+		std::erase_if(rEntry.second, [pPipeline](const BindlessArrayConsumer& rConsumer)
 		{
 			return rConsumer.pPipeline == pPipeline;
 		});
-		if (it->second.empty())
-		{
-			it = mBindlessArrayConsumers.erase(it);
-		}
-		else
-		{
-			++it;
-		}
-	}
+		return rEntry.second.empty();
+	});
 
 	std::erase_if(mStandaloneSamplerBindings, [pPipeline](const StandaloneSamplerBinding& rBinding)
 	{
@@ -597,10 +582,9 @@ void TextureDescriptors::UnregisterPipeline(const Pipeline* pPipeline)
 	});
 }
 
-void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
+void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc, const Texture& rTexture)
 {
 	AssertBindlessWriteEpoch();
-	Texture& rTexture = mrTextureManager.mTextureMap.at(crc);
 
 	auto it = mTextureBindings.find(crc);
 	if (it != mTextureBindings.end())
@@ -615,14 +599,6 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
 	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 	mImageInfos.at(CrcToIndex(crc)).imageView = rTexture.mVkImageView;
 	AppendPublication(crc, -1);
-}
-
-void TextureDescriptors::UnregisterBindingsForKey(common::crc_t bindingKey)
-{
-	// Heap: unordered_map::erase deallocates the bucket's vector<TextureBinding>; called from
-	// IslandTerrainResidency::EvictionSweep inside Graphics::UpdateFrameResidency.
-	ScopedSuppressAllocationTracking suppress;
-	mTextureBindings.erase(bindingKey);
 }
 
 void TextureDescriptors::RewriteSamplerDescriptors()
@@ -701,7 +677,7 @@ void TextureDescriptors::ClearTextureBindings()
 int64_t TextureDescriptors::CrcToIndex(common::crc_t crc)
 {
 	// Phase exclusion protects mImageInfosMap and miNextTextureIndex: ParticleManager::Spawn serializes worker writes with mSpawnMutex during
-	// RunFrameTick dispatch, which fully joins before render writes. UpdateDescriptorsForTexture and BlurLightingTexture assert !mbInFrameTick.
+	// RunFrameTick dispatch, which fully joins before render writes. UpdateDescriptorsForTexture, the adoption and first-blur path, asserts !mbInFrameTick.
 	auto it = mImageInfosMap.find(crc);
 	if (it != mImageInfosMap.end())
 	{

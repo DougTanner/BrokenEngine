@@ -538,7 +538,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			// RecordCreate copied the pixels into staging and no upload thread owns this chunk on the early-out path, so
 			// the CPU buffer is freed here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
 			gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
-			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc);
+			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc, rTexture);
 
 			rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
@@ -571,7 +571,7 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	// ownership, so freeing its CPU buffer here (on the main thread) cannot race that thread. The free precedes the
 	// kReady store, so a kReady texture holds no buffer and a later whole reload allocates a new one.
 	gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
-	mTextureDescriptors.UpdateDescriptorsForTexture(crc);
+	mTextureDescriptors.UpdateDescriptorsForTexture(crc, rTexture);
 
 	rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 	gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
@@ -815,13 +815,7 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, int64_t iDescriptorS
 	// A reblur leaves the bindless element unchanged, so only the first blur publishes it.
 	if (bFirstBlur)
 	{
-		// Register blurred texture in bindless array. Render-phase caller: CrcToIndex is lock-free, safe only
-		//   because no worker Spawn runs concurrently (see TextureDescriptors::CrcToIndex).
-		ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
-		common::crc_t blurredCrc = crc ^ TextureDescriptors::kBlurSalt;
-		int64_t iBlurredIndex = mTextureDescriptors.CrcToIndex(blurredCrc);
-		mTextureDescriptors.mImageInfos.at(iBlurredIndex).imageView = rResult.mVkImageView;
-		mTextureDescriptors.AppendPublication(blurredCrc, -1);
+		mTextureDescriptors.UpdateDescriptorsForTexture(crc ^ TextureDescriptors::kBlurSalt, rResult);
 	}
 }
 

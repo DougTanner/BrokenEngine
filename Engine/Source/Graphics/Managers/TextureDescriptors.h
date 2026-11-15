@@ -63,7 +63,7 @@ public:
 	void RegisterBindlessArrayConsumer(std::span<Texture*> textures, Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
 	void RegisterStandaloneSamplerBinding(Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
 	void UnregisterPipeline(const Pipeline* pPipeline);
-	void UpdateDescriptorsForTexture(common::crc_t crc);
+	void UpdateDescriptorsForTexture(common::crc_t crc, const Texture& rTexture);
 	// Island slots own five coordinated array elements: template-owned elevation plus four lazy
 	// chunk-backed channels. The registry keeps their metadata and descriptor registrations together.
 	void MintIslandSlot(int64_t iSlot, common::crc_t islandCrc, Texture& rElevationTexture, const common::crc_t (&textureCrcs)[4]);
@@ -85,6 +85,10 @@ public:
 	// Global descriptor Set 0 shared by all graphics pipelines
 	VkDescriptorSetLayout mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mGlobalDescriptorSets;
+
+	std::vector<VkDescriptorImageInfo> mImageInfos;
+
+private:
 
 	struct TextureBinding
 	{
@@ -123,7 +127,6 @@ public:
 	void WriteFullArrayDescriptors(const Pipeline& rPipeline, int64_t iSet, int64_t iBinding, std::span<Texture* const> textures, VkSampler vkSampler);
 	void WriteArrayElementFromLive(Texture* const* ppArray, int64_t iIndex, int64_t iSet);
 	void RegisterIslandSlotBindings(common::crc_t bindingKey, Texture** ppTextures, int64_t iSlot);
-	void UnregisterBindingsForKey(common::crc_t bindingKey);
 	void AssertBindlessWriteEpoch() const;
 
 	// PipelineDescriptorWriter registers kBindlessArrayConsumer descriptors for arrays with lazily assigned per-slot binding keys, such as IslandTerrainResidency.
@@ -148,11 +151,8 @@ public:
 	std::unordered_map<int64_t, IslandSlot> mIslandSlots;
 	std::vector<StandaloneSamplerBinding> mStandaloneSamplerBindings;
 
-	std::vector<VkDescriptorImageInfo> mImageInfos;
 	std::unordered_map<common::crc_t, int64_t> mImageInfosMap;
 	int64_t miNextTextureIndex = 0;
-
-private:
 
 	struct PendingPublication
 	{

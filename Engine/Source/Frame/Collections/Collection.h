@@ -400,8 +400,6 @@ int64_t AccumulateRenderCapacity(const INTERPOLATE_MAP& rRenderInterpolates, con
 template <typename MAP_TYPE, typename ACCESSOR, typename INTERPOLATE_MAP>
 void EraseStaleRenderState(MAP_TYPE& rRenderStateMap, const INTERPOLATE_MAP& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, ACCESSOR Accessor)
 {
-	// Heap: unordered_map erase for stale render state entries
-	ScopedSuppressAllocationTracking suppress;
 	std::erase_if(rRenderStateMap, [&rRenderInterpolates, &rActiveCoords, &Accessor](const typename MAP_TYPE::value_type& rPair)
 	{
 		for (const GridCoord& rCoord : rActiveCoords)
