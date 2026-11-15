@@ -572,6 +572,8 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	{
 		ShipOrders_t orders = rPrevious.pOrders[i];
 		ShipFlags_t flags = rPrevious.pFlags[i];
+		// The fire request lasts one tick: only this tick's AcquireTarget sets it, which a transfer-locked row skips.
+		flags.Set(ShipFlags::kFireBlaster, false);
 		std::chrono::duration<float> nextBlasterFireTime = rPrevious.pNextBlasterFireTimes[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		XMVECTOR vecWantedDirection = rPrevious.pVecWantedDirections[i];

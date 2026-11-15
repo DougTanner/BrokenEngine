@@ -482,11 +482,6 @@ No directional dependencies. Overlaps with no ordering required; whichever
 lands second merges, re-deriving its sites and version bumps from the landed
 tree:
 
-- `Documents/Plans/Game/ClearOmniFireBlasterOnTransferArrival.md` edits the
-  same Omni Transfer `SpawnInfo` literal in `OmnisNavigation.cpp` (its
-  `.flags` member) or the `spawnFlags` block of `OmnisPostRender::Spawn`. It
-  stays a separate Plan because it changes simulation results, so a replay
-  mismatch could not be attributed between it and this change.
 - `Documents/Plans/Game/FleetOwnedSquadronState.md`:
   `engine::kiProtocolVersion` and `FC/Ships/AGENTS.md` `## Ship Invariants`.
 - `Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md`:

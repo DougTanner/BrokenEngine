@@ -10,7 +10,10 @@ sizing derives from the shared omni radius.
 - Omnis fire only blasters, at the kept attack target when it is visible, within
   `kfBlasterTargetRange` on the Omni's stored plane, and in line of sight
   (`../Ships/AGENTS.md` `## Ship Invariants`), else at the nearest such enemy,
-  one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire.
+  one flat shot per `kBlasterFireInterval`; a climbing Omni holds fire. The fire
+  request (`ShipFlags::kFireBlaster`) is a per-tick PostRender Update output,
+  so a transfer arrival, transfer-locked on its first tick, fires nothing that
+  tick.
 - A fleet-controlled Omni in its flagship's cell steers by its fleet's stance
   through the fleet tactic it shares with fleet Fighters (`../Ships/AGENTS.md`
   `## Fleet Coordination Invariants`): in escort the tactic gives it no

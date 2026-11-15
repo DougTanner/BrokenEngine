@@ -223,7 +223,6 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 		{
 			continue;
 		}
-		rCurrentPostRender.pFlags[i].Set(ShipFlags::kFireBlaster, false);
 
 		// Dying omnis stop firing through the death-explosion animation, and healing omnis until fully healed.
 		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
