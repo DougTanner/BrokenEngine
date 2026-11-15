@@ -48,10 +48,7 @@ void TextureUploadManager::InitializeTransferResources()
 	CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &mTransferVkFence));
 	VkName(VK_OBJECT_TYPE_FENCE, mTransferVkFence, "Transfer");
 
-	VmaAllocationInfo stagingVmaAllocationInfo {};
-	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo);
-	miStagingSize = kiByteBudgetPerFrame;
-	mpStagingMappedData = stagingVmaAllocationInfo.pMappedData;
+	mOptionalStagingBuffer.emplace("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 }
 
 void TextureUploadManager::DestroyTransferResources()
@@ -88,23 +85,16 @@ void TextureUploadManager::DestroyTransferResources()
 		vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count());
 	}
 
-	if (mStagingVkBuffer != VK_NULL_HANDLE)
-	{
-		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mStagingVkBuffer, mStagingVmaAllocation);
-		mStagingVkBuffer = VK_NULL_HANDLE;
-		mStagingVmaAllocation = VK_NULL_HANDLE;
-		miStagingSize = 0;
-	}
+	mOptionalStagingBuffer.reset();
 
 	// Clean up any GPU-uploaded texture images that were not adopted by TextureManager
-	for (const auto& [rCrc, rLazyChunk] : gpFileManager->mpPackChunks->mLazyChunkMap)
+	for ([[maybe_unused]] auto& [rCrc, rLazyChunk] : gpFileManager->mpPackChunks->mLazyChunkMap)
 	{
 		if (rLazyChunk.vkUploadImage != VK_NULL_HANDLE)
 		{
-			LazyChunk& rMutableChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(rCrc);
-			vmaDestroyImage(gpDeviceManager->mpAllocator, rMutableChunk.vkUploadImage, rMutableChunk.vmaAllocation);
-			rMutableChunk.vkUploadImage = VK_NULL_HANDLE;
-			rMutableChunk.vmaAllocation = VK_NULL_HANDLE;
+			vmaDestroyImage(gpDeviceManager->mpAllocator, rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
+			rLazyChunk.vkUploadImage = VK_NULL_HANDLE;
+			rLazyChunk.vmaAllocation = VK_NULL_HANDLE;
 		}
 	}
 
@@ -436,39 +426,17 @@ void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, cons
 	const std::byte* pData = rLazyChunk.pData.get();
 	int64_t iStagingUsed = 0;
 
-	while (iStagingUsed < miStagingSize && miCurrentLayer < rDimensions.iArrayLayers)
+	while (iStagingUsed < kiByteBudgetPerFrame && miCurrentLayer < rDimensions.iArrayLayers)
 	{
 		int64_t iMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1ui32);
 		int64_t iMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1ui32);
 		int64_t iRemainingHeight = iMipHeight - miCurrentMipY;
 		int64_t iRemainingMipBytes = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iRemainingHeight);
-		int64_t iRemainingStaging = miStagingSize - iStagingUsed;
+		int64_t iRemainingStaging = kiByteBudgetPerFrame - iStagingUsed;
 
-		if (iRemainingMipBytes <= iRemainingStaging)
-		{
-			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + iStagingUsed, pData + miCurrentDataOffset, iRemainingMipBytes);
-
-			VkBufferImageCopy vkBufferImageCopy {};
-			vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iStagingUsed);
-			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
-			vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(miCurrentLayer);
-			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(miCurrentMipY), .z = 0};
-			vkBufferImageCopy.imageExtent = {.width = static_cast<uint32_t>(iMipWidth), .height = static_cast<uint32_t>(iRemainingHeight), .depth = 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
-
-			iStagingUsed += iRemainingMipBytes;
-			miCurrentDataOffset += iRemainingMipBytes;
-			miCurrentMipY = 0;
-			++muiCurrentMip;
-			if (muiCurrentMip >= rDimensions.iMipLevels)
-			{
-				muiCurrentMip = 0;
-				++miCurrentLayer;
-			}
-		}
-		else
+		int64_t iCopyHeight = iRemainingHeight;
+		int64_t iCopyBytes = iRemainingMipBytes;
+		if (iRemainingMipBytes > iRemainingStaging)
 		{
 			// Partial mip: chunk height must satisfy VUID-vkCmdCopyBufferToImage-imageOffset-07738.
 			// The Vulkan validator interprets minImageTransferGranularity as BLOCK-relative for
@@ -485,24 +453,36 @@ void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, cons
 				break;
 			}
 
-			int64_t iCopyHeight = iChunksThatFit * iChunkHeight;
-			int64_t iCopyBytes = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iCopyHeight);
+			iCopyHeight = iChunksThatFit * iChunkHeight;
+			iCopyBytes = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iCopyHeight);
+		}
 
-			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + iStagingUsed, pData + miCurrentDataOffset, iCopyBytes);
+		std::memcpy(static_cast<std::byte*>(mOptionalStagingBuffer->vmaAllocationInfo.pMappedData) + iStagingUsed, pData + miCurrentDataOffset, iCopyBytes);
 
-			VkBufferImageCopy vkBufferImageCopy {};
-			vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iStagingUsed);
-			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
-			vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(miCurrentLayer);
-			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(miCurrentMipY), .z = 0};
-			vkBufferImageCopy.imageExtent = {.width = static_cast<uint32_t>(iMipWidth), .height = static_cast<uint32_t>(iCopyHeight), .depth = 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+		VkBufferImageCopy vkBufferImageCopy {};
+		vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iStagingUsed);
+		vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
+		vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(miCurrentLayer);
+		vkBufferImageCopy.imageSubresource.layerCount = 1;
+		vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(miCurrentMipY), .z = 0};
+		vkBufferImageCopy.imageExtent = {.width = static_cast<uint32_t>(iMipWidth), .height = static_cast<uint32_t>(iCopyHeight), .depth = 1};
+		vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mOptionalStagingBuffer->vkStagingBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
-			miCurrentDataOffset += iCopyBytes;
-			miCurrentMipY += iCopyHeight;
+		iStagingUsed += iCopyBytes;
+		miCurrentDataOffset += iCopyBytes;
+		miCurrentMipY += iCopyHeight;
+		if (miCurrentMipY < iMipHeight)
+		{
 			break; // staging full
+		}
+
+		miCurrentMipY = 0;
+		++muiCurrentMip;
+		if (muiCurrentMip >= rDimensions.iMipLevels)
+		{
+			muiCurrentMip = 0;
+			++miCurrentLayer;
 		}
 	}
 }
@@ -511,41 +491,19 @@ void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemor
 {
 	if (bDone)
 	{
-		bool bSeparateTransferFamily = gpInstanceManager->miTransferQueueFamilyIndex != gpInstanceManager->miGraphicsQueueFamilyIndex;
-		if (bSeparateTransferFamily)
+		// HandleUploadEarlyOut routes a shared transfer/graphics queue to foreground adoption, so the families differ here.
+		rVkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		rVkImageMemoryBarrier.dstAccessMask = 0;
+		rVkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		rVkImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		// QFOT optional (VK_KHR_maintenance9): no ownership transfer needed, transition layout directly; the barrier's queue
+		//   family indices stay VK_QUEUE_FAMILY_IGNORED. Otherwise this is the queue family release barrier (transfer -> graphics).
+		if (!(gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional))
 		{
-			if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional)
-			{
-				// QFOT optional (VK_KHR_maintenance9): no ownership transfer needed, transition layout directly
-				rVkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				rVkImageMemoryBarrier.dstAccessMask = 0;
-				rVkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				rVkImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				rVkImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				rVkImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			}
-			else
-			{
-				// Queue family release barrier (transfer -> graphics)
-				rVkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				rVkImageMemoryBarrier.dstAccessMask = 0;
-				rVkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				rVkImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				rVkImageMemoryBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex);
-				rVkImageMemoryBarrier.dstQueueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
-			}
-			vkCmdPipelineBarrier(mTransferVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &rVkImageMemoryBarrier);
+			rVkImageMemoryBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex);
+			rVkImageMemoryBarrier.dstQueueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
 		}
-		else
-		{
-			rVkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			rVkImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			rVkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			rVkImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			rVkImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			rVkImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			vkCmdPipelineBarrier(mTransferVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &rVkImageMemoryBarrier);
-		}
+		vkCmdPipelineBarrier(mTransferVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &rVkImageMemoryBarrier);
 	}
 
 	CHECK_VK(vkEndCommandBuffer(mTransferVkCommandBuffer));

@@ -325,7 +325,7 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fPbrDayBrightness = gPbrDayBrightness.mfCurrent;
 	rMainLayout.fPbrAmbient = gPbrIblAmbient.mfCurrent;
 
-	rMainLayout.fPbrMipmapCount = static_cast<float>(gpTextureManager->mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount);
+	rMainLayout.fPbrMipmapCount = static_cast<float>(gpTextureManager->mTextureMap.at(TextureManager::kPrefilteredCrc).mInfo.iMipLevels);
 	rMainLayout.fPbrSmoke = gPbrSmoke.mfCurrent;
 
 	rMainLayout.fPbrBrdfDiffuse = gPbrBrdfDiffuse.mfCurrent;

@@ -88,11 +88,21 @@ Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
 
 	CHECK_VK(volkInitialize());
 
-	Create();
+	try
+	{
+		Create();
 
-	LoadAnimationDataFromEagerChunks();
+		LoadAnimationDataFromEagerChunks();
 
-	gpSwapchainManager->AcquireNextImage();
+		gpSwapchainManager->AcquireNextImage();
+	}
+	catch (...)
+	{
+		// A constructor failure skips ~Graphics, so this catch runs its teardown.
+		meDestroyType = DestroyType::kSurface;
+		Destroy();
+		throw;
+	}
 
 	// Find the monitor refresh rate
 	int64_t iDevices = 0;
@@ -491,16 +501,7 @@ void Graphics::Create()
 	// manager's constructor requires.
 	if (bInitializeBootTextures)
 	{
-		try
-		{
-			mpTextureManager->InitializeBootTextures();
-		}
-		catch (...)
-		{
-			meDestroyType = DestroyType::kSurface;
-			Destroy();
-			throw;
-		}
+		mpTextureManager->InitializeBootTextures();
 	}
 	if (mpParticleManager == nullptr)
 	{

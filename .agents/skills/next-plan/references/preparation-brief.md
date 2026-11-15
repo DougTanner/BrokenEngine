@@ -54,6 +54,13 @@ snapshot's execution card as approved scope, named in the card's
 `### What does this plan do?`, and into `Slices`, so the Plan review step
 reviews it, and every other one returns under `Residuals`.
 
+## Harness criteria
+
+When the card's `Acceptance checks` field in
+[`execution-card.md`](../../../references/execution-card.md) `## Template`
+turns an `/agent-harness` criterion taken from the claimed Plan into a code
+reading, also return that criterion as a weakened-criterion `Verification` row.
+
 ## Citation rule
 
 Find every live Plan other than the claimed one that names the claimed Plan's

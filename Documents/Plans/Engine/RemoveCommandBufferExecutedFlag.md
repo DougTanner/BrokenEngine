@@ -139,14 +139,6 @@ serialization, replay, or shader exposure.
    validation error, hang, or assert. The supplied evidence records no
    harness setup.
 
-## Coordination
-
-The Plan below does not depend on this one, and this one depends on none:
-
-- `Documents/Plans/Engine/TextureUploadCleanup.md` edits the acquire lookup at
-  `CommandBufferManager.cpp:78-80`, near `:59` and `:113`. Whichever lands
-  later re-derives its lines by symbol.
-
 ## Notes
 
 - Nothing was built or run by the authoring sessions; the evidence is from

@@ -48,6 +48,12 @@ Execution card:
   it also names its baseline cohorts and expects a gap outside the
   cohort-to-cohort range the `query_profile` caveat in
   `.agents/skills/agent-harness/references/command-reference.md`
-  `## Durable caveats` defines>
+  `## Durable caveats` defines; an `/agent-harness` check names a command that
+  reaches the path its criterion observes, from that command reference or from
+  a command reference the selected project's
+  `Projects/<Project>/Documents/AgentHarness.md` routes, and when none does,
+  the check is instead the code reading the Change Workflow Run targeted
+  pre-review checks step in `.agents/references/change-workflow.md` prescribes
+  for a path nothing reaches today>
 - Roles: <required and conditional assignments>
 ```

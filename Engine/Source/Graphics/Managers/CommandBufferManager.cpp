@@ -73,9 +73,10 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 	// mSubmitGlobal.Wake() edge published those writes first. Same family as CommandBuffers.h (mFlags/mVkFence).
 	VkCommandBuffer pVkCommandBuffers[2] {};
 	int64_t iCommandBufferCount = 0;
-	if (gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers)
+	VkCommandBuffer vkAcquireCommandBuffer = gpTextureManager->PendingAcquireCommandBuffer();
+	if (vkAcquireCommandBuffer != VK_NULL_HANDLE)
 	{
-		pVkCommandBuffers[iCommandBufferCount++] = gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex);
+		pVkCommandBuffers[iCommandBufferCount++] = vkAcquireCommandBuffer;
 	}
 	pVkCommandBuffers[iCommandBufferCount++] = rCommandBuffers.mGlobalVkCommandBuffer;
 
@@ -196,7 +197,8 @@ void CommandBufferManager::SubmitUiOnlyCommandBuffer(int64_t iFramebufferIndex)
 
 	// With no Global submission to prepend it to, the acquire command buffer goes alone. The ImGui submission's fence signal
 	// covers it in submission order, so the next fence wait still guards its reuse.
-	if (gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers)
+	VkCommandBuffer vkAcquireCommandBuffer = gpTextureManager->PendingAcquireCommandBuffer();
+	if (vkAcquireCommandBuffer != VK_NULL_HANDLE)
 	{
 		VkSubmitInfo vkSubmitInfo
 		{
@@ -206,7 +208,7 @@ void CommandBufferManager::SubmitUiOnlyCommandBuffer(int64_t iFramebufferIndex)
 			.pWaitSemaphores = nullptr,
 			.pWaitDstStageMask = nullptr,
 			.commandBufferCount = 1,
-			.pCommandBuffers = &gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex),
+			.pCommandBuffers = &vkAcquireCommandBuffer,
 			.signalSemaphoreCount = 0,
 			.pSignalSemaphores = nullptr,
 		};

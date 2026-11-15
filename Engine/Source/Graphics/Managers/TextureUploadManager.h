@@ -45,8 +45,6 @@ public:
 	// thread must never touch it.
 	std::unordered_set<common::crc_t> mLightingTextureCrcs;
 
-	std::binary_semaphore mFrameSignal = std::binary_semaphore(0);
-
 private:
 
 	void UploadThread();
@@ -81,6 +79,7 @@ private:
 	int64_t miCurrentMipY = 0;      // Y texel offset within current mip (for sub-mip partial copies)
 	int64_t miCurrentDataOffset = 0;     // Byte offset into LazyChunk.pData
 
+	std::binary_semaphore mFrameSignal = std::binary_semaphore(0);
 	std::thread mUploadThread;
 	std::mutex mWorkMutex;
 	std::atomic<bool> mbUploadPaused = false; // Set by WaitIdle under mWorkMutex, cleared by SignalFrame; UploadThread skips iterations while set
@@ -96,10 +95,7 @@ private:
 	VkCommandBuffer mTransferVkCommandBuffer = VK_NULL_HANDLE;
 	VkFence mTransferVkFence = VK_NULL_HANDLE;
 
-	VkBuffer mStagingVkBuffer = VK_NULL_HANDLE;
-	VmaAllocation mStagingVmaAllocation = VK_NULL_HANDLE;
-	int64_t miStagingSize = 0;
-	void* mpStagingMappedData = nullptr;
+	std::optional<StagingBuffer> mOptionalStagingBuffer; // kiByteBudgetPerFrame bytes
 };
 
 inline TextureUploadManager* gpTextureUploadManager = nullptr;

@@ -19,12 +19,12 @@ static uint32_t AllFramebuffersMask()
 	return (1ui32 << static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers))) - 1ui32;
 }
 
-std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier)
+static std::tuple<int64_t, int64_t> ScaledDetailTextureSize(std::tuple<int64_t, int64_t> baseDetail, float fMultiplier)
 {
-	auto [iWorldDetailX, iWorldDetailY] = FullDetail();
+	auto [iBaseDetailX, iBaseDetailY] = baseDetail;
 
-	int64_t iX = static_cast<int64_t>(fMultiplier * static_cast<float>(iWorldDetailX));
-	int64_t iY = static_cast<int64_t>(fMultiplier * static_cast<float>(iWorldDetailY));
+	int64_t iX = static_cast<int64_t>(fMultiplier * static_cast<float>(iBaseDetailX));
+	int64_t iY = static_cast<int64_t>(fMultiplier * static_cast<float>(iBaseDetailY));
 
 	iX = std::max(iX, 128i64);
 	iY = std::max(iY, 64i64);
@@ -33,6 +33,11 @@ std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier
 	iY = std::min(iY, static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D));
 
 	return std::make_tuple(iX, iY);
+}
+
+std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier)
+{
+	return ScaledDetailTextureSize(FullDetail(), fMultiplier);
 }
 
 std::tuple<int64_t, int64_t> TextureManager::ExtraAreaDetailTextureSize(float fMultiplier)
@@ -51,24 +56,7 @@ std::tuple<int64_t, int64_t> TextureManager::ExtraAreaDetailTextureSize(float fM
 
 std::tuple<int64_t, int64_t> TextureManager::WaterDetailTextureSize(float fMultiplier)
 {
-	auto [iWorldDetailX, iWorldDetailY] = WaterFullDetail();
-
-	int64_t iX = static_cast<int64_t>(fMultiplier * static_cast<float>(iWorldDetailX));
-	int64_t iY = static_cast<int64_t>(fMultiplier * static_cast<float>(iWorldDetailY));
-
-	iX = std::max(iX, 128i64);
-	iY = std::max(iY, 64i64);
-
-	iX = std::min(iX, static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D));
-	iY = std::min(iY, static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D));
-
-	return std::make_tuple(iX, iY);
-}
-
-float TextureManager::DetailTextureAspectRatio()
-{
-	auto [iWorldDetailX, iWorldDetailY] = FullDetail();
-	return static_cast<float>(iWorldDetailX) / static_cast<float>(iWorldDetailY);
+	return ScaledDetailTextureSize(WaterFullDetail(), fMultiplier);
 }
 
 void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, int64_t iArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter)
@@ -223,7 +211,6 @@ void TextureManager::InitializeBootTextures()
 	// Load pre-baked cubemaps from pack data
 	common::crc_t pIblCrcs[] = {kIrradianceCrc, kPrefilteredCrc, kPrefilteredWaterCrc};
 	WaitForTextures(pIblCrcs);
-	mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount = mTextureMap.at(kPrefilteredCrc).mInfo.iMipLevels;
 
 	gpProfileManager->BootStop(kModelTexturesGeneration);
 
@@ -471,8 +458,6 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 		return;
 	}
 
-	bool bNeedAcquireBarrier = gpInstanceManager->miTransferQueueFamilyIndex != gpInstanceManager->miGraphicsQueueFamilyIndex;
-
 	{
 		// Every taken elevation is adopted in this call: teardown subtracts only the untaken list from the counter.
 		// Heap: the taken list is freed here, inside Graphics::UpdateFrameResidency.
@@ -485,10 +470,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			ASSERT(rTemplate.iTextureSlot >= 0 && !rTemplate.bGpuResident);
 			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(islandCrc);
 			rTemplate.elevationTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
-			if (bNeedAcquireBarrier)
-			{
-				rTemplate.elevationTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
-			}
+			rTemplate.elevationTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
 			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // completed elevation adopted: disarm the pending-adoption counter
 		}
 	}
@@ -506,21 +488,27 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			continue;
 		}
 
+		if (eState != ChunkState::kGpuUploadComplete && eState != ChunkState::kDiskLoaded)
+		{
+			continue;
+		}
+
 		// A lighting texture is blurred at adoption; once this acquire command buffer holds a blur, it waits for a later frame.
 		bool bBlurDeferred = (mFlags & TextureManagerFlags::kBlurRecorded) && gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc);
-
-		if (eState == ChunkState::kGpuUploadComplete && !bBlurDeferred)
+		if (bBlurDeferred)
 		{
-			AdoptUploadedChunk(rCrc, rTexture, bNeedAcquireBarrier);
-
-			if (++iAdoptedCount >= kiMaxAdoptionsPerFrame)
-			{
-				break;
-			}
+			continue;
 		}
-		else if (eState == ChunkState::kDiskLoaded && !bBlurDeferred)
+
+		if (eState == ChunkState::kGpuUploadComplete)
 		{
-			// Fallback: upload thread didn't GPU upload (same queue family)
+			// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
+			rTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
+			rTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
+		}
+		else
+		{
+			// kDiskLoaded: no GPU-uploaded image to adopt, so the upload is recorded here.
 
 			TextureUploadManager::ValidateTextureDimensions(rLazyChunk);
 			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, rTexture.mInfo.vkExtent3D.depth);
@@ -534,52 +522,34 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 					std::memcpy(data.data(), &rLazyChunk.pData[iPosition], static_cast<int64_t>(data.size_bytes()));
 				}));
 			}
+		}
 
-			// RecordCreate copied the pixels into staging and no upload thread owns this chunk on the early-out path, so
-			// the CPU buffer is freed here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
-			gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
-			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc, rTexture);
+		// Freeing the CPU buffer here (on the main thread) cannot race the upload thread: kGpuUploadComplete means UploadThread
+		// finished this chunk and released ownership, and no upload thread owns a kDiskLoaded chunk, whose pixels RecordCreate
+		// already copied into staging. The free precedes the kReady store, so a kReady texture holds no buffer and a later
+		// whole reload allocates a new one.
+		gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
+		mTextureDescriptors.UpdateDescriptorsForTexture(rCrc, rTexture);
 
-			rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
-			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
+		rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
+		gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
 
-			if (gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc))
-			{
-				BlurLightingTexture(rCrc, miAcquireFramebufferIndex, EnsureAcquireCommandBufferBegun());
-				mFlags.Set(TextureManagerFlags::kBlurRecorded);
-			}
+		if (gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc))
+		{
+			BlurLightingTexture(rCrc, miAcquireFramebufferIndex, EnsureAcquireCommandBufferBegun());
+			mFlags.Set(TextureManagerFlags::kBlurRecorded);
+		}
 
-			// Only upload one texture a frame
+		// Only one fallback upload a frame; transfer adoptions stop at kiMaxAdoptionsPerFrame
+		if (eState == ChunkState::kDiskLoaded)
+		{
 			break;
 		}
-	}
-}
 
-void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier)
-{
-	LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
-
-	// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
-	rTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
-
-	if (bNeedAcquireBarrier)
-	{
-		rTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
-	}
-
-	// Reaching kGpuUploadComplete means the transfer thread (UploadThread) finished this chunk and released
-	// ownership, so freeing its CPU buffer here (on the main thread) cannot race that thread. The free precedes the
-	// kReady store, so a kReady texture holds no buffer and a later whole reload allocates a new one.
-	gpFileManager->mpPackChunks->FreeLazyChunkBuffer(rLazyChunk);
-	mTextureDescriptors.UpdateDescriptorsForTexture(crc, rTexture);
-
-	rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
-	gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
-
-	if (gpTextureUploadManager->mLightingTextureCrcs.contains(crc))
-	{
-		BlurLightingTexture(crc, miAcquireFramebufferIndex, EnsureAcquireCommandBufferBegun());
-		mFlags.Set(TextureManagerFlags::kBlurRecorded);
+		if (++iAdoptedCount >= kiMaxAdoptionsPerFrame)
+		{
+			break;
+		}
 	}
 }
 
@@ -619,6 +589,16 @@ void TextureManager::EndAcquireCommandBuffer()
 	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers);
 }
 
+VkCommandBuffer TextureManager::PendingAcquireCommandBuffer() const
+{
+	if (!(mFlags & TextureManagerFlags::kPendingAcquireBarriers))
+	{
+		return VK_NULL_HANDLE;
+	}
+
+	return mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex);
+}
+
 void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 {
 	ScopedSlowOperation scopedSlowOperation(kGraphics, "Required texture readiness wait");
@@ -642,7 +622,8 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 			EndAcquireCommandBuffer();
 
 			// Flush pending acquire barriers since we're not in the render loop
-			if (mFlags & TextureManagerFlags::kPendingAcquireBarriers)
+			VkCommandBuffer vkAcquireCommandBuffer = PendingAcquireCommandBuffer();
+			if (vkAcquireCommandBuffer != VK_NULL_HANDLE)
 			{
 				VkFenceCreateInfo vkFenceCreateInfo
 				{
@@ -653,7 +634,6 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 				VkFence vkFence = VK_NULL_HANDLE;
 				CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &vkFence));
 
-				VkCommandBuffer vkAcquireCommandBuffer = mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex);
 				VkSubmitInfo vkSubmitInfo
 				{
 					.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,

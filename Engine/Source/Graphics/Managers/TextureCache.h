@@ -30,7 +30,6 @@ public:
 	// via ToVkImageLayout). bFromSwapchain still selects the barrier stage/access masks.
 	static void CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, int64_t iMipmapLevels, int64_t iArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData);
 
-	int64_t miPhysicallyBasedRenderingCubeMipmapCount = 0;
 	Texture mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture;
 };
 

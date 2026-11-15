@@ -289,6 +289,6 @@ s after the trace started.
   `VirtualFree(MEM_DECOMMIT)` of the texture chunk's CPU pool range. Fixed:
   lazy pack chunk CPU buffers now come from mimalloc
   (`PackChunks::AllocateLazyChunkBuffer`), and
-  `TextureManager::AdoptUploadedChunk` frees the texture buffer back to it
+  `TextureManager::ProcessPendingTextures` frees the texture buffer back to it
   through `PackChunks::FreeLazyChunkBuffer` with no OS call; a 185 s Profile run
   then measured a 470 us maximum adoption over 741 adoptions.

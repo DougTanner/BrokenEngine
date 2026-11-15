@@ -27,7 +27,7 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    in
    [`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
    `## Tier evidence ceiling`. Done when every template field is filled under
-   that heading.
+   that heading as the template states.
 5. Confirm the drafted file's structure with one run from the worktree root:
 
    ```powershell
