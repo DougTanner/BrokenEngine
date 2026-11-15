@@ -43,8 +43,9 @@ struct CellStaticData
 	mutable std::vector<NavData> navigationData;
 
 	// A completed navigation build can have no vertices (degenerate or underwater contours), so emptiness cannot
-	// signal an unbuilt cell. BuildCellNavigationData on the server and Read on the client set this flag; a cell a save
-	// reload creates starts with it clear. This flag is outside the CRC and save format.
+	// signal an unbuilt cell. BuildNavigationDataIfUnbuilt on the server, and Read and ClientSessionRuntime's
+	// navigation install on the client, set this flag; a cell a save reload creates starts with it clear. This flag
+	// is outside the CRC and save format.
 	mutable common::Flags<CellStaticDataFlags> flags;
 
 	// Derived from placements and resident heightmaps, outside persistence and CRC. Live clients prepare it
@@ -61,6 +62,11 @@ struct CellStaticData
 	// Network-only compact geometry and server-built visibility; Read rebuilds navigation acceleration.
 	void Write(std::ostream& rStream) const;
 	void Read(std::istream& rStream);
+
+#if defined(BT_SERVER)
+	// Writes only this cell's own members, so per-cell frame-tick threads may call it in parallel.
+	void BuildNavigationDataIfUnbuilt() const;
+#endif
 
 #if defined(BT_CLIENT)
 	void BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const;

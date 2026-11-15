@@ -76,13 +76,13 @@ struct ShipTactic
 // one side only; every other result clears ShipFlags::kVeerOff.
 [[nodiscard]] ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
 
-// Veer-off until kfVeerOffEndDistanceSquared from the veer-off point, else Attack the kept attack target rRegistryTarget
-// on its plane (FindAttackTarget from itself in x/y, at or below iHighestFlightPlane), starting a veer-off as
-// ChooseFighterFleetTactic does, or route to its next waypoint on clearance tier iClearanceTier's graph while hidden on
-// that tier or from the pick. kTargetFlagship (the nearest enemy flagship, when the previous frame holds one),
+// For a Fighter: veer-off until kfVeerOffEndDistanceSquared from the veer-off point, else Attack the kept attack target
+// rRegistryTarget on its plane (FindAttackTarget from itself in x/y, at or below the Fighter's highest plane), starting a
+// veer-off as ChooseFighterFleetTactic does, or route to its next waypoint on the Fighter clearance tier's graph while
+// hidden on that tier or from the pick. kTargetFlagship (the nearest enemy flagship, when the previous frame holds one),
 // kSharedTarget (FindSquadronTarget), else kSeekAndDestroy (FindAttackTarget's no-sight pick from itself) impose the
 // target even while hidden; the last two store rRegistryTarget even on a veer-off tick. Returns false, leaving rTactic
 // unchanged, when not veering off and the previous frame holds no such enemy.
-[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic);
+[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic);
 
 } // namespace game

@@ -244,6 +244,9 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 inline bool gbWaterFoamReset = true; // Re-armed when the retained foam textures are created.
 // Recorded foam commands and published foam uniforms must both follow this predicate.
 bool WaterFoamActive();
+// One water normal band's size divided by Water Scale. RenderLightingMain publishes it and PopulateWaterReducedUv
+// reduces the normal origins with it; a different value in either would make the pattern drift with camera motion.
+float WaterNormalSize(float fSize);
 
 // GameBase publishes gameplay pause before Global so render publishers share one client-only decision.
 inline bool gbGameplayPaused = false;

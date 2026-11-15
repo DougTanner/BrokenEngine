@@ -50,7 +50,6 @@ inline constexpr NetworkSimulationBounds GetNetworkSimulationBounds(NetworkSimul
 {
 	switch (eLevel)
 	{
-		case NetworkSimulationLevel::kDisabled:     return {.iCrcMinimum = 62,  .iAssumedMaximum = 2,  .iFastReplayMaximum = 2,  .iStatusReplayMaximum = 2,  .iKnockOnReplayMaximum = 2};
 		case NetworkSimulationLevel::kEastCoast:    return {.iCrcMinimum = 50,  .iAssumedMaximum = 8,  .iFastReplayMaximum = 6, .iStatusReplayMaximum = 10, .iKnockOnReplayMaximum = 10};
 		case NetworkSimulationLevel::kWestCoast:    return {.iCrcMinimum = 40, .iAssumedMaximum = 20, .iFastReplayMaximum = 20, .iStatusReplayMaximum = 20, .iKnockOnReplayMaximum = 24};
 		case NetworkSimulationLevel::kEurope:       return {.iCrcMinimum = 32, .iAssumedMaximum = 32, .iFastReplayMaximum = 32, .iStatusReplayMaximum = 30, .iKnockOnReplayMaximum = 36};
@@ -200,36 +199,13 @@ inline void DispatchOrEnqueue(std::deque<DelayedPacket>& rDelayedPackets, Networ
 }
 
 template <typename FNHANDLEPACKET>
-inline void ProcessDelayed(std::deque<DelayedPacket>& rDelayedPackets, FNHANDLEPACKET HandlePacket)
-{
-	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	while (!rDelayedPackets.empty() && rDelayedPackets.front().releaseTime <= now)
-	{
-		HandlePacket(rDelayedPackets.front());
-		rDelayedPackets.pop_front();
-	}
-}
-
-template <typename FNHANDLEPACKET>
-inline void FlushDelayed(std::deque<DelayedPacket>& rDelayedPackets, FNHANDLEPACKET HandlePacket)
-{
-	while (!rDelayedPackets.empty())
-	{
-		HandlePacket(rDelayedPackets.front());
-		rDelayedPackets.pop_front();
-	}
-}
-
-template <typename FNHANDLEPACKET>
 inline void ProcessOrFlush(std::deque<DelayedPacket>& rDelayedPackets, bool bFastForward, FNHANDLEPACKET HandlePacket)
 {
-	if (bFastForward)
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	while (!rDelayedPackets.empty() && (bFastForward || rDelayedPackets.front().releaseTime <= now))
 	{
-		FlushDelayed(rDelayedPackets, HandlePacket);
-	}
-	else
-	{
-		ProcessDelayed(rDelayedPackets, HandlePacket);
+		HandlePacket(rDelayedPackets.front());
+		rDelayedPackets.pop_front();
 	}
 }
 

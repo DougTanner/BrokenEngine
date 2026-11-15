@@ -89,18 +89,19 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   targeting and the Fighter beam in PostCollision read the current frame, after
   every ship's Update. Changing a read's source frame shifts CRC-visible
   behavior by one tick.
-- Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
-  `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
-  Each type's PostRender `PostRead` rejects a non-finite or out-of-range
-  navigation delay, an unknown controller, a nonzero `pClientGuids` or
-  `pGlobalIds` on a row that is not `ShipController::kFleet`, a target flight
-  plane the type disallows, and an AI direction that fails
-  `IsShipHeadingValid`. On every Frame read, Interpolate `PostRead` requires a
-  finite Fighter or Omni height at or above the lowest plane, allowing
-  terrain-raised heights above the highest plane; Battleships retain the
-  lowest-to-highest plane range. Every type rejects a stored plane that is
-  neither `kuiNoFlightPlane` nor allowed for the type, and a heading that fails
-  `IsShipHeadingValid`.
+- Every ship type's `pNavigationDelays` stays within the range
+  `IsNavigationDelayInRange` tests, between `kfMinimumNavigationDelaySeconds`
+  and `kfMaximumNavigationDelaySeconds` (`ShipTypes.h`), which every
+  navigation-delay admission shares. Each type's PostRender `PostRead` rejects
+  a non-finite or out-of-range navigation delay, an unknown controller, a
+  nonzero `pClientGuids` or `pGlobalIds` on a row that is not
+  `ShipController::kFleet`, a target flight plane the type disallows, and an AI
+  direction that fails `IsShipHeadingValid`. On every Frame read, Interpolate
+  `PostRead` requires a finite Fighter or Omni height at or above the lowest
+  plane, allowing terrain-raised heights above the highest plane; Battleships
+  retain the lowest-to-highest plane range. Every type rejects a stored plane
+  that is neither `kuiNoFlightPlane` nor allowed for the type, and a heading
+  that fails `IsShipHeadingValid`.
 - A ship's target flight plane lives in its orders, set at spawn and changed by
   `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
   by the random-spawn Omni chase (`../Fighters/AGENTS.md`,

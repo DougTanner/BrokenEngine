@@ -487,12 +487,6 @@ tree:
   `.flags` member) or the `spawnFlags` block of `OmnisPostRender::Spawn`. It
   stays a separate Plan because it changes simulation results, so a replay
   mismatch could not be attributed between it and this change.
-- `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` edits
-  `Fighters.h`, `Battleships.h`, `Fighters.cpp`, `Battleships.cpp`, and
-  `Omnis.cpp` elsewhere, and (its item 14) the body and comment of
-  `IsNavigationDelayInRange`, which this Plan keeps; it keeps the predicate's
-  name and signature and leaves the `SpawnInfo::navigationDelay` defaults this
-  Plan deletes untouched.
 - `Documents/Plans/Game/FleetOwnedSquadronState.md`:
   `engine::kiProtocolVersion` and `FC/Ships/AGENTS.md` `## Ship Invariants`.
 - `Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md`:

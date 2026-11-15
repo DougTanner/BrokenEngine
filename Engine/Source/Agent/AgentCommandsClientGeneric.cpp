@@ -170,7 +170,6 @@ static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]
 	// BeginCaptureAndDefer temporarily restores an iconic window without activation, waits for its live swapchain,
 	// then returns it to the minimized state after the capture result arrives.
 	engine::ScreenshotRequest request;
-	request.bPublishResult = true;
 	if (rParameters.contains("path"))
 	{
 		request.path = PathFromParameter(rParameters.at("path"));
@@ -619,7 +618,6 @@ static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_u
 	}
 
 	engine::DumpRenderTargetRequest request;
-	request.bPublishResult = true;
 	request.name = rParameters.at("name").get<std::string>();
 	if (rParameters.contains("index"))
 	{

@@ -17,24 +17,36 @@ static std::optional<nlohmann::json> sOptionalCaptureResult;
 static int64_t siCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
 static int64_t siCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
 
-static std::string PathToString(const std::filesystem::path& rPath)
-{
-	std::u8string pathString = rPath.u8string();
-	return std::string(reinterpret_cast<const char*>(pathString.c_str()), pathString.size());
-}
-
-static void ReportCaptureFailure(std::string_view error, bool bPublishResult, int64_t iCaptureToken)
+static void ReportCaptureFailure(std::string_view error, int64_t iCaptureToken)
 {
 	LOG(kGraphics, kWarning, "{}", error);
-	if (bPublishResult)
+	nlohmann::json result;
+	result["error"] = error;
+	SetCaptureResult(iCaptureToken, std::move(result));
+}
+
+// %TEMP%\Screenshots, created when missing. Reports failureText and returns an empty path when GetTempPathW fails.
+static std::filesystem::path ResolveDefaultCaptureDirectory(std::string_view failureText, int64_t iCaptureToken)
+{
+	wchar_t pcDirectory[MAX_PATH] {};
+	int64_t iTemporaryPathLength = static_cast<int64_t>(GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory));
+	if (iTemporaryPathLength == 0 || iTemporaryPathLength >= std::ssize(pcDirectory))
 	{
-		nlohmann::json result;
-		result["error"] = error;
-		SetCaptureResult(iCaptureToken, std::move(result));
+		ReportCaptureFailure(failureText, iCaptureToken);
+		return {};
 	}
+	std::filesystem::path directory = pcDirectory;
+	directory /= "Screenshots";
+	std::filesystem::create_directories(directory);
+	return directory;
 }
 
 static constexpr bool IsBlueGreenRedAlpha(VkFormat vkFormat);
+
+static constexpr uint32_t SwapRedBlue(uint32_t uiPixel)
+{
+	return ((uiPixel & 0x00FF0000) >> 16) | (uiPixel & 0x0000FF00) | ((uiPixel & 0x000000FF) << 16) | (uiPixel & 0xFF000000);
+}
 
 int64_t ResetCaptureResult()
 {
@@ -119,9 +131,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 				for (int64_t iColumn = 0; iColumn < vkExtent3D.width; ++iColumn)
 				{
 					uint32_t uiAlphaRedGreenBlue = puiAlphaRedGreenBlue[i * vkExtent3D.width + iColumn];
-					puiAlphaBlueGreenRed[i * vkExtent3D.width + iColumn] = bSwapRedBlue
-						? ((uiAlphaRedGreenBlue & 0x00FF0000) >> 16) | ((uiAlphaRedGreenBlue & 0x0000FF00) >> 0) | ((uiAlphaRedGreenBlue & 0x000000FF) << 16) | 0xFF000000
-						: (uiAlphaRedGreenBlue & 0x00FFFFFF) | 0xFF000000;
+					puiAlphaBlueGreenRed[i * vkExtent3D.width + iColumn] = bSwapRedBlue ? SwapRedBlue(uiAlphaRedGreenBlue) | 0xFF000000 : (uiAlphaRedGreenBlue & 0x00FFFFFF) | 0xFF000000;
 				}
 			}
 
@@ -149,16 +159,11 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			}
 			else
 			{
-				wchar_t pcDirectory[MAX_PATH] {};
-				int64_t iTemporaryPathLength = static_cast<int64_t>(GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory));
-				if (iTemporaryPathLength == 0 || iTemporaryPathLength >= std::ssize(pcDirectory))
+				filename = ResolveDefaultCaptureDirectory("SaveScreenshot GetTempPathW failed or returned insufficient capacity", rRequest.iCaptureToken);
+				if (filename.empty())
 				{
-					ReportCaptureFailure("SaveScreenshot GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.iCaptureToken);
 					return;
 				}
-				filename = pcDirectory;
-				filename /= "Screenshots";
-				std::filesystem::create_directories(filename);
 				filename /= std::format("agent_{}.{}", iScreenshot, rRequest.bPng ? "png" : "jpg");
 			}
 			LOG(kGraphics, kDebug, "  {}", filename);
@@ -167,7 +172,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			{
 				if (stbi_write_png(reinterpret_cast<const char*>(filename.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, pPixels, static_cast<int>(iWidth * 4)) == 0)
 				{
-					ReportCaptureFailure("SaveScreenshot stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+					ReportCaptureFailure("SaveScreenshot stbi_write_png failed", rRequest.iCaptureToken);
 					return;
 				}
 			}
@@ -175,31 +180,20 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			{
 				if (stbi_write_jpg(reinterpret_cast<const char*>(filename.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, pPixels, static_cast<int>(rRequest.iQuality)) == 0)
 				{
-					ReportCaptureFailure("SaveScreenshot stbi_write_jpg failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+					ReportCaptureFailure("SaveScreenshot stbi_write_jpg failed", rRequest.iCaptureToken);
 					return;
 				}
 			}
 
-			// Publish only when the caller requested a result; ordinary gameplay F9 dev saves leave publication
-			// disabled so their result cannot be consumed as the response to a concurrent agent capture.
-			if (rRequest.bPublishResult)
-			{
-				nlohmann::json result;
-				result["path"] = PathToString(filename);
-				result["width"] = iWidth;
-				result["height"] = iHeight;
-				SetCaptureResult(rRequest.iCaptureToken, std::move(result));
-			}
+			nlohmann::json result;
+			result["path"] = common::ToString(filename.native());
+			result["width"] = iWidth;
+			result["height"] = iHeight;
+			SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 		}
 		catch (const std::exception& rException)
 		{
-			LOG(kGraphics, kError, "SaveScreenshot failed: {}", rException.what());
-			if (rRequest.bPublishResult)
-			{
-				nlohmann::json result;
-				result["error"] = rException.what();
-				SetCaptureResult(rRequest.iCaptureToken, std::move(result));
-			}
+			ReportCaptureFailure(std::format("SaveScreenshot failed: {}", rException.what()), rRequest.iCaptureToken);
 		}
 	}, common::kiMinWorkbufferSize, common::kThreadScreenshot));
 }
@@ -403,16 +397,11 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 		{
 			static std::atomic<int64_t> siDump(1);
 			int64_t iDump = siDump.fetch_add(1);
-			wchar_t pcDirectory[MAX_PATH] {};
-			int64_t iTemporaryPathLength = static_cast<int64_t>(GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory));
-			if (iTemporaryPathLength == 0 || iTemporaryPathLength >= std::ssize(pcDirectory))
+			basePath = ResolveDefaultCaptureDirectory("DumpRenderTarget GetTempPathW failed or returned insufficient capacity", rRequest.iCaptureToken);
+			if (basePath.empty())
 			{
-				ReportCaptureFailure("DumpRenderTarget GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.iCaptureToken);
 				return;
 			}
-			basePath = pcDirectory;
-			basePath /= "Screenshots";
-			std::filesystem::create_directories(basePath);
 			basePath /= std::format("dump_{}_{}", rRequest.name, iDump);
 		}
 
@@ -431,10 +420,10 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			// !binStream tests failbit and badbit after close, covering a failed open, a short write, and a failed close.
 			if (!binStream)
 			{
-				ReportCaptureFailure("DumpRenderTarget raw .bin write failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget raw .bin write failed", rRequest.iCaptureToken);
 				return;
 			}
-			result["raw"] = PathToString(binPath);
+			result["raw"] = common::ToString(binPath.native());
 		}
 
 		std::filesystem::path pngPath = basePath;
@@ -448,8 +437,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			{
 				for (int64_t i = 0; i < iPixels; ++i)
 				{
-					uint32_t uiBlueGreenRedAlpha = pSource[i];
-					redGreenBlueAlphaPixels.at(i) = ((uiBlueGreenRedAlpha & 0x00FF0000) >> 16) | ((uiBlueGreenRedAlpha & 0x0000FF00) >> 0) | ((uiBlueGreenRedAlpha & 0x000000FF) << 16) | (uiBlueGreenRedAlpha & 0xFF000000);
+					redGreenBlueAlphaPixels.at(i) = SwapRedBlue(pSource[i]);
 				}
 			}
 			else
@@ -458,10 +446,10 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			}
 			if (stbi_write_png(reinterpret_cast<const char*>(pngPath.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, redGreenBlueAlphaPixels.data(), static_cast<int>(iWidth * 4)) == 0)
 			{
-				ReportCaptureFailure("DumpRenderTarget color stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget color stbi_write_png failed", rRequest.iCaptureToken);
 				return;
 			}
-			result["path"] = PathToString(pngPath);
+			result["path"] = common::ToString(pngPath.native());
 		}
 		else if (IsSingleChannelNormalizable(vkFormat))
 		{
@@ -488,30 +476,21 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			}
 			if (stbi_write_png(reinterpret_cast<const char*>(pngPath.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 1, gray.data(), static_cast<int>(iWidth)) == 0)
 			{
-				ReportCaptureFailure("DumpRenderTarget grayscale stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget grayscale stbi_write_png failed", rRequest.iCaptureToken);
 				return;
 			}
-			result["path"] = PathToString(pngPath);
+			result["path"] = common::ToString(pngPath.native());
 			result["min"] = fMin;
 			result["max"] = fMax;
 		}
 		// else: format not PNG-encodable; pre-validation guarantees rRequest.bRaw, so the .bin above is the output.
 
 		LOG(kGraphics, kDebug, "DumpRenderTarget {} -> {}", rRequest.name, basePath);
-		if (rRequest.bPublishResult)
-		{
-			SetCaptureResult(rRequest.iCaptureToken, std::move(result));
-		}
+		SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 	}
 	catch (const std::exception& rException)
 	{
-		LOG(kGraphics, kError, "DumpRenderTarget failed: {}", rException.what());
-		if (rRequest.bPublishResult)
-		{
-			nlohmann::json result;
-			result["error"] = rException.what();
-			SetCaptureResult(rRequest.iCaptureToken, std::move(result));
-		}
+		ReportCaptureFailure(std::format("DumpRenderTarget failed: {}", rException.what()), rRequest.iCaptureToken);
 	}
 }
 

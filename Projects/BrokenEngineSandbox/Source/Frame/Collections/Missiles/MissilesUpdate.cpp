@@ -156,34 +156,25 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// Retained targets steer toward the source's previous-frame position.
+			// Retained targets steer toward the source's previous-frame position, every other missile along its stored
+			// direction.
+			XMVECTOR vecWantedDirection = vecStoredDirection;
+			float fTurnRate = kfDeltaRotationTowardsStored;
 			if (bRetained)
 			{
-				deltaRotationDelay -= deltaTime;
-
-				XMVECTOR vecTargetPosition = retained.vecPreviousPosition;
-				XMVECTOR vecToTargetNormal = XMVector3Normalize(XMVectorSubtract(vecTargetPosition, rCurrentInterpolate.pVecPositions[i]));
-				float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecToTargetNormal));
-				float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfDeltaRotationTowardsTarget : -kfDeltaRotationTowardsTarget;
-
-				float fDelayPercent = std::clamp(1.0f - deltaRotationDelay / kMissileDeltaRotationDelay, 0.0f, 1.0f);
-				fWantedDeltaRotation *= fDelayPercent;
-
-				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
+				vecWantedDirection = XMVector3Normalize(XMVectorSubtract(retained.vecPreviousPosition, rCurrentInterpolate.pVecPositions[i]));
+				fTurnRate = kfDeltaRotationTowardsTarget;
 			}
-			else
-			{
-				deltaRotationDelay -= deltaTime;
 
-				XMVECTOR vecCurrentDirection = rCurrentInterpolate.pVecDirections[i];
-				float fDirectionCrossZ = XMVectorGetZ(XMVector3Cross(vecCurrentDirection, vecStoredDirection));
-				float fWantedDeltaRotation = fDirectionCrossZ > 0.0f ? kfDeltaRotationTowardsStored : -kfDeltaRotationTowardsStored;
+			deltaRotationDelay -= deltaTime;
 
-				float fDelayPercent = std::clamp(1.0f - deltaRotationDelay / kMissileDeltaRotationDelay, 0.0f, 1.0f);
-				fWantedDeltaRotation *= fDelayPercent;
+			float fDirectionCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecWantedDirection));
+			float fWantedDeltaRotation = fDirectionCrossZ > 0.0f ? fTurnRate : -fTurnRate;
 
-				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
-			}
+			float fDelayPercent = std::clamp(1.0f - deltaRotationDelay / kMissileDeltaRotationDelay, 0.0f, 1.0f);
+			fWantedDeltaRotation *= fDelayPercent;
+
+			fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
 
 			fDeltaRotation = common::ClampMagnitude(fDeltaRotation, rCurrent.pfDeltaRotationMaximum[i]);
 

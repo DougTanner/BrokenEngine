@@ -10,7 +10,7 @@
     <Filter Include="Game\Data\Shaders"><UniqueIdentifier>{781063cd-4b26-44ba-b092-a6e59309bbca}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Source\Pch.cpp"><Filter>Viewer</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp"><Filter>Engine</Filter></ClCompile>
     <ClInclude Include="..\..\Source\Pch.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h"><Filter>Engine\Data\Shaders</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h"><Filter>Game\Data\Shaders</Filter></ClInclude>
@@ -328,6 +328,5 @@
     <ClInclude Include="..\..\Source\Graphics\Camera.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\Source\ModelViewerApplication.h"><Filter>Viewer</Filter></ClInclude>
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h"><Filter>Viewer</Filter></ClInclude>
-    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h"><Filter>Viewer</Filter></ClInclude>
   </ItemGroup>
 </Project>

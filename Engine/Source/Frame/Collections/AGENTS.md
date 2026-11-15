@@ -74,10 +74,11 @@ SOA layout change.
 
 - Optional ID maps are part of collection identity. Add/remove/swap operations
   must keep map entries and row indices synchronized.
-- Collection code calls `RemoveIndexableElement()` only from the removals the
-  `## Core Contract` row-lifecycle bullet names: the `CompactCollections` fold
-  and a `DestroyExpiredControlled` callback. Generated insertion callables are
-  invoked exactly once so each helper preserves its assigned ID stream.
+- Collection code calls `DestroyElement()` on a mapped row only from the
+  removals the `## Core Contract` row-lifecycle bullet names: the
+  `CompactCollections` fold and a `DestroyExpiredControlled` callback.
+  Generated insertion callables are invoked exactly once so each helper
+  preserves its assigned ID stream.
 - ID maps are not serialized. Once both frame halves are read,
   `engine::ValidateCollectionPair` checks each pair's count/capacity parity and
   then rebuilds the map from the paired PostRender `pIds`, rejecting a zero or

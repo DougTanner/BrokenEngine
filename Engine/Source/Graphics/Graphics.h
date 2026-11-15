@@ -72,11 +72,9 @@ struct ScreenshotRequest
 	int64_t iMaxWidth = 1'568;
 	bool bPng = false;
 	int64_t iQuality = 80;
-	// Publish the async save's result JSON for the caller to consume from the capture-result slot.
-	// Ordinary gameplay F9 dev saves leave publication disabled.
-	bool bPublishResult = false;
 	// Capture token minted and made active by ResetCaptureResult(); the async save publishes only while it remains
-	// active, so an overlapping abandoned encoder cannot replace a newer request's result. 0 when no result is requested.
+	// active, so an overlapping abandoned encoder cannot replace a newer request's result. 0 for F9 dev saves, whose
+	// result no caller consumes.
 	int64_t iCaptureToken = 0;
 };
 
@@ -90,9 +88,6 @@ struct DumpRenderTargetRequest
 	int64_t iChannel = 0;
 	std::filesystem::path path;
 	bool bRaw = false;
-	// As ScreenshotRequest::bPublishResult — set only by the agent dump handler so the encode result reaches the
-	// deferred-response poll and no non-agent save is consumed as the response to a concurrent agent capture.
-	bool bPublishResult = false;
 	// As ScreenshotRequest::iCaptureToken — publication succeeds only while this request remains active, so an
 	// overlapping abandoned encoder cannot replace a newer request's result. 0 for non-agent dumps.
 	int64_t iCaptureToken = 0;

@@ -302,7 +302,6 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 	}
 
 	bool LogDifferences(const FightersPostRender& rOther) const;
-	static void AvoidTerrain(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iStart, int64_t iEnd);
 
 	struct SpawnInfo
 	{

@@ -15,13 +15,6 @@
 namespace engine
 {
 
-// JSON path echoes require UTF-8 bytes.
-static std::string PathToUtf8(const std::filesystem::path& rPath)
-{
-	std::u8string u8String = rPath.u8string();
-	return std::string(reinterpret_cast<const char*>(u8String.c_str()), u8String.size());
-}
-
 static bool IsWindowsReservedDeviceBasename(std::string_view utf8)
 {
 	std::string basename(utf8.substr(0, utf8.find('.')));
@@ -135,9 +128,9 @@ static void CommandSave(const nlohmann::json& rParameters, nlohmann::json& rResu
 	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
 	if (!game::gpGame->mServerSaveLoad.ServerSave(file))
 	{
-		throw std::runtime_error("save failed to write '" + PathToUtf8(file) + "'");
+		throw std::runtime_error("save failed to write '" + common::ToString(file.native()) + "'");
 	}
-	rResult["file"] = PathToUtf8(file);
+	rResult["file"] = common::ToString(file.native());
 }
 
 void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -161,7 +154,7 @@ void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResult)
 	{
 		game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused);
 	}
-	rResult["file"] = PathToUtf8(file);
+	rResult["file"] = common::ToString(file.native());
 	rResult["resetToFresh"] = bResetToFresh;
 	rResult["paused"] = static_cast<bool>(game::gpGame->mGameFlags & engine::GameFlags::kPaused);
 }

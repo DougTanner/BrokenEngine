@@ -37,6 +37,9 @@ top of the file. A session reviewing the log removes each row it handles.
   the game builds its active-work span from ReconcileDispatcher's public mWorks
   plus the dispatch result's iActiveCount — have ReconcileDispatchResult carry
   the span over the active works and make mWorks private
+- 2026-11-15 claude/4028f52d-a875-45f8-b548-c1851fe1804e — Size observation —
+  ShaderGlobalLayout.h is 5276 bt-token-v1 tokens, above the ~5,000 threshold;
+  splitting it is follow-up work outside this change
 - 2026-11-14 claude/179efbf3-916e-4701-9a2c-e96ffd751f75 —
   Engine/Source/Graphics/Managers/DeviceManager.cpp:400 — drop the
   std::filesystem::exists pre-check and its filesystem_error catch and let the
@@ -78,12 +81,12 @@ top of the file. A session reviewing the log removes each row it handles.
   return — let those branches fall through to one tail assignment, with only
   the two deferred branches returning early.
 - 2026-11-14 claude/5939deae-ae49-4fa3-8c68-a2981f6a14ef —
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.h:125
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.h:85
   — drop NextRouteWaypoint's `rbFinal` out parameter and the snap-and-compare at
   ShipBehaviours.cpp:542 that fills it, since no caller reads the result
-  (Battleships.cpp:508, Omnis.cpp:673 and :697, ShipBehaviours.cpp:564 and :828,
-  FleetCoordination.cpp:118) — makes unnecessary:
-  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:507
+  (Battleships.cpp:496, Omnis.cpp:658 and :682, ShipBehaviours.cpp:564 and :839,
+  FleetCoordination.cpp:119) — makes unnecessary:
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/Battleships.cpp:495
 - 2026-11-14 claude/d2a0bc7b-1e0b-4fb0-b1fc-8d003a2e91f6 —
   Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp:165 —
   in ApplyOwnedEntityEvent, find the entity once and either write its coordinate

@@ -397,14 +397,7 @@ void CompactCollections(FRAME& rFrame, const INTERPOLATE_TUPLE& rInterpolateColl
 			return IsCompacted(rPostRender, i);
 		}, [&](int64_t i)
 		{
-			if constexpr (HasIdToIndex<std::remove_cvref_t<decltype(rInterpolate)>>)
-			{
-				RemoveIndexableElement(rInterpolate, rPostRender, rPostRender.pIds[i], rInterpolate.Members(), rPostRender.Members());
-			}
-			else
-			{
-				DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
-			}
+			DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
 		});
 	}(std::get<static_cast<size_t>(INDICES)>(rInterpolateCollections), std::get<static_cast<size_t>(INDICES)>(rPostRenderCollections)), ...);
 }

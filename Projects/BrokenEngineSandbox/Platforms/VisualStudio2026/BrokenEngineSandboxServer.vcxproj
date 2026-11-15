@@ -418,10 +418,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\MissilesUpdate.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Fighters\Fighters.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersCombat.cpp" />
-    <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersNavigation.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Battleships\Battleships.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsCombat.cpp" />
-    <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsNavigation.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\FleetCoordination.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.cpp" />

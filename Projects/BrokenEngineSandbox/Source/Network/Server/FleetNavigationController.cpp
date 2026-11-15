@@ -20,14 +20,7 @@ namespace game
 // unbuilt cell where the recording had a built one.
 static bool FlagshipReachesEdge(const Frame& rFlagshipFrame, ShipLocator flagship, const engine::CellStaticData& rStaticData, int64_t iDirection)
 {
-	if (!(rStaticData.flags & engine::CellStaticDataFlags::kNavigationDataBuilt))
-	{
-		// Heap: BuildCellNavigationData grows the per-graph navigationData vector and each graph's vertex, polygon, and visibility-edge vectors, and
-		// this path runs on the main thread inside the armed main loop
-		ScopedSuppressAllocationTracking suppress;
-		engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-		rStaticData.flags.Set(engine::CellStaticDataFlags::kNavigationDataBuilt);
-	}
+	rStaticData.BuildNavigationDataIfUnbuilt();
 
 	XMVECTOR vecPosition = ShipPosition(rFlagshipFrame.interpolate, flagship);
 	int64_t iTargetFlightPlane = VisitShip(rFlagshipFrame, flagship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
@@ -75,18 +68,13 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			// Drain cellChangeTimerSeconds only while the flagship is at wantedCoordinate, so the cycle is transit plus
 			// navigationDelaySeconds of idle time. Drain there even in cross-cell mode; an expired timer fires when that mode
 			// ends instead of freezing. The fleet step runs once per tick, so each pass drains one tick.
-			if (rFlagship.coordinate == rFleet.wantedCoordinate)
-			{
-				rFleet.cellChangeTimerSeconds -= std::chrono::duration<float>(engine::kfDeltaTime);
-			}
-
-			if (rFleet.cellChangeTimerSeconds.count() > 0.0f)
+			if (!(rFlagship.coordinate == rFleet.wantedCoordinate))
 			{
 				continue;
 			}
+			rFleet.cellChangeTimerSeconds -= std::chrono::duration<float>(engine::kfDeltaTime);
 
-			// A cross-cell move between ticks can move the flagship after the timer last drained.
-			if (!(rFlagship.coordinate == rFleet.wantedCoordinate))
+			if (rFleet.cellChangeTimerSeconds.count() > 0.0f)
 			{
 				continue;
 			}

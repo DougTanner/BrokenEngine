@@ -26,7 +26,7 @@ static bool HasTerrainCollision(int64_t iFlightPlane)
 	return engine::gpFlightPlanes->Plane(iFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision;
 }
 
-AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour, int64_t iFlightPlane)
+AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour, int64_t iFlightPlane)
 {
 	float fLocalSteerRate = kfSteerRate;
 	XMVECTOR vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
@@ -53,8 +53,8 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 				: XMVectorSet(-fNormalY, fNormalX, 0.0f, 0.0f);
 
 			// Elevation correction: push toward preferred elevation
-			float fElevationArtificialIntelligence = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) - fElevationOffset;
-			float fElevationError = fElevationArtificialIntelligence - kfPreferredElevation;
+			float fElevationAi = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) - fElevationOffset;
+			float fElevationError = fElevationAi - kfPreferredElevation;
 			XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNormalX, fNormalY, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
 
 			vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
@@ -68,9 +68,9 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 		}
 	}
 
-	XMVECTOR vecArtificialIntelligenceDirection = common::LerpDirection(vecCurrentDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime));
+	XMVECTOR vecAiDirection = common::LerpDirection(vecCurrentDirection, vecDesiredDirection, common::ExponentialInterpolant(fLocalSteerRate, fDeltaTime));
 
-	return {.vecArtificialIntelligenceDirection = vecArtificialIntelligenceDirection};
+	return {.vecAiDirection = vecAiDirection};
 }
 
 constexpr int64_t kiFrontSamples = 4;

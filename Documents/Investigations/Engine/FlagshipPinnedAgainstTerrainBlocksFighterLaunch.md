@@ -44,7 +44,8 @@ ship.
   time, and clamps it to `fMaxTurnRate`.
 - Navigation avoidance blends only 0.5% of its wanted turn into the current turn
   each tick
-  (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsNavigation.cpp:55`,
+  (`AvoidTerrain` in
+  `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp`,
   `Projects/BrokenEngineSandbox/Source/Frame/TerrainUtils.cpp:132`, factor 0.995
   at `:85`).
 - Hypothesis: steering and the bounce push the turn in opposite directions on

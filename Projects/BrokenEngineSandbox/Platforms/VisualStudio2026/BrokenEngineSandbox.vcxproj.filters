@@ -1166,9 +1166,6 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersCombat.cpp">
       <Filter>Game\Frame\Collections\Fighters</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersNavigation.cpp">
-      <Filter>Game\Frame\Collections\Fighters</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersRender.cpp">
       <Filter>Game\Frame\Collections\Fighters</Filter>
     </ClCompile>
@@ -1176,9 +1173,6 @@
       <Filter>Game\Frame\Collections\Battleships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsCombat.cpp">
-      <Filter>Game\Frame\Collections\Battleships</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsNavigation.cpp">
       <Filter>Game\Frame\Collections\Battleships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsRender.cpp">

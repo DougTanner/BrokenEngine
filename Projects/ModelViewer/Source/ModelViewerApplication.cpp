@@ -2,6 +2,7 @@
 
 #include "File/PackChunks.h"
 #include "Frame/TerrainCollisionUtils.h"
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/MenuUtils.h"
 #include "Ui/PbrWrappersBase.h"
@@ -9,7 +10,6 @@
 
 #include "Graphics/Camera.h"
 #include "Profile/ProfileRows.h"
-#include "Ui/Screens/TweaksScreen/Tweaks.h"
 #include "Game.h"
 
 namespace game

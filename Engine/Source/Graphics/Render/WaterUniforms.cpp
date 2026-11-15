@@ -29,8 +29,14 @@ bool WaterFoamActive()
 	return gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
 }
 
-// Reduced-time accumulators require exactly one call per frame.
-static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime)
+float WaterNormalSize(float fSize)
+{
+	return fSize / gWaterScale.mfCurrent;
+}
+
+// Reduced-time accumulators require exactly one call per frame. fColorNoiseFrequency is the color-noise frequency
+// PopulateWaterParameters publishes.
+static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::chrono::duration<float> elapsedTime, float fColorNoiseFrequency)
 {
 	XMFLOAT4A f4CameraPosition {};
 	XMStoreFloat4A(&f4CameraPosition, engine::gpCamera->mVecPosition);
@@ -39,11 +45,10 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	gPresentationContinuity.cameraBasisCoordinate = engine::gpCamera->mBasisCoordinate;
 	gPresentationContinuity.f2WaterOrigin = {f4CameraPosition.x, f4CameraPosition.y};
 
-	// RenderLightingMain publishes the same float size quotients; a different value would make the pattern drift with camera motion.
 	float fWaterScale = gWaterScale.mfCurrent;
-	double fSizeBaseOne = static_cast<double>(gLightingSampledNormalsOneSize.mfCurrent / fWaterScale);
-	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent / fWaterScale);
-	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent / fWaterScale);
+	double fSizeBaseOne = static_cast<double>(WaterNormalSize(gLightingSampledNormalsOneSize.mfCurrent));
+	double fSizeBaseTwo = static_cast<double>(WaterNormalSize(gLightingSampledNormalsTwoSize.mfCurrent));
+	double fSizeBaseThree = static_cast<double>(WaterNormalSize(gLightingSampledNormalsThreeSize.mfCurrent));
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
 	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), engine::CameraBase::kfCameraFramingDefault, engine::CameraBase::kfWaveFadeEndFraming, 0.0f, 1.0f);
 	// Scroll speed follows the Gerstner phase speed, which grows with the square root of wavelength.
@@ -139,7 +144,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	rGlobalLayout.fWaterReducedNormalTimeThreeY = static_cast<float>(sfReducedTimeThreeY);
 
 	// Modulo 10.0 requires noise and normal-map octave multipliers in tenths for seamless fract() wraps.
-	double fNoiseFrequency = static_cast<double>(gWaterColorNoiseFrequency.mfCurrent / fWaterScale);
+	double fNoiseFrequency = static_cast<double>(fColorNoiseFrequency);
 	XMFLOAT2 f2ReducedNoiseOrigin {static_cast<float>(std::fmod(fNoiseFrequency * fCameraX, 10.0)), static_cast<float>(std::fmod(fNoiseFrequency * fCameraY, 10.0))};
 	rGlobalLayout.fWaterReducedNoiseOriginX = f2ReducedNoiseOrigin.x;
 	rGlobalLayout.fWaterReducedNoiseOriginY = f2ReducedNoiseOrigin.y;
@@ -260,7 +265,8 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterDepthColorFloor = gWaterDepthColorFloor.mfCurrent;
 	rGlobalLayout.fWaterUnderseaCompressionInverse = 1.0f / gWaterUnderseaCompression.mfCurrent; // TerrainElevation.frag undersea depth-curve exponent
 	rGlobalLayout.fWaterDepthReflectionFeatherInverse = 1.0f / (fDayPercent * gWaterDepthReflectionFeather.mfCurrent); // unguarded: night dayPercent=0 -> +inf absorbed by the shader clamp
-	rGlobalLayout.fWaterColorNoiseFrequency = gWaterColorNoiseFrequency.mfCurrent / gWaterScale.mfCurrent; // same quotient PopulateWaterReducedUv reduces
+	float fColorNoiseFrequency = gWaterColorNoiseFrequency.mfCurrent / gWaterScale.mfCurrent;
+	rGlobalLayout.fWaterColorNoiseFrequency = fColorNoiseFrequency;
 
 	PopulateWaterSunsetFade(rGlobalLayout, fSunAngle);
 
@@ -297,7 +303,7 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterMediumAmplitude = fMediumSlope;
 
 	PopulateWaterFoam(rGlobalLayout, elapsedTime);
-	PopulateWaterReducedUv(rGlobalLayout, elapsedTime);
+	PopulateWaterReducedUv(rGlobalLayout, elapsedTime, fColorNoiseFrequency);
 }
 
 // Gerstner wave phase-reduction modulus (shared by both bands).

@@ -289,7 +289,7 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 	if (rView.flagshipGlobalId.iValue != 0 && rView.eStance == FleetStance::kWeaponsFree)
 	{
 		ShipTactic tactic {};
-		if ((orders & ShipOrders::kSharedTarget) && ChooseAttackTactic(rPreviousFrame, rStaticData, iClearanceTier, vecPosition, rNavRectangleBoard, uiFlightPlane, alignment, HighestFlightPlane(ShipType::kFighter), orders, rView.flagshipGlobalId, rFlags, rVecVeerOffPoint, rRegistryTarget, tactic))
+		if ((orders & ShipOrders::kSharedTarget) && ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, rNavRectangleBoard, uiFlightPlane, alignment, orders, rView.flagshipGlobalId, rFlags, rVecVeerOffPoint, rRegistryTarget, tactic))
 		{
 			return tactic;
 		}
@@ -308,8 +308,11 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 	return tactic;
 }
 
-bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
+bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
 {
+	int64_t iClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
+	int64_t iHighestFlightPlane = HighestFlightPlane(ShipType::kFighter);
+
 	// The sight-ignoring pick runs before a veer-off continues, so a veering row also stores the current target.
 	XMVECTOR vecTargetPosition = XMVectorZero();
 	bool bInLineOfSight = false;

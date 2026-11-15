@@ -105,6 +105,21 @@ void ResetDataToNull(STRUCT& rStruct, TUPLE&& rMembers)
 	}, std::forward<TUPLE>(rMembers));
 }
 
+// Installs a buffer whose allocation already succeeded, so a failed allocation never publishes its capacity or layout.
+template <typename STRUCT, typename TUPLE>
+void PublishAndAssign(STRUCT& rStruct, int64_t iCapacity, common::AlignedUniquePtr<std::byte> pNewData, TUPLE&& rMembers)
+{
+	rStruct.iCapacity = iCapacity;
+	rStruct.iPhysicalLayoutCapacity = iCapacity;
+	rStruct.pData = std::move(pNewData);
+
+	std::byte* pCurrent = rStruct.pData.get();
+	std::apply([&](auto&... rMemberPointers)
+	{
+		(AssignAligned(rMemberPointers, iCapacity, pCurrent), ...);
+	}, std::forward<TUPLE>(rMembers));
+}
+
 // iPhysicalLayoutCapacity records the installed buffer's stride capacity and survives shrink reuse.
 // Deserialization can already have overwritten iCapacity, so buffer reuse is bounded by the physical capacity.
 template <typename STRUCT, typename TUPLE>
@@ -132,16 +147,7 @@ void AllocateAndAssign(STRUCT& rStruct, int64_t iCapacity, TUPLE&& rMembers)
 		throw std::ios_base::failure("AllocateAndAssign");
 	}
 
-	// Publish capacity and physical layout only after allocation succeeds.
-	rStruct.iCapacity = iCapacity;
-	rStruct.iPhysicalLayoutCapacity = iCapacity;
-	rStruct.pData = std::move(pNewData);
-
-	std::byte* pCurrent = rStruct.pData.get();
-	std::apply([&](auto&... rMemberPointers)
-	{
-		(AssignAligned(rMemberPointers, iCapacity, pCurrent), ...);
-	}, std::forward<TUPLE>(rMembers));
+	PublishAndAssign(rStruct, iCapacity, std::move(pNewData), std::forward<TUPLE>(rMembers));
 }
 
 template <typename T>
@@ -208,15 +214,7 @@ void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& rMembers)
 			throw std::bad_alloc();
 		}
 
-		rCurrent.iCapacity = iCapacity;
-		rCurrent.iPhysicalLayoutCapacity = iCapacity;
-		rCurrent.pData = std::move(pNewData);
-
-		std::byte* pCurrent = rCurrent.pData.get();
-		std::apply([&](auto&... rMemberPointers)
-		{
-			(AssignAligned(rMemberPointers, iCapacity, pCurrent), ...);
-		}, std::forward<TUPLE>(rMembers));
+		PublishAndAssign(rCurrent, iCapacity, std::move(pNewData), std::forward<TUPLE>(rMembers));
 
 		ASSERT(rCurrent.iCount <= rCurrent.iCapacity);
 	}

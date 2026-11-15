@@ -306,7 +306,6 @@ int RunModelViewer(HINSTANCE hinstance)
 						.path = directory / std::format("viewer_{}.png", ++iScreenshotSequence),
 						.iMaxWidth = 0,
 						.bPng = true,
-						.bPublishResult = true,
 						.iCaptureToken = engine::ResetCaptureResult(),
 					};
 					siScreenshotToken = request.iCaptureToken;

@@ -48,10 +48,12 @@ runtime contracts of the screens that remain here.
   map hold pick, share one pending mark until the server answers. The slider,
   the selector, and the pick each send the one fleet navigation request carrying
   the fleet's current values with only their own field changed, and only on a
-  change, so the answering sync clears the mark. The slider sends on a release
-  that changes the value, not once per frame; a release whose typed value falls
-  outside the range the server admits reverts to the fleet's current delay
-  instead of sending, because the server treats such a delay as corrupt data.
+  change, so the answering sync clears the mark. The slider spans the range the
+  server admits, read from the bounds `IsNavigationDelayInRange` tests
+  (`../../Frame/Collections/Ships/ShipTypes.h`). It sends on a release that
+  changes the value, not once per frame; a release whose typed value falls
+  outside that range reverts to the fleet's current delay instead of sending,
+  because the server treats such a delay as corrupt data.
 - Unless the map shows, the fleet panel opens on auto-unhide, which fires once
   the want-state has lasted `kForceOpenGracePeriod`; while
   `FleetSelection::mbRevealFleetPanel` holds (the agent `reveal_ui` request,

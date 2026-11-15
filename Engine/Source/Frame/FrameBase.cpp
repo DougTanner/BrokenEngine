@@ -259,14 +259,8 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	// NavData is derived from placements + per-template NavContour. Build it here on the
 	// per-coord dispatch thread (naturally parallel across coords) when a coord reaches a tick
 	// with it not yet built. Client receives prebuilt navigationData over the
-	// wire and never enters this branch (server-only NavContour).
-	if (!(rStaticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
-	{
-		// Heap: one-time build per cell grows each graph's vertex, polygon, and visibility-edge vectors in proportion to the cell's islands
-		ScopedSuppressAllocationTracking suppress;
-		BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-		rStaticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
-	}
+	// wire and never makes this call (server-only NavContour).
+	rStaticData.BuildNavigationDataIfUnbuilt();
 #endif
 
 	// Live client cells arrive prepared; menu and server cells retain synchronous terrain setup.

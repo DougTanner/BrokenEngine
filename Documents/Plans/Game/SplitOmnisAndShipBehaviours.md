@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T18:00:15.932Z","dependsOn":["Documents/Plans/Engine/ConsolidatedSmallDeduplications.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T18:00:15.932Z","dependsOn":[]} -->
 # Inline OmnisPostRender::UpdateFacing, Then Reduce Omnis.cpp and ShipBehaviours.cpp
 
 ## Context
@@ -92,51 +92,48 @@ session does not turn either run into a general refactor of its file.
 ### Shared boundary hint: the Omni-only Ships functions
 
 Evidence for both runs' boundary choice, not a work item; it widens no scope.
-Line numbers as of commit `629ced2e`, from the architecture phase (cohesion
-lens) of a deep analysis of
-`Projects/BrokenEngineSandbox/Source/Frame/Collections` (recursive),
-confirmed by an independent verification read:
+From the architecture phase (cohesion lens) of a deep analysis of
+`Projects/BrokenEngineSandbox/Source/Frame/Collections` (recursive) at commit
+`629ced2e`, confirmed by an independent verification read; line numbers as of
+the change that deleted `FightersNavigation.cpp`:
 
-- `ApplyAcceleratedMovement` (`Ships/ShipBehaviours.cpp:873`),
-  `ApplyTerrainPush` (`:888`, with its file-local constants
+- `ApplyAcceleratedMovement` (`Ships/ShipBehaviours.cpp:945`),
+  `ApplyTerrainPush` (`:960`, with its file-local constants
   `kfTerrainPushVelocity` and `kfMaximumPushVelocity` at lines 21-22), and
-  `RegenerateShield` (`:1046`) each have exactly one caller, all in
-  `OmnisPostRender::Update` (`Omnis/Omnis.cpp` lines 712, 752, 749).
+  `RegenerateShield` (`:1118`) each have exactly one caller, all in
+  `OmnisPostRender::Update` (`Omnis/Omnis.cpp` lines 697, 737, 734).
   `AcceleratedMovementConstants` (`Ships/ShipTypes.h:144`) is instantiated
   only at `Omnis/Omnis.h:58`. `AcquireTarget` (`Ships/ShipQueries.cpp:163`)
-  likewise has one caller, at `Omnis/Omnis.cpp:708`.
+  likewise has one caller, at `Omnis/Omnis.cpp:693`.
 - Moving the three `ShipBehaviours.cpp` functions next to their caller is a
   pure move that changes no operation order, but it takes only about 30 lines
   out of `ShipBehaviours.cpp`, and moving them into `Omnis.cpp` would work
   against its reduction. If the runs move them, they move once: out of
   `ShipBehaviours.cpp` into the new Omnis file the step 2 reduction creates.
-- `ResolveTerrainContact` also has one caller (`Omnis/Omnis.cpp:758`) but
+- `ResolveTerrainContact` also has one caller (`Omnis/Omnis.cpp:743`) but
   stays in `ShipBehaviours.cpp`: it shares the file-static
   `TerrainContactNavData` and the start-overlap prefix with
   `ApplyTerrainBounce`.
 
 ### Navigation hints for the ShipBehaviours.cpp run
 
-Line numbers as of commit `fe1fb69b`. The code-quality metrics pass reported
-the first two and nobody judged them; the rest are in-function observations
-the analysis forwarded without inspecting this file. None is a finding, a
-work item, or a reason to split:
+Observations from commit `fe1fb69b`; line numbers as of the change that deleted
+`FightersNavigation.cpp`. The code-quality metrics pass reported the first two
+and nobody judged them; the rest are in-function observations the analysis
+forwarded without inspecting this file. None is a finding, a work item, or a
+reason to split:
 
-- `ComputeNavigation` (lines 567-787): cyclomatic complexity 31, nesting
+- `ComputeNavigation` (lines 567-798): cyclomatic complexity 31, nesting
   depth 4.
-- Clone ranges at lines 308-312, 557-561, and 806-810, each a short
+- Clone ranges at lines 308-312, 557-561, and 817-821, each a short
   best-candidate loop with a different key.
 - The footprint-point draw is written twice inside `ComputeNavigation` (lines
-  671-676 and 702-709).
+  682-687 and 713-720).
 - `ResolveTerrainContact` and `ApplyTerrainBounce` share the start-overlap
-  resolve-and-log prefix (lines 914-921 and 931-939).
-- The cell-centre fallback in `ComputeNavigation` (lines 761-765) is reached
+  resolve-and-log prefix (lines 986-993 and 1003-1011).
+- The cell-centre fallback in `ComputeNavigation` (lines 772-776) is reached
   only by a stored navigation mode above the documented ones, which no
   simulation write in the folder produces.
-- The header names `ComputeNavigation`'s parameter `rVecAiDirection` and the
-  definition names it differently (line 567);
-  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` owns that
-  rename. The comment at lines 346-352 holds one over-long line.
 
 ### Risk
 
@@ -218,9 +215,4 @@ Invariants and exposure:
 
 ## Coordination
 
-The directional prerequisite is in this Plan's metadata:
-`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` renames
-identifiers in `ShipBehaviours.cpp` and edits `ComputeReturnDestination` in
-`ShipBehaviours.h` and `ShipBehaviours.cpp`, so the `ShipBehaviours.cpp` run
-measures the file with those edits in it. No mandatory nondirectional
-coordination.
+No mandatory nondirectional coordination.

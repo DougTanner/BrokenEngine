@@ -79,12 +79,10 @@ compiles, and the three siblings do not match.
 (`C/CollectionController.h:128-152`, `:93-103`) take callbacks that carry no
 per-collection decision:
 
-- The three removal lambdas are fixed by the collection type:
-  `RemoveIndexableElement` then `--i` (`C/PointLights/PointLights.cpp:13-17`),
-  `DestroyElement` then `--i` (`C/Puffs/Puffs.cpp:13-17`,
-  `C/WindRadials/WindRadials.cpp:13-17`). The same choice between the two
-  removal functions already exists at
-  `Engine/Source/Frame/FrameUtils.h:401-408`.
+- The three removal lambdas are identical: each calls `DestroyElement` then
+  `--i` (`C/PointLights/PointLights.cpp:13-17`, `C/Puffs/Puffs.cpp:13-17`,
+  `C/WindRadials/WindRadials.cpp:13-17`). `DestroyElement` is the one removal
+  function and keeps a mapped collection's ID map itself.
 - The three grow lambdas are identical: each calls `GrowPairedCollections` on
   the pair's `Members()` (`C/PointLights/PointLightsUpdate.cpp:121-124`,
   `C/Puffs/PuffsUpdate.cpp:61-64`,
@@ -135,15 +133,14 @@ the controller helpers change.
 7. Drop the default argument at `CollectionController.h:107` and name the type
    explicitly at `PointLights.h:31`; fix the comment at
    `CollectionController.h:105`, which describes the default.
-8. `DestroyExpiredControlled` removes the expired row itself — the id-indexed
-   removal when the collection has an id-to-index map, the plain swap-and-pop
-   otherwise — and steps the index back, so the revisit rule has one owner.
-   Its removal-callback parameter goes.
+8. `DestroyExpiredControlled` removes the expired row itself, calling
+   `DestroyElement` for every controlled collection, and steps the index back,
+   so the revisit rule has one owner. Its removal-callback parameter goes.
 9. `AddControlledElement` takes the PostRender collection and calls
    `GrowPairedCollections` itself. Its grow-callback parameter goes.
 10. `C/Collection.h:3-6` includes `CollectionController.h` before
     `CollectionLifecycle.h` and `CollectionMemory.h`, which declare
-    `HasIdToIndex`, `GrowPairedCollections`, and both removal functions.
+    `HasIdToIndex`, `GrowPairedCollections`, and `DestroyElement`.
     `CollectionController.h` therefore includes `CollectionLifecycle.h`
     itself, which already includes `CollectionMemory.h`
     (`CollectionLifecycle.h:3-4`) and names nothing `CollectionController.h`
@@ -220,9 +217,7 @@ client-only (`Engine/Source/Frame/FrameBase.h:244-251` lists them only under
   `WindRadials.h:13-38`).
 - The add and seed callbacks, `InterpolateKeyframes`, and
   `ControllerTypeRegistry` beyond its default argument.
-- A removal-dispatch helper shared with `CompactCollections`
-  (`FrameUtils.h:401-408`): more than the minimum.
-- `RemoveIndexableElement` and `DestroyElement` themselves.
+- `DestroyElement` itself.
 
 ## Risk tier
 

@@ -112,8 +112,7 @@ refactor candidate on 2026-11-13.
 
 - `BuildShipRegistryWindow`, `ValidateRegistrySourceLayers`, and the engine
   frame registry.
-- The row loop of `MissilesPostRender::Update`, including the steering arms
-  `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` owns.
+- The row loop of `MissilesPostRender::Update`, including its steering block.
 - The `iCount == 0` guard in Missiles `PreCollision`.
 - The `pfDeltaRotations` collection member, its serialization, CRC
   membership, and every other reader (missile homing in Missiles Update,

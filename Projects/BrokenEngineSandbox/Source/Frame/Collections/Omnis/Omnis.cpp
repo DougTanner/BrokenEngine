@@ -565,21 +565,6 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		return;
 	}
 
-	// Cell center: every cell's local frame is centered on the origin.
-	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and neighbour offset add stays W-clean,
-	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
-
-	// Random-spawn destinations: island centers are fixed for this cell's tick; the per-thread workbuffer shares them across ships.
-	int64_t iIslandCount = std::ssize(engine::CentredIslands(rStaticData.islands));
-	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
-	for (int64_t i = 0; i < iIslandCount; ++i)
-	{
-		const engine::IslandPlacement& rPlacement = rStaticData.islands.at(i);
-		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
-	}
-	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
-
 	FleetBoard fleetBoard(rPreviousFrame);
 	NavRectangleBoard navRectangleBoard(rPreviousFrame, ShipType::kOmni);
 
@@ -659,7 +644,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					// keep kPatrolCell.
 					ShipOrders_t navigationOrders = orders;
 					navigationOrders.Set(ShipOrders::kPatrolCell, (orders & ShipOrders::kPatrolCell) && !(flags & ShipFlags::kHealing));
-					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, navigationOrders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+					ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, navigationOrders, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 				}
 				flags.Set(ShipFlags::kNoAiDirection, false);
 				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
@@ -688,7 +673,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 					SetTargetFlightPlane(orders, DefaultFlightPlane(ShipType::kOmni));
 				}
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), islandCandidates, vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
+				XMVECTOR vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
 					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.

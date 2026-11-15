@@ -124,4 +124,16 @@ TweaksScreen& GetTweaksScreen();
 
 } // namespace engine
 
+namespace game
+{
+
+// Defined by every client program and called by name from the engine Lighting, Smoke, Wind, and Sound sections.
+// Sub-tabs are numbered from iFirstSubtab in the order drawn; Sound draws inline in the engine Volumes sub-tab.
+void RenderLightingTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab);
+void RenderSmokeTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab);
+void RenderWindTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab);
+void RenderSoundTweakExtensions(engine::TweaksScreen& rScreen);
+
+} // namespace game
+
 #endif // BT_CLIENT

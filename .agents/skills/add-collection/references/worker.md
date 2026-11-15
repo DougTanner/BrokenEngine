@@ -191,13 +191,14 @@ runner applies. The purpose and the triggers live in
   contribute version terms. Sounds and Puffs are the live engine examples;
   Wrecks is the game example.
 - Use `CollectionFlags::kIdToIndex` only when external owners need a stable
-  handle. Add rows with `AddIndexableElement`, which maintains the map; never
-  call `RemoveIndexableElement` from collection code outside the removals the
-  row-lifecycle bullet of `Engine/Source/Frame/Collections/AGENTS.md`
-  `## Core Contract` names; remove any other row by releasing it from its owner
-  or marking it with `engine::MarkDestroy`, as that bullet directs.
-  Manual identity wiring is conditional on a real alternate ID source or
-  lifecycle, such as Sounds' client-only UUID stream, not on the flag itself.
+  handle. Add rows with `AddIndexableElement`, which maintains the map. Call
+  `DestroyElement` only as the `DestroyElement()` bullet of
+  `Engine/Source/Frame/Collections/AGENTS.md`
+  `## Identity, Serialization, and CRC` allows; remove any other row by
+  releasing it from its owner or marking it with `engine::MarkDestroy`, as that
+  file's `## Core Contract` row-lifecycle bullet directs. Manual identity
+  wiring is conditional on a real alternate ID source or lifecycle, such as
+  Sounds' client-only UUID stream, not on the flag itself.
 - Optional hooks merged into the surrounding phase need no no-op boilerplate:
   absent hooks or hooks that cannot be called skip silently, while `Update` and
   direct/manual calls remain compile-checked.

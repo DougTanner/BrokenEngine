@@ -12,7 +12,7 @@ void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unus
 {
 	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, TickToSimulationTime(rFrame.interpolate.iTick), [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
 	{
-		RemoveIndexableElement(rInterpolate, rPostRender, rPostRender.pIds[i], rInterpolate.Members(), rPostRender.Members());
+		DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
 		--i;
 	});
 }

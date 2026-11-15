@@ -50,8 +50,8 @@ Unmet criterion: "every listed name has at least one reader or is removed".
 `NetworkMessages::CoordUpdateTickReader` (`NetworkMessages.h:323-429`) is a
 third implementer of the message visitor interface, beside `MessageWriter`
 and `MessageReader`. It exists for one caller: `GetCoordUpdateTickOrZero`
-(`NetworkMessages.h:956-970`), called only at `NetworkSimulation.h:156`, whose
-result feeds only the `kVerbose` drop log at `NetworkSimulation.h:158`. The
+(`NetworkMessages.h:956-970`), called only at `NetworkSimulation.h:155`, whose
+result feeds only the `kVerbose` drop log at `NetworkSimulation.h:157`. The
 class repeats `Type` (`:337-343` against `:168-174`) and lacks the
 `Field(float&)` and `BoundedCount` members both other visitors carry.
 
@@ -137,7 +137,7 @@ changes, so `kiProtocolVersion` stays.
      (`:308-312`). Use the reader directly, not `NetworkMessages::Read`, which
      throws (`:453-456`); a dropped simulated packet is not corruption.
    - Delete `PacketTypeName` and print the numeric `iPacketType` at
-     `NetworkSimulation.h:158`. `Server/Server.cpp:275` already logs the raw
+     `NetworkSimulation.h:157`. `Server/Server.cpp:275` already logs the raw
      type byte, so this matches an existing log and removes the parallel
      list.
 
@@ -178,7 +178,7 @@ changes, so `kiProtocolVersion` stays.
 - `NetworkMessages::CoordUpdateTickReader`: the whole class.
 - `NetworkMessages::GetCoordUpdateTickOrZero`: its body.
 - `PacketTypeName`: the whole function.
-- The drop log statement at `NetworkSimulation.h:155-158`: the type argument
+- The drop log statement at `NetworkSimulation.h:154-157`: the type argument
   only.
 - `SerializeStatusChangeBatch`: linkage, declaration, and the zero-count
   guard.
@@ -248,13 +248,10 @@ exposure: every removed name is unread, and `kiProtocolVersion` stays.
 `Documents/Plans/Engine/RemoveIslandPlacementsFromStaticDataWire.md` edits
 `NetworkMessages.h` and `NetworkProtocol.h` too and lands after this Plan.
 
-`Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 2)
-edits `NetworkSimulation.h` too and needs the same temporary non-disabled
-build. Neither depends on the other. Whichever lands later re-derives its
-regions from the landed tree. `keNetworkSimulation` is defined in
-`Engine/Source/EngineSwitches.h`, moved there after commit `c675b6b2`; the
-`NetworkSimulation.h` and `EngineSwitches.h` lines cited here are those after
-that move.
+`keNetworkSimulation` is defined in `Engine/Source/EngineSwitches.h`, moved
+there after commit `c675b6b2`; the `EngineSwitches.h` lines cited here are
+those after that move, and the `NetworkSimulation.h` lines are those of the
+current tree.
 
 ## Notes
 

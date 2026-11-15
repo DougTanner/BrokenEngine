@@ -142,6 +142,22 @@ void CellStaticData::Read(std::istream& rStream)
 	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 }
 
+#if defined(BT_SERVER)
+void CellStaticData::BuildNavigationDataIfUnbuilt() const
+{
+	if (flags & CellStaticDataFlags::kNavigationDataBuilt)
+	{
+		return;
+	}
+
+	// Heap: one-time build per cell grows the per-graph navigationData vector and each graph's vertex, polygon, and
+	// visibility-edge vectors in proportion to the cell's islands
+	ScopedSuppressAllocationTracking suppress;
+	BuildCellNavigationData(navigationData, islands);
+	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
+}
+#endif
+
 #if defined(BT_CLIENT)
 void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
 {

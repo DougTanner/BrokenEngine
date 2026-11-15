@@ -83,6 +83,8 @@ struct GlobalLayout
 	float fSmokeNoiseScaleOne INIT;
 	float fSmokeNoiseScaleTwo INIT;
 	float fSmokeCurlScale INIT; // Noise UV per world meter (SmokeCurlOffset); left raw because it multiplies the per-invocation world position
+	vec2 f2SmokeSwirlTimeOffset INIT; // Circular time offset of the swirl noise in noise UV, from fElapsedTime only (SmokeSpread)
+	vec2 f2SmokeWindTimeOffset INIT; // (sin, cos) of 0.5 * fElapsedTime: the wind-noise world-position offset in meters, from fElapsedTime only (SmokeSpread)
 	vec2 f2SmokeCurlTimeOffset INIT; // gSmokeCurlSpeed-scaled circular time offset in noise UV, from fElapsedTime only (SmokeCurlOffset)
 	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed extents of any pf4SmokeAreas entry (all share one construction, so the size cancels): smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
 	float fSmokeCurlStrengthLow INIT; // Calm-wind curl strength; left raw because SmokeCurlOffset blends it toward High by the per-invocation wind factor

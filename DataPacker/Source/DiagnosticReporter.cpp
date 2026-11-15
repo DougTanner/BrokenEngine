@@ -6,12 +6,6 @@ namespace diagnostic
 
 static std::atomic<bool> sbValidatedLinkedWorktree = false;
 
-static std::string PathToUtf8(const std::filesystem::path& rPath)
-{
-	std::u8string value = rPath.u8string();
-	return std::string(reinterpret_cast<const char*>(value.data()), value.size());
-}
-
 static std::wstring Utf8ToWide(std::string_view value)
 {
 	if (value.empty())
@@ -62,7 +56,7 @@ static std::string BuildModalText(const Record& rRecord)
 		if (rFailure.optionalAssetPath)
 		{
 			text.append("Asset: ");
-			text.append(PathToUtf8(*rFailure.optionalAssetPath));
+			text.append(common::ToString(rFailure.optionalAssetPath->native()));
 			text.append("\n\n");
 		}
 		text.append(NormalizeUtf8(rFailure.message));

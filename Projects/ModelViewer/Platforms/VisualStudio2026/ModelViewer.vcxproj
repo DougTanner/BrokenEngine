@@ -123,7 +123,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <Link><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Source\Pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h" />
     <ClInclude Include="..\..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h" />
@@ -408,7 +408,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Graphics\Camera.h" />
     <ClInclude Include="..\..\Source\ModelViewerApplication.h" />
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(Configuration)|$(Platform)'!='Debug|x64' and '$(Configuration)|$(Platform)'!='Release|x64'" Text="ModelViewer supports Debug|x64 or Release|x64." />

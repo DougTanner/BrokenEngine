@@ -225,11 +225,10 @@ void RenderLightingMain(int64_t iCommandBuffer)
 {
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	// Same float quotients PopulateWaterReducedUv reduces the normal origins with.
 	float fWaterScale = gWaterScale.mfCurrent;
-	rMainLayout.fLightingSampledNormalsOneSize = gLightingSampledNormalsOneSize.mfCurrent / fWaterScale;
-	rMainLayout.fLightingSampledNormalsTwoSize = gLightingSampledNormalsTwoSize.mfCurrent / fWaterScale;
-	rMainLayout.fLightingSampledNormalsThreeSize = gLightingSampledNormalsThreeSize.mfCurrent / fWaterScale;
+	rMainLayout.fLightingSampledNormalsOneSize = WaterNormalSize(gLightingSampledNormalsOneSize.mfCurrent);
+	rMainLayout.fLightingSampledNormalsTwoSize = WaterNormalSize(gLightingSampledNormalsTwoSize.mfCurrent);
+	rMainLayout.fLightingSampledNormalsThreeSize = WaterNormalSize(gLightingSampledNormalsThreeSize.mfCurrent);
 	rMainLayout.uiWaterNormalIndexOne = static_cast<uint32_t>(gWaterNormalIndexOne.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexTwo = static_cast<uint32_t>(gWaterNormalIndexTwo.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexThree = static_cast<uint32_t>(gWaterNormalIndexThree.Get<int64_t>());

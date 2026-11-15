@@ -229,7 +229,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 		if (sbContinuousScreenshots && !gpGraphics->mOptionalScreenshotRequest)
 		{
 			// Fill only when empty so the per-frame F9 default request can't overwrite an agent-issued request's
-			// parameters (path / maxWidth / bPublishResult) before the capture site consumes it.
+			// parameters (path / maxWidth / iCaptureToken) before the capture site consumes it.
 			gpGraphics->mOptionalScreenshotRequest = ScreenshotRequest {};
 		}
 	}

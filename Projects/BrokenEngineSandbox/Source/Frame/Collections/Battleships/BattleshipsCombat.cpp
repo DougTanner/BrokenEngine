@@ -48,8 +48,8 @@ static void BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emi
 	rCurrentPostRender.pVecVelocities[i] = XMVectorZero();
 }
 
-// The Fighters beam calls every ship type's ApplyBeamDamage through one generic call, so the shooter position stays in the signature.
-void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, [[maybe_unused]] FXMVECTOR vecShooterPosition, float fDamage)
+// Returns whether the row began its explosion.
+static bool ApplyDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, float fDamage)
 {
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
@@ -61,10 +61,18 @@ void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::G
 		if (rCurrentPostRender.pController[i] == ShipController::kFleet)
 		{
 			rCurrentPostRender.pfHealths[i] = 0.0f;
-			return;
+			return false;
 		}
 		BeginExplosion(rFrame, emitterCoordinate, i);
+		return true;
 	}
+	return false;
+}
+
+// The Fighters beam calls every ship type's ApplyBeamDamage through one generic call, so the shooter position stays in the signature.
+void XM_CALLCONV BattleshipsPostRender::ApplyBeamDamage(Frame& rFrame, engine::GridCoord emitterCoordinate, int64_t i, [[maybe_unused]] FXMVECTOR vecShooterPosition, float fDamage)
+{
+	ApplyDamage(rFrame, emitterCoordinate, i, fDamage);
 }
 
 void BattleshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -122,8 +130,6 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 		{
 			if (rResult.uiOtherCategory & CollisionCategory::kuiBlaster)
 			{
-				rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
-
 #if defined(BT_CLIENT)
 				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gFighterHitVolume.mfCurrent);
 #endif
@@ -132,15 +138,8 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 				engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), giBattleshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
-				if (rCurrentPostRender.pfHealths[i] <= 0.0f)
+				if (ApplyDamage(rFrame, rStaticData.coordinate, i, rResult.fDamageReceived))
 				{
-					// A fleet Battleship never dies: its health holds at 0.
-					if (rCurrentPostRender.pController[i] == ShipController::kFleet)
-					{
-						rCurrentPostRender.pfHealths[i] = 0.0f;
-						continue;
-					}
-					BeginExplosion(rFrame, rStaticData.coordinate, i);
 					break;
 				}
 			}
@@ -179,18 +178,7 @@ void BattleshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		rCurrentPostRender.pfHealths[i] -= fDamage;
-
-		if (rCurrentPostRender.pfHealths[i] <= 0.0f)
-		{
-			// A fleet Battleship never dies: its health holds at 0.
-			if (rCurrentPostRender.pController[i] == ShipController::kFleet)
-			{
-				rCurrentPostRender.pfHealths[i] = 0.0f;
-				continue;
-			}
-			BeginExplosion(rFrame, rStaticData.coordinate, i);
-		}
+		ApplyDamage(rFrame, rStaticData.coordinate, i, fDamage);
 	}
 }
 

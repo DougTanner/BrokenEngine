@@ -391,7 +391,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Nav Delay").x + ImGui::GetStyle().ItemInnerSpacing.x));
 		// Ctrl+Click typed input can be non-finite or out of range and the server rejects such a delay, so the
 		// release below reverts it instead of clamping it; checking only on release leaves the text box alone while typing
-		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, 0.0f, 60.0f, "%.3f");
+		ImGui::SliderFloat("Nav Delay", &sfNavigationDelayEditValue, kfMinimumNavigationDelaySeconds, kfMaximumNavigationDelaySeconds, "%.3f");
 		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{

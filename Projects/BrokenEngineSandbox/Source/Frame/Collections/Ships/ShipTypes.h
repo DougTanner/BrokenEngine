@@ -179,11 +179,14 @@ inline constexpr int64_t kiFiringClearanceTier = 0;
 
 [[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
 
-// Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both
-// infinities fail it too.
+// The admitted navigation-delay range in seconds, which the HUD slider also spans.
+inline constexpr float kfMinimumNavigationDelaySeconds = 0.0f;
+inline constexpr float kfMaximumNavigationDelaySeconds = 60.0f;
+
+// Written as one range test so NaN and both infinities fail it too.
 [[nodiscard]] constexpr bool IsNavigationDelayInRange(float fDelay)
 {
-	return fDelay >= 0.0f && fDelay <= 60.0f;
+	return fDelay >= kfMinimumNavigationDelaySeconds && fDelay <= kfMaximumNavigationDelaySeconds;
 }
 
 // A ship heading or AI direction has Z and W exactly 0 and an x/y length squared in [0.25, 4]: a coarse corruption test

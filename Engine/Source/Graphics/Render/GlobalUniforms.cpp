@@ -608,13 +608,21 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
 	rGlobalLayout.fElapsedTime = currentTime.count();
-	// Smoke curl time offset (SmokeCurlOffset): the swirl noise's circular time offset (0.04 noise UV/s in SmokeSpread)
-	// scaled by kfSmokeCurlTimeScale to 0.001 noise UV/s, about one glass feature per 10 s at Smoke Curl Speed 1.
+	// Smoke swirl time offset (SmokeSpread): a circle of radius 4 noise UV at 0.01 rad/s, moving at 0.04 noise UV/s.
+	float fSmokeSwirlTime = 0.01f * currentTime.count();
+	float fSmokeSwirlTimeOffsetX = 2.0f * (-1.0f + 2.0f * std::sin(fSmokeSwirlTime));
+	float fSmokeSwirlTimeOffsetY = 2.0f * (-1.0f + 2.0f * std::cos(fSmokeSwirlTime));
+	rGlobalLayout.f2SmokeSwirlTimeOffset.x = fSmokeSwirlTimeOffsetX;
+	rGlobalLayout.f2SmokeSwirlTimeOffset.y = fSmokeSwirlTimeOffsetY;
+	float fSmokeWindTime = 0.5f * currentTime.count();
+	rGlobalLayout.f2SmokeWindTimeOffset.x = std::sin(fSmokeWindTime);
+	rGlobalLayout.f2SmokeWindTimeOffset.y = std::cos(fSmokeWindTime);
+	// Smoke curl time offset (SmokeCurlOffset): the swirl offset scaled by kfSmokeCurlTimeScale to 0.001 noise UV/s,
+	// about one glass feature per 10 s at Smoke Curl Speed 1.
 	static constexpr float kfSmokeCurlTimeScale = 0.025f;
-	float fSmokeCurlTime = 0.01f * currentTime.count();
-	float fSmokeCurlTimeOffsetScale = gSmokeCurlSpeed.mfCurrent * kfSmokeCurlTimeScale * 2.0f;
-	rGlobalLayout.f2SmokeCurlTimeOffset.x = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::sin(fSmokeCurlTime));
-	rGlobalLayout.f2SmokeCurlTimeOffset.y = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::cos(fSmokeCurlTime));
+	float fSmokeCurlTimeOffsetScale = gSmokeCurlSpeed.mfCurrent * kfSmokeCurlTimeScale;
+	rGlobalLayout.f2SmokeCurlTimeOffset.x = fSmokeSwirlTimeOffsetX * fSmokeCurlTimeOffsetScale;
+	rGlobalLayout.f2SmokeCurlTimeOffset.y = fSmokeSwirlTimeOffsetY * fSmokeCurlTimeOffsetScale;
 	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);

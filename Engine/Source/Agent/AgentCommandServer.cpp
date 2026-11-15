@@ -160,15 +160,6 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 			continue;
 		}
 
-		{
-			std::unique_lock lock(mMutex);
-			if (stopToken.stop_requested())
-			{
-				closesocket(uiClientSocket);
-				break;
-			}
-		}
-
 		ServeConnection(uiClientSocket, stopToken);
 
 		// Bump the generation so any response still deferred from this connection is discarded by Drain instead of

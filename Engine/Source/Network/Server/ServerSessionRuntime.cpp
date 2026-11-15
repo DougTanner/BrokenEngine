@@ -128,15 +128,7 @@ void ServerSessionRuntime::PreparePausedSubscriptions()
 		{
 			continue;
 		}
-		engine::CellStaticData& rStaticData = it->second.staticData;
-		if (!(rStaticData.flags & CellStaticDataFlags::kNavigationDataBuilt))
-		{
-			// Heap: BuildCellNavigationData grows the per-graph navigationData vector and each graph's vertex, polygon, and visibility-edge vectors, and
-			// this path runs on the main thread inside the armed main loop
-			ScopedSuppressAllocationTracking suppress;
-			engine::BuildCellNavigationData(rStaticData.navigationData, rStaticData.islands);
-			rStaticData.flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
-		}
+		it->second.staticData.BuildNavigationDataIfUnbuilt();
 	}
 }
 

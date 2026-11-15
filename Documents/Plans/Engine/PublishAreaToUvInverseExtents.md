@@ -387,7 +387,3 @@ Exposure:
 - The choices in `## Design` are the author's recommendation, not a user
   decision; the user's decision is that the reciprocals move to the CPU for
   every area.
-- `Documents/Plans/Engine/ConsolidatedSmallDeduplications.md` (its item 8)
-  also changes `GlobalLayout` fields, at other positions. No ordering is
-  needed; whichever lands later applies its edit to the layout then in the
-  tree.

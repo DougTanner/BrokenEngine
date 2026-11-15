@@ -5,8 +5,6 @@
 #include "Ui/CurveWidget.h"
 #include "Ui/LightingWrappersBase.h"
 
-#include "Ui/Screens/TweaksScreen/Tweaks.h"
-
 namespace engine
 {
 

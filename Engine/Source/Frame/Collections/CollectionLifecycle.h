@@ -96,29 +96,6 @@ std::tuple<int64_t, typename INTERPOLATE::id_t> AddVisualIndexableElement(INTERP
 }
 #endif // BT_CLIENT
 
-// POST_RENDER must provide pIds containing the element IDs.
-template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
-void RemoveIndexableElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, typename INTERPOLATE::id_t id, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)
-{
-	ASSERT(rInterpolate.iCount > 0);
-	int64_t iIndex = rInterpolate.idToIndexMap.at(id);
-
-	if (rInterpolate.iCount - 1 > iIndex) [[likely]]
-	{
-		typename INTERPOLATE::id_t lastId = rPostRender.pIds[rInterpolate.iCount - 1];
-
-		SwapElement(rInterpolate, iIndex, std::forward<INTERPOLATE_TUPLE>(rInterpolateTuple));
-		SwapElement(rPostRender, iIndex, std::forward<POST_RENDER_TUPLE>(rPostRenderTuple));
-
-		rInterpolate.idToIndexMap.insert_or_assign(lastId, iIndex);
-	}
-
-	--rInterpolate.iCount;
-	--rPostRender.iCount;
-
-	rInterpolate.idToIndexMap.erase(id);
-}
-
 // Position of collection type T in a Collections() tuple of references; the tuple size when T is absent.
 template <typename T, typename... TS>
 consteval int64_t CollectionTupleIndex([[maybe_unused]] std::type_identity<std::tuple<TS...>> typeIdentity)
@@ -179,10 +156,18 @@ void ReleaseOwnedHandles([[maybe_unused]] FRAME& rFrame, INTERPOLATE& rInterpola
 }
 
 // Removes element at index from paired collections using swap-and-pop: the last row moves into index iIndex, so
-// the row now at iIndex has not been visited by a forward walk. Iteration state stays the caller's to adjust.
+// the row now at iIndex has not been visited by a forward walk. Iteration state stays the caller's to adjust. An ID
+// map re-points the moved row's ID at iIndex and drops the removed ID, read from the paired PostRender pIds; when the
+// removed row is last both IDs are the same and the erase undoes the re-point.
 template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
 void DestroyElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, int64_t iIndex, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)
 {
+	if constexpr (HasIdToIndex<INTERPOLATE>)
+	{
+		rInterpolate.idToIndexMap.insert_or_assign(rPostRender.pIds[rInterpolate.iCount - 1], iIndex);
+		rInterpolate.idToIndexMap.erase(rPostRender.pIds[iIndex]);
+	}
+
 	if (rInterpolate.iCount - 1 > iIndex) [[likely]]
 	{
 		SwapElement(rInterpolate, iIndex, std::forward<INTERPOLATE_TUPLE>(rInterpolateTuple));

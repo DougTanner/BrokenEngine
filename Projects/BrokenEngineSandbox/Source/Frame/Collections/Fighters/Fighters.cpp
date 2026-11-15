@@ -557,21 +557,8 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	const FightersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pFighters;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
-	// Island centers and base height are fixed for this cell's tick; the per-thread workbuffer shares candidates across ships.
-	int64_t iIslandCount = std::ssize(engine::CentredIslands(rStaticData.islands));
-	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
-	for (int64_t i = 0; i < iIslandCount; ++i)
-	{
-		const engine::IslandPlacement& rPlacement = rStaticData.islands.at(i);
-		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
-	}
-	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
-
 	FleetBoard fleetBoard(rPreviousFrame);
 	NavRectangleBoard navRectangleBoard(rPreviousFrame, ShipType::kFighter);
-
-	// Cell center: every cell's local frame is centered on the origin; W=1.0 keeps it a proper position.
-	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -636,7 +623,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					}
 					else
 					{
-						ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, vecCellCenter, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+						ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kFighter, .iRow = i}, vecPosition, navRectangleBoard, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 					}
 					bool bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
 					fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
@@ -652,7 +639,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					// Seek and Destroy, in any cell: attack, or with no enemy idle in place under drag, ignoring the flagship
 					// and the fleet's wanted cell. The row stays roaming, so a switch back to Patrol recomputes its path.
 					ShipTactic tactic {};
-					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
+					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
 					iNavigationDirection = -1;
 					// The stored wanted heading feeds the heading capture, which kNoAiDirection gates while idle, and the fleet
 					// cone test in AvoidTerrain, which reads it ungated.
@@ -671,14 +658,14 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				else
 				{
 					ShipTactic tactic {};
-					if (ChooseAttackTactic(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], kiFighterHighestFlightPlane, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
+					if (ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
 					{
 						SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 					}
 					else
 					{
 						// No enemy in the cell: return to an island.
-						tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), islandCandidates, vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
+						tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
 					}
 					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
 					flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
@@ -737,7 +724,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrentInterpolate.pfDeltaRotations[i] = fDeltaRotation;
 	}
 
-	FightersPostRender::AvoidTerrain(rFrame, rPreviousFrame, rStaticData, 0, rFrame.interpolate.pFighters->iCount);
+	AvoidTerrain<ShipType::kFighter>(rFrame, rPreviousFrame, rStaticData);
 }
 
 bool FightersInterpolate::LogDifferences(const FightersInterpolate& rOther) const

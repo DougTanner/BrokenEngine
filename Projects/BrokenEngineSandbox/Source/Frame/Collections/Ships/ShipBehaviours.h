@@ -90,12 +90,12 @@ public:
 
 // Fleet navigation: roaming, cross-cell movement, island destinations, following the row's own flagship, and a fleet
 // Omni's patrol around its flagship while that flagship is in the cell.
-void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
+void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
 
 // Random-spawn steering destination: the next route waypoint toward the nearest island center when returning or with
 // no enemy, else the nearest enemy. Updates the kReturnToIslandCenter hysteresis from the raw distance to that island
 // center; rbHasDestination is false in an island-free cell with no enemy.
-[[nodiscard]] XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
+[[nodiscard]] XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
 
 // The horizontal AI bearing is inside the inclusive +/-45-degree forward cone.
 [[nodiscard]] bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection);
@@ -106,6 +106,15 @@ void XM_CALLCONV AimAiDirection(FXMVECTOR vecOffset, XMVECTOR& rVecAiDirection);
 
 // Steps the turn rate from fPreviousDeltaRotation toward fWantedDeltaRotation by at most the turn acceleration, within the max turn rate.
 [[nodiscard]] float RampHeadingTurnRate(float fPreviousDeltaRotation, float fWantedDeltaRotation, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants);
+// The Fighter or Battleship terrain avoidance pass over every row, run once after the type's PostRender Update row loop:
+// a row that is not dying, past arrival grace, inside the heading cone when fleet-controlled, and not facing a near enemy
+// in line of sight ramps its turn rate toward ComputeTerrainAvoidance's.
+template <ShipType TYPE>
+void AvoidTerrain(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData);
+template <>
+void AvoidTerrain<ShipType::kFighter>(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData);
+template <>
+void AvoidTerrain<ShipType::kBattleship>(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData);
 [[nodiscard]] float XM_CALLCONV SteerHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, const HeadingMovementConstants& rConstants);
 [[nodiscard]] XMVECTOR XM_CALLCONV CaptureHeading(FXMVECTOR vecDirection, FXMVECTOR vecWantedNormal, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants);
 
