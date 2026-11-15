@@ -5,17 +5,17 @@
 
 layout (local_size_x = kiParticleUpdateGroupSize) in;
 
-layout (binding = 0) uniform globalUniform
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
     GlobalLayout globalLayout;
 };
 
-layout (scalar, binding = 1) buffer particlesUniform
+layout (scalar, set = 1, binding = 1) buffer particlesUniform
 {
 	ParticlesLayout particles;
 };
 
-layout (binding = 2) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = 2) uniform sampler2D elevationTextureSampler;
 
 void main()
 {

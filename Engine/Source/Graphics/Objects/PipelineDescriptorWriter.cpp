@@ -10,10 +10,6 @@ namespace engine
 // Check if a binding belongs to global Set 0 (must not register for per-pipeline descriptor updates)
 static bool BindingIsInSet0(const Pipeline& rPipeline, int64_t iBinding)
 {
-	if (rPipeline.mExternalVkDescriptorSetLayout == VK_NULL_HANDLE)
-	{
-		return false;
-	}
 	// Callers gate every BindingIsInSet0 with BindingExistsInShaderLayout (short-circuit), so the binding
 	// is always declared by some shader here — ResolveBindingSetIndex's default-0 fallback never decides.
 	return Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding) == 0;
@@ -214,7 +210,6 @@ bool PipelineDescriptorWriter::BindingExistsInShaderLayout(const Pipeline& rPipe
 void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 {
 	bool bMultiSet = rPipeline.mInfo.flags & PipelineFlags::kMultiSet;
-	bool bHasExternalSet0 = rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE;
 	bool bHasExternalSet1 = rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE;
 
 	int64_t iPerCommandBuffer = rPipeline.mbPerCommandBuffer ? std::ssize(gpSwapchainManager->mFramebuffers) : 1;
@@ -245,7 +240,7 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 	{
 		VkDescriptorPool vkDescriptorPool = gpDeviceManager->mVkDescriptorPool;
 
-		// Allocate Set 1 descriptor set (or single set for compute pipelines)
+		// Allocate Set 1 descriptor set
 		VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
 		if (!bHasExternalSet1)
 		{
@@ -343,10 +338,7 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 		cursor.iDescriptorCount = FilterWritesByShaderLayout(rPipeline, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)));
 
 		// Route writes by set index: drop Set 0 (global), keep Set 1 and Set 2
-		if (bHasExternalSet0)
-		{
-			cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)), vkDestinationSet2, bHasExternalSet1);
-		}
+		cursor.iDescriptorCount = RouteWritesBySet(rPipeline.mInfo, std::span<VkWriteDescriptorSet>(cursor.pVkWriteDescriptorSets, static_cast<size_t>(cursor.iDescriptorCount)), vkDestinationSet2, bHasExternalSet1);
 
 		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(cursor.iDescriptorCount), cursor.pVkWriteDescriptorSets, 0, nullptr);
 	}

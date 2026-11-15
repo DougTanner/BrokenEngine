@@ -19,6 +19,12 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-15 claude/a2c7596c-10a1-435c-b437-17d460d78832 —
+  Engine/Source/Graphics/Objects/Pipeline.h:156 — `mExternalVkDescriptorSetLayout`
+  is always assigned the global Set 0 layout in `Pipeline::Create` and read
+  only in `PipelineCreator::CreateMultiSetPipelineLayout`, so it is a copy of
+  `mTextureDescriptors.mGlobalVkDescriptorSetLayout` — read the global layout
+  directly and delete the member
 - 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
   Engine/Data/Shaders/Shadow/Shadow.comp:38 — the terrain shadow march's end
   index is published per direction by the CPU (iShadowElevationSize, written

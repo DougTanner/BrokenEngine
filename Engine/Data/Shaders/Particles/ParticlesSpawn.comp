@@ -6,27 +6,27 @@
 // Sequential free-list scan — single-threaded by design; parallel claim would require subgroup ballot
 layout (local_size_x = 1) in;
 
-layout (binding = 0) uniform globalUniform
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
     GlobalLayout globalLayout;
 };
 
-layout (scalar, binding = 1) buffer spawnUniform
+layout (scalar, set = 1, binding = 1) buffer spawnUniform
 {
 	ParticlesSpawnLayout spawn;
 };
 
-layout (scalar, binding = 2) buffer particlesUniform
+layout (scalar, set = 1, binding = 2) buffer particlesUniform
 {
 	ParticlesLayout particles;
 };
 
-layout (scalar, binding = 3) buffer dispatchIndirectCommandUniform
+layout (scalar, set = 1, binding = 3) buffer dispatchIndirectCommandUniform
 {
 	VkDispatchIndirectCommand vkDispatchIndirectCommand;
 };
 
-layout (scalar, binding = 4) buffer drawIndirectCommandUniform
+layout (scalar, set = 1, binding = 4) buffer drawIndirectCommandUniform
 {
 	VkDrawIndexedIndirectCommand vkDrawIndexedIndirectCommand;
 };

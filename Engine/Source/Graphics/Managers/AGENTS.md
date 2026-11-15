@@ -22,10 +22,9 @@ graphics recreation.
   ownership to graphics, and present waits for graphics when present uses a
   distinct queue. Do not assume all queues alias or that every transition is
   cross-queue.
-- The shared descriptor pool serves graphics and compute pipelines. Most
-  pipelines consume global Set 0, but legacy standalone compute pipelines retain
-  their own layouts and do not. Pipeline-specific sets and bindless arrays must
-  remain valid through partial recreation.
+- The shared descriptor pool serves graphics and compute pipelines. Every
+  pipeline consumes global Set 0. Pipeline-specific sets and bindless arrays
+  must remain valid through partial recreation.
 - The texture-descriptor registry owns island bindless-slot metadata and
   descriptor registrations. Fixed bindless-array storage addresses and slot
   indices are registry identity. Inside the bindless write epoch, eviction

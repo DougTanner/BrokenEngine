@@ -51,29 +51,6 @@ static void ConfigureUpdateAfterBind(VkDescriptorSetLayoutCreateInfo& rVkLayoutC
 	}
 }
 
-static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rVkLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding> bindings, Pipeline& rPipeline, VkPipelineLayoutCreateInfo& rVkPipelineLayoutCreateInfo, VkShaderStageFlags vkPushConstantStageFlags)
-{
-	rVkLayoutCreateInfo.bindingCount = static_cast<uint32_t>(std::ssize(bindings));
-	rVkLayoutCreateInfo.pBindings = bindings.data();
-
-	VkDescriptorBindingFlags pVkBindingFlags[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
-	VkDescriptorSetLayoutBindingFlagsCreateInfo vkBindingFlagsCreateInfo {};
-	ConfigureUpdateAfterBind(rVkLayoutCreateInfo, bindings, pVkBindingFlags, vkBindingFlagsCreateInfo, rPipeline.mInfo.flags & PipelineFlags::kUpdateAfterBind);
-
-	CHECK_VK(vkCreateDescriptorSetLayout(gpDeviceManager->mVkDevice, &rVkLayoutCreateInfo, nullptr, &rPipeline.mVkDescriptorSetLayout));
-	VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, rPipeline.mVkDescriptorSetLayout, rPipeline.mInfo.name.data());
-
-	rVkPipelineLayoutCreateInfo.pSetLayouts = &rPipeline.mVkDescriptorSetLayout;
-	rVkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
-	VkPushConstantRange vkPushConstantRange {};
-	vkPushConstantRange.stageFlags = vkPushConstantStageFlags;
-	vkPushConstantRange.offset = 0;
-	vkPushConstantRange.size = static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
-	rVkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
-	CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &rVkPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
-	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
-}
-
 // Allocate iSlotCount * iElementSize host-visible/coherent bytes and assert those properties. Zero every indirect-command byte so no slot
 // executes before CPU data is written; return the persistent mapping. Graphics draw-indirect and compute dispatch-indirect share this path
 // with their respective command types. Device-local draw/dispatch paths remain GPU-written and unmapped.
@@ -644,24 +621,13 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 	vkPushConstantRange.offset = 0;
 	vkPushConstantRange.size = static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
 
-	// Compute uses global Set 0 and per-pipeline Set 1 when Set 1 bindings exist.
+	// Compute uses global Set 0 and per-pipeline Set 1.
 	VkDescriptorSetLayoutBinding pVkSet1Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	VkDescriptorSetLayoutBinding pVkSet2Bindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	int64_t iSet1Count = 0;
 	int64_t iSet2Count = 0;
 	SplitBindingsBySet(rPipeline, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), pVkSet1Bindings, iSet1Count, pVkSet2Bindings, iSet2Count);
-
-	if (iSet1Count > 0)
-	{
-		CreateMultiSetPipelineLayout(rPipeline, vkUniformTextureDescriptorSetLayoutCreateInfo, vkPipelineLayoutCreateInfo, vkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), std::span<const VkDescriptorSetLayoutBinding>());
-	}
-	else
-	{
-		// Standalone compute: shader set-0 bindings form the per-pipeline set. Clear the
-		// external-layout pointer so binder and writer treat it as standalone.
-		rPipeline.mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
-		CreateSingleSetPipelineLayout(vkUniformTextureDescriptorSetLayoutCreateInfo, std::span<const VkDescriptorSetLayoutBinding>(pVkDescriptorSetLayoutBindings, iDescriptorCount), rPipeline, vkPipelineLayoutCreateInfo, VK_SHADER_STAGE_COMPUTE_BIT);
-	}
+	CreateMultiSetPipelineLayout(rPipeline, vkUniformTextureDescriptorSetLayoutCreateInfo, vkPipelineLayoutCreateInfo, vkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding>(pVkSet1Bindings, iSet1Count), std::span<const VkDescriptorSetLayoutBinding>());
 
 	VkComputePipelineCreateInfo vkComputePipelineCreateInfo
 	{
