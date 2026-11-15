@@ -67,6 +67,6 @@ replay, or threading exposure.
 ## Notes
 
 `Documents/Plans/Game/FleetOwnedSquadronState.md` and
-`FighterLaunchTerrainAdmissionNeedsElevationGrid.md` (this folder) edit
+`ReplayMetaClientStateAndFighterAdmission.md` (this folder) edit
 `SpawnFleetMember` in the same file, a different function; no ordering is
 needed.

@@ -115,8 +115,6 @@ wire exposure.
 
 ## Coordination
 
-`Documents/Plans/Engine/TextureUploadManagerCleanup.md` edits other
-functions of `TextureUploadManager.cpp` and leaves `WaitIdle` alone. Neither
-Plan depends on the other. The author recommends landing this Plan first: it
-fixes a race and the other is clean-up. Whichever lands later re-derives its
-lines by symbol.
+`Documents/Plans/Engine/TextureUploadCleanup.md` edits other functions of
+`TextureUploadManager.cpp` and leaves `WaitIdle` alone. That Plan depends on
+this one and re-derives its lines by symbol.

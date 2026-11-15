@@ -179,9 +179,9 @@ Under option 2:
 
 ## Related
 
-`Documents/Plans/Game/ReduceShipBehavioursCpp.md` may move `ComputeNavigation`
-out of `ShipBehaviours.cpp`. A Plan written from this investigation after that
-lands re-derives its sites from the landed source.
+`Documents/Plans/Game/SplitOmnisAndShipBehaviours.md` may move
+`ComputeNavigation` out of `ShipBehaviours.cpp`. A Plan written from this
+investigation after that lands re-derives its sites from the landed source.
 
 A Plan written from
 `Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md` under its

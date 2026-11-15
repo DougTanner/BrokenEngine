@@ -1,15 +1,17 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-11-15T13:27:28.000Z","dependsOn":[]} -->
-# Clean up the client reconcile replay chain
+# Clean up reconcile replay and clear wind trails after a full state
 
 ## Context
 
 Four clean-ups found by a deep analysis of `Engine/Source/Network/Client` at
 commit `d87ad840` (in-function refactoring and architecture review phases),
-merged into one Plan by user direction because they edit the same reconcile
-files and each needs the same replay checks. Nothing was built or run. Line
-numbers are from that commit; the sites spot-checked at `66452fe5` had not
-moved. Locate by symbol if they have. Short names: `RR.cpp` is
-`Engine/Source/Network/Client/ReconcileReplay.cpp`, `RR.h` is
+plus one visual fix found by the architecture review phase of a deep analysis
+of `Engine/Source/Frame/Collections` (2026-11-14, section E). All edit the
+reconcile files and need the same replay checks. Nothing was built or run.
+Line numbers in sections A to D are from commit `d87ad840`; the sites
+spot-checked at `66452fe5` had not moved. Line numbers in section E are from
+commit `ae681f03`. Locate by symbol if they have moved. Short names: `RR.cpp`
+is `Engine/Source/Network/Client/ReconcileReplay.cpp`, `RR.h` is
 `ReconcileReplay.h`, `Crc.cpp` is `ReconcileReplayCrc.cpp`, and `Tick.cpp` is
 `ReconcileReplayTick.cpp`, all in that directory. `N` is
 `engine::kiNetworkBufferSize`.
@@ -262,21 +264,72 @@ Folding it into a shared helper would change the mid-replay injection path
 in the logged `Validated:` value. `iInjectedBaseSlot = iSlot` is written only
 at `RR.cpp:34`.
 
-Unmet condition: the reconcile replay chain holds no clamp, parameter, store,
-or block whose removal changes nothing, no branch for a state it cannot
-reach, no file-local function declared in `RR.h` or member that repeats
-another value, and one definition each of the snapshot search and the
-replay-base reset.
+### E. A resync full state pairs wind trails with stale positions
 
-Originating gap: that analysis's review of these functions. It is not an
-unmet acceptance criterion of any change. It is pre-existing: the analysis
-session changed no source.
+`WindTrailsInterpolate::sPreviousPositions`
+(`Engine/Source/Frame/Collections/WindTrails/WindTrails.h:44`) caches each
+trail's previous rendered position, keyed by the trail's visual `Id`. A resync
+full state for a cell that is already rendered reissues those ids to different
+trails, and the cache then pairs a trail with another trail's old position.
+
+Traced sequence:
+
+1. `Engine/Source/Network/Client/Client.cpp:394-395` reads the full state into
+   a fresh `game::Frame`. `FrameBase.cpp:134-142` reads server collections
+   only, so `windTrails` is empty and `uiNextVisualUuid` is 1
+   (`Engine/Source/Frame/FrameBase.h:203`).
+2. `HydrateReceivedFullState`
+   (`Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp:296-301`)
+   re-adds the trails through `WindTrailsPostRender::Add`, issuing ids from 1
+   under the cell's unchanged frame identifier.
+3. A cell with confirmed state keeps rendering: the frame is stored as
+   `optionalPendingFullState` (`ClientSessionRuntime.cpp:563-577`) and
+   `ReconcileInjectPendingFullState` (`RR.cpp:15-39`) later moves it into the
+   snapshot ring.
+4. On the next rendered frame `WindTrailsRender.cpp:28-31` keeps every cached
+   entry whose id exists in the new `idToIndexMap`; `:94` reads another
+   trail's cached position and `:107-110` builds a quad across the gap.
+
+The map is cleared only at `Engine/Source/GameBase.cpp:953` and `:1194`.
+
+Effect: visual only — one spurious wind-deposit quad per affected trail for one
+rendered frame. No CRC, serialization, or version exposure. The repository
+already keeps visual continuity across this same event for smoke
+(`Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp:303-314`).
+
+User decision, recorded by the authoring agent from the user's own words
+(2026-11-14): clear the wind trail position cache on the main thread after a
+resync full state is applied. Accepting the artifact and documenting it was
+the other form offered, and the user did not choose it.
+
+Two sites that look right are wrong:
+
+- `AdoptFullState` only stores the pending frame; frames rendered before the
+  injection refill the cache with the old ids.
+- The injection itself runs in the per-coordinate reconcile worker, and
+  `Engine/Source/Network/Client/AGENTS.md` `## Reconciliation Replay Chain`
+  says each worker writes only its coordinate, so a worker must not touch this
+  file-scope map.
+
+### Unmet conditions
+
+The reconcile replay chain holds no clamp, parameter, store, or block whose
+removal changes nothing, no branch for a state it cannot reach, no file-local
+function declared in `RR.h` or member that repeats another value, and one
+definition each of the snapshot search and the replay-base reset. A wind
+trail's first rendered frame after its id is reissued deposits nothing.
+
+Originating gap: those analyses' reviews of these functions. Neither is an
+unmet acceptance criterion of any change. Both are pre-existing: the analysis
+sessions changed no source.
 
 ## Design
 
 Recommended (the author's recommendation). The steps are listed in the order
-to apply them; no source required an order, and this one edits each
-`RunReplay` and adoption region once before the shared helper is extracted.
+to apply them. Step 2 (adoption calls injection) comes before step 9 so the
+wind-trail signal is set at one site, in injection, and covers adoption too.
+Otherwise no source required an order, and this one edits each `RunReplay`
+and adoption region once before the shared helper is extracted.
 
 1. `ComputeOutputLayout` (A1, A2): delete the `std::min` line (328) and keep
    the `ASSERT` at line 329. `ApplyCoordWriteback` repeats the same range
@@ -334,6 +387,15 @@ to apply them; no source required an order, and this one edits each
    `CoordScratch` owns all four fields. Call it from the three remaining
    sites. Leave every `iLastValidatedIndex` and `iInjectedBaseSlot` write at
    its current site, outside the helper.
+9. Wind-trail clear (E): add the smallest signal the workers need to report
+   that a full state was injected or adopted, set at one site in
+   `ReconcileInjectPendingFullState`, which after step 2 covers adoption too.
+   The worker writes it only in its own coordinate's state. On the main
+   thread, after the reconcile dispatch returns, the caller of the dispatch
+   clears `WindTrailsInterpolate::sPreviousPositions` when any coordinate
+   reported it. A cleared map makes every trail deposit nothing for one frame,
+   which is the documented first-frame behavior. Run `/update-claude-docs`
+   for `Engine/Source/Frame/Collections/WindTrails/AGENTS.md`.
 
 The two `while` loops in `ReconcileCatchUpCoord` and
 `ReconcileFastPathCatchUp` are textually identical, but their budgets, start
@@ -351,11 +413,14 @@ project's readers change in the same landing.
 ## Critical files
 
 - `Engine/Source/Network/Client/ReconcileReplay.h`
-- `Engine/Source/Network/Client/ReconcileReplay.cpp`
+- `Engine/Source/Network/Client/ReconcileReplay.cpp` and the main-thread
+  caller of its dispatch
 - `Engine/Source/Network/Client/ReconcileReplayTick.cpp`
 - `Engine/Source/Network/Client/ReconcileReplayCrc.cpp`
 - `Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp`
 - `ReconcileReplayClientState.cpp` in that same game directory
+- `Engine/Source/Frame/Collections/WindTrails/WindTrails.h`
+- `Engine/Source/Frame/Collections/WindTrails/AGENTS.md`
 
 ## In scope
 
@@ -389,11 +454,16 @@ In `## Design` order:
    in `CrcValidateLoop`; the inline search loop in `DetermineRollbackBase`;
    one new `CoordScratch` member holding the four statements, and the
    statements at the three sites that remain.
+9. One main-thread clear of `WindTrailsInterpolate::sPreviousPositions` after
+   the reconcile dispatch, the smallest signal the workers need to report
+   that a full state was injected or adopted (set in
+   `ReconcileInjectPendingFullState`), and the documentation sync
+   `/update-claude-docs` requires.
 
 ## Out of scope
 
-- `ReconcileInjectPendingFullState` beyond its replay-base reset statements,
-  and `iInjectedBaseSlot`.
+- `ReconcileInjectPendingFullState` beyond its replay-base reset statements
+  and the step 9 signal, and `iInjectedBaseSlot`.
 - Every `iLastValidatedIndex` write outside `AdoptUnreachablePendingFullState`.
 - `DetermineRollbackBase` beyond its search loop, and its `rbShrunkRollback`
   output, which `ReconcileCoord` still reads.
@@ -421,28 +491,42 @@ In `## Design` order:
   and erased updates consistent for the next reconcile. It was seen beside
   proof B1, was not traced, and does not affect the proof.
 - `Documents/Architecture/GameReconciliation.md`.
+- Leaving the wind-trail artifact in place and only documenting it.
+- The id permutation a reconcile replay with a different spawn order can cause
+  inside the replay window: not traced, not part of this Plan.
+- How visual ids are issued, `EraseStaleRenderState`, and the smoke continuity
+  path.
 
 ## Risk triggers and invariants
 
-Risk tier: Tier 3 (the author's classification, the highest among the merged
-sources). Trigger: the edits are on the determinism and CRC surface. The
-client reconcile chain decides which frames a cell commits and compares
-against server CRCs; the branch removals are safe only because of
-reachability proofs that span files and rest on the single-writer fact F1;
-the adoption change is safe only by the reasoning in A4 about what
-`ComputeOutputLayout` later writes; and public members of an engine header
-that game projects read are removed or added. The change is meant to compute
-exactly what the code computes today. Threading is unchanged: each reconcile
-worker still writes only its own `CoordWork`. No packet, save, `.pack`, or
-`kiVersion` change. The executing session derives the tier again and
-re-proves each claim against the code it finds.
+Risk tier: Tier 3 (the author's classification). Triggers: the edits are on
+the determinism and CRC surface. The client reconcile chain decides which
+frames a cell commits and compares against server CRCs; the branch removals
+are safe only because of reachability proofs that span files and rest on the
+single-writer fact F1; the adoption change is safe only by the reasoning in
+A4 about what `ComputeOutputLayout` later writes; and public members of an
+engine header that game projects read are removed or added. The wind-trail
+clear spans two independently owned subsystems (`Network/Client` and
+`Frame/Collections`) and adds a main-thread write beside worker-thread
+reconcile code.
+
+Steps 1 to 8 are meant to compute exactly what the code computes today. The
+one exception is step 9, a deliberate visual behavior change: after a
+reconcile dispatch that injected or adopted a pending full state, the wind
+trail position cache is cleared, so each trail deposits nothing for one
+rendered frame. It is client-only visual state, outside the CRC. Threading is
+otherwise unchanged: each reconcile worker still writes only its own
+`CoordWork`. No packet, save, `.pack`, or `kiVersion` change. The executing
+session derives the tier again and re-proves each claim against the code it
+finds.
 
 Invariants:
 
 - Every path commits the ring head, count, confirmed offset, and confirmed
   tick it commits today; after adoption these are identical to today's.
 - `iAssumedFrameTicks` and the committed `iSnapshotCount` are identical.
-- A reconcile worker writes only its own coordinate's state.
+- A reconcile worker writes only its own coordinate's state, and no reconcile
+  worker reads or writes `sPreviousPositions`.
 - The adoption log line and the "Reconcile post-replay" log lines keep their
   text and argument values.
 
@@ -455,25 +539,22 @@ Invariants:
    finds no `iReplayStackCount` and no `miActiveCount`; `RR.h` does not
    declare `ReconcileCoord`; and the snapshot search loop and the four
    replay-base reset statements each appear once in the four `Engine` files.
-2. `/compile` builds the BrokenEngineSandbox client and server.
-3. The replay determinism recipe in
+2. `sPreviousPositions` is cleared on the main thread after a reconcile
+   dispatch that injected or adopted a pending full state, the signal is set
+   at one site, in `ReconcileInjectPendingFullState`, and no reconcile worker
+   reads or writes `sPreviousPositions`.
+3. `/compile` builds the BrokenEngineSandbox client and server.
+4. The replay determinism recipe in
    `Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md` shows no
    CRC mismatch, the same result as before the change.
-4. The resimulation check in
+5. The resimulation check in
    `Projects/BrokenEngineSandbox/Documents/AgentHarness/verification.md`
    (steps 1 to 7) passes as that document states it, with no `ASSERT` in the
    client log.
 
-The supplied evidence records no harness setup for criteria 3 and 4, and none
-that makes a client adopt a pending full state past an update gap. The
-executing session sets criteria 3 and 4 up from the harness documentation; if
-it finds no adoption setup, step 2 of `## Design` is verified by code reading
-plus criteria 2 to 4.
-
-## Coordination
-
-- `Documents/Plans/Engine/ClearWindTrailCacheAfterFullState.md` adds a signal
-  to the injection and adoption functions. Once adoption calls injection, a
-  signal set in injection covers both. Neither Plan depends on the other;
-  whichever lands second re-derives its regions by symbol from the landed
-  file.
+The supplied evidence records no harness setup for criteria 4 and 5, none
+that makes a client adopt a pending full state past an update gap, and none
+that produces a resync full state for a rendered cell. The executing session
+sets criteria 4 and 5 up from the harness documentation and runs them as one
+harness session; if it finds no adoption or resync setup, step 2 and step 9
+of `## Design` are verified by code reading plus criteria 3 to 5.

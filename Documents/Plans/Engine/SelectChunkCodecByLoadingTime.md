@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T19:54:15.198Z","dependsOn":["Documents/Plans/Engine/RejectCompressedEagerChunks.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T19:54:15.198Z","dependsOn":["Documents/Plans/Engine/PackChunksAndFileManagerCleanup.md"]} -->
 # Select the chunk compression format by measured engine loading time
 
 ## Context

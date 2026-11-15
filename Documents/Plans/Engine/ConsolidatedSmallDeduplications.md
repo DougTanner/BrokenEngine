@@ -3,11 +3,13 @@
 
 ## Context
 
-This Plan merges seventeen small de-duplication and redundancy-removal Plans
-into one change, done all at once, by the user's direction. Each `###` item
-below keeps its source Plan's findings, and the same number names it in every
-later section. The items edit independent regions; where two touch the same
-file, `## Coordination` says so.
+This Plan groups seventeen small de-duplication, redundancy-removal, and
+naming items into one change, done all at once, by the user's direction. Each
+`###` item below keeps its source Plan's findings, and the same number names it
+in every later section; items 11, 16, and 17 have lettered parts that edit the
+same files, and the letter names the part in every later section (an unlettered
+reference to one of those items covers all its parts). The items edit
+independent regions; where two touch the same file, `## Coordination` says so.
 
 Every line number is from the commit its item names (or, where it names none,
 from the commit that added the source Plan); locate each site by symbol if it
@@ -207,10 +209,12 @@ They differ only in how each leaves its loop (`return`, `continue` or
 `## Fleet Health Invariants`. Unmet criterion: the fleet-health rule has one
 writer.
 
-### 11. Escort slot point scans once
+### 11. Escort slot scan and ChooseAttackTactic Fighter values
 
-Commit `fe1fb69b`. `ChooseFleetTactic` calls the file-local `EscortSlotPoint`
-twice for an escorting fleet Fighter
+Commit `fe1fb69b` for both parts.
+
+(a) Escort slot point. `ChooseFleetTactic` calls the file-local
+`EscortSlotPoint` twice for an escorting fleet Fighter
 (`FC/Ships/FleetCoordination.cpp:272-273`), with the same `rPreviousFrame`,
 `rView`, and `globalId` and `iTickOffset` 0 then `kiEscortLeadTicks`. The row
 scan (`:132-148`) producing `iCount` and `iSlot` reads only
@@ -222,6 +226,25 @@ first read at `:152`. The only route is a Patrol fleet Fighter's escort tick
 is real but small and unmeasured: fleet Fighter counts are bounded
 (`kiMaximumFleetSquadronsPerType`, `kpiFleetSquadronCapacities` in `Fleet.h`),
 and this change only halves the scan.
+
+(b) `ChooseAttackTactic` parameters. `ChooseAttackTactic`
+(`FC/Ships/FleetCoordination.h:86`, defined at
+`FC/Ships/FleetCoordination.cpp:310`) takes `iClearanceTier` and
+`iHighestFlightPlane` as parameters. All three call sites pass the Fighter
+values: `FC/Fighters/Fighters.cpp:661` and `:680` pass
+`ShipTypeClearanceTier(ShipType::kFighter)` and
+`kiFighterHighestFlightPlane`; `ChooseFighterFleetTactic`
+(`FleetCoordination.cpp:291`) passes its own
+`ShipTypeClearanceTier(ShipType::kFighter)` (`:287`) and
+`HighestFlightPlane(ShipType::kFighter)`, which is the same plane. The body is
+Fighter-only whatever is passed: `FindSquadronTarget` reads `pFighters`
+directly (`FleetCoordination.cpp:168-169`), and `kVeerOff`, `kSharedTarget`,
+and `kSeekAndDestroy` are Fighter-row settings. So the two parameters suggest a
+ship-type choice the body cannot honour: another type passing its own values
+would still pick targets from Fighter rows. A cohesion finding of the
+architecture phase of a deep analysis of `FC/Ships/` (the directory, not its
+subdirectories), confirmed by the verifying review; pre-existing debt, not an
+unmet acceptance criterion of any change.
 
 ### 12. Missile steering arms
 
@@ -312,11 +335,12 @@ parallel; root `AGENTS.md` also says DRY. The comment at
 `FC/Fighters/Fighters.cpp:657-658` names this pass `AvoidTerrain`; the shared
 function keeps that name, so the comment stays true.
 
-### 16. Ship navigation derives caller-invariant inputs
+### 16. Ship navigation inputs and names
 
-Commit `fe1fb69b`. `ComputeNavigation` (`FC/Ships/ShipBehaviours.h:133`,
-defined at `FC/Ships/ShipBehaviours.cpp:567`) takes three parameters every
-ship script passes identically (`Fighters.cpp:644`, `Battleships.cpp:469`,
+(a) Caller-invariant inputs. Commit `fe1fb69b`. `ComputeNavigation`
+(`FC/Ships/ShipBehaviours.h:133`, defined at
+`FC/Ships/ShipBehaviours.cpp:567`) takes three parameters every ship script
+passes identically (`Fighters.cpp:644`, `Battleships.cpp:469`,
 `Omnis.cpp:662`): `vecCellCenter`, the same expression in each script
 (`Fighters.cpp:577`, `Battleships.cpp:425`, `Omnis.cpp:571`) with no other
 use; `deltaTime`, built from `rFrame.interpolate.fDeltaTime`
@@ -326,9 +350,65 @@ is already a parameter; and `flagshipGlobalId`,
 reads `pGlobalIds` itself through the locator (`ShipBehaviours.cpp:569-572`).
 Low priority: the verifying review rated the benefit marginal.
 
-### 17. TickFleetTimers single wanted-cell test
+(b) Island candidates. Lines from the commit that added the source Plan. Each
+ship type's PostRender `Update` opens with the same nine lines that build a
+per-thread workbuffer of island candidates: `FC/Fighters/Fighters.cpp:560-568`,
+`FC/Battleships/Battleships.cpp:414-422`, `FC/Omnis/Omnis.cpp:573-581` (only
+the leading comment's wording differs in Omnis). Each candidate is
+`(f2WorldPosition.x, f2WorldPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1)`
+for one entry of `engine::CentredIslands(rStaticData.islands)`. In each file
+the span has exactly one consumer, `ComputeReturnDestination`
+(`Fighters.cpp:681`, `Battleships.cpp:503`, `Omnis.cpp:691`), defined at
+`FC/Ships/ShipBehaviours.cpp:789`. That function already receives
+`rStaticData`, and its comment at `:798-799` restates the candidate recipe.
+`ComputeNavigation` in the same file reads `CentredIslands` directly (`:607`,
+`:657`). The block counts `CentredIslands(...)` but indexes
+`rStaticData.islands.at(i)`, correct only because `CentredIslands` returns a
+prefix of the list (`Engine/Source/Frame/IslandChainPlacement.h`, "indices
+into it are indices into the list"). So three writable copies feed one
+CRC-visible input (return-to-island steering) of one function that could read
+its source itself. Found by the architecture phase of a deep analysis of
+`FC/Fighters`, verified by a second reader; not an unmet acceptance criterion
+of any change. The false condition: the island-candidate recipe exists at one
+site.
 
-Commit `4cf9d607`. `FleetNavigationController::TickFleetTimers`
+(c) `ArtificialIntelligence` names. Commit `213d2577`. The direction a ship's
+AI wants to travel has two names in the Sandbox game code. Most of the code
+spells it `Ai`: the collection member `pVecAiDirections`, the flag
+`ShipFlags::kNoAiDirection`, the helper `AimAiDirection`, the type
+`AiSteeringResult`, and parameters named `vecAiDirection` and
+`rVecAiDirection`. A smaller set of identifiers in two translation units still
+spells it `ArtificialIntelligence`, sometimes on the same line as the short
+form:
+
+- `ComputeNavigation` is declared in `FC/Ships/ShipBehaviours.h` with the
+  parameter `XMVECTOR& rVecAiDirection` and defined in `ShipBehaviours.cpp`
+  with `XMVECTOR& rVecArtificialIntelligenceDirection`.
+- `RecomputeNavigationPath` in `ShipBehaviours.cpp` passes its
+  `rVecArtificialIntelligenceDirection` straight to `AimAiDirection`, whose
+  own parameter is `rVecAiDirection`.
+- `AiSteeringResult` in `BES/Frame/TerrainUtils.h` holds one member,
+  `vecArtificialIntelligenceDirection`, and is returned by
+  `ComputeArtificialIntelligenceSteering`.
+
+`Documents/C++StyleGuide.txt` rule 56 lists `Ai` as an approved term "for any
+entity the simulation spawns, owns, or controls rather than a human player"
+and gives `pVecAiDirections` as its example, so `Ai` is the established
+repository term. Root `AGENTS.md` `## Directives` "One term per concept"
+requires the established term; a search for `AiDirection` today misses every
+long-form site. A case-insensitive search of every tracked file for
+`ArtificialIntelligence` at `213d2577` finds the long form only in
+`ShipBehaviours.cpp`, `TerrainUtils.h`, and `TerrainUtils.cpp` (plus the
+investigation row this part came from,
+`Documents/Investigations/Engine/RefactorCandidates.md`). No `AGENTS.md` file,
+agent command name, log string, serialized name, shader, or project file
+contains it, and `ComputeArtificialIntelligenceSteering` has one caller, in
+`ComputeNavigation`.
+
+### 17. TickFleetTimers wanted-cell test and navigation build
+
+(a) Single wanted-cell test. Commit `4cf9d607`.
+`FleetNavigationController::TickFleetTimers`
 (`BES/Network/Server/FleetNavigationController.cpp:62`) tests
 `rFlagship.coordinate == rFleet.wantedCoordinate` at `:78` to gate the timer
 drain and negated at `:89` to `continue`, under a comment (`:88`) about a
@@ -342,6 +422,33 @@ behaves identically, including for a NaN timer.
 sequences. The function feeds the fleet RNG and the fleet checksum
 (`BES/Network/Server/AGENTS.md` `## Deterministic Tick Contracts`,
 `BES/Save/AGENTS.md` `## Replay Contract`).
+
+(b) Build navigation data if unbuilt. Commit `4cf9d607`; paths from the
+repository root. The server builds a cell's navigation data lazily, and the
+build has two halves that must stay together: call
+`BuildCellNavigationData(navigationData, islands)` and set
+`CellStaticDataFlags::kNavigationDataBuilt` (an empty result is a valid build,
+so only the flag says "built"; see the comment on `CellStaticData::flags` in
+`Engine/Source/Frame/CellStaticData.h`). That pair, with its not-yet-built
+test and its `ScopedSuppressAllocationTracking` scope, is written out three
+times:
+
+- `Engine/Source/Frame/FrameBase.cpp:263-269`, in the frame tick, on the
+  per-cell dispatch thread, through a `const CellStaticData&`;
+- `Engine/Source/Network/Server/ServerSessionRuntime.cpp:132-139`, in
+  `ServerSessionRuntime::PreparePausedSubscriptions`, on the main thread;
+- `Projects/BrokenEngineSandbox/Source/Network/Server/FleetNavigationController.cpp:23-30`,
+  in `FlagshipReachesEdge`, on the main thread during the fleet step, through
+  a `const CellStaticData&`.
+
+The three blocks differ only in `engine::` qualification and comment text. No
+engine function wraps the pair: `BuildCellNavigationData`
+(`Engine/Source/Frame/NavBuild.h`) takes the vector and does not set the flag.
+A fourth site that forgot the flag would rebuild on every call, and one that
+forgot the test would rebuild a built cell. Found by the architecture phase of
+a deep analysis of `Projects/BrokenEngineSandbox/Source/Network`. Not checked:
+`Projects/Coretide` is absent from session worktrees, so whether it holds
+another copy is unknown.
 
 ## Design
 
@@ -433,13 +540,29 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
     results. Do not route `AreaDamage` through `ApplyBeamDamage` (it would
     need a dummy shooter position). The order of health writes, the
     `BeginExplosion` call, and every random draw and UUID mint is unchanged.
-11. Inside `FleetCoordination.cpp`, run the row scan once per escorting
+11. (a) Inside `FleetCoordination.cpp`, run the row scan once per escorting
     Fighter and produce both the slot point and the lead point from the one
     `iCount` and `iSlot`. The phase arithmetic at `:152-156` runs once per
     offset exactly as today, so both results stay bit-identical. How the two
     points are returned (a small file-local result struct, or a scan helper
     returning `iCount` and `iSlot`) is the executing session's trivial
     choice. Update the comment above `EscortSlotPoint` (`:124-126`).
+
+    (b) Remove `iClearanceTier` and `iHighestFlightPlane` from
+    `ChooseAttackTactic` and derive the values inside it as its sibling
+    `ChooseFighterFleetTactic` does, with
+    `ShipTypeClearanceTier(ShipType::kFighter)` and
+    `HighestFlightPlane(ShipType::kFighter)`: one concrete variant exists at
+    three call sites, and deriving the same values inside is bit-identical.
+    The own-tier sight retest in `ChooseAttackTactic`
+    (`FleetCoordination.cpp:338-342`) stays unconditional. `ChooseFleetTactic`
+    skips its retest when the type's tier equals `kiFiringClearanceTier`
+    (`:260`); that skip is keyed by `eType`, stays where it is, and is not
+    copied into `ChooseAttackTactic`. The retest is live because the Fighter's
+    clearance tier is not `kiFiringClearanceTier` (`BES/Frame/TerrainUtils.h`,
+    `ShipTypeClearanceTier`), so there is no dead branch to remove. Reword the
+    declaration comment (`FleetCoordination.h:79-85`), which names both
+    parameters, to name the Fighter's tier and highest plane instead.
 12. Keep one copy of the six steps in place. Before them, choose the wanted
     direction and the rate: `vecStoredDirection` and
     `kfDeltaRotationTowardsStored` by default, replaced inside
@@ -520,7 +643,7 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
       only itself and the previous frame; the pass runs once per type per
       tick after that type's row loop and before Transfer, Destroy, and
       Spawn; the comments giving those reasons move with the code.
-16. Remove `vecCellCenter`, `deltaTime`, and `flagshipGlobalId` from
+16. (a) Remove `vecCellCenter`, `deltaTime`, and `flagshipGlobalId` from
     `ComputeNavigation` and derive them inside: the cell centre from the same
     expression the scripts use, with the W=1 rationale comment the scripts
     carry on that local (`Omnis.cpp:568-570` and counterparts) moved with
@@ -533,13 +656,105 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
     equal, `flagshipGlobalId` stays a parameter and only the other two go.
     The three ship scripts change together, keeping Fighters and Battleships
     the parallel pair `FC/Battleships/AGENTS.md` describes.
-17. In the per-fleet loop of `TickFleetTimers`, after the dead-flagship
+
+    (b) The authoring agent's choice, not a user decision: the smallest
+    change. `ComputeReturnDestination` reads
+    `engine::CentredIslands(rStaticData.islands)` itself and loses its
+    `std::span<const XMFLOAT4> islandCandidates` parameter
+    (`FC/Ships/ShipBehaviours.h`/`.cpp`). In the body, take the
+    centred-islands span; the empty test and the nearest-center scan run over
+    it, building each candidate vector in the loop with the recipe in item
+    16(b)'s Context. Rewrite the comment at `:798-799`, which describes the
+    removed precomputation. Delete the nine-line block in each of the three
+    `Update` functions and the `islandCandidates` argument at each call.
+    Alternative considered and not chosen, also by the authoring agent: an
+    owning type in `FC/Ships/ShipBehaviours.h`, constructed from
+    `rStaticData` once per `Update` beside `NavRectangleBoard`, holding the
+    workbuffer allocation and exposing the candidate span, with
+    `ComputeReturnDestination` unchanged (proposed by an architecture review
+    of the Battleships collection, commit `7dae9a27`). Its one advantage: the
+    candidates are formed once per cell per `Update`, where this part forms
+    them per row, one `XMVectorSet` per centred island for each row that
+    calls `ComputeReturnDestination`. It was not chosen under the root
+    `AGENTS.md` KISS and YAGNI directives: it adds a type and keeps the
+    allocation, the span, and the parameter, where this part only deletes
+    code, and the per-row cost is small beside the scan over the same islands
+    that the function already runs for each such row. Bit identity, which
+    the change must keep:
+
+    - The candidate stays `(x, y, Lowest().fHeightMeters, 1)`. An `XMFLOAT4`
+      store and load round trip is exact, so building the vector in the loop
+      gives the same bits as loading the stored one.
+    - The scan keeps list order and the strict `<` first-nearest rule,
+      starting from the first centred island.
+    - The distance stays `XMVector3LengthSq`, so the Z term stays.
+    - Dropping the workbuffer push has no simulation effect.
+
+    (c) Rename every long-form identifier to the `Ai` form the rest of the
+    code already uses, because rule 56 approves it and the short form is the
+    one the collection member, the flag, and the header declaration carry.
+    This part changes identifier and comment text only; no type, parameter
+    order, value, or statement changes. Rename set (lines as of `213d2577`,
+    except the `TerrainUtils.cpp` ones, which are from a later commit; locate
+    by symbol if they moved):
+
+    | Old identifier | New identifier | Sites |
+    |---|---|---|
+    | `ComputeArtificialIntelligenceSteering` | `ComputeAiSteering` | `TerrainUtils.h:24`, `TerrainUtils.cpp:29`, `ShipBehaviours.cpp:351` (comment), `ShipBehaviours.cpp:775` |
+    | `AiSteeringResult::vecArtificialIntelligenceDirection` | `vecAiDirection` | `TerrainUtils.h:19`, `TerrainUtils.cpp:73` (designated initializer) |
+    | local `vecArtificialIntelligenceDirection` in the steering function | `vecAiDirection` | `TerrainUtils.cpp:71`, `:73` |
+    | local `fElevationArtificialIntelligence` | `fElevationAi` | `TerrainUtils.cpp:56`, `:57` |
+    | parameter `vecArtificialIntelligenceDirection` of `ShouldRecomputeNavigation` | `vecAiDirection` | `ShipBehaviours.cpp:339`, `:355` |
+    | parameter `rVecArtificialIntelligenceDirection` of `RecomputeNavigationPath` | `rVecAiDirection` | `ShipBehaviours.cpp:510`, `:518`, `:522` |
+    | parameter `rVecArtificialIntelligenceDirection` of `ComputeNavigation` | `rVecAiDirection` | `ShipBehaviours.cpp:567`, `:598`, `:619`, `:742`, `:769`, `:775`, `:776` |
+    | structured binding `vecNewArtificialIntelligenceDirection` | `vecNewAiDirection` | `ShipBehaviours.cpp:775`, `:776` |
+
+    The comment at `ShipBehaviours.cpp:350`, inside
+    `ShouldRecomputeNavigation`, names `rVecArtificialIntelligenceDirection`,
+    but that function's parameter has no `r` prefix; write it as
+    `vecAiDirection`, the renamed parameter it describes. None of the new
+    names collides with an existing name in its scope: the short forms
+    already in `ShipBehaviours.cpp` are parameters and locals of other
+    functions (`IsWithinHeadingCone`, `AimAiDirection`,
+    `ApplyAcceleratedMovement`), and `TerrainUtils.cpp` has no short-form
+    name today. The `ComputeNavigation` definition line carries both part (a)'s
+    parameter removal and this rename; the rename needs no
+    `ShipBehaviours.h` edit, since the declaration already says
+    `rVecAiDirection`.
+17. (a) In the per-fleet loop of `TickFleetTimers`, after the dead-flagship
     `continue`: add one `continue` when the flagship is not at
     `rFleet.wantedCoordinate`; make the `cellChangeTimerSeconds` drain
     unconditional; keep the `> 0.0f` `continue`; delete the second coordinate
     test with its `continue` and comment; keep the content of the comment
     above the drain (drain only while at the wanted cell, even in cross-cell
     mode; one tick per pass), placed with the new guard and the drain.
+
+    (b) One server-only const member function on `CellStaticData`, because
+    the function touches only that struct's own `mutable` members
+    (`navigationData`, `flags`) and two of the three callers hold a
+    `const CellStaticData&`. A free function beside `BuildCellNavigationData`
+    in `NavBuild.h` is the alternative; it would need `CellStaticData` there,
+    and `CellStaticData.h` already includes `NavBuild.h`.
+
+    - `Engine/Source/Frame/CellStaticData.h`: declare, under
+      `#if defined(BT_SERVER)`, a const member that builds this cell's
+      navigation data unless `kNavigationDataBuilt` is set (suggested name
+      `BuildNavigationDataIfUnbuilt`; the name is a trivial choice). Update
+      the comment on `flags` that names `BuildCellNavigationData` as the
+      server's setter.
+    - `Engine/Source/Frame/CellStaticData.cpp`: define it with the body the
+      three sites share — the flag test, the `// Heap:` note and
+      `ScopedSuppressAllocationTracking` scope, the `BuildCellNavigationData`
+      call, and the flag set.
+    - Replace each of the three blocks with one call. Each site keeps the
+      part of its comment that says why the build happens there (first tick
+      of a cell; a paused update serving pending subscriptions; the fleet
+      step running ahead of dispatch).
+
+    Invariant the function must keep: it reads and writes only its own
+    `CellStaticData`, with no shared or static state, because the frame-tick
+    caller runs in parallel across cells. Navigation data is outside the CRC
+    and the save, so no byte changes.
 
 ## Critical files
 
@@ -561,7 +776,7 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Battleships/BattleshipsCombat.cpp`
   (10)
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/FleetCoordination.cpp`
-  (11)
+  (11), `FleetCoordination.h` (11b)
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/MissilesUpdate.cpp`
   (12)
 - `Projects/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj` and
@@ -584,9 +799,15 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
   `BrokenEngineSandbox.vcxproj` and `BrokenEngineSandboxServer.vcxproj` with
   their `.filters` (15)
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.cpp`
-  and `Battleships/Battleships.cpp` (15, 16), `Omnis/Omnis.cpp` (16)
+  (11b, 15, 16) and `Battleships/Battleships.cpp` (15, 16),
+  `Omnis/Omnis.cpp` (16)
+- `Projects/BrokenEngineSandbox/Source/Frame/TerrainUtils.h` and
+  `TerrainUtils.cpp` (16c)
 - `Projects/BrokenEngineSandbox/Source/Network/Server/FleetNavigationController.cpp`
   (17)
+- `Engine/Source/Frame/CellStaticData.h`, `CellStaticData.cpp`, and
+  `FrameBase.cpp`; `Engine/Source/Network/Server/ServerSessionRuntime.cpp`
+  (17b)
 
 ## In scope
 
@@ -622,9 +843,14 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
 10. A new file-local damage function next to `BeginExplosion`, and the damage
     steps in `BattleshipsPostRender::ApplyBeamDamage`, `PostCollision`, and
     `AreaDamage`.
-11. The file-local static `EscortSlotPoint` and its comment
+11. (a) The file-local static `EscortSlotPoint` and its comment
     (`FleetCoordination.cpp:124-157`), and its two calls in
-    `ChooseFleetTactic` (`:272-273`).
+    `ChooseFleetTactic` (`:272-273`). (b) `ChooseAttackTactic`: its
+    declaration and comment in `FleetCoordination.h`, its definition's
+    parameter list, and the two derived locals in its body; the
+    `ChooseAttackTactic` call in `ChooseFighterFleetTactic`
+    (`FleetCoordination.cpp:291`) and the two calls in `Fighters.cpp`
+    (`:661`, `:680`): the two arguments only.
 12. `MissilesPostRender::Update`: the `if (bRetained)` / `else` steering arms.
 13. The `Pch.cpp` compile item and filter item of the ModelViewer project, and
     the deletion of the viewer's `Pch.cpp`. The four `Render*TweakExtensions`
@@ -644,12 +870,26 @@ and item 8's CPU-versus-GPU rounding, both stated below. No item bumps a
     file-local template, and the shared threshold pair in
     `FC/Ships/ShipBehaviours.h`/`.cpp`; deleting `FightersNavigation.cpp` and
     `BattleshipsNavigation.cpp` and their project and filter entries.
-16. `ComputeNavigation`: declaration, definition parameter list, and the
+16. (a) `ComputeNavigation`: declaration, definition parameter list, and the
     derived locals at the top of its body; in each ship script's PostRender
     `Update`, the `vecCellCenter` local and its comment and the arguments of
-    the one `ComputeNavigation` call.
-17. `FleetNavigationController::TickFleetTimers`: the lines from the comment
-    above the drain through the second coordinate test.
+    the one `ComputeNavigation` call. (b) `ComputeReturnDestination`: its
+    declaration, its parameter list, the candidate read and scan at the top
+    of its body, and the comment at `:798-799`; the island-candidates block
+    at the top of `FightersPostRender::Update`,
+    `BattleshipsPostRender::Update`, and `OmnisPostRender::Update`, and the
+    `islandCandidates` argument of the one `ComputeReturnDestination` call in
+    each. (c) The identifiers in item 16(c)'s rename table, at every site
+    listed, and the two comment lines at `ShipBehaviours.cpp:350` and `:351`
+    that name them; any further `ArtificialIntelligence` identifier a fresh
+    case-insensitive search of the tracked tree finds at implementation time,
+    renamed the same way.
+17. (a) `FleetNavigationController::TickFleetTimers`: the lines from the
+    comment above the drain through the second coordinate test. (b) The new
+    `CellStaticData` member: declaration and definition, and the comment on
+    `CellStaticData::flags`; the navigation build block in the frame tick
+    (`FrameBase.cpp`), in `ServerSessionRuntime::PreparePausedSubscriptions`,
+    and in `FlagshipReachesEdge`.
 
 Documentation: any `AGENTS.md` sentence `/update-claude-docs` finds this
 change makes false, including where a sentence names item 15's moved
@@ -694,11 +934,20 @@ function or its file, and `FC/Ships/AGENTS.md` `## Ship Invariants` and
   `:310`); Omnis' already-shared step; `BeginExplosion`, the
   `ApplyBeamDamage` signature, the cell-exit transfer test in
   `PostCollision`, and the `AreaDamage` query; `AGENTS.md` rule text.
-- 11: `FleetCoordination.h` and every caller outside the file; the escort
+- 11(a): `FleetCoordination.h` and every caller outside the file; the escort
   slot rule (slot order, lap clock, lead, speed formula); the scan's growth
   with rows times escorting Fighters, such as a per-fleet cache on
-  `FleetBoard`; `FindSquadronTarget` and every other function in the file;
-  `FC/Fighters/AGENTS.md`.
+  `FleetBoard`; `FC/Fighters/AGENTS.md`.
+- 11 as a whole: every function in `FleetCoordination.cpp` other than
+  `EscortSlotPoint`, its two calls in `ChooseFleetTactic`,
+  `ChooseAttackTactic`, and its call in `ChooseFighterFleetTactic`.
+- 11(b): `ChooseFleetTactic` beyond 11(a)'s two calls, including its
+  tier-equality skip at `FleetCoordination.cpp:260`; `FindSquadronTarget`,
+  `FindAttackTarget`, and their `iHighestFlightPlane` parameters
+  (`FindAttackTarget` has callers of other ship types; `FindSquadronTarget`
+  is file-static and its one caller is `ChooseAttackTactic`); any change to
+  which tier or plane a Fighter uses; `AGENTS.md` files (none names the two
+  parameters).
 - 12: the target-loss block, the jitter block, and every other statement of
   `MissilesPostRender::Update`; the steering constants; what `Transfer` sends
   as the stored direction; any `kiVersion`.
@@ -711,27 +960,44 @@ function or its file, and `FC/Ships/AGENTS.md` `## Ship Invariants` and
   navigation request; the five default initialisers and the
   `ServerSession.cpp` comment; `pNavigationDelays`,
   `SpawnInfo::navigationDelay`, and everything else
-  `Documents/Plans/Game/RemoveShipNavigationDelayColumn.md` owns.
+  `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md` owns.
 - 15: any behavior change (gate order, threshold values, cone test, idle-row
   behavior); `OmnisNavigation.cpp` and Omni steering; `ComputeTerrainAvoidance`,
   `FindNearestEnemyShip`, `HasLineOfSight`, and `RampHeadingTurnRate`;
   sharing any other mirrored Fighter and Battleship code.
-- 16: the island candidate list each script passes to
-  `ComputeReturnDestination`
-  (`Documents/Plans/Game/ReturnDestinationReadsCentredIslands.md`);
-  the navigation modes, random draws, arrival checks, and path-query cadence;
-  the other `ComputeNavigation` parameters; the in-function repeats inside
-  `ComputeNavigation` (`Documents/Plans/Game/ReduceShipBehavioursCpp.md`);
-  the `rVecArtificialIntelligenceDirection` parameter name
-  (`Documents/Plans/Game/RenameArtificialIntelligenceToAi.md`); `pGlobalIds`
-  as a simulation input outside the CRC
-  (`Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md`); the mode 6 and 7
+- 16: the navigation modes, random draws, arrival checks, and path-query
+  cadence; the other `ComputeNavigation` parameters beyond 16(c)'s rename of
+  `rVecArtificialIntelligenceDirection`; `ComputeNavigation`'s own
+  `CentredIslands` reads; the in-function repeats inside `ComputeNavigation`
+  (`Documents/Plans/Game/SplitOmnisAndShipBehaviours.md`); `pGlobalIds` as a
+  simulation input outside the CRC
+  (`Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md`); the mode 6 and 7
   random-draw rule
   (`Documents/Investigations/Engine/ResolveModeSixSevenRandomDrawRule.md`).
-- 17: the rest of `TickFleetTimers` (pick logic, member loop, log),
-  `FlagshipReachesEdge`, and `ReachableNeighbourDirections`; any change to
-  when a timer drains, when a fleet picks, or how many fleet RNG draws a
-  tick makes; turning `FleetNavigationController` into a free function.
+- 16(b): the return-distance hysteresis, the route waypoint call, and every
+  other line of `ComputeReturnDestination`; `CentredIslands` and the island
+  placement list; any change to which island a ship returns to.
+- 16(c): any change to behaviour, types, parameter order, or statement order
+  made by the rename; identifiers that already use `Ai`; the word "AI" in
+  comments and documentation prose; rewrapping or otherwise reformatting the
+  long lines the renamed identifiers sit on; `Documents/C++StyleGuide.txt`
+  and every `AGENTS.md` file (none names a long-form identifier);
+  `Documents/Investigations/Engine/RefactorCandidates.md`; the private
+  Coretide project, which contains no long-form identifier.
+- 17(a): the rest of `TickFleetTimers` (pick logic, member loop, log),
+  `FlagshipReachesEdge` beyond its navigation build block (17(b)), and
+  `ReachableNeighbourDirections`; any change to when a timer drains, when a
+  fleet picks, or how many fleet RNG draws a tick makes; turning
+  `FleetNavigationController` into a free function.
+- 17(b): `BuildCellNavigationData` itself and everything it builds; the
+  elevation grid build in the frame tick (the Fighter launch admission
+  question is
+  `Documents/Plans/Game/ReplayMetaClientStateAndFighterAdmission.md`);
+  `Engine/Source/Agent/Commands/CellCoordinateProbe.cpp`, which builds into
+  a local copy and sets no flag, and the client's `CellStaticData::Read`;
+  when or on which thread any site builds; `Projects/Coretide` (a session
+  that can read the primary checkout reports a copy there as a residual
+  instead of editing it).
 
 ## Risk tier
 
@@ -743,21 +1009,25 @@ Tier 3 — invariant/integration, the highest of the items, per
 - Data layout (item 8): the shared CPU/GLSL `GlobalLayout` gains a field;
   smoke is client-only visual state outside the CRC, and the server includes
   the header and is rebuilt.
-- A change spanning independently owned subsystems (item 6, and the merged
-  change as a whole): `Common`, engine Graphics, Agent, Network, Frame, and
-  Render, DataPacker, the ModelViewer, and BrokenEngineSandbox simulation,
-  server, and UI; the `Common.h`-aggregated header edit rebuilds every
-  precompiled header.
+- A change spanning independently owned subsystems (items 6 and 17(b), and
+  the change as a whole): `Common`, engine Graphics, Agent, Network, Frame,
+  and Render, DataPacker, the ModelViewer, and BrokenEngineSandbox
+  simulation, server, and UI; the `Common.h`-aggregated header edit rebuilds
+  every precompiled header. Item 17(b) adds an engine Frame function and
+  changes callers in engine Frame, engine Network Server, and the game's
+  Network Server, and one caller runs on the per-cell dispatch threads.
 
 Lower-tier exposure the review still covers:
 
 - Determinism/CRC paths whose computed values must not change (items 3, 5,
-  10, 11, 12, 15, 16, 17; item 14's predicate is shared by server admission,
-  grid-save validation, ship `PostRead`, and the harness rig, and must admit
-  exactly the same values). Item 17 must leave the fleet RNG and fleet
-  checksum bit-identical.
-- Public header names removed or added (items 2, 9, 15, 16), declarations
-  moved between headers (item 13), and project membership (items 13, 15).
+  10, 11, 12, 15, 16, 17(a); item 14's predicate is shared by server
+  admission, grid-save validation, ship `PostRead`, and the harness rig, and
+  must admit exactly the same values). Item 17(a) must leave the fleet RNG
+  and fleet checksum bit-identical. Item 17(b)'s navigation data is outside
+  the CRC and the save.
+- Public header names removed, added, or renamed (items 2, 9, 11(b), 15, 16,
+  17(b)), declarations moved between headers (item 13), and project
+  membership (items 13, 15).
 - Developer-tool behavior: item 7 changes the log level and text of the two
   catch paths and the published `error` text; item 1 is `BT_CLIENT`,
   Debug-only.
@@ -795,7 +1065,11 @@ Code reads:
 10. The subtract, clamp, and `BeginExplosion` step appears once in
     `BattleshipsCombat.cpp`.
 11. One escort tick walks the previous-frame Fighter rows once, a single scan
-    feeding both points, with the per-offset phase arithmetic unchanged.
+    feeding both points, with the per-offset phase arithmetic unchanged
+    (11a). `ChooseAttackTactic` has no `iClearanceTier` or
+    `iHighestFlightPlane` parameter at its declaration, definition, and
+    three calls, and the diff adds no tier-equality test to
+    `ChooseAttackTactic` (11b).
 12. One copy of the six steering steps remains in `MissilesPostRender::Update`.
 13. The ModelViewer project compiles `Engine/Source/Pch.cpp` as its
     precompiled-header creator, and nothing references the deleted
@@ -813,9 +1087,20 @@ Code reads:
 16. `ComputeNavigation` has no `vecCellCenter` or `deltaTime` parameter, and
     no `flagshipGlobalId` parameter unless item 16's fallback applied, which
     the executing session reports with its reason; any in-function flagship
-    read is from `rPreviousFrame`.
+    read is from `rPreviousFrame` (16a). No ship collection source builds
+    island candidates (no `islandCandidates` identifier remains in the three
+    `.cpp` files), and `ComputeReturnDestination` takes no candidate span
+    (16b). A case-insensitive search of the tracked tree for
+    `ArtificialIntelligence` matches no file under `Projects/`, `Engine/`,
+    `Common/`, `DataPacker/`, or `Tools/`, and part (c)'s edits change
+    identifier and comment text only, in `ShipBehaviours.cpp`,
+    `TerrainUtils.h`, and `TerrainUtils.cpp` (16c).
 17. `TickFleetTimers` compares the flagship's coordinate with
-    `wantedCoordinate` once per fleet, before the drain.
+    `wantedCoordinate` once per fleet, before the drain (17a).
+    `BuildCellNavigationData` is called with a cell's own `navigationData`
+    from one place, the new `CellStaticData` function, and
+    `kNavigationDataBuilt` is set on the server from that place only; the new
+    function uses no static or shared state (17b).
 
 Builds and static checks (one set):
 
@@ -844,14 +1129,18 @@ Harness (`/agent-harness`), on the criterion 18 build:
     CRC-path items need: id-indexed rows destroyed (3); collection
     allocation (5, any run); fleet and random-spawn Battleships taking
     blaster, missile, and beam damage, with a fleet Battleship's health
-    holding at 0 (10); fleet Fighters escorting their flagship (11); missiles
-    flying with and without a target (12); fleet and random-spawn Fighters
-    and Battleships flying near island terrain (15); a fleet ship of each of
-    the three types reaching its `ComputeNavigation` call, including a
-    Patrol fleet Fighter (`ShipOrders::kSeekAndDestroy` clear) on a tick its
-    flagship is not in its cell (16); and at least one fleet flagship picking
-    a new cell (17). A scene that cannot share the recording gets its own
-    baseline recording under the same check.
+    holding at 0 (10); fleet Fighters escorting their flagship (11a);
+    random-spawn Fighters and Seek and Destroy or Same Target fleet Fighters
+    fighting (11b); missiles flying with and without a target (12); fleet
+    and random-spawn Fighters and Battleships flying near island terrain
+    (15); a fleet ship of each of the three types reaching its
+    `ComputeNavigation` call, including a Patrol fleet Fighter
+    (`ShipOrders::kSeekAndDestroy` clear) on a tick its flagship is not in
+    its cell (16a); a cell that has centred islands and random-spawn ships
+    with no enemy in the cell, so they return to an island (16b); and at
+    least one fleet flagship picking a new cell (17). A scene that cannot
+    share the recording gets its own baseline recording under the same
+    check.
 23. A Debug client sends `audio_streaming_harness_rig` once per action, once
     with an unknown action, and once with `inspect` plus an extra field; each
     returns the same result shape or error text as on the baseline (1).
@@ -866,45 +1155,50 @@ Harness (`/agent-harness`), on the criterion 18 build:
 26. The harness session launches the client and the server, sends commands
     over several connections, and sends `quit` to each; both processes exit
     without a hang (4).
+27. A client connects to a fresh server and receives the origin's static
+    data, and a fleet flagship picks a new cell, exercising item 17(b)'s
+    three sites (first tick, subscription service, fleet step).
 
 ## Coordination
 
 Within this Plan: items 6 and 7 both edit `Screenshot.cpp` (item 6's
 `PathToString` call sites sit in the encoders item 7 edits); items 15 and 16
 both edit `FC/Ships/ShipBehaviours.h`/`.cpp` and the `Update` bodies of
-`Fighters.cpp` and `Battleships.cpp`, on different lines.
+`Fighters.cpp` and `Battleships.cpp`, on different lines; item 11(b) edits
+two `ChooseAttackTactic` calls in `Fighters.cpp`, outside item 15's and item
+16's lines. Within item 16, part (b)'s island-candidate block sits a few lines
+from part (a)'s `vecCellCenter` local in all three `Update` functions, and
+parts (a) and (c) both edit the `ComputeNavigation` definition line; part (c)
+does not edit the `ComputeArtificialIntelligenceSteering` call line beyond the
+rename. Item 17's two parts edit different functions of
+`FleetNavigationController.cpp` (`TickFleetTimers`, `FlagshipReachesEdge`).
 
 Other Plans that edit the same regions, with no ordering required unless
 stated; whichever lands second re-derives its sites by symbol from the landed
 tree:
 
-- `Documents/Plans/Engine/NameAudioHarnessRigNoPoolIndex.md` names the
-  sentinel at `:347`, inside the `release_read` branch item 1 moves.
-- `Documents/Plans/Engine/RemoveCoordUpdateTickReader.md` edits
+- `Documents/Plans/Engine/AudioHarnessRigCleanup.md` names the sentinel at
+  `:347`, inside the `release_read` branch item 1 moves.
+- `Documents/Plans/Engine/RemoveDeadNetworkSymbols.md` edits
   `NetworkSimulation.h` and needs the same temporary non-disabled build as
   item 2.
 - `Documents/Plans/Engine/PublishAreaToUvInverseExtents.md` changes other
   `GlobalLayout` fields (item 8).
-- `Documents/Plans/Game/SkipMissileRegistryWindowWithoutMissiles.md` leaves
-  item 12's steering arms to this Plan.
-- `Documents/Plans/Game/RemoveShipNavigationDelayColumn.md` keeps
+- `Documents/Plans/Game/MissileUpdateCleanup.md` leaves item 12's steering
+  arms to this Plan.
+- `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md` keeps
   `IsNavigationDelayInRange` by name, removes its three `PostRead` callers
   and the spawn-payload check, and deletes `SpawnInfo::navigationDelay`
-  (item 14); it also edits `Fighters.cpp`, `Battleships.cpp`, `Fighters.h`,
-  and `Battleships.h` (item 15). Other Plans cite `HudScreen.cpp` by line
-  number, which item 14 can shift: `Documents/Plans/Game/`
-  `FleetOwnedSquadronState.md`, `IncludeShipGlobalIdsInCrc.md`,
-  `RemoveClientStateFromReplayMeta.md`, and
-  `RemoveShipNavigationDelayColumn.md`.
-- Item 15's files are also edited by `Documents/Plans/Game/`
-  `ReturnDestinationReadsCentredIslands.md`, `IncludeShipGlobalIdsInCrc.md`,
-  and `SyncFighterBeamHalfWidthParameter.md`.
-- `Documents/Plans/Game/ReduceShipBehavioursCpp.md` depends on this Plan
+  (item 14); it also edits `Fighters.cpp`, `Battleships.cpp`, `Omnis.cpp`,
+  `Fighters.h`, and `Battleships.h` (items 15, 16). Other Plans cite
+  `HudScreen.cpp` by line number, which item 14 can shift:
+  `Documents/Plans/Game/` `FleetOwnedSquadronState.md`,
+  `ShipCrcTuplesAndOmniTransfer.md`, and
+  `ReplayMetaClientStateAndFighterAdmission.md`.
+- Items 15's and 16's files are also edited by
+  `Documents/Plans/Game/ShipCombatHelpers.md` (`Fighters.cpp`, and
+  `PreCollision` in `Omnis.cpp`).
+- `Documents/Plans/Game/SplitOmnisAndShipBehaviours.md` depends on this Plan
   (item 16) and measures `ShipBehaviours.cpp` with item 15's function in it.
-- `Documents/Plans/Game/RenameArtificialIntelligenceToAi.md` renames a
-  parameter on the `ComputeNavigation` definition line item 16 edits.
-- `Documents/Plans/Game/ReturnDestinationReadsCentredIslands.md` removes the
-  island candidate block a few lines from item 16's `vecCellCenter` local and
-  edits `ComputeReturnDestination` in the same two `FC/Ships` files.
 - `Documents/Plans/Game/FleetOwnedSquadronState.md` edits the member loop of
   `TickFleetTimers`, not item 17's lines.

@@ -73,6 +73,6 @@ changes project membership only through `/update-vcxproj`.
 ## Coordination
 
 Neither Plan depends on the other.
-`Documents/Plans/Engine/IslandsWriteAfterFramebufferFenceWait.md` changes the
-call order around `UpdateActiveIslands` in `GameBase::Render`. Whichever lands
+`Documents/Plans/Engine/IslandsUpdateOrderingAndEmission.md` changes the call
+order around `UpdateActiveIslands` in `GameBase::Render`. Whichever lands
 second re-derives its regions by symbol from the landed files.

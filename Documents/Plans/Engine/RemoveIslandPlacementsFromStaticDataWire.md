@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T14:19:47.916Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-14T14:19:47.916Z","dependsOn":["Documents/Plans/Engine/RemoveDeadNetworkSymbols.md"]} -->
 # Stop sending island placements and require client string terminators
 
 ## Context
@@ -258,11 +258,9 @@ executing session sets them up from the harness documentation.
 
 ## Coordination
 
-`Documents/Plans/Engine/RemoveCoordUpdateTickReader.md` and
-`Documents/Plans/Engine/RemoveUnreferencedNetworkWireSymbols.md` edit
-`NetworkMessages.h` or `NetworkProtocol.h` too. None of the three depends on
-another. Whichever lands later re-derives the lines of its references from the
-landed headers.
+`Documents/Plans/Engine/RemoveDeadNetworkSymbols.md` edits `NetworkMessages.h`
+and `NetworkProtocol.h` too. This Plan depends on it and re-derives the lines
+of its references from the landed headers.
 
 ## Notes
 

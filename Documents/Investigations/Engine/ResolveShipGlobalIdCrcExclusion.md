@@ -2,7 +2,7 @@
 
 This is an Investigation, not a Plan. It is the options record for a choice
 the user has since made: `### Open choice for the user` records that choice,
-and `Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` is the Plan that
+and `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md` is the Plan that
 carries it.
 
 ## Context
@@ -92,10 +92,10 @@ whether the exclusion stays or ends. The user was shown an earlier form of the
 two options, in which option 1 also rewrote the three comments, before commit
 `7dae9a27` made that rewrite separately, and chose nothing then. This
 investigation chooses neither. The authoring agent's record of what the user
-chose afterwards, on 2026-11-14, when the session that authored
-`Documents/Plans/Game/IncludeShipGlobalIdsInCrc.md` asked: `pGlobalIds` goes
-into `SharedCrcMembers()` for Fighters, Battleships, and Omnis, which is
-option 2 below. That Plan carries the choice, so no further Plan is written
+chose afterwards, on 2026-11-14, when the session that authored the global-ID
+Plan, now part of `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md`,
+asked: `pGlobalIds` goes into `SharedCrcMembers()` for Fighters, Battleships,
+and Omnis, which is option 2 below. That Plan carries the choice, so no further Plan is written
 from this investigation, which stays as the record of the options.
 
 Author's recommendation: option 2. Rationale: it would catch a client/server
@@ -215,18 +215,6 @@ edits `Ships/AGENTS.md`, which this investigation edits under its option 1
 only, and under its own option 2 bumps the same `Frame::kiVersion` base.
 Whichever Plan lands second re-derives its base value and its document edit
 from the landed source.
-
-`Documents/Plans/Game/OmniAnimationTimeClientOnly.md` also edits the first
-bullet of `Omnis/AGENTS.md` `## State Boundaries`, which this investigation
-rewords under its option 2. A Plan written from this investigation after that
-lands re-derives that bullet from the landed source.
-
-`Documents/Plans/Game/RemoveShipNavigationDelayColumn.md` removes
-`pNavigationDelays` from the three `SharedCrcMembers()` tuples this
-investigation's option 2 adds `pGlobalIds` to, and edits another bullet of
-`Ships/AGENTS.md` `## Ship Invariants`, the section its option 1 edits. A Plan
-written from this investigation after that lands re-derives its tuple and
-document edits from the landed source.
 
 ## Notes
 
