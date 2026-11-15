@@ -129,18 +129,18 @@ game state around the deterministic Frame tick.
   one fleet RNG and each fleet spawn search keeps clear of the points earlier
   spawns of its pass took, so replay playback must walk the recording's order.
   In normal play the engine's `PrepareTick` runs it after the tick's frame
-  inputs exist and before the agent status-change drain and the broadcast
-  snapshot, so the `StatusChange`s the fleet timers write into the frame input
-  when a flagship picks a new cell enter that tick's broadcast and recorded
-  input, and each spawn queued on the engine transfer manager joins that tick's
-  post-tick batch. On a later tick of a multi-tick update, `ComputeActiveSet`
-  can erase a cell whose frame input survives until the next `BuildFrameInputs`;
-  the step still reads a frame input's cell with `mCells.at` unchecked because
-  it reaches frame inputs only through a live member's cell, which holds that
-  member's owned row (or, for a just-queued spawn, is the origin or its
-  flagship's cell) and so stays active. Replay playback reruns the step on every
-  dispatching tick with every bookkeeping effect but no frame change and no
-  queued spawn, because playback takes every frame change from the recording.
+  inputs exist and before the agent status-change drain and the type sort, so
+  the `StatusChange`s the fleet timers write into the frame input when a
+  flagship picks a new cell enter that tick's broadcast and recorded input, and
+  each spawn queued on the engine transfer manager joins that tick's post-tick
+  batch. On a later tick of a multi-tick update, `ComputeActiveSet` can erase a
+  cell whose frame input survives until the next `BuildFrameInputs`; the step
+  still reads a frame input's cell with `mCells.at` unchecked because it reaches
+  frame inputs only through a live member's cell, which holds that member's
+  owned row (or, for a just-queued spawn, is the origin or its flagship's cell)
+  and so stays active. Replay playback reruns the step on every dispatching tick
+  with every bookkeeping effect but no frame change and no queued spawn, because
+  playback takes every frame change from the recording.
 - Fleet navigation never moves a flagship into the origin (0,0): it is never a
   pick candidate, and no order sends a fleet there. A flagship's pick of a new
   cell follows its fleet's behaviour. Random Walk draws one direction among the

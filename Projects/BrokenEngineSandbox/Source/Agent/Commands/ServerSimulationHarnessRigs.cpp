@@ -587,14 +587,6 @@ void DrainPendingAgentStatusChanges()
 				rStatusChanges.push_back(rScheduled.change);
 			}
 		}
-		for (auto itStatusChange = rStatusChanges.begin(); itStatusChange != rStatusChanges.end(); ++itStatusChange)
-		{
-			auto itInsertion = std::upper_bound(rStatusChanges.begin(), itStatusChange, *itStatusChange, [](const StatusChange& rLeft, const StatusChange& rRight)
-			{
-				return rLeft.eType < rRight.eType;
-			});
-			std::rotate(itInsertion, itStatusChange, std::next(itStatusChange));
-		}
 		std::erase_if(rScheduledChanges, IsReleased);
 		it = rScheduledChanges.empty() ? sHarnessRig.pendingAgentStatusChanges.erase(it) : std::next(it);
 	}

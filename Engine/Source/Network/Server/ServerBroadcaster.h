@@ -2,12 +2,11 @@
 
 #if defined(BT_SERVER)
 
-// The engine owns per-cell publication assembly and the deferred-injection drain: the broadcast snapshot of this
-// tick's status changes, the deterministic type grouping the wire format depends on, and the per-coordinate update
-// handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads. The game Agent harness rig
-// owns its deferred injection queue; it drains once per tick before that tick's snapshot. This header stays out of
-// the Engine.h aggregation and its consumers include it directly, though nothing in it requires that:
-// game::StatusChange, the one game type it needs, is already complete where the game Pch.h includes Engine.h.
+// The engine owns per-cell publication assembly and the deferred-injection drain: the type sort of this tick's status
+// changes in each frame input, matching the order the wire format's type grouping gives clients, and the per-coordinate
+// update handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads. The game Agent
+// harness rig owns its deferred injection queue; it drains once per tick before that tick's type sort. This header
+// stays out of the Engine.h aggregation and its consumers include it directly, though it names no game type.
 
 namespace engine
 {
@@ -23,8 +22,6 @@ public:
 	void BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, const common::ScopedWorkbufferArena& rPublicationArena);
 
 	void ResetState();
-
-	std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>> mBroadcastStatusChanges;
 };
 
 } // namespace engine

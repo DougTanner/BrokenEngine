@@ -396,7 +396,7 @@ void GameBase::ServerUpdate()
 	game::gpServerSession->mpRuntime->Poll(networkTimeState);
 
 	// Drain agent commands with the debug-control packets, before SaveLoadReplay/PrepareActiveSet so
-	// flag-setting commands are consumed the same update and injected StatusChanges enter the broadcast snapshot.
+	// flag-setting commands are consumed the same update and injected StatusChanges enter the tick's frame input.
 	if (gpAgentCommandServer != nullptr) [[unlikely]]
 	{
 		gpAgentCommandServer->Drain();

@@ -6,7 +6,6 @@
 
 #include "Agent/Commands/ReplayHarnessRigs.h"
 #include "File/GridSave.h"
-#include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerTransferManager.h"
 #include "GameBase.h"
 
@@ -281,10 +280,13 @@ void Replay::ClearReplayAbortState()
 {
 	// Live simulation resumes from the replayed frames, so relink clients and their owned entities to them as a load
 	// does. That also frees every subscription, so the next active-set rebuild retires every non-origin cell holding no
-	// owned entity until clients resubscribe.
+	// owned entity and no pin until clients resubscribe.
 	ClearReplayTransientState();
 	game::gpServerSession->mpTransferManager->mTransfers.clear();
-	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
+	for ([[maybe_unused]] auto& [rCoordinate, rFrameInput] : game::gpGame->mFrameInputs)
+	{
+		rFrameInput.statusChanges.clear();
+	}
 	game::gpServerSession->ResetForLoad();
 }
 
@@ -779,11 +781,10 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 		}
 
 		// Replay publication state belongs to one fixed tick. HarvestTransfers is intentionally disabled during
-		// playback, so clear the staged maps here before this tick's post-dispatch records are loaded below.
+		// playback, so clear the transfer map here before this tick's post-dispatch records are loaded below.
 		if (game::gpGame->mbReplaying)
 		{
 			game::gpServerSession->mpTransferManager->mTransfers.clear();
-			game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
 		}
 
 		auto AbortReplay = [&]()
@@ -885,10 +886,6 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					ReplayHarnessRigs::ObservePlaybackEvent(*this, game::gpGame->miTickCounter);
 				}
 
-				if (!rFrameInput.statusChanges.empty())
-				{
-					game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.insert_or_assign(rCoordinate, rFrameInput.statusChanges);
-				}
 				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCells.at(rCoordinate).pCurrent));
 			}
 

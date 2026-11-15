@@ -19,7 +19,6 @@ void ServerBroadcaster::BuildFrameInputs()
 	ScopedSuppressAllocationTracking suppress;
 
 	game::gpGame->mFrameInputs.clear();
-	mBroadcastStatusChanges.clear();
 
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
@@ -43,12 +42,18 @@ void ServerBroadcaster::PrepareTickStatusChanges()
 	// scheduled tick and until its coord is one the tick will simulate (active, with a committed pCurrent frame).
 	game::DrainPendingAgentStatusChanges();
 
-	// Save this tick's StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)
-	for (const auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
+	// Stable in-place insertion sort by type: the server applies, records, and publishes this list, and clients apply
+	// the codec's type-grouped wire order, so both sides apply one order.
+	for ([[maybe_unused]] auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
 	{
-		if (!rFrameInput.statusChanges.empty())
+		std::vector<game::StatusChange>& rStatusChanges = rFrameInput.statusChanges;
+		for (auto itStatusChange = rStatusChanges.begin(); itStatusChange != rStatusChanges.end(); ++itStatusChange)
 		{
-			mBroadcastStatusChanges.insert_or_assign(rCoord, rFrameInput.statusChanges);
+			auto itInsertion = std::upper_bound(rStatusChanges.begin(), itStatusChange, *itStatusChange, [](const game::StatusChange& rLeft, const game::StatusChange& rRight)
+			{
+				return rLeft.eType < rRight.eType;
+			});
+			std::rotate(itInsertion, itStatusChange, std::next(itStatusChange));
 		}
 	}
 }
@@ -56,38 +61,33 @@ void ServerBroadcaster::PrepareTickStatusChanges()
 void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, [[maybe_unused]] const common::ScopedWorkbufferArena& rPublicationArena)
 {
 	const std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>>& rTransfers = game::gpServerSession->mpTransferManager->mTransfers;
-	const std::vector<engine::GridCoord>& rActiveCoordinates = game::gpGame->mActiveCoordinates;
+	const std::unordered_map<engine::GridCoord, game::FrameInput>& rFrameInputs = game::gpGame->mFrameInputs;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	bool bReplaying = game::gpGame->mbReplaying;
 	auto ForEachPublicationCoord = [&](const auto& rCallback)
 	{
+		for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
+		{
+			rCallback(rCoord);
+		}
 		if (!bReplaying)
 		{
-			for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
-			{
-				rCallback(rCoord);
-			}
 			return;
 		}
 
-		for (auto it = rActiveCoordinates.begin(); it != rActiveCoordinates.end(); ++it)
+		for (const auto& [rCoord, rFrameInput] : rFrameInputs)
 		{
-			if (std::find(rActiveCoordinates.begin(), it, *it) == it)
-			{
-				rCallback(*it);
-			}
-		}
-		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : mBroadcastStatusChanges)
-		{
-			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord))
+			if (!rFrameInput.statusChanges.empty() && !std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord))
 			{
 				rCallback(rCoord);
 			}
 		}
 		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : rTransfers)
 		{
-			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord) && !mBroadcastStatusChanges.contains(rCoord))
+			auto itFrameInput = rFrameInputs.find(rCoord);
+			bool bHasStatusChanges = itFrameInput != rFrameInputs.end() && !itFrameInput->second.statusChanges.empty();
+			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord) && !bHasStatusChanges)
 			{
 				rCallback(rCoord);
 			}
@@ -99,9 +99,9 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	ForEachPublicationCoord([&](const engine::GridCoord& rCoord)
 	{
 		++iPublicationCoordCount;
-		if (auto it = mBroadcastStatusChanges.find(rCoord); it != mBroadcastStatusChanges.end())
+		if (auto it = rFrameInputs.find(rCoord); it != rFrameInputs.end())
 		{
-			iStatusChangeCount += std::ssize(it->second);
+			iStatusChangeCount += std::ssize(it->second.statusChanges);
 		}
 		if (auto it = rTransfers.find(rCoord); it != rTransfers.end())
 		{
@@ -144,9 +144,9 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		engine::GridUpdateData updateData {};
 		updateData.uiSharedCrc = (*game::gpGame->mCells.at(rCoord).pCurrent).postRender.uiSharedCrc;
 		int64_t iRunStart = iStatusChangeIndex;
-		if (auto it = mBroadcastStatusChanges.find(rCoord); it != mBroadcastStatusChanges.end())
+		if (auto it = rFrameInputs.find(rCoord); it != rFrameInputs.end())
 		{
-			for (const game::StatusChange& rChange : it->second)
+			for (const game::StatusChange& rChange : it->second.statusChanges)
 			{
 				std::memcpy(pStatusChanges + iStatusChangeIndex++, &rChange, sizeof(game::StatusChange));
 			}
@@ -189,7 +189,6 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 
 void ServerBroadcaster::ResetState()
 {
-	mBroadcastStatusChanges.clear();
 	game::ResetPendingAgentStatusChanges();
 }
 

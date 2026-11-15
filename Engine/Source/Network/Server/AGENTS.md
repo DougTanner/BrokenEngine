@@ -143,10 +143,10 @@ the engine calls by name.
   coordinate is active with a committed current Frame, and adds them to that
   tick's post-tick batch, which is applied right after the tick with its
   arrivals; destination and liveness rules apply to transfers only.
-  `ServerBroadcaster` owns the broadcast snapshot of a tick's status changes,
-  the drain of agent-injected changes held for a later tick, and the
-  per-coordinate publication `ServerSessionRuntime` hands to the delta resend
-  ring at tick completion.
+  `ServerBroadcaster` owns the drain of agent-injected changes held for a later
+  tick, the type sort of each frame input's status changes that the tick then
+  applies, records, and publishes, and the per-coordinate publication
+  `ServerSessionRuntime` hands to the delta resend ring at tick completion.
 - Keep every workbuffer-backed publication view valid until synchronous delta
   and optional full-frame buffering have consumed it. Preflight capacity for the
   complete publication block before forming any view, including the codec's
@@ -184,14 +184,14 @@ the engine calls by name.
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.
 - The harness rig status-change queue is owned by the game Agent (the game
-  project's own `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster
-  drains injected changes and takes its snapshot once per normal-play tick, so
-  an injected change can enter any tick of a multi-tick update, and its reset
-  clears that queue. The transfer manager drains its spawn queue after natural
-  collection and before deterministic sorting, and its reset clears that queue.
-  Each accepted transfer batch goes to the engine replay owner before live
-  application (`../../File/AGENTS.md#replay-streams`); capture failure
-  invalidates recording but never vetoes the accepted batch.
+  project's own `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster drains
+  injected changes and sorts each frame input's status changes once per
+  normal-play tick, so an injected change can enter any tick of a multi-tick
+  update, and its reset clears that queue. The transfer manager drains its spawn
+  queue after natural collection and before deterministic sorting, and its reset
+  clears that queue. Each accepted transfer batch goes to the engine replay
+  owner before live application (`../../File/AGENTS.md#replay-streams`); capture
+  failure invalidates recording but never vetoes the accepted batch.
 
 ## Buffered State
 

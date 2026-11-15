@@ -273,7 +273,6 @@ void ServerSessionRuntime::CompleteTick(int64_t iTick)
 		common::ScopedWorkbufferArena publicationArena = common::gpThreadLocal->mWorkbuffer.Push();
 		game::gpServerSession->mpBroadcaster->BuildTickPublication(iTick, *this, publicationArena);
 	}
-	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
 	SendNewSubscriptionFullStates();
 	mpServer->Flush();
 }
