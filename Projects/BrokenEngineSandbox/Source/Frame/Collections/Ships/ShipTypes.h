@@ -3,9 +3,8 @@
 namespace game
 {
 
-// Enumerator order is the frame tuple order, the ForEachShipType order, the registry source-layer order, and the
-// OwnershipLayers order. Serialized as one byte in the spawn request, FleetSync, the fleet save, and the tick-input
-// payloads.
+// Enumerator order is the frame tuple order, the ForEachShipType order, and the OwnershipLayers order. Serialized as one
+// byte in the spawn request, FleetSync, the fleet save, and the tick-input payloads.
 enum class ShipType : uint8_t
 {
 	kFighter,

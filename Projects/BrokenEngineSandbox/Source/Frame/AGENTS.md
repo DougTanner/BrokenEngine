@@ -21,9 +21,9 @@ order or participation changes.
 - Every game collection pair registers in the tuples in `FrameCollections.h`;
   no collection has explicit per-collection dispatch. Register new collections
   in the correct tuple and preserve deterministic ordering: the three ship types
-  follow in `ShipType` order, which `ForEachShipType`, the registry source
-  layers, and `Frame::OwnershipLayers` share. The client's tuples alone append
-  the client-only Wrecks after Battleships (`Collections/Battleships/AGENTS.md`
+  follow in `ShipType` order, which `ForEachShipType` and
+  `Frame::OwnershipLayers` share. The client's tuples alone append the
+  client-only Wrecks after Battleships (`Collections/Battleships/AGENTS.md`
   `## Wreck Invariants`). `GameServerInterpolateCollections` and
   `GameServerPostRenderCollections` list the collections both builds hold;
   `Frame::kiVersion`, `Crcs`, `LogDifferences`, and `ServerRead` with its pair
@@ -113,11 +113,7 @@ order or participation changes.
   follow the shared ship lifecycle contract (`Collections/Ships/AGENTS.md`
   `## Ship Invariants`).
 - Battleship missile targeting is owned by `Collections/Battleships/AGENTS.md`
-  and Missiles Update targeting, through the engine frame registry
-  (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`), by
-  `Collections/Missiles/AGENTS.md`. This scope builds its only query window, the
-  Missile-Update window in Missiles Update, as specified in Frame Registry Query
-  Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
+  and Missiles Update targeting by `Collections/Missiles/AGENTS.md`.
 - `Frame::OwnershipLayers` maps the engine registry's ownership layer onto each
   ship type's PostRender columns, one layer per type; `Frame::OwnedEntityCount`
   counts a frame's fleet-controlled rows.

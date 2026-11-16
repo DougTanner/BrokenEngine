@@ -83,7 +83,7 @@ void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, en
 	});
 }
 
-void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, [[maybe_unused]] float fDeltaRotation)
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch)
 {
 	if ((uiAreaLight.uuid.iValue != 0) && !(lifecycleFlags & engine::LifecycleFlags::kDying) && !(flags & kFalling))
 	{
@@ -158,7 +158,7 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 
 	engine::SoundsPostRender::Add(rFrame, rPostRender.puiSounds[iIndex]);
 
-	SynchronizeMissile(rFrame.interpolate, rMissiles.puiAreaLights[iIndex], rMissiles.puiSmokeTrails[iIndex], rPostRender.puiSounds[iIndex], rMissiles.pVecPositions[iIndex], rMissiles.pVecDirections[iIndex], rPostRender.pVecVelocities[iIndex], rMissiles.pVecPositions[iIndex], rPostRender.pFlags[iIndex], rPostRender.pLifecycleFlags[iIndex], rPostRender.pfPitches[iIndex], rPostRender.pfDeltaRotations[iIndex]);
+	SynchronizeMissile(rFrame.interpolate, rMissiles.puiAreaLights[iIndex], rMissiles.puiSmokeTrails[iIndex], rPostRender.puiSounds[iIndex], rMissiles.pVecPositions[iIndex], rMissiles.pVecDirections[iIndex], rPostRender.pVecVelocities[iIndex], rMissiles.pVecPositions[iIndex], rPostRender.pFlags[iIndex], rPostRender.pLifecycleFlags[iIndex], rPostRender.pfPitches[iIndex]);
 }
 
 void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
@@ -399,7 +399,6 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
 	ASSERT(!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying));
-	// PostCollision runs after the Update query window is gone, so the handle is only cleared.
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 
 #if defined(BT_CLIENT)

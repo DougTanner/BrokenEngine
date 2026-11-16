@@ -10,69 +10,6 @@ static Uuid OwnershipUuid(const RegistryOwnershipLayer& rLayer, int64_t iIndex)
 	return uuid;
 }
 
-#if defined(BT_DEBUG)
-
-static void ValidateRows(std::span<const int64_t> rows, int64_t iSourceCount)
-{
-	int64_t iPrevious = -1;
-	for (int64_t iRow : rows)
-	{
-		ASSERT(iRow > iPrevious && iRow < iSourceCount);
-		iPrevious = iRow;
-	}
-}
-
-void ValidateRegistrySourceLayers(std::span<const RegistrySourceLayer> sourceLayers)
-{
-	for (const RegistrySourceLayer& rLayer : sourceLayers)
-	{
-		ValidateRows(rLayer.rows, rLayer.iSourceCount);
-	}
-
-	int64_t iIndexA = 0;
-	for (const RegistrySourceLayer& rLayerA : sourceLayers)
-	{
-		for (int64_t iRowA : rLayerA.rows)
-		{
-			registry_id_t idA = rLayerA.pIds[iRowA];
-			ASSERT((idA.uuid.iValue != 0));
-
-			int64_t iIndexB = 0;
-			for (const RegistrySourceLayer& rLayerB : sourceLayers)
-			{
-				for (int64_t iRowB : rLayerB.rows)
-				{
-					ASSERT(iIndexB == iIndexA || rLayerB.pIds[iRowB] != idA);
-					++iIndexB;
-				}
-			}
-
-			++iIndexA;
-		}
-	}
-}
-
-#endif // BT_DEBUG
-
-bool ResolveRegistryHandle(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id, RegistryResult& rResult)
-{
-	for (const RegistrySourceLayer& rLayer : sourceLayers)
-	{
-		for (int64_t iRow : rLayer.rows)
-		{
-			if (rLayer.pIds[iRow] == id)
-			{
-				rResult.id = rLayer.pIds[iRow];
-				rResult.vecCurrentPosition = rLayer.pVecCurrentPositions[iRow];
-				rResult.vecPreviousPosition = rLayer.pVecPreviousPositions[iRow];
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
 void AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());

@@ -162,23 +162,10 @@ collision, terrain sampling, navigation, and generic collections.
 
 ## Frame Registry
 
-- The frame registry (`FrameRegistry.h`) lets one collection find rows of
-  another by binding columns the collections already own: it copies no records,
-  allocates nothing, and keeps no state between query windows, so nothing it
-  produces is serialized, CRC'd, or transferred.
-- The game builds its one query window and owns its timing and bound columns
-  (`../../../Documents/Architecture/FrameUpdatePipeline.md`); the engine never
-  names a game collection.
-- The caller owns one combined workbuffer reservation per query window, holding
-  the source-row indices and layer descriptors, and keeps it alive for the
-  query window; form every pointer and span the window uses only after the
-  reservation returns. A workbuffer grow while a window is live keeps the
-  window's published pointers valid and only signals an under-sized
-  reservation (`../../../Common/AGENTS.md`). A window never survives
-  source-layer movement, reallocation, or cell transfer.
-- Source ids are unique across every bound layer and eligible row spans are
-  strictly ascending and in range; `ValidateRegistrySourceLayers` checks both,
-  and the caller runs it in debug builds when it builds the window.
+- The frame registry (`FrameRegistry.h`) defines registry ids and the ownership
+  layer, which binds columns the collections already own: it copies no records,
+  allocates nothing, and keeps no state, so nothing it produces is serialized,
+  CRC'd, or transferred.
 - `AssignRegistryClientGuid` is the registry's only write. It is legal only on
   the main thread after the tick, through an ownership layer whose client-GUID
   column is CRC-excluded. The caller holds that layer by value and never retains

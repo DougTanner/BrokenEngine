@@ -179,7 +179,7 @@ that geometry.
 - `PostCollision` and `AreaDamage`.
 - Any other `pRegistryIds` read: the direct column reads in `Frame.cpp`,
   `AgentCommandsServerQueries.cpp`, `FindNearestEnemyFlagship`
-  (`ShipQueries.cpp:249`), `BuildShipRegistryWindow`, and every write.
+  (`ShipQueries.cpp:249`), `FindLowestPlaneShipByRegistryId`, and every write.
 - Changing which frame any registry-id site reads.
 - Any other change to `FindAttackTarget` or to the Combat functions beyond the
   three parts above.

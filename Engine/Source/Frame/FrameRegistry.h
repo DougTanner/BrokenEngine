@@ -9,30 +9,6 @@ namespace engine
 struct RegistryEntryTag;
 using registry_id_t = Id<RegistryEntryTag>;
 
-// One source collection's published columns. Bound by value for the length of a single query window.
-struct RegistrySourceLayer
-{
-	const registry_id_t* pIds = nullptr;           // Required; ids stay unique across every bound layer
-	const XMVECTOR* pVecCurrentPositions = nullptr;  // Required
-	const XMVECTOR* pVecPreviousPositions = nullptr; // Required
-	std::span<const int64_t> rows {};                // Eligible rows: strictly ascending, in range
-	int64_t iSourceCount = 0;
-};
-
-struct RegistryResult
-{
-	registry_id_t id {};
-	XMVECTOR vecCurrentPosition {};
-	XMVECTOR vecPreviousPosition {};
-};
-
-#if defined(BT_DEBUG)
-void ValidateRegistrySourceLayers(std::span<const RegistrySourceLayer> sourceLayers);
-#endif
-
-// id must be nonzero.
-[[nodiscard]] bool ResolveRegistryHandle(std::span<const RegistrySourceLayer> sourceLayers, registry_id_t id, RegistryResult& rResult);
-
 // Binds a foreign-typed id column as bytes. Viewing an Id<T> array through a const Uuid* or a
 // const registry_id_t* is undefined behavior — the specializations are not similar types — so the ownership
 // layer erases the element type here and reads each element back through Uuid.

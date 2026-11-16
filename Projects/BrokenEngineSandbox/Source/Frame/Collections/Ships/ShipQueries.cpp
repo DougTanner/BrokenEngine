@@ -306,70 +306,22 @@ float ShipHull(const Frame& rFrame, ShipLocator locator)
 	});
 }
 
-RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame)
+bool FindLowestPlaneShipByRegistryId(const Frame& rFrame, const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition)
 {
-	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-
-	auto IsEligible = [](const auto& rInterpolate, const auto& rGracePostRender, int64_t i)
-	{
-		return (rInterpolate.pRegistryIds[i].uuid.iValue != 0) && rGracePostRender.pArrivalGracePeriods[i].count() <= 0.0f && NearestFlightPlane(rInterpolate.pVecPositions[i]) == 0;
-	};
-
-	int64_t iEligibleCount = 0;
-	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
-	{
-		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
-		{
-			if (IsEligible(rInterpolate, rGracePostRender, i))
-			{
-				++iEligibleCount;
-			}
-		}
-	});
-
-	// Reserve all window storage together. PushBuffer may grow the workbuffer, so no pointer is published until
-	// the combined reservation has returned. The eligible row indices and the layer descriptors then remain in one
-	// allocation for the window's lifetime.
-	static constexpr int64_t kiLayerCount = std::to_underlying(ShipType::kCount);
-	int64_t iRowBytes = iEligibleCount * static_cast<int64_t>(sizeof(int64_t));
-	int64_t iTotalBytes = iRowBytes + kiLayerCount * static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
-	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
-	std::byte* pBufferBytes = pBuffer.mpData;
-	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iRowBytes);
-
-	// The eligible rows fill the front of the buffer layer after layer, ascending within each layer as every source layer's rows must be.
-	int64_t* pEligibleRows = reinterpret_cast<int64_t*>(pBufferBytes);
-	int64_t iFilledCount = 0;
+	bool bFound = false;
 	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
 	{
-		int64_t iLayerFirstRow = iFilledCount;
-		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
+		for (int64_t i = 0; i < rInterpolate.iCount && !bFound; ++i)
 		{
-			if (IsEligible(rInterpolate, rGracePostRender, i))
+			if (rInterpolate.pRegistryIds[i] == registryId && rGracePostRender.pArrivalGracePeriods[i].count() <= 0.0f && NearestFlightPlane(rInterpolate.pVecPositions[i]) == 0)
 			{
-				pEligibleRows[iFilledCount++] = i;
+				// No row is added or removed before the Update phase ends, so the previous row matches the current one.
+				rVecPreviousPosition = ShipPosition(rPreviousFrame.interpolate, ShipLocator {.eType = eType, .iRow = i});
+				bFound = true;
 			}
 		}
-
-		pLayers[std::to_underlying(eType)] =
-		{
-			.pIds = rInterpolate.pRegistryIds,
-			.pVecCurrentPositions = rInterpolate.pVecPositions,
-			.rows = std::span<const int64_t>(pEligibleRows + iLayerFirstRow, static_cast<size_t>(iFilledCount - iLayerFirstRow)),
-			.iSourceCount = rInterpolate.iCount,
-		};
 	});
-	// Previous rows still align with the current ones: no row is added or removed before the Update phase ends.
-	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rPreviousInterpolate, [[maybe_unused]] const auto& rPreviousPostRender)
-	{
-		pLayers[std::to_underlying(eType)].pVecPreviousPositions = rPreviousInterpolate.pVecPositions;
-	});
-
-	std::span<const engine::RegistrySourceLayer> sourceLayers(pLayers, static_cast<size_t>(kiLayerCount));
-#if defined(BT_DEBUG)
-	engine::ValidateRegistrySourceLayers(sourceLayers);
-#endif
-	return {.buffer = std::move(pBuffer), .sourceLayers = sourceLayers};
+	return bFound;
 }
 
 } // namespace game

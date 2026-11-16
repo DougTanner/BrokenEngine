@@ -31,7 +31,7 @@ constexpr float kfDeltaRotationTowardsStored = 3.0f;
 
 #if defined(BT_CLIENT)
 // Defined in Missiles.cpp, where ClientInitialize also calls it.
-void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, float fDeltaRotation);
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch);
 void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition);
 #endif
 
@@ -78,7 +78,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 #if defined(BT_CLIENT)
-		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, lifecycleFlags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i]);
+		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, lifecycleFlags, rPreviousPostRender.pfPitches[i]);
 #endif // BT_CLIENT
 	}
 }
@@ -89,10 +89,6 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	const MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPrevious = *rPreviousFrame.postRender.pMissiles;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
-
-	// Before the ship Updates, current registry ids and interpolated positions still align with previous rows.
-	// Bind previous positions for retained-target homing and previous arrival grace for eligibility.
-	RegistryWindow window = BuildShipRegistryWindow(rFrame, rPreviousFrame);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -142,13 +138,13 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// Validate the retained handle against the rows the registry currently considers eligible on the lowest
-			// plane; a source that died, transferred, is still in arrival grace, or left that plane drops the handle.
-			engine::RegistryResult retained {};
+			// Keep the target only while its ship row is past arrival grace with the lowest plane as its nearest; a
+			// target that died, transferred, is still in arrival grace, or left that plane drops the handle.
+			XMVECTOR vecTargetPreviousPosition = XMVectorZero();
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
 			{
-				bRetained = engine::ResolveRegistryHandle(window.sourceLayers, uiTarget, retained);
+				bRetained = FindLowestPlaneShipByRegistryId(rFrame, rPreviousFrame, uiTarget, vecTargetPreviousPosition);
 				if (!bRetained)
 				{
 					uiTarget = {};
@@ -156,13 +152,13 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// Retained targets steer toward the source's previous-frame position, every other missile along its stored
+			// Retained targets steer toward the target's previous-frame position, every other missile along its stored
 			// direction.
 			XMVECTOR vecWantedDirection = vecStoredDirection;
 			float fTurnRate = kfDeltaRotationTowardsStored;
 			if (bRetained)
 			{
-				vecWantedDirection = XMVector3Normalize(XMVectorSubtract(retained.vecPreviousPosition, rCurrentInterpolate.pVecPositions[i]));
+				vecWantedDirection = XMVector3Normalize(XMVectorSubtract(vecTargetPreviousPosition, rCurrentInterpolate.pVecPositions[i]));
 				fTurnRate = kfDeltaRotationTowardsTarget;
 			}
 

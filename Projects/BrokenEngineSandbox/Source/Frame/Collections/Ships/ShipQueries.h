@@ -113,18 +113,10 @@ struct ShipUuid
 // Armor for Omnis, health otherwise.
 [[nodiscard]] float ShipHull(const Frame& rFrame, ShipLocator locator);
 
-// One registry query window: its source layers plus the single workbuffer allocation their spans point into. The owner
-// keeps the whole object alive for the window; the allocation pops when it dies, so no source-layer span outlives it.
-struct RegistryWindow
-{
-	common::ScopedWorkbufferAllocation<std::byte*> buffer;
-	std::span<const engine::RegistrySourceLayer> sourceLayers {};
-};
-
-// Builds the window for the lowest flight plane. It binds the three ship types as source layers in ForEachShipType
-// order. A row is eligible while it publishes a registry id, its arrival grace has run out, and the flight plane nearest
-// its current Interpolate position is the lowest, so a ship climbing away from that plane leaves the window. The previous frame's arrival grace decides
-// eligibility and its positions are bound as previous positions.
-[[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame& rPreviousFrame);
+// The previous-frame position of the first row, in ForEachShipType order, whose current registry id is the nonzero
+// registryId, whose previous-frame arrival grace has run out, and whose current Interpolate position's nearest flight
+// plane is the lowest; returns false, leaving rVecPreviousPosition unchanged, when none matches. Call it before the ship
+// Updates, while current ship rows still align with previous rows.
+[[nodiscard]] bool FindLowestPlaneShipByRegistryId(const Frame& rFrame, const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition);
 
 } // namespace game

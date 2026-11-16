@@ -357,11 +357,14 @@ round's re-review covers its own fix.
 - `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
 - fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier
   1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and
-  also carries Steps 7 and 8.
+  also carries Steps 7 and 8; its brief carries what
+  `.agents/skills/coherence-review/SKILL.md` `## Inputs` requires.
 - fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the
-  reviewer must be new to the change.
+  reviewer must be new to the change; its brief carries what
+  `.agents/skills/coherence-review/SKILL.md` `## Inputs` requires.
 - `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier
-  for one concrete unresolved hypothesis.
+  for one concrete unresolved hypothesis; its brief carries what
+  `.agents/skills/adversarial-review/SKILL.md` `## Inputs` requires.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence
   worker — for the external claims a review or `/resolve-findings` handoff
   raises.
