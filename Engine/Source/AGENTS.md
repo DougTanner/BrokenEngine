@@ -96,10 +96,10 @@ order, frame-phase order, or phase participation changes.
   `ThreadLocal::Entry` around `ProcessMain`, so it spans launch-option parsing,
   crash handling, and teardown.
 - `TextureUploadManager` and `FileManager` outlive `MainThread` so crash
-  handling and teardown can use them. Device loss recreates `Graphics` in place.
-  The client render `LogTickScope` spans both rendering and device-loss
-  recovery, including replacement renderer construction, so recovery diagnostics
-  retain the current tick context.
+  handling and teardown can use them. Device or surface loss recreates
+  `Graphics` in place. The client render `LogTickScope` spans both rendering and
+  that recovery, including replacement renderer construction, so recovery
+  diagnostics retain the current tick context.
 - Client COM uses `RO_INIT_MULTITHREADED`. Process and worker priorities, worker
   counts, and the single-instance policy are set in `Main.cpp`.
 

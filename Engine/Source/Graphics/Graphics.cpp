@@ -336,28 +336,24 @@ bool Graphics::SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabil
 {
 	rVkSurfaceCapabilitiesKHR = {};
 	CHECK_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &rVkSurfaceCapabilitiesKHR));
-	// Re-check the tier: CHECK_VK above can escalate meDestroyType to kSurface (VK_ERROR_SURFACE_LOST_KHR), and a
-	// surface-loss teardown must never be deferred (the zeroed caps struct would read as a zero-area extent).
 	return rVkSurfaceCapabilitiesKHR.currentExtent.width != 0xFFFFFFFF
-	    && (rVkSurfaceCapabilitiesKHR.currentExtent.width == 0 || rVkSurfaceCapabilitiesKHR.currentExtent.height == 0)
-	    && meDestroyType < DestroyType::kSurface;
+	    && (rVkSurfaceCapabilitiesKHR.currentExtent.width == 0 || rVkSurfaceCapabilitiesKHR.currentExtent.height == 0);
 }
 
 void Graphics::Create()
 {
 	mFlags.Set(GraphicsFlags::kRecreated, false);
 
-	// Heap: make_unique for each manager (~12 objects that live for the app's lifetime or until device loss).
+	// Heap: make_unique for each manager (~12 objects that live for the app's lifetime or until device or surface loss).
 	// Can't use workbuffer (temporary) or pre-allocate (managers have complex internal state built in constructors)
 	ScopedSuppressAllocationTracking suppress;
 
 	Refresh();
 
 	// Defer swapchain-tier recreation before Destroy when a defined surface extent is zero, leaving meDestroyType pending for retry as
-	// Refresh's zero-extent guard does. Lost-surface capabilities are invalid, so surface-loss recovery must proceed with teardown and
-	// recreation. Zero-area extents during surface loss or fresh device recovery bypass this gate and reach CreateSwapchain; the extent clamp
-	// cannot help when minImageExtent is also zero. That case has no recovery-retry handling.
-	if (gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain && meDestroyType < DestroyType::kSurface)
+	// Refresh's zero-extent guard does. A fresh Graphics construction (boot, or a device- or surface-loss rebuild) bypasses this gate and
+	// reaches CreateSwapchain; the extent clamp cannot help when minImageExtent is also zero. That case has no recovery-retry handling.
+	if (gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain)
 	{
 		VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
 		if (SurfaceExtentZeroArea(vkSurfaceCapabilitiesKHR))
@@ -371,15 +367,14 @@ void Graphics::Create()
 		}
 	}
 
-	// Any recreate that reaches here proceeds (including the kSurface tier the gate skips), so clear the once-per-
-	// transition latch: the next genuine defer must re-log and re-arm.
+	// Any recreate that reaches here proceeds, so clear the once-per-transition latch: the next genuine defer must re-log
+	// and re-arm.
 	mbSwapchainRecreateDeferred = false;
 
 	// Capture the tier before Destroy() zeroes meDestroyType: the surviving texture manager's rebuild below selects its
-	// work by it, and the post-Destroy zero-area re-check only applies to a swapchain-tier recreate (kSurface/device-loss
-	// are deliberately unguarded; see the gate).
+	// work by it, and the post-Destroy zero-area re-check applies only to a swapchain-tier recreate.
 	DestroyType eDestroyType = meDestroyType;
-	bool bSwapchainTierRecreate = gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain && meDestroyType < DestroyType::kSurface;
+	bool bSwapchainTierRecreate = gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain;
 
 	Destroy();
 
@@ -387,7 +382,6 @@ void Graphics::Create()
 	// Re-query after Destroy and defer a defined zero-area extent; Vulkan requires a nonzero imageExtent.
 	// With the swapchain manager absent, GameBase::HandleDeferredSwapchain skips rendering and retries Create;
 	// its pre-Destroy gate defers until the extent is valid, and teardown tolerates the repeated Destroy on retry.
-	// CHECK_VK can escalate surface loss to kSurface, which bypasses this deferral.
 	if (bSwapchainTierRecreate)
 	{
 		VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};

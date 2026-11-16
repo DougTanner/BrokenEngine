@@ -482,12 +482,12 @@ static int64_t MainThread(HINSTANCE hinstance)
 				}
 				catch (const std::system_error& rException)
 				{
-					if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+					if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST) && rException.code() != VkErrorCode(VK_ERROR_SURFACE_LOST_KHR))
 					{
 						throw;
 					}
-					LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
-					// Heap: device recovery replaces the Graphics owner and all its GPU managers.
+					LOG(kDefault, kDebug, "Caught Vulkan device or surface loss: {}", rException.what());
+					// Heap: device- or surface-loss recovery replaces the Graphics owner and all its GPU managers.
 					ScopedSuppressAllocationTracking suppress;
 					pGraphics.reset();
 					pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
@@ -662,7 +662,8 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 {
 #if defined(BT_CLIENT)
 	// Game handles cursor when ImGui doesn't want the mouse. Guard GetIO(): this window receives messages while no ImGui
-	// context exists — before Graphics constructs ImGuiManager, after Graphics is destroyed, and during device-loss recreation.
+	// context exists — before Graphics constructs ImGuiManager, after Graphics is destroyed, and during device- or
+	// surface-loss recreation.
 	if (uiMessage == WM_SETCURSOR && LOWORD(iLongParameter) == HTCLIENT && ImGui::GetCurrentContext() != nullptr && !ImGui::GetIO().WantCaptureMouse)
 	{
 		SetCursor(game::gpGame->ShouldUseCrosshair() ? sHcursorCrosshair : sHcursorArrow);

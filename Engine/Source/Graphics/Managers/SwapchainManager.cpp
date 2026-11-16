@@ -605,7 +605,6 @@ void SwapchainManager::AcquireNextImage()
 	else if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
 		mCurrentImageAvailableVkFence = VK_NULL_HANDLE;
-		// std::max, not plain assign: a same-frame kSurface escalation must never downgrade to kSwapchain.
 		gpGraphics->meDestroyType = std::max(DestroyType::kSwapchain, gpGraphics->meDestroyType);
 	}
 	else
@@ -641,7 +640,6 @@ void SwapchainManager::PresentToQueue(int64_t iFramebufferIndex)
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
 		// The kbRenderThread frame-tail mPresent.Wait() in Graphics::PresentAcquire publishes this write before Refresh() in the next Create() and prevents the next frame's Global submit from racing vkQueuePresentKHR on the shared queue.
-		// A same-frame kSurface escalation must never downgrade to kSwapchain.
 		gpGraphics->meDestroyType = std::max(DestroyType::kSwapchain, gpGraphics->meDestroyType);
 		return;
 	}

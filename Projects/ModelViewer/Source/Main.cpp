@@ -329,12 +329,12 @@ int RunModelViewer(HINSTANCE hinstance)
 		}
 		catch (const std::system_error& rException)
 		{
-			if (rException.code() != engine::VkErrorCode(VK_ERROR_DEVICE_LOST))
+			if (rException.code() != engine::VkErrorCode(VK_ERROR_DEVICE_LOST) && rException.code() != engine::VkErrorCode(VK_ERROR_SURFACE_LOST_KHR))
 			{
 				throw;
 			}
-			LOG(kGraphics, kInfo, "ModelViewer recreating Graphics after device loss: {}", rException.what());
-			// Heap: device recovery replaces the Graphics owner and all its GPU managers.
+			LOG(kGraphics, kInfo, "ModelViewer recreating Graphics after device or surface loss: {}", rException.what());
+			// Heap: device- or surface-loss recovery replaces the Graphics owner and all its GPU managers.
 			ScopedSuppressAllocationTracking suppress;
 			std::optional<engine::ScreenshotRequest> optionalScreenshotRequest = std::move(pGraphics->mOptionalScreenshotRequest);
 			pGraphics.reset();

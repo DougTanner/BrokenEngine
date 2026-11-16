@@ -41,18 +41,11 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
-		// std::max, not plain assign: a same-frame kSurface escalation must never downgrade to kSwapchain.
 		gpGraphics->meDestroyType = std::max(DestroyType::kSwapchain, gpGraphics->meDestroyType);
 		return;
 	}
 
-	if (vkResult == VK_ERROR_SURFACE_LOST_KHR)
-	{
-		gpGraphics->meDestroyType = DestroyType::kSurface;
-		return;
-	}
-
-	if (vkResult == VK_ERROR_DEVICE_LOST)
+	if (vkResult == VK_ERROR_DEVICE_LOST || vkResult == VK_ERROR_SURFACE_LOST_KHR)
 	{
 		// Heap: std::system_error composes its message in std::string.
 		ScopedSuppressAllocationTracking suppress;

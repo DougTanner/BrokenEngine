@@ -154,8 +154,7 @@ public:
 private:
 
 	// Queries surface caps into rVkSurfaceCapabilitiesKHR and returns true when the swapchain recreate must defer: a
-	// zero-area defined currentExtent (window off-screen/minimized) with the tier still below kSurface. Not const —
-	// the CHECK_VK inside can escalate meDestroyType to kSurface (surface-lost), which the < kSurface term then excludes.
+	// zero-area defined currentExtent (window off-screen/minimized).
 	bool SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabilitiesKHR);
 
 	void WaitFramebuffer(int64_t iCommandBuffer);

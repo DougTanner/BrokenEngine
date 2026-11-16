@@ -28,6 +28,14 @@ top of the file. A session reviewing the log removes each row it handles.
   collection's kiVersion bumped; the plan's ## Out of scope excludes it — makes
   unnecessary: ValidateNoTransferRows (Frame.cpp:115-131) and its call at
   Frame.cpp:821
+- 2026-11-15 claude/42225028-bbfa-4078-98f5-84becc296ea6 —
+  Engine/Source/Graphics/GraphicsUtils.cpp:44 — now that surface loss throws
+  instead of raising `meDestroyType` to `kSurface`, nothing sets a tier above
+  `kSwapchain` while a frame runs, so every
+  `std::max(DestroyType::kSwapchain, meDestroyType)` (also Graphics.cpp:395,
+  :573, :586 and SwapchainManager.cpp:608, :643) is a plain assignment —
+  assign `DestroyType::kSwapchain` directly, or decide whether the tier
+  ordering is still needed above `kSwapchain`
 - 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
   Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp:161
   — `MissilesInterpolate::ClientInitialize` calls `SynchronizeMissile`

@@ -60,19 +60,21 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   last recording, and let only fresh recording republish it. An idle frame must
   not replay prior barriers.
 - `CheckVkFailed` handles every failed `CHECK_VK` result: out-of-date and
-  suboptimal swapchain results escalate to the swapchain tier, surface loss to
-  the surface tier, and `VK_ERROR_DEVICE_LOST` throws `std::system_error` with
-  `VkErrorCode` carrying the raw Vulkan result. `SwapchainManager`'s acquire and
-  present paths must inspect their results directly, so they apply the same
-  swapchain-tier escalation themselves and pass every other result to
-  `CHECK_VK`. The main loop and upload thread recover only when both category
-  and value exactly match device loss; every other system error stays fatal.
-  Only the fatal unexpected-result path breaks into the debugger; the
-  recoverable results deliberately do not, so a routine window resize does not
-  halt every debug session. New Vulkan call sites go through `CHECK_VK` instead
-  of repeating or bypassing that escalation.
+  suboptimal swapchain results escalate to the swapchain tier, and
+  `VK_ERROR_SURFACE_LOST_KHR` and `VK_ERROR_DEVICE_LOST` throw
+  `std::system_error` with `VkErrorCode` carrying the raw Vulkan result.
+  `SwapchainManager`'s acquire and present paths must inspect their results
+  directly, so they apply the same swapchain-tier escalation themselves and
+  pass every other result to `CHECK_VK`. The main loop recovers from surface or
+  device loss (`../AGENTS.md` `## Startup and Main Loop`); the upload thread
+  recovers only from device loss and never rebuilds `Graphics`. Each recovers
+  only when both category and value exactly match; every other system error
+  stays fatal. Only the fatal unexpected-result path breaks into the debugger;
+  the recoverable results deliberately do not, so a routine window resize does
+  not halt every debug session. New Vulkan call sites go through `CHECK_VK`
+  instead of repeating or bypassing that escalation.
 - Destroy tiers are monotonic within a frame. Selective texture, sampler,
-  command-buffer, pipeline, swapchain, and surface rebuilds preserve lower-tier
+  command-buffer, pipeline, and swapchain rebuilds preserve lower-tier
   resources; full teardown drains the pack loaders, then waits for uploads and
   device work, before destroying dependencies and resetting texture chunk state;
   that order is required (`../File/AGENTS.md`). `Graphics::Destroy` only tears
@@ -88,13 +90,13 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   lighting texture once the pipeline manager exists.
 - A zero-area swapchain extent defers swapchain-tier recreation. The render loop
   skips submission, retries creation at sim-tick cadence, and acquires again
-  only after recreation succeeds; surface-loss recovery remains a full recreate.
-  The simulation keeps ticking while rendering is skipped, so client state the
-  render path normally drains or paces is drained or paced on every skipped
-  iteration in `GameBase::Render`'s skip path (staged particle spawns, the
-  texture-upload frame signal), and render-frame-paced accumulators reset once
-  in `GameBase::HandleDeferredSwapchain`'s resume branch (profiler frame
-  samples, `mRenderFrameTimer`, and its delta validity marker).
+  only after recreation succeeds. The simulation keeps ticking while rendering
+  is skipped, so client state the render path normally drains or paces is
+  drained or paced on every skipped iteration in `GameBase::Render`'s skip path
+  (staged particle spawns, the texture-upload frame signal), and
+  render-frame-paced accumulators reset once in
+  `GameBase::HandleDeferredSwapchain`'s resume branch (profiler frame samples,
+  `mRenderFrameTimer`, and its delta validity marker).
 - `WaitFramebuffer` supplies actual rendered-frame wall intervals to
   [Profile's slow-operation diagnostics](../Profile/AGENTS.md#slow-operation-diagnostics).
   Skip the first partial interval after renderer creation or a render-timer
