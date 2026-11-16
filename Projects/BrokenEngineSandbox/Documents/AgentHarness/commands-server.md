@@ -108,18 +108,17 @@ adding the fields below; the other entries are its own commands. For the engine
   one edge neighbour, so a position more than one neighbour step out asserts in
   the source cell's `FramePostRenderBase::PrepareTransferRequest` before any
   transfer ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)). A
-  `pLifecycleFlags` write that sets `LifecycleFlags::kTransfer` (1) is likewise
-  unchecked, apart from a Pushers row, and is valid only on a row whose
-  position is outside the cell: the Transfer phase selects rows by the flag
-  alone, and `PrepareTransferRequest` finds no exit direction for a row inside
-  the cell.
+  `pLifecycleFlags` write that sets `LifecycleFlags::kTransfer` (1) is refused
+  on every row by the save reader (below), because the Destroy phase removes
+  every such row before a tick ends.
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
-  `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
+  `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, the
   [ship pusher ownership](../../Source/Frame/Collections/Ships/AGENTS.md),
-  with no lifecycle bit on a Pushers row) plus one more refusal: a changed
-  `uiNextUuid` must lie within `[current, 2^47]`.
+  with no lifecycle bit on a Pushers row, and no `kTransfer` row in any game
+  collection) plus one more refusal: a changed `uiNextUuid` must lie within
+  `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
   while recording, during playback, and while a `replay_record` or `replay_play`

@@ -95,6 +95,8 @@ sizing derives from the shared omni radius.
 - The simulation keeps `pNextBlasterFireTimes` in [0, `kBlasterFireInterval`],
   which `SpawnBlasters` asserts. `PostRead` rejects out-of-range rows on every
   Frame read.
+- The simulation writes only finite `pfArmors` and `pfShields`; `PostRead`
+  rejects a non-finite one on every Frame read.
 - The simulation keeps the Interpolate `pDestroyedTimes` in [0, `kDestroyTime`].
   The Interpolate `PostRead` rejects out-of-range rows on every Frame read.
 - `OmnisPostRender::Spawn(SpawnInfo)` is the asserting overload of the engine

@@ -110,6 +110,26 @@ static void ValidateFlyingMissiles(const Frame& rFrame)
 	}
 }
 
+// The Destroy phase removes every kTransfer row in the tick that set it, so a stream holding one is corrupt; a
+// read row would enter the next Transfer phase from inside its cell, which has no exit direction.
+static void ValidateNoTransferRows(const Frame& rFrame)
+{
+	auto ValidateCollection = [](const auto& rPostRender)
+	{
+		for (int64_t i = 0; i < rPostRender.iCount; ++i)
+		{
+			if (rPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer)
+			{
+				throw std::ios_base::failure("Frame transfer flag");
+			}
+		}
+	};
+	std::apply([&](const auto&... rPostRender)
+	{
+		(ValidateCollection(rPostRender), ...);
+	}, GameServerPostRenderCollections(rFrame.postRender));
+}
+
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
@@ -798,6 +818,7 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
 	ValidatePusherOwners(loadedFrame);
 	ValidateFlyingMissiles(loadedFrame);
+	ValidateNoTransferRows(loadedFrame);
 	rCurrent = std::move(loadedFrame);
 	return rStream;
 }

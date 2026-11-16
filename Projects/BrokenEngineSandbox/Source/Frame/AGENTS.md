@@ -66,7 +66,8 @@ order or participation changes.
   death transition. Build-local reads also reject a flying missile — neither
   falling nor dying — whose height is non-finite or whose velocity Z is nonzero;
   finite off-plane heights are valid during its return to the lowest plane
-  (`Collections/Missiles/AGENTS.md` `## Invariants`).
+  (`Collections/Missiles/AGENTS.md` `## Invariants`). They also reject any row
+  of a `GameServerPostRenderCollections` collection with `kTransfer` set.
 - Navigation and elevation are deterministic derived data excluded from both the
   CRC and persisted frame payload. The game derives the clearance tiers, the
   planes each tier has graphs on, and each graph's clearance and elevation

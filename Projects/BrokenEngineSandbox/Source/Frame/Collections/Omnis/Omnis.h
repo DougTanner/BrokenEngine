@@ -228,7 +228,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	// Reject an out-of-range navigation delay too, which no navigation-delay admission accepts, an unknown controller, which
 	// selects no script, a target flight plane the type disallows, which no controller writes, an AI direction failing
 	// IsShipHeadingValid, since every simulation write and ship spawn stores a horizontal unit vector, and a client GUID or
-	// global ID on a row that is not fleet-controlled, which only a fleet spawn writes.
+	// global ID on a row that is not fleet-controlled, which only a fleet spawn writes. Reject a non-finite armor or shield,
+	// which no simulation write produces: NaN armor passes no death test and NaN in either never completes healing.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -244,6 +245,14 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			if (!IsShipHeadingValid(rCurrent.pVecAiDirections[i]))
 			{
 				throw std::ios_base::failure("OmnisPostRender pVecAiDirections");
+			}
+			if (!std::isfinite(rCurrent.pfArmors[i]))
+			{
+				throw std::ios_base::failure("OmnisPostRender pfArmors");
+			}
+			if (!std::isfinite(rCurrent.pfShields[i]))
+			{
+				throw std::ios_base::failure("OmnisPostRender pfShields");
 			}
 			if (rCurrent.pController[i] >= ShipController::kCount)
 			{

@@ -19,6 +19,15 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-15 claude/8e00ea59-d178-42f1-831f-3608122b6db6 —
+  Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:115 — move kTransfer (and
+  kDestroy) out of the persisted pLifecycleFlags column into a column that is
+  never saved, since CompactCollections clears them within the tick, and
+  persist only kDying. A saved stream could then never hold the Transfer flag.
+  This changes the Collection layout and save format and needs every
+  collection's kiVersion bumped; the plan's ## Out of scope excludes it — makes
+  unnecessary: ValidateNoTransferRows (Frame.cpp:115-131) and its call at
+  Frame.cpp:821
 - 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
   Engine/Source/File/ServerSaveLoad.cpp:117 — `Autoload` adopts a save
   without the `ResetSession`, `ResetForLoad`, and `ComputeActiveSet` tail that
