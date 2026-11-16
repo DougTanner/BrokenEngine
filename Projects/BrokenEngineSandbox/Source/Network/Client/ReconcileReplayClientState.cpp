@@ -13,70 +13,69 @@ namespace game
 
 void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool bAnyFullReplay, ConfirmedClientState& rInOutState)
 {
-	ConfirmedClientState clientState = rInOutState;
-
-	if (bAnyFullReplay)
+	if (!bAnyFullReplay)
 	{
-		for (const engine::CoordWork& rWork : works)
+		return;
+	}
+
+	if (rInOutState.clientGlobalIdentifier.iValue == 0)
+	{
+		return;
+	}
+
+	for (const engine::CoordWork& rWork : works)
+	{
+		const engine::CoordScratch& rScratch = rWork.scratch;
+		if (rScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath)
 		{
-			const engine::CoordScratch& rScratch = rWork.scratch;
-			if (rScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath)
-			{
-				continue;
-			}
+			continue;
+		}
 
-			// replayStack[0] is the confirmed frame; scan from index 1 onwards
-			for (int64_t i = 1; i < std::ssize(rScratch.replayStack); ++i)
+		// replayStack[0] is the confirmed frame; scan from index 1 onwards
+		for (int64_t i = 1; i < std::ssize(rScratch.replayStack); ++i)
+		{
+			const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
+			for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 			{
-				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
-				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
+				if (!IsOwnedEntityTransfer(rRequest.change))
 				{
-					if (!IsOwnedEntityTransfer(rRequest.change))
-					{
-						continue;
-					}
-					if (!(clientState.clientGlobalIdentifier.iValue != 0))
-					{
-						continue;
-					}
-					if (OwnedSpawnGlobalId(rRequest.change) != clientState.clientGlobalIdentifier)
-					{
-						continue;
-					}
-
-					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
-					// follows the server in having no outward neighbour instead of wrapping to the far side.
-					const common::HexDirection& rDirection = engine::kCellDirections.pEntries[rRequest.iDirection];
-					engine::GridCoord destination {};
-					if (!engine::TryAddGridCoordinate(rWork.coord, rDirection.iDeltaQ, rDirection.iDeltaR, destination)) [[unlikely]]
-					{
-						continue;
-					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState {} GlobalId: {} Source: ({},{}) Direction: {} Dest: ({},{})", StatusChangeTypeName(rRequest.change.eType), clientState.clientGlobalIdentifier, rWork.coord.iQ, rWork.coord.iR, static_cast<int64_t>(rRequest.iDirection), destination.iQ, destination.iR);
-					// The carried hull: armor for Omnis, health for Fighters and Battleships.
-					clientState.fPreviousClientArmor = std::visit([](const auto& rData) -> float
-					{
-						using Data = std::remove_cvref_t<decltype(rData)>;
-						if constexpr (std::is_same_v<Data, OmnisPostRender::SpawnInfo>)
-						{
-							return rData.fArmor;
-						}
-						else if constexpr (std::is_same_v<Data, FightersPostRender::SpawnInfo> || std::is_same_v<Data, BattleshipsPostRender::SpawnInfo>)
-						{
-							return rData.fHealth;
-						}
-						else
-						{
-							ASSERT(false);
-							std::unreachable();
-						}
-					}, rRequest.change.data);
+					continue;
 				}
+				if (OwnedSpawnGlobalId(rRequest.change) != rInOutState.clientGlobalIdentifier)
+				{
+					continue;
+				}
+
+				// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
+				// follows the server in having no outward neighbour instead of wrapping to the far side.
+				const common::HexDirection& rDirection = engine::kCellDirections.pEntries[rRequest.iDirection];
+				engine::GridCoord destination {};
+				if (!engine::TryAddGridCoordinate(rWork.coord, rDirection.iDeltaQ, rDirection.iDeltaR, destination)) [[unlikely]]
+				{
+					continue;
+				}
+				LOG(kNetwork, kVerbose, "ReconcileUpdateClientState {} GlobalId: {} Source: ({},{}) Direction: {} Dest: ({},{})", StatusChangeTypeName(rRequest.change.eType), rInOutState.clientGlobalIdentifier, rWork.coord.iQ, rWork.coord.iR, static_cast<int64_t>(rRequest.iDirection), destination.iQ, destination.iR);
+				// The carried hull: armor for Omnis, health for Fighters and Battleships.
+				rInOutState.fPreviousClientArmor = std::visit([](const auto& rData) -> float
+				{
+					using Data = std::remove_cvref_t<decltype(rData)>;
+					if constexpr (std::is_same_v<Data, OmnisPostRender::SpawnInfo>)
+					{
+						return rData.fArmor;
+					}
+					else if constexpr (std::is_same_v<Data, FightersPostRender::SpawnInfo> || std::is_same_v<Data, BattleshipsPostRender::SpawnInfo>)
+					{
+						return rData.fHealth;
+					}
+					else
+					{
+						ASSERT(false);
+						std::unreachable();
+					}
+				}, rRequest.change.data);
 			}
 		}
 	}
-
-	rInOutState = clientState;
 }
 
 } // namespace game

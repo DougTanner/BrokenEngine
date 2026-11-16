@@ -7,13 +7,8 @@
 namespace game
 {
 
-struct FrameInput;
-
-using engine::SnapshotIndex;
-
 struct ConfirmedClientState
 {
-	engine::GridCoord clientGridCoordinate {};
 	engine::GlobalId clientGlobalIdentifier {};
 	float fPreviousClientArmor = 0.0f;
 };
@@ -32,7 +27,6 @@ public:
 
 private:
 
-	ConfirmedClientState mConfirmedClientState;
 	engine::ReconcileDispatcher mDispatcher;
 	float mfLastLoggedVisualErrorDelta = 0.0f;
 	int64_t miLastVisualErrorLogTick = -1'000;

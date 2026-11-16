@@ -23,11 +23,6 @@ ClientSessionBase::~ClientSessionBase() = default;
 
 void ClientSessionBase::Reconcile()
 {
-	if (mpDesynchronizationCore->IsStalled())
-	{
-		return;
-	}
-
 	gpProfileManager->CpuStart(kCpuTimerNetworkPollReconcile);
 	{
 		// Heap: reconciliation deserialization and map operations
@@ -92,10 +87,6 @@ void ClientSessionBase::ResetSessionForServerLoad()
 	game::gpGame->ResetRenderClock();
 
 	// Discard cells, the camera tracking, smoke, and particles from the previous server state.
-	for ([[maybe_unused]] auto& [rCoordinate, rCell] : game::gpGame->mCells)
-	{
-		rCell.ResetClientState();
-	}
 	game::gpGame->mCells.clear();
 	gpCamera->DiscardTrackingCaches();
 	gbSmokeClear = true;

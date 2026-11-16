@@ -172,7 +172,7 @@ inline constexpr int64_t kiRenderBehindTicks = 2;
 
 // Standard-menu contract. The engine owns the six standard menu screens (Ui/Screens); this is the
 // narrow surface they cannot read for themselves: which optional entries the game offers, the live
-// client/discovery state behind the Main Menu, and the game-owned side effects.
+// client/discovery state behind the Main Menu, and the actions the screens request.
 enum class StandardMenuFeature : uint8_t
 {
 	kLocalServer  = 0x01,
@@ -221,6 +221,8 @@ public:
 	void CreateNewFrame();
 #if defined(BT_CLIENT)
 	void ChangeFrameToMainMenu();
+	void ChangeFrameToGame();
+	void ApplyStandardMenuAction(StandardMenuAction eAction);
 	void LeaveSettingsScreen();
 
 	static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput);

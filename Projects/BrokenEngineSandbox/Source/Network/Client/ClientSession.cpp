@@ -6,10 +6,8 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Graphics/Camera.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
-#include "Profile/ProfileRows.h"
 #include "Fleet.h"
 #include "Game.h"
 
@@ -28,7 +26,6 @@ const char* ToString(SubscriptionChangeReason eReason)
 		case SubscriptionChangeReason::kChangedCell:    return "kChangedCell";
 		case SubscriptionChangeReason::kDied:           return "kDied";
 		case SubscriptionChangeReason::kFleetSynchronization:      return "kFleetSync";
-		case SubscriptionChangeReason::kPollTick:       return "kPollTick";
 		case SubscriptionChangeReason::kFocusNextFleet: return "kFocusNextFleet";
 		case SubscriptionChangeReason::kFocusPreviousFleet: return "kFocusPrevFleet";
 		case SubscriptionChangeReason::kSelectOwnedEntity: return "kSelectOwnedEntity";
@@ -115,15 +112,6 @@ void ClientSession::ProcessReceivedGamePackets()
 		eParsingType = GamePacketType::kServerMapFleetMarkers;
 		ParseMapFleetMarkers(mpRuntime->mpClient->mReceivedGamePackets, gpGame->mMapFleetMarkers);
 	}
-	catch (const std::ios_base::failure& rException)
-	{
-		// The client trusts its server, so a shared reader throwing this type means server bytes the client cannot
-		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
-		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
-		// the peer.
-		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(eParsingType), rException.what());
-		ASSERT(false);
-	}
 	catch (const std::exception& rException)
 	{
 		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing packet (type {}): {}", static_cast<uint8_t>(eParsingType), rException.what());
@@ -149,9 +137,7 @@ void ClientSession::ProcessReceivedGamePackets()
 }
 
 // Applying an owned-entity event to the client owned-entity list is game-agnostic apart from two steps, the
-// mFleetSelection pending-focus step and the client-cell move for the focused entity (ClientOwnedEntityIdentifier):
-// a future project may want it and UpdateOwnedEntityCoordinate moved into shared engine code, depending on its
-// requirements.
+// mFleetSelection pending-focus step and the client-cell move for the focused entity (ClientOwnedEntityIdentifier).
 void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent)
 {
 	if (rEvent.eState == engine::OwnedEntityState::kDied)
@@ -190,49 +176,6 @@ void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engin
 	{
 		it->coord = coordinate;
 	}
-}
-
-void ClientSession::ConnectToServer(std::string_view serverAddress)
-{
-	gpGame->mpcModalMessage[0] = '\0';
-	mpRuntime->Connect(serverAddress, engine::kiDefaultPort);
-}
-
-void ClientSession::OnConnectionRejected(std::string_view reason)
-{
-	std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "%.*s", static_cast<int>(reason.size()), reason.data());
-	gpGame->meUiState = engine::UiState::kModal;
-}
-
-void ClientSession::OnConnectionFailed()
-{
-	std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "Connection failed");
-	gpGame->meUiState = engine::UiState::kModal;
-}
-
-void ClientSession::OnConnectionAccepted()
-{
-	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
-	{
-		gpGame->StartGameMusic();
-		Camera& rCamera = static_cast<Camera&>(*engine::gpCamera);
-		rCamera.StorePose(true);
-		gpGame->mGameFlags.Set(engine::GameFlags::kMainMenu, false);
-		gpGame->ResetSession();
-		gpGame->CreateNewFrame();
-		rCamera.ApplyPose(false);
-		gpGame->meUiState = engine::UiState::kNone;
-	}
-}
-
-void ClientSession::OnConnectionLost()
-{
-	gpGame->ChangeFrameToMainMenu();
-	if (gpGame->mpcModalMessage[0] == '\0')
-	{
-		std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "Connection lost");
-	}
-	gpGame->meUiState = engine::UiState::kModal;
 }
 
 void ClientSession::OnServerLoad()

@@ -10,9 +10,7 @@
 namespace engine
 {
 
-class Client;
 class ClientSessionRuntime;
-struct ReceivedDebugFrame;
 
 } // namespace engine
 
@@ -21,7 +19,6 @@ namespace game
 
 class ClientReconciler;
 struct Frame;
-enum class GamePacketType : uint8_t;
 
 enum class SubscriptionChangeReason : uint8_t
 {
@@ -30,7 +27,6 @@ enum class SubscriptionChangeReason : uint8_t
 	kChangedCell,
 	kDied,
 	kFleetSynchronization,
-	kPollTick,
 	kFocusNextFleet,
 	kFocusPreviousFleet,
 	kSelectOwnedEntity,
@@ -45,8 +41,6 @@ public:
 	ClientSession();
 	~ClientSession();
 
-	void ConnectToServer(std::string_view serverAddress);
-
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType);
 	void SendDestroyFleetMemberRequest(engine::GlobalId globalId);
@@ -59,10 +53,6 @@ private:
 	friend class engine::ClientSessionBase;
 	friend class engine::ClientSessionRuntime;
 
-	void OnConnectionRejected(std::string_view reason);
-	void OnConnectionFailed();
-	void OnConnectionAccepted();
-	void OnConnectionLost();
 	void OnServerLoad();
 	void ProcessReceivedGamePackets();
 	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);

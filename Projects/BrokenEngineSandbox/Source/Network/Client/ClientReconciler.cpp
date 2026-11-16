@@ -5,7 +5,6 @@
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
-#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game
@@ -69,10 +68,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	// Heap: Frame allocation during replay, map operations on serverUpdates, and scratch resize
 	ScopedSuppressAllocationTracking suppress;
 
-	// Re-sync client identity from main thread
-	mConfirmedClientState.clientGridCoordinate = gpGame->mClientGridCoordinate;
-	mConfirmedClientState.clientGlobalIdentifier = gpGame->ClientOwnedEntityIdentifier();
-	mConfirmedClientState.fPreviousClientArmor = gpGame->mfPreviousClientArmor;
+	ConfirmedClientState confirmedClientState {.clientGlobalIdentifier = gpGame->ClientOwnedEntityIdentifier(), .fPreviousClientArmor = gpGame->mfPreviousClientArmor};
 
 	engine::ReconcileInputs inputs;
 	inputs.iTargetTick = gpGame->miTickCounter;
@@ -99,9 +95,8 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	}
 
 	// Owned-entity transfer migration updates previous client armor.
-	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
 	std::span<const engine::CoordWork> activeWorks(mDispatcher.mWorks.data(), static_cast<size_t>(dispatch.iActiveCount));
-	ReconcileUpdateClientState(activeWorks, dispatch.bAnyFullReplay, newConfirmedClientState);
+	ReconcileUpdateClientState(activeWorks, dispatch.bAnyFullReplay, confirmedClientState);
 
 	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
 	{
@@ -134,15 +129,13 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 		}
 	}
 
-	mConfirmedClientState = newConfirmedClientState;
-	gpGame->mfPreviousClientArmor = newConfirmedClientState.fPreviousClientArmor;
+	gpGame->mfPreviousClientArmor = confirmedClientState.fPreviousClientArmor;
 
 	return {};
 }
 
 void ClientReconciler::Reset()
 {
-	mConfirmedClientState = {};
 	mDispatcher.Reset();
 	mfLastLoggedVisualErrorDelta = 0.0f;
 	miLastVisualErrorLogTick = -1'000;

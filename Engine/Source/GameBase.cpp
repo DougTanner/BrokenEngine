@@ -1165,6 +1165,36 @@ void GameBase::ChangeFrameToMainMenu()
 	static_cast<game::Camera&>(*gpCamera).ApplyPose(true);
 }
 
+void GameBase::ChangeFrameToGame()
+{
+	ASSERT(mGameFlags & GameFlags::kMainMenu);
+
+	game::gpGame->StartGameMusic();
+	static_cast<game::Camera&>(*gpCamera).StorePose(true);
+
+	mGameFlags.Set(GameFlags::kMainMenu, false);
+	ResetSession();
+	CreateNewFrame();
+	static_cast<game::Camera&>(*gpCamera).ApplyPose(false);
+	meUiState = UiState::kNone;
+}
+
+void GameBase::ApplyStandardMenuAction(StandardMenuAction eAction)
+{
+	switch (eAction)
+	{
+		case StandardMenuAction::kStartDiscovery:
+			game::gpClientSession->mpRuntime->StartDiscovery();
+			break;
+		case StandardMenuAction::kConnectToDiscoveredServer:
+			game::gpClientSession->mpRuntime->ConnectToDiscoveredServer(kiDefaultPort);
+			break;
+		case StandardMenuAction::kChangeFrameToMainMenu:
+			ChangeFrameToMainMenu();
+			break;
+	}
+}
+
 void GameBase::LeaveSettingsScreen()
 {
 	if (meUiState == UiState::kGameSettings)

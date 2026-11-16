@@ -50,6 +50,12 @@ static void PersistClientGuidToDisk(const ClientGuid& rGuid)
 	}
 }
 
+static void ShowConnectionMessage(const char* pcMessage)
+{
+	std::snprintf(game::gpGame->mpcModalMessage, sizeof(game::gpGame->mpcModalMessage), "%s", pcMessage);
+	game::gpGame->meUiState = UiState::kModal;
+}
+
 // Lowering miCurrentTargetBehind waits out one mSmoothedJitterMicroseconds window's worth of sim ticks, so in
 // loss-free arrival the average has mostly turned over before the lower target is adopted. Measured in
 // sim ticks, not EvaluateClock calls: jitter samples arrive one per coord update, so they land at tick
@@ -342,13 +348,14 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort
 {
 	// Heap: address copy, GUID file I/O, and Client/ENet construction
 	ScopedSuppressAllocationTracking suppress;
+	game::gpGame->mpcModalMessage[0] = '\0';
 	ResetConnectionState();
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
 	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, clientGuid, &PersistClientGuidToDisk);
 	if (mpClient->mpHost == nullptr)
 	{
-		game::gpClientSession->OnConnectionFailed();
+		ShowConnectionMessage("Connection failed");
 		Disconnect();
 	}
 }
@@ -437,17 +444,17 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 
 	mpClient->Poll(rTimeState);
 	// Client clears kConnectionAccepted on disconnect; the session bit keeps a lost accepted connection on the accepted
-	// branch, whose disconnect check routes it to OnConnectionLost rather than OnConnectionFailed.
+	// branch, whose disconnect check routes it to the lost branch rather than the failed branch.
 	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted) && !(mStateFlags & ClientSessionStateFlags::kConnectionWasAccepted))
 	{
 		if (const char* pcRejection = mpClient->mpcRejectionReason[0] != '\0' ? mpClient->mpcRejectionReason : nullptr; pcRejection != nullptr)
 		{
-			game::gpClientSession->OnConnectionRejected(pcRejection);
+			ShowConnectionMessage(pcRejection);
 			Disconnect();
 		}
 		else if (mpClient->mStateFlags & Client::ClientStateFlags::kDisconnectedEvent)
 		{
-			game::gpClientSession->OnConnectionFailed();
+			ShowConnectionMessage("Connection failed");
 			Disconnect();
 		}
 		else
@@ -457,8 +464,11 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		return;
 	}
 
-	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted);
-	game::gpClientSession->OnConnectionAccepted();
+	if (!(mStateFlags & ClientSessionStateFlags::kConnectionWasAccepted))
+	{
+		mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted);
+		game::gpGame->ChangeFrameToGame();
+	}
 	game::gpClientSession->PollDesynchronizationState();
 	if (mpClient == nullptr)
 	{
@@ -466,11 +476,12 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	}
 	if (mpClient->mStateFlags & Client::ClientStateFlags::kDisconnectedEvent)
 	{
-		game::gpClientSession->OnConnectionLost();
-		if (mpClient != nullptr)
+		game::gpGame->ChangeFrameToMainMenu();
+		if (game::gpGame->mpcModalMessage[0] == '\0')
 		{
-			Disconnect();
+			std::snprintf(game::gpGame->mpcModalMessage, sizeof(game::gpGame->mpcModalMessage), "Connection lost");
 		}
+		game::gpGame->meUiState = UiState::kModal;
 		return;
 	}
 	if (std::optional<int64_t> optionalLoadGeneration = mpClient->DrainLoadNotification(); optionalLoadGeneration.has_value())

@@ -127,11 +127,12 @@ is engine-owned here.
   contract.
 - The client-only `StandardMenuFeature`, `StandardMenuState`,
   `StandardMenuModel`, and `StandardMenuAction` types plus the `game::Game`
-  members `GetStandardMenuModel` and `ApplyStandardMenuAction`, which the
-  screens call, extend that contract for the engine-owned menus. They are the
-  only surface through which a standard screen reaches game-owned networking and
-  frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No
-  server declaration depends on them.
+  member `GetStandardMenuModel` and the `GameBase` member
+  `ApplyStandardMenuAction`, which the screens call, extend that contract for
+  the engine-owned menus. They are the only surface through which a standard
+  screen reaches the client session runtime and frame transitions; their usage
+  rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on
+  them.
 - The client-only `GameBase::mChatLog` (`ChatLog.h`) is the chat state: a
   `ChatLog::kiCapacity`-entry history ring that `Client::ServerChat` appends to,
   plus the input box's open flag and text. `GameBase::ProcessInput` opens the

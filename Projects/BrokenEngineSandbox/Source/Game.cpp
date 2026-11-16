@@ -182,22 +182,6 @@ engine::StandardMenuModel Game::GetStandardMenuModel() const
 		.state = gpClientSession->mpRuntime->GetStandardMenuState(),
 	};
 }
-
-void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
-{
-	switch (eAction)
-	{
-		case engine::StandardMenuAction::kStartDiscovery:
-			gpClientSession->mpRuntime->StartDiscovery();
-			break;
-		case engine::StandardMenuAction::kConnectToDiscoveredServer:
-			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort);
-			break;
-		case engine::StandardMenuAction::kChangeFrameToMainMenu:
-			ChangeFrameToMainMenu();
-			break;
-	}
-}
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
@@ -239,7 +223,7 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 			}
 			else
 			{
-				gpClientSession->ConnectToServer("127.0.0.1");
+				gpClientSession->mpRuntime->Connect("127.0.0.1", engine::kiDefaultPort);
 			}
 		}
 

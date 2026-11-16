@@ -27,9 +27,8 @@ Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
   when that event arrives.
 - `ClientReconciler` runs one engine reconcile dispatch per client update,
   returns the desync record the dispatch fills to the session base, and owns
-  what stays game-side: confirmed client-state tracking and the visual-error
-  aggregation and cross-coordinate owned-entity transfer migration it computes
-  from the dispatch result.
+  what stays game-side: the visual-error aggregation and cross-coordinate
+  owned-entity transfer migration it computes from the dispatch result.
 
 ## Session Policy
 
@@ -69,10 +68,10 @@ Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
   exception boundaries. Owned-entity states are decoded in the engine
   `Client::Receive`, so the engine application loop's one catch logs an
   ordinary local failure as a warning; the fleet-sync and map fleet marker
-  handlers share one boundary that splits corrupt data from an ordinary local
-  failure under the hub's corrupt-input policy
-  (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data application
-  and per-frame gameplay hydration remain outside those catches.
+  handlers share one boundary that logs an ordinary local failure as a warning,
+  and their decoders raise no corrupt-data signal, under the hub's corrupt-input
+  policy (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data
+  application and per-frame gameplay hydration remain outside those catches.
 - Desired subscriptions stay sticky to reduce visible churn. During a real
   debug-frame wait, transport polling and receive-buffer drains continue while
   subscription updates, simulation, and reconciliation remain stalled.

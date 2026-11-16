@@ -64,7 +64,6 @@ public:
 	// The standard menu screens read this every render pass, and again after any action that can
 	// change it, because an action's effect must be visible to later decisions in the same pass.
 	engine::StandardMenuModel GetStandardMenuModel() const;
-	void ApplyStandardMenuAction(engine::StandardMenuAction eAction);
 
 	bool HasFocusedClientEntity() const;
 	void UpdateCameraShake();

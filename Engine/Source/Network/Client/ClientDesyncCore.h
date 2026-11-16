@@ -31,7 +31,7 @@ public:
 
 	void OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo);
 	void PollDebugFrameResponse();
-	bool PollDesyncTimeout();
+	void PollDesyncTimeout();
 	void RecoverFromDesync();
 	void Reset();
 

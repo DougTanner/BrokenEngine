@@ -47,13 +47,7 @@ void ClientDesyncCore::PollDebugFrameResponse()
 		return;
 	}
 
-	if (pDebugFrame->iTick != mDesyncDebugState.iTick)
-	{
-		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iQ, pDebugFrame->coordinate.iR, mDesyncDebugState.iTick, mDesyncDebugState.coord.iQ, mDesyncDebugState.coord.iR);
-		return;
-	}
-
-	if (pDebugFrame->coordinate != mDesyncDebugState.coord)
+	if (pDebugFrame->iTick != mDesyncDebugState.iTick || pDebugFrame->coordinate != mDesyncDebugState.coord)
 	{
 		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iQ, pDebugFrame->coordinate.iR, mDesyncDebugState.iTick, mDesyncDebugState.coord.iQ, mDesyncDebugState.coord.iR);
 		return;
@@ -79,16 +73,16 @@ void ClientDesyncCore::PollDebugFrameResponse()
 	}
 }
 
-bool ClientDesyncCore::PollDesyncTimeout()
+void ClientDesyncCore::PollDesyncTimeout()
 {
 	if (mDesyncDebugState.iTick < 0)
 	{
-		return false;
+		return;
 	}
 
 	if (std::chrono::steady_clock::now() - mDesyncDebugState.entryTime <= kDesyncDebugTimeout)
 	{
-		return false;
+		return;
 	}
 
 	mDesyncDebugState = {};
@@ -103,7 +97,6 @@ bool ClientDesyncCore::PollDesyncTimeout()
 		std::snprintf(game::gpGame->mpcModalMessage, sizeof(game::gpGame->mpcModalMessage), "Desynced from server (debug frame timeout)");
 		game::gpClientSession->mpRuntime->mpClient->Disconnect();
 	}
-	return true;
 }
 
 void ClientDesyncCore::RecoverFromDesync()
