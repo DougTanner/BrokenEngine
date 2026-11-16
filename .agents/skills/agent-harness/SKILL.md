@@ -78,8 +78,13 @@ screenshot path), and each such record comes back as one `Decisive checks`
 row; where the step settles a criterion, it also names the criterion ID and the
 expected observation. A step may branch: it states a condition on its own
 recorded observation and, for each outcome, the number of the step to run next
-or that the run ends. The launch for the user and a release-only recovery
-(`## When to use`) take no step sequence.
+or that the run ends. A brief may supply its step sequence by citing the
+execution card's `/agent-harness` acceptance checks by the card's file path
+plus its `## Execution card` selector; the `runner` reads those checks and
+takes them as the numbered steps in card order, each check's text standing as
+its step's setup, action, observation, and expected result, and its position
+in card order as the criterion ID. The launch for the user and a release-only
+recovery (`## When to use`) take no step sequence.
 
 ## Handoff
 

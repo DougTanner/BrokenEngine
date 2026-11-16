@@ -306,8 +306,10 @@ self-checks remain inside the implementation slices.
   ranges before that round's `Build required` handoff compiles.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered
   work advances; the brief states the agent-harness trigger `/compile`
-  `## Inputs` defines, so a stage whose acceptance table carries
-  `/agent-harness` criteria also builds the client and the server.
+  `## Inputs` defines, so a stage whose acceptance checks include an
+  `/agent-harness` check also builds the client and the server. Main reads
+  whether they do from the execution card's `Roles` field alone (Step 8
+  `runner` bullet), never from its `Acceptance checks` field.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
@@ -411,9 +413,23 @@ Order: all run in parallel, except `/progressive-disclosure-review` runs after
 
 #### Step 8 — Verify the acceptance table
 
-Order: `/verify-acceptance` runs after Step 7; `/create-follow-up-plans` runs
-when a leftover is proven, per the Leftovers paragraph below.
+Order: after Step 7 the `runner` runs first, then `/verify-acceptance`; at a
+landing stage the `runner` runs before Step 9's `/finalize-changes` dispatch;
+`/create-follow-up-plans` runs when a leftover is proven, per the Leftovers
+paragraph below.
 
+- `runner` runs `/agent-harness` for every `/agent-harness` acceptance check on
+  the execution card, on the edited tree — every stage, landing or not,
+  including checks marked `before the first edit`, which Step 4 ran only on the
+  unedited tree. The card's `Roles` field names this `runner` exactly when at
+  least one acceptance check is an `/agent-harness` check; main dispatches it
+  when `Roles` names it, reading that field alone. A change without an
+  execution card is Tier 1 (Step 1), and no Tier 1 change carries an
+  `/agent-harness` acceptance check (`.agents/skills/verify-acceptance/SKILL.md`
+  `## Inputs`), so main dispatches no `runner` for it. The brief cites the
+  checks in the execution-card form `/agent-harness` `## Inputs` defines, writes
+  no step sequence of its own, and sets no wall-clock budget; main reads no
+  check.
 - fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing
   without landing; a stage landing in the same session gets this from Step 9's
   landing table instead, and where the Step 6 combined pass applies that pass is

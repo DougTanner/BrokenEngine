@@ -39,7 +39,8 @@ that did not produce the work.
 
 - The approved acceptance criteria and invariants, verbatim — from the execution
   card where one exists, otherwise from the approved request.
-- The approved tier, which fixes the evidence ceiling.
+- The approved tier, which fixes the evidence ceiling. At Tier 1 that ceiling
+  admits no `/agent-harness` acceptance check.
 - The changed files and regions the stage covers.
 - The evidence locations: handoffs, command output, logs, `Temp/` files, or the
   repository paths a check reads.
