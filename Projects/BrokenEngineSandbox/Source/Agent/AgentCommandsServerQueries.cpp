@@ -126,7 +126,6 @@ static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int6
 		{
 			{"index", i},
 			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
-			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"alignment", rPost.pAlignments[i].uiValue},
 		});
 	}

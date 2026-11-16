@@ -129,20 +129,17 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		// Load (type index copied in AllocateAndCopy)
-		[[maybe_unused]] int64_t iTypeIndex = rCurrent.puiTypeIndices[i];
 		XMVECTOR vecVelocity = rPreviousPostRender.pVecVelocities[i];
 
 		XMVECTOR vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), vecVelocity, rPrevious.pVecPositions[i]);
 		// Positions must always have W=1.0 — prevents W-lane drift via MultiplyAdd.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		XMVECTOR vecDirection = XMVector3Normalize(vecVelocity);
-
 		rCurrent.pVecPositions[i] = vecPosition;
-		rCurrent.pVecDirections[i] = vecDirection;
 
 #if defined(BT_CLIENT)
+		// Load (type index copied in AllocateAndCopy)
+		int64_t iTypeIndex = rCurrent.puiTypeIndices[i];
 		SynchronizeBlaster(rCurrentFrameInterpolate, rCurrent.pAreaLights[i], rCurrent.pPointLights[i], vecPosition, vecVelocity, iTypeIndex);
 
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))

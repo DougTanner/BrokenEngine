@@ -53,31 +53,6 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 			.fLengthMultiplier = rType.pWindTrailLengthMultiplierWrapper->mfCurrent,
 		});
 	}
-
-	if ((rBlasters.pPointLights[iIndex].uuid.iValue != 0))
-	{
-		float fSize = rType.f2Size.x;
-		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pPointLights[iIndex],
-		{
-			.vecPosition = rBlasters.pVecPositions[iIndex],
-			.fVisibleArea = fSize,
-			.fRotation = 0.0f,
-		});
-	}
-	else
-	{
-		float fWidth = rType.f2Size.x;
-		float fLength = rType.f2Size.y;
-
-		XMVECTOR vecDirection = rBlasters.pVecDirections[iIndex];
-		auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(rBlasters.pVecPositions[iIndex], vecDirection, fLength, fLength, fWidth);
-
-		engine::AreaLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pAreaLights[iIndex],
-		{
-			.iTypeIndex = rType.iAreaLightTypeIndex,
-			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
-		});
-	}
 }
 
 void BlastersInterpolate::ClientInitializeAll(Frame& rFrame)
@@ -106,7 +81,6 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 	int64_t iIndex = engine::AddElement(rCurrentInterpolate, rCurrentPostRender);
 
 	rCurrentInterpolate.pVecPositions[iIndex] = rSpawnInformation.vecPosition;
-	rCurrentInterpolate.pVecDirections[iIndex] = XMVector3Normalize(rSpawnInformation.vecVelocity);
 	rCurrentInterpolate.puiTypeIndices[iIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
 
 	rCurrentPostRender.pVecVelocities[iIndex] = rSpawnInformation.vecVelocity;
@@ -160,7 +134,6 @@ bool BlastersInterpolate::LogDifferences(const BlastersInterpolate& rOther) cons
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
-		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 	}
 
 	return bEqual;

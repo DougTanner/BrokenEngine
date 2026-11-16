@@ -29,6 +29,14 @@ top of the file. A session reviewing the log removes each row it handles.
   unnecessary: ValidateNoTransferRows (Frame.cpp:115-131) and its call at
   Frame.cpp:821
 - 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp:161
+  — `MissilesInterpolate::ClientInitialize` calls `SynchronizeMissile`
+  through a hand declaration in `MissilesUpdate.cpp`, although every render
+  copy runs `MissilesInterpolate::Update`, which syncs the area light again
+  before drawing (the reason Blasters dropped its `ClientInitialize` light
+  sync) — check whether the trail and sound parts need the first-frame call;
+  if not, drop it and make `SynchronizeMissile` file-static
+- 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
   Engine/Source/File/ServerSaveLoad.cpp:117 — `Autoload` adopts a save
   without the `ResetSession`, `ResetForLoad`, and `ComputeActiveSet` tail that
   `ServerLoad` and `ServerReset` run, and its caller in the game `Game.cpp`

@@ -35,7 +35,7 @@ adding the fields below; the other entries are its own commands. For the engine
   attack target, 0 for none;
   missile rows:
   `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
-  blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
+  blaster rows: `index,local,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
   `kIsFlagship`, 2 `kTargetFlagship`, 4 `kSquadron1`, 8 `kSeekAndDestroy`, 16

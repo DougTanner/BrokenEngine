@@ -31,7 +31,7 @@ struct BlastersType
 
 struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, public engine::TypeRegistry<BlastersType>
 {
-	static constexpr int64_t kiVersion = 4;
+	static constexpr int64_t kiVersion = 5;
 	static constexpr char kpcName[] = "Blasters";
 	static constexpr common::crc_t kCrc = common::CrcConsteval(kpcName);
 
@@ -46,13 +46,12 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
-	XMVECTOR* __restrict pVecDirections = nullptr;
 #if defined(BT_CLIENT)
 	engine::area_lights_t* __restrict pAreaLights = nullptr;
 	engine::point_lights_t* __restrict pPointLights = nullptr;
 	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 #endif
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pVecDirections); }
+	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions); }
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf) { return std::tie(rSelf.pAreaLights, rSelf.pPointLights, rSelf.pWindTrails); }
 #endif
