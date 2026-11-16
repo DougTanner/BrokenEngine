@@ -348,11 +348,22 @@ try {
 
 	if (-not $runGeneration) {
 		# The harness claim reads its data directory from this record, and the claim and launch compare the
-		# Shared data directory against its listing. The listing is taken before MSBuild runs, so a refresh
-		# during the build differs at the next comparison, and a failed build keeps the previous record.
+		# Shared data directory against its listing. A refresh that deletes and rewrites the primary stamp
+		# leaves it absent while DataPacker stages files, so the stamp is re-read after the listing, and an
+		# absent stamp or one rewritten with a different commit since mode selection blocks the build. A
+		# refresh that runs during the listing and finishes with the same commit before the re-read is not
+		# caught here; the claim's record comparison refuses any record that differs from the published data.
+		# The listing is taken before MSBuild runs, so a refresh during the build differs at the next
+		# comparison, and a failed build keeps the previous record.
 		[string[]] $sharedDataListing = @()
 		if ($dataBuildMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
 			$sharedDataListing = [string[]]@(Get-AgentDataListing $gameDataDirectory)
+			$stamp = $null
+			try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $gameProject)).Trim() }
+			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
+			if ($stamp -cne [string]$context.sharedDataStamp) {
+				Stop-CompileInvoke 'shared-data.refresh-overlap' "A primary Shared data refresh is running or ended without rewriting the stamp, or completed with a different commit since data mode selection, so the Shared data listing may not match the published data. Rerun /compile once the primary SharedDataStamp.txt exists again; a rerun while it is missing resolves Local and runs a full Local generation build."
+			}
 		}
 		$buildExitCode = Invoke-WorktreeCliBuild $dataProperties
 		if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
