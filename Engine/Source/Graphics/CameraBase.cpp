@@ -337,7 +337,7 @@ void CameraBase::UpdateFraming()
 	{
 		// Scale per-tick zoom delta with current framing, bounded by sqrt so wide framings don't get 4x ticks and over-build Hermite velocity that carries into close framings.
 		float fFramingDelta = static_cast<float>(iScrollDelta) * kfFramingPerWheelTick * std::sqrt(mfCameraFraming / kfCameraFramingDefault);
-		float fNewTarget = std::clamp(mfCameraFramingTarget - fFramingDelta, kfMinimumFraming, kfFramingMaximum);
+		float fNewTarget = std::clamp(mfCameraFramingTarget - fFramingDelta, kfFramingMinimum, kfFramingMaximum);
 		if (fNewTarget != mfCameraFramingTarget)
 		{
 			// Capture current framing and velocity whenever the zoom target changes so the Hermite curve remains continuous.
@@ -569,14 +569,14 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	// Each level of detail halves mesh quads per dimension, coupling mesh density to the visible-area snap grid.
 	// The integer framing bucket latches quad size within a level of detail to prevent sub-pixel framing drift from jittering snapped edges.
 	// floor(area / quadSize) amplifies quad-size jitter by approximately area / quadSize, so quad size must stay stable while the latch key is unchanged.
-	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fRenderFraming, kfMinimumFraming) / kfMinimumFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
+	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fRenderFraming, kfLevelOfDetailFraming) / kfLevelOfDetailFraming) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
 	// LOD hysteresis: refuse to flip back across the shared boundary if framing is still
-	// near it. Boundaries are at kfMinimumFraming * 4^L; 5% band absorbs FP rounding around
+	// near it. Boundaries are at kfLevelOfDetailFraming * 4^L; 5% band absorbs FP rounding around
 	// asymptotic settling.
 	static constexpr float kfLevelOfDetailHysteresisFraction = 0.05f;
 	if (iLevelOfDetail == miVisibleAreaLevelOfDetail - 1)
 	{
-		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail));
+		float fBoundary = kfLevelOfDetailFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail));
 		if (fRenderFraming > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;
@@ -584,7 +584,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	}
 	else if (iLevelOfDetail == miVisibleAreaLevelOfDetail + 1)
 	{
-		float fBoundary = kfMinimumFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail + 1));
+		float fBoundary = kfLevelOfDetailFraming * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail + 1));
 		if (fRenderFraming < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
 		{
 			iLevelOfDetail = miVisibleAreaLevelOfDetail;

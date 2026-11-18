@@ -5,6 +5,7 @@
 #include "Data/Shader.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileRows.h"
@@ -79,7 +80,9 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		ppAreaLightsLayouts[i] = pAreaLightsLayouts;
 	}
 
-	float fMinimumLightingSize = MinLightingDepositSize();
+	float fAreaMultiplier = gAreaLightAreaMultiplier.mfCurrent;
+	float fLinearMultiplier = std::sqrt(fAreaMultiplier);
+	float fForcedSquare = gAreaLightForcedSquare.mfCurrent;
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -96,19 +99,46 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 		float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
 		float fIntensityMultiplier = rCurrent.pfIntensityMultipliers[i];
 		float fVisibleIntensity = rType.pVisibleIntensityWrapper != nullptr ? rType.pVisibleIntensityWrapper->mfCurrent : rType.fVisibleIntensity;
-		float fLightingSize = std::max(rType.pLightingSizeWrapper != nullptr ? rType.pLightingSizeWrapper->mfCurrent : rType.fLightingSize, fMinimumLightingSize);
+		float fLightingSize = rType.pLightingSizeWrapper != nullptr ? rType.pLightingSizeWrapper->mfCurrent : rType.fLightingSize;
 		float fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
 
 		// Lighting quads preserve the visible quad's orientation.
 		XMVECTOR vecOffset0 = XMVectorSubtract(vecVisiblePosition0, vecCenter);
 		float fVisibleExtent = XMVectorGetX(XMVector2Length(vecOffset0));
-		float fScale = fVisibleExtent > 0.0f ? fLightingSize / fVisibleExtent : 1.0f;
+		float fScale = (fVisibleExtent > 0.0f ? fLightingSize / fVisibleExtent : 1.0f) * fLinearMultiplier;
 		XMVECTOR vecScaleFactor = XMVectorReplicate(fScale);
 
 		XMVECTOR vecLightingPosition0 = XMVectorMultiplyAdd(vecOffset0, vecScaleFactor, vecCenter);
 		XMVECTOR vecLightingPosition1 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition1, vecCenter), vecScaleFactor, vecCenter);
 		XMVECTOR vecLightingPosition2 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition2, vecCenter), vecScaleFactor, vecCenter);
 		XMVECTOR vecLightingPosition3 = XMVectorMultiplyAdd(XMVectorSubtract(vecVisiblePosition3, vecCenter), vecScaleFactor, vecCenter);
+
+		if (fForcedSquare > 0.0f)
+		{
+			XMVECTOR vecHorizontalMask = XMVectorSelectControl(1, 1, 0, 0);
+			XMVECTOR vecWidth = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecLightingPosition1, vecLightingPosition0), vecHorizontalMask);
+			XMVECTOR vecLength = XMVectorSelect(XMVectorZero(), XMVectorSubtract(vecLightingPosition2, vecLightingPosition0), vecHorizontalMask);
+			float fWidthSquared = XMVectorGetX(XMVector2LengthSq(vecWidth));
+			float fLengthSquared = XMVectorGetX(XMVector2LengthSq(vecLength));
+			if (fWidthSquared != fLengthSquared)
+			{
+				bool bStretchWidth = fWidthSquared < fLengthSquared;
+				XMVECTOR vecShortEdge = bStretchWidth ? vecWidth : vecLength;
+				XMVECTOR vecLongEdge = bStretchWidth ? vecLength : vecWidth;
+				XMVECTOR vecTargetEdge = XMVector3Cross(vecLongEdge, XMVectorSet(0.0f, 0.0f, bStretchWidth ? -1.0f : 1.0f, 0.0f));
+				if (XMVectorGetX(XMVector2Dot(vecTargetEdge, vecShortEdge)) < 0.0f)
+				{
+					vecTargetEdge = XMVectorNegate(vecTargetEdge);
+				}
+
+				XMVECTOR vecOffset = XMVectorScale(XMVectorSubtract(vecTargetEdge, vecShortEdge), 0.5f * fForcedSquare);
+				XMVECTOR vecMiddleOffset = bStretchWidth ? vecOffset : XMVectorNegate(vecOffset);
+				vecLightingPosition0 = XMVectorSelect(vecLightingPosition0, XMVectorSubtract(vecLightingPosition0, vecOffset), vecHorizontalMask);
+				vecLightingPosition1 = XMVectorSelect(vecLightingPosition1, XMVectorAdd(vecLightingPosition1, vecMiddleOffset), vecHorizontalMask);
+				vecLightingPosition2 = XMVectorSelect(vecLightingPosition2, XMVectorSubtract(vecLightingPosition2, vecMiddleOffset), vecHorizontalMask);
+				vecLightingPosition3 = XMVectorSelect(vecLightingPosition3, XMVectorAdd(vecLightingPosition3, vecOffset), vecHorizontalMask);
+			}
+		}
 
 		// Rebasing translates the bounding box, so converting its two corners preserves the rectangle.
 		auto [vecMinimum, vecMaximum] = common::ComputeAxisAlignedBoundingBox(vecVisiblePosition0, vecVisiblePosition1, vecVisiblePosition2, vecVisiblePosition3, vecLightingPosition0, vecLightingPosition1, vecLightingPosition2, vecLightingPosition3);
@@ -158,7 +188,7 @@ void AreaLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 		XMFLOAT4A f4Parameters {};
 		f4Parameters.x = fBlurredTextureIndex;
-		f4Parameters.y = fLightingIntensity * fIntensityMultiplier;
+		f4Parameters.y = fLightingIntensity * fIntensityMultiplier / fAreaMultiplier;
 		rAreaLayout.pf4Parameters[0] = f4Parameters;
 		rAreaLayout.pf4Parameters[1] = f4Parameters;
 		rAreaLayout.pf4Parameters[2] = f4Parameters;

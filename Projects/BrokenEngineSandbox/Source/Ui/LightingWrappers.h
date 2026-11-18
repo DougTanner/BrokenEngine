@@ -73,7 +73,7 @@ inline engine::Wrapper gHexShieldIntensityDecay(1.25f, 0.1f, 6.0f);
 inline engine::Wrapper gHexShieldLightingIntensity(4.0f, 0.0f, 8.0f);
 
 inline engine::Wrapper gMissileExhaustVisibleIntensity(1.0f, 0.1f, 5.0f);
-inline engine::Wrapper gMissileExhaustLightingArea(3.0f, 1.0f, 4.0f);
+inline engine::Wrapper gMissileExhaustLightingArea(3.0f, 1.0f, 16.0f);
 inline engine::Wrapper gMissileExhaustLightingIntensity(3.5f, 0.0f, 5.0f);
 
 // Fighters - Hit flash

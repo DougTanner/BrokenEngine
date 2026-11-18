@@ -15,8 +15,6 @@ struct PatchLatticeLayout
 
 struct GlobalLayout
 {
-	uint32_t uiRandomSeed INIT;
-
 	float fElapsedTime INIT;
 	float fBaseHeight INIT;
 	float fBaseHeightInverse INIT; // 1 / max(fBaseHeight, 0.001) (Terrain.frag below-base height ratio)
@@ -161,25 +159,18 @@ struct GlobalLayout
 	float fSpreadDirectionCountStart INIT;
 	float fSpreadDistanceStart INIT;
 	float fSpreadRingCountStart INIT;
-	float fSpreadJitterStart INIT;
-	float fSpreadSampleJitterRangeStart INIT;
-	float fSpreadSampleJitterClusteringStart INIT;
 	float fSpreadDecayStart INIT;
 	float fSpreadAccumulationDecayStart INIT;
 	float fSpreadDistanceFalloffStart INIT;
 	float fSpreadOutputThresholdStart INIT;
 	float fSpreadOutputCompressStart INIT;
 	float fSpreadPassCount INIT;
-	float pfSpreadRingRotations[kiMaxSpreadPasses] INIT;
 
 	// Spread End (interpolation targets for last spread pass)
 	float fSpreadDirectionalityEnd INIT;
 	float fSpreadDirectionCountEnd INIT;
 	float fSpreadDistanceEnd INIT;
 	float fSpreadRingCountEnd INIT;
-	float fSpreadJitterEnd INIT;
-	float fSpreadSampleJitterRangeEnd INIT;
-	float fSpreadSampleJitterClusteringEnd INIT;
 	float fSpreadDecayEnd INIT;
 	float fSpreadAccumulationDecayEnd INIT;
 	float fSpreadDistanceFalloffEnd INIT;

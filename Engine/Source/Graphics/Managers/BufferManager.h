@@ -81,7 +81,7 @@ public:
 
 	Buffer mQuadsVertexBuffer;
 
-	// Each water LOD halves each quad dimension, clamped to one; nominal framing boundaries are kfMinimumFraming * 4^k.
+	// Each water LOD halves each quad dimension, clamped to one; nominal framing boundaries are CameraBase::kfLevelOfDetailFraming * 4^k.
 	// Camera applies hysteresis and uses the selected LOD for visible-area snapping.
 	// All LODs share mWaterMeshBuffer; indirect firstIndex/indexCount/vertexOffset select the LOD without re-recording commands.
 	// Terrain draws IslandTemplate's Gaea2 Mesher meshes in CommandBufferRecordMain.

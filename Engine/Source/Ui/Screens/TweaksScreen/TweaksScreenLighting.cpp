@@ -29,56 +29,50 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Lighting Deposit Texture Multiplier", gLightingDepositTextureMultiplier, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Deposit Threshold", gLightingDepositThreshold, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Deposit Compress", gLightingDepositCompress, iSection, 1.0f);
+				rScreen.WrapperSlider("Area Light Area Multiplier", gAreaLightAreaMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Area Light Forced Square", gAreaLightForcedSquare, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("3a. Spread");
 				rScreen.WrapperSlider("Spread Pass Count", gSpreadPassCount, iSection, 1.0f);
 				rScreen.WrapperSlider("Spread Decay", gSpreadDecay, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Accumulation Decay", gSpreadAccumulationDecay, iSection, 1.0f);
-
-				float fSpreadStartY = ImGui::GetCursorPosY();
-
-				rScreen.WrapperSeparatorText("3b. Spread Start");
-				rScreen.WrapperSlider("Spread Texture Multiplier Start", gSpreadTextureMultiplierStart, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Directionality", gSpreadDirectionality, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Direction Count", gSpreadDirectionCount, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance", gSpreadDistance, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Ring Count", gSpreadRingCount, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Jitter", gSpreadJitter, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Sample Jitter Range Start", gSpreadSampleJitterRangeStart, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Sample Jitter Clustering Start", gSpreadSampleJitterClusteringStart, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance Falloff", gSpreadDistanceFalloff, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Height Multiplier", gSpreadHeightMultiplier, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Height End Height", gSpreadHeightEndHeight, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Height Power", gSpreadHeightPower, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Output Threshold", gSpreadOutputThreshold, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Output Compress", gSpreadOutputCompress, iSection, 1.0f);
-
-				ImGui::TableNextColumn();
-
-				ImGui::SetCursorPosY(fSpreadStartY);
-
-				rScreen.WrapperSeparatorText("3c. Spread End");
-				rScreen.WrapperSlider("Spread Texture Multiplier End", gSpreadTextureMultiplierEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Directionality End", gSpreadDirectionalityEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Direction Count End", gSpreadDirectionCountEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance End Start Height", gSpreadDistanceEnd.startHeight, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance End End Height", gSpreadDistanceEnd.endHeight, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance End Low", gSpreadDistanceEnd.low, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance End High", gSpreadDistanceEnd.high, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Ring Count End", gSpreadRingCountEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Jitter End", gSpreadJitterEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Sample Jitter Range End", gSpreadSampleJitterRangeEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Sample Jitter Clustering End", gSpreadSampleJitterClusteringEnd, iSection, 1.0f);
 				rScreen.WrapperSlider("Spread Decay End", gSpreadDecayEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Accumulation Decay", gSpreadAccumulationDecay, iSection, 1.0f);
 				rScreen.WrapperSlider("Spread Accumulation Decay End", gSpreadAccumulationDecayEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Distance Falloff End", gSpreadDistanceFalloffEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Output Threshold End", gSpreadOutputThresholdEnd, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Output Compress End", gSpreadOutputCompressEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Texture Multiplier Start", gSpreadTextureMultiplierStart, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Texture Multiplier End", gSpreadTextureMultiplierEnd, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("4. Temporal");
 				rScreen.WrapperSlider("Lighting Texel Ramp Meters Per Second", gLightingTexelRampMetersPerSecond, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Temporal Blend", gLightingTemporalBlend, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Update Cadence", gLightingUpdateCadence, iSection, 1.0f);
+
+				ImGui::TableNextColumn();
+
+				rScreen.WrapperSeparatorText("3b. Spread Sampling");
+				rScreen.WrapperSlider("Spread Directionality", gSpreadDirectionality, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Directionality End", gSpreadDirectionalityEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Direction Count", gSpreadDirectionCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Direction Count End", gSpreadDirectionCountEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance", gSpreadDistance, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End Start Height", gSpreadDistanceEnd.startHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End End Height", gSpreadDistanceEnd.endHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End Low", gSpreadDistanceEnd.low, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance End High", gSpreadDistanceEnd.high, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Ring Count", gSpreadRingCount, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Ring Count End", gSpreadRingCountEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance Falloff", gSpreadDistanceFalloff, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Distance Falloff End", gSpreadDistanceFalloffEnd, iSection, 1.0f);
+
+				rScreen.WrapperSeparatorText("3c. Spread Height");
+				rScreen.WrapperSlider("Spread Height Multiplier", gSpreadHeightMultiplier, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Height End Height", gSpreadHeightEndHeight, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Height Power", gSpreadHeightPower, iSection, 1.0f);
+
+				rScreen.WrapperSeparatorText("3d. Spread Output");
+				rScreen.WrapperSlider("Spread Output Threshold", gSpreadOutputThreshold, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Threshold End", gSpreadOutputThresholdEnd, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Compress", gSpreadOutputCompress, iSection, 1.0f);
+				rScreen.WrapperSlider("Spread Output Compress End", gSpreadOutputCompressEnd, iSection, 1.0f);
 
 				ImGui::EndTable();
 			}

@@ -186,7 +186,7 @@ CONSTEXPR float kfWaterNormalThreeOctaveThreeSizeMultiplier = 3.5f;
 // and the TextureManager render-target pointer vectors.
 CONSTEXPR int kiMaxIslands = 128;
 
-CONSTEXPR int kiMaxSpreadPasses = 40;
+CONSTEXPR int kiMaxSpreadPasses = 128;
 CONSTEXPR int kiMaxDebugTextures = kiMaxSpreadPasses + 16;
 
 CONSTEXPR int kiDebugTextureFormatFloat16LightingDirectional = 0;

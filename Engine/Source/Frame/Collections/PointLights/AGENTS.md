@@ -16,8 +16,7 @@ sprite.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The
   deposit is always world-axis-aligned and samples the blurred texture; the
   sprite samples the unblurred texture.
-- Clamp deposit area to the renderer's minimum detail-texel footprint using the
-  un-bumped detail texture size.
+- Deposit area uses the selected lighting area directly in world-space units.
 - Controller wrappers apply when controlled lights are seeded and animated. A
   light with no controller takes its visible intensity, lighting area, and
   lighting intensity from its type at render, through the type's tuning wrapper

@@ -129,15 +129,6 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	bool bScheduledFrame = bLightingEnabled && gpGraphics->miFrameCounter % iLightingUpdateCadence == 0;
 	int64_t iScheduledLayer = bScheduledFrame ? (gpGraphics->miFrameCounter / iLightingUpdateCadence) % shaders::kiLightingLayers : -1;
 
-	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
-	static uint32_t suiRandomSeed = []
-	{
-		common::RandomEngine randomEngine;
-		randomEngine.TimeSeed();
-		return static_cast<uint32_t>(common::RandomNext(randomEngine) >> 32);
-	}();
-	rGlobalLayout.uiRandomSeed = suiRandomSeed;
-
 	rGlobalLayout.fLightingObjectsAdd = gLightingObjectsAdd.mfCurrent;
 	rGlobalLayout.fLightingDepositThreshold = gLightingDepositThreshold.mfCurrent;
 	rGlobalLayout.fLightingDepositCompress = gLightingDepositCompress.mfCurrent;
@@ -181,9 +172,6 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSpreadDirectionCountStart = gSpreadDirectionCount.mfCurrent;
 	rGlobalLayout.fSpreadDistanceStart = gSpreadDistance.mfCurrent;
 	rGlobalLayout.fSpreadRingCountStart = gSpreadRingCount.mfCurrent;
-	rGlobalLayout.fSpreadJitterStart = gSpreadJitter.mfCurrent;
-	rGlobalLayout.fSpreadSampleJitterRangeStart = gSpreadSampleJitterRangeStart.mfCurrent;
-	rGlobalLayout.fSpreadSampleJitterClusteringStart = gSpreadSampleJitterClusteringStart.mfCurrent;
 	rGlobalLayout.fSpreadDecayStart = gSpreadDecay.mfCurrent;
 	rGlobalLayout.fSpreadAccumulationDecayStart = gSpreadAccumulationDecay.mfCurrent;
 	rGlobalLayout.fSpreadDistanceFalloffStart = gSpreadDistanceFalloff.mfCurrent;
@@ -196,9 +184,6 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.mfCurrent;
 	rGlobalLayout.fSpreadDistanceEnd = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), gSpreadDistanceEnd);
 	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.mfCurrent;
-	rGlobalLayout.fSpreadJitterEnd = gSpreadJitterEnd.mfCurrent;
-	rGlobalLayout.fSpreadSampleJitterRangeEnd = gSpreadSampleJitterRangeEnd.mfCurrent;
-	rGlobalLayout.fSpreadSampleJitterClusteringEnd = gSpreadSampleJitterClusteringEnd.mfCurrent;
 	rGlobalLayout.fSpreadDecayEnd = gSpreadDecayEnd.mfCurrent;
 	rGlobalLayout.fSpreadAccumulationDecayEnd = gSpreadAccumulationDecayEnd.mfCurrent;
 	rGlobalLayout.fSpreadDistanceFalloffEnd = gSpreadDistanceFalloffEnd.mfCurrent;
@@ -208,15 +193,6 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSpreadHeightMultiplier = gSpreadHeightMultiplier.mfCurrent;
 	rGlobalLayout.fSpreadHeightEndHeightInverse = 1.0f / std::max(gSpreadHeightEndHeight.mfCurrent, 0.001f);
 	rGlobalLayout.fSpreadHeightPower = gSpreadHeightPower.mfCurrent;
-
-	// Per-ring rotation angles: jitter slider sets the seed; the shader scales by interpolated jitter
-	// Each ring uses its own seed for uncorrelated rotations
-	float fJitter = gSpreadJitter.mfCurrent;
-	common::RandomEngine ringRandomEngine(1'000 * static_cast<uint32_t>(static_cast<float>(shaders::kiMaxSpreadPasses) * fJitter));
-	for (float& rfSpreadRingRotation : rGlobalLayout.pfSpreadRingRotations)
-	{
-		rfSpreadRingRotation = common::Random<XM_2PI>(ringRandomEngine);
-	}
 
 	PopulateLightingParameters(rGlobalLayout, iScheduledLayer, bLightingEnabled);
 }

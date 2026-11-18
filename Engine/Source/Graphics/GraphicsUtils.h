@@ -56,7 +56,6 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 // rf4Position is projected onto a flight plane (e.g. ProjectToFlightPlane's output), so it is already in the camera
 // cell's frame.
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor);
-float MinLightingDepositSize();
 
 bool SupportsStorageImage(VkFormat vkFormat);
 bool SupportsColorAttachmentBlend(VkFormat vkFormat);

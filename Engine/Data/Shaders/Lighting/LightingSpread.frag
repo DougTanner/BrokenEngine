@@ -2,7 +2,6 @@
 
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
-#include "ShaderRandom.h"
 
 // Push constants
 layout(push_constant) uniform pushConstants
@@ -61,9 +60,6 @@ void main()
 	float fSpreadDistance = mix(globalLayout.fSpreadDistanceStart, globalLayout.fSpreadDistanceEnd, fT);
 	float fDirectionCountBase = mix(globalLayout.fSpreadDirectionCountStart, globalLayout.fSpreadDirectionCountEnd, fT);
 	float fRingCountF = mix(globalLayout.fSpreadRingCountStart, globalLayout.fSpreadRingCountEnd, fT);
-	float fJitter = mix(globalLayout.fSpreadJitterStart, globalLayout.fSpreadJitterEnd, fT);
-	float fSampleJitterRange = mix(globalLayout.fSpreadSampleJitterRangeStart, globalLayout.fSpreadSampleJitterRangeEnd, fT);
-	float fSampleJitterClustering = mix(globalLayout.fSpreadSampleJitterClusteringStart, globalLayout.fSpreadSampleJitterClusteringEnd, fT);
 	float fDecay = mix(globalLayout.fSpreadDecayStart, globalLayout.fSpreadDecayEnd, fT);
 	float fAccumulationDecay = mix(globalLayout.fSpreadAccumulationDecayStart, globalLayout.fSpreadAccumulationDecayEnd, fT);
 	float fDistanceFalloff = mix(globalLayout.fSpreadDistanceFalloffStart, globalLayout.fSpreadDistanceFalloffEnd, fT);
@@ -94,7 +90,6 @@ void main()
 	f4OutBlue = vec4(0.0f);
 
 	// Configurable direction count: evenly spaced unit vectors around the circle
-	// Offset by half-step (0.25 * step) to avoid sampling exactly on cardinal axes
 	const uint32_t uiRingCount = uint32_t(fRingCountF);
 
 	// Constant per-sample weight (not per-ring falloff): softens outer ring contributions relative to
@@ -102,15 +97,8 @@ void main()
 	float fInvSqrtDistance = inversesqrt(float(1 + uiRingCount));
 	float fTotalSamples = 0.0f;
 
-	// Per-fragment PRNG: hash run-unique seed with pixel coords, advance per (ring, direction) sample for x/y jitter.
-	uvec2 u2Pixel = uvec2(gl_FragCoord.xy);
-	uint uiSeed = globalLayout.uiRandomSeed ^ (u2Pixel.x * 0x27d4eb2du) ^ (u2Pixel.y * 0x165667b1u);
-	RandomEngine prng = SeedRandomEngine(uiSeed);
-
 	for (uint32_t j = 0; j < uiRingCount; ++j)
 	{
-		// Per-ring jitter: rotation angle scaled by interpolated jitter
-		float fRingJitter = globalLayout.pfSpreadRingRotations[j] * fJitter;
 		float fRingFalloff = 1.0f - fDistanceFalloff * (float(j + 1) / float(uiRingCount));
 
 		float fDirectionCount = fDirectionCountBase + float(j);
@@ -119,9 +107,8 @@ void main()
 		const float fDirectionStep = (2.0f * kfPi) / fDirectionCount;
 		fTotalSamples += fDirectionCount * fRingFalloff;
 
-		// Incremental rotation recurrence: advance f2Direction by a fixed per-step rotation each iteration
-		// instead of recomputing cos/sin. Re-seeded per ring at fRingJitter to bound accumulated float drift.
-		vec2 f2Direction = vec2(cos(fRingJitter), sin(fRingJitter));
+		// Reset each ring to the positive-X unit vector to bound drift from incremental rotation.
+		vec2 f2Direction = vec2(1.0f, 0.0f);
 		float fCosStep = cos(fDirectionStep);
 		float fSinStep = sin(fDirectionStep);
 		for (uint32_t i = 0; i < uiDirectionCount; ++i)
@@ -132,13 +119,8 @@ void main()
 			// Weight = alignment of the sampling direction with each channel's axis
 			vec4 f4DirWeight = max(vec4(f2Direction.x, -f2Direction.x, -f2Direction.y, f2Direction.y), 0.0f);
 
-			// Per-sample x/y jitter — does NOT touch f2Direction. clustering > 1 clusters near origin, < 1 pushes to rim.
-			float fSampleJitterR = pow(Random01(prng), fSampleJitterClustering);
-			float fSampleJitterAngle = Random01(prng) * (2.0f * kfPi);
-			vec2 f2SampleJitterOff = fSampleJitterR * vec2(cos(fSampleJitterAngle), sin(fSampleJitterAngle)) * vec2(fAspectRatioX, fAspectRatioY) * fSampleJitterRange;
-
 			// Ring distance: total reach = fSpreadDistance, more rings = denser sampling (not wider spread)
-			vec2 f2Coord = f2InTexcoord + vec2(fAspectRatioX, fAspectRatioY) * (fSpreadDistance * (float(j + 1) / float(uiRingCount)) * f2Direction) + f2SampleJitterOff;
+			vec2 f2Coord = f2InTexcoord + vec2(fAspectRatioX, fAspectRatioY) * (fSpreadDistance * (float(j + 1) / float(uiRingCount)) * f2Direction);
 
 			vec4 f4Red = texture(redSampler, f2Coord);
 			vec4 f4Green = texture(greenSampler, f2Coord);

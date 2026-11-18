@@ -21,10 +21,6 @@ inline RenderBasis MakeRenderBasis(GridCoord coordinate, GridCoord cameraCoordin
 	return basis;
 }
 
-// Minimum framing (LOD pivot floor). Single source for both the engine LOD-bucket math in
-// CameraBase::CalculateMatricesAndVisibleArea and the zoom-clamp floor in CameraBase::UpdateFraming.
-inline constexpr float kfMinimumFraming = 150.0f;
-
 // Camera (display-rate, client-only, continuous)
 struct CameraInput
 {
@@ -76,15 +72,21 @@ public:
 	// view at this vertical field of view, in degrees. Every projection and field of view shows the same half-height
 	// across the view-perpendicular plane through the look-at, framing * tan(kfFramingFieldOfView / 2); the eye is
 	// derived from it.
-	static constexpr float kfFramingFieldOfView = 25.3125f;
+	static constexpr float kfFramingFieldOfView = 25.0f;
 	static constexpr float kfCameraFramingDefault = 300.0f;
 	// Camera-height zoom-factor fade endpoint (2x default framing = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
 	static constexpr float kfWaveFadeEndFraming = 2.0f * kfCameraFramingDefault;
+	// Zoom-in floor.
+	static constexpr float kfFramingMinimum = 100.0f;
+	// Pivot of the visible-area LOD buckets, independent of the zoom-in floor: each LOD doubles the water quad size,
+	// and PopulateGerstnerBand fades out waves shorter than a few quads, so the first boundary (4x this) must not fall
+	// below the default Water Low and Medium Amplitude Fade End or those bands vanish at the switch instead of following the fade.
+	static constexpr float kfLevelOfDetailFraming = 300.0f;
 	// Zoom-out ceiling. NOT a texel reference: the shadow/lighting texel grids hold a constant on-screen pixel size at
 	// any framing (the texels coarsen with zoom instead of cropping coverage), so this is purely the gameplay limit on
 	// how far the camera can pull back.
-	static constexpr float kfFramingMaximum = 600.0f;
+	static constexpr float kfFramingMaximum = 800.0f;
 	// Initial zoom-target on construction: a few wheel-clicks above the default for a comfortable opening frame with
 	// zoom range either way. WHEEL_DELTA (120) * kfFramingPerWheelTick (0.1) = 12 units per click.
 	static constexpr float kfCameraFramingInitial = kfCameraFramingDefault + 48.0f;
@@ -129,7 +131,7 @@ public:
 	static constexpr float kfVisualErrorMinDistance = 0.001f;
 
 	// Visible-area LOD (read by renderer to pick which mesh-LOD region to draw). Equation:
-	// floor(log4(framing / kfMinimumFraming)) clamped to BufferManager::kiVisibleAreaLodCount-1.
+	// floor(log4(framing / kfLevelOfDetailFraming)) clamped to BufferManager::kiVisibleAreaLodCount-1.
 	// Higher LOD = fewer mesh quads (each dim halved per LOD; total quads /4 per LOD).
 	int64_t miVisibleAreaLevelOfDetail = 0;
 

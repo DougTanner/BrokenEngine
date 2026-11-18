@@ -18,12 +18,19 @@ world-space visible-light quad (unblurred).
   toggle may publish zero, while the visible-light draw retains the full
   rendered count.
 - Orientation via corners: visible quad uses raw corners; deposit quad scales
-  the corner offsets about the center so its horizontal center-to-corner-0
-  distance equals the type's lighting size, floored at
-  `MinLightingDepositSize()`. The deposit therefore keeps the visible quad's
-  shape and rotation without a rotation field, but its size comes only from the
-  type, never from the owner's quad size. `ProjectToFlightPlane` then projects
-  it onto its layer's flight plane.
+  the corner offsets about the center so, for a nonzero horizontal visible
+  center-to-corner-0 extent, the base scale makes that distance equal the type's
+  lighting size in world-space units. A zero extent uses an unscaled base.
+  Both branches then multiply the offsets by the square root of
+  `gAreaLightAreaMultiplier`, increasing the source XY footprint area by that
+  wrapper's factor and dividing deposit intensity by the same factor. The
+  deposit keeps the visible quad's rotation without a rotation field.
+  `gAreaLightForcedSquare` then stretches the shorter source XY side toward
+  the longer side, symmetrically about the center, before culling and
+  projection. This adjustment preserves each scaled corner's Z/W and leaves
+  intensity unchanged. `ProjectToFlightPlane` projects each adjusted corner
+  onto its layer's flight plane; differing corner heights can make the
+  projected footprint nonsquare.
 - Per-type render-time overrides: visible intensity, lighting size, and lighting
   intensity each read an optional `Wrapper*` on the type (live UI tuning)
   falling back to the baked value; the per-light multiplier scales both

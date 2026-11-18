@@ -22,7 +22,7 @@ constexpr char kpcClientStatePath[] = "ClientState.bin";
 
 static bool ValidFraming(float fFraming)
 {
-	return std::isfinite(fFraming) && fFraming >= engine::kfMinimumFraming && fFraming <= engine::CameraBase::kfFramingMaximum;
+	return std::isfinite(fFraming) && fFraming >= engine::CameraBase::kfFramingMinimum && fFraming <= engine::CameraBase::kfFramingMaximum;
 }
 
 void SaveClientState()
@@ -56,7 +56,7 @@ void LoadClientState()
 
 	if (!ValidFraming(settings.fCameraFramingTarget) || !ValidFraming(settings.fMenuCameraFraming))
 	{
-		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera framing target {} or menu framing {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraFramingTarget, settings.fMenuCameraFraming, engine::kfMinimumFraming, engine::CameraBase::kfFramingMaximum);
+		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera framing target {} or menu framing {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraFramingTarget, settings.fMenuCameraFraming, engine::CameraBase::kfFramingMinimum, engine::CameraBase::kfFramingMaximum);
 		return;
 	}
 	if (!std::isfinite(settings.f2MenuCameraPosition.x) || !std::isfinite(settings.f2MenuCameraPosition.y))

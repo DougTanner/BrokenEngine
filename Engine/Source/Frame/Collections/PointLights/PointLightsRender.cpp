@@ -82,8 +82,6 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 	XMVECTOR vecCameraRightNormal = XMVector3Normalize(XMMatrixTranspose(engine::gpCamera->mMatView).r[0]);
 	XMVECTOR vecCameraUpNormal = XMVector3Normalize(XMMatrixTranspose(engine::gpCamera->mMatView).r[1]);
 
-	float fMinLightingArea = MinLightingDepositSize();
-
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Positions are local to the rendered cell; the basis converts them into the camera cell's frame.
@@ -100,7 +98,6 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			fLightingArea = rType.pLightingAreaWrapper != nullptr ? rType.pLightingAreaWrapper->mfCurrent : rType.fLightingArea;
 			fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
 		}
-		fLightingArea = std::max(fLightingArea, fMinLightingArea);
 
 		XMFLOAT4A f4Position {};
 		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))

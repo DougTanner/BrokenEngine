@@ -305,7 +305,7 @@ DeviceManager::DeviceManager()
 		// color/normals/AO/masks/elevation = 5 * 128 * up-to-kiMaxFramebuffers (4) = 2560, plus every other
 		// pipeline's samplers (incl. the elevation array, a third kPipelineTerrain consumer — Terrain.vert's
 		// submerged-vert sink).
-		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8'192},
+		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 16'384},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 4'096},
 		// Only global Set 0 declares samplers: three per set * up to four framebuffers = 12; reserve 16.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 16},

@@ -12,39 +12,38 @@ namespace engine
 
 // Write - Pre-Blur
 inline Wrapper gLightingBlurSigma(2.0f, 0.01f, 4.0f);
-inline Wrapper gLightingBlurSampleCount(200.0f, 16.0f, 400.0f, 1.0f);
-inline Wrapper gLightingBlurEdgeFalloff(0.4f, 0.01f, 0.6f);
+inline Wrapper gLightingBlurSampleCount(400.0f, 16.0f, 1024.0f, 1.0f);
+inline Wrapper gLightingBlurEdgeFalloff(0.6f, 0.01f, 1.0f);
 
 // Write - Deposit
-inline Wrapper gLightingDepositTextureMultiplier(0.4f, 0.2f, 0.8f);
-inline Wrapper gLightingDepositThreshold(0.0f, 0.0f, 4.0f);
-inline Wrapper gLightingDepositCompress(4.0f, 0.0f, 16.0f);
+inline Wrapper gLightingDepositTextureMultiplier(1.0f, 0.1f, 1.0f);
+inline Wrapper gLightingDepositThreshold(0.05f, 0.0f, 0.1f);
+inline Wrapper gLightingDepositCompress(16.0f, 0.0f, 128.0f);
+#if defined(BT_CLIENT)
+inline Wrapper gAreaLightAreaMultiplier(1.0f, 1.0f, 16.0f);
+inline Wrapper gAreaLightForcedSquare(0.0f, 0.0f, 1.0f);
+#endif
 
 // Write - Spread
-inline Wrapper gSpreadPassCount(40.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses), 1.0f); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp). Step 1.0f load-bearing: RenderTargetTexturesLighting.cpp / CommandBufferRecordMain.cpp and uint() in LightCombine.comp truncate this value while LightingUniforms.cpp normalization and LightingSpread.frag interpolation use it raw, so only an integral value makes every phase describe the same pass count.
+inline Wrapper gSpreadPassCount(64.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses), 1.0f); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp). Step 1.0f load-bearing: RenderTargetTexturesLighting.cpp / CommandBufferRecordMain.cpp and uint() in LightCombine.comp truncate this value while LightingUniforms.cpp normalization and LightingSpread.frag interpolation use it raw, so only an integral value makes every phase describe the same pass count.
 inline Wrapper gSpreadDecay(1.0f, 0.0f, 1.0f);
+inline Wrapper gSpreadDecayEnd(1.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadAccumulationDecay(0.35f, 0.0f, 1.0f);
-
-// Write - Spread Start
+inline Wrapper gSpreadAccumulationDecayEnd(0.35f, 0.0f, 1.0f);
 inline Wrapper gSpreadTextureMultiplierStart(0.05f, 0.01f, 0.1f);
-inline Wrapper gSpreadDirectionality(0.1f, 0.0f, 1.0f);
-inline Wrapper gSpreadDirectionCount(4.0f, 4.0f, 32.0f, 1.0f);
-inline Wrapper gSpreadDistance(0.0f, 0.0f, 10.0f);
-inline Wrapper gSpreadRingCount(4.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
-inline Wrapper gSpreadJitter(0.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadSampleJitterRangeStart(4.0f, 0.0f, 20.0f);
-inline Wrapper gSpreadSampleJitterClusteringStart(4.0f, 0.25f, 16.0f);
-inline Wrapper gSpreadDistanceFalloff(1.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadHeightMultiplier(0.125f, 0.0f, 0.2f);
-inline Wrapper gSpreadHeightEndHeight(3.0f, 0.1f, 10.0f);
-inline Wrapper gSpreadHeightPower(3.0f, 0.1f, 8.0f);
-inline Wrapper gSpreadOutputThreshold(0.0f, 0.0f, 4.0f);
-inline Wrapper gSpreadOutputCompress(3.5f, 0.0f, 5.0f);
-
-// Write - Spread End
 inline Wrapper gSpreadTextureMultiplierEnd(0.01f, 0.005f, 0.02f);
+
+// Write - Temporal (mirror of the shadow texel-contraction + temporal-blend tunables)
+inline Wrapper gLightingTexelRampMetersPerSecond(150.0f, 10.0f, 2'000.0f);
+inline Wrapper gLightingTemporalBlend(0.2f, 0.05f, 1.0f);
+inline Wrapper gLightingUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
+
+// Write - Spread Sampling
+inline Wrapper gSpreadDirectionality(0.1f, 0.0f, 1.0f);
 inline Wrapper gSpreadDirectionalityEnd(0.8f, 0.0f, 1.0f);
+inline Wrapper gSpreadDirectionCount(8.0f, 4.0f, 32.0f, 1.0f);
 inline Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f, 1.0f);
+inline Wrapper gSpreadDistance(0.0f, 0.0f, 10.0f);
 inline HeightLerpWrapperQuartet gSpreadDistanceEnd  // camera-height-lerped fSpreadDistanceEnd
 {
 	.startHeight = Wrapper(150.0f, 0.0f, 1'000.0f),
@@ -52,20 +51,21 @@ inline HeightLerpWrapperQuartet gSpreadDistanceEnd  // camera-height-lerped fSpr
 	.low = Wrapper(10.0f, 1.0f, 40.0f),
 	.high = Wrapper(26.0f, 1.0f, 40.0f),
 };
-inline Wrapper gSpreadRingCountEnd(3.0f, 2.0f, 16.0f, 1.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
-inline Wrapper gSpreadJitterEnd(0.874f, 0.0f, 1.0f);
-inline Wrapper gSpreadSampleJitterRangeEnd(0.0f, 0.0f, 10.0f);
-inline Wrapper gSpreadSampleJitterClusteringEnd(4.0f, 0.25f, 16.0f);
-inline Wrapper gSpreadDecayEnd(1.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadAccumulationDecayEnd(0.35f, 0.0f, 1.0f);
+inline Wrapper gSpreadRingCount(8.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
+inline Wrapper gSpreadRingCountEnd(2.0f, 2.0f, 16.0f, 1.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
+inline Wrapper gSpreadDistanceFalloff(1.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadDistanceFalloffEnd(0.75f, 0.0f, 1.0f);
-inline Wrapper gSpreadOutputThresholdEnd(0.0f, 0.0f, 4.0f);
-inline Wrapper gSpreadOutputCompressEnd(1.0f, 0.0f, 4.0f);
 
-// Write - Temporal (mirror of the shadow texel-contraction + temporal-blend tunables)
-inline Wrapper gLightingTexelRampMetersPerSecond(150.0f, 10.0f, 2'000.0f);
-inline Wrapper gLightingTemporalBlend(0.2f, 0.05f, 1.0f);
-inline Wrapper gLightingUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
+// Write - Spread Height
+inline Wrapper gSpreadHeightMultiplier(0.125f, 0.0f, 0.2f);
+inline Wrapper gSpreadHeightEndHeight(3.0f, 0.1f, 10.0f);
+inline Wrapper gSpreadHeightPower(3.0f, 0.1f, 8.0f);
+
+// Write - Spread Output
+inline Wrapper gSpreadOutputThreshold(0.0f, 0.0f, 0.005f);
+inline Wrapper gSpreadOutputThresholdEnd(0.0f, 0.0f, 0.01f);
+inline Wrapper gSpreadOutputCompress(1.0f, 0.0f, 2.0f);
+inline Wrapper gSpreadOutputCompressEnd(2.0f, 0.0f, 4.0f);
 
 // Combine (Uchimura tone curve)
 inline Wrapper gCombineMaxBrightness(1.3f, 0.1f, 4.0f);
