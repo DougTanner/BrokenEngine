@@ -81,7 +81,7 @@ inline Wrapper gWaterHeightDarkenLighting(0.1f, 0.0f, 1.0f);
 
 // Low frequency waves
 inline Wrapper gWaterLowCount(31i64, std::vector<int64_t> {15, 31, 63, 127, 255});
-inline Wrapper gWaterLowDirectionDegrees(104.0f, 0.0f, 360.0f);
+inline Wrapper gWaterLowDirectionDegrees(100.0f, 0.0f, 360.0f);
 inline Wrapper gWaterLowSpreadDegrees(10.0f, 0.0f, 45.0f);
 inline Wrapper gWaterLowWavelengthShortest(0.5f, 0.1f, 2.0f);
 inline Wrapper gWaterLowWavelengthLongest(3.0f, 1.0f, 8.0f);

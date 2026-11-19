@@ -16,31 +16,31 @@ inline Wrapper gLightingBlurSampleCount(400.0f, 16.0f, 1024.0f, 1.0f);
 inline Wrapper gLightingBlurEdgeFalloff(0.6f, 0.01f, 1.0f);
 
 // Write - Deposit
-inline Wrapper gLightingDepositTextureMultiplier(1.0f, 0.1f, 1.0f);
-inline Wrapper gLightingDepositThreshold(0.05f, 0.0f, 0.1f);
-inline Wrapper gLightingDepositCompress(16.0f, 0.0f, 128.0f);
+inline Wrapper gLightingDepositTextureMultiplier(0.2f, 0.1f, 1.0f);
+inline Wrapper gLightingDepositThreshold(0.0f, 0.0f, 0.1f);
+inline Wrapper gLightingDepositCompress(0.0f, 0.0f, 128.0f);
 #if defined(BT_CLIENT)
-inline Wrapper gAreaLightAreaMultiplier(1.0f, 1.0f, 16.0f);
-inline Wrapper gAreaLightForcedSquare(0.0f, 0.0f, 1.0f);
+inline Wrapper gAreaLightAreaMultiplier(3.0f, 1.0f, 16.0f);
+inline Wrapper gAreaLightForcedSquare(0.2f, 0.0f, 1.0f);
 #endif
 
 // Write - Spread
 inline Wrapper gSpreadPassCount(64.0f, 1.0f, static_cast<float>(shaders::kiMaxSpreadPasses), 1.0f); // min >= 1.0f load-bearing: keeps std::pow(fPassCount, -fCombineExposurePassScale) base positive and the 1/fPassCount pass scaling finite (LightingUniforms.cpp). Step 1.0f load-bearing: RenderTargetTexturesLighting.cpp / CommandBufferRecordMain.cpp and uint() in LightCombine.comp truncate this value while LightingUniforms.cpp normalization and LightingSpread.frag interpolation use it raw, so only an integral value makes every phase describe the same pass count.
 inline Wrapper gSpreadDecay(1.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadDecayEnd(1.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadAccumulationDecay(0.35f, 0.0f, 1.0f);
-inline Wrapper gSpreadAccumulationDecayEnd(0.35f, 0.0f, 1.0f);
+inline Wrapper gSpreadAccumulationDecay(1.0f, 0.0f, 1.0f);
+inline Wrapper gSpreadAccumulationDecayEnd(1.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadTextureMultiplierStart(0.05f, 0.01f, 0.1f);
 inline Wrapper gSpreadTextureMultiplierEnd(0.01f, 0.005f, 0.02f);
 
 // Write - Temporal (mirror of the shadow texel-contraction + temporal-blend tunables)
 inline Wrapper gLightingTexelRampMetersPerSecond(150.0f, 10.0f, 2'000.0f);
-inline Wrapper gLightingTemporalBlend(0.2f, 0.05f, 1.0f);
+inline Wrapper gLightingTemporalBlend(0.5f, 0.05f, 1.0f);
 inline Wrapper gLightingUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
 
 // Write - Spread Sampling
-inline Wrapper gSpreadDirectionality(0.1f, 0.0f, 1.0f);
-inline Wrapper gSpreadDirectionalityEnd(0.8f, 0.0f, 1.0f);
+inline Wrapper gSpreadDirectionality(0.9f, 0.0f, 1.0f);
+inline Wrapper gSpreadDirectionalityEnd(1.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadDirectionCount(8.0f, 4.0f, 32.0f, 1.0f);
 inline Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f, 1.0f);
 inline Wrapper gSpreadDistance(0.0f, 0.0f, 10.0f);
@@ -48,24 +48,24 @@ inline HeightLerpWrapperQuartet gSpreadDistanceEnd  // camera-height-lerped fSpr
 {
 	.startHeight = Wrapper(150.0f, 0.0f, 1'000.0f),
 	.endHeight = Wrapper(600.0f, 0.0f, 1'000.0f),
-	.low = Wrapper(10.0f, 1.0f, 40.0f),
-	.high = Wrapper(26.0f, 1.0f, 40.0f),
+	.low = Wrapper(20.0f, 1.0f, 40.0f),
+	.high = Wrapper(20.0f, 1.0f, 40.0f),
 };
 inline Wrapper gSpreadRingCount(8.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
 inline Wrapper gSpreadRingCountEnd(2.0f, 2.0f, 16.0f, 1.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
-inline Wrapper gSpreadDistanceFalloff(1.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadDistanceFalloffEnd(0.75f, 0.0f, 1.0f);
+inline Wrapper gSpreadDistanceFalloff(0.0f, 0.0f, 1.0f);
+inline Wrapper gSpreadDistanceFalloffEnd(0.0f, 0.0f, 1.0f);
 
 // Write - Spread Height
-inline Wrapper gSpreadHeightMultiplier(0.125f, 0.0f, 0.2f);
-inline Wrapper gSpreadHeightEndHeight(3.0f, 0.1f, 10.0f);
+inline Wrapper gSpreadHeightMultiplier(0.2f, 0.0f, 0.2f);
+inline Wrapper gSpreadHeightEndHeight(10.0f, 0.1f, 100.0f);
 inline Wrapper gSpreadHeightPower(3.0f, 0.1f, 8.0f);
 
 // Write - Spread Output
-inline Wrapper gSpreadOutputThreshold(0.0f, 0.0f, 0.005f);
+inline Wrapper gSpreadOutputThreshold(0.001f, 0.0f, 0.005f);
 inline Wrapper gSpreadOutputThresholdEnd(0.0f, 0.0f, 0.01f);
-inline Wrapper gSpreadOutputCompress(1.0f, 0.0f, 2.0f);
-inline Wrapper gSpreadOutputCompressEnd(2.0f, 0.0f, 4.0f);
+inline Wrapper gSpreadOutputCompress(0.0f, 0.0f, 2.0f);
+inline Wrapper gSpreadOutputCompressEnd(2.5f, 0.0f, 4.0f);
 
 // Combine (Uchimura tone curve)
 inline Wrapper gCombineMaxBrightness(1.3f, 0.1f, 4.0f);
@@ -79,7 +79,7 @@ inline Wrapper gCombineExposurePassScale(0.0f, 0.0f, 1.0f); // Paired with gSpre
 inline Wrapper gCombineHuePreserve(0.0f, 0.0f, 1.0f);
 #if defined(BT_CLIENT)
 inline CurveData gCombineCurveOld({ImVec2(0.0000f, 32.0000f), ImVec2(0.3880f, 25.9852f), ImVec2(0.5766f, 0.9778f), ImVec2(1.0000f, 8.4444f)}, 0.0000f, 32.0000f);
-inline CurveData gCombineCurveNew({ImVec2(0.0000f, 32.0000f), ImVec2(0.3880f, 25.9852f), ImVec2(0.5766f, 0.9778f), ImVec2(1.0000f, 8.4444f)}, 0.0000f, 32.0000f);
+inline CurveData gCombineCurveNew({ImVec2(0.f, 21.132076f), ImVec2(0.049473684f, 2.9886792f), ImVec2(0.14263158f, 1.9018868f), ImVec2(0.21947369f, 0.f), ImVec2(0.3131579f, 1.6905661f), ImVec2(0.4231579f, 0.96603775f), ImVec2(0.5105263f, 0.9056604f), ImVec2(1.f, 1.0867925f)}, 0.0000f, 32.0000f);
 inline bool gbUseCombineCurveNew = true;
 #endif
 

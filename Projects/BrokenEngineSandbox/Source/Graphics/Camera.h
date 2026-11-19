@@ -14,7 +14,7 @@ public:
 	static constexpr XMVECTOR kVecMenuIslandCenter {0.0f, 0.0f, 0.0f, 1.0f};
 
 	// Main-menu XY offset from the menu island center is local to the origin cell.
-	static constexpr XMVECTOR kVecMenuCameraOffset {-34.6f, -101.0f, 0.0f, 0.0f};
+	static constexpr XMVECTOR kVecMenuCameraOffset {10.0f, -115.0f, 0.0f, 0.0f};
 	static constexpr float kfMenuCameraFraming = 344.2f;
 
 	Camera();

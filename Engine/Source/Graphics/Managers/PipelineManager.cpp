@@ -124,11 +124,12 @@ PipelineManager::PipelineManager()
 		{
 			.name = "DebugTexture",
 			.flags = {PipelineFlags::kNoWireframe},
-			.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersDebugTexturefragCrc)},
+			.ppShaders = {&mShaders.at(data::kShadersDebugTexturevertCrc), &mShaders.at(data::kShadersDebugTexturefragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTextures},
 				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = 3, .ppTextures = rTextures.mppLightingDepositTextures},
 				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesB},

@@ -9,10 +9,10 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 // Texture array
-layout (set = 1, binding = 1) uniform sampler2D debugTextures[kiMaxDebugTextures];
-layout (set = 1, binding = 2) uniform sampler2D pLightingDepositSamplers[3];
-layout (set = 1, binding = 3) uniform sampler2D pDebugTexturesB[kiMaxDebugTextures];
-layout (set = 1, binding = 4) uniform sampler2D pDebugTexturesC[kiMaxDebugTextures];
+layout (set = 1, binding = 2) uniform sampler2D debugTextures[kiMaxDebugTextures];
+layout (set = 1, binding = 3) uniform sampler2D pLightingDepositSamplers[3];
+layout (set = 1, binding = 4) uniform sampler2D pDebugTexturesB[kiMaxDebugTextures];
+layout (set = 1, binding = 5) uniform sampler2D pDebugTexturesC[kiMaxDebugTextures];
 
 // Input
 layout (location = 0) in flat int iInInstanceIndex;
@@ -69,19 +69,9 @@ void main()
 	}
 	else if (iFormat == kiDebugTextureFormatFloat16LinearVisibleArea)
 	{
-		// Camera-centered rectangle sized to visible area, mapped to lighting area UV
-		float fVisibleWidth = globalLayout.f4VisibleArea.z - globalLayout.f4VisibleArea.x;
-		float fVisibleHeight = globalLayout.f4VisibleArea.y - globalLayout.f4VisibleArea.w;
-		vec2 f2WorldPos = vec2(
-			globalLayout.f2CameraPosition.x - fVisibleWidth * 0.5f + f2InTexcoord.x * fVisibleWidth,
-			globalLayout.f2CameraPosition.y + fVisibleHeight * 0.5f - f2InTexcoord.y * fVisibleHeight);
-		vec2 f2LightingTexcoord = vec2(
-			(f2WorldPos.x - globalLayout.f4LightingArea.x) / (globalLayout.f4LightingArea.z - globalLayout.f4LightingArea.x),
-			1.0f - (f2WorldPos.y - globalLayout.f4LightingArea.w) / (globalLayout.f4LightingArea.y - globalLayout.f4LightingArea.w));
-
-		vec4 f4R = texture(pLightingDepositSamplers[0], f2LightingTexcoord);
-		vec4 f4G = texture(pLightingDepositSamplers[1], f2LightingTexcoord);
-		vec4 f4B = texture(pLightingDepositSamplers[2], f2LightingTexcoord);
+		vec4 f4R = texture(pLightingDepositSamplers[0], f2InTexcoord);
+		vec4 f4G = texture(pLightingDepositSamplers[1], f2InTexcoord);
+		vec4 f4B = texture(pLightingDepositSamplers[2], f2InTexcoord);
 		float fInvRange = 1.0f / globalLayout.fDebugTextureLinearRange;
 		float fR = clamp((f4R.r + f4R.g + f4R.b + f4R.a) * fInvRange, 0.0f, 1.0f);
 		float fG = clamp((f4G.r + f4G.g + f4G.b + f4G.a) * fInvRange, 0.0f, 1.0f);
@@ -91,18 +81,9 @@ void main()
 	else if (iFormat == kiDebugTextureFormatFloat16DepositDirectionCombined)
 	{
 		// Combined direction across all 3 deposit channels, weighted by per-channel intensity
-		float fVisibleWidth = globalLayout.f4VisibleArea.z - globalLayout.f4VisibleArea.x;
-		float fVisibleHeight = globalLayout.f4VisibleArea.y - globalLayout.f4VisibleArea.w;
-		vec2 f2WorldPos = vec2(
-			globalLayout.f2CameraPosition.x - fVisibleWidth * 0.5f + f2InTexcoord.x * fVisibleWidth,
-			globalLayout.f2CameraPosition.y + fVisibleHeight * 0.5f - f2InTexcoord.y * fVisibleHeight);
-		vec2 f2LightingTexcoord = vec2(
-			(f2WorldPos.x - globalLayout.f4LightingArea.x) / (globalLayout.f4LightingArea.z - globalLayout.f4LightingArea.x),
-			1.0f - (f2WorldPos.y - globalLayout.f4LightingArea.w) / (globalLayout.f4LightingArea.y - globalLayout.f4LightingArea.w));
-
-		vec4 f4R = texture(pLightingDepositSamplers[0], f2LightingTexcoord);
-		vec4 f4G = texture(pLightingDepositSamplers[1], f2LightingTexcoord);
-		vec4 f4B = texture(pLightingDepositSamplers[2], f2LightingTexcoord);
+		vec4 f4R = texture(pLightingDepositSamplers[0], f2InTexcoord);
+		vec4 f4G = texture(pLightingDepositSamplers[1], f2InTexcoord);
+		vec4 f4B = texture(pLightingDepositSamplers[2], f2InTexcoord);
 		// EWNS: r=East, g=West, a=South, b=North. Summing signed components across channels
 		// naturally weights direction by each channel's magnitude (intensity)
 		float fEastWest = (f4R.r - f4R.g) + (f4G.r - f4G.g) + (f4B.r - f4B.g);

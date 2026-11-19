@@ -92,6 +92,9 @@ single-sourced. GLSL indents with tabs and aligns with spaces after them, as
   ungraded. Presentation formats belong to
   [InstanceManager](../../Source/Graphics/Managers/AGENTS.md#instancemanager).
 - Debug texture display decodes renderer targets, including EWNS views.
+  F2 uses the world camera to project world-area textures over their source
+  rectangles. `DebugTexture.vert` selects each rectangle and plane. Terrain
+  elevation is displayed on a flat plane at sea level.
 - The UI depth prepass is self-contained and expands opaque ImGui rectangles to
   populate depth before world rendering.
 

@@ -715,6 +715,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilate.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\DebugTexture.vert" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

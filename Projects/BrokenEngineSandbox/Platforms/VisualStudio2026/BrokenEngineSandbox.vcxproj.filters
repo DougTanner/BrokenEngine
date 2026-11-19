@@ -1799,5 +1799,8 @@
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp">
       <Filter>Engine\Data\Shaders\Water</Filter>
     </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\DebugTexture.vert">
+      <Filter>Engine\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
