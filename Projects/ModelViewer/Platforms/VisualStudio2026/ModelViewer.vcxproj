@@ -26,102 +26,36 @@
   <Import Project="$(ProjectDir)Build\ResolvedData.props" Condition="$([System.IO.File]::Exists('$(ProjectDir)..\..\..\..\.git')) and exists('$(ProjectDir)Build\ResolvedData.props')" />
   <PropertyGroup>
     <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
-    <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
-    <ThirdPartyLibraryDirectory Condition="'$(ThirdPartyLibraryDirectory)'==''">$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output</ThirdPartyLibraryDirectory>
     <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
-    <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
-    <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
     <GameDataDirectory Condition="'$(GameDataDirectory)'=='' and '$(DataBuildMode)'=='Local'">$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data</GameDataDirectory>
-    <GeneratedDataIncludeRoot Condition="'$(GeneratedDataIncludeRoot)'=='' and '$(GameDataDirectory)'!=''">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('$(GameDataDirectory)'))))</GeneratedDataIncludeRoot>
-    <GameDataDirectoryIsAbsolute Condition="'$(GameDataDirectory)'!=''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GameDataDirectory)', '^(?:[A-Za-z]:[\\/]|[\\/]{2})'))</GameDataDirectoryIsAbsolute>
+  </PropertyGroup>
+  <Import Project="..\..\..\..\Engine\Platforms\VisualStudio2026\Engine.props" />
+  <PropertyGroup>
     <OutDir>$(ProjectDir)Output\</OutDir>
     <IntDir>$(ProjectDir)Build\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName Condition="'$(Configuration)'=='Debug'">$(ProjectName).Debug</TargetName>
-    <TargetName Condition="'$(Configuration)'=='Release'">$(ProjectName)</TargetName>
-    <LinkIncremental>false</LinkIncremental>
-    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
-    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
-    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <EnableMicrosoftCodeAnalysis>true</EnableMicrosoftCodeAnalysis>
-    <CodeAnalysisRuleSet>$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineAnalysis.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <FloatingPointModel>Strict</FloatingPointModel>
-      <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\Source;$(ProjectDir)Build;$(GeneratedDataIncludeRoot);$(VK_SDK_PATH)\Include;$(ProjectDir)..\..\..\..\ThirdParty;$(ProjectDir)..\..\..\..\ThirdParty\glm;$(ProjectDir)..\..\..\..\ThirdParty\enet\include;$(ProjectDir)..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)..\..\..\..\ThirdParty\imgui;$(ProjectDir)..\..\..\..\ThirdParty\implot;$(ProjectDir)..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)..\..\..\..\Common;$(ProjectDir)..\..\..\..\Common\ClangTidyShims;$(ProjectDir)..\..\..\..\Engine\Source;$(ProjectDir)..\..\..\..\Engine\Data;$(ProjectDir)..\..\..\..\Projects\BrokenEngineSandbox\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
-      <ExceptionHandling>Async</ExceptionHandling>
-      <EnableModules>false</EnableModules>
-      <BuildStlModules>false</BuildStlModules>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
-if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
-    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-    if errorlevel 1 exit /b 1
-)
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
-    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-    if errorlevel 1 exit /b 1
-)
-</Command>
-    </PreBuildEvent>
     <CustomBuildStep>
       <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(DataRepositoryRoot)\Engine\Data" "$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Data" "$(GameDataDirectory)"</Command>
-      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
-      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
-      <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>BT_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <SupportJustMyCode>false</SupportJustMyCode>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
-      <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <EnablePREfast>true</EnablePREfast>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
-      <DisableSpecificWarnings>4702</DisableSpecificWarnings>
     </ClCompile>
-    <Link><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>

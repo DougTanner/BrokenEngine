@@ -35,9 +35,11 @@ physics binary.
   rule 43 for polymorphic uses and the compiler-detectable part of rule 39
   (C4100/C4101/C4189 unused names not silenced by a `(void)` discard, C4541 RTTI
   use with RTTI off).
-  Compile settings are mirrored between the two vcxprojs: when changing one,
-  change the other, except for their intentionally different compiler process
-  limits (ProcessorNumber).
+  The settings both projects share live once in
+  `Engine/Platforms/VisualStudio2026/Engine.props`, which the client, the server
+  and the ModelViewer import; each vcxproj keeps inline only the settings it
+  does not share, such as its include directories, preprocessor definitions and
+  compiler process limit (`ProcessorNumber`).
 - Both projects directly compile `Engine/Source/Memory/Mimalloc.cpp` without PCH
   or forced includes. This vendor implementation retains its ThirdParty warning
   policy: compiler warnings and warning promotion are disabled; its other
@@ -66,9 +68,9 @@ physics binary.
 	  `pwsh.exe`. 5.1 ships with every Windows install, so an unassisted vcxproj or
 	  IDE build succeeds on a machine that has no PowerShell 7. This is the
 	  deliberate exception to the repository's PowerShell 7 standard, which governs
-	  agent-invoked helpers rather than the build itself; it binds all three
-	  consuming projects — client, server, and DataPacker. Keep the invoked `.ps1`
-	  scripts 5.1-compatible.
+	  agent-invoked helpers rather than the build itself; it binds all four
+	  consuming projects — client, server, ModelViewer, and DataPacker. Keep the
+	  invoked `.ps1` scripts 5.1-compatible.
 - CustomBuildStep: DataPacker export runs only for Local with
   `RunDataPacker=true`. Primary Local Visual Studio builds preserve automatic
   export; linked worktrees default off and require explicit opt-in. The build
@@ -105,11 +107,11 @@ physics binary.
 - Clang-Tidy: server enables it in all configs; client in Debug and Release (off
   in Profile). Checks come from the repo-root `.clang-tidy`; VS appends the
   `clang-analyzer-*` suite after the config's Checks, so analyzer exclusions
-  live in each vcxproj's `<ClangTidyChecks>`, not in `.clang-tidy`. Opt-in per
-  project: *Properties → Code Analysis → Enable Clang-Tidy*. Ordinary `/compile`
-  builds force-disable it (it costs roughly 1,800 CPU-seconds per client build);
-  the `/compile` skill's explicit clang-tidy mode is the agent route to its
-  diagnostics.
+  live in the `<ClangTidyChecks>` of `Engine.props`, not in `.clang-tidy`.
+  Opt-in per project: *Properties → Code Analysis → Enable Clang-Tidy*. Ordinary
+  `/compile` builds force-disable it (it costs roughly 1,800 CPU-seconds per
+  client build); the `/compile` skill's explicit clang-tidy mode is the agent
+  route to its diagnostics.
 
 ## vcxproj File Inclusion Rules
 

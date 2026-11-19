@@ -147,7 +147,9 @@ void ServerFleetManager::ProcessDestroyFleetMemberRequests()
 			{
 				FrameInput& rFrameInput = gpGame->mFrameInputs.at(memberIt->coordinate);
 				const Frame& rFrame = *gpGame->mCells.at(memberIt->coordinate).pCurrent;
-				ShipLocator ship = FindShipByGlobalId(rFrame, rRequest.globalId).value();
+				std::optional<ShipLocator> optionalShip = FindShipByGlobalId(rFrame, rRequest.globalId);
+				ASSERT(optionalShip.has_value());
+				ShipLocator ship = *optionalShip;
 				int64_t iUuid = VisitShip(rFrame, ship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 				{
 					return rPostRender.pIds[iRow].uuid.iValue;

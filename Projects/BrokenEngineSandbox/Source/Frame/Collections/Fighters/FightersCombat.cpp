@@ -116,9 +116,9 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	}
 
 #if defined(BT_CLIENT)
-	XMVECTOR vecEnd = VisitShip(rFrame, *optionalTarget, [&](const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+	XMVECTOR vecEnd = VisitShip(rFrame, *optionalTarget, [&, eTargetType = optionalTarget->eType](const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 	{
-		return ShipHullContact(optionalTarget->eType, rPostRender.pController[iRow], rInterpolate.pVecPositions[iRow], rInterpolate.pVecDirections[iRow], vecShooterPosition);
+		return ShipHullContact(eTargetType, rPostRender.pController[iRow], rInterpolate.pVecPositions[iRow], rInterpolate.pVecDirections[iRow], vecShooterPosition);
 	});
 #endif
 	VisitShip(rFrame, *optionalTarget, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)

@@ -16,11 +16,12 @@
 # 'clang-analyzer-*' (Microsoft.Cpp.ClangTidy.props) and passes it via --checks,
 # which is APPENDED AFTER this file's Checks — so the analyzer runs despite the
 # leading '-*' here, and any analyzer exclusion added here would be re-enabled.
-# Analyzer enablement/exclusions therefore live in each vcxproj's <ClangTidyChecks>
+# Analyzer enablement/exclusions therefore live in the <ClangTidyChecks> of
+# Engine/Platforms/VisualStudio2026/Engine.props and DataPacker.vcxproj
 # (currently: clang-analyzer-* minus optin.core.EnumCastOutOfRange,
 # deadcode.DeadStores, and security.ArrayBound, and in DataPacker also
 # optin.cplusplus.UninitializedObject and core.uninitialized.Assign;
-# each vcxproj comment states why).
+# each of those files' comments states why).
 #
 # Deferred (re-enable in a future cleanup pass once the codebase is prepared):
 #   misc-const-correctness          - high warning volume on existing locals

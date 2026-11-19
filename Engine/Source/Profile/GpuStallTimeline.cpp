@@ -280,13 +280,17 @@ void GpuStallTimeline::Retired(const GpuDiagnosticSample& rSample, bool bAnomaly
 			{
 				optionalQueued = TickStallMilliseconds(*optionalStartTick) - CpuMilliseconds(mPendingStallStart, rRow.submitTime);
 			}
-			if (bCalibrated && rTicks[kTimelineGlobalEnd] && rTicks[kTimelineMainStart])
+			const std::optional<uint64_t>& rOptionalGlobalEnd = rTicks[kTimelineGlobalEnd];
+			const std::optional<uint64_t>& rOptionalMainStart = rTicks[kTimelineMainStart];
+			if (bCalibrated && rOptionalGlobalEnd && rOptionalMainStart)
 			{
-				optionalGlobalToMain = TickMilliseconds(*rTicks[kTimelineGlobalEnd], *rTicks[kTimelineMainStart]);
+				optionalGlobalToMain = TickMilliseconds(*rOptionalGlobalEnd, *rOptionalMainStart);
 			}
-			if (rTicks[kTimelineImageStart] && rTicks[kTimelineImageEnd])
+			const std::optional<uint64_t>& rOptionalImageStart = rTicks[kTimelineImageStart];
+			const std::optional<uint64_t>& rOptionalImageEnd = rTicks[kTimelineImageEnd];
+			if (rOptionalImageStart && rOptionalImageEnd)
 			{
-				optionalImage = TickMilliseconds(*rTicks[kTimelineImageStart], *rTicks[kTimelineImageEnd]);
+				optionalImage = TickMilliseconds(*rOptionalImageStart, *rOptionalImageEnd);
 			}
 			// A world row spans the Global, Main, and UI submissions; a UI-only row lies inside one submission.
 			if ((bCalibrated || !rRow.bWorld) && optionalStartTick && optionalEndTick)

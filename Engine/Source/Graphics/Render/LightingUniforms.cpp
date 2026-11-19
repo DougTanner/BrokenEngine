@@ -227,7 +227,7 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.mfCurrent;
-	float fMoonAmount = MoonAmount(static_cast<game::Camera*>(engine::gpCamera)->SunAngle());
+	float fMoonAmount = MoonAmount(static_cast<game::Camera&>(*engine::gpCamera).SunAngle());
 	float fSkyboxPowerOne = gLightingWaterSkyboxOnePower.mfCurrent;
 	float fSkyboxPowerTwo = gLightingWaterSkyboxTwoPower.mfCurrent;
 	float fSkyboxPowerThree = gLightingWaterSkyboxThreePower.mfCurrent;

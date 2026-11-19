@@ -762,8 +762,9 @@ comment is required, so rule 64 never reports it.
     and no #pragma warning(disable or suppress) or #pragma clang diagnostic
     ignored around code. Fix the cause in code. When no meaning-preserving fix
     exists, report the diagnostic to the user, who either chooses a different
-    fix or disables the check in configuration: .clang-tidy Checks, a vcxproj's
-    <ClangTidyChecks>, a vcxproj's <DisableSpecificWarnings>, or the
+    fix or disables the check in configuration: .clang-tidy Checks,
+    <ClangTidyChecks> or <DisableSpecificWarnings> in
+    Engine/Platforms/VisualStudio2026/Engine.props or a vcxproj, or the
     project-wide disable list in Common/ExternalHeaders.h. The pragmas that wrap
     third-party includes in Common/ExternalHeaders.h and
     Tools/ToolCommon/ToolCliCommon.h are that configuration, not code

@@ -285,7 +285,7 @@ ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousF
 
 ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget)
 {
-	int64_t iClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
+	static constexpr int64_t kiClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
 	if (rView.flagshipGlobalId.iValue != 0 && rView.eStance == FleetStance::kWeaponsFree)
 	{
 		ShipTactic tactic {};
@@ -293,7 +293,7 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 		{
 			return tactic;
 		}
-		if (ContinueVeerOff(rStaticData, iClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, tactic))
+		if (ContinueVeerOff(rStaticData, kiClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, tactic))
 		{
 			return tactic;
 		}
@@ -302,7 +302,7 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 	ShipTactic tactic = ChooseFleetTactic(ShipType::kFighter, rPreviousFrame, rStaticData, rView, globalId, vecPosition, rNavRectangleBoard, uiFlightPlane, alignment, rRegistryTarget);
 	if (tactic.bAttacking)
 	{
-		return AttackOrStartVeerOff(rStaticData, iClearanceTier, vecPosition, tactic.vecDestination, rNavRectangleBoard, rFlags, rVecVeerOffPoint);
+		return AttackOrStartVeerOff(rStaticData, kiClearanceTier, vecPosition, tactic.vecDestination, rNavRectangleBoard, rFlags, rVecVeerOffPoint);
 	}
 	rFlags.Set(ShipFlags::kVeerOff, false);
 	return tactic;
@@ -310,7 +310,7 @@ ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, con
 
 bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic)
 {
-	int64_t iClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
+	static constexpr int64_t kiClearanceTier = ShipTypeClearanceTier(ShipType::kFighter);
 	int64_t iHighestFlightPlane = HighestFlightPlane(ShipType::kFighter);
 
 	// The sight-ignoring pick runs before a veer-off continues, so a veering row also stores the current target.
@@ -326,14 +326,14 @@ bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::C
 		bPicked = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, {AttackTargetFlags::kHorizontal, AttackTargetFlags::kIgnoreLineOfSight}, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight);
 	}
 
-	if (ContinueVeerOff(rStaticData, iClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, rTactic))
+	if (ContinueVeerOff(rStaticData, kiClearanceTier, vecPosition, rVecVeerOffPoint, rNavRectangleBoard, rFlags, rTactic))
 	{
 		return true;
 	}
 
 	if (((orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, alignment, rRegistryTarget, vecTargetPosition)) || bPicked)
 	{
-		bInLineOfSight = HasShipLineOfSight(rPreviousFrame, rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
+		bInLineOfSight = HasShipLineOfSight(rPreviousFrame, rStaticData, kiClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
 	else if (!FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, uiFlightPlane, vecPosition, AttackTargetFlags::kHorizontal, alignment, iHighestFlightPlane, rRegistryTarget, vecTargetPosition, bInLineOfSight))
 	{
@@ -341,11 +341,11 @@ bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::C
 	}
 	else if (bInLineOfSight)
 	{
-		// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on iClearanceTier.
-		bInLineOfSight = HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
+		// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on kiClearanceTier.
+		bInLineOfSight = HasLineOfSight(rStaticData, kiClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition);
 	}
 
-	rTactic = bInLineOfSight ? AttackOrStartVeerOff(rStaticData, iClearanceTier, vecPosition, vecTargetPosition, rNavRectangleBoard, rFlags, rVecVeerOffPoint) : RouteTactic(rStaticData, iClearanceTier, vecPosition, vecTargetPosition, rNavRectangleBoard);
+	rTactic = bInLineOfSight ? AttackOrStartVeerOff(rStaticData, kiClearanceTier, vecPosition, vecTargetPosition, rNavRectangleBoard, rFlags, rVecVeerOffPoint) : RouteTactic(rStaticData, kiClearanceTier, vecPosition, vecTargetPosition, rNavRectangleBoard);
 	return true;
 }
 

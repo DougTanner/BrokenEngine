@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
+  </PropertyGroup>
+  <PropertyGroup>
+    <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
+    <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
+    <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
+    <ThirdPartyLibraryDirectory Condition="'$(ThirdPartyLibraryDirectory)'==''">$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output</ThirdPartyLibraryDirectory>
+    <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
+    <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
+    <GameDataDirectory Condition="'$(GameDataDirectory)'=='' and '$(DataBuildMode)'=='Local'">$(ProjectDir)Output\Data</GameDataDirectory>
+    <GeneratedDataIncludeRoot Condition="'$(GeneratedDataIncludeRoot)'=='' and '$(GameDataDirectory)'!=''">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('$(GameDataDirectory)'))))</GeneratedDataIncludeRoot>
+    <GameDataDirectoryIsAbsolute Condition="'$(GameDataDirectory)'!=''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GameDataDirectory)', '^(?:[A-Za-z]:[\\/]|[\\/]{2})'))</GameDataDirectoryIsAbsolute>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)\Output\</OutDir>
+    <IntDir>$(ProjectDir)\Build\$(ProjectName)\$(Configuration)\</IntDir>
+    <CustomBuildBeforeTargets />
+    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
+    <LinkIncremental>false</LinkIncremental>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis Condition="'$(Configuration)'!='Release'">false</EnableMicrosoftCodeAnalysis>
+    <TargetName Condition="'$(Configuration)'!='Release'">$(ProjectName).$(Configuration)</TargetName>
+    <TargetName Condition="'$(Configuration)'=='Release'">$(ProjectName)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Profile'">
+    <CodeAnalysisRuleSet>NativeMinimumRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)BrokenEngineAnalysis.ruleset</CodeAnalysisRuleSet>
+    <!-- Analysis diagnostics reach the post-link NativeCodeAnalysis task, not cl's console, so
+         TreatWarningAsError never sees them; this is what makes them fail the build. It takes effect
+         wherever RunCodeAnalysis is true - including the Release default set just below, so Visual
+         Studio Release builds enforce as well - and is inert only for agent builds, which pass
+         /p:RunCodeAnalysis=false. Keep CodeAnalysisNeverReportRuleErrors unset or the task silently
+         drops back to warnings. -->
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. DeadStores flags values whose only reads a compile-time log level or feature switch removes from this configuration. ArrayBound flags indexes bounded by invariants the analyzer cannot see, such as an ASSERT, which is not [[noreturn]]. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(ProjectDir)\..\..\..\..\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(ProjectDir)\..\..\..\..\Engine\Data" "$(ProjectDir)\..\..\Data" "$(GameDataDirectory)"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+    if errorlevel 1 exit /b 1
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+    if errorlevel 1 exit /b 1
+)
+</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MinimalRebuild>false</MinimalRebuild>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'!='Debug'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <!-- 4702: ThirdParty Clipper2 CheckPrecisionRange has an unreachable fallback after DoError() throws (exceptions enabled); benign, fires only at LTCG codegen where the ExternalHeaders.h push(0) cannot suppress it -->
+      <DisableSpecificWarnings>4702</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Profile'">
+    <ClCompile>
+      <EnablePREfast>false</EnablePREfast>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <EnablePREfast>true</EnablePREfast>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />
+    <Error Condition="'$(RunDataPacker)'!='true' and '$(RunDataPacker)'!='false'" Text="RunDataPacker must be true or false; received '$(RunDataPacker)'." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(RunDataPacker)'!='false'" Text="Shared DataBuildMode requires RunDataPacker=false." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(GameDataDirectory)'==''" Text="Shared DataBuildMode requires an explicit absolute GameDataDirectory." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(GameDataDirectoryIsAbsolute)'!='True'" Text="Shared GameDataDirectory must be an absolute path; received '$(GameDataDirectory)'." />
+  </Target>
+</Project>

@@ -11,14 +11,15 @@ the rationale behind each.
 
 1. Compiler Floating-Point Model
 ---------------------------------
-Both client and server vcxproj set /fp:strict for all configurations
-(Debug, Profile, Release). This prevents the compiler from reordering,
-fusing, or algebraically simplifying floating-point operations in ways
-that could change results.
+Engine.props, the property sheet the client, server and ModelViewer
+vcxproj files import, sets /fp:strict for all configurations (Debug,
+Profile, Release). This prevents the compiler from reordering, fusing,
+or algebraically simplifying floating-point operations in ways that
+could change results.
 
 Files:
-  BrokenEngineSandbox.vcxproj       <FloatingPointModel>Strict</FloatingPointModel>
-  BrokenEngineSandboxServer.vcxproj <FloatingPointModel>Strict</FloatingPointModel>
+  Engine/Platforms/VisualStudio2026/Engine.props
+                                    <FloatingPointModel>Strict</FloatingPointModel>
   DataPacker.vcxproj                <FloatingPointModel>Strict</FloatingPointModel>
   ThirdParty.vcxproj                <FloatingPointModel>Strict</FloatingPointModel>
 

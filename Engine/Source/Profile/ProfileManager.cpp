@@ -485,11 +485,12 @@ std::optional<int64_t> GpuDiagnosticSample::RootMicroseconds() const
 		{
 			continue;
 		}
-		if (!microseconds[eRoot])
+		const std::optional<int64_t>& rOptionalMicroseconds = microseconds[eRoot];
+		if (!rOptionalMicroseconds)
 		{
 			return std::nullopt;
 		}
-		iTotal += *microseconds[eRoot];
+		iTotal += *rOptionalMicroseconds;
 	}
 	return iTotal;
 }
@@ -511,9 +512,10 @@ void GpuDiagnosticSample::Log(std::string_view context) const
 	int64_t iStart = submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
 	for (int64_t i = iStart; i < kGpuTimerCount; ++i)
 	{
-		if (microseconds[i])
+		const std::optional<int64_t>& rOptionalMicroseconds = microseconds[i];
+		if (rOptionalMicroseconds)
 		{
-			LOG(kGraphics, kWarning, "  {}: {}us", kpGpuTimerNames[i], *microseconds[i]);
+			LOG(kGraphics, kWarning, "  {}: {}us", kpGpuTimerNames[i], *rOptionalMicroseconds);
 		}
 		else
 		{

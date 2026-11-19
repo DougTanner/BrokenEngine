@@ -79,7 +79,9 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 			const Frame& rFlagshipFrame = *gpGame->mCells.at(rFlagship.coordinate).pCurrent;
-			ShipLocator flagship = FindShipByGlobalId(rFlagshipFrame, rFlagship.globalId).value();
+			std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFlagshipFrame, rFlagship.globalId);
+			ASSERT(optionalFlagship.has_value());
+			ShipLocator flagship = *optionalFlagship;
 			int64_t iFlagshipNavigationDirection = VisitShip(rFlagshipFrame, flagship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
 			{
 				return GetNavigationDirection(rPostRender.pFlags[iRow]);
