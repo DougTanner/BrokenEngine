@@ -19,11 +19,11 @@ An executable plan starts at byte zero with exactly one metadata line:
 `<!-- broken-engine-plan/v1 {"createdUtc":"2026-07-22T18:24:31.042Z","dependsOn":["Documents/Plans/Area/Prerequisite.md"]} -->`
 
 Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn`
-is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` paths.
-Every plan document in this tree carries the marker; a missing marker —
-including one preceded by a BOM, so it is not at byte zero — is a validation
-error naming the file. `AGENTS.md` is exempt at every level of the tree and must
-never carry metadata.
+is a unique ordinal-sorted list of normalized `Documents/Plans/**/*.md` or
+`Projects/Coretide/Documents/Plans/**/*.md` paths. Every plan document in this
+tree carries the marker; a missing marker — including one preceded by a BOM, so
+it is not at byte zero — is a validation error naming the file. `AGENTS.md` is
+exempt at every level of the tree and must never carry metadata.
 
 WorktreeCli is the only component that parses the scheduler and changes claims.
 It selects the newest eligible executable plan by
@@ -77,8 +77,14 @@ not by what motivated it:
 A plan spanning areas goes to the area owning most of its named files; a tie
 stays in `Engine/`.
 
-Every Plan sits exactly at `Documents/Plans/<Area>/<Name>.md` and may own a
-support folder named after its file without `.md`
+A Plan whose critical files or `## In scope` name any `Projects/Coretide/` file
+lives at `Projects/Coretide/Documents/Plans/<Area>/<Name>.md` in the session
+Coretide clone, follows every rule of this file, is selected, claimed, and
+completed with the engine Plans, and lands with the Coretide commit. A Coretide
+Plan may depend on an engine Plan; an engine Plan never names a Coretide Plan.
+
+Every Plan sits exactly at `Documents/Plans/<Area>/<Name>.md`, or the Coretide
+path above, and may own a support folder named after its file without `.md`
 (`Documents/Plans/<Area>/<Name>/`), holding the files the Plan needs, every one
 committed with the Plan. A ledger support file holds only rows the Plan acts on,
 never excluded false positives. Each file keeps its real format and extension,

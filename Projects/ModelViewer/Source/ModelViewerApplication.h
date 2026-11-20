@@ -17,8 +17,7 @@ public:
 	void ResetLightingPreset();
 	void ToggleFlight();
 	void TogglePause();
-	void SelectModel(int64_t iSelection);
-	void SelectAdjacentModel(int64_t iStep);
+	void SelectModel(int64_t iStep);
 	bool WorldVisible() const;
 	void ResetDisplayTime();
 	bool Render();

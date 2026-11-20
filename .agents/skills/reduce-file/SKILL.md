@@ -30,14 +30,15 @@ Choose exactly one mode from the invocation:
   and apply the review's qualification rules. Report only the size and concrete
   cohesive split opportunity. Do not map the file, draft a plan, or edit code;
   route an accepted out-of-scope residual through `/create-follow-up-plans`.
-- Standalone or pre-approval analysis: Inspect the target and return one
-  evidence-backed meaningful plan choice. Do not ask the user to select among
-  speculative options. Produce the decision-complete draft inline; do not write
-  or queue a plan unless the user explicitly authorizes that action.
-- Approved-plan execution: Treat the approved plan and deltas as the decision
-  authority. Implement its assigned reduction without reopening settled design
-  choices. Stop and report a contradiction if repository evidence invalidates a
-  meaningful plan assumption.
+- Standalone or pre-approval analysis: Runs in one `planner`. Inspect the
+  target and return one evidence-backed meaningful plan choice. Do not ask the
+  user to select among speculative options. Produce the decision-complete draft
+  inline; do not write or queue a plan unless the user explicitly authorizes
+  that action.
+- Approved-plan execution: Runs in one `implementer`. Treat the approved plan
+  and deltas as the decision authority. Implement its assigned reduction
+  without reopening settled design choices. Stop and report a contradiction if
+  repository evidence invalidates a meaningful plan assumption.
 
 If no path is supplied, ask for one.
 

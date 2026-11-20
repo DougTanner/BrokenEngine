@@ -3,7 +3,8 @@
 # what artifact type is each change". The script writes no file except the -OutputPath result the
 # caller names, and no repository metadata (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the
 # index). Diagnostics go to stderr; stdout carries the result document, or with -OutputPath one
-# summary line.
+# summary line. A session Coretide clone at Projects/Coretide is inventoried by the same pipeline in that
+# repository, from the merge base of its HEAD and upstream, and its rows are merged under that prefix.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -61,17 +62,22 @@ $script:Root = $null
 $script:BaselineSha = ''
 $script:HeadSha = ''
 $script:HeadPaths = $null
+# The session Coretide clone's Root, BaselineSha, HeadSha, and HeadPaths, or null; Enter-CoretideSide swaps them in.
+$script:Coretide = $null
+$script:CoretidePrefix = 'Projects/Coretide/'
+$script:EngineSide = $null
 $script:BlobHashes = @{}
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:InventoryScriptPath = $PSCommandPath
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-session-change-inventory/v1'
+	schemaVersion = 'broken-engine-session-change-inventory/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Session change inventory did not run.'
 	baselineSha = $null
 	headSha = $null
+	coretide = $null
 	entries = @()
 	counts = $null
 	triggers = $null
@@ -105,8 +111,10 @@ function Complete-SessionChangeInventory([int] $ExitCode, [string] $Status, [str
 	}
 	if ($EmitTargets) {
 		# The targets consumer reads raw stdout: a non-pass run leaves stdout empty and reports
-		# the structured outcome on stderr, and a pass has already written the targets bytes.
+		# the structured outcome on stderr, and a pass has already written the targets bytes and
+		# adds a one-line status receipt on stderr, since a redirected stdout leaves none visible.
 		if ($ExitCode -ne 0) { Write-InventoryStream $true (($result | ConvertTo-Json -Depth 32 -Compress) + "`n") }
+		else { Write-InventoryStream $true "$Status $Code $($result.message)`n" }
 		exit $ExitCode
 	}
 	Write-InventoryStream $false ($result | ConvertTo-Json -Depth 32 -Compress)
@@ -139,6 +147,34 @@ function Invoke-InventoryGit([string[]] $Arguments, [bool] $AllowFailure = $fals
 	$process.Dispose()
 	if (-not $AllowFailure -and $run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	return $run
+}
+
+# Points every Git read and side variable at the Coretide clone, so the engine pipeline functions answer for it with
+# unprefixed paths, until Exit-CoretideSide puts the engine values back. Calls never nest.
+function Enter-CoretideSide() {
+	$script:EngineSide = @{ Root = $script:Root; BaselineSha = $script:BaselineSha; HeadSha = $script:HeadSha; HeadPaths = $script:HeadPaths }
+	$script:Root = $script:Coretide.Root
+	$script:BaselineSha = $script:Coretide.BaselineSha
+	$script:HeadSha = $script:Coretide.HeadSha
+	$script:HeadPaths = $script:Coretide.HeadPaths
+}
+
+function Exit-CoretideSide() {
+	$script:Coretide.HeadPaths = $script:HeadPaths
+	$script:Root = $script:EngineSide.Root
+	$script:BaselineSha = $script:EngineSide.BaselineSha
+	$script:HeadSha = $script:EngineSide.HeadSha
+	$script:HeadPaths = $script:EngineSide.HeadPaths
+}
+
+function Test-CoretidePath([string] $Path) {
+	return $null -ne $script:Coretide -and $Path.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal)
+}
+
+function Add-CoretidePrefix([object] $Entry) {
+	$Entry.Path = $script:CoretidePrefix + $Entry.Path
+	if ($null -ne $Entry.OldPath) { $Entry.OldPath = $script:CoretidePrefix + $Entry.OldPath }
+	return $Entry
 }
 
 function Get-InventoryHex([byte[]] $Hash) {
@@ -229,8 +265,11 @@ function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
 	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
 	$extension = if ($leaf.Contains('.')) { $leaf.Substring($leaf.LastIndexOf('.')).ToLowerInvariant() } else { '' }
 	$components = $Path -split '/'
+	# The Coretide Plans tree follows the engine Plans rules below its Projects/Coretide/ prefix.
+	$planComponents = $components
+	if ($Path.StartsWith('Projects/Coretide/', [StringComparison]::Ordinal)) { $planComponents = @($components | Select-Object -Skip 2) }
 	# A text file in a Plan's support folder (Documents/Plans/<Area>/<Name>/) is Plan content whatever its extension.
-	if (-not $IsBinary -and $components.Count -gt 4 -and $components[0] -ceq 'Documents' -and $components[1] -ceq 'Plans') { return 'plan' }
+	if (-not $IsBinary -and $planComponents.Count -gt 4 -and $planComponents[0] -ceq 'Documents' -and $planComponents[1] -ceq 'Plans') { return 'plan' }
 	if ($script:DualLanguageHeaders -ccontains $leaf.ToLowerInvariant()) { return 'dual-language-header' }
 	$underShaders = $false
 	for ($i = 0; $i -lt $components.Count - 2; $i++) {
@@ -242,7 +281,7 @@ function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
 	if ($underShaders -and $extension -ceq '.h') { return 'glsl' }
 	if ($extension -cin @('.cpp', '.h', '.inl')) { return 'cpp' }
 	if ($leaf -ceq 'SKILL.md' -and $components.Count -eq 4 -and $components[0] -ceq '.agents' -and $components[1] -ceq 'skills') { return 'skill' }
-	if ($extension -ceq '.md' -and $components.Count -gt 2 -and $components[0] -ceq 'Documents' -and $components[1] -ceq 'Plans' -and $leaf -cne 'AGENTS.md') { return 'plan' }
+	if ($extension -ceq '.md' -and $planComponents.Count -gt 2 -and $planComponents[0] -ceq 'Documents' -and $planComponents[1] -ceq 'Plans' -and $leaf -cne 'AGENTS.md') { return 'plan' }
 	if ($extension -cin @('.ps1', '.psm1', '.py', '.sh')) { return 'script' }
 	if ($extension -ceq '.vcxproj' -or $leaf.ToLowerInvariant().EndsWith('.vcxproj.filters')) { return 'vcxproj' }
 	if ($extension -cin @('.md', '.txt')) { return 'doc' }
@@ -302,17 +341,27 @@ function Get-SkillPackageManifestPath([string] $Path) {
 	return $null
 }
 
-function Get-InventorySideText([string] $Revision, [string] $Path) {
+function Get-InventorySideText([bool] $HeadSide, [string] $Path) {
 	# A commit-valued side is read from the object database; the working-tree side is the file itself.
 	# An unreadable side returns $null, which suppresses the guard candidate rather than guessing.
-	if ([string]::IsNullOrEmpty($Revision)) {
-		$full = Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)
-		if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $null }
-		return [IO.File]::ReadAllText($full)
+	# A Coretide path is read unprefixed in the Coretide clone at its own baseline or head.
+	$coretide = Test-CoretidePath $Path
+	if ($coretide) {
+		Enter-CoretideSide
+		$Path = $Path.Substring($script:CoretidePrefix.Length)
 	}
-	$run = Invoke-InventoryGit @('show', "$($Revision):$Path") $true
-	if ($run.ExitCode -ne 0) { return $null }
-	return $run.Stdout
+	try {
+		$revision = if ($HeadSide) { $script:HeadSha } else { $script:BaselineSha }
+		if ([string]::IsNullOrEmpty($revision)) {
+			$full = Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)
+			if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $null }
+			return [IO.File]::ReadAllText($full)
+		}
+		$run = Invoke-InventoryGit @('show', "$($revision):$Path") $true
+		if ($run.ExitCode -ne 0) { return $null }
+		return $run.Stdout
+	}
+	finally { if ($coretide) { Exit-CoretideSide } }
 }
 
 function Get-InventoryGuardSide([string] $Text) {
@@ -358,8 +407,8 @@ function Get-RoutingTrigger([object[]] $Entries) {
 			}
 		}
 		elseif ($entry.Status -ceq 'M' -and $script:CppClasses -ccontains $entry.Class) {
-			$baselineSide = Get-InventoryGuardSide (Get-InventorySideText $script:BaselineSha $entry.Path)
-			$currentSide = Get-InventoryGuardSide (Get-InventorySideText $script:HeadSha $entry.Path)
+			$baselineSide = Get-InventoryGuardSide (Get-InventorySideText $false $entry.Path)
+			$currentSide = Get-InventoryGuardSide (Get-InventorySideText $true $entry.Path)
 			if ($null -ne $baselineSide -and $null -ne $currentSide -and $baselineSide -cne $currentSide) {
 				$guardCandidate = $true
 				if ($candidatePaths.Add($entry.Path)) { $candidates.Add([ordered]@{ path = $entry.Path; reason = 'guard' }) }
@@ -584,6 +633,25 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 			currentMode = $row.DestinationMode
 		})
 	}
+	# The Coretide side's baseline is already the merge base of its HEAD and upstream, so its two-dot range is its
+	# reviewed three-dot range.
+	if ($null -ne $script:Coretide) {
+		Enter-CoretideSide
+		try {
+			$coretideBinaryPaths = Get-InventoryBinaryPath $script:BaselineSha $script:HeadSha
+			foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) {
+				$reviewedEntries.Add((Add-CoretidePrefix (Get-InventoryEntry $row $coretideBinaryPaths $false)))
+				$reviewed.Add([ordered]@{
+					status = $row.Status
+					path = $script:CoretidePrefix + $row.Path
+					oldPath = if ($null -ne $row.OldPath) { $script:CoretidePrefix + $row.OldPath } else { $null }
+					baselineMode = $row.SourceMode
+					currentMode = $row.DestinationMode
+				})
+			}
+		}
+		finally { Exit-CoretideSide }
+	}
 	# Routing reads a modified file's baseline side from $script:BaselineSha, whose reviewed-diff value
 	# is the merge base. That name is the same script-scope variable the caller's own $baselineSha
 	# binds, and the completion message still reads it, so the top-level value is put back afterwards.
@@ -610,7 +678,11 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 		if ($reviewedTriggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }
 	}
 	foreach ($row in $reviewed) {
-		if ($row.path.StartsWith('Documents/Plans/') -or ($null -ne $row.oldPath -and $row.oldPath.StartsWith('Documents/Plans/'))) {
+		$planPath = $false
+		foreach ($side in @($row.path, $row.oldPath)) {
+			if ($null -ne $side -and ($side.StartsWith('Documents/Plans/') -or $side.StartsWith('Projects/Coretide/Documents/Plans/'))) { $planPath = $true }
+		}
+		if ($planPath) {
 			$skeleton.Add([ordered]@{ check = 'Executable Plan check'; status = 'BLOCKED' })
 			break
 		}
@@ -806,6 +878,41 @@ try {
 		$unlistedUntracked = $unlistedReference
 		foreach ($entry in $untrackedEntries) { $entries.Add($entry) }
 	}
+	$coretideRegions = [Collections.Generic.List[object]]::new()
+	$coretideRoot = Get-AgentCoretideRepository $script:Root
+	if ($null -ne $coretideRoot) {
+		$script:Coretide = @{ Root = $coretideRoot; BaselineSha = ''; HeadSha = ''; HeadPaths = $null }
+		Enter-CoretideSide
+		try {
+			# With a commit-valued engine head the clone's HEAD stands for its side and its working tree is left out.
+			$script:BaselineSha = (Invoke-InventoryGit @('merge-base', 'HEAD', '@{upstream}')).Stdout.Trim()
+			if (-not $workingTreeHead) { $script:HeadSha = (Invoke-InventoryGit @('rev-parse', '--verify', 'HEAD^{commit}')).Stdout.Trim() }
+			$script:Coretide.BaselineSha = $script:BaselineSha
+			$script:Coretide.HeadSha = $script:HeadSha
+			$coretideBinaryPaths = Get-InventoryBinaryPath $script:BaselineSha $script:HeadSha
+			foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) {
+				$entries.Add((Add-CoretidePrefix (Get-InventoryEntry $row $coretideBinaryPaths $workingTreeHead)))
+			}
+			$coretideUntracked = @()
+			if ($workingTreeHead) {
+				$unlistedReference = 0
+				$coretideUntracked = @(Get-InventoryUntrackedEntry $IncludeUntracked.IsPresent ([ref] $unlistedReference))
+				$unlistedUntracked += $unlistedReference
+			}
+			if ($Regions) {
+				foreach ($region in (Get-RegionTable $script:BaselineSha $script:HeadSha ([object[]] $coretideUntracked))) {
+					$region.path = $script:CoretidePrefix + $region.path
+					$coretideRegions.Add($region)
+				}
+			}
+			foreach ($entry in $coretideUntracked) { $entries.Add((Add-CoretidePrefix $entry)) }
+		}
+		finally { Exit-CoretideSide }
+		$result.coretide = [ordered]@{
+			baselineSha = $script:Coretide.BaselineSha
+			headSha = if ($workingTreeHead) { $null } else { $script:Coretide.HeadSha }
+		}
+	}
 	$sorted = [Collections.Generic.List[object]]::new($entries)
 	$sorted.Sort([Comparison[object]] {
 		param($left, $right)
@@ -842,7 +949,10 @@ try {
 		})
 	}
 	$fullRegions = [Collections.Generic.List[object]]::new()
-	if ($Regions) { $fullRegions = Get-RegionTable $baselineSha $headSha ([object[]] $untrackedEntries) }
+	if ($Regions) {
+		$fullRegions = Get-RegionTable $baselineSha $headSha ([object[]] $untrackedEntries)
+		$fullRegions.AddRange($coretideRegions)
+	}
 	if ($prefixes.Count -gt 0) {
 		$allRegions = $fullRegions
 		$fullRegions = [Collections.Generic.List[object]]::new()

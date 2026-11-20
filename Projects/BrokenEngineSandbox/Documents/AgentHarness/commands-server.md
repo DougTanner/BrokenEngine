@@ -160,10 +160,13 @@ adding the fields below; the other entries are its own commands. For the engine
 
   With a handshaken client, each successful edit runs the load-time
   resynchronization (`resynchronizedClients` counts those clients): it advances
-  the server's load generation, which shares a 255-per-process budget with
-  `load` and `reset`, zeroes `status.harvestedTransferTotal`, drops every queued
-  `inject_payload` entry, and makes clients log `ClientSession::OnServerLoad`,
-  drop their coordinate state, and resubscribe. So batch edits into one command.
+  the server's load generation, whose per-process budget
+  ([Debug Load Generation](../../../../Documents/Architecture/Network.md#debug-load-generation))
+  it shares with `load`, `reset`, a successful startup autoload, and
+  `replay_play` playback (its start, each loop, and an abort), zeroes
+  `status.harvestedTransferTotal`, drops every queued `inject_payload` entry,
+  and makes clients log `ClientSession::OnServerLoad`, drop their coordinate
+  state, and resubscribe. So batch edits into one command.
   The resynchronization frees every subscription before clients resubscribe, so
   the server's active set keeps only cells with a fleet-owned ship (a row whose
   `pController` is `Fleet`), pinned cells, and the origin: with a handshaken

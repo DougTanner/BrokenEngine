@@ -5,13 +5,13 @@
 #include "Network/Server/ServerClientManager.h"
 
 #include "Frame/IslandChainPlacement.h"
-#include "Network/Server/ServerTransferManager.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
+#include "Network/Server/FleetRows.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -111,7 +111,7 @@ ServerClientManager::ServerClientManager()
 }
 
 // NewClients, OnClientDisconnected, and ResetState track handled clients in mProcessedClientIds, which is game-agnostic
-// apart from the mpFleetManager calls and mNextFighterLaunchTicks.
+// apart from the mpFleetManager calls.
 void ServerClientManager::NewClients()
 {
 	// Heap: processed-client-ID set insert
@@ -140,48 +140,9 @@ void ServerClientManager::NewClients()
 	}
 }
 
-bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid, const Fleet& rFleet, FleetMember& rMember, int64_t& riNextFighterLaunchBay, common::ScopedWorkbufferArena& rTakenSpawnPoints)
+std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid, const Fleet& rFleet, const FleetMember& rMember, int64_t& riNextFighterLaunchBay, common::ScopedWorkbufferArena& rTakenSpawnPoints)
 {
-	// The fleet step runs while miTickCounter names the tick being prepared; that tick's post-tick batch creates each
-	// queued row.
-	int64_t iSpawnTick = gpGame->miTickCounter;
-	bool bIsFlagship = rMember.globalId == rFleet.flagshipGlobalId;
-	int64_t iTargetFlightPlane = DefaultFlightPlane(rMember.eType);
-
-	ShipOrders_t spawnOrders {};
-	if (bIsFlagship)
-	{
-		spawnOrders.Set(ShipOrders::kIsFlagship);
-	}
-	if (rMember.eType == ShipType::kFighter || rMember.eType == ShipType::kOmni)
-	{
-		spawnOrders = SquadronOrders(rMember.eType, rMember.flags);
-		spawnOrders.Set(ShipOrders::kSquadron1, rMember.uiSquadron == 1);
-	}
-	SetTargetFlightPlane(spawnOrders, iTargetFlightPlane);
-
-	// The owner's GUID rides the spawn, so the row is born owned.
-	auto QueueFleetSpawn = [&](engine::GridCoord spawnCoordinate, auto spawnInfo)
-	{
-		spawnInfo.alignment = gpGame->mFleetAlignment;
-		spawnInfo.eController = ShipController::kFleet;
-		spawnInfo.orders = spawnOrders;
-		spawnInfo.globalId = rMember.globalId;
-		spawnInfo.clientGuid = rClientGuid;
-		spawnInfo.flagshipGlobalId = rFleet.flagshipGlobalId;
-		spawnInfo.fleetWantedCoordinate = rFleet.wantedCoordinate;
-		spawnInfo.uiPendingFleetWantedCoordinateTicks = rFleet.uiPendingFleetWantedCoordinateTicks;
-		// Playback takes every spawn from the recorded post-tick batches.
-		if (!gpGame->mbReplaying)
-		{
-			gpServerSession->mpTransferManager->QueueSpawn(spawnCoordinate, iSpawnTick, MakeSpawn(spawnInfo));
-		}
-		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnFleetMember Type: {} Guid: ({},{}) GlobalId: {} Coord: ({},{}) Flagship: {} FlagshipGlobalId: {}", ShipTypeName(rMember.eType), rClientGuid.uiHigh, rClientGuid.uiLow, rMember.globalId.iValue, spawnCoordinate.iQ, spawnCoordinate.iR, bIsFlagship, rFleet.flagshipGlobalId.iValue);
-		rMember.flags.Set(FleetMemberFlags::kIsDead, false);
-		rMember.coordinate = spawnCoordinate;
-		gpServerSession->mpFleetManager->SendFleetSyncToClient(rClientGuid);
-	};
-	auto QueueSpawnPointSpawn = [&](auto spawnInfo)
+	auto QueueSpawnPointSpawn = [&](auto spawnInfo) -> std::optional<engine::GridCoord>
 	{
 		std::optional<XMFLOAT2> optionalSpawnPoint = FindFleetSpawnPoint(mFleetSpawnCandidates, *gpGame->mCells.at(engine::kOriginCoordinate).pCurrent, rTakenSpawnPoints.mBuffer.Span<XMFLOAT2>());
 		if (!optionalSpawnPoint)
@@ -192,7 +153,7 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 				LOG(kNetwork, kWarning, "ServerClientManager::SpawnFleetMember no clear fleet spawn point in the origin cell, retrying each tick Type: {} Guid: ({},{}) GlobalId: {}", ShipTypeName(rMember.eType), rClientGuid.uiHigh, rClientGuid.uiLow, rMember.globalId.iValue);
 				mbFleetSpawnBlocked = true;
 			}
-			return false;
+			return std::nullopt;
 		}
 		mbFleetSpawnBlocked = false;
 		rTakenSpawnPoints.mBuffer.PushBack(*optionalSpawnPoint);
@@ -200,8 +161,8 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 		spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
 		spawnInfo.uiFlightPlane = 0;
-		QueueFleetSpawn(engine::kOriginCoordinate, spawnInfo);
-		return true;
+		QueueFleetSpawn(rClientGuid, rFleet, rMember, engine::kOriginCoordinate, spawnInfo);
+		return engine::kOriginCoordinate;
 	};
 	switch (rMember.eType)
 	{
@@ -210,7 +171,7 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 			engine::GridCoord flagshipCoordinate = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId)->coordinate;
 			if (!gpGame->mCells.contains(flagshipCoordinate))
 			{
-				return false;
+				return std::nullopt;
 			}
 			// A cell just loaded or transferred into has no elevation grid until it ticks, so build its terrain here: the bay
 			// terrain admission reaches the fleet checksum, and playback can hold an unbuilt cell where the recording had a
@@ -220,9 +181,10 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 			std::optional<ShipLocator> optionalBattleship = FindShipByGlobalId(rBattleshipFrame, rFleet.flagshipGlobalId);
 			if (!optionalBattleship)
 			{
-				return false;
+				return std::nullopt;
 			}
 
+			int64_t iTargetFlightPlane = DefaultFlightPlane(ShipType::kFighter);
 			const BattleshipsInterpolate& rBattleshipsInterpolate = *rBattleshipFrame.interpolate.pBattleships;
 			int64_t iBattleshipRow = optionalBattleship->iRow;
 			std::span<const common::PackedModelHardpoint> bays = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rBattleshipFrame.postRender.pBattleships->pController[iBattleshipRow])].fighterLaunchBays;
@@ -255,10 +217,10 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 					.vecVelocity = rBattleshipFrame.postRender.pBattleships->pVecVelocities[iBattleshipRow],
 					.uiFlightPlane = rBattleshipsInterpolate.puiFlightPlanes[iBattleshipRow],
 				};
-				QueueFleetSpawn(flagshipCoordinate, spawnInfo);
-				return true;
+				QueueFleetSpawn(rClientGuid, rFleet, rMember, flagshipCoordinate, spawnInfo);
+				return flagshipCoordinate;
 			}
-			return false;
+			return std::nullopt;
 		}
 		case ShipType::kOmni:       return QueueSpawnPointSpawn(OmnisPostRender::SpawnInfo {});
 		case ShipType::kBattleship: return QueueSpawnPointSpawn(BattleshipsPostRender::SpawnInfo {});
@@ -284,8 +246,6 @@ void ServerClientManager::ResetState()
 	{
 		return engine::gpServer->FindClient(iClientId)->ownedEntities.empty();
 	});
-	// The load may move the tick counter backward; the next launch of each fleet may then come at once.
-	mNextFighterLaunchTicks.clear();
 }
 
 } // namespace game

@@ -195,6 +195,16 @@ function Get-AgentGameProjects([string] $Root) {
 	return $names
 }
 
+# The full path of Root's Projects/Coretide when it is the toplevel of a Git repository (the private nested Coretide
+# repository, or a session's local clone of it), else null.
+function Get-AgentCoretideRepository([string] $Root) {
+	$coretide = Get-AgentCanonicalPath (Join-Path $Root 'Projects/Coretide')
+	if (-not [IO.Directory]::Exists($coretide)) { return $null }
+	$run = Invoke-AgentProcess 'git' @('-C', $coretide, 'rev-parse', '--show-toplevel') $coretide
+	if ($run.ExitCode -ne 0 -or -not (Get-AgentCanonicalPath $run.Stdout.Trim()).Equals($coretide, [StringComparison]::OrdinalIgnoreCase)) { return $null }
+	return $coretide
+}
+
 # True when the '/'-separated repository-relative Path is a data input of game Project: a path under DataPacker,
 # Engine/Data, or Projects/<Project>/Data, or Common/DataFile.h, matched case-sensitively as a Git pathspec matches.
 # Repository agent documentation is never a data-pipeline input, so an AGENTS.md leaf is dropped. The Raw carve-out
@@ -365,45 +375,61 @@ function Get-AgentHarnessLaunchConfiguration([string] $Root, [string] $DataDirec
 # sorted ordinally. The index stands for presence, so a staged Plan and its staged support files count as present.
 # Every path deeper than <Area>/<Name>.md lies in the support folder <Area>/<Name>/, a nested Plan included. With
 # -Folder (a support-folder path), only the support-markdown and support-uncommitted rules apply, over that folder.
+# The session Coretide clone's Documents/Plans is checked under the same rules, its rows and a -Folder under it
+# carrying the Projects/Coretide/ prefix.
 function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folder) {
 	$root = [IO.Path]::GetFullPath($RepositoryRoot, (Get-Location).ProviderPath)
-	$scope = if ($Folder) { ':(literal)' + $Folder + '/' } else { 'Documents/Plans' }
-	$listing = Invoke-AgentProcess 'git' @('-C', $root, 'ls-files', '-z', '--', $scope) $root
-	if ($listing.ExitCode -ne 0) { throw "git ls-files failed for '$scope': $($listing.Stderr.Trim())" }
-	$status = Invoke-AgentProcess 'git' @('-C', $root, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored=matching', '--', $scope) $root
-	if ($status.ExitCode -ne 0) { throw "git status failed for '$scope': $($status.Stderr.Trim())" }
-
-	$indexed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($path in ($listing.Stdout -split "`0")) { if ($path.Length -ne 0) { [void] $indexed.Add($path) } }
-	$paths = [Collections.Generic.HashSet[string]]::new($indexed, [StringComparer]::Ordinal)
-	$uncommitted = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	$fields = @($status.Stdout -split "`0")
-	for ($index = 0; $index -lt $fields.Count; $index++) {
-		$record = $fields[$index]
-		if ($record.Length -lt 4) { continue }
-		$state = $record.Substring(0, 2)
-		$path = $record.Substring(3)
-		[void] $paths.Add($path)
-		if ($state -ceq '??' -or $state -ceq '!!' -or $state[1] -ne ' ') { [void] $uncommitted.Add($path) }
-		# A rename or copy record carries one extra field, its original path.
-		if ($state.Contains('R') -or $state.Contains('C')) { $index++ }
+	$coretidePrefix = 'Projects/Coretide/'
+	$coretide = Get-AgentCoretideRepository $root
+	# Each tree is (repository, prefix, folder below that repository's root or empty).
+	$trees = [Collections.Generic.List[object[]]]::new()
+	if ($Folder -and $Folder.StartsWith($coretidePrefix, [StringComparison]::Ordinal)) {
+		if ($coretide) { $trees.Add(@($coretide, $coretidePrefix, $Folder.Substring($coretidePrefix.Length))) }
+	} else {
+		$trees.Add(@($root, '', $Folder))
+		if (-not $Folder -and $coretide) { $trees.Add(@($coretide, $coretidePrefix, '')) }
 	}
 
 	$keys = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($path in $paths) {
-		$segments = $path.Substring('Documents/Plans/'.Length).Split('/')
-		if ($segments.Count -eq 1) {
-			if (-not $Folder -and $segments[0] -cne 'AGENTS.md') { [void] $keys.Add("$path`0root-file") }
-			continue
+	foreach ($tree in $trees) {
+		$repository, $prefix, $treeFolder = $tree
+		$scope = if ($treeFolder) { ':(literal)' + $treeFolder + '/' } else { 'Documents/Plans' }
+		$listing = Invoke-AgentProcess 'git' @('-C', $repository, 'ls-files', '-z', '--', $scope) $repository
+		if ($listing.ExitCode -ne 0) { throw "git ls-files failed for '$prefix$scope': $($listing.Stderr.Trim())" }
+		$status = Invoke-AgentProcess 'git' @('-C', $repository, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored=matching', '--', $scope) $repository
+		if ($status.ExitCode -ne 0) { throw "git status failed for '$prefix$scope': $($status.Stderr.Trim())" }
+
+		$indexed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+		foreach ($path in ($listing.Stdout -split "`0")) { if ($path.Length -ne 0) { [void] $indexed.Add($path) } }
+		$paths = [Collections.Generic.HashSet[string]]::new($indexed, [StringComparer]::Ordinal)
+		$uncommitted = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+		$fields = @($status.Stdout -split "`0")
+		for ($index = 0; $index -lt $fields.Count; $index++) {
+			$record = $fields[$index]
+			if ($record.Length -lt 4) { continue }
+			$state = $record.Substring(0, 2)
+			$path = $record.Substring(3)
+			[void] $paths.Add($path)
+			if ($state -ceq '??' -or $state -ceq '!!' -or $state[1] -ne ' ') { [void] $uncommitted.Add($path) }
+			# A rename or copy record carries one extra field, its original path.
+			if ($state.Contains('R') -or $state.Contains('C')) { $index++ }
 		}
-		if ($segments.Count -eq 2) {
-			if (-not $Folder -and -not $segments[1].EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$path`0area-file") }
-			continue
+
+		foreach ($path in $paths) {
+			$segments = $path.Substring('Documents/Plans/'.Length).Split('/')
+			if ($segments.Count -eq 1) {
+				if (-not $Folder -and $segments[0] -cne 'AGENTS.md') { [void] $keys.Add("$prefix$path`0root-file") }
+				continue
+			}
+			if ($segments.Count -eq 2) {
+				if (-not $Folder -and -not $segments[1].EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$prefix$path`0area-file") }
+				continue
+			}
+			$supportFolder = "Documents/Plans/$($segments[0])/$($segments[1])"
+			if ($path.EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$prefix$path`0support-markdown") }
+			if ($uncommitted.Contains($path)) { [void] $keys.Add("$prefix$path`0support-uncommitted") }
+			if (-not $Folder -and -not $indexed.Contains("$supportFolder.md")) { [void] $keys.Add("$prefix$supportFolder`0support-orphan") }
 		}
-		$supportFolder = "Documents/Plans/$($segments[0])/$($segments[1])"
-		if ($path.EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$path`0support-markdown") }
-		if ($uncommitted.Contains($path)) { [void] $keys.Add("$path`0support-uncommitted") }
-		if (-not $Folder -and -not $indexed.Contains("$supportFolder.md")) { [void] $keys.Add("$supportFolder`0support-orphan") }
 	}
 	# NUL sorts below every path character, so sorting the keys orders the rows by path, then rule.
 	[string[]] $sorted = @($keys)
@@ -411,4 +437,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation

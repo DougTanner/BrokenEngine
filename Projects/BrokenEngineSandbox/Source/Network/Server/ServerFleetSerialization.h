@@ -8,13 +8,12 @@
 namespace game
 {
 
-// The fleet state of one replay fleet record, staged for playback. Its members carry their respawn countdowns.
+// The fleet state of one replay fleet record, staged for playback.
 struct ReplayFleetRecord
 {
 	int64_t iTick = 0;
 	std::unordered_map<engine::ClientGuid, std::vector<Fleet>> fleets;
 	common::RandomEngine randomEngine;
-	std::unordered_map<FleetGuid, int64_t> nextFighterLaunchTicks;
 };
 
 // The replay fleet record bytes of the fleet state at the end of the fleet step of tick iTick.
@@ -52,7 +51,8 @@ std::span<const KEY> SortedGuidKeys(const std::unordered_map<KEY, VALUE>& rMap, 
 	return keys;
 }
 
-void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets);
+// Sends iClientId the FleetSync of rFleets only when the packet's CRC differs from ruiLastSentCrc, then stores it there.
+void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets, common::crc_t& ruiLastSentCrc);
 
 // Sends iClientId one map marker per live fleet flagship among every owner's fleets in rFleets, flagging those
 // rClientGuid owns.
@@ -62,9 +62,8 @@ void WriteFleetData(std::ostream& rStream, const std::unordered_map<engine::Clie
 
 void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom);
 
-// The replay fleet record bytes of the live fleet state: the WriteFleetData bytes, each member's respawn countdown in
-// the same walk order, then the Fighter launch ticks in fleet GUID order. Owner client IDs and queued fleet requests
-// are left out.
+// The replay fleet record bytes of the live fleet state: the WriteFleetData bytes a grid save holds. Owner client IDs
+// and queued fleet requests are left out.
 std::string ReplayFleetRecordBytes();
 
 // Reads the bytes ReplayFleetRecordBytes writes; the caller reads the record's tick first.

@@ -28,9 +28,11 @@ never build or modify that output; source changes use the `/compile`
   not add a `--domain` option or harness-key support.
 - `plan validate|list|claim-next|claim-status|unclaim|complete|reject` is the
   only scheduler surface. It reads tracked `Documents/Plans` metadata under the
-  [scheduler rules that document owns](../../Documents/Plans/AGENTS.md#git-backed-scheduler)
-  and stores only short-lived machine-local claim records. `validate` lints
-  metadata and reports excluded plans, stale dependency edges, and healed
+  [scheduler rules that document owns](../../Documents/Plans/AGENTS.md#git-backed-scheduler),
+  also reading, as `Projects/Coretide/Documents/Plans` paths, the Plans of the
+  primary Coretide repository in the main worktree and of the session Coretide
+  clone, and stores only short-lived machine-local claim records. `validate`
+  lints metadata and reports excluded plans, stale dependency edges, and healed
   claims; it evaluates no baseline and compares no metadata across commits.
   `validate --lint-only` runs that lint alone: no scheduler guard, no storage,
   no healing, so `healedClaims` is an empty array; every other plan operation
@@ -49,13 +51,15 @@ never build or modify that output; source changes use the `/compile`
   eligibility, dependency blocking, and healing against the primary tip so a
   behind session never heals a peer's claim or claims past a prerequisite landed
   after its baseline, while reading the exact bytes the selector uses from the
-  session tree. WorktreeCli alone compares a targeted request with an existing
-  session claim: `claim-status --plan` and `claim-next --plan` return
-  `claim-plan-mismatch` with the differing normalized `requestedPlan` and
-  `heldPlan`, leaving the claim unchanged. `complete` and `reject` rewrite the
-  markers of direct dependency children, delete the target Plan file, and report
-  every changed path; `reject` additionally requires
-  `--user-authorized-rejection`.
+  session tree. A session Coretide clone's `HEAD` must stand in the same
+  relation to the primary Coretide `HEAD`, whose Plans join the primary tip
+  whether or not the session holds a clone. WorktreeCli alone compares a
+  targeted request with an existing session claim: `claim-status --plan` and
+  `claim-next --plan` return `claim-plan-mismatch` with the differing
+  normalized `requestedPlan` and `heldPlan`, leaving the claim unchanged.
+  `complete` and `reject` rewrite the markers of direct dependency children,
+  delete the target Plan file, and report every changed path; `reject`
+  additionally requires `--user-authorized-rejection`.
 - `build` prints one `broken-engine-build-result/v1` JSON object to stdout;
   human progress goes to stderr. It retains the combined MSBuild stream in the
   invoking worktree's ignored `Temp\AgentBuildLogs\` path and parses structured

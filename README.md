@@ -103,8 +103,7 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
   approve the UAC prompt. `Microsoft.PowerShell` defaults to the MSIX/Store
   package, which lands under `C:\Program Files\WindowsApps`; those ACLs cannot
   be granted to the Codex sandbox users, so every sandboxed `pwsh` exec fails
-  with `CreateProcessAsUserW failed: 5 (Access is denied)` and `/codex-review`
-  degrades to `CODEX-UNAVAILABLE` and its Opus reviewer fallback.
+  with `CreateProcessAsUserW failed: 5 (Access is denied)`.
   `--installer-type wix` selects the MSI, which installs to
   `C:\Program Files\PowerShell\7` and works under the sandbox.
 	```powershell
@@ -220,8 +219,8 @@ setting is needed to suppress that confirmation.
 - Close and reopen the terminal, then verify the installation with
   `codex --version`.
 - Run `codex login status` and confirm it reports a ChatGPT login. For the
-  subscription-backed Claude-to-Codex review route, do not set `OPENAI_API_KEY`;
-  doing so switches it to metered API billing.
+  subscription-backed Codex Bridge route, do not set `OPENAI_API_KEY`; doing so
+  switches it to metered API billing.
 - From a PowerShell 7 tab inside Windows Terminal, opened at the repository
   root, load the repository helper and launch Codex in a UUID-named worktree:
 	```powershell
@@ -235,12 +234,11 @@ setting is needed to suppress that confirmation.
   client with kill-on-host-close lifetime, propagates its exit code, and
   preserves partial artifacts on provisioning failure.
 - The Codex headless route
-  (`.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1`, driven by the
-  `/claude-to-codex` skill, through which `/codex-review` also launches) runs
-  one task on Codex only on explicit request, read-only or with worktree edits,
-  under a selectable role configuration, model, and effort; normal workflow
-  delegation does not use it. Headless Codex runs bill the ChatGPT subscription,
-  not metered API credits.
+  (`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`, driven by the
+  `/codex-bridge` skill) runs one existing role's task on Codex only on
+  explicit request, read-only or with worktree edits, under one of two fixed
+  model and effort presets; normal workflow delegation does not use it.
+  Headless Codex runs bill the ChatGPT subscription, not metered API credits.
 
 #### Optional Current Maintainer Configuration
 

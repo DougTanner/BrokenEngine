@@ -91,10 +91,13 @@ its exception for the `/analyze-gpu-stall` focused route. The client logs
 input, so nothing can be reproduced. Before each trace, confirm the client log's
 last focus line is `WM_SETFOCUS`; otherwise ask the user to click into the
 client. Then run `Invoke-GpuTrace.ps1` with `-ClientLog`, no `-AgentHarness`,
-and the slow-operation pattern joined with `|WM_KILLFOCUS`, while the user
-plays, so a lost focus also stops the trace. Only a printed slow-operation line
-is a caught stall; when a printed line is `WM_KILLFOCUS`, stop tracing and
-report the lost focus. Leave both processes running.
+`-MaxSeconds` set to the run budget's remaining seconds within the
+`## Trace sessions` bound, and the slow-operation pattern joined with
+`|WM_KILLFOCUS`, while the user plays, so a lost focus also stops the trace.
+Only a printed slow-operation line is a caught stall; when a printed line is
+`WM_KILLFOCUS`, stop tracing and report the lost focus. When a trace ends with
+no printed line, rerun it within the run budget, measured from the first
+trace's start. Leave both processes running.
 
 ## Elevated route
 

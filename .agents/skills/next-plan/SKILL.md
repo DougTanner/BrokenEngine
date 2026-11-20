@@ -1,8 +1,8 @@
 ---
 name: next-plan
-description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, presents the `/plan-alternatives` candidates before the Plan reviews, and presents the execution card's summary, the Plan review changes, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
+description: Validates and deterministically claims one Git-backed executable Plan through WorktreeCli, resolves it against current code, presents the `/plan-alternatives` candidates before the Plan reviews, and presents the execution card's summary, the Plan review changes, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
-argument-hint: "[Documents/Plans/... | partial pattern]"
+argument-hint: "[Documents/Plans/... | Projects/Coretide/Documents/Plans/... | partial pattern]"
 allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, Skill, AskUserQuestion]
 ---
 
@@ -27,10 +27,11 @@ The `argument-hint` value selects the Plan:
 
 - Bare invocation selects the newest eligible Plan by immutable `createdUtc`,
   then normalized UTF-8 path.
-- A normalized `Documents/Plans/...` argument selects that Plan.
+- A normalized `Documents/Plans/...` or `Projects/Coretide/Documents/Plans/...`
+  argument selects that Plan.
 - Any other argument is a case-sensitive partial match against executable Plan
-  paths relative to `Documents/Plans/`; exactly one match selects that Plan,
-  and zero or multiple matches block.
+  paths relative to whichever of those two Plans roots holds them; exactly one
+  match selects that Plan, and zero or multiple matches block.
 
 ## Steps
 
@@ -43,9 +44,10 @@ The `argument-hint` value selects the Plan:
 2. Only when a decision needs the queue — a tier-constrained request, or the
    user asks to see the queue — see it before selecting:
    `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Get-NextPlanList.ps1`
-   It is read-only and reports a bounded point-in-time projection — widen with
-   `-Top <n>` only when a decision needs more. For a tier-constrained request,
-   read its result through [claim-results.md](references/claim-results.md)
+   Its only write is fetching the session Coretide clone, and it reports a
+   bounded point-in-time projection — widen with `-Top <n>` only when a
+   decision needs more. For a tier-constrained request, read its result
+   through [claim-results.md](references/claim-results.md)
    `## Reading the queue listing`. A bare or plain named-Plan invocation skips
    this step, because step 3 selects and reports every stop itself. Done when
    this file's `## Inputs` resolves exactly one Plan or blocks.
@@ -59,7 +61,7 @@ The `argument-hint` value selects the Plan:
    reference read at this step, and any other result is read through
    [claim-results.md](references/claim-results.md) `## nextAction`.
    Done when the result reports `nextAction: prepare`.
-4. Dispatch one preparation `implementer` to verify every Plan statement against
+4. Dispatch one preparation `planner` to verify every Plan statement against
    current code, on the single task brief in
    [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
    `## Task brief`.
@@ -88,7 +90,7 @@ The `argument-hint` value selects the Plan:
    `## Task brief` section above.
 
    It leaves reading both the target source and the handoff and reporting
-   references the brief cites to the dispatched `implementer`, naming those
+   references the brief cites to the dispatched `planner`, naming those
    references as paths only, and reads source itself only for a decision it
    must make that the Plan and the returned handoff cannot settle.
 
@@ -108,7 +110,7 @@ The `argument-hint` value selects the Plan:
    baseline and, from the heading Grep above, the line ranges of the sections
    carrying the claimed Plan's investigation portion
    (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main reads, then
-   a fresh preparation `implementer` whose continuation capsule carries that
+   a fresh preparation `planner` whose continuation capsule carries that
    diagnosis handoff, unless that handoff returns without a proven root cause,
    which main reports to the user as a blocker under the approval-refused row of
    `### Post-checkpoint outcomes` with the claim held; the handoff that
@@ -333,7 +335,7 @@ the `### User decisions needed` form and delivered as above. Whether a reply
 answered a decision follows
 [`authority-order.md`](../../references/authority-order.md). When the approved
 presentation differs from the execution card, main dispatches, before step 8,
-one fresh preparation `implementer` whose continuation capsule
+one fresh preparation `planner` whose continuation capsule
 ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Continuation capsule`) carries the snapshot step 8 cites as the approved
 plan with its `##` selectors, and the user's approval answers; that worker
@@ -342,9 +344,9 @@ always names `Slices` in its `Return:`, whether or not the update changes the
 snapshot's scope, so step 8 dispatches from that handoff's `Slices`. Main does
 not read or edit the card or the snapshot for this update. A yes to step 4's
 split question, including one accepted as its recommendation, is the user's
-direction to defer stages 2 to M. The preparation `implementer` that records the
-yes — that approval-update worker, or the preparation `implementer` of the
-Tier-3 grill round that carries the yes — also marks each card acceptance check
+direction to defer stages 2 to M. The preparation `planner` that records the
+yes — that approval-update worker, or the preparation `planner` of the Tier-3
+grill round that carries the yes — also marks each card acceptance check
 and citation rewrite of stages 2 to M deferred to its stage's Plan, never
 deleting it, and names those stages in the card's `Out of scope`. After the
 handoff that records the yes and before step 8, and never earlier, because
@@ -414,7 +416,7 @@ work still to land — prints neither line.
   pixel-evidence deferral, retained resume, takeover, and changes requested at
   landing.
 - [references/preparation-brief.md](references/preparation-brief.md) — the
-  step-4 preparation `implementer`'s snapshot, leftovers, citation rule, and
+  step-4 preparation `planner`'s snapshot, leftovers, citation rule, and
   stage split; cited in its brief, not read by main.
 - [references/tier3-workflow.md](references/tier3-workflow.md) — the additional
   Tier-3 preparation route.

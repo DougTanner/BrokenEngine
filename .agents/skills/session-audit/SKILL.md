@@ -31,8 +31,8 @@ Require a self-contained, immutable brief containing:
 - the absolute adopted worktree and the session baseline commit;
 - the changed-file inventory and touched regions with implementation,
   propagation, review-fix, conditional-role, and reconciliation attribution,
-  excluding named pre-existing or concurrently owned work. The preparation
-  implementer assembles that inventory with the read-only
+  excluding named pre-existing or concurrently owned work. The brief-writing
+  `implementer` assembles that inventory with the read-only
   `.agents/scripts/Get-SessionChangeInventory.ps1 ... -Regions` run described
   below, never by enumerating the changed files and hunks inline; the
   attribution and the exclusion of pre-existing or concurrently owned work stay
@@ -59,21 +59,21 @@ Require a self-contained, immutable brief containing:
 
 The inventory run is
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute adopted worktree>' -Baseline <full 40-character SHA> -Regions`.
-It writes no file and prints one `broken-engine-session-change-inventory/v1`
+It writes no file and prints one `broken-engine-session-change-inventory/v2`
 object with `entries` and their `class` values, `counts`, `triggers`, and the
 per-hunk `regions` table. Only `status` `pass` is usable; any other status means
 the inventory is missing for the rule below. The implementer reports `truncated`
 with the brief so a shortfall is never presented as a complete inventory. Add
 the `-IncludeUntracked` switch when the audit scope includes untracked files.
 
-Main dispatches one preparation `implementer` to assemble that brief from
+Main dispatches one brief-writing `implementer` to assemble that brief from
 repository state and to map the user-authorized audit scope to the same named
 late, reconciled, or unseen-integration hypotheses; main then dispatches the
-reviewer. Return `BLOCKED` when the checkout, session baseline, attribution,
-intent, a mode decision, or an applicable prerequisite domain review is missing,
-ambiguous, moving, or incomplete. The assigned implementer's assembly from
-repository state is the only allowed source; the auditor never reconstructs
-these inputs from conversation history.
+`reviewer`. Return `BLOCKED` when the checkout, session baseline, attribution,
+intent, a mode decision, or an applicable prerequisite domain review is
+missing, ambiguous, moving, or incomplete. The assigned implementer's assembly
+from repository state is the only allowed source; the auditor never
+reconstructs these inputs from conversation history.
 
 ## Handoff
 

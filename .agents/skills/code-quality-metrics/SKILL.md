@@ -31,7 +31,7 @@ Per-path and per-line-range `bt-token-v1` counts come from
 
 ## Inputs
 
-Supply these fields on the task brief form in
+Dispatch one `researcher`, supplying these fields on the task brief form in
 [`subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Task brief`. The per-mode invocation sections of
 [`references/worker.md`](references/worker.md) own the exact parameter spellings

@@ -16,9 +16,11 @@ diff, before main asks the confirmation.
    file, so add the untracked files declared as authorized additions and
    reconcile each of them through `landing.porcelain`, never through
    `landing.reviewed`.
-2. Reconcile the diff paths against the declared owned paths. Each changed
-   region must name its authorizing Plan clause or user instruction. Extra,
-   missing without a recorded no-change decision, or unauthorized bytes block.
+2. Reconcile the diff paths against the declared owned paths, the
+   `Projects/Coretide/` diff paths against the Coretide landing set. Each
+   changed region must name its authorizing Plan clause or user instruction.
+   Extra, missing without a recorded no-change decision, or unauthorized bytes
+   block.
 3. Confirm every handoff still applies to this diff. A later change invalidates
    a handoff only where it changed bytes that handoff's result depends on — for
    the two typed prose handoffs below, the session's own bytes in the regions
@@ -28,7 +30,10 @@ diff, before main asks the confirmation.
    contract, evidence, and `unchanged`, `intentionally persisted`, `restored`,
    or non-passing `residual` outcome. A reviewed path reported dirty whose
    working-tree bytes match the reviewed `-Head` tree is the expected state of
-   an uncommitted candidate and classifies as `intentionally persisted`.
+   an uncommitted candidate and classifies as `intentionally persisted`. The
+   ignored `Projects/Coretide/` entry is the session Coretide clone, whose
+   changes the reviewed rows carry, and classifies as `intentionally
+   persisted`.
 
 The run writes only the named result file and emits one summary line on stdout.
 `-Landing` requires a commit-valued `-Head` and excludes the other modes.
@@ -41,7 +46,8 @@ object itself adds; no part of the run ever runs or replaces the WorktreeCli
 `plan validate` run required by `## Executable Plan check` below. The `landing`
 object also carries `acceptanceSkeleton`: the rows this landing owes, each
 emitted `BLOCKED` and named by skill, plus the `Executable Plan check` row when
-the reviewed diff touches `Documents/Plans/`.
+the reviewed diff touches `Documents/Plans/` or
+`Projects/Coretide/Documents/Plans/`.
 
 ## Acceptance table
 

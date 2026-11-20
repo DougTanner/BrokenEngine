@@ -1,6 +1,6 @@
 # Claude Code SubagentStop hook, registered in .claude/settings.json. Sends an
-# implementer, reviewer, researcher, or runner subagent back when its final
-# message lacks the shared handoff form of
+# implementer, planner, reviewer, researcher, or runner subagent back when its
+# final message lacks the shared handoff form of
 # .agents/references/subagent-handoff.md ## Handoffs or is at least that
 # section's character cap long. The form needs
 # a line that is exactly Status: PASS, Status: NEEDS_ACTION, or
@@ -20,7 +20,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
-$script:CheckedAgentTypes = @('implementer', 'reviewer', 'researcher', 'runner')
+$script:CheckedAgentTypes = @('implementer', 'planner', 'reviewer', 'researcher', 'runner')
 $script:FieldNames = @('Findings', 'Changed files', 'Decisive checks', 'Build required', 'Evidence', 'Residuals')
 # Mirrors the cap owned by .agents/references/subagent-handoff.md ## Handoffs.
 $script:HandoffCharacterCap = 4000

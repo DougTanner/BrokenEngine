@@ -174,6 +174,9 @@
     <ClInclude Include="..\..\Source\Network\Server\FleetNavigationController.h">
       <Filter>Game\Network\Server</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Network\Server\FleetRows.h">
+      <Filter>Game\Network\Server</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
@@ -648,6 +651,9 @@
       <Filter>Game\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\Server\FleetNavigationController.cpp">
+      <Filter>Game\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\Server\FleetRows.cpp">
       <Filter>Game\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.cpp">

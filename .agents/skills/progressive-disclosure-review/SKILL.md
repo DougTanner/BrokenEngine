@@ -119,4 +119,4 @@ this `Temp/` file.
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
   are the session executing this skill. Steps and rules for the dispatched
-  reviewer.
+  `reviewer`.

@@ -22,19 +22,20 @@ package against the repository's mechanical and semantic contracts.
   or bundled links need independent findings-only review.
 - Validate mode may be the fresh validation pass carried by the Tier-1
   `/coherence-review` combined review. The root Change Workflow still requires
-  an independent reviewer; the author never validates their own change as that
-  review.
+  an independent `reviewer`; the author never validates their own change as
+  that review.
 
 ## Inputs
 
 Supply `mode: author` or `mode: validate` in the task brief.
 
-In author mode, supply the user intent, intended clients, allowed package scope,
-and any fixed workflow or compatibility decisions.
+In author mode, dispatch one `implementer` and supply the user intent,
+intended clients, allowed package scope, and any fixed workflow or
+compatibility decisions.
 
-In validate mode, supply one repository skill directory or its `SKILL.md` as
-`Path`. A deliberately disposable package outside `.agents/skills/` also
-requires `AllowOutsideSkills: true`.
+In validate mode, dispatch one `reviewer` and supply one repository skill
+directory or its `SKILL.md` as `Path`. A deliberately disposable package
+outside `.agents/skills/` also requires `AllowOutsideSkills: true`.
 
 ## Handoff
 

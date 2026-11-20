@@ -44,9 +44,9 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   writes only its own fields.
 - `ExecuteClientAgentCommand` (`AgentCommandsClientGeneric.cpp`, whole-file
   `BT_CLIENT`) owns the client-generic handlers, `send_raw_packet`,
-  `set_client_grid_coord`, and `release_client_grid_coord`, and dispatches the
-  focused `audio_streaming_harness_rig`, `desync_probe`, and `describe_scene`
-  modules; the client commands of the harness command reference
+  `set_client_grid_coord`, `release_client_grid_coord`, and `pin_graphics`, and
+  dispatches the focused `audio_streaming_harness_rig`, `desync_probe`, and
+  `describe_scene` modules; the client commands of the harness command reference
   (`../../../.agents/skills/agent-harness/references/command-reference.md`)
   define their schemas. `set_client_grid_coord` requires a connected session
   whose owned entity is already assigned (`## Game contract`), because before
@@ -58,11 +58,11 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   read-only `presentation_continuity_probe`, which reports the render-published
   presentation-continuity snapshot (`../Graphics/Render/AGENTS.md`).
 - `ExecuteServerAgentCommand` (`AgentCommandsServerGeneric.cpp`, whole-file
-  `BT_SERVER`) owns `status`, `pause`, `timescale`, `save`, `load`, `reset`, the
-  server `query_profile`, `create_cell`, and the five replay commands; the
-  server commands of the harness command reference define their schemas. It
-  exports `RefuseDuringReplay`, which `create_cell` and the game `edit_frame`
-  share.
+  `BT_SERVER`) owns `status`, `pause`, `pause_at_tick`, `timescale`, `save`,
+  `load`, `reset`, the server `query_profile`, `create_cell`, and the five
+  replay commands; the server commands of the harness command reference define
+  their schemas. It exports `RefuseDuringReplay`, which `create_cell` and the
+  game `edit_frame` share.
 - `AudioStreamingHarnessRig` owns the client Debug audio/File harness rig state,
   snapshots, controls, and subsystem hooks; `AgentCommandServer` owns its
   instance, while `Commands/AgentCommandsAudioStreaming.cpp` owns the command's

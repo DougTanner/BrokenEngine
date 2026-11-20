@@ -405,7 +405,8 @@ For memory, record resource extents/formats/counts/payload and actual live VMA
 delta/resize peak, including all real slots, baseline overlap, diagnostics and
 retired allocations. Do not equate payload arithmetic with actual residency.
 Timing duration is unmeasured; five pairs require 7200 completed frames per
-fixture, excluding builds/loading/draining/captures. Follow [Change Workflow User Interaction](../../../.agents/references/change-workflow.md#user-interaction) Long test runs: before dispatching a run expected to exceed 10 minutes, obtain user approval with expected duration, checks and a shorter alternative. Do not truncate required cohorts or claim full acceptance from a spot check.
+fixture, excluding builds/loading/draining/captures. Do not truncate required
+cohorts or claim full acceptance from a spot check.
 
 ## Risks and invariants
 

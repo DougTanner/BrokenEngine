@@ -30,8 +30,8 @@ itself, to the user, who picks at most one option or combination.
   change at Tier 1, whenever the trigger in
   [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
   `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
-- From a `/next-plan` claim, after the preparation `implementer` verifies the
-  Plan and before the Plan review reviewers, whenever that same trigger fires.
+- From a `/next-plan` claim, after the preparation `planner` verifies the Plan
+  and before the Plan review reviewers, whenever that same trigger fires.
 - Not for a new Collection, manager, or subsystem API:
   `/external-design-interface` already produces three designs and replaces this
   skill for that case.
@@ -182,7 +182,7 @@ route that matches the change:
   `/prepare-change` as a fixed decision for a redraft, and the Plan review
   reviews run on the redraft.
 - `/next-plan` claim: the claimed Plan file is immutable, so the choice goes
-  back to the preparation `implementer` as a fixed decision for a redrafted
+  back to the preparation `planner` as a fixed decision for a redrafted
   execution card, which that worker writes into a resolved Plan snapshot under
   gitignored `Temp/` and cites in its handoff; the Plan review reviews then run
   on that snapshot. A "do nothing" choice is a user-authorized Plan rejection

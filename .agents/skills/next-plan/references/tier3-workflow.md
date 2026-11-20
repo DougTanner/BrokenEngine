@@ -23,13 +23,12 @@ identity, semantics, layout, guard scope, or named invariant.
 ## Plan review
 
 Main returns the accepted findings of the Plan review step's reviewers to the
-preparation `implementer`. That worker performs every repository read and
-search `/external-grill-plan` requires
-and returns an immutable decision brief in the shape that skill's `## Handoff`
-defines; it never interviews, chooses, or delegates.
-Main routes external-claim requests to a `locator` through
-`/verify-external-claims`, then dispatches a fresh preparation `implementer`
-per round whose continuation capsule carries that skill's
+preparation `planner`. That worker performs every repository read and search
+`/external-grill-plan` requires and returns an immutable decision brief in the
+shape that skill's `## Handoff` defines; it never interviews, chooses, or
+delegates. Main routes external-claim requests to a `locator` through
+`/verify-external-claims`, then dispatches a fresh preparation `planner` per
+round whose continuation capsule carries that skill's
 [`## Inputs`](../../external-grill-plan/SKILL.md#inputs) for the round, and
 receives the next brief. Main alone interviews the user and decides, recording
 the exact questions, answers, decisions, and refinements; it performs no

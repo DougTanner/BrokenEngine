@@ -156,8 +156,8 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
 
 	UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
-	// Not at the fleet sync that clears the member's kIsDead: the server sends it while the spawn is still queued, before
-	// the row exists.
+	// Not at the fleet sync that clears the member's kIsDead: that sync shares this event's reliable flush, and the client
+	// applies owned-entity events before game packets, so this event arrives first.
 	if (rEvent.eState == engine::OwnedEntityState::kSpawned && rEvent.globalId == gpGame->mFleetSelection.mPendingFocusMemberGlobalId)
 	{
 		gpGame->mFleetSelection.SelectOwnedEntityInFleet(rEvent.globalId);
@@ -216,12 +216,12 @@ void ClientSession::SendDestroyFleetMemberRequest(engine::GlobalId globalId)
 	}, GameMessages::DestroyFleetMemberRequestMessage {.globalId = globalId});
 }
 
-void ClientSession::SendSquadronOrdersRequest(engine::GlobalId globalId, FleetMemberFlags_t flags)
+void ClientSession::SendSquadronOrdersRequest(engine::GlobalId globalId, ShipOrders_t orders)
 {
 	mpRuntime->SendGameRequest(GamePacketType::kClientSquadronOrdersRequest, [&]
 	{
-		LOG(kNetwork, kDebug, "ClientSession::SendSquadronOrdersRequest Member: {} Flags: {}", globalId.iValue, std::to_underlying(flags.meFlags));
-	}, GameMessages::SquadronOrdersRequestMessage {.globalId = globalId, .uiFlags = std::to_underlying(flags.meFlags)});
+		LOG(kNetwork, kDebug, "ClientSession::SendSquadronOrdersRequest Member: {} Orders: {}", globalId.iValue, std::to_underlying(orders.meFlags));
+	}, GameMessages::SquadronOrdersRequestMessage {.globalId = globalId, .uiOrders = std::to_underlying(orders.meFlags)});
 }
 
 void ClientSession::SendFleetNavigationRequest(const FleetGuid& rFleetGuid, float fDelay, FleetBehaviour eBehaviour, engine::GridCoord holdCoordinate)

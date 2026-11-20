@@ -1,6 +1,7 @@
+#include <cstdint>
 #include <source_location>
 #include <string_view>
-namespace common { void Assert(bool bCondition, std::string_view expression, std::source_location sourceLocation = std::source_location::current()); }
+#include "../../../../Common/ErrorUtils.h"
 
 // ImGui Vulkan backend needs Volk for function loading
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -17,8 +18,9 @@ namespace common { void Assert(bool bCondition, std::string_view expression, std
 #pragma warning(push, 0)
 #pragma warning(disable: ALL_CODE_ANALYSIS_WARNINGS)
 
-#undef assert
-#define assert(a) common::Assert(a, #a)
+// Must match the Common/ExternalHeaders.h definition token for token, so imgui.h inline functions stay identical
+// across units. Defining IM_ASSERT also keeps imgui.h from including <assert.h>.
+#define IM_ASSERT(_EXPR) ASSERT(_EXPR)
 
 #include "imgui/imgui.cpp"
 #include "imgui/imgui_draw.cpp"

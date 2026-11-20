@@ -17,12 +17,12 @@ site — tuple, version, CRC, persistence, creation, transfer, hydration, identi
 
 - An enclosing `/implement-plan` implementation adds a field, member, or data
   column to an existing Collection.
-- Apply this specialist checklist in that implementer's context whenever a
+- Apply this specialist checklist in that `implementer`'s context whenever a
   `* __restrict` pointer is added; do not dispatch a separate member worker.
 
 ## Inputs
 
-The enclosing implementer's brief supplies the task-brief fields in
+The enclosing `implementer`'s brief supplies the task-brief fields in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Task brief` and its ownership snapshot. This checklist also consumes the
 target collection and member, the intended ownership and shared/client

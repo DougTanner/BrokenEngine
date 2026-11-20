@@ -2,10 +2,11 @@
 .SYNOPSIS
 	Run one Claude Code task on Codex headless in a worktree and capture its result.
 
-	-Agent selects a .codex/agents/<agent>.toml preset for model and reasoning effort (default sol);
-	-Model and -Effort override that preset's values. -Sandbox read-only (default) lets Codex only
-	read the worktree; workspace-write also lets it edit files there. The skill's -Sandbox input owns
-	the resources neither mode reaches, and its Rules route tasks needing them to Claude roles.
+	-Agent selects one of the two $presets entries for model and reasoning effort (default sol).
+	-Sandbox read-only (default) lets Codex only read the worktree; workspace-write also lets it edit
+	files there. The skill's -Sandbox input owns the resources neither mode reaches, and its Rules
+	route tasks needing them to Claude roles. -CheckModels checks the presets' models instead of
+	launching.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -38,13 +39,21 @@
 	performs exactly one attempt, because a second attempt would start from the first attempt's
 	edits.
 
-	Exit codes: 0 for every wait whatever its status;
-	126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
+	Exit codes (launch and -Wait calls; -CheckModels has its own below): 0 for every wait whatever
+	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
 	non-zero only for a script error. None of these retry. When the codex CLI itself exits non-zero,
 	the failed receipt's reason carries its last non-empty stderr line capped at 200 characters, with
 	the full stderr retained as <runId>.stderr.txt beside the run records; when the CLI printed
 	nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed or
-	malformed status is `.agents/skills/claude-to-codex/SKILL.md`, `## Rules`.
+	malformed status is `.agents/skills/codex-bridge/SKILL.md`, `## Rules`.
+
+	-CheckModels checks each $presets model against the live Codex model catalog
+	(`codex debug models`) and prints one compact JSON receipt: schemaVersion
+	(broken-engine-codex-models/v1); status (pass, blocked, or error); checks, one row per slug with
+	slug, newest, and reason (null when it passes); message (null, or the error cause). A slug is
+	blocked when the catalog lacks it, or when a list-visibility slug of the same
+	gpt-<version>-<family> carries a numerically higher version; hidden entries never block. Exit 0
+	pass, 2 blocked, 1 error.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
@@ -66,19 +75,8 @@ param(
 
 	[Parameter(ParameterSetName = 'Launch')]
 	[Parameter(ParameterSetName = 'InternalRun')]
-	[ValidateSet('opus', 'sol', 'sonnet')]
-	[string] $Agent = 'sol',                              # .codex/agents preset used for model and effort
-
-	# The value rides the detached run's pre-quoted argument line, so a double quote is refused.
-	[Parameter(ParameterSetName = 'Launch')]
-	[Parameter(ParameterSetName = 'InternalRun')]
-	[ValidatePattern('^[^\s"]+$')]
-	[string] $Model,                                      # overrides the preset's model
-
-	[Parameter(ParameterSetName = 'Launch')]
-	[Parameter(ParameterSetName = 'InternalRun')]
-	[ValidatePattern('^[a-z][a-z0-9_-]*$')]
-	[string] $Effort,                                     # overrides the preset's model_reasoning_effort
+	[ValidateSet('sol', 'astra')]
+	[string] $Agent = 'sol',                              # $presets entry used for model and effort
 
 	[Parameter(ParameterSetName = 'Launch')]
 	[Parameter(ParameterSetName = 'InternalRun')]
@@ -87,6 +85,9 @@ param(
 
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
+
+	[Parameter(Mandatory, ParameterSetName = 'CheckModels')]
+	[switch] $CheckModels,                                # check the $presets models; never launches
 
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $InternalRunId                               # detached-run mode: launched by this script, never by a caller
@@ -105,37 +106,10 @@ $waitSleepSeconds = 5
 # 'default' or 'fast'. Fast is disabled for now; set 'fast' to re-enable it (see .NOTES for the cost).
 $serviceTier = 'default'
 
-function Get-AgentConfiguration([string] $RepositoryRoot, [string] $AgentName)
-{
-	$rolePath = Join-Path ([System.IO.Path]::GetFullPath($RepositoryRoot)) ".codex/agents/$AgentName.toml"
-	$lines = @(Get-Content -LiteralPath $rolePath -ErrorAction Stop)
-
-	$values = @{}
-	foreach ($key in @('model', 'model_reasoning_effort'))
-	{
-		$assignments = @($lines | Where-Object { $_ -match "^\s*$key\s*=" })
-		if (($assignments.Count -ne 1) -or ($assignments[0] -notmatch "^\s*$key\s*=\s*`"([^`"]+)`"\s*(?:#.*)?$"))
-		{
-			throw "agent configuration '$rolePath' must contain exactly one quoted $key assignment"
-		}
-
-		$values[$key] = $Matches[1]
-	}
-
-	if ($values.model -notmatch '^\S+$')
-	{
-		throw "agent configuration '$rolePath' contains an unusable model value"
-	}
-
-	if ($values.model_reasoning_effort -notmatch '^[a-z][a-z0-9_-]*$')
-	{
-		throw "agent configuration '$rolePath' contains an unusable model_reasoning_effort value"
-	}
-
-	return [pscustomobject]@{
-		Model = $values.model
-		ReasoningEffort = $values.model_reasoning_effort
-	}
+# The only presets: -Agent picks one, and -CheckModels checks their models.
+$presets = @{
+	sol = @{ Model = 'gpt-6.2-sol'; Effort = 'xhigh' }
+	astra = @{ Model = 'gpt-6.2-astra'; Effort = 'high' }
 }
 
 function Write-Receipt([hashtable] $Fields)
@@ -210,8 +184,8 @@ function Invoke-CodexAttempt([string] $StagingPath)
 		exec `
 		--sandbox $Sandbox `
 		-C $Worktree `
-		-m $agentConfiguration.Model `
-		-c "model_reasoning_effort=`"$($agentConfiguration.ReasoningEffort)`"" `
+		-m $presets[$Agent].Model `
+		-c "model_reasoning_effort=`"$($presets[$Agent].Effort)`"" `
 		-c "service_tier=`"$serviceTier`"" `
 		--ephemeral `
 		-o $StagingPath `
@@ -302,7 +276,88 @@ if ($PSCmdlet.ParameterSetName -ceq 'Wait')
 	exit 0
 }
 
-# Only the modes that start Codex refuse the key; a wait stays a status query in any environment.
+if ($PSCmdlet.ParameterSetName -ceq 'CheckModels')
+{
+	Set-StrictMode -Version Latest
+	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
+	if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1')))
+	{
+		$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
+	}
+	Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
+
+	$result = [ordered]@{
+		schemaVersion = 'broken-engine-codex-models/v1'
+		status = 'error'
+		checks = @()
+		message = $null
+	}
+
+	$exitCode = 1
+	try
+	{
+		$codex = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+		if (-not $codex)
+		{
+			throw 'codex CLI not found on PATH'
+		}
+
+		$run = Invoke-AgentProcess $codex.Source @('debug', 'models') $PSScriptRoot
+		if ($run.ExitCode -ne 0)
+		{
+			throw "codex debug models exited $($run.ExitCode)"
+		}
+
+		$catalog = @(($run.Stdout | ConvertFrom-Json).models)
+		$blocked = $false
+		foreach ($slug in @($presets.Values | ForEach-Object { $_.Model } | Sort-Object -Unique))
+		{
+			$reason = $null
+			if (-not @($catalog | Where-Object { $_.slug -ceq $slug }))
+			{
+				$reason = 'absent from the catalog'
+			}
+
+			$newest = $slug
+			$pinned = Get-AgentModelFamily $slug
+			if ($null -ne $pinned)
+			{
+				$newestVersion = $pinned.Version
+				foreach ($entry in @($catalog | Where-Object { $_.visibility -ceq 'list' }))
+				{
+					$candidate = Get-AgentModelFamily $entry.slug
+					if (($null -ne $candidate) -and ($candidate.Family -ceq $pinned.Family) -and ((Compare-AgentModelVersion $candidate.Version $newestVersion) -gt 0))
+					{
+						$newest = $entry.slug
+						$newestVersion = $candidate.Version
+					}
+				}
+
+				if (($null -eq $reason) -and ($newest -cne $slug))
+				{
+					$reason = 'a newer listed version exists'
+				}
+			}
+
+			$blocked = $blocked -or ($null -ne $reason)
+			$result.checks += [ordered]@{ slug = $slug; newest = $newest; reason = $reason }
+		}
+
+		$result.status = if ($blocked) { 'blocked' } else { 'pass' }
+		$exitCode = if ($blocked) { 2 } else { 0 }
+	}
+	catch
+	{
+		$result.status = 'error'
+		$result.message = $_.Exception.Message
+		$exitCode = 1
+	}
+
+	[Console]::Out.Write(($result | ConvertTo-Json -Depth 8 -Compress))
+	exit $exitCode
+}
+
+# Only the modes that start Codex refuse the key; a wait or a model check runs in any environment.
 if ($null -ne [Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'Process'))
 {
 	Write-Error 'refusing to launch Codex with inherited OPENAI_API_KEY' -ErrorAction Continue
@@ -314,17 +369,6 @@ if (-not $codex)
 {
 	Write-Error 'codex CLI not found on PATH' -ErrorAction Continue
 	exit 127
-}
-
-$agentConfiguration = Get-AgentConfiguration $Worktree $Agent
-if ($Model)
-{
-	$agentConfiguration.Model = $Model
-}
-
-if ($Effort)
-{
-	$agentConfiguration.ReasoningEffort = $Effort
 }
 
 if ($PSCmdlet.ParameterSetName -ceq 'Launch')
@@ -352,9 +396,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$powershell = (Get-Process -Id $PID).Path
 	# One pre-quoted command line: an argument array would be re-escaped and would split these paths.
 	$noRetryArgument = if ($NoRetry) { ' -NoRetry' } else { '' }
-	$modelArgument = if ($Model) { " -Model `"$Model`"" } else { '' }
-	$effortArgument = if ($Effort) { " -Effort `"$Effort`"" } else { '' }
-	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`" -Sandbox `"$Sandbox`"$modelArgument$effortArgument$noRetryArgument"
+	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`" -Sandbox `"$Sandbox`"$noRetryArgument"
 	$detached = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
 
 	[ordered]@{

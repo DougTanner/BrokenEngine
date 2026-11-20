@@ -22,8 +22,8 @@ mechanics live in [`capture.md`](capture.md); trace reading in
    holds a caught stall, or the run budget ended.
 4. For the `focused` route, launch the client and server and trace as
    [`capture.md`](capture.md) `## Focused route` directs. Done when a trace
-   holds a caught stall, or the trace ended without one and both processes are
-   left running.
+   holds a caught stall, a `WM_KILLFOCUS` line stopped tracing, or the run
+   budget ended, with both processes left running.
 5. For the `supplied` route, record the ETL, the client log, and the noted
    stall time. Done when each is recorded or named missing in a residual.
 

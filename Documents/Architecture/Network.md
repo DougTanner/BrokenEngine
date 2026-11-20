@@ -96,10 +96,11 @@ generating/consuming StatusChange events.
   and stamps connection responses, load notifications, subscribe accepts,
   coordinate static/full state, and update/resend traffic with its current
   value; the client stamps subscribe requests with its committed value. Each
-  successful debugging load advances through generations 1–255; a 256th attempt
-  asserts before increment, notification, or reset-state mutation, with no
-  wraparound path. Slot epochs, ACK packets, Frame/save/replay versions, and CRC
-  contents are unchanged.
+  successful debugging load, and a successful startup load of the autosave,
+  advances the generation; `Server::AdvanceLoadGeneration` owns the limit, and
+  the attempt past it asserts before increment, notification, or reset-state
+  mutation, with no wraparound path. Slot epochs, ACK packets,
+  Frame/save/replay versions, and CRC contents are unchanged.
 - The first accepted connection response seeds the client's committed
   generation, including for a client joining after an earlier load. A repeated
   accepted Hello reports the same current server generation but leaves the
@@ -427,50 +428,54 @@ sizes are the full packet including the type byte.
 | `kClientSpawnIntoFleetRequest` | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; no open squadron of that type (`FindOpenFleetSquadron`) → refused with a warning |
 | `kClientDestroyFleetMemberRequest` | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | `GameMessages::DestroyFleetMemberRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
 | `kClientMapFleetMarkersRequest` | `GameMessages::MapFleetMarkersRequestMessage::kiSize` + 1 | `GameMessages::MapFleetMarkersRequestMessage::kiSize` + 1 | 2 | yes | violation | none; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
-| `kClientSquadronOrdersRequest` | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 or a flags bit outside `kSquadronOrderFlags` → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
+| `kClientSquadronOrdersRequest` | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | `GameMessages::SquadronOrdersRequestMessage::kiSize` + 1 | 8 | yes | violation | global ID ≤ 0 or an orders bit outside `kSquadronOrderBits` → corrupt; consumption: `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
 | `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
 client-sendable). The current wire-protocol version is `kiProtocolVersion`.
-Version 56 added a pause byte after the time ratio to `kServerTimespeedUpdate`;
-version 55 removed the island placements from the `kServerCoordinateStaticData`
-body, which now carries navigation only, removed the `kClientHello`
-build-configuration string, made the `kClientHello` and accepted
-`kServerConnectionResponse` GUID a fixed field, and carried `kClientChat` and
-`kServerChat` text to the end of the packet with no terminator; version 54
-removed `navigationDelay` from the three ship `SpawnInfo` payloads and
-`animationTime` from the Omni one, and the shared collection columns lost the
-ship `pNavigationDelays` and `OmnisInterpolate::pAnimationTimes`; version 53
-renamed the fighter-orders request `kClientSquadronOrdersRequest` and its status
-change `kUpdateSquadronOrders`, which gained a ship-type byte; the request now
-also carries the Omni squadron settings (`kOmniOrderFlags`), which FleetSync
-member flags also gained, and the status change the `ShipOrders` bits
-`kPatrolCell` and `kPatrolTogether`; version 52 appended the
-`kClientFighterOrdersRequest` packet and the `kUpdateFighterOrders` status
-change, and FleetSync member flags gained the `kFighterOrderFlags` bits; version
-51 renamed the fleet navigation-delay request `kClientFleetNavigation` and added
-the fleet behaviour byte and hold coordinate to it and to each FleetSync fleet
-header; version 50 appended the `kClientMapFleetMarkersRequest` and
-`kServerMapFleetMarkers` packets; version 49 removed the `kSpawnExplosion`
-status change and its `ExplosionsPostRender::SpawnInfo` payload, so every later
-`StatusChangeType` value moved down one; version 47 added a squadron byte to
-each FleetSync member; version 43 made the `kServerCoordinateStaticData` count
-one navigation graph per game `kNavigationGraphs` entry (clearance tier and
-flight plane) instead of one per flight plane; version 42 added the missile
-cooldown `nextMissileFireTime` to the Battleship `SpawnInfo` `Fields()`; version
-41 removed the client update-owned-entity request, so every later game packet
-type moved down one value, and dropped the weapon-mode fields from the
-`UpdateShip` payload and the Omni `SpawnInfo` `Fields()`; version 40 replaced
-the beam cooldown `nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()`
-with the missile tube slot `uiNextMissileTube`; version 39 replaced the two
-Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()` with the
-one beam cooldown `nextBeamFireTime`; version 38 made every cell a flat-top
-hexagon: each `GridCoord` on the wire carries axial coordinates (`iQ`, `iR`),
-every cell-local position is local to its hexagon, and a `kClientSubscribe`
-coord must lie within grid distance 1 of an authorized coord; version 37 added
-the replay playback byte to the accepted `kServerConnectionResponse` and to
+Version 57 moved the squadron settings out of the FleetSync member flags into
+one 16-bit `ShipOrders` value per squadron at the end of each FleetSync fleet
+header, and made the `kClientSquadronOrdersRequest` settings a 16-bit
+`ShipOrders` mask; version 56 added a pause byte after the time ratio to
+`kServerTimespeedUpdate`; version 55 removed the island placements from the
+`kServerCoordinateStaticData` body, which now carries navigation only, removed
+the `kClientHello` build-configuration string, made the `kClientHello` and
+accepted `kServerConnectionResponse` GUID a fixed field, and carried
+`kClientChat` and `kServerChat` text to the end of the packet with no
+terminator; version 54 removed `navigationDelay` from the three ship `SpawnInfo`
+payloads and `animationTime` from the Omni one, and the shared collection
+columns lost the ship `pNavigationDelays` and
+`OmnisInterpolate::pAnimationTimes`; version 53 renamed the fighter-orders
+request `kClientSquadronOrdersRequest` and its status change
+`kUpdateSquadronOrders`, which gained a ship-type byte; the request now also
+carries the Omni squadron settings (`kOmniOrderFlags`), which FleetSync member
+flags also gained, and the status change the `ShipOrders` bits `kPatrolCell` and
+`kPatrolTogether`; version 52 appended the `kClientFighterOrdersRequest` packet
+and the `kUpdateFighterOrders` status change, and FleetSync member flags gained
+the `kFighterOrderFlags` bits; version 51 renamed the fleet navigation-delay
+request `kClientFleetNavigation` and added the fleet behaviour byte and hold
+coordinate to it and to each FleetSync fleet header; version 50 appended the
+`kClientMapFleetMarkersRequest` and `kServerMapFleetMarkers` packets; version 49
+removed the `kSpawnExplosion` status change and its
+`ExplosionsPostRender::SpawnInfo` payload, so every later `StatusChangeType`
+value moved down one; version 47 added a squadron byte to each FleetSync member;
+version 43 made the `kServerCoordinateStaticData` count one navigation graph per
+game `kNavigationGraphs` entry (clearance tier and flight plane) instead of one
+per flight plane; version 42 added the missile cooldown `nextMissileFireTime` to
+the Battleship `SpawnInfo` `Fields()`; version 41 removed the client
+update-owned-entity request, so every later game packet type moved down one
+value, and dropped the weapon-mode fields from the `UpdateShip` payload and the
+Omni `SpawnInfo` `Fields()`; version 40 replaced the beam cooldown
+`nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()` with the missile
+tube slot `uiNextMissileTube`; version 39 replaced the two Battleship blaster
+cooldowns in the Battleship `SpawnInfo` `Fields()` with the one beam cooldown
+`nextBeamFireTime`; version 38 made every cell a flat-top hexagon: each
+`GridCoord` on the wire carries axial coordinates (`iQ`, `iR`), every cell-local
+position is local to its hexagon, and a `kClientSubscribe` coord must lie within
+grid distance 1 of an authorized coord; version 37 added the replay playback
+byte to the accepted `kServerConnectionResponse` and to
 `kServerLoadNotification`; version 36 dropped `bIsFlagship` and
 `flagshipGlobalId` from the `UpdateFleetData` `Fields()` list and removed
 `kClientRespawnInFleetRequest` and `kClientDeleteFleetRequest`, shifting the

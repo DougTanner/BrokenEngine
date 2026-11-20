@@ -2,10 +2,11 @@
 name: reset-worktree
 description: >-
   Ready a landed wrapper session worktree for another /next-plan run: refuse
-  unless it is clean and holds no commits the primary branch lacks, then
-  fast-forward the session branch to the primary tip, delete the worktree's
-  Temp directory, and rerun the setup a newly created session worktree gets.
-  Use only when the user explicitly invokes this skill.
+  unless it and its Coretide clone are clean and hold no commits the primary
+  branch or the clone's upstream lacks, then fast-forward the session branch to
+  the primary tip, delete the worktree's Temp directory, and rerun the setup a
+  newly created session worktree gets. Use only when the user explicitly
+  invokes this skill.
 disable-model-invocation: true
 allowed-tools: [Bash, PowerShell]
 ---

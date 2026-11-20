@@ -18,8 +18,8 @@ public:
 
 	// Pulls the game camera's target, runs the display-rate camera update for the coord the camera renders, and sets
 	// controller vibration from the decayed shake; shared by GameBase::Render() and the Main.cpp boot render.
-	// fSunDeltaTime is the render clock's advance this frame limited to [0, this frame's sim delta], so the sun stops
-	// whenever on-screen game time stops.
+	// fSunDeltaTime is the render clock's advance this frame limited to [0, this frame's sim delta], or 0 while
+	// gbGraphicsPinned, so the sun stops whenever on-screen game time stops.
 	void UpdateCamera(const GameBase& rGame, GridCoord cameraCoordinate, float fSunDeltaTime);
 
 	// Per-coord render interpolation. GameBase::Render() and the Main.cpp boot path own its lifecycle and forward it by

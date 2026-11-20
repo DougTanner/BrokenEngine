@@ -26,24 +26,27 @@ grid file uses. This subsystem owns the game half of that contract.
   read into an isolated staged value the engine carries without inspecting and
   applies only once the whole replay generation validates.
 - Replay metadata also carries the fleet state the frames do not hold, as replay
-  fleet records: the fleet payload a grid save writes, every member's respawn
-  countdown, and the Fighter launch ticks, without owner client IDs or queued
-  requests. Recording takes one record at its start and another at each tick
-  whose fleet checksum before the fleet step differs from the previous tick's
-  end-of-tick checksum, so every fleet change made outside the fleet step and
-  the tick is caught with no per-site code.
+  fleet records: exactly the fleet payload a grid save writes, which includes
+  every member's respawn countdown and each fleet's Fighter launch tick, without
+  owner client IDs or queued requests. A load resets those countdowns and launch
+  ticks, so a grid save stores them only to share the record layout. Recording
+  takes one record at its start and another at each tick whose fleet checksum
+  before the fleet step differs from the previous tick's end-of-tick checksum,
+  so every fleet change made outside the fleet step and the tick is caught with
+  no per-site code.
 - The fleet checksum is the CRC of the record bytes, taken after each recorded
   tick and verified after each replayed tick; a mismatch logs an error and
   playback continues, as a frame CRC mismatch does. It is replay-only and
   server-only, never part of `Frame::Crc`, the client/server CRC exchange, or
   the wire.
 - Each dispatching playback tick reruns the fleet step and then, when a record
-  is due at that tick, replaces the fleets, the fleet RNG, the countdowns, and
-  the launch ticks with it, keeping the live owner client IDs, then sends every
-  connected client its full fleet sync. The start record, applied on the first
-  dispatched tick, replaces the state the adoption's load reset rebuilt from the
-  frames. An abort therefore keeps the last dispatched tick's fleets, including
-  fleets and members added during the recording.
+  is due at that tick, replaces the fleets, with their countdowns and launch
+  ticks, and the fleet RNG with it, keeping the live owner client IDs; that
+  tick's fleet sync send (`../Network/Server/AGENTS.md`) then carries the change
+  to each connected owner. The start record, applied on the first dispatched
+  tick, replaces the state the adoption's load reset rebuilt from the frames.
+  An abort therefore keeps the last dispatched tick's fleets, including fleets
+  and members added during the recording.
 - After a successful save load, a fresh reset, replay adoption, a replay
   playback abort, or an agent frame edit with a connected client, the path
   calls the engine session load reset

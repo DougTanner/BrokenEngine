@@ -30,55 +30,15 @@ inline constexpr int64_t kiMaximumFleetMembers = kiMaximumFleetSquadronsPerType 
 enum class FleetMemberFlags : uint8_t
 {
 	kIsDead = 1 << 0,
-	// Fighter squadron settings, equal on every member of the squadron; both clear is Patrol with Same Target on.
-	kSeekAndDestroy  = 1 << 1,
-	kSeparateTargets = 1 << 2,
-	// Omni squadron settings, equal on every member of the squadron; both clear is Escort with Patrol Together off.
-	kPatrolCell      = 1 << 3,
-	// Patrol Cell only: the squadron flies to one shared destination.
-	kPatrolTogether  = 1 << 4,
 };
 using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
 
-inline constexpr FleetMemberFlags_t kFighterOrderFlags {FleetMemberFlags::kSeekAndDestroy, FleetMemberFlags::kSeparateTargets};
-inline constexpr FleetMemberFlags_t kOmniOrderFlags {FleetMemberFlags::kPatrolCell, FleetMemberFlags::kPatrolTogether};
-inline constexpr FleetMemberFlags_t kSquadronOrderFlags {FleetMemberFlags::kSeekAndDestroy, FleetMemberFlags::kSeparateTargets, FleetMemberFlags::kPatrolCell, FleetMemberFlags::kPatrolTogether};
-
-// The squadron setting flags a member of eType may hold.
-inline FleetMemberFlags_t SquadronOrderFlags(ShipType eType)
-{
-	switch (eType)
-	{
-		case ShipType::kFighter:    return kFighterOrderFlags;
-		case ShipType::kOmni:       return kOmniOrderFlags;
-		case ShipType::kBattleship: break;
-		case ShipType::kCount:      break;
-	}
-	return {};
-}
-
-// Replaces the kSquadronOrderFlags bits of rFlags with those of orderFlags, keeping every other bit.
-inline void SetSquadronOrderFlags(FleetMemberFlags_t& rFlags, FleetMemberFlags_t orderFlags)
-{
-	rFlags.meFlags = static_cast<FleetMemberFlags>((std::to_underlying(rFlags.meFlags) & ~std::to_underlying(kSquadronOrderFlags.meFlags)) | orderFlags.Mask(kSquadronOrderFlags));
-}
-
-// The row ShipOrders a Fighter or Omni member's settings give.
-inline ShipOrders_t SquadronOrders(ShipType eType, FleetMemberFlags_t flags)
-{
-	ShipOrders_t orders {};
-	if (eType == ShipType::kFighter)
-	{
-		orders.Set(ShipOrders::kSeekAndDestroy, flags & FleetMemberFlags::kSeekAndDestroy);
-		orders.Set(ShipOrders::kSharedTarget, !(flags & FleetMemberFlags::kSeparateTargets));
-	}
-	else
-	{
-		orders.Set(ShipOrders::kPatrolCell, flags & FleetMemberFlags::kPatrolCell);
-		orders.Set(ShipOrders::kPatrolTogether, flags & FleetMemberFlags::kPatrolTogether);
-	}
-	return orders;
-}
+// The squadron setting bits a squadron of each type may hold, indexed by ShipType.
+inline constexpr ShipOrders_t kpSquadronOrderBits[] {{ShipOrders::kSeekAndDestroy, ShipOrders::kSharedTarget}, {ShipOrders::kPatrolCell, ShipOrders::kPatrolTogether}, {}};
+static_assert(std::ssize(kpSquadronOrderBits) == std::to_underlying(ShipType::kCount), "kpSquadronOrderBits needs one entry per ShipType");
+// The settings an empty squadron's first member starts with, indexed by ShipType.
+inline constexpr ShipOrders_t kpDefaultSquadronOrders[] {{ShipOrders::kSharedTarget}, {}, {}};
+static_assert(std::ssize(kpDefaultSquadronOrders) == std::to_underlying(ShipType::kCount), "kpDefaultSquadronOrders needs one entry per ShipType");
 
 struct FleetMember
 {
@@ -91,8 +51,8 @@ struct FleetMember
 	// in add order and a removal closes its hole.
 	uint8_t uiSquadron = 0;
 	engine::GridCoord coordinate {};
-	// Server-only automatic respawn countdown in seconds; TickRespawnTimers reads it only while kIsDead is set. Replay
-	// fleet records carry every member's value; grid saves and the wire do not.
+	// Server-only automatic respawn countdown in seconds; TickRespawnTimers reads it only while kIsDead is set. Grid saves
+	// and replay fleet records carry every member's value; the wire does not.
 	std::chrono::duration<float> respawnTimerSeconds = std::chrono::duration<float>::zero();
 };
 
@@ -123,6 +83,10 @@ struct Fleet
 	// The hex kStayInCell travels to and holds. Never the origin: the server refuses an origin hold, and entering
 	// kStayInCell overwrites this default before it is navigated to.
 	engine::GridCoord holdCoordinate {.iQ = 1, .iR = 0};
+	// One squadron's settings, as the bits its members' rows hold, indexed by ShipType and squadron number.
+	ShipOrders_t pSquadronOrders[std::to_underlying(ShipType::kCount)][kiMaximumFleetSquadronsPerType] {};
+	// Server-only: the first spawn tick at which the Battleship may launch another Fighter batch.
+	int64_t iNextFighterLaunchTick = 0;
 };
 
 inline int64_t CountFleetSquadronMembers(const Fleet& rFleet, ShipType eType, uint8_t uiSquadron)

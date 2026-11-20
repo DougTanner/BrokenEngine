@@ -135,7 +135,10 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   render delta the caller passes to `CameraBase::Update` (wall delta multiplied
   by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances
   from the render clock's per-frame advance the caller passes separately, so it
-  stops whenever on-screen game time stops, and pauses in the main menu. Debug
+  stops whenever on-screen game time stops, and pauses in the main menu. While
+  `gbGraphicsPinned` (`Render/Render.h`) is set,
+  `RenderInterpolation::UpdateRenderInterpolation` overwrites `mfSunAngle` with
+  `CameraBase::kfDefaultSunAngle` and passes a sun advance of 0. Debug
   free-camera motion is main-menu-only and drives the pose directly, ignoring
   the pulled target.
 - Long-distance target changes use a bounded smoothstep jump that may re-anchor

@@ -100,26 +100,21 @@ repeated operation.
 
 ## Verify execution-model routing
 
-For every headless `/codex-review` attempt in the routing inventory, classify
-the actual assigned task before considering its role label: `planning/design`,
-`review/audit`, `implementation/propagation/documentation`,
-`judgment-heavy research`, `locate/build/mechanical`, or `unable to classify`.
-Map that concern to the appropriate workflow role, then evaluate the configured
-and actual model and effort against the mapping in
-`.agents/references/change-workflow.md` `### Delegation roles` as it existed at
-that commit, not the requested role alone. When the assigned task is unable to
-classify, or the governing mapping cannot be established, do not infer
-compliance.
+For every headless Codex launch through the bridge launcher in the routing
+inventory, evaluate the actual model and effort against the model and effort
+the commit-time launcher applies for the launched `-Agent` preset, not against
+the role table's Codex definitions. When the launched preset's model and effort
+cannot be established, do not infer compliance.
 
 Use only this allowed evidence chain from claim to conclusion: a headless
-`/codex-review` is compliant only with its parent wrapper invocation/result, the
-commit-time `.codex/agents/<agent>.toml` `model` and `model_reasoning_effort`
-pins that `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` applies, and
-fixed structured output. A requested role, explicit requested model/effort, or
-configured mapping proves intent only; when required model or effort evidence
-cannot be proved, the verdict is `unverified`. Record the parent wrapper event,
-the actual concern, the commit-time pinned model and effort with their proof,
-the verdict, and the citation.
+launch is compliant only with its parent launcher invocation/result, the
+commit-time model and effort pins the commit's launcher
+(`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`, or its earlier path)
+applies for the launched `-Agent` preset, and fixed structured output. A
+requested role, explicit requested model/effort, or configured mapping proves
+intent only; when required model or effort evidence cannot be proved, the
+verdict is `unverified`. Record the parent launcher event, the commit-time
+pinned model and effort with their proof, the verdict, and the citation.
 
 Verdicts are `compliant`, `violation`, `unverified`, or `not-executed`.
 `not-executed` is a nonfinding only when the parent event/result conclusively

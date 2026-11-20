@@ -61,10 +61,8 @@ behavior. A CPU timing criterion needs `Profile` on every side it measures:
 both sides of a comparison, and a single-condition measurement. A `Profile` or
 `Release` scenario cannot use anything a command reference limits to
 Debug or to `kbDebugInput` builds, or run a replay determinism check
-([`replay.md`](references/replay.md)). The brief may state a
-wall-clock budget for the run; otherwise a 10-minute default applies. A longer
-run follows [`change-workflow.md`](../../references/change-workflow.md)
-`### User Interaction` Long test runs.
+([`replay.md`](references/replay.md)). The brief may state a wall-clock budget
+for the run; a run whose brief states none has no budget.
 
 A harness run dispatched on its own runs in the delegated execution context of
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
@@ -134,16 +132,9 @@ extended with these fields:
   passes only when its existing runtime check passes.
 
 Each shared `Residuals` row names a missing capability or environment, or a
-criterion left unsettled by the run budget; use `none` when absent. Each row
-for a criterion left unsettled by the run budget gives what that criterion
-checks. The first such row also gives, once for the whole fresh run (a
-redispatch reclaims and restarts the scenario), the runner's estimate of the
-wall-clock time that run needs to settle every unsettled criterion, and a
-shorter run budget with the criteria it would likely settle, because
-[`change-workflow.md`](../../references/change-workflow.md)
-`### User Interaction` Long test runs needs all three and main reads no check.
-A `shared-data.changed` or `shared-data.record-missing` residual from the claim
-or a launch routes `/compile` for the named target, and a
+criterion left unsettled by the brief-stated run budget; use `none` when
+absent. A `shared-data.changed` or `shared-data.record-missing` residual from
+the claim or a launch routes `/compile` for the named target, and a
 `claim.data-directory-mismatch` residual routes `/compile` of both the Server
 and the Client target in one data mode, and a ModelViewer
 `capture.executable-missing` residual routes `/compile` ModelViewer Debug, each

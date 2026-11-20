@@ -121,16 +121,18 @@ worker.
 
 ### Synthesize and Gate the Plan
 
-12. After the user decides, create a complete implementation plan containing the
-    final header-style interface, key call-site examples, incorporated elements,
-    affected integration sites and invariants, exclusions, and decisive
-    acceptance checks. Done when that plan contains each of those.
+12. After the user decides, dispatch one `planner` with the chosen design's file
+    path plus selector and the user's decision to write a complete
+    implementation plan to gitignored `Temp/design-interface-plan.md`,
+    containing the final header-style interface, key call-site examples,
+    incorporated elements, affected integration sites and invariants,
+    exclusions, and decisive acceptance checks, and, when the plan adds a
+    Collection, the record that `/add-collection` owns its mechanical wiring
+    and invokes `/add-collection-member` for every SOA column. Done when its
+    handoff cites that plan and the plan contains each of those.
 13. Classify that plan under the `.agents/references/change-workflow.md` Approve
     and classify through Plan review steps, which own the tier and the
     plan-review gates that tier requires. Done when the plan is classified.
-14. When the plan adds a Collection, record that `/add-collection` owns its
-    mechanical wiring and invokes `/add-collection-member` for every SOA column.
-    Done when the plan records that ownership.
 
 ## Handoff
 
@@ -158,8 +160,8 @@ citations, to gitignored `Temp/design-interface-pattern-evidence.md` under one
 `## Pattern evidence` heading, and cites that path plus its `##` selector under
 `Evidence`.
 
-The full design does not travel inline either. Each planner writes it — the
-header-style declarations, the representative usage, and the detail behind
+The full design does not travel inline either. Each step 9 planner writes it —
+the header-style declarations, the representative usage, and the detail behind
 every other planner row — to its own gitignored `Temp/` design file under one
 `## Design` heading: `Temp/design-interface-minimal-surface.md`,
 `Temp/design-interface-data-locality.md`, or
@@ -170,11 +172,11 @@ its `##` selector under `Evidence`.
 workflow edits no tracked file and requires no build; the brief-writing
 `implementer` cites its one gitignored `Temp/` brief file under `Evidence`.
 
-The researcher uses only the researcher extension; each planner uses only the
-planner extension; the brief-writing `implementer` adds none. Main consumes
-those child handoffs, then owns the comparison
-packet and user-facing decision below; that presentation is outside the child
-envelopes.
+The researcher uses only the researcher extension; each step 9 planner uses
+only the planner extension; the brief-writing `implementer` and the step 12
+planner add none, and the step 12 planner cites its plan file under `Evidence`.
+Main consumes those child handoffs, then owns the comparison packet and
+user-facing decision below; that presentation is outside the child envelopes.
 
 ### Implicit detection
 
@@ -199,10 +201,11 @@ choose a public interface when multiple meaningfully different shapes remain.
 - The manager, the brief-writing `implementer`, the researcher, and the planners
   may inspect the repository, but they do not create, edit, or remove scratch
   source, build output, branches, or worktrees, and they do not compile
-  candidates. The three exceptions: the `implementer` writes its one gitignored
+  candidates. The four exceptions: the `implementer` writes its one gitignored
   `Temp/` brief file, the researcher writes its one gitignored `Temp/`
-  pattern-evidence file, and each planner writes its one gitignored `Temp/`
-  design file.
+  pattern-evidence file, each step 9 planner writes its one gitignored `Temp/`
+  design file, and the step 12 planner writes its one gitignored `Temp/` plan
+  file.
 - The workflow ends at the decision and plan gate; do not begin implementation
   from this skill. Follow `.agents/references/change-workflow.md` for
   delegation, plan, review, and landing mechanics rather than restating them

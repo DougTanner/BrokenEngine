@@ -19,6 +19,14 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-20 claude/bdfc78d3-acd8-4d0c-9af9-3f1bc3399d83 — refactor
+  observation — Engine/Source/Agent/Commands/ReplayHarnessRigs.cpp:243 — the
+  writer-input pause arms a count of writer inputs while
+  `GameBase::miPauseAtTick` (Engine/Source/GameBase.cpp:505) arms a target
+  tick, two pause-at-target mechanisms in the server tick loop — key the
+  writer-input pause on a target tick so both share one check, after a harness
+  run confirms the replay matrix still passes when a target tick has only
+  terminal writers and for a pending recording start
 - 2026-11-19 claude/dc240152-a8d5-4109-98cc-1668cbc3fa7c —
   Engine/Source/Profile/ProfileManager.h:402 — fill the ring slots with a
   sequence value no real submission can have (submission sequences start at 1),
@@ -89,14 +97,6 @@ top of the file. A session reviewing the log removes each row it handles.
   before drawing (the reason Blasters dropped its `ClientInitialize` light
   sync) — check whether the trail and sound parts need the first-frame call;
   if not, drop it and make `SynchronizeMissile` file-static
-- 2026-11-15 claude/d58c37a3-698d-45c4-8a10-a85cb03c0154 —
-  Engine/Source/File/ServerSaveLoad.cpp:117 — `Autoload` adopts a save
-  without the `ResetSession`, `ResetForLoad`, and `ComputeActiveSet` tail that
-  `ServerLoad` and `ServerReset` run, and its caller in the game `Game.cpp`
-  owns its own fresh-world fallback, so startup and runtime loads follow
-  different sequences — route startup through one load-or-reset entry point
-  in `ServerSaveLoad` that shares that tail (needs a harness check of
-  `ResetForLoad` during the `Game` constructor)
 - 2026-11-15 claude/a2c7596c-10a1-435c-b437-17d460d78832 —
   Engine/Source/Graphics/Objects/Pipeline.h:156 — `mExternalVkDescriptorSetLayout`
   is always assigned the global Set 0 layout in `Pipeline::Create` and read

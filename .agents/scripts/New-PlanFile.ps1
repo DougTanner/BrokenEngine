@@ -100,16 +100,22 @@ try {
 		Complete-PlanFile 1 'error' 'input.name-invalid' "Plan -Name must match '^[A-Z][A-Za-z0-9]*\.md$': '$Name'."
 	}
 
+	# A session Coretide clone carries a second Plans root, Projects/Coretide/Documents/Plans (Documents/Plans/AGENTS.md).
+	$coretideRepository = Get-AgentCoretideRepository $repositoryRoot
+	$coretidePlansRoot = if ($coretideRepository) { Get-AgentCanonicalPath (Join-Path $coretideRepository 'Documents\Plans') } else { $null }
+
 	$areaInput = $Area.Replace('\', '/').Trim()
 	$areaFull = if ([IO.Path]::IsPathFullyQualified($areaInput)) {
 		Get-AgentCanonicalPath $areaInput
-	} elseif ($areaInput -ceq 'Documents/Plans' -or $areaInput.StartsWith('Documents/Plans/', [StringComparison]::Ordinal)) {
+	} elseif ($areaInput -ceq 'Documents/Plans' -or $areaInput.StartsWith('Documents/Plans/', [StringComparison]::Ordinal) -or $areaInput.StartsWith('Projects/Coretide/Documents/Plans/', [StringComparison]::Ordinal)) {
 		Get-AgentCanonicalPath (Join-Path $repositoryRoot $areaInput)
 	} else {
 		Get-AgentCanonicalPath (Join-Path $plansRoot $areaInput)
 	}
-	if (-not (Test-PlanFileContained $areaFull $plansRoot)) {
-		Complete-PlanFile 1 'error' 'input.area-outside-plans' "Plan -Area must resolve beneath Documents/Plans: '$Area'."
+	$coretideArea = $null -ne $coretidePlansRoot -and (Test-PlanFileContained $areaFull $coretidePlansRoot)
+	$areaPlansRoot = if ($coretideArea) { $coretidePlansRoot } else { $plansRoot }
+	if (-not (Test-PlanFileContained $areaFull $areaPlansRoot)) {
+		Complete-PlanFile 1 'error' 'input.area-outside-plans' "Plan -Area must resolve beneath Documents/Plans, or beneath Projects/Coretide/Documents/Plans when the session has a Coretide clone: '$Area'."
 	}
 	if (-not (Test-Path -LiteralPath $areaFull -PathType Container)) {
 		# Git keeps no empty directory, so a documented area loses its directory with its last Plan.
@@ -122,7 +128,7 @@ try {
 			if ($line -cmatch '^- `([A-Za-z0-9]+)/`') { $documentedAreas.Add($Matches[1]) }
 		}
 		# Case-sensitive, so a wrongly cased directory is never created for Git to track under that name.
-		if (-not ($documentedAreas -ccontains (Get-PlanFileRelativePath $areaFull $plansRoot))) {
+		if (-not ($documentedAreas -ccontains (Get-PlanFileRelativePath $areaFull $areaPlansRoot))) {
 			Complete-PlanFile 1 'error' 'input.area-not-found' "Plan -Area must be an existing directory or an area Documents/Plans/AGENTS.md '## Plan files' lists: '$Area'."
 		}
 		[void] [IO.Directory]::CreateDirectory($areaFull)
@@ -148,12 +154,14 @@ try {
 		}
 		$dependencyInput = $dependency.Replace('\', '/').Trim()
 		$dependencyFull = if ([IO.Path]::IsPathFullyQualified($dependencyInput)) { Get-AgentCanonicalPath $dependencyInput } else { Get-AgentCanonicalPath (Join-Path $repositoryRoot $dependencyInput) }
-		if (-not (Test-PlanFileContained $dependencyFull $plansRoot) -or [IO.Path]::GetExtension($dependencyFull) -cne '.md') {
-			Complete-PlanFile 1 'error' 'input.depends-on-invalid' "Every -DependsOn entry must be a Documents/Plans/**/*.md path: '$dependency'."
+		# A Coretide Plan may depend on an engine Plan, but an engine Plan's marker never names a Coretide Plan.
+		$coretideDependency = $coretideArea -and (Test-PlanFileContained $dependencyFull $coretidePlansRoot)
+		if ((-not $coretideDependency -and -not (Test-PlanFileContained $dependencyFull $plansRoot)) -or [IO.Path]::GetExtension($dependencyFull) -cne '.md') {
+			Complete-PlanFile 1 'error' 'input.depends-on-invalid' "Every -DependsOn entry must be a Documents/Plans/**/*.md path, or for a Coretide area also a Projects/Coretide/Documents/Plans/**/*.md path: '$dependency'."
 		}
 		# Resolving a path preserves the caller's casing, so the canonical prefix is prepended rather than carried
 		# over from the input; the remainder names a real file whose casing the caller owns.
-		$relative = 'Documents/Plans/' + (Get-PlanFileRelativePath $dependencyFull $plansRoot)
+		$relative = if ($coretideDependency) { 'Projects/Coretide/Documents/Plans/' + (Get-PlanFileRelativePath $dependencyFull $coretidePlansRoot) } else { 'Documents/Plans/' + (Get-PlanFileRelativePath $dependencyFull $plansRoot) }
 		if (-not $normalized.Contains($relative)) { [void] $normalized.Add($relative) }
 	}
 	$normalized.Sort([StringComparer]::Ordinal)
@@ -174,7 +182,11 @@ try {
 	[IO.File]::WriteAllText($targetFull, $marker + "`n" + [IO.File]::ReadAllText($bodyFull), [Text.UTF8Encoding]::new($false))
 	$result.written = $true
 	# WorktreeCli's Plan inventory is Git-backed, so stage only this new Plan while preserving every other index and worktree path.
-	Invoke-AgentGit @('-C', $repositoryRoot, 'add', '--', (':(literal)' + $result.plan)) | Out-Null
+	if ($coretideArea) {
+		Invoke-AgentGit @('-C', $coretideRepository, 'add', '--', (':(literal)' + (Get-PlanFileRelativePath $targetFull $coretideRepository))) | Out-Null
+	} else {
+		Invoke-AgentGit @('-C', $repositoryRoot, 'add', '--', (':(literal)' + $result.plan)) | Out-Null
+	}
 
 	$worktreeCli = Join-Path $repositoryRoot 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe'
 	if (-not (Test-Path -LiteralPath $worktreeCli -PathType Leaf)) {

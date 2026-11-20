@@ -25,6 +25,8 @@ plus the session's residue removed and semantic candidates routed to the caller.
 
 ## Inputs
 
+Dispatch one `mechanic` with these fields:
+
 - `Scope` — the C++ files and ranges of a caller-supplied cleanup scope, or
   none to review the ranges changed in this session.
 - `Baseline` — the full 40-character session baseline SHA and the absolute

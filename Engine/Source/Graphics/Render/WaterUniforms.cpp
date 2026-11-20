@@ -100,6 +100,15 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fScrollSineThree = std::sin(fScrollGammaThree);
 	sfReducedTimeThreeX = std::fmod(sfReducedTimeThreeX + fDeltaThree * (fScrollCosineThree - fScrollSineThree), 10.0);
 	sfReducedTimeThreeY = std::fmod(sfReducedTimeThreeY + fDeltaThree * (fScrollCosineThree + fScrollSineThree), 10.0);
+	if (gbGraphicsPinned)
+	{
+		sfReducedTimeOneX = 0.0;
+		sfReducedTimeOneY = 0.0;
+		sfReducedTimeTwoX = 0.0;
+		sfReducedTimeTwoY = 0.0;
+		sfReducedTimeThreeX = 0.0;
+		sfReducedTimeThreeY = 0.0;
+	}
 	rGlobalLayout.f4WaterNormalRotationOne = {static_cast<float>(fCosineOne), -static_cast<float>(fSineOne), static_cast<float>(fSineOne), static_cast<float>(fCosineOne)};
 	rGlobalLayout.f4WaterNormalRotationTwo = {static_cast<float>(fCosineTwo), -static_cast<float>(fSineTwo), static_cast<float>(fSineTwo), static_cast<float>(fCosineTwo)};
 	rGlobalLayout.f4WaterNormalRotationThree = {static_cast<float>(fCosineThree), -static_cast<float>(fSineThree), static_cast<float>(fSineThree), static_cast<float>(fCosineThree)};
@@ -180,7 +189,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 		};
 		float fTextureInverseTileSize = ReduceFoamOrigin(gWaterFoamTextureTileSize.mfCurrent, rGlobalLayout.f2WaterFoamReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamTextureInverseTileSize = fTextureInverseTileSize;
-		rGlobalLayout.fWaterFoamTextureStrength = gWaterFoamEnabled.Get<bool>() ? gWaterFoamTextureStrength.mfCurrent : 0.0f;
+		rGlobalLayout.fWaterFoamTextureStrength = gWaterFoamEnabled.Get<bool>() && !gbGraphicsPinned ? gWaterFoamTextureStrength.mfCurrent : 0.0f;
 		float fBreakupInverseTileSize = ReduceFoamOrigin(gWaterFoamBreakupTileSize.mfCurrent, rGlobalLayout.f2WaterFoamBreakupReducedTextureOrigin);
 		rGlobalLayout.fWaterFoamBreakupInverseTileSize = fBreakupInverseTileSize;
 		rGlobalLayout.fWaterFoamBreakupAmount = gWaterFoamBreakupAmount.mfCurrent;

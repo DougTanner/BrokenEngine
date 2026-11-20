@@ -21,7 +21,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <full 40-character SHA> -Regions
    -OutputPath Temp/code-style-review-inventory.json`, whose result document
-   is one `broken-engine-session-change-inventory/v1` object.
+   is one `broken-engine-session-change-inventory/v2` object.
    - When the caller supplied untracked files, add the `-IncludeUntracked`
      switch to that command.
    - When the caller supplied `Paths`, add

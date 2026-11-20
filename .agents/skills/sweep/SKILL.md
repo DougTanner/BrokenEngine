@@ -189,7 +189,7 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
   finished unit and batch, so a compacted or restarted session resumes where it
   stopped.
 - The coordinator calls the `codex` CLI directly rather than through
-  [`/claude-to-codex`](../claude-to-codex/SKILL.md), because it runs detached
+  [`/codex-bridge`](../codex-bridge/SKILL.md), because it runs detached
   parallel unit pipelines.
 
 ## References

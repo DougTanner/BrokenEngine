@@ -22,12 +22,12 @@ affinity.
 
 - An enclosing `/implement-plan` implementation creates a `Collection<T>`
   struct or adds a new frame collection pair.
-- Apply this specialist checklist in that implementer's context; do not
+- Apply this specialist checklist in that `implementer`'s context; do not
   dispatch a separate collection worker.
 
 ## Inputs
 
-The enclosing implementer's brief supplies the task-brief fields in
+The enclosing `implementer`'s brief supplies the task-brief fields in
 [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Task brief` and its ownership snapshot. This checklist also consumes the
 exact collection variant, the collection name and ownership, all known

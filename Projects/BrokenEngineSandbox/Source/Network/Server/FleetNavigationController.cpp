@@ -9,6 +9,7 @@
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/TerrainUtils.h"
+#include "Network/Server/FleetRows.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Game.h"
 
@@ -166,43 +167,11 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				LOG(kNetwork, kDebug, "FleetNavigationController::TickFleetTimers refused move FleetGuid: ({},{}) Coord: ({},{}) Direction: {}", rFleet.guid.uiHigh, rFleet.guid.uiLow, rFlagship.coordinate.iQ, rFlagship.coordinate.iR, iDirection);
 				continue;
 			}
-			int64_t iPendingTicks = engine::kiTickRate;
 			rFleet.wantedCoordinate = destination;
-			rFleet.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks);
+			rFleet.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(engine::kiTickRate);
 			rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
-
-			// Playback takes every frame change from the recording.
-			if (gpGame->mbReplaying)
-			{
-				continue;
-			}
-
-			int64_t iMembersUpdated = 0;
-			for (const FleetMember& rMember : rFleet.members)
-			{
-				if (rMember.flags & FleetMemberFlags::kIsDead)
-				{
-					continue;
-				}
-
-				engine::GridCoord memberCoordinate = rMember.coordinate;
-
-				ShipUuid shipUuid = ShipUuidByGlobalId(*gpGame->mCells.at(memberCoordinate).pCurrent, rMember.globalId);
-				ASSERT(shipUuid.iUuid != 0);
-				gpGame->mFrameInputs.at(memberCoordinate).statusChanges.push_back(
-				{
-					.eType = StatusChangeType::kUpdateFleet,
-					.data = UpdateFleetData
-					{
-						.eType = shipUuid.eType,
-						.iUuid = shipUuid.iUuid,
-						.fleetWantedCoordinate = destination,
-						.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks),
-					},
-				});
-				++iMembersUpdated;
-			}
-			LOG(kNetwork, kDebug, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Behaviour: {} Direction: {} WantedCoord: ({},{}) MembersUpdated: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, kpcFleetBehaviourNames[std::to_underlying(ePickBehaviour)], iDirection, destination.iQ, destination.iR, iMembersUpdated);
+			QueueUpdateFleet(rFleet);
+			LOG(kNetwork, kDebug, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Behaviour: {} Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, kpcFleetBehaviourNames[std::to_underlying(ePickBehaviour)], iDirection, destination.iQ, destination.iR);
 		}
 	}
 }

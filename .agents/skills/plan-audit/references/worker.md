@@ -141,7 +141,13 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   under the pixel-evidence prohibition in
   [`../../agent-harness/SKILL.md`](../../agent-harness/SKILL.md) `## Handoff`;
   report it as a must-fix finding that cites that prohibition and offers a
-  replacement a harness query settles or a meaningful user decision.
+  replacement a harness query settles or a meaningful user decision. Before a
+  finding proposes or tightens an `/agent-harness` signal, confirm that what
+  [`../../../references/change-workflow.md`](../../../references/change-workflow.md)
+  `#### Step 5 — Run targeted pre-review checks` accepts as reaching a path can
+  force the signal's runtime precondition on demand. A precondition it cannot
+  force counts as a path nothing reaches today under that section, so the
+  finding proposes the code reading that section prescribes instead.
 - Do not edit any repository file, run `/agent-harness`, or interview the user.
   The manager owns all judgment; delegation conduct is in
   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md).

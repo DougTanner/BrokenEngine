@@ -43,7 +43,8 @@ bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes)
 bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath)
 {
 	std::filesystem::path path(value);
-	if (value.rfind(L"Documents/Plans/", 0) != 0)
+	std::wstring_view rootRelative = value.starts_with(kCoretidePrefix) ? value.substr(kCoretidePrefix.size()) : value;
+	if (!rootRelative.starts_with(L"Documents/Plans/"))
 	{
 		return false;
 	}
@@ -131,7 +132,7 @@ static bool ParsePlanBytes(Plan& rPlan)
 		rPlan.createdUtc = metadata["createdUtc"].get<std::string>();
 		if (!rPlan.bDependenciesKnown)
 		{
-			rPlan.diagnostic = "dependency is not a canonical Documents/Plans Markdown path";
+			rPlan.diagnostic = "dependency is not a canonical Documents/Plans or Projects/Coretide/Documents/Plans Markdown path";
 			return false;
 		}
 		if (!std::is_sorted(rPlan.dependencies.begin(), rPlan.dependencies.end(), Utf8PathLess) || std::adjacent_find(rPlan.dependencies.begin(), rPlan.dependencies.end()) != rPlan.dependencies.end())
@@ -198,9 +199,9 @@ static void ReportInvalidMetadata(const Plan& rPlan, nlohmann::json& rDiagnostic
 	rDiagnostics.push_back({{"plan", WideToUtf8(rPlan.path)}, {"code", "invalid-metadata"}, {"message", std::move(message)}});
 }
 
-bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+bool BuildPlans(const std::filesystem::path& rRepository, std::wstring_view prefix, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 {
-	std::optional<std::string> optionalListing = RunGit({L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans"});
+	std::optional<std::string> optionalListing = RunGit({L"-C", rRepository.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans"});
 	if (!optionalListing)
 	{
 		return false;
@@ -213,8 +214,9 @@ bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::
 		{
 			return false;
 		}
+		std::wstring repositoryPath = Utf8ToWide(std::string_view(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset)));
 		std::wstring path;
-		if (!NormalizePlanPath(Utf8ToWide(std::string_view(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
+		if (!NormalizePlanPath(std::wstring(prefix) + repositoryPath, path))
 		{
 			iOffset = iEnd + 1;
 			continue;
@@ -222,7 +224,7 @@ bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::
 		iOffset = iEnd + 1;
 		Plan plan {};
 		plan.path = path;
-		plan.diskPath = rWorktree / path;
+		plan.diskPath = rRepository / repositoryPath;
 		ParsePlan(plan);
 		ClassifyDirectoryGuidance(plan);
 		if (!plan.bValid && plan.diagnostic != "missing")
@@ -234,10 +236,10 @@ bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::
 	return true;
 }
 
-bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+bool BuildPlansAtCommit(const std::filesystem::path& rRepository, std::wstring_view commit, std::wstring_view prefix, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 {
 	// -z keeps paths unambiguous.  Every path still passes the scheduler's stricter canonical check.
-	std::optional<std::string> optionalListing = RunGit({L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans"});
+	std::optional<std::string> optionalListing = RunGit({L"-C", rRepository.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans"});
 	if (!optionalListing)
 	{
 		return false;
@@ -263,12 +265,13 @@ bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_vie
 		{
 			continue;
 		}
+		std::wstring repositoryPath = Utf8ToWide(entry.substr(static_cast<size_t>(iTab + 1)));
 		std::wstring path;
-		if (!NormalizePlanPath(Utf8ToWide(entry.substr(static_cast<size_t>(iTab + 1))), path))
+		if (!NormalizePlanPath(std::wstring(prefix) + repositoryPath, path))
 		{
 			continue;
 		}
-		std::optional<std::string> optionalBytes = RunGit({L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path});
+		std::optional<std::string> optionalBytes = RunGit({L"-C", rRepository.wstring(), L"show", std::wstring(commit) + L":" + repositoryPath});
 		if (!optionalBytes)
 		{
 			return false;

@@ -28,12 +28,12 @@ Adapted from an external MIT-licensed skill; see [LICENSE](LICENSE).
 
 ## Inputs
 
-Require the reported symptom and expected behavior, the reproduction scope,
-the session baseline when one exists, and every supplied log, capture, command
-result, or other evidence. A Review and resolve correctness step dispatch also
-names that origin, carries the failed retest as evidence, and gives the fix's
-stated root cause as an unproven hypothesis. Name any missing input needed to
-build a reproducing signal.
+Dispatch one `implementer`. Require the reported symptom and expected behavior,
+the reproduction scope, the session baseline when one exists, and every
+supplied log, capture, command result, or other evidence. A Review and resolve
+correctness step dispatch also names that origin, carries the failed retest as
+evidence, and gives the fix's stated root cause as an unproven hypothesis. Name
+any missing input needed to build a reproducing signal.
 
 ## Handoff
 

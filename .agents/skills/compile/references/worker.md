@@ -59,8 +59,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      `generatedDataIncludeRoot`.
    - `recommendedTargets` — `{project, configuration, reason}` rows naming the
      targets the changed paths require, not advisory: each row names a target
-     whose source roots or forced includes contain a changed path. A
-     `ThirdParty` row (reason `thirdparty-candidate`) has no configuration.
+     whose source roots, forced includes, or included Common headers contain a
+     changed path. A `ThirdParty` row (reason `thirdparty-candidate`) has no
+     configuration.
 
 3. Fix the target and configuration list from that evidence. Done when every
    target this request will build is named.
@@ -291,8 +292,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
       fails, the envelope's `target` names the DataPacker solution: report it
       as each requested build's failing-build row citing that envelope, and
       record it as not reached in the [`../SKILL.md`](../SKILL.md) `## Handoff`
-      row for a game build that names the envelope's switch values. Its
-      fields:
+      row for a game build, ModelViewer included, that names the game and the
+      envelope's switch values. Its fields:
       - `status` (`success`/`fail`), `failureKind` (`none`/`tool`/`msbuild`),
         and `exitCode` — the build's exit code keeps its existing meaning
         (MSBuild's exit code once launched; `1` for tool failures including a

@@ -51,22 +51,18 @@ Require a self-contained brief containing:
   the change may affect, and any prior findings relevant to a focused re-review;
 - checkout path and applicable repository instructions.
 
-The targets file is the authoritative supplied input. A `/codex-review` prompt
-supplies it as the `Targets file: <path>` entry in its evidence section (the
-receipt's `targetsPath`, written next to the prompt file), and inlines the same
-bytes there as a copy of that file. Otherwise the dispatching manager saves one
-read-only run to a file with the targets-file bullet's invocation above, which
-redirects its stdout into the file and runs as one call of either shell tool.
-That invocation's gitignored `Temp/` path is the save-path
-convention, and the manager supplies the path, not
-the targets bytes, to the review worker. The run reports its own `status` rather
-than a field of the saved file: on `pass` (exit 0) stdout carries only the
-targets bytes, while `blocked` (exit 2) or `error` (exit 1) sends no targets
-bytes to the file, so the redirect leaves it empty while the envelope goes to
-stderr, and such a run counts as a
-missing targets file below. The saved file itself holds only `schemaVersion`
-and `paths`, so a check of that file confirms those two keys. Never rebuild the
-targets file or restate the class decision inline.
+The targets file is the authoritative supplied input. The dispatching manager
+saves one read-only run to a file with the targets-file bullet's invocation
+above, which redirects its stdout into the file and runs as one call of either
+shell tool. That invocation's gitignored `Temp/` path is the save-path
+convention, and the manager supplies the path, not the targets bytes, to the
+review worker. The run reports its own `status` rather than a field of the
+saved file: on `pass` (exit 0) stdout carries only the targets bytes, while
+`blocked` (exit 2) or `error` (exit 1) sends no targets bytes to the file, so
+the redirect leaves it empty while the envelope goes to stderr, and such a run
+counts as a missing targets file below. The saved file itself holds only
+`schemaVersion` and `paths`, so a check of that file confirms those two keys.
+Never rebuild the targets file or restate the class decision inline.
 
 Return `BLOCKED` when the session baseline, diff boundary, targets file, intent,
 or invariants are missing or moving. Do not reconstruct them from a mutable
@@ -118,7 +114,7 @@ path, or `BLOCKED` when the evidence needed to trace it is unavailable.
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
   are the session executing this skill. Steps and rules for the dispatched
-  reviewer.
+  `reviewer`.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   `## Task brief` — task brief.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)

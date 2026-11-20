@@ -157,7 +157,8 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 }
 
 // screenshot: capture the live window to a downscaled JPG/PNG. Completes via the deferred-response mechanism once
-// the async save records its result. Schema: {"path"?,"maxWidth"?:1568,"format"?:"jpg|png","quality"?:80}.
+// the async save records its result. Schema:
+// {"path"?,"maxWidth"?:1568,"format"?:"jpg|png","quality"?:80,"requirePinned"?:false}.
 static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	// The capture consume site (Graphics::PresentAcquire) is compiled out under !kbScreenshots, so a deferred request
@@ -165,6 +166,10 @@ static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]
 	if constexpr (!kbScreenshots)
 	{
 		throw std::runtime_error("screenshot capture is compiled out (kbScreenshots is false)");
+	}
+	if (rParameters.contains("requirePinned") && rParameters.at("requirePinned").get<bool>() && (!gbGraphicsPinned || !(game::gpGame->mGameFlags & GameFlags::kPaused)))
+	{
+		throw std::runtime_error("screenshot requirePinned requires pin_graphics and paused gameplay");
 	}
 
 	// BeginCaptureAndDefer temporarily restores an iconic window without activation, waits for its live swapchain,
@@ -1117,6 +1122,22 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 	rResult["clientGridCoord"] = AgentCoordinateJson(game::gpGame->mClientGridCoordinate);
 }
 
+// pin_graphics: set gbGraphicsPinned for the rest of the launch. Requires paused gameplay, which holds every
+// simulation-driven visual the flag does not. Schema: {}.
+static void CommandPinGraphics(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
+{
+	if (!rParameters.empty())
+	{
+		throw std::runtime_error("pin_graphics accepts no params");
+	}
+	if (!(game::gpGame->mGameFlags & GameFlags::kPaused))
+	{
+		throw std::runtime_error("pin_graphics requires paused gameplay");
+	}
+
+	gbGraphicsPinned = true;
+}
+
 static const char* UiStateName(UiState eState)
 {
 	switch (eState)
@@ -1278,6 +1299,11 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 	if (command == "release_client_grid_coord")
 	{
 		CommandReleaseClientGridCoordinate(rParameters, rResult);
+		return true;
+	}
+	if (command == "pin_graphics")
+	{
+		CommandPinGraphics(rParameters, rResult);
 		return true;
 	}
 	return false;

@@ -57,10 +57,10 @@ enum class ShipOrders : uint16_t
 	kTargetFlagship     = 0x0002,
 	// Fleet Fighter and Omni rows only. Set when the row's fleet member is in squadron 1, clear for squadron 0.
 	kSquadron1          = 0x0004,
-	// Fleet Fighter rows only: the squadron's settings (SquadronOrders, Fleet.h).
+	// Fleet Fighter rows only: the squadron's settings (Fleet::pSquadronOrders, Fleet.h).
 	kSeekAndDestroy     = 0x0008,
 	kSharedTarget       = 0x0010,
-	// Fleet Omni rows only: the squadron's settings (SquadronOrders, Fleet.h).
+	// Fleet Omni rows only: the squadron's settings (Fleet::pSquadronOrders, Fleet.h).
 	kPatrolCell         = 0x0020,
 	kPatrolTogether     = 0x0040,
 

@@ -1,7 +1,7 @@
 # Preparation Brief
 
-The contract the `/next-plan` preparation `implementer` follows, cited by path
-in its brief. The step that dispatches it, and what main writes into that
+The contract the `/next-plan` preparation `planner` follows, cited by path in
+its brief. The step that dispatches it, and what main writes into that
 brief, stay in [the `/next-plan` steps](../SKILL.md#steps) step 4.
 
 ## Snapshot

@@ -28,7 +28,7 @@ Require all of the following before starting:
 - evidence that `/plan-audit` reviewed this exact plan revision, plus the
   manager's decision on every finding;
 - the text of every Plan the plan references, carried in the preparation
-  `implementer`'s brief;
+  `planner`'s brief;
 - user intent, applicable repository instructions, session baseline when one
   exists, and any changes the user approved after the plan;
 - the draft execution card, carrying every field of the card template in
@@ -38,7 +38,7 @@ Require all of the following before starting:
   path plus both selectors, the recorded answers (each relayed as
   [`../../references/authority-order.md`](../../references/authority-order.md)
   requires), and the external-claim verdicts, in the continuation capsule.
-- Roles: execution splits by role — the preparation `implementer` performs every
+- Roles: execution splits by role — the preparation `planner` performs every
   repository read and search this skill requires and returns immutable decision
   briefs; the main session interviews the user, decides, and dispatches the
   `locator` for external-claim requests. Delegates may locate evidence or verify

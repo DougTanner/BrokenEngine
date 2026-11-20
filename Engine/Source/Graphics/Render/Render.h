@@ -267,6 +267,10 @@ void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> curren
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 
 inline bool gbWaterFoamReset = true; // Re-armed when the retained foam textures are created.
+// Set only by the pin_graphics agent command; holds for the rest of the launch. PopulateWaterReducedUv (water scroll
+// and foam strength), RenderInterpolation::UpdateRenderInterpolation (interpolation fraction and sun), and
+// GameBase::Render (elapsed time) substitute their fixed values every frame while it is set.
+inline bool gbGraphicsPinned = false;
 // Recorded foam commands and published foam uniforms must both follow this predicate.
 bool WaterFoamActive();
 // One water normal band's size divided by Water Scale. RenderLightingMain publishes it and PopulateWaterReducedUv

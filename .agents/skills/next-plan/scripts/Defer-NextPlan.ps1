@@ -8,6 +8,8 @@ function Complete-Deferral([int]$ExitCode,[string]$Status,[string]$Code,[string]
 # the resume claim must weigh.
 function Get-DirtyPath([string]$Porcelain){$paths=[Collections.Generic.List[string]]::new();$fields=@($Porcelain -split "`0");$index=0;while($index -lt $fields.Count){$record=$fields[$index];$index++;if($record.Length -lt 4){continue};$paths.Add($record.Substring(3));$state=$record.Substring(0,2);if($state.Contains('R') -or $state.Contains('C')){if($index -lt $fields.Count){$paths.Add($fields[$index]);$index++}}};return $paths}
 try {
+	$sharedScripts=Join-Path $PSScriptRoot '..\..\..\scripts';if(-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))){$sharedScripts=Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'}
+	Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force -DisableNameChecking
 	Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
 	$context=Get-NextPlanContext
 	$status=Get-NextPlanClaimStatus $context
@@ -18,6 +20,9 @@ try {
 	$tree=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
 	if($tree.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree, so retained work could not be reported; the Plan claim is unchanged. $($tree.Stderr.Trim())")}
 	$retained=@(Get-DirtyPath $tree.Stdout)
+	# The session Coretide clone's retained work is reported under its session prefix.
+	$coretide=Get-AgentCoretideRepository $context.Worktree
+	if($coretide){$coretideTree=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'status','--porcelain=v1','-z','--untracked-files=all') $coretide;if($coretideTree.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session Coretide clone, so retained work could not be reported; the Plan claim is unchanged. $($coretideTree.Stderr.Trim())")};$retained+=@(Get-DirtyPath $coretideTree.Stdout|ForEach-Object{"Projects/Coretide/$_"})}
 	$response=Invoke-NextPlanProcess $context.WorktreeCli (@('plan','unclaim')+$claimArguments) $context.Worktree
 	$release=ConvertFrom-NextPlanProcessJson $response 'plan unclaim'
 	if($response.ExitCode -ne 0 -or [string]$release.code -notin @('released','already-absent')){Complete-Deferral $(if($response.ExitCode -eq 2){2}else{1}) $(if($response.ExitCode -eq 2){'blocked'}else{'error'}) 'defer.unclaim-failed' 'WorktreeCli did not release the Plan claim.' 'stop-report-to-user'}

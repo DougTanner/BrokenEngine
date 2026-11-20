@@ -150,20 +150,34 @@ when that window must be observed or clicked.
   Requires a running game. Clears the `set_client_grid_coord` pin and returns
   the current `{"clientGridCoord":[q,r]}`. The viewer stays in that cell until
   the next game writer, such as an owned-entity event, moves it.
-- `screenshot`: `{"path"?,"maxWidth"?,"format"?:"jpg"|"png","quality"?}`;
+- `pin_graphics`: no params (only an empty object is accepted). Requires the
+  client's gameplay to be paused (client `describe_scene` `gameFlags` contains
+  `kPaused`); otherwise returns `ok:false` and changes nothing. Returns the
+  normal envelope with a `null` result. For the rest of the client launch it
+  holds the client time-based rendering values the pause does not: the water
+  normal-map scroll phase at zero, foam hidden, the sun at its default angle
+  outside the Graphics settings screen, the render interpolation fraction at 0,
+  and the render elapsed time exact on the current tick, which also holds the
+  wave phase. It changes no Tweaks value, and while pinned neither the Tweaks
+  sun-angle slider nor `Water Foam Enabled` changes those values. The pin is
+  never persisted; only a fresh client launch clears it.
+- `screenshot`:
+  `{"path"?,"maxWidth"?,"format"?:"jpg"|"png","quality"?,"requirePinned"?}`;
   `maxWidth` defaults to `ScreenshotRequest::iMaxWidth` and `quality` to
   `ScreenshotRequest::iQuality`. A `quality` outside `1..100` is a parameter
   error. A `maxWidth` value `<= 0` disables downscaling and preserves native
-  framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>`
-  using the process temp directory. Returns `{"path","width","height"}` — the
-  saved file and its pixel dimensions, never image bytes. Requires
-  `kbScreenshots`. To check that two captures match, take both with `format`
-  `png` and `maxWidth` 0 and compare the files with `Get-FileHash`; equal
-  hashes are matching frames. A paused comparison requires a 1:1 time ratio
-  (server `timescale` at 1/1), because at a slower ratio the camera chase does
-  not settle. Take captures until two consecutive hashes match before
-  comparing, since the camera and textures can still be settling after a
-  load.
+  framebuffer dimensions. `requirePinned` defaults to false; true makes the
+  command return `ok:false` before capturing unless `pin_graphics` was sent and
+  the client's gameplay is paused. Default path is
+  `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns
+  `{"path","width","height"}` — the saved file and its pixel dimensions, never
+  image bytes. Requires `kbScreenshots`. To check that two captures match, take
+  both with `format` `png` and `maxWidth` 0 and compare the files with
+  `Get-FileHash`; equal hashes are matching frames. A paused comparison
+  requires a 1:1 time ratio (server `timescale` at 1/1), because at a slower
+  ratio the camera chase does not settle. Take captures until two consecutive
+  hashes match before comparing, since the camera and textures can still be
+  settling after a load.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
   `{"paths":[absolute .rdc paths]}`. Requires a client launched with
@@ -413,7 +427,8 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
 ## Server commands
 
 - `status`: no params. Returns
-  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[q,r],...],"nextGlobalId","harvestedTransferTotal":int}`.
+  `{"tick","paused","pauseAtTick","recording","replaying","clientCount","activeCoords":[[q,r],...],"nextGlobalId","harvestedTransferTotal":int}`.
+  `pauseAtTick` is the target `pause_at_tick` armed, -1 when none.
   `harvestedTransferTotal` counts every cell-crossing transfer applied by a
   harvest since the current game state began, cumulatively, and no spawn; it is
   zeroed on load, reset, every load-time client resynchronization, and entering
@@ -421,16 +436,20 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
 - `pause`: `{"paused":bool}`. Returns the applied `paused` value. Connected
   clients follow the server pause; confirm with client `describe_scene`
   `gameFlags` (`kPaused`). To advance a paused server by exactly one tick, send
-  `timescale {"faster":false}` until it returns `denominator` 32, then send
-  `pause {"paused":false}` and `pause {"paused":true}` back to back, with no
-  wait or other command between them, and confirm that `status.tick` rose by 1.
-  The server takes one agent request at the start of each update, before that
-  update's tick wait: the unpause lets the tick ending that update run, and the
-  pause stops the next tick only if it arrives before the next update starts.
-  That window is one update interval
-  (`TimeStep::SimulationToWall(kTickNanoseconds)`), which at 1/1 is shorter
-  than one AgentHarness call, so a wait between the two commands, or a faster
-  timescale, lets extra ticks run.
+  `pause_at_tick` with `tick` = `status.tick`+1.
+- `pause_at_tick`: `{"tick":int}`; `tick` is required and must be an integer
+  greater than `status.tick`, otherwise the command fails with the error
+  envelope and changes nothing. Arms the target, replacing any armed one,
+  unpauses the server, and returns `{"tick"}` at once; the server then runs
+  until it finishes that tick and pauses there exactly, at any timescale, and
+  clears the target. Poll `status` until `paused` is true; `tick` then equals
+  the target and `pauseAtTick` is -1. Load and reset keep an armed target, and
+  it fires only when the clock later reaches it, as after a later reset or a
+  load to an earlier tick; until then `status.pauseAtTick` still reports it. A
+  runner whose target is now behind the clock re-arms with `pause_at_tick`,
+  which replaces it; `pause` stops the server but leaves the target armed. The
+  target is a server tick: a connected client follows the pause at its own
+  tick, the one client `describe_scene` reports, which trails the server's.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns
   `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}`
   there changes nothing and still succeeds.

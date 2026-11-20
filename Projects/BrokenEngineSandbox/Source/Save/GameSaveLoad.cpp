@@ -4,7 +4,6 @@
 
 #include "Save/GameSaveLoad.h"
 
-#include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -112,13 +111,7 @@ void PrepareReplayPlaybackTick()
 	ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;
 	rFleetManager.mFleets = std::move(rRecord.fleets);
 	rFleetManager.mRandomEngine = rRecord.randomEngine;
-	gpServerSession->mpClientManager->mNextFighterLaunchTicks = std::move(rRecord.nextFighterLaunchTicks);
 	++rReplayLog.iNextPlaybackRecord;
-
-	for ([[maybe_unused]] const auto& [rClientGuid, iClientId] : rFleetManager.mGuidToClientId)
-	{
-		rFleetManager.SendFleetSyncToClient(rClientGuid);
-	}
 }
 
 // The fleet checksum is replay-only: it never enters Frame::Crc or the wire.

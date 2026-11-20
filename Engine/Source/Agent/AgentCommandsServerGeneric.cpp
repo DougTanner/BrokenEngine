@@ -76,6 +76,7 @@ void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nlohmann:
 {
 	rResult["tick"] = game::gpGame->miTickCounter;
 	rResult["paused"] = game::gpGame->mGameFlags & engine::GameFlags::kPaused;
+	rResult["pauseAtTick"] = game::gpGame->miPauseAtTick;
 	rResult["recording"] = (!engine::gpReplay->mReplayWriters.empty());
 	rResult["replaying"] = game::gpGame->mbReplaying;
 
@@ -109,6 +110,22 @@ static void CommandPause(const nlohmann::json& rParameters, nlohmann::json& rRes
 	bool bPaused = rParameters.at("paused").get<bool>();
 	game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused, bPaused); // mirrors kClientPauseRequest
 	rResult["paused"] = bPaused;
+}
+
+static void CommandPauseAtTick(const nlohmann::json& rParameters, nlohmann::json& rResult)
+{
+	if (!rParameters.contains("tick"))
+	{
+		throw std::runtime_error("pause_at_tick requires integer 'tick'");
+	}
+	int64_t iTick = IntegerFromValue<int64_t>(rParameters.at("tick"), "tick");
+	if (iTick <= game::gpGame->miTickCounter)
+	{
+		throw std::runtime_error(std::format("pause_at_tick 'tick' must be greater than the current tick {}", game::gpGame->miTickCounter));
+	}
+	game::gpGame->miPauseAtTick = iTick;
+	game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused, false);
+	rResult["tick"] = iTick;
 }
 
 static void CommandTimescale(const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -458,6 +475,11 @@ bool ExecuteServerAgentCommand(std::string_view command, const nlohmann::json& r
 	if (command == "pause")
 	{
 		CommandPause(rParameters, rResult);
+		return true;
+	}
+	if (command == "pause_at_tick")
+	{
+		CommandPauseAtTick(rParameters, rResult);
 		return true;
 	}
 	if (command == "timescale")

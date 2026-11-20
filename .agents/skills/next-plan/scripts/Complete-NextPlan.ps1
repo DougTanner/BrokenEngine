@@ -28,9 +28,13 @@ try {
  if($folderViolations.Count -ne 0){Add-Diagnostic 'Get-AgentPlansLayoutViolation' ([string]$folderViolations[0].rule) ([string]$folderViolations[0].path) "$($folderViolations.Count) layout violation(s) in the support folder '$supportFolder'.";Complete-Workflow 2 'blocked' 'completion.support-folder-invalid' "The held Plan's support folder breaks the Documents/Plans/AGENTS.md layout rules; nothing was changed." 'stop-report-to-user'}
  # Another live Plan naming the held Plan's file name after its metadata line would cite a deleted Plan once this exit runs, so it refuses before any change.
  $heldName=[IO.Path]::GetFileName($heldPlan);$citation=[regex]::new('(?<![A-Za-z0-9])'+[regex]::Escape($heldName));$citingCount=0;$firstCiting=$null
+ # Both Plans trees: the engine's and, when the session holds one, the Coretide clone's under its session prefix.
  $listing=Invoke-AgentProcess 'git' @('-C',$context.Worktree,'ls-files','-z','--','Documents/Plans') $context.Worktree
  if($listing.ExitCode -ne 0){throw "git ls-files failed for 'Documents/Plans': $($listing.Stderr.Trim())"}
- foreach($path in ($listing.Stdout -split "`0")){
+ $listedPaths=@($listing.Stdout -split "`0")
+ $coretide=Get-AgentCoretideRepository $context.Worktree
+ if($coretide){$coretideListing=Invoke-AgentProcess 'git' @('-C',$coretide,'ls-files','-z','--','Documents/Plans') $coretide;if($coretideListing.ExitCode -ne 0){throw "git ls-files failed for 'Projects/Coretide/Documents/Plans': $($coretideListing.Stderr.Trim())"};$listedPaths+=@(($coretideListing.Stdout -split "`0")|Where-Object{$_.Length -ne 0}|ForEach-Object{"Projects/Coretide/$_"})}
+ foreach($path in $listedPaths){
   if(-not $path.EndsWith('.md',[StringComparison]::Ordinal) -or [IO.Path]::GetFileName($path) -ceq 'AGENTS.md' -or $path -ceq $heldPlan){continue}
   # A Plan deleted in the worktree is still listed until the deletion is staged.
   $file=Join-Path $context.Worktree $path;if(-not (Test-Path -LiteralPath $file -PathType Leaf)){continue}

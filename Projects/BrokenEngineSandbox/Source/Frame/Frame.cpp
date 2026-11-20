@@ -133,7 +133,7 @@ static void ValidateNoTransferRows(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 189i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameServerInterpolateTypes {}) + engine::SumVersions(GameServerPostRenderTypes {});
+const int64_t Frame::kiVersion = 190i64 + engine::kiFrameBaseVersion + engine::SumVersions(GameServerInterpolateTypes {}) + engine::SumVersions(GameServerPostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())

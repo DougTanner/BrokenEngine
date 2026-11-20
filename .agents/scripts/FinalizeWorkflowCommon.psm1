@@ -402,4 +402,26 @@ function Invoke-FinalizeLandingLockClaim {
 	return New-FinalizeLandingLockClaimResult $false 'landing-lock.retryable-wait' 'A foreign landing lease remains live; retry this claim after its reported expiry.' 'retryable-wait' $false $PollMilliseconds $Owner $state.Status 1
 }
 
-Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim
+# The approval review receipt gate: null when the 'broken-engine-finalize-approval-review/v1' receipt at Path records
+# an attempted SmartGit launch for ApprovedCommit, the full commit being landed; otherwise its blocking Code and Message.
+# SmartGit outcomes stay non-blocking; malformed, mismatched, or non-attempted receipts block.
+function Test-FinalizeApprovalReviewReceipt([string] $Path, [string] $ApprovedCommit) {
+	$rerun = 'Rerun Show-FinalizeApprovalReview.ps1 for the approved commit with the documented stdout redirect so the receipt is overwritten.'
+	if ([string]::IsNullOrWhiteSpace($Path)) {
+		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = 'A broken-engine-finalize-approval-review/v1 receipt is required for postconfirmation landing.' }
+	}
+	$reviewItem = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+	if ($null -eq $reviewItem -or $reviewItem.PSIsContainer) { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' is not a readable file." } }
+	try { $reviewResult = [IO.File]::ReadAllText($reviewItem.FullName) | ConvertFrom-Json -Depth 64 -ErrorAction Stop }
+	catch { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' is not valid JSON: $($_.Exception.Message)" } }
+	if ($null -eq $reviewResult) { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' carries no result object." } }
+	$reviewProperties = @($reviewResult.PSObject.Properties.Name)
+	if ($reviewProperties -cnotcontains 'schemaVersion' -or $reviewProperties -cnotcontains 'status' -or $reviewProperties -cnotcontains 'approvedTip' -or [string]$reviewResult.schemaVersion -cne 'broken-engine-finalize-approval-review/v1') {
+		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' must be a 'broken-engine-finalize-approval-review/v1' result carrying status and approvedTip." }
+	}
+	if ([string]$reviewResult.approvedTip -cne $ApprovedCommit) { return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' records a different reviewed commit than the approved commit. $rerun" } }
+	if ([string]$reviewResult.status -cnotin @('opened', 'unavailable', 'failed')) { return [pscustomobject]@{ Code = 'approval-review.not-launched'; Message = "Approval review receipt '$Path' does not record an attempted SmartGit launch for the approved commit. $rerun" } }
+	return $null
+}
+
+Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Test-FinalizeApprovalReviewReceipt

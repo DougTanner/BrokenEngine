@@ -114,10 +114,13 @@ may feed simulation state.
 - Water phase and camera-relative UV origins are computed in `double`, reduced
   with `std::fmod`, then cast to float. The normal-map scroll integrates its
   reduced phase from per-frame size, speed, and delta time so tunable changes
-  do not jump; Gerstner wave phase is not integrated, so a tunable change may
-  jump it. The reductions consume the absolute camera position, rebuilt as a
-  `double` from the camera cell and the camera's local position, so the pattern
-  stays continuous when the camera changes cell.
+  do not jump; while `gbGraphicsPinned` (`Render.h`) is set,
+  `PopulateWaterReducedUv` holds that phase at zero and publishes a foam
+  texture strength of zero, hiding the foam.
+  Gerstner wave phase is not integrated, so a tunable change may jump it. The
+  reductions consume the absolute camera position, rebuilt as a `double` from
+  the camera cell and the camera's local position, so the pattern stays
+  continuous when the camera changes cell.
 - Rotate normal-map camera origins into the shader's pattern space before
   reduction, and preserve integral shader-side wrap multipliers. The stationary
   foam material layers and spawn noise each reduce camera position divided by

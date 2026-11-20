@@ -18,17 +18,21 @@ From the session worktree root:
 pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
 ```
 
-- `-Area` — a directory beneath `Documents/Plans`: an existing one, or an area
+- `-Area` — a directory beneath `Documents/Plans`, or beneath
+  `Projects/Coretide/Documents/Plans` when the session has a Coretide clone,
+  where the Plan is staged in the clone's index: an existing one, or an area
   `Documents/Plans/AGENTS.md` `## Plan files` lists, whose absent directory the
   script creates; any other missing directory is rejected with
   `input.area-not-found`.
 - `-Name` — a bare filename matching `^[A-Z][A-Za-z0-9]*\.md$`.
 - `-Body` — a file holding the plan text that goes below the marker. The body
   travels as a file so no transcript text is ever executed.
-- `-DependsOn` — `Documents/Plans/**/*.md` paths. `pwsh -File` hands every
-  argument over as one literal string, so several dependencies can only travel
-  as one comma-separated token. Omit the parameter entirely when the Plan has no
-  dependencies: the script rejects a blank entry and defaults to an empty
+- `-DependsOn` — `Documents/Plans/**/*.md` paths, plus
+  `Projects/Coretide/Documents/Plans/**/*.md` paths for a Coretide area only (an
+  engine area rejects one with `input.depends-on-invalid`). `pwsh -File` hands
+  every argument over as one literal string, so several dependencies can only
+  travel as one comma-separated token. Omit the parameter entirely when the Plan
+  has no dependencies: the script rejects a blank entry and defaults to an empty
   dependency list only when the parameter is absent.
 
 ## Result

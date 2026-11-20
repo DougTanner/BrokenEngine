@@ -117,6 +117,16 @@ def baseline(root:Path,sha:str)->dict[str,tuple[dict[str,str],bytes]]:
   if kind=="blob" and mode in {"100644","100755"} and supported(p):
    b=run(root,"show",f"{sha}:{p}");out[p]=(ident(p,mode,b),b)
  return out
+# Compare only: the session Coretide clone at Projects/Coretide when it is a repository toplevel, else None; its corpora
+# join Compare's under the Projects/Coretide/ prefix, its baseline at the merge base of its HEAD and upstream.
+def coretide_repository(root:Path)->Path|None:
+ c=root/"Projects"/"Coretide"
+ if not c.is_dir():return None
+ r=subprocess.run(["git","-C",str(c),"rev-parse","--show-toplevel"],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ if r.returncode or Path(r.stdout.decode("utf-8","replace").strip()).resolve()!=c.resolve():return None
+ return c
+def coretide_prefixed(corpus:dict[str,tuple[dict[str,str],bytes]])->dict[str,tuple[dict[str,str],bytes]]:
+ return {"Projects/Coretide/"+p:(ident("Projects/Coretide/"+p,i["mode"],b),b) for p,(i,b) in corpus.items()}
 def metric(n:float,d:float,app:bool=True)->dict[str,Any]:return {"applicable":bool(app and d!=0),"value":n/d if app and d else None,"numerator":n,"denominator":d}
 def metrics(fs:Iterable[dict[str,Any]], lines:Iterable[tuple[str,int]], sloc:dict[str,set[int]], walks:Iterable[dict[str,Any]])->dict[str,Any]:
  fs=list(fs); total=sum(len(x) for x in sloc.values()); union=defaultdict(set)
@@ -447,7 +457,9 @@ def build(q:dict[str,Any])->dict[str,Any]:
    prefix=target+"/";paths={x for x in before if x.startswith(prefix) and (q["scope"]=="Recursive" or "/" not in x[len(prefix):])}
   cv=capture(before,cap,analyzer_source);cur=capture_view(cv,restrict(cv,paths));base=None;comparison=None;select={"kind":"snapshot","scope":q["scope"],"target":target,"paths":sorted(paths)}
  elif q["mode"]=="Compare":
-  br=baseline(root,q["baseline"]);pairs=derive_pairs(targets(Path(q["targets"])),br,before,cap)
+  br=baseline(root,q["baseline"]);coretide=coretide_repository(root)
+  if coretide is not None:br|=coretide_prefixed(baseline(coretide,run(coretide,"merge-base","HEAD","@{upstream}").decode().strip()));before|=coretide_prefixed(current(coretide))
+  pairs=derive_pairs(targets(Path(q["targets"])),br,before,cap)
   bt={pair["baseline"]["path"] for pair in pairs if pair["baseline"] is not None};ct={pair["current"]["path"] for pair in pairs if pair["current"] is not None}
   bv=capture(br,cap,analyzer_source);cv_c=capture(before,cap,analyzer_source);base=capture_view(bv,restrict(bv,bt));cur=capture_view(cv_c,restrict(cv_c,ct))
   failures=[]
@@ -470,6 +482,7 @@ def build(q:dict[str,Any])->dict[str,Any]:
  else:fail("invalid mode")
  if commit is None:
   after=current(root)
+  if q["mode"]=="Compare" and coretide is not None:after|=coretide_prefixed(current(coretide))
   if {p:x[0] for p,x in before.items()}!={p:x[0] for p,x in after.items()}:fail("capture drift")
  def pub(v:Any)->Any:return None if v is None else {k:x for k,x in v.items() if not k.startswith("_")}
  return {"schemaVersion":SCHEMA,"mode":q["mode"],"profile":PROFILE,"tool":canonical_tool(q["tool"]),"targetSelection":select,"baseline":pub(base),"current":pub(cur),"comparison":comparison}

@@ -105,6 +105,20 @@ try {
 	}
 }
 catch { Write-Warning "Seeding the worktree shader caches failed, so the first launch rebuilds them: $($_.Exception.Message)" }
+# A real local clone, not a link or a linked worktree: ripgrep skips links, and a clone records no branch or worktree
+# in the primary Coretide repository.
+$sessionCoretide = Join-Path $Worktree 'Projects\Coretide'
+if (Test-Path -LiteralPath $sessionCoretide) {
+	$sessionCoretideRepository = Get-AgentCoretideRepository $Worktree
+	if ($null -eq $sessionCoretideRepository) { throw "'$sessionCoretide' exists but is not the toplevel of a Git repository." }
+	Invoke-AgentGit @('-C', $sessionCoretideRepository, 'fetch') | Out-Null
+	Invoke-AgentGit @('-C', $sessionCoretideRepository, 'merge', '--ff-only', '@{upstream}') | Out-Null
+}
+elseif ($null -ne ($primaryCoretide = Get-AgentCoretideRepository $root)) {
+	Invoke-AgentGit @('clone', $primaryCoretide, $sessionCoretide) | Out-Null
+}
+else { Write-Host "The primary checkout has no Coretide repository, so this session has no Coretide clone." }
+Write-Host ''
 # Each step below is separated by a blank line so its output reads as its own block in the transcript.
 & (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
 Write-Host ''

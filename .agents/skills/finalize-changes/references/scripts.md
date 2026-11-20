@@ -48,13 +48,19 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLoc
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' > 'Temp/finalize-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCoretide.ps1 -Prepare -CurrentWorktree '<current-worktree>' -CommitMessageFile 'Temp/finalize-coretide-commit-message.txt'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCoretide.ps1 -Land -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -OwnerToken '<owner-token>' -ApprovedCoretideCommit '<coretide-commit>' -ApprovalReviewResultFile 'Temp/finalize-coretide-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>/Projects/Coretide' -ApprovedTip '<coretide-commit>' > 'Temp/finalize-coretide-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
 pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1
 ```
 
 Add `-ReleasePlanClaim` to the landing command when a claimed Plan reached final
-preparation, `-RequireExportOutputsRewritten` to the candidate-commit command
+preparation, `-ApprovedEngineCommit '<approved-commit>'
+-EngineApprovalReviewResultFile 'Temp/finalize-approval-review-result.json'` to
+the Coretide `-Land` command when an engine commit lands too,
+`-RequireExportOutputsRewritten` to the candidate-commit command
 when the rules below call for the regeneration check,
 `-CommitMessageFile '<message-file>'` to the approval-preparation
 command when the rules below call for the message override,
@@ -231,6 +237,8 @@ attempted launch blocks with `approval-review.not-launched`. All three are exit
 2, `blocked`, `terminal`, and happen before the landing changes anything on
 primary. The landing lease claimed after confirmation is already live, and the
 worker releases it with `-Release` exactly as for any other blocked landing.
+`Invoke-FinalizeCoretide.ps1 -Land` applies the same gate to the Coretide
+receipt and, when the engine pair is passed, to the engine receipt.
 
 A refreshed confirmation reruns the review against the newly reviewed candidate
 and overwrites the artifact; the stale receipt is never reused, because its
@@ -344,6 +352,17 @@ and overwrites the artifact; the stale receipt is never reused, because its
   target. Pass `-ReleasePlanClaim` when a claimed Plan reached final
   preparation; the script then deletes the claim best-effort. Without the switch
   it invokes no `plan` command at all.
+- `Invoke-FinalizeCoretide.ps1` prints one `broken-engine-finalize-coretide/v1`
+  result carrying `status` (`pass`, `none`, `landed`, `blocked`, or `error`),
+  `code`, `message`, `coretideCommit`, `planClaim`, and `residuals`. A `pass`
+  from `-Prepare` has also fetched `coretideCommit` into the primary Coretide
+  repository, moving no ref, so the Coretide review opens a repository SmartGit
+  knows; a missing primary Coretide repository is `error` with
+  `primary.coretide-absent`. `-Land` runs under the landing lease the caller
+  already holds and first requires it live for this session and worktree under
+  `-OwnerToken`, else `landing-lock.not-held`. A rerun after landing reports
+  `none`, so `-Land` is idempotent. Pass `-ReleasePlanClaim` to it only on a
+  Coretide-only landing of a claimed Plan.
 
 Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
 before an open-ended user wait. At the end of every landing, successful or

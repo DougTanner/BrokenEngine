@@ -1,6 +1,6 @@
 ---
 name: create-follow-up-plans
-description: Converts proven pre-existing or out-of-scope Change Workflow residuals into concise, evidence-backed follow-up Plans under `Documents/Plans/<area>/` with tracked scheduler metadata. Do not route an in-scope acceptance failure out of the active change. Also use when asked to record review findings without duplicating existing Plans, and for tooling-friction follow-ups recorded at a /next-plan claim exit.
+description: Converts proven pre-existing or out-of-scope Change Workflow residuals into evidence-backed follow-up Plans under `Documents/Plans/<area>/`, or `Projects/Coretide/Documents/Plans/<area>/` for a Plan naming a Coretide file, with tracked scheduler metadata. Do not route an in-scope acceptance failure out of the active change. Also use when asked to record review findings without duplicating existing Plans, and for tooling-friction follow-ups recorded at a /next-plan claim exit.
 allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 ---
 
@@ -9,7 +9,9 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 ## Purpose
 
 Turn eligible residuals into concise, evidence-backed executable debt Plans
-under `Documents/Plans/<area>/`, with tracked scheduler metadata.
+under `Documents/Plans/<area>/`, or under
+`Projects/Coretide/Documents/Plans/<area>/` in the session Coretide clone for a
+Plan naming a Coretide file, with tracked scheduler metadata.
 
 ## When to use
 
@@ -28,6 +30,8 @@ under `Documents/Plans/<area>/`, with tracked scheduler metadata.
     rejected for a tooling-friction or context-efficiency follow-up too.
 
 ## Inputs
+
+Dispatch one `implementer` with these fields:
 
 - `Objective` — the active intent or plan the proposals arose from.
 - `Scope` — affected symbols and files, and the session changed-file list.

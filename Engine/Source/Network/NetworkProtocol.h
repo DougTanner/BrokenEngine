@@ -43,7 +43,7 @@ enum class PacketType : uint8_t
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes
 };
 
-inline constexpr int64_t kiProtocolVersion = 56;
+inline constexpr int64_t kiProtocolVersion = 57;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiCoordinateSlots = 16; // 7 visible subscriptions + 6 sticky + 3 spare

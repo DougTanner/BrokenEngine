@@ -502,6 +502,11 @@ void GameBase::ServerUpdate()
 		}
 		FinalizeFrameTick();
 		++iFinalizedTicks;
+		if (miTickCounter == miPauseAtTick) [[unlikely]]
+		{
+			mGameFlags.Set(GameFlags::kPaused);
+			miPauseAtTick = -1;
+		}
 		if (mGameFlags & GameFlags::kPaused) [[unlikely]]
 		{
 			mTimeStep.mTickRemainderNanoseconds = 0ns;
@@ -754,8 +759,10 @@ void GameBase::Render()
 {
 	const std::vector<GridCoord>& rActiveCoordinates = mActiveCoordinates;
 
-	// Interpolate elapsed time with the sub-step remainder for smooth rendering
-	std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>((TickToSimulationTime(miTickCounter) + std::max(0ns, mTimeStep.mTickRemainderNanoseconds)).time_since_epoch()));
+	// Interpolate elapsed time with the sub-step remainder for smooth rendering; pinned graphics drop it to stay
+	// tick-exact.
+	std::chrono::nanoseconds tickRemainder = gbGraphicsPinned ? 0ns : std::max(0ns, mTimeStep.mTickRemainderNanoseconds);
+	std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>((TickToSimulationTime(miTickCounter) + tickRemainder).time_since_epoch()));
 
 	GridCoord cameraCoordinate = mClientGridCoordinate;
 	bool bHaveRenderableCamera = false;

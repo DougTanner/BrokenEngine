@@ -174,6 +174,7 @@ membership, filter, and exception rules. Build commands: `/compile`.
 DP - DataPacker/
 MV - Projects/ModelViewer/
 BES - Projects/BrokenEngineSandbox/
-CT - Projects/Coretide/ (private repo, gitignored, present only in the primary
-checkout; design docs under `Projects/Coretide/Documents/Design/`; this repo is
+CT - Projects/Coretide/ (private repo, gitignored, present in the primary
+checkout and, as a local clone of it, in each session worktree the wrappers
+create; design docs under `Projects/Coretide/Documents/Design/`; this repo is
 public, so never copy CT content into it)

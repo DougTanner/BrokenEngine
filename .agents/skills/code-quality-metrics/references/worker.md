@@ -79,6 +79,10 @@ rename, and the rest become one-sided add or delete pairs. Do not broaden
 targets from checkout changes. Context changes remain visible but suppress
 target attribution.
 
+Both Compare corpora include the session Coretide clone under
+`Projects/Coretide/`, its baseline side at the merge base of the clone's `HEAD`
+and upstream; `Snapshot` never includes it.
+
 ## Rules
 
 - Diagnostics go to stderr; exit `2` means inputs, capture, bootstrap, analyzer,

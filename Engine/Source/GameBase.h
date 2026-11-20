@@ -276,6 +276,9 @@ public:
 
 	ServerSaveLoad mServerSaveLoad;
 
+	// Tick the pause_at_tick agent command armed; ServerUpdate pauses once that tick finalizes. -1 when none.
+	int64_t miPauseAtTick = -1;
+
 	// Reusable server-side dispatch references; capacity persists across ticks as the active-cell count changes.
 	std::vector<ActiveFrameReference> mActiveFrameReferences;
 #endif // BT_SERVER

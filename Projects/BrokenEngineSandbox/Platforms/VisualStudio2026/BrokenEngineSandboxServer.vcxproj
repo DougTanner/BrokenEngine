@@ -206,6 +206,7 @@
     <ClInclude Include="..\..\Source\Network\Server\ServerFleetManager.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerFleetSerialization.h" />
     <ClInclude Include="..\..\Source\Network\Server\FleetNavigationController.h" />
+    <ClInclude Include="..\..\Source\Network\Server\FleetRows.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBroadcaster.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerClientManager.h" />
@@ -333,6 +334,7 @@
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetManager.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetSerialization.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\FleetNavigationController.cpp" />
+    <ClCompile Include="..\..\Source\Network\Server\FleetRows.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerTransferManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBroadcaster.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerClientManager.cpp" />

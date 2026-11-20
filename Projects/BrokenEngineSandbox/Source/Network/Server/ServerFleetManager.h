@@ -31,7 +31,20 @@ struct PendingSquadronOrdersRequest
 {
 	int64_t iClientId = 0;
 	engine::GlobalId globalId {};
-	FleetMemberFlags_t flags {};
+	ShipOrders_t orders {};
+};
+
+struct FleetMemberLocation
+{
+	Fleet* pFleet = nullptr;
+	FleetMember* pMember = nullptr;
+};
+
+struct ConnectedOwner
+{
+	int64_t iClientId = 0;
+	// The CRC of the last FleetSync packet sent to this owner; 0 until one is sent, so the next send always goes.
+	common::crc_t uiLastFleetSyncCrc = 0;
 };
 
 class ServerFleetManager
@@ -47,7 +60,8 @@ public:
 	void TickFleetTimers();
 	void TickRespawnTimers();
 
-	void SendFleetSyncToClient(const engine::ClientGuid& rClientGuid);
+	// Sends each connected owner its FleetSync when the packet differs from the last one it was sent.
+	void SendChangedFleetSyncs();
 
 	void ClearPendingRequests();
 
@@ -66,13 +80,14 @@ public:
 	// Do NOT call from the load path — ReadFleetData is authoritative there; use ClearPendingRequests() instead.
 	void ResetState();
 
-	int64_t FindClientIdForGuid(const engine::ClientGuid& rGuid) const;
+	// The owner's fleet and member named by globalId; both null when the owner has no such member.
+	FleetMemberLocation FindFleetMember(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId);
 
 	// All fleets keyed by persistent ClientGuid (survives disconnect/reconnect)
 	std::unordered_map<engine::ClientGuid, std::vector<Fleet>> mFleets;
 
-	// Connected client mapping: ClientGuid -> iClientId (0 = disconnected)
-	std::unordered_map<engine::ClientGuid, int64_t> mGuidToClientId;
+	// Connected client mapping: ClientGuid -> client id (0 = disconnected) and last sent FleetSync CRC
+	std::unordered_map<engine::ClientGuid, ConnectedOwner> mGuidToClientId;
 
 	FleetNavigationController mNavigation;
 
@@ -83,6 +98,7 @@ public:
 private:
 
 	void CreateFleet(const engine::ClientGuid& rClientGuid);
+	FleetMember& AddFleetMember(const engine::ClientGuid& rClientGuid, Fleet& rFleet, ShipType eType, uint8_t uiSquadron);
 
 public:
 

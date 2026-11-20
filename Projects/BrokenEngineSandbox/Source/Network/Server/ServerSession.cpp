@@ -57,8 +57,8 @@ static FleetBehaviour AdmitFleetBehaviourByte(uint8_t uiValue)
 
 // The engine drain admits each packet through its contract row first. Every client-sendable game contract row has
 // min == max (GamePacketType.h), so admission settles each payload's size exactly and the cases below add no per-case
-// size check; only residual value checks a row cannot express — navigation-delay range, ship type, fleet behaviour and
-// squadron-orders flags bytes, the never-origin fleet hold, and global IDs — stay, and they throw to drop the packet.
+// size check; only residual value checks a row cannot express — navigation-delay range, ship type and fleet behaviour
+// bytes, squadron-orders bits, the never-origin fleet hold, and global IDs — stay, and they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
 	// Answered ahead of the playback refusal: the reply only reads state, so the map works during playback.
@@ -120,12 +120,12 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 			{
 				engine::NetworkMessages::ThrowCorruptStream("ServerSession squadron-orders global ID");
 			}
-			FleetMemberFlags_t flags {static_cast<FleetMemberFlags>(message.uiFlags)};
-			if (flags.Mask(kSquadronOrderFlags) != message.uiFlags)
+			ShipOrders_t orders {static_cast<ShipOrders>(message.uiOrders)};
+			if (orders.Mask(kSquadronOrderBits) != message.uiOrders)
 			{
-				engine::NetworkMessages::ThrowCorruptStream("ServerSession squadron-orders flags");
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession squadron-orders bits");
 			}
-			mpFleetManager->mPendingSquadronOrdersRequests.push_back({.iClientId = rPacket.iClientId, .globalId = message.globalId, .flags = flags});
+			mpFleetManager->mPendingSquadronOrdersRequests.push_back({.iClientId = rPacket.iClientId, .globalId = message.globalId, .orders = orders});
 			break;
 		}
 		case GamePacketType::kClientFleetNavigation:
@@ -159,11 +159,15 @@ void ServerSession::AfterNetworkPoll()
 	mpClientManager->NewClients();
 	mpFleetManager->ProcessCreateFleetRequests();
 	mpFleetManager->ProcessSpawnIntoFleetRequests();
+	// Last, after this poll's connects, requests, and navigation changes.
+	mpFleetManager->SendChangedFleetSyncs();
 }
 
 void ServerSession::FinalizeTickClients()
 {
 	mpFleetManager->DetectFleetMemberDeaths();
+	// After this tick's request drains, spawns, playback record adoption, and deaths.
+	mpFleetManager->SendChangedFleetSyncs();
 
 	// Post-swap, so the counters describe the tick that just finished, and once per advancing tick.
 	PublishServerEntityCounts();
@@ -205,7 +209,6 @@ void ServerSession::OnOwnedEntityDied([[maybe_unused]] const engine::ClientGuid&
 
 void ServerSession::OnResetForLoad()
 {
-	// Before the per-client fleet syncs, so each carries the rebuilt member flags.
 	mpFleetManager->RebuildFleetMembersForLoad();
 
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)

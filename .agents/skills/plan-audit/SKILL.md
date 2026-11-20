@@ -34,7 +34,7 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
 
 - Immutable complete plan as a file path readable from the worktree root — the
   exact claimed-Plan path or a complete resolved Plan snapshot the preparation
-  `implementer` wrote and cited under `Evidence` (a gitignored `Temp/` path is
+  `planner` wrote and cited under `Evidence` (a gitignored `Temp/` path is
   fine), whose body carries the plan's `## In scope` and `## Out of scope`
   sections — headings verbatim, with their content intact — because the citation
   check reads heading presence from the supplied file alone. Never inline text:
@@ -43,8 +43,7 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
   the card template in
   [`../../references/execution-card.md`](../../references/execution-card.md)
   `## Template`. Head it with the words `execution card`, in any casing, which
-  `/codex-review`'s prompt assembly requires in the scope file before it will
-  dispatch this audit.
+  the citation check reads as the card's presence.
 - Approved execution card, superseding the draft above, and session baseline
   only when the Change Workflow Approve and classify step triggers them.
 - User intent and applicable repository instructions

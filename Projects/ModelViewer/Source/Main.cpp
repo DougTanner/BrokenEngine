@@ -52,7 +52,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	{
 		if ((iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr)
 		{
-			gpModelViewerApplication->SelectAdjacentModel(uiWordParameter == VK_LEFT ? -1 : 1);
+			gpModelViewerApplication->SelectModel(uiWordParameter == VK_LEFT ? -1 : 1);
 		}
 		return 0;
 	}

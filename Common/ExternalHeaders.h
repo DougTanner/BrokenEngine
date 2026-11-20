@@ -130,6 +130,10 @@ using namespace std::chrono_literals;
 #include <wrl/client.h>
 #include <shellapi.h>
 
+// Replace any Windows header ASSERT with the engine one before the third-party assert hooks below forward to it.
+#undef ASSERT
+#include "ErrorUtils.h"
+
 static_assert(VER_PRODUCTBUILD > 10'011 || (VER_PRODUCTBUILD == 10'011 && VER_PRODUCTBUILD_QFE >= 16'384), "Update the Windows SDK");
 
 // Make sure this is the first DirectXMath include location (can be included from other windows headers automatically)
@@ -219,6 +223,9 @@ inline constexpr bool XmIsInf(float fValue)
 		#pragma clang diagnostic push
 		#pragma clang diagnostic ignored "-Weverything"
 	#endif
+	// Must match ThirdParty/Prebuilts/Source/Engine/ImGui.cpp token for token, so imgui.h inline functions stay
+	// identical across units.
+	#define IM_ASSERT(_EXPR) ASSERT(_EXPR)
 	#include "imgui.h"
 	#include "backends/imgui_impl_win32.h"
 	#include "backends/imgui_impl_vulkan.h"
@@ -307,6 +314,9 @@ inline constexpr bool XmIsInf(float fValue)
 // nlohmann::json (ThirdParty/json submodule) - runtime agent command channel (BT_ENGINE) and offline island
 // bake archetype/route loaders (BT_DATA_PACKER).
 #if defined(BT_ENGINE) || defined(BT_DATA_PACKER)
+	// Must match ThirdParty/Prebuilts/Source/DataPacker/tinygltf.cpp token for token (one-definition rule). The
+	// explicit conversion accepts json's smart-pointer asserts, which ASSERT's bool copy-initialization rejects.
+	#define JSON_ASSERT(x) ASSERT(static_cast<bool>(x))
 	#include "json/single_include/nlohmann/json.hpp"
 #endif
 
@@ -410,7 +420,6 @@ inline constexpr bool XmIsInf(float fValue)
 	#error "BT_DEBUG vs DEBUG/_DEBUG/NDEBUG/_NDEBUG inconsistent"
 #endif
 
-#undef ASSERT
 #undef assert
 #define assert USE_ASSERT_NOT_assert
 

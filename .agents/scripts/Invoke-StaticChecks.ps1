@@ -21,6 +21,8 @@
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
 # files when checking the working tree. `markdown-links`, `file-hygiene`, and `line-length`
 # read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
+# Every Git read of a Projects/Coretide/ entry runs in the session Coretide clone, against the inventory's
+# `coretide` baseline and head.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -43,6 +45,9 @@ $script:Root = $null
 $script:HeadSha = ''
 $script:HeadPaths = $null
 $script:UntrackedPaths = @()
+# The session Coretide clone's Root, BaselineSha, HeadSha, and HeadPaths, or null.
+$script:Coretide = $null
+$script:CoretidePrefix = 'Projects/Coretide/'
 $script:HeadingSlugs = @{}
 # Inline markdown link: the target is everything up to the closing parenthesis or the optional title.
 $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
@@ -106,11 +111,15 @@ function Get-StaticCheckShell() {
 	return $shell
 }
 
-function Invoke-StaticCheckGit([string[]] $Arguments, [switch] $RawStdout) {
-	$run = Invoke-StaticCheckProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root -RawStdout:$RawStdout
+function Invoke-StaticCheckGit([string[]] $Arguments, [switch] $RawStdout, [string] $Root = $script:Root) {
+	$run = Invoke-StaticCheckProcess 'git' (@('-C', $Root, '--no-pager') + $Arguments) $Root -RawStdout:$RawStdout
 	if ($run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	# The comma keeps a raw byte[] from being unrolled into the pipeline.
 	return , $run.Stdout
+}
+
+function Test-CoretidePath([string] $Path) {
+	return $null -ne $script:Coretide -and $Path.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal)
 }
 
 function Get-InventoryDocument() {
@@ -119,6 +128,11 @@ function Get-InventoryDocument() {
 	if ($IncludeUntracked) {
 		# The hygiene check enumerates the same untracked set for itself.
 		$script:UntrackedPaths = @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
+		$coretideRoot = Get-AgentCoretideRepository $script:Root
+		if ($null -ne $coretideRoot) {
+			$script:UntrackedPaths += @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z') -Root $coretideRoot) -split "`0" |
+				Where-Object { -not [string]::IsNullOrEmpty($_) } | ForEach-Object { $script:CoretidePrefix + $_ })
+		}
 		$arguments += '-IncludeUntracked'
 	}
 	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) $arguments $script:Root
@@ -135,6 +149,15 @@ function Test-HeadPath([string] $Path) {
 	# A commit-valued head is answered from its tree, so a file the working tree happens to hold but
 	# that commit does not is never treated as present.
 	if ([string]::IsNullOrEmpty($script:HeadSha)) { return Test-Path -LiteralPath (Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)) -PathType Leaf }
+	if (Test-CoretidePath $Path) {
+		if ($null -eq $script:Coretide.HeadPaths) {
+			$script:Coretide.HeadPaths = [Collections.Generic.HashSet[string]]::new([string[]] @())
+			foreach ($line in ((Invoke-StaticCheckGit @('ls-tree', '-r', '--name-only', '-z', $script:Coretide.HeadSha) -Root $script:Coretide.Root) -split "`0")) {
+				if (-not [string]::IsNullOrEmpty($line)) { [void] $script:Coretide.HeadPaths.Add($script:CoretidePrefix + $line) }
+			}
+		}
+		return $script:Coretide.HeadPaths.Contains($Path)
+	}
 	if ($null -eq $script:HeadPaths) {
 		$script:HeadPaths = [Collections.Generic.HashSet[string]]::new([string[]] @())
 		foreach ($line in ((Invoke-StaticCheckGit @('ls-tree', '-r', '--name-only', '-z', $script:HeadSha)) -split "`0")) {
@@ -146,6 +169,7 @@ function Test-HeadPath([string] $Path) {
 
 function Get-HeadText([string] $Path) {
 	if ([string]::IsNullOrEmpty($script:HeadSha)) { return [IO.File]::ReadAllText((Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)), $script:Utf8) }
+	if (Test-CoretidePath $Path) { return Invoke-StaticCheckGit @('show', "$($script:Coretide.HeadSha):$($Path.Substring($script:CoretidePrefix.Length))") -Root $script:Coretide.Root }
 	return Invoke-StaticCheckGit @('show', "$($script:HeadSha):$Path")
 }
 
@@ -373,13 +397,14 @@ function Invoke-LineLengthCheck([object] $Inventory, [bool] $Truncated) {
 	return New-CheckRow 'line-length' $true $status ([ordered]@{ fileCount = $paths.Count; limit = $script:MaximumLineLength; failures = [object[]] $failures.ToArray() })
 }
 
-function Add-WhitespaceFailure([string[]] $Arguments, [int] $CleanExit, [int] $FindingsExit, [Collections.Generic.List[object]] $Failures) {
-	$run = Invoke-StaticCheckProcess 'git' (@('-C', $script:Root, '--no-pager', '-c', 'core.quotePath=false') + $Arguments) $script:Root
+# Root and Prefix name the repository the Git command runs in and the prefix its reported paths gain.
+function Add-WhitespaceFailure([string[]] $Arguments, [int] $CleanExit, [int] $FindingsExit, [Collections.Generic.List[object]] $Failures, [string] $Root = $script:Root, [string] $Prefix = '') {
+	$run = Invoke-StaticCheckProcess 'git' (@('-C', $Root, '--no-pager', '-c', 'core.quotePath=false') + $Arguments) $Root
 	if ($run.ExitCode -ne $CleanExit -and $run.ExitCode -ne $FindingsExit) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	# Each finding is one `<path>:<line>: <problem>.` line followed by the offending `+` lines.
 	foreach ($line in ($run.Stdout -split "`n")) {
 		if ($line.StartsWith('+') -or $line.TrimEnd("`r") -cnotmatch '^(.+):(\d+): (.+?)\.?$') { continue }
-		$Failures.Add([ordered]@{ path = $Matches[1]; line = [int] $Matches[2]; problem = $Matches[3] })
+		$Failures.Add([ordered]@{ path = $Prefix + $Matches[1]; line = [int] $Matches[2]; problem = $Matches[3] })
 	}
 }
 
@@ -389,8 +414,8 @@ function Test-SpaceIndentedLine([string] $Text) {
 	return $Text -cmatch '^ +[^ ]' -and $Text -cnotmatch '^ +\*(?:\s|/|$)'
 }
 
-function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures) {
-	$diff = Invoke-StaticCheckGit (@('-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff') + $DiffArguments + @('--') + $Paths)
+function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures, [string] $Root = $script:Root, [string] $Prefix = '') {
+	$diff = Invoke-StaticCheckGit (@('-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff') + $DiffArguments + @('--') + $Paths) -Root $Root
 	$path = $null
 	$number = 0
 	$inHunk = $false
@@ -401,7 +426,7 @@ function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths
 		if ($line -cmatch '^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@') { $inHunk = $true; $number = [int] $Matches[1]; continue }
 		# With -U0 a hunk holds no context lines, and only an added line advances the new-side number.
 		if (-not $inHunk -or -not $line.StartsWith('+')) { continue }
-		if ($null -ne $path -and (Test-SpaceIndentedLine $line.Substring(1))) { $Failures.Add([ordered]@{ path = $path; line = $number; problem = 'indent with spaces' }) }
+		if ($null -ne $path -and (Test-SpaceIndentedLine $line.Substring(1))) { $Failures.Add([ordered]@{ path = $Prefix + $path; line = $number; problem = 'indent with spaces' }) }
 		$number++
 	}
 }
@@ -415,8 +440,17 @@ function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
 
 	# Whitespace errors on added lines; -M keeps a renamed file's unchanged lines from counting as added.
 	Add-WhitespaceFailure (@('diff', '--check', '-M', '--no-color') + $diffArguments) 0 2 $failures
+	$coretideDiffArguments = @()
+	if ($null -ne $script:Coretide) {
+		$coretideDiffArguments = @($script:Coretide.BaselineSha)
+		if (-not [string]::IsNullOrEmpty($script:Coretide.HeadSha)) { $coretideDiffArguments += $script:Coretide.HeadSha }
+		Add-WhitespaceFailure (@('diff', '--check', '-M', '--no-color') + $coretideDiffArguments) 0 2 $failures $script:Coretide.Root $script:CoretidePrefix
+	}
 	$nullDevice = if ($IsWindows) { 'NUL' } else { '/dev/null' }
-	foreach ($path in $untracked) { Add-WhitespaceFailure @('diff', '--no-index', '--check', '--no-color', '--', $nullDevice, $path) 1 3 $failures }
+	foreach ($path in $untracked) {
+		if (Test-CoretidePath $path) { Add-WhitespaceFailure @('diff', '--no-index', '--check', '--no-color', '--', $nullDevice, $path.Substring($script:CoretidePrefix.Length)) 1 3 $failures $script:Coretide.Root $script:CoretidePrefix }
+		else { Add-WhitespaceFailure @('diff', '--no-index', '--check', '--no-color', '--', $nullDevice, $path) 1 3 $failures }
+	}
 
 	$entries = @{}
 	foreach ($entry in $Inventory.entries) { if ($entry.status -cne 'D') { $entries[$entry.path] = $entry } }
@@ -425,13 +459,19 @@ function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
 	$glslPaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cin @('glsl', 'dual-language-header') }
 	$untrackedGlsl = [Collections.Generic.HashSet[string]]::new([string[]] @())
 	$pathspec = [Collections.Generic.List[string]]::new()
+	$coretidePathspec = [Collections.Generic.List[string]]::new()
 	foreach ($path in $glslPaths) {
 		if ($untracked -ccontains $path) { [void] $untrackedGlsl.Add($path); continue }
-		$pathspec.Add($path)
-		if ($null -ne $entries[$path].oldPath) { $pathspec.Add($entries[$path].oldPath) }
+		$sidePaths = @($path)
+		if ($null -ne $entries[$path].oldPath) { $sidePaths += $entries[$path].oldPath }
+		foreach ($sidePath in $sidePaths) {
+			if (Test-CoretidePath $sidePath) { $coretidePathspec.Add($sidePath.Substring($script:CoretidePrefix.Length)) }
+			else { $pathspec.Add($sidePath) }
+		}
 	}
 	# An empty pathspec would diff every path.
 	if ($pathspec.Count -gt 0) { Add-AddedGlslIndentFailure $diffArguments ([string[]] $pathspec) $failures }
+	if ($coretidePathspec.Count -gt 0) { Add-AddedGlslIndentFailure $coretideDiffArguments ([string[]] $coretidePathspec) $failures $script:Coretide.Root $script:CoretidePrefix }
 
 	# File-level byte checks: gitlinks and symlinks carry no file bytes, and binary is Git's own decision.
 	$bytePaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cne 'binary' -and $entry.current.mode -cin @('100644', '100755') }
@@ -440,11 +480,13 @@ function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
 		# Plain assignments: an `if` expression would unroll the byte[] into the pipeline.
 		$head = $null
 		if ([string]::IsNullOrEmpty($script:HeadSha)) { $head = [IO.File]::ReadAllBytes((Join-Path $script:Root ($path -replace '/', [IO.Path]::DirectorySeparatorChar))) }
+		elseif (Test-CoretidePath $path) { $head = Invoke-StaticCheckGit @('cat-file', 'blob', "$($script:Coretide.HeadSha):$($path.Substring($script:CoretidePrefix.Length))") -RawStdout -Root $script:Coretide.Root }
 		else { $head = Invoke-StaticCheckGit @('cat-file', 'blob', "$($script:HeadSha):$path") -RawStdout }
 		$baseline = $null
 		if ($null -ne $entry.baseline) {
 			$baselinePath = if ($null -ne $entry.oldPath) { $entry.oldPath } else { $path }
-			$baseline = Invoke-StaticCheckGit @('cat-file', 'blob', "$($Inventory.baselineSha):$baselinePath") -RawStdout
+			if (Test-CoretidePath $baselinePath) { $baseline = Invoke-StaticCheckGit @('cat-file', 'blob', "$($script:Coretide.BaselineSha):$($baselinePath.Substring($script:CoretidePrefix.Length))") -RawStdout -Root $script:Coretide.Root }
+			else { $baseline = Invoke-StaticCheckGit @('cat-file', 'blob', "$($Inventory.baselineSha):$baselinePath") -RawStdout }
 		}
 		$text = $null
 		try { $text = Get-AgentNormalizedText $head }
@@ -484,6 +526,14 @@ try {
 	}
 	$inventory = Get-InventoryDocument
 	$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
+	if ($null -ne $inventory.coretide) {
+		$script:Coretide = @{
+			Root = Get-AgentCoretideRepository $script:Root
+			BaselineSha = $inventory.coretide.baselineSha
+			HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.coretide.headSha)) { '' } else { $inventory.coretide.headSha }
+			HeadPaths = $null
+		}
+	}
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 

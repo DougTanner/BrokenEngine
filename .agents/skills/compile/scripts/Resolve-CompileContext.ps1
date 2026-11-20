@@ -4,9 +4,10 @@
 # Read-only: it launches no writing command and emits nothing but stdout JSON and stderr
 # diagnostics.
 #
-# dataBuildMode is decided here from the primary's Shared data stamp alone, and no agent judgment
-# remains: Shared when this worktree's data inputs equal those of the stamp's commit, otherwise
-# Local, including a missing or unresolvable stamp.
+# dataBuildMode is decided here from the primary's Shared data stamp and the thirdparty-candidate
+# row, and no agent judgment remains: Shared when this worktree's data inputs equal those of the
+# stamp's commit and no thirdparty-candidate row fires, otherwise Local, including a missing or
+# unresolvable stamp.
 [CmdletBinding()]
 param(
 	[string] $RepositoryRoot,
@@ -115,8 +116,9 @@ function Get-ContextNormalizedPaths([string] $Text) {
 }
 
 function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project, [bool] $IsLinkedWorktree) {
-	# One row per target whose source roots or forced includes contain a changed path; the worker builds every row, and
-	# a `.md` path or a path under no target's roots adds none. ModelViewer compiles only BrokenEngineSandbox's shader layouts.
+	# One row per target whose source roots, forced includes, or included Common headers contain a changed path; the
+	# worker builds every row, and a `.md` path or a path under no target's roots adds none. ModelViewer compiles only
+	# BrokenEngineSandbox's shader layouts.
 	$changedUnder = {
 		param([string[]] $Prefixes)
 		foreach ($path in $Paths) {
@@ -129,8 +131,9 @@ function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project, [bo
 	}
 	$targets = [Collections.Generic.List[object]]::new()
 	# A linked worktree's consumer builds link the session ThirdParty candidate once a ThirdParty/
-	# path or Common/DebugDefines.h (force-included) changed, and Invoke-CompileBuild.ps1 reads this row as that trigger.
-	if ($IsLinkedWorktree -and (& $changedUnder @('ThirdParty/', 'Common/DebugDefines.h'))) {
+	# path, Common/DebugDefines.h (force-included), or Common/ErrorUtils.h (included by the ThirdParty wrapper sources)
+	# changed, and Invoke-CompileBuild.ps1 reads this row as that trigger.
+	if ($IsLinkedWorktree -and (& $changedUnder @('ThirdParty/', 'Common/DebugDefines.h', 'Common/ErrorUtils.h'))) {
 		$targets.Add([pscustomobject][ordered]@{ project = 'ThirdParty'; configuration = $null; reason = 'thirdparty-candidate' })
 	}
 	if ([string]::IsNullOrEmpty($Project)) { return $targets.ToArray() }
@@ -252,10 +255,12 @@ try {
 	$script:Result.changedPathCount = $changed.Count
 	$script:Result.changedPathsTruncated = $changed.Count -gt $script:MaximumReportedPaths
 	$script:Result.changedPaths = @(@($changed) | Select-Object -First $script:MaximumReportedPaths)
+	$recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project $script:Result.isLinkedWorktree)
 
 	if ($null -ne $script:Result.project) {
 		# The stamp vouches for the Shared data only as exported from its own commit, so Shared needs this
-		# worktree's data inputs to equal that commit's; every other case resolves Local.
+		# worktree's data inputs to equal that commit's, and a thirdparty-candidate row resolves Local so
+		# DataPacker exports with the session ThirdParty candidate; every other case resolves Local.
 		$stamp = $null
 		try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $script:Result.project)).Trim() }
 		catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
@@ -272,6 +277,9 @@ try {
 				$reason = if ($dataInputChanges.Count -eq 0) { 'stamp-match' } else { 'inputs-differ' }
 			}
 		}
+		if ($reason -ceq 'stamp-match' -and @($recommendedTargets | Where-Object { $_.project -ceq 'ThirdParty' }).Count -gt 0) {
+			$reason = 'thirdparty-candidate'
+		}
 		$script:Result.dataBuildModeReason = $reason
 		$script:Result.dataBuildMode = if ($reason -ceq 'stamp-match') { 'Shared' } else { 'Local' }
 		$dataOwner = if ($script:Result.dataBuildMode -ceq 'Local') { $root } else { $primary }
@@ -286,7 +294,7 @@ try {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
 
-	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project $script:Result.isLinkedWorktree)
+	$script:Result.recommendedTargets = $recommendedTargets
 	$modeText = if ($null -eq $script:Result.dataBuildMode) { 'unresolved without a game project' } else { "$($script:Result.dataBuildMode) ($($script:Result.dataBuildModeReason))" }
 	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $modeText."
 }

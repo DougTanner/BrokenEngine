@@ -82,31 +82,34 @@ struct DestroyFleetMemberRequestMessage
 	}
 };
 
-// Sets the squadron setting flags (SquadronOrderFlags) of the squadron of the Fighter or Omni member globalId to uiFlags.
+// Sets the settings (the ShipOrders squadron setting bits, kpSquadronOrderBits) of the squadron of the Fighter or Omni
+// member globalId to uiOrders.
 struct SquadronOrdersRequestMessage
 {
-	static constexpr int64_t kiSize = sizeof(int64_t) + sizeof(uint8_t);
-	static_assert(kiSize == 9);
+	static constexpr int64_t kiSize = sizeof(int64_t) + sizeof(uint16_t);
+	static_assert(kiSize == 10);
 
 	engine::GlobalId globalId {};
-	uint8_t uiFlags = 0;
+	uint16_t uiOrders = 0;
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, SquadronOrdersRequestMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.globalId.iValue);
-		rVisitor.Field(rMessage.uiFlags);
+		rVisitor.Field(rMessage.uiOrders);
 	}
 };
 
 struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
-	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t);
+	static constexpr int64_t kiSquadronOrdersSize = std::to_underlying(ShipType::kCount) * kiMaximumFleetSquadronsPerType * sizeof(uint16_t);
+	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t) + kiSquadronOrdersSize;
 	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t);
 
 	static_assert(kiFleetCountSize == 8);
-	static_assert(kiFleetHeaderSize == 45);
+	static_assert(kiSquadronOrdersSize == 12);
+	static_assert(kiFleetHeaderSize == 57);
 	static_assert(kiFleetMemberSize == 11);
 
 	template <typename TVISITOR, typename TFLEET>
@@ -114,7 +117,7 @@ struct FleetSyncMessage
 	{
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
-		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t));
+		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float) + sizeof(uint8_t) + sizeof(int32_t) + sizeof(int32_t) + kiSquadronOrdersSize);
 		rVisitor.Field(rFleet.flagshipGlobalId.iValue);
 		float fNavigationDelay = rFleet.navigationDelaySeconds.count();
 		rVisitor.Field(fNavigationDelay);
@@ -122,6 +125,18 @@ struct FleetSyncMessage
 		rVisitor.Field(uiBehaviour);
 		rVisitor.Field(rFleet.holdCoordinate.iQ);
 		rVisitor.Field(rFleet.holdCoordinate.iR);
+		for (int64_t i = 0; i < std::to_underlying(ShipType::kCount); ++i)
+		{
+			for (int64_t j = 0; j < kiMaximumFleetSquadronsPerType; ++j)
+			{
+				uint16_t uiOrders = std::to_underlying(rFleet.pSquadronOrders[i][j].meFlags);
+				rVisitor.Field(uiOrders);
+				if constexpr (!std::is_const_v<TFLEET>)
+				{
+					rFleet.pSquadronOrders[i][j].meFlags = static_cast<ShipOrders>(uiOrders);
+				}
+			}
+		}
 		if constexpr (!std::is_const_v<TFLEET>)
 		{
 			rFleet.navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay);

@@ -79,12 +79,12 @@ heading turn in `ShipBehaviours` follows the
   follows its own flagship, found by `pFlagshipGlobalIds` in any of the three
   types.
 - A fleet Fighter or Omni row's spawn sets `ShipOrders::kSquadron1` from its
-  member's squadron and its squadron setting bits from its member's settings
-  (`SquadronOrders`, `../../../Fleet.h`; `../../../Network/Server/AGENTS.md`
-  `## State Ownership`): `kSeekAndDestroy` and `kSharedTarget` on a Fighter
-  (`../Fighters/AGENTS.md`), `kPatrolCell` and `kPatrolTogether` on an Omni
-  (`../Omnis/AGENTS.md`). A transfer carries them, and afterwards only
-  `kUpdateSquadronOrders` changes the setting bits.
+  member's squadron and its squadron setting bits from its squadron's slot
+  (`Fleet::pSquadronOrders`, `../../../Fleet.h`;
+  `../../../Network/Server/AGENTS.md` `## State Ownership`): `kSeekAndDestroy`
+  and `kSharedTarget` on a Fighter (`../Fighters/AGENTS.md`), `kPatrolCell` and
+  `kPatrolTogether` on an Omni (`../Omnis/AGENTS.md`). A transfer carries them,
+  and afterwards only `kUpdateSquadronOrders` changes the setting bits.
 - In PostRender Update a ship script reads other ship rows only from the
   previous frame, so the tuple order never hands it a row this tick has not
   updated yet, Omni weapon targeting included; Battleship Spawn-phase weapon

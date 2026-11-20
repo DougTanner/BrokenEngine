@@ -37,7 +37,7 @@ caller hands the reviewer as a file: create `Temp/` if absent, in a call of its
 own, then run
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -OutputPath Temp/adversarial-review-inventory.json`
 (add `-Head <commit>` for a committed head). The file holds one
-`broken-engine-session-change-inventory/v1` object with `entries`, `counts`, and
+`broken-engine-session-change-inventory/v2` object with `entries`, `counts`, and
 `triggers`; the run itself prints only one summary line naming its status, code,
 and message. Pass that path to the reviewer only after this run printed that
 line naming status `pass`; otherwise, or with no summary line, do not dispatch

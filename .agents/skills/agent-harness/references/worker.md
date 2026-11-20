@@ -361,7 +361,7 @@ and the handoff this run returns.
     - The launch script runs `Baseline`, `Register`, and the immediate `Check`
       for every launch. Run an action directly only for step 33's
       transport-failure `Check`, as its own shell call in the form shown below,
-      and for step 25's post-quit `Baseline`, in the form step 25 shows, each
+      and for step 25's post-quit `Check`, in the form step 25 shows, each
       using the state path retained in step 20:
 
       ```powershell
@@ -440,8 +440,8 @@ and the handoff this run returns.
     - `exitCode` is the registered process's exit code, or `null` when the exit
       code was not captured, usually because the watcher never bound the
       process, such as after the launcher's handle was released. Step 33 owns
-      the expected exit after `crash_report_harness_rig`; never prove it from a
-      second launch.
+      the expected exit after `crash_report_harness_rig` and after a step 25
+      quit; never prove it from a second launch.
     - Exit `0` means every registered role still holds its registered exact
       identity — the registered PID plus its registered start time, never a
       process-name search.
@@ -449,16 +449,17 @@ and the handoff this run returns.
       role's exit code, and a zero exit code alone never makes a disappearance
       intentional — and its findings carry any crash report written since that
       role's pre-launch baseline.
-      The first `Check` after an exit, whether a launch, wait, release, or step
-      33 runs it, reports that exit once and clears the role's registration, so
-      no later `Check` reports it again.
+      The first `Check` after an exit, whether a launch, wait, release, step 25,
+      or step 33 runs it, reports that exit once and clears the role's
+      registration, so no later `Check` reports it again.
       - A report unchanged since that baseline, or moved to the pending file
         by the role's startup rename, is stale and is never announced as a new
         crash, and a role that exited without writing a report reports
         `reportPath` and `headline` as `null` rather than inventing evidence.
     - Exit `1` is a setup or state failure, except code
       `check.no-registered-roles` after every registered role has exited and
-      been reported or been quit through step 25, which is expected.
+      been reported or been quit through step 25, which is expected, including
+      at release's entry check, which reports it as `processCheckNote`.
     - Never delete, move, or rewrite a reported crash report or its retained
       evidence; report it by path.
     - The checker reports only through the command, poll, or check that is
@@ -525,30 +526,25 @@ and the handoff this run returns.
     - `launch.md` owns the concrete argument values and the evidence check
       around this call.
 
-25. Before relinking or relaunching, send `quit`, wait for the exact numeric
-    `pid` from the role's latest launch result, and clear the role's
-    process-check registration. Done when that PID is gone and either the
-    role's `Baseline` passed or the quit's transport failure has its step 33
-    `Check` result reported.
+25. To quit a role before a relink, a relaunch, or a release, send `quit`,
+    wait for the exact numeric `pid` from the role's latest launch result, and
+    run the process check's `Check`. Done when that PID is gone and that
+    `Check` result is classified and reported through step 33.
 
-    - Use this independent shell call with the role's port, retained PID, and
-      the `-Role`, `-GameName`, and app-data root of its launch call:
+    - Use this independent shell call with the role's port and retained PID:
 
       ```powershell
       '{"cmd":"quit"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port <role port> --timeout-ms 3000 -
-      $quitExit = $LASTEXITCODE
       Wait-Process -Id <retained role PID> -Timeout 60
       if (Get-Process -Id <retained role PID> -ErrorAction SilentlyContinue) { throw 'Role did not exit.' }
-      if ($quitExit -eq 0) { pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role '<role>' -GameName '<role game name>' -ConfiguredAppDataRoot '<absolute app-data root>' } else { "quit exit $quitExit" }
+      pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
       ```
 
       `Wait-Process` reports a non-terminating error on timeout; the subsequent
       exact-PID check proves exit. If the PID survives, treat the run as failed
       and investigate or release it through step 39 before continuing.
-    - `Baseline` leaves the deliberately quit role with no registered process,
-      so no later `Check` reports its exit; read its result as step 22 states.
-    - A failed quit skips `Baseline` because the role may already have crashed,
-      and step 33's `Check` must still report that exit.
+    - A quit before a release continues at the release (step 39) and skips the
+      step 26 relaunch.
     - A live executable locks its image.
     - Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a
       duplicate on the same port binds alongside the live listener instead of
@@ -561,7 +557,14 @@ and the handoff this run returns.
 
 26. Relaunch the role with its launch call (step 21), which baselines the role
     before it registers the new process. Done when the replacement process's
-    launch result has returned.
+    launch result has returned and, when a server quit left a client on the
+    `ModalDialog` window, that client's OK click below has returned.
+
+    - A server quit leaves a connected client on the `ModalDialog` window,
+      where it neither discovers nor reconnects. After the server relaunch,
+      send the client `click {"label":"OK","window":"ModalDialog"}`; OK closes
+      the dialog, and the client, already on the main menu, then connects as
+      [`launch.md`](launch.md) `## Launch` describes.
 
 ### Invoke commands
 
@@ -590,19 +593,29 @@ and the handoff this run returns.
 
 33. After a transport failure, run the process check's `-Action Check` (Launch
     steps above) once before any retry and report its result through this same
-    command. Done when every transport failure has that check's result reported
-    before any retry.
+    command; classify the result of step 25's post-quit `Check` the same way.
+    Done when every transport failure has that check's result reported before
+    any retry, and every step 25 post-quit `Check` has its result classified
+    and reported.
 
     - That active command is the only channel the checker reports through, so a
       lost connection is diagnosed here rather than waited out.
     - After `crash_report_harness_rig`, a check exit of `2` whose finding for
       that command's role carries `exitCode` `0` and a non-null `reportPath` is
       the rig's expected result: report that finding as the rig's outcome,
-      never as a process-check failure. Any other check exit of `2`, or any
-      other finding in it, means the endpoint exited unexpectedly, including a
-      handled exception that terminated with exit code `0` and wrote a crash
-      report, so retry nothing and report the finding's role, report path,
-      exception headline, exit code, and retained evidence path.
+      never as a process-check failure. Apart from that result and the step 25
+      quit result below, any check exit of `2`, or any other finding in it,
+      means the endpoint exited unexpectedly, including a handled exception
+      that terminated with exit code `0` and wrote a crash report, so retry
+      nothing and report the finding's role, report path, exception headline,
+      exit code, and retained evidence path.
+    - After a step 25 quit, a finding for the quit role with `exitCode` `0` and
+      a null `reportPath` is the quit's expected result: report it as the
+      quit's outcome, never as a process-check failure. A nonzero or `null`
+      `exitCode`, a non-null `reportPath`, or any finding for another role is
+      an unexpected exit, reported as above. That same `Check` also serves a
+      quit that failed in transport, so it meets this step's Done condition
+      for that failure.
     - A check exit of `0` leaves the transport failure an ordinary one and the
       retry proceeds, unless the failure may follow a fully sent request, such
       as stderr saying `command was sent`, `no response`, `incomplete response`,
@@ -852,19 +865,18 @@ case.
 - Never infer an identity, switch data mode, fall back to Shared data, or run
   DataPacker/Gaea/texture export.
 - An owner mismatch is a hard stop. Never remove coordination state manually.
-- The run holds the one client/server slot on the machine, so it is bounded:
-  a wall-clock budget (the brief's, or the default that `../SKILL.md`
-  `## Inputs` states) measured from the moment the claim succeeds (a
-  quit-and-reclaim restarts it), and at most three attempts per criterion
-  where the process-check rules allow a retry at all. A criterion that has not
-  settled within its attempts is `BLOCKED`, with each attempt's commands and
-  observations recorded as `Decisive checks` rows. At the wall-clock budget,
-  start no further command (a helper wait already in flight runs to its own
-  deadline), mark every unsettled criterion `BLOCKED`, release through the
-  lifecycle and release steps below, and return the handoff. Never repeat a
-  scenario past its attempt cap or keep the slot to perfect a criterion; a
-  partial handoff with the slot released beats a complete one that never
-  arrives.
+- The run holds the one client/server slot on the machine, so it is bounded: by
+  the wall-clock budget the brief states, if any (`../SKILL.md` `## Inputs`),
+  measured from the moment the claim succeeds (a quit-and-reclaim restarts it),
+  and by at most three attempts per criterion where the process-check rules
+  allow a retry at all. A criterion that has not settled within its attempts is
+  `BLOCKED`, with each attempt's commands and observations recorded as
+  `Decisive checks` rows. At the wall-clock budget, start no further command (a
+  helper wait already in flight runs to its own deadline), mark every unsettled
+  criterion `BLOCKED`, release through the lifecycle and release steps below,
+  and return the handoff. Never repeat a scenario past its attempt cap or keep
+  the slot to perfect a criterion; a partial handoff with the slot released
+  beats a complete one that never arrives.
 - Prefer a script over the image. Most visual criteria — frame non-black, region
   matches an expected color, two captures differ, pixel count past a threshold —
   are assertions a few lines of code settle more precisely than an eye on a
@@ -880,28 +892,49 @@ case.
   them; pass a `maxWidth` and `quality` matched to the assertion as part of
   designing the check.
 - A before/after pixel baseline pins every time-varying client visual input an
-  existing route reaches and records each pinned value with the recipe. For
-  the BrokenEngineSandbox sun angle, after the last tick advance with the game
-  paused, `set_slider` a chosen value on `##Sun Angle` in window `Tweaks`
-  (Debug-client and F3 mechanics: [`command-reference.md`](command-reference.md)
-  `set_slider` entry), close Tweaks, confirm `tweaksVisible:false`
-  (`describe_ui` entry), then have the driver sleep one fixed wall-clock
-  duration in milliseconds between the `describe_ui` reply and the
-  `screenshot`, recorded with the recipe and identical in every run, so the
-  terrain and object shadow refreshes (`Engine/Source/Graphics/Render/AGENTS.md`
-  `## Ordering and Publication`) and temporal history catch up. No harness
-  command waits for rendered frames, and this sleep is not a readiness wait,
-  which stays with the ping poll. Client render state accumulated since launch
-  or by wall-clock time, such as the water scroll or foam aging, has no pinning
-  route, so the recipe takes two baseline captures, and every capture, the
-  after-change one included, replays the full recipe on its own fresh client
-  launch. Judge the after-change capture only where the two baseline captures
-  agree within the check's pixel threshold, recorded with the recipe like the
-  sleep duration: every asserted region (hulls, wrecks, and the like) must lie
-  inside that agreement area, the run reports the excluded pixel count, and an
-  asserted region outside it leaves its criterion unsettled, never `PASS`. An
-  input whose pinning needs a new command or C++ is surfaced for re-planning,
-  never worked around by sweeping values until the pixels match.
+  existing route reaches and records each pinned value with the recipe. Before
+  the first baseline capture, write a save with `save` from a recorded setup
+  and record its name and paused tick. After the client connects, the server
+  `load`s that save with `pauseAfterLoad` true, confirmed by `status` reporting
+  `paused:true` and `tick` equal to the recorded tick, otherwise the launch is
+  redone. The load repeats per launch because pause resets when the previous
+  capture's client disconnects ([`command-reference.md`](command-reference.md)
+  `## Server commands` pause/timescale note). When the change under test bumps
+  `Frame::kiVersion`, the baseline build's save fails to load in the
+  after-change build (`load` entry), so the after-change build writes its own
+  save from the same recorded setup, redone until `status` reports its paused
+  `tick` equal to the recorded tick, and its launches load that save. After
+  the per-launch load's confirming `status`, re-query client `describe_scene`
+  until its `gameFlags` contains `kPaused`, redoing the launch only when a
+  fixed wall-clock limit, recorded with the recipe like the sleep, runs out,
+  then send `pin_graphics` once
+  ([`command-reference.md`](command-reference.md) `pin_graphics` entry). A
+  later tick advance needs no resend: the pin holds for the launch. Take the
+  capture with `screenshot` `requirePinned` true. Have the driver sleep one
+  fixed wall-clock duration in milliseconds between the reply to the recipe's
+  last pinning command (the per-launch load's confirming `status`, any last
+  tick advance's confirming `status`, or `pin_graphics`, whichever comes last)
+  and the `screenshot`, recorded with the recipe and identical in every run, so
+  the terrain and object shadow refreshes
+  (`Engine/Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`),
+  the downstream EWNS lighting that foam albedo feeds
+  (`Engine/Data/Shaders/Water/AGENTS.md` `## Retained Foam`), and temporal
+  history catch up. No harness command waits for rendered frames,
+  and this sleep is not a readiness wait, which stays with the ping poll. Any
+  other client render state accumulated since launch or by wall-clock time has
+  no pinning route and depends on launch history, so the recipe takes two
+  baseline captures; every capture, the after-change one included, replays the
+  full recipe on its own fresh client launch; and a capture whose launch
+  strayed from the recipe is redone. Before the first baseline capture, fix
+  each asserted region's (hulls, wrecks, and the like) excluded-pixel allowance
+  and record it with the recipe, like the sleep duration and the check's pixel
+  threshold. Judge the after-change capture against the baselines at that
+  threshold: a region whose count of pixels where the two baseline captures
+  disagree is within its allowance is judged on its agreeing pixels, and the
+  run reports the excluded count; a region over its allowance leaves its
+  criterion unsettled, never `PASS`. An input whose pinning needs a new command
+  or C++ is surfaced for re-planning, never worked around by sweeping values
+  until the pixels match.
 
 ### Performance investigations
 

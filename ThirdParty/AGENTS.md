@@ -10,6 +10,11 @@ approval and license review.
   units, generated configuration shims, implementation-only defines, and
   source-level warning boundaries. The executable-owned mimalloc wrapper lives
   in `Engine/Source/Memory/Mimalloc.cpp`.
+- A wrapper routes its library's assert hook to the engine `ASSERT` from
+  `Common/ErrorUtils.h`, so library checks fire in every configuration. A hook
+  that a header also expands in PCH units, such as `IM_ASSERT` or
+  `JSON_ASSERT`, is defined in `Common/ExternalHeaders.h` too, token for token
+  identical, so the header's inline functions keep one definition.
 - PCH-backed consumption defines, suppressions, and includes belong in
   `Common/ExternalHeaders.h`, gated by `BT_CLIENT`, `BT_ENGINE`, `BT_SERVER`,
   or `BT_DATA_PACKER` as appropriate.

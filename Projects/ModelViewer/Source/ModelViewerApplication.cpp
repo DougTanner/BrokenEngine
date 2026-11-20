@@ -49,9 +49,15 @@ void ModelViewerApplication::TogglePause()
 	mFlags.Toggle(ViewerFlags::kPaused);
 }
 
-void ModelViewerApplication::SelectModel(int64_t iSelection)
+void ModelViewerApplication::SelectModel(int64_t iStep)
 {
-	if (iSelection < 0 || iSelection >= std::ssize(mPreviews) || iSelection == miSelected)
+	int64_t iSelection = miSelected + iStep;
+	if (iSelection < 0 || iSelection >= std::ssize(mPreviews))
+	{
+		return;
+	}
+
+	if (iStep == 0)
 	{
 		return;
 	}
@@ -60,11 +66,6 @@ void ModelViewerApplication::SelectModel(int64_t iSelection)
 	mAnimationTime = 0s;
 	mFlags.Set(ViewerFlags::kPlaying, false);
 	LoadModelMetadata();
-}
-
-void ModelViewerApplication::SelectAdjacentModel(int64_t iStep)
-{
-	SelectModel(miSelected + iStep);
 }
 
 struct LightingPreset
@@ -1119,7 +1120,7 @@ void ModelViewerApplication::RenderUi()
 			{
 				if (ImGui::Selectable(mPreviews.at(i).pcPath, i == miSelected))
 				{
-					SelectModel(i);
+					SelectModel(i - miSelected);
 				}
 			}
 			ImGui::Spacing();

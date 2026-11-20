@@ -116,7 +116,7 @@ void ServerSaveLoad::FinalAutosave()
 
 bool ServerSaveLoad::Autoload()
 {
-	// Heap: file paths, grid save file I/O, and the staged snapshot's frames
+	// Heap: the autosave file paths
 	ScopedSuppressAllocationTracking suppress;
 
 	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath(std::filesystem::path(kAutosaveFilename))))
@@ -124,16 +124,7 @@ bool ServerSaveLoad::Autoload()
 		return false;
 	}
 
-	engine::StagedGridSave stagedGrid;
-	if (!engine::ReadGridSave(std::filesystem::path(kAutosaveFilename), stagedGrid))
-	{
-		return false;
-	}
-
-	engine::GridCoord loadedClientGridCoordinate = stagedGrid.clientGridCoordinate;
-	engine::AdoptGridSave(std::move(stagedGrid));
-	game::gpGame->SetClientGridCoordinate(loadedClientGridCoordinate);
-	return true;
+	return ServerLoad(std::filesystem::path(kAutosaveFilename));
 }
 
 } // namespace engine

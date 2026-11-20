@@ -9,7 +9,7 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
    `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -Regions`
    (add `-Head <commit>` for a committed head, and the `-IncludeUntracked`
    switch when `Scope` names untracked shader files). It writes no file and
-   prints one `broken-engine-session-change-inventory/v1` object: every
+   prints one `broken-engine-session-change-inventory/v2` object: every
    `entries` row whose `class` is `glsl` or `dual-language-header` is in scope,
    and those class rules are the only statement of which `.h` files are shader
    sources — never restate or reconstruct that classification inline. The

@@ -1,6 +1,6 @@
 # Prepare Change Worker
 
-The preparation steps and judgment rules the dispatched `implementer` runs.
+The preparation steps and judgment rules the dispatched `planner` runs.
 Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps

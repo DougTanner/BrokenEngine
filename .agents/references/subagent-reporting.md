@@ -9,10 +9,17 @@ safely summarized, and the prompt states why.
 
 The Change Workflow delegation role table authoritatively assigns delegated
 work; a role exception it does not list is stated in the skill it governs. This
-reference owns only reporting-local conduct: independent findings-only work
-uses a fresh context, any authorized narrow edit path includes its
-required self-check, and tool restrictions a skill body states are prose
-boundaries rather than host enforcement.
+reference owns only reporting-local conduct: independent findings-only work uses
+a fresh context, any authorized narrow edit path includes its required
+self-check, tool restrictions a skill body states are prose boundaries rather
+than host enforcement, and a worker reads a Coretide inventory entry's diff in
+the form below.
+
+A worker reads the diff of a changed-file inventory entry under
+`Projects/Coretide/` (origin: `.agents/scripts/Get-SessionChangeInventory.ps1`
+header) with
+`git -C Projects/Coretide diff <coretide.baselineSha> [<coretide.headSha>]`,
+taking both values from the same inventory result.
 
 ## Task brief
 

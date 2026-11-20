@@ -3,7 +3,7 @@ name: prepare-change
 description: >-
   Prepare a change before its plan reviews: gather the repository evidence that
   fixes the risk tier and, at Tier 2+, draft the implementation plan as a file
-  and the execution card. Use for the `implementer` preparation the Change
+  and the execution card. Use for the `planner` preparation the Change
   Workflow Approve and classify and Prepare and explore alternatives steps
   require, for a change that is not a claimed executable Plan. Preparation only;
   never implements the change.
@@ -14,17 +14,17 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 
 ## Purpose
 
-One `implementer` produces the repository evidence that fixes the risk tier,
-and, for the Tier-2+ plan preparation the Prepare and explore alternatives step
+One `planner` produces the repository evidence that fixes the risk tier, and,
+for the Tier-2+ plan preparation the Prepare and explore alternatives step
 dispatches, the implementation plan as a file with the draft execution card
 inside it. A Tier-1 dispatch made only to classify the work returns the evidence
 alone.
 
 ## When to use
 
-- The `implementer` preparation bullets of the Change Workflow Approve and
-  classify and Prepare and explore alternatives steps — Tier 2 and above, or
-  any tier where classifying the work needs repository evidence.
+- The `planner` preparation bullets of the Change Workflow Approve and classify
+  and Prepare and explore alternatives steps — Tier 2 and above, or any tier
+  where classifying the work needs repository evidence.
 - Not for a claimed executable Plan:
   [`../next-plan/SKILL.md`](../next-plan/SKILL.md) keeps its own preparation
   route.

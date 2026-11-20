@@ -58,9 +58,9 @@ Assess in this order:
    skill surface, brief assembly, handoff volume, direct main work, and
    repeats. Every finding carries the emitter, measured chars, and replacement
    that section requires.
-5. Execution-model routing: verify every headless `/codex-review` attempt using
-   the concern-first classification, allowed evidence chain, and verdict rules
-   in `measurement.md`.
+5. Execution-model routing: verify every headless Codex launch through the
+   bridge launcher using the preset evaluation, allowed evidence chain, and
+   verdict rules in `measurement.md`.
 6. Control-work classification: classify control work and label each control
    using the rules in `measurement.md`; distinguish required controls from
    removable candidates before treating the burden as waste.

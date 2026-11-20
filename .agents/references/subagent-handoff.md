@@ -22,14 +22,17 @@ Residuals: <actionable blocker or none>
 
 That fenced form is the whole return — nothing precedes or follows it except the
 extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
-declares — and `Status` carries exactly one of the three tokens alone on its
-line. Every row is one line. Do not quote code and do not repeat a row from
-another field. The whole returned handoff stays under 4,000 characters; no
-skill sets its own cap. Before returning, the worker estimates the drafted
-handoff's character count; when it may reach the cap, the full material of the
-fields that push it over moves to an existing file or log, or to a `Temp/` file
-when no existing file holds it, with one `##` heading per section of that
-material, and `Evidence` carries one table-of-contents row per section:
+declares, and the final verdict line a Codex bridge run places after the
+complete handoff
+([`../skills/codex-bridge/SKILL.md`](../skills/codex-bridge/SKILL.md) step 2) —
+and `Status` carries exactly one of the three tokens alone on its line. Every
+row is one line. Do not quote code and do not repeat a row from another field.
+The whole returned handoff stays under 4,000 characters; no skill sets its own
+cap. Before returning, the worker estimates the drafted handoff's character
+count; when it may reach the cap, the full material of the fields that push it
+over moves to an existing file or log, or to a `Temp/` file when no existing
+file holds it, with one `##` heading per section of that material, and
+`Evidence` carries one table-of-contents row per section:
 `<path> ## <heading> — <one-line description of what the section holds>`. A
 selector into a Markdown file is a `##` heading in it. The handoff itself still
 carries the decision-relevant summary of each moved field, such as the count in

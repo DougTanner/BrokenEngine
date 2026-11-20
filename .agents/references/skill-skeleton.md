@@ -85,7 +85,10 @@ never loads the private steps into its context:
 present or ask anything verbatim; a `SKILL.md` missing text main must deliver
 verbatim is the failure this rule prevents. Text main reads to decide whether or
 how to dispatch — triggers, inputs, verbatim presentations and questions — is
-public even when it would otherwise fall under `Steps` or `Rules`.
+public even when it would otherwise fall under `Steps` or `Rules`. The role a
+dispatch of the worker uses is named in `SKILL.md`, in backticks, one per mode
+when modes use different roles; [`change-workflow.md`](change-workflow.md)
+`### Delegation roles` owns the rule.
 
 Each other reference is linked from `references/worker.md` when only the
 executor reads it, or from `SKILL.md` when the dispatcher reads it. A

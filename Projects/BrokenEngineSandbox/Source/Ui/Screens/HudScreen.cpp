@@ -454,18 +454,17 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		ImGui::Text("%s Squadron %d", ShipTypeName(pSquadronMember->eType), pSquadronMember->uiSquadron + 1);
 
 		// Each control sends the squadron's settings with its one change.
-		FleetMemberFlags_t orderFlags {};
-		SetSquadronOrderFlags(orderFlags, pSquadronMember->flags);
+		ShipOrders_t orders = pFleet->pSquadronOrders[std::to_underlying(pSquadronMember->eType)][pSquadronMember->uiSquadron];
 		bool bSend = false;
 		ImGui::BeginDisabled((rOrdersToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		if (pSquadronMember->eType == ShipType::kFighter)
 		{
-			bool bSeekAndDestroy = pSquadronMember->flags & FleetMemberFlags::kSeekAndDestroy;
-			bool bSameTarget = !(pSquadronMember->flags & FleetMemberFlags::kSeparateTargets);
+			bool bSeekAndDestroy = orders & ShipOrders::kSeekAndDestroy;
+			bool bSameTarget = orders & ShipOrders::kSharedTarget;
 			ImGui::BeginDisabled(!bSeekAndDestroy);
 			if (ImGui::Button("Patrol"))
 			{
-				orderFlags.Set(FleetMemberFlags::kSeekAndDestroy, false);
+				orders.Set(ShipOrders::kSeekAndDestroy, false);
 				bSend = true;
 			}
 			ImGui::EndDisabled();
@@ -473,24 +472,24 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			ImGui::BeginDisabled(bSeekAndDestroy);
 			if (ImGui::Button("Seek and Destroy"))
 			{
-				orderFlags.Set(FleetMemberFlags::kSeekAndDestroy);
+				orders.Set(ShipOrders::kSeekAndDestroy);
 				bSend = true;
 			}
 			ImGui::EndDisabled();
 			if (ImGui::Checkbox("Same Target", &bSameTarget))
 			{
-				orderFlags.Set(FleetMemberFlags::kSeparateTargets, !bSameTarget);
+				orders.Set(ShipOrders::kSharedTarget, bSameTarget);
 				bSend = true;
 			}
 		}
 		else
 		{
-			bool bPatrolCell = pSquadronMember->flags & FleetMemberFlags::kPatrolCell;
-			bool bPatrolTogether = pSquadronMember->flags & FleetMemberFlags::kPatrolTogether;
+			bool bPatrolCell = orders & ShipOrders::kPatrolCell;
+			bool bPatrolTogether = orders & ShipOrders::kPatrolTogether;
 			ImGui::BeginDisabled(!bPatrolCell);
 			if (ImGui::Button("Escort"))
 			{
-				orderFlags.Set(FleetMemberFlags::kPatrolCell, false);
+				orders.Set(ShipOrders::kPatrolCell, false);
 				bSend = true;
 			}
 			ImGui::EndDisabled();
@@ -498,13 +497,13 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			ImGui::BeginDisabled(bPatrolCell);
 			if (ImGui::Button("Patrol Cell"))
 			{
-				orderFlags.Set(FleetMemberFlags::kPatrolCell);
+				orders.Set(ShipOrders::kPatrolCell);
 				bSend = true;
 			}
 			ImGui::EndDisabled();
 			if (ImGui::Checkbox("Patrol Together", &bPatrolTogether))
 			{
-				orderFlags.Set(FleetMemberFlags::kPatrolTogether, bPatrolTogether);
+				orders.Set(ShipOrders::kPatrolTogether, bPatrolTogether);
 				bSend = true;
 			}
 		}
@@ -512,7 +511,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		if (bSend)
 		{
 			rOrdersToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-			gpClientSession->SendSquadronOrdersRequest(pSquadronMember->globalId, orderFlags);
+			gpClientSession->SendSquadronOrdersRequest(pSquadronMember->globalId, orders);
 		}
 	}
 

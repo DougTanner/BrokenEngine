@@ -27,14 +27,16 @@ Produces the landing acceptance table and the landing summary main presents.
 Require the approved objective, its stage decisions, and the caller-owned
 changed paths. That path set is the session's full landing set, including paths
 already committed — a deletion among them included — so a re-preparation
-dispatch passes it unchanged rather than trimming it to what is still dirty. An
-optional `Attribution trailer` brief field carries the dispatching session's own
-attribution trailer line; when the brief omits it or gives `none`, the commit
-message has no trailer. The finalizer produces the landing acceptance table
-itself, inside the workflow in `references/worker.md`, from the prepared diff
-final preparation and reconciliation produced — do not reuse an earlier table.
-When a Plan completion or rejection belongs to the landing, the brief also
-carries the `/next-plan` step-10 `Complete-NextPlan.ps1` result verbatim.
+dispatch passes it unchanged rather than trimming it to what is still dirty. The
+landing set may hold `Projects/Coretide/` paths of the session Coretide clone;
+they land in a separate Coretide commit. An optional `Attribution trailer` brief
+field carries the dispatching session's own attribution trailer line; when the
+brief omits it or gives `none`, the commit message has no trailer. The finalizer
+produces the landing acceptance table itself, inside the workflow in
+`references/worker.md`, from the prepared diff final preparation and
+reconciliation produced — do not reuse an earlier table. When a Plan completion
+or rejection belongs to the landing, the brief also carries the `/next-plan`
+step-10 `Complete-NextPlan.ps1` result verbatim.
 
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`
@@ -86,7 +88,9 @@ retained-claim, or still-active work.
 
 Main first runs the handoff's `SmartGit launch:` line verbatim under the root
 AGENTS.md bundled-script rule, then reads `status`, `message`, and
-`manualCommand` from the receipt that line redirects to. Between the handoff and
+`manualCommand` from the receipt that line redirects to; it does the same for
+the `Coretide SmartGit launch:` line when the handoff carries one. A
+Coretide-only landing has no `SmartGit launch:` line. Between the handoff and
 the question main makes no tool call other than these and the ones the handoff's
 own result requires. A receipt with any status the line forms below do not name,
 or one that is unreadable, is a blocker to report, not a summary to present.
@@ -98,10 +102,15 @@ resolved as `<primary-branch>` below, the acceptance table's non-PASS rows if it
 has any, and the required line `**SmartGit review:** <status>` for `opened` and
 `**SmartGit review:** <status> — <manualCommand> — <message>` for `unavailable`
 and `failed`, filled from the fields just read — so the summary cannot be
-written before that receipt exists. Write it in plain words the user can act on,
-with no repository jargon. Then ask exactly:
+written before that receipt exists. When Coretide changes land, the summary
+also carries the Coretide changed-file count and the same review line, filled
+from the Coretide receipt. Write it in plain words the user can act on, with no
+repository jargon. Then ask exactly:
 
 - `Confirm landing this change from <session-branch> onto primary branch <primary-branch>?`
+
+When Coretide changes land, the question ends
+` and Coretide commit <coretide-commit>?` in place of `?`.
 
 `<primary-branch>` is always the sidecar-backed `PrimaryBranch` that
 `Get-AgentWorktreeSessionContext` reports — never a host-reported default or an
@@ -126,6 +135,7 @@ plus the continuation capsule below
   never retyped;
 - whether a claimed Plan reached final preparation, so the landing invocation
   passes `-ReleasePlanClaim`;
+- the approved Coretide commit, when Coretide changes land;
 - one confirmation row: the exact question asked and the user's affirmative
   reply.
 

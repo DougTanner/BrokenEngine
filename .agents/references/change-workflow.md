@@ -28,21 +28,19 @@ work.
 
 | `subagent_type` | Claude Code definition | Codex definition | Work |
 | --- | --- | --- | --- |
-| `planner` | .claude/agents/planner.md | .codex/agents/astra-planner.toml | Plans, design |
+| `planner` | .claude/agents/planner.md | .codex/agents/astra-planner.toml | Preparation, plans, design |
 | `reviewer` | .claude/agents/reviewer.md | .codex/agents/astra.toml | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Preparation, implementation, propagation, docs, plans, finalization |
-| `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives |
+| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Implementation, propagation, docs, follow-up plans, finalization |
+| `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives; `/code-quality-metrics` |
 | `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
 | `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
 | `runner` | .claude/agents/runner.md | .codex/agents/sonnet.toml | `/agent-harness` runs dispatched on their own |
 | `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
-- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On
-  Claude only, a documented host-unavailability fallback to `general-purpose`
-  may pass `model:` and runs without a locked-in effort
+- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort.
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never
   substitute for a role, including inside plan mode — route the work through the
-  table above. The documented host-unavailability fallback is the only exception
+  table above.
 - Do not follow review findings blindly. Use judgement on each one: accept it
   when the failure is real and reachable, and be especially careful with
   findings that add guards, options, or machinery for cases nobody has observed
@@ -86,11 +84,6 @@ work.
   (`.agents/references/authority-order.md`). Open each option with a written
   label such as `Option 1:`, never a rendered list marker, and reuse those
   labels in any question naming options.
-- Long test runs: before dispatching a test run (an `/agent-harness` scenario, a
-  replay determinism check, or any other test) expected to take more than 10
-  minutes, ask the user first, giving the expected duration, what the run
-  checks, and a shorter alternative such as a spot-check; dispatch the longer
-  run only when the user agrees.
 - Footer: only the main-session message that asks the `/finalize-changes`
   landing confirmation question carries it; that message ends with
   `Follow-up Plans created:` and the single word `none`, or one line per Plan
@@ -182,8 +175,8 @@ Risk tiers: `.agents/references/risk-tiers.md`.
 
 #### Step 1 — Approve and classify
 
-- `implementer` runs `/prepare-change` — Tier 2+, or any tier where classifying
-  the work needs repository evidence.
+- `planner` runs `/prepare-change` — Tier 2+, or any tier where classifying the
+  work needs repository evidence.
 
 From user intent and any such preparation, main locks in the objective, the
 approved stage decisions, the tier and its triggers, the roles, and the
@@ -200,7 +193,7 @@ is no plan file, so main briefs from the Step 1 preparation where that step's
 `/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan
 and Tier-1 routes.
 
-- `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
+- `planner` runs `/prepare-change` to prepare the plan — Tier 2+.
 - main dispatches one `researcher` per axis for `/plan-alternatives`,
   concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger
   (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds
@@ -236,14 +229,14 @@ plan snapshot.
   every tier, when the plan adds new code or changes non-documentation behavior
   (both defined in that skill's `## When to use`); when unsure whether a plan
   triggers it, dispatch it.
-- `implementer` owns `/external-grill-plan` repository evidence and short
-  written decision summaries, updated round by round — Tier 3 only.
+- `planner` owns `/external-grill-plan` repository evidence and short written
+  decision summaries, updated round by round — Tier 3 only.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence
   worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and
   at Tier 3 also for the claims a grill round raises.
-- fresh `implementer` carrying a continuation capsule from the preparation
-  writes the Plan review findings main accepts into the plan snapshot; main does
-  not write those findings into the snapshot itself — Tier 1-2 with a plan
+- fresh `planner` carrying a continuation capsule from the preparation writes
+  the Plan review findings main accepts into the plan snapshot; main does not
+  write those findings into the snapshot itself — Tier 1-2 with a plan
   snapshot, after main accepts a finding; Tier 3 follows
   `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
 - fresh `reviewer` runs `/plan-simplicity-review` over only the difference those
@@ -252,7 +245,7 @@ plan snapshot.
   round add mechanism (a new guard, check, option, or code path) rather than
   only correcting statements.
 
-At Tier 3 main only decides and interviews from the `implementer` and `locator`
+At Tier 3 main only decides and interviews from the `planner` and `locator`
 handoffs, then presents the resolved plan for approval per `/next-plan`
 `### Implementation approval`; the brief and iteration contract is in
 `.agents/skills/next-plan/references/tier3-workflow.md`.
@@ -429,14 +422,7 @@ paragraph below.
   `/agent-harness` acceptance check (`.agents/skills/verify-acceptance/SKILL.md`
   `## Inputs`), so main dispatches no `runner` for it. The brief cites the
   checks in the execution-card form `/agent-harness` `## Inputs` defines and
-  writes no step sequence of its own; main reads no check. The brief sets no
-  wall-clock budget, with one exception after a budget stop: when the `runner`
-  returns criteria left unsettled by the run budget, main asks the user under
-  Long test runs from the runner's budget-stop `Residuals` rows
-  (`/agent-harness` `## Handoff`). Only after the user approves either the
-  estimate or the shorter budget does main dispatch a fresh `runner` that cites
-  the whole set of card `/agent-harness` checks again, with a brief that sets
-  the budget the user approved.
+  writes no step sequence of its own; main reads no check.
 - fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing
   without landing; a stage landing in the same session gets this from Step 9's
   landing table instead, and where the Step 6 combined pass applies that pass is

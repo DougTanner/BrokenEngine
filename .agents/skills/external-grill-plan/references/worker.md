@@ -90,8 +90,8 @@ revision and pass a fresh `/plan-audit` before re-entry.
 
 ### Plan Context
 
-The preparation `implementer` never runs a command that changes scheduler state;
-the idempotent claim invocation belongs to main, per `/next-plan`.
+The preparation `planner` never runs a command that changes scheduler state; the
+idempotent claim invocation belongs to main, per `/next-plan`.
 
 Consult a referenced Plan only when the plan declares a dependency, shares
 files or symbols with another Plan, or the closing checks reveal likely overlap.

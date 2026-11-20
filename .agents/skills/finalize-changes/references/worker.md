@@ -56,8 +56,12 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      [`claim-results.md`](../../next-plan/references/claim-results.md)
      `## Claim-exit result fields`.
    - The claim stays held. Final preparation is not completion.
+   - Split the landing set by repository: the engine landing set is every path
+     outside `Projects/Coretide/`, and only it goes into the `-OwnedPathsFile`;
+     the `Projects/Coretide/` paths are the Coretide landing set.
    - Done when a completion result and the changed-path file its
-     `changes.path` names are in hand, or when no claimed Plan finished.
+     `changes.path` names are in hand, or when no claimed Plan finished, and
+     the landing set is split.
 2. Create the authorized source landing commit, then squash it onto the
    session's merge-base with primary.
    - Reconciliation never advances primary.
@@ -74,8 +78,17 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      invocation. Its `candidate.export-output-not-regenerated` block returns a
      blocker for the user carrying the script's message verbatim, never a
      blocked result for the recovery dispatch the `## Steps` preamble names.
+   - When the Coretide landing set is non-empty, write
+     `Temp/finalize-coretide-commit-message.txt` describing only the Coretide
+     changes and run `Invoke-FinalizeCoretide.ps1 -Prepare` with it
+     ([`scripts.md#invocation`](scripts.md#invocation)), so the step-3
+     `-Landing` inventory covers the Coretide commit. The engine message never
+     names or describes a Coretide file or its content.
+   - A Coretide-only landing (an empty engine landing set) creates no engine
+     commit.
    - Done when one prepared commit whose parent is the session's merge-base with
-     primary exists.
+     primary exists, or the landing is Coretide-only, and `-Prepare` returned
+     `pass` or `none` for a non-empty Coretide landing set.
 3. Fill the acceptance table on the resulting diff.
    - Load and follow
      [`landing-acceptance-table.md`](landing-acceptance-table.md) first, which
@@ -97,8 +110,16 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      a `Temp/` path plus selector from that file.
    - A meaningful change to that diff re-runs review of the changed regions
      only.
+   - Reconcile the Coretide landing set against the `Projects/Coretide/` rows
+     of `landing.reviewed`, and the engine landing set against the rest. When
+     this worker's own `Invoke-FinalizeCoretide.ps1 -Prepare` reports `none`
+     with code `coretide.no-changes`, each Coretide path of `landing.reviewed`
+     counts as a recorded no-change decision citing that result, because the
+     clone's upstream is the primary Coretide checkout.
    - Done when every row of that table carries a status.
 4. Run the primary-movement check.
+   - A Coretide-only landing skips this step and step 5 and goes to step 6,
+     which fills only its Coretide line.
    - After the step-3 acceptance table, invoke the read-only primary-movement
      checker using the canonical command in
      [`scripts.md#invocation`](scripts.md#invocation).
@@ -140,9 +161,13 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      [`scripts.md#invocation`](scripts.md#invocation), redirect included, and
      fill `<primary-worktree>` and, as `<landing-commit>`, the prepared landing
      commit.
-   - Do not run it: main runs it after this handoff, per `SKILL.md`
+   - When `-Prepare` returned `pass`, also fill in a `Coretide SmartGit launch:`
+     line from the Coretide review command in
+     [`scripts.md#invocation`](scripts.md#invocation), redirect included, with
+     `<primary-worktree>` and its `coretideCommit`.
+   - Do not run them: main runs them after this handoff, per `SKILL.md`
      `### Landing confirmation`.
-   - Done when that line is filled in for the commit the summary describes, or
+   - Done when each line is filled in for the commit the summary describes, or
      a blocker was returned.
 7. Refresh that line only for a meaningful change.
    - Whenever `SKILL.md` `### Landing confirmation` requires a refreshed
@@ -150,14 +175,16 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      return it with the refreshed summary.
    - Done when the line names the commit the current summary describes.
 8. Assemble and return one handoff carrying the complete step-3 acceptance
-   table, the `SmartGit launch:` row holding that line, and a landing summary.
+   table, the `SmartGit launch:` and `Coretide SmartGit launch:` rows holding
+   the step-6 lines, and a landing summary.
    - The summary carries `## Context`, outcome-focused `## What landed`, and
      `## Landing`.
    - `## Landing` states the checked candidate parent and live primary (and,
      after harmless primary movement, that any internal rebase can land only a
      byte-identical patch).
    - It also states both branches, objective decisions, changed-file count/kind,
-     and the exact remaining operation.
+     the Coretide commit and its changed-file count or none, and the exact
+     remaining operation.
    - Retain all existing summary fields and do not state
      `Primary has not advanced.` when the live tip is newer.
    - Main runs the launch line, then presents the summary immediately before the
@@ -171,7 +198,17 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
    - Only that affirmative response permits the landing worker to claim the
      landing lock and invoke landing with that owner token, in the order
      `## Bundled scripts` states.
-   - Done when that claim has returned the owner token landing carries.
+   - When a Coretide commit lands, land it next, before the engine landing:
+     run `Invoke-FinalizeCoretide.ps1 -Land`
+     ([`scripts.md#invocation`](scripts.md#invocation)) with that owner token
+     and the Coretide receipt main's run of the `Coretide SmartGit launch:`
+     line wrote, adding the approved engine commit and its receipt when the
+     engine landing set is non-empty. Continue on `landed` or `none`.
+   - A Coretide-only landing passes `-ReleasePlanClaim` to `-Land` for a
+     claimed Plan in place of step 10's, skips steps 10-12, and releases the
+     lease through `Invoke-FinalizeLockClaim.ps1 -Release`.
+   - Done when that claim has returned the owner token landing carries and any
+     Coretide `-Land` has returned its result.
 10. Invoke landing with that owner token.
     - That invocation passes `-ApprovalReviewResultFile` naming the receipt that
       main's run of the step-6 line wrote; the receipt gate in
@@ -201,6 +238,8 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
       message has been returned.
 13. Record the machine-local claim deletion.
     - A failed claim delete is a reported residual, never a landing blocker.
+    - On a Coretide-only landing, read the deletion or its residual from the
+      `-Land` result's `planClaim` and `residuals`.
     - Done when the deletion is recorded as performed or as that residual.
 14. Dispose of a landing blocked by primary advancing.
     - If primary advanced before the advance succeeds, landing does its own
@@ -231,6 +270,9 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 
 ## Recovery
 
+- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` result stops before the
+  engine landing; release the lease as for any blocked landing and return the
+  result as a blocker for the user.
 - Postconfirmation `rebase.conflicted`: the landing script has aborted the
   rebase, restored the approved session commit, and released its normal
   postconfirmation landing lease. The original landing arguments, candidate,

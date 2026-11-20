@@ -4,8 +4,9 @@ Use this checklist after selecting the subagent consumption shape in
 [`skill-skeleton.md`](skill-skeleton.md) `## Consumption shapes`.
 
 1. Keep dispatcher-facing purpose, triggers, inputs, handoff, and references in
-   `SKILL.md`. Done when the dispatcher can compose the task brief and consume
-   the result without opening private instructions.
+   `SKILL.md`. Done when the dispatcher can name the dispatched role
+   (`skill-skeleton.md` `## Section placement`), compose the task brief, and
+   consume the result without opening private instructions.
 2. Keep executor steps and rules in `references/worker.md`. Done when the
    executor can complete the task after reading the public contract and worker
    entry file.

@@ -40,16 +40,26 @@ try {
 	}
 	$root = [IO.Path]::GetFullPath($RepositoryRoot)
 
+	# A Coretide Plan's support folder lives at the same layout in the session Coretide clone.
+	$prefix = ''
+	$repository = $root
+	if ($Plan.StartsWith('Projects/Coretide/', [StringComparison]::Ordinal)) {
+		$prefix = 'Projects/Coretide/'
+		$repository = Get-AgentCoretideRepository $root
+		if ($null -eq $repository) { Complete-SupportFolder 2 'blocked' 'input.plan-invalid' "-Plan names a Coretide Plan, but '$root' holds no Coretide clone: '$Plan'." }
+	}
+
 	# The New-PlanFile.ps1 name and area grammar, which admits no empty, '.', '..', ':', or wildcard segment.
-	$segments = $Plan.Split('/')
+	$segments = $Plan.Substring($prefix.Length).Split('/')
 	if ($segments.Count -ne 4 -or $segments[0] -cne 'Documents' -or $segments[1] -cne 'Plans' -or $segments[2] -cnotmatch '^[A-Za-z0-9]+\z' -or
 		$segments[3] -cnotmatch '^[A-Z][A-Za-z0-9]*\.md\z' -or $segments[3] -ceq 'AGENTS.md') {
-		Complete-SupportFolder 2 'blocked' 'input.plan-invalid' "-Plan must be exactly Documents/Plans/<Area>/<Name>.md in the New-PlanFile.ps1 grammar: '$Plan'."
+		Complete-SupportFolder 2 'blocked' 'input.plan-invalid' "-Plan must be exactly Documents/Plans/<Area>/<Name>.md or Projects/Coretide/Documents/Plans/<Area>/<Name>.md in the New-PlanFile.ps1 grammar: '$Plan'."
 	}
 	$area = $segments[2]
 	$name = $segments[3].Substring(0, $segments[3].Length - '.md'.Length)
-	$result.folder = "Documents/Plans/$area/$name"
-	$plansFull = [IO.Path]::Combine($root, 'Documents', 'Plans')
+	$folder = "Documents/Plans/$area/$name"
+	$result.folder = $prefix + $folder
+	$plansFull = [IO.Path]::Combine($repository, 'Documents', 'Plans')
 	$areaFull = [IO.Path]::Combine($plansFull, $area)
 	$folderFull = [IO.Path]::Combine($areaFull, $name)
 
@@ -69,9 +79,9 @@ try {
 	}
 
 	# With no uncommitted entry, the folder's index listing equals its files on disk.
-	$listing = Invoke-AgentProcess 'git' @('-C', $root, 'ls-files', '-z', '--', (':(literal)' + $result.folder + '/')) $root
+	$listing = Invoke-AgentProcess 'git' @('-C', $repository, 'ls-files', '-z', '--', (':(literal)' + $folder + '/')) $repository
 	if ($listing.ExitCode -ne 0) { throw "git ls-files failed for '$($result.folder)': $($listing.Stderr.Trim())" }
-	$result.paths = @(($listing.Stdout -split "`0") | Where-Object { $_.Length -ne 0 })
+	$result.paths = @(($listing.Stdout -split "`0") | Where-Object { $_.Length -ne 0 } | ForEach-Object { $prefix + $_ })
 
 	Remove-Item -LiteralPath $folderFull -Recurse -Force -Confirm:$false -ErrorAction Stop
 	Complete-SupportFolder 0 'pass' 'ok' "Deleted the support folder '$($result.folder)'."

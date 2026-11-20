@@ -32,41 +32,48 @@ unreadable, the run falls through into the ordinary flow below, so a later
 `reused` result can carry a `sync` object and the baseline rule above applies.
 
 Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
-never `resume-with-flag`, when the session worktree holds an uncommitted
-`Documents/Plans` path; that result's `message` names those paths and the
+never `resume-with-flag`, when the session worktree or its Coretide clone holds
+an uncommitted path under either Plans root, `Documents/Plans/` or
+`Projects/Coretide/Documents/Plans/` (a clone path counts under its
+`Projects/Coretide/` prefix); that result's `message` names those paths and the
 user's options. There are two exceptions: that off-tip run when the early
 lookup reports the held claim, whatever its uncommitted paths, and an exact
-`-Plan` request whose every uncommitted path is under `Documents/Plans/` and
-none is the requested Plan. Either run proceeds, reports those
-paths as `retained`, and is refused at the dirty-worktree gate only when the
-fast-forward would touch one of them. The held-claim run targets the held Plan,
-so a claim no longer live at the primary tip ends in `none-available`, in
-`claim.plan-moved` when the fast-forward renamed the held Plan, or in a fresh
-claim on that same Plan while it is still eligible, never in a claim on a
-different Plan. A refusal of the held-claim run before Plan validation runs
-carries the held claim the early lookup found, with `state: existing`, and its
-`message` ends by saying that claim remains held.
+`-Plan` request whose every uncommitted path is under either Plans root and
+none is the requested Plan. Either run proceeds, reports those paths as
+`retained`, and is refused at the dirty-worktree gate only when the session or
+Coretide clone fast-forward would touch one of them. The held-claim run targets
+the held Plan, so a claim no longer live at the primary tip ends in
+`none-available`, in `claim.plan-moved` when the fast-forward renamed the held
+Plan, or in a fresh claim on that same Plan while it is still eligible, never
+in a claim on a different Plan. A refusal of the held-claim run before Plan
+validation runs carries the held claim the early lookup found, with
+`state: existing`, and its `message` ends by saying that claim remains held.
 
 Otherwise, before it validates and claims, the claim script brings the session
 branch up to the primary tip by fast-forward only when the session is behind,
-reporting a `sync` object that names the old and new commits; a session holding
-any commit the primary tip lacks cannot be fast-forwarded, so it stops with
-`claim.session-diverged` and leaves the branch untouched. Because selection
-therefore reads a tree at the primary tip as of that invocation,
-`none-available` means the Plan is genuinely ineligible rather than merely
-absent from a stale worktree; a Plan that lands on primary afterwards is picked
-up by the next invocation. A `claim.session-diverged` result carries no
-`divergence` object: its `message` lists every commit the session holds and
-primary lacks, names the repair-script recovery route for a session whose
-primary branch was rewritten under it, and it may also carry the `retained`
-projection under `-ResumeRetained` or for that held-claim run.
+reporting a `sync` object that names the old and new commits, and
+fast-forwards the session Coretide clone, when one exists, to its upstream, the
+primary Coretide `HEAD`. A session or clone holding any commit its target lacks
+cannot be fast-forwarded, so the run stops with `claim.session-diverged` and
+moves neither; a fast-forward that git refuses stops with
+`claim.session-sync-failed`. Because selection therefore reads a tree at the
+primary tip as of that invocation, `none-available` means the Plan is genuinely
+ineligible rather than merely absent from a stale worktree; a Plan that lands
+on primary afterwards is picked up by the next invocation. A
+`claim.session-diverged` result carries no `divergence` object: its `message`
+lists every commit the session or clone holds and its target lacks, and it may
+also carry the `retained` projection under `-ResumeRetained` or for either
+exempt run above. The session message names the repair-script recovery route for
+a session whose primary branch was rewritten under it; that script replays only
+the session branch, so the clone message calls its commits ordinary unlanded
+Coretide commits to land.
 
 A claim run that passes validation also carries an `integrity` object:
 `totalCount` violations of the
 [`Documents/Plans/AGENTS.md`](../../../../Documents/Plans/AGENTS.md)
-`## Plan files` layout rules in the session tree, the first 16 as
-`rule`/`path` items, and `truncated`. Any violation, or any `validation`
-diagnostic with code `invalid-metadata`, stops the run as
+`## Plan files` layout rules in the session tree and its Coretide clone, the
+first 16 as `rule`/`path` items, and `truncated`. Any violation, or any
+`validation` diagnostic with code `invalid-metadata`, stops the run as
 `claim.plans-integrity`, exit 2, with `status: blocked` and
 `nextAction: stop-report-to-user`, before any Plan is claimed. Main reports
 each listed item and diagnostic to the user in its next message.

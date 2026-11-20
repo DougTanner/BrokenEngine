@@ -25,6 +25,13 @@ try {
 		$held = @(Invoke-AgentGit @('-C', $worktree, 'rev-list', "$tip..HEAD"))
 		throw "Branch '$($context.Branch)' holds $($held.Count) commit(s) primary tip $tip does not ($($held -join ', ')), so nothing was changed. Land them first; if the primary branch was rewritten under this session, run pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1 from the session worktree root instead."
 	}
+	$coretide = Get-AgentCoretideRepository $worktree
+	if ($null -ne $coretide) {
+		$coretideDirty = @(Invoke-AgentGit @('-C', $coretide, 'status', '--porcelain', '--untracked-files=all'))
+		if ($coretideDirty.Count -ne 0) { throw "The Coretide clone has uncommitted or untracked changes, so nothing was changed: $($coretideDirty -join '; ')" }
+		$coretideHeld = @(Invoke-AgentGit @('-C', $coretide, 'rev-list', '@{upstream}..HEAD'))
+		if ($coretideHeld.Count -ne 0) { throw "The Coretide clone holds $($coretideHeld.Count) commit(s) its upstream does not ($($coretideHeld -join ', ')), so nothing was changed. Land them first." }
+	}
 
 	Invoke-AgentGit @('-C', $worktree, 'merge', '--ff-only', $tip) | Out-Null
 	$temp = Join-Path $worktree 'Temp'

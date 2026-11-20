@@ -52,11 +52,11 @@ The authoring steps, repository conventions, and writing guidance selected by
     internal-validator failure as `BLOCKED`. Record both results in the author
     handoff, return `NEEDS_ACTION`, and name fresh `/external-skill-creator`
     validate-mode review as the manager's required next action under shared
-    `Residuals`. The manager dispatches the independent reviewer and owns the
-    finding-fix cycle; the author executor does not dispatch or wait for that
-    review. Done when both author mechanical checks pass and the independent
-    validation request is present in the handoff, or a `BLOCKED` result stopped
-    the run.
+    `Residuals`. The manager dispatches the independent `reviewer` and owns
+    the finding-fix cycle; the author executor does not dispatch or wait for
+    that review. Done when both author mechanical checks pass and the
+    independent validation request is present in the handoff, or a `BLOCKED`
+    result stopped the run.
 14. Apply [`validation.md`](validation.md): run a loader check when the authored
     change affects loading or claims loader compatibility, and run focused host
     checks only for changed client-dependent behavior or claimed compatibility.

@@ -1,8 +1,6 @@
-# Advisory citation lookup, plus execution-card completeness, for one input file: a plan file, or a
-# reviewer scope file carrying an inline execution card. It renders no verdict: a record with
-# pathExists or lineExists false is a lead for the auditor, never a finding, and for a scope file the
-# heading results are advisory because a scope file need not carry the plan headings. The card result is
-# advisory for a plan file as well: 'present' is a whole-file phrase match, so a plan whose prose only
+# Advisory citation lookup, plus execution-card completeness, for one plan file. It renders no
+# verdict: a record with pathExists or lineExists false is a lead for the auditor, never a finding.
+# The card result is advisory too: 'present' is a whole-file phrase match, so a plan whose prose only
 # mentions 'execution card' reports present true with all eight fields missing, which is not a defect.
 # It must stay runnable under a read-only sandbox, so it reads only and writes its whole result to
 # stdout; stderr carries diagnostics only.

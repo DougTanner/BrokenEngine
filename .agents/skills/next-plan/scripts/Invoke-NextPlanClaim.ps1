@@ -35,15 +35,18 @@ function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 		$matchingDiagnostics=@($diagnostics|Where-Object{$_.PSObject.Properties.Name -ccontains 'plan' -and [string]$_.plan -ceq $RequestedPlan})
 		if($matchingDiagnostics.Count -eq 1 -and $matchingDiagnostics[0].PSObject.Properties.Name -ccontains 'message' -and -not [string]::IsNullOrWhiteSpace([string]$matchingDiagnostics[0].message)){return "The requested Plan '$RequestedPlan' is excluded from selection: $([string]$matchingDiagnostics[0].message)."}
 		if($matchingDiagnostics.Count -gt 0){return $fallback}
-		if($result.Contains('sync')){
+		# A Coretide Plan moves only with the session Coretide clone's fast-forward, whose paths lack the Projects/Coretide/ prefix.
+		$repository=$Context.Worktree;$prefix='';$sync=if($result.Contains('sync')){$result.sync}else{$null}
+		if($RequestedPlan.StartsWith('Projects/Coretide/',[StringComparison]::Ordinal)){$repository=$coretide;$prefix='Projects/Coretide/';$sync=$coretideSync}
+		if($null -ne $sync){
 			# Each NUL-delimited rename record is three fields: status with similarity score, source path, destination path.
-			$renames=Invoke-NextPlanProcess 'git.exe' @('-C',$Context.Worktree,'diff','--name-status','-z','-M','--diff-filter=R',$result.sync.from,$result.sync.to,'--','Documents/Plans') $Context.Worktree
+			$renames=Invoke-NextPlanProcess 'git.exe' @('-C',$repository,'diff','--name-status','-z','-M','--diff-filter=R',$sync.from,$sync.to,'--','Documents/Plans') $repository
 			if($renames.ExitCode -ne 0){return $fallback}
 			$fields=@($renames.Stdout -split "`0")
 			for($index=0;$index+2 -lt $fields.Count;$index+=3){
-				if($fields[$index+1] -ceq $RequestedPlan){
-					$result.moved=[ordered]@{from=$RequestedPlan;to=$fields[$index+2]}
-					return "The requested Plan '$RequestedPlan' was renamed to '$($result.moved.to)' by the fast-forward $($result.sync.from)..$($result.sync.to); no Plan was claimed. Report this to the user, who decides whether to claim the Plan at its new path by rerunning this command with -Plan '$($result.moved.to)'."
+				if($prefix+$fields[$index+1] -ceq $RequestedPlan){
+					$result.moved=[ordered]@{from=$RequestedPlan;to=$prefix+$fields[$index+2]}
+					return "The requested Plan '$RequestedPlan' was renamed to '$($result.moved.to)' by the fast-forward $($sync.from)..$($sync.to); no Plan was claimed. Report this to the user, who decides whether to claim the Plan at its new path by rerunning this command with -Plan '$($result.moved.to)'."
 				}
 			}
 		}
@@ -61,7 +64,7 @@ try {
  if ($Plan) {
   $Plan=$Plan.Replace('\','/')
   Assert-NextPlanGitPath $Plan
-  if ($Plan.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)) {
+  if ($Plan.StartsWith('Documents/Plans/',[StringComparison]::Ordinal) -or $Plan.StartsWith('Projects/Coretide/Documents/Plans/',[StringComparison]::Ordinal)) {
    # WorktreeCli owns canonical path validation; preserve its exact-path contract.
   } else {
    $pattern=$Plan
@@ -81,15 +84,27 @@ try {
  $status=Invoke-NextPlanProcess 'git.exe' @('-C',$context.Worktree,'status','--porcelain=v1','-z','--untracked-files=all') $context.Worktree
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
+ # The session Coretide clone is fetched first, so its upstream is the primary Coretide HEAD the checks below compare
+ # against; its dirty paths join the engine's under their session prefix.
+ $coretide=Get-AgentCoretideRepository $context.Worktree
+ $coretideDirty=@()
+ if($coretide){
+  $fetch=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'fetch') $coretide
+  if($fetch.ExitCode -ne 0){throw "git fetch failed in the session Coretide clone. $($fetch.Stderr.Trim())"}
+  $coretideStatus=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'status','--porcelain=v1','-z','--untracked-files=all') $coretide
+  if($coretideStatus.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session Coretide clone. $($coretideStatus.Stderr.Trim())")}
+  $coretideDirty=@(Get-DirtyPath $coretideStatus.Stdout|ForEach-Object{"Projects/Coretide/$_"})
+  $dirty+=$coretideDirty
+ }
  if($dirty.Count -ne 0){
   # Uncommitted scheduler input must never reach selection or healing. plan claim-next reads only committed trees
   # (session HEAD and the primary tip) and with --plan claims only that Plan, and healing reads the primary tip, so two
   # runs that pass --plan are exempt: a run whose early lookup reported the held claim, whatever is dirty, and an exact
-  # -Plan request whose every dirty path is under Documents/Plans/ and none is the requested Plan. The overlap
+  # -Plan request whose every dirty path is under either Plans root and none is the requested Plan. The overlap
   # check below protects retained work.
-  $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
+  $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal) -or $_.StartsWith('Projects/Coretide/Documents/Plans/',[StringComparison]::Ordinal)})
   $exempt=($null -ne $heldClaim) -or ($targeted -and $null -eq $pattern -and $schedulerPaths.Count -eq $dirty.Count -and $dirty -cnotcontains $Plan)
-  if($schedulerPaths.Count -ne 0 -and -not $exempt){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
+  if($schedulerPaths.Count -ne 0 -and -not $exempt){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ or Projects/Coretide/Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
   if(-not $ResumeRetained -and -not $exempt){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
@@ -100,7 +115,23 @@ try {
    $overlap=@($dirty|Where-Object{$incomingPaths -ccontains $_})
    if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "The claim cannot proceed because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No new Plan was claimed and the worktree was not touched. Report this to the user, who decides how to resolve it, for example by landing that work first." 'stop-report-to-user'}
   }
+  if($coretideDirty.Count -ne 0){
+   # The claim below also fast-forwards the session Coretide clone to its upstream.
+   $coretideIncoming=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'diff','--name-only','-z','HEAD','@{upstream}') $coretide
+   if($coretideIncoming.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git diff --name-only could not compare the session Coretide clone with its upstream. $($coretideIncoming.Stderr.Trim())")}
+   $coretideIncomingPaths=@(($coretideIncoming.Stdout -split "`0")|Where-Object{-not [string]::IsNullOrEmpty($_)}|ForEach-Object{"Projects/Coretide/$_"})
+   $coretideOverlap=@($coretideDirty|Where-Object{$coretideIncomingPaths -ccontains $_})
+   if($coretideOverlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "The claim cannot proceed because fast-forwarding the session Coretide clone to its upstream would touch $($coretideOverlap.Count) retained path(s): $(Format-DirtyPath $coretideOverlap). No new Plan was claimed and the worktree was not touched. Report this to the user, who decides how to resolve it, for example by landing that work first." 'stop-report-to-user'}
+  }
   $result.retained=[ordered]@{count=$dirty.Count;truncated=($dirty.Count -gt 10);paths=@($dirty|Select-Object -First 10)}
+ }
+ if($coretide){
+  # WorktreeCli's claim path also requires the clone HEAD to be an ancestor of the primary Coretide HEAD, so a clone
+  # holding any commit its upstream lacks stops here, before either fast-forward moves anything.
+  $coretideRevList=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'rev-list','@{upstream}..HEAD') $coretide
+  if($coretideRevList.ExitCode -ne 0){throw "git rev-list @{upstream}..HEAD failed in the session Coretide clone. $($coretideRevList.Stderr.Trim())"}
+  $coretideHeld=@(($coretideRevList.Stdout -split "`n")|ForEach-Object{$_.Trim()}|Where-Object{$_.Length -gt 0})
+  if($coretideHeld.Count -ne 0){Complete-Claim 2 'blocked' 'claim.session-diverged' "The session Coretide clone holds $($coretideHeld.Count) commit(s) its upstream does not ($($coretideHeld -join ', ')), so it cannot be fast-forwarded; no new Plan was claimed and neither the session branch nor the clone was moved. Report this to the user, who decides how to resolve it; these are ordinary unlanded Coretide commits to land." 'stop-report-to-user'}
  }
  # The executable-Plan inventory below is read from the session tree, so a session behind primary hides
  # Plans that already exist at the primary tip; fast-forward first so the inventory matches primary.
@@ -119,6 +150,15 @@ try {
   if($merge.ExitCode -ne 0){$mergeDetail=(($merge.Stdout,$merge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session branch from $($context.SessionHead) to the primary tip $($context.PrimaryTip) failed; no new Plan was claimed, and the worktree may be partially updated, so inspect it before retrying. git reported: $mergeDetail" 'stop-report-to-user'}
   $result.sync=[ordered]@{fastForwarded=$true;from=$context.SessionHead;to=$context.PrimaryTip}
  }
+ $coretideSync=$null
+ if($coretide){
+  $coretideRange=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'rev-parse','HEAD','@{upstream}') $coretide
+  if($coretideRange.ExitCode -ne 0){throw "git rev-parse HEAD @{upstream} failed in the session Coretide clone. $($coretideRange.Stderr.Trim())"}
+  $coretideFrom,$coretideTo=@(($coretideRange.Stdout -split "`n")|ForEach-Object{$_.Trim()}|Where-Object{$_.Length -gt 0})
+  if($coretideFrom -cne $coretideTo){$coretideSync=[ordered]@{from=$coretideFrom;to=$coretideTo}}
+  $coretideMerge=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'merge','--ff-only','@{upstream}') $coretide
+  if($coretideMerge.ExitCode -ne 0){$coretideMergeDetail=(($coretideMerge.Stdout,$coretideMerge.Stderr) -join "`n").Trim();Complete-Claim 1 'error' 'claim.session-sync-failed' "Fast-forwarding the session Coretide clone to its upstream failed; no new Plan was claimed, and the clone may be partially updated, so inspect it before retrying. git reported: $coretideMergeDetail" 'stop-report-to-user'}
+ }
  # plan validate can heal this session's claim and still fail, so from here on only plan claim-next reports it.
  $result.claim=$null
  $validate=Invoke-NextPlanProcess $context.WorktreeCli @('plan','validate','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
@@ -136,8 +176,8 @@ try {
   foreach($executablePlan in @($validation.plans)){
    if($executablePlan.PSObject.Properties.Name -ccontains 'path'){
     $candidate=[string]$executablePlan.path
-    # Match below Documents/Plans/ so a pattern naming that prefix cannot match every Plan.
-    $relative=if($candidate.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)){$candidate.Substring('Documents/Plans/'.Length)}else{$candidate}
+    # Match below whichever Plans root prefixes the candidate, so a pattern naming a root cannot match every Plan.
+    $relative=$candidate;foreach($plansRoot in @('Documents/Plans/','Projects/Coretide/Documents/Plans/')){if($candidate.StartsWith($plansRoot,[StringComparison]::Ordinal)){$relative=$candidate.Substring($plansRoot.Length)}}
     if($relative.Contains($pattern,[StringComparison]::Ordinal)){$candidates.Add($candidate)}
    }
   }

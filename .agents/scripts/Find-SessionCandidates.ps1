@@ -103,6 +103,10 @@ $script:ScannedPatterns = $script:CandidatePatterns
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
+# The session Coretide clone, whose Projects/Coretide/ paths Git reads unprefixed there at the inventory's Coretide head.
+$script:CoretidePrefix = 'Projects/Coretide/'
+$script:CoretideRoot = $null
+$script:CoretideHeadSha = ''
 $script:NewSideLines = @{}
 $script:Rule22SingleLineHits = @{}
 
@@ -133,8 +137,8 @@ function Complete-SessionCandidates([int] $ExitCode, [string] $Status, [string] 
 	exit $ExitCode
 }
 
-function Invoke-CandidateGit([string[]] $Arguments) {
-	$run = Invoke-AgentProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
+function Invoke-CandidateGit([string[]] $Arguments, [string] $Root = $script:Root) {
+	$run = Invoke-AgentProcess 'git' (@('-C', $Root, '--no-pager') + $Arguments) $Root
 	if ($run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
 	return $run.Stdout
 }
@@ -147,6 +151,9 @@ function Get-NewSideLine([string] $Path) {
 	# and a working-tree head (including an untracked addition) reads the file itself.
 	$text = if ([string]::IsNullOrEmpty($script:HeadSha)) {
 		[IO.File]::ReadAllText((Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)), $script:Utf8)
+	}
+	elseif ($null -ne $script:CoretideRoot -and $Path.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal)) {
+		Invoke-CandidateGit @('show', "$($script:CoretideHeadSha):$($Path.Substring($script:CoretidePrefix.Length))") $script:CoretideRoot
 	}
 	else {
 		Invoke-CandidateGit @('show', "$($script:HeadSha):$Path")
@@ -205,7 +212,17 @@ function Get-AddedLine([object] $Inventory) {
 function Get-FileLine([string[]] $Paths) {
 	# Whole-file mode scans every working-tree line of each named file, which must be a tracked C++ file.
 	$relative = @($Paths | ForEach-Object { $_ -replace '\\', '/' })
-	$tracked = [Collections.Generic.HashSet[string]]::new([string[]] @((Invoke-CandidateGit (@('--literal-pathspecs', 'ls-files', '-z', '--') + $relative)) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) }))
+	$coretideRoot = Get-AgentCoretideRepository $script:Root
+	$coretidePaths = @($relative | Where-Object { $null -ne $coretideRoot -and $_.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal) })
+	$enginePaths = @($relative | Where-Object { $coretidePaths -cnotcontains $_ })
+	$tracked = [Collections.Generic.HashSet[string]]::new([string[]] @())
+	if ($enginePaths.Count -gt 0) {
+		foreach ($file in ((Invoke-CandidateGit (@('--literal-pathspecs', 'ls-files', '-z', '--') + $enginePaths)) -split "`0")) { if (-not [string]::IsNullOrEmpty($file)) { [void] $tracked.Add($file) } }
+	}
+	if ($coretidePaths.Count -gt 0) {
+		$unprefixed = @($coretidePaths | ForEach-Object { $_.Substring($script:CoretidePrefix.Length) })
+		foreach ($file in ((Invoke-CandidateGit (@('--literal-pathspecs', 'ls-files', '-z', '--') + $unprefixed) $coretideRoot) -split "`0")) { if (-not [string]::IsNullOrEmpty($file)) { [void] $tracked.Add($script:CoretidePrefix + $file) } }
+	}
 	$scanned = [Collections.Generic.List[object]]::new()
 	foreach ($file in $relative) {
 		if ($file -cnotmatch '\.(?:h|cpp)$' -or -not $tracked.Contains($file) -or -not (Test-Path -LiteralPath (Join-Path $script:Root $file) -PathType Leaf)) {
@@ -456,6 +473,10 @@ try {
 		}
 		$inventory = Get-InventoryDocument
 		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
+		if ($null -ne $inventory.coretide) {
+			$script:CoretideRoot = Get-AgentCoretideRepository $script:Root
+			$script:CoretideHeadSha = if ([string]::IsNullOrWhiteSpace($inventory.coretide.headSha)) { '' } else { $inventory.coretide.headSha }
+		}
 		$scannedLines = Get-AddedLine $inventory
 		$scope = 'session-added C++ lines and namespace spacing throughout changed C++ files'
 	}

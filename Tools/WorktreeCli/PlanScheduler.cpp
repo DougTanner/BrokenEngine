@@ -349,8 +349,91 @@ static std::optional<std::string> ResolveRepositoryCommit(std::wstring_view repo
 	return IsLowerHex(*optionalCommit, 40) ? optionalCommit : std::nullopt;
 }
 
+// A Coretide repository and its HEAD commit; an empty commit means the checkout holds no Coretide repository.
+struct CoretideHead
+{
+	std::filesystem::path repository;
+	std::string commit;
+};
+
+// Coretide is a nested independent repository, so Projects/Coretide counts only when it is its own Git toplevel.
+static std::optional<std::filesystem::path> FindCoretideRepository(const std::filesystem::path& rWorktree)
+{
+	std::optional<std::wstring> optionalDirectory = coordination::CanonicalizeDirectoryPath((rWorktree / L"Projects" / L"Coretide").wstring());
+	if (!optionalDirectory)
+	{
+		return std::nullopt;
+	}
+	std::optional<std::string> optionalToplevel = RunGit({L"-C", *optionalDirectory, L"rev-parse", L"--show-toplevel"});
+	if (!optionalToplevel)
+	{
+		return std::nullopt;
+	}
+	TrimLineEnding(*optionalToplevel);
+	if (coordination::CanonicalizeDirectoryPath(Utf8ToWide(*optionalToplevel)) != optionalDirectory)
+	{
+		return std::nullopt;
+	}
+	return std::filesystem::path(*optionalDirectory);
+}
+
+// Fails only when a present Coretide repository's HEAD cannot be read.
+static bool ResolveCoretideHead(const std::filesystem::path& rWorktree, CoretideHead& rHead)
+{
+	std::optional<std::filesystem::path> optionalRepository = FindCoretideRepository(rWorktree);
+	if (!optionalRepository)
+	{
+		return true;
+	}
+	std::optional<std::string> optionalCommit = ResolveCommit(*optionalRepository, L"HEAD");
+	if (!optionalCommit)
+	{
+		return false;
+	}
+	rHead = {.repository = std::move(*optionalRepository), .commit = std::move(*optionalCommit)};
+	return true;
+}
+
+// The primary Coretide repository sits in the main engine worktree, the first worktree list entry.  A session
+// clone's origin is that same path, so this one rule holds in every session, with or without a clone.
+static bool ResolvePrimaryCoretideHead(std::wstring_view repository, CoretideHead& rHead)
+{
+	std::optional<std::string> optionalListing = RunGit({L"--git-dir", std::wstring(repository), L"worktree", L"list", L"--porcelain", L"-z"});
+	if (!optionalListing || !optionalListing->starts_with("worktree "))
+	{
+		return false;
+	}
+	int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0'));
+	if (iEnd == -1)
+	{
+		return false;
+	}
+	int64_t iBegin = std::ssize(std::string_view("worktree "));
+	return ResolveCoretideHead(Utf8ToWide(std::string_view(optionalListing->data() + iBegin, static_cast<size_t>(iEnd - iBegin))), rHead);
+}
+
+static bool AddCoretidePlans(const CoretideHead& rHead, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+{
+	return rHead.commit.empty() || BuildPlansAtCommit(rHead.repository, Utf8ToWide(rHead.commit), kCoretidePrefix, rPlans, rDiagnostics);
+}
+
+// Run in the session clone, which holds its own commits and the fetched primary history; a commit the clone lacks
+// fails the check, so it counts as unrelated.
+static bool IsCoretideAncestor(const CoretideHead& rSession, std::string_view ancestor, std::string_view descendant)
+{
+	return RunGit({L"-C", rSession.repository.wstring(), L"merge-base", L"--is-ancestor", Utf8ToWide(ancestor), Utf8ToWide(descendant)}).has_value();
+}
+
+// The working-tree Plans of a checkout: its own tree plus, when it holds one, its Coretide clone's.
+static bool BuildWorktreePlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
+{
+	std::optional<std::filesystem::path> optionalCoretide = FindCoretideRepository(rWorktree);
+	return BuildPlans(rWorktree, L"", rPlans, rDiagnostics) && (!optionalCoretide || BuildPlans(*optionalCoretide, kCoretidePrefix, rPlans, rDiagnostics));
+}
+
 // Healing classifies against the primary tip rather than the caller's tree, so a session that has already
-// deleted its own terminal target never heals its own live claim.
+// deleted its own terminal target never heals its own live claim.  The primary Coretide Plans join whatever the
+// caller's clone state, so a session without a clone never heals a live Coretide claim.
 static bool BuildPrimaryTipPlans(std::wstring_view repository, const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans)
 {
 	std::optional<std::string> optionalReference = ResolvePrimaryReference(repository);
@@ -360,7 +443,8 @@ static bool BuildPrimaryTipPlans(std::wstring_view repository, const std::filesy
 		return false;
 	}
 	nlohmann::json ignored = nlohmann::json::array();
-	return BuildPlansAtCommit(rWorktree, Utf8ToWide(*optionalTip), rPlans, ignored);
+	CoretideHead primaryCoretide;
+	return BuildPlansAtCommit(rWorktree, Utf8ToWide(*optionalTip), L"", rPlans, ignored) && ResolvePrimaryCoretideHead(repository, primaryCoretide) && AddCoretidePlans(primaryCoretide, rPlans, ignored);
 }
 
 static bool ResolveContext(const Arguments& rArguments, std::wstring& rRepository, std::filesystem::path& rWorktree)
@@ -454,7 +538,7 @@ static int64_t RunValidate(const Arguments& rArguments)
 		return Failure("invalid-plan");
 	}
 	std::unordered_map<std::wstring, Plan> plans; nlohmann::json diagnostics = nlohmann::json::array();
-	if (!BuildPlans(worktree, plans, diagnostics))
+	if (!BuildWorktreePlans(worktree, plans, diagnostics))
 	{
 		return Failure("scan-failed");
 	}
@@ -567,11 +651,21 @@ static int64_t RunList(const Arguments& rArguments)
 	{
 		return Failure("git-identity-mismatch");
 	}
+	CoretideHead primaryCoretide;
+	if (!ResolvePrimaryCoretideHead(repository, primaryCoretide))
+	{
+		return Failure("primary-revision-failed");
+	}
+	CoretideHead sessionCoretide;
+	if (!ResolveCoretideHead(worktree, sessionCoretide) || (!sessionCoretide.commit.empty() && (primaryCoretide.commit.empty() || (!IsCoretideAncestor(sessionCoretide, sessionCoretide.commit, primaryCoretide.commit) && !IsCoretideAncestor(sessionCoretide, primaryCoretide.commit, sessionCoretide.commit)))))
+	{
+		return Failure("git-identity-mismatch");
+	}
 	// Same two Plan maps claim-next evaluates: the primary tip decides eligibility, the session tree supplies the
 	// rows and their marker bytes.  Metadata that never parsed cannot fill a row, so it stays in the diagnostics.
 	std::unordered_map<std::wstring, Plan> primaryPlans; nlohmann::json primaryDiagnostics = nlohmann::json::array();
 	std::unordered_map<std::wstring, Plan> sessionPlans; nlohmann::json diagnostics = nlohmann::json::array();
-	if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalPrimaryCommit), primaryPlans, primaryDiagnostics) || !BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), sessionPlans, diagnostics))
+	if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalPrimaryCommit), L"", primaryPlans, primaryDiagnostics) || !AddCoretidePlans(primaryCoretide, primaryPlans, primaryDiagnostics) || !BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), L"", sessionPlans, diagnostics) || !AddCoretidePlans(sessionCoretide, sessionPlans, diagnostics))
 	{
 		return Failure("scan-failed");
 	}
@@ -717,11 +811,21 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 	{
 		return Failure("git-identity-mismatch");
 	}
+	CoretideHead primaryCoretide;
+	if (!ResolvePrimaryCoretideHead(repository, primaryCoretide))
+	{
+		return Failure("primary-revision-failed");
+	}
+	CoretideHead sessionCoretide;
+	if (!ResolveCoretideHead(worktree, sessionCoretide) || (!sessionCoretide.commit.empty() && (primaryCoretide.commit.empty() || !IsCoretideAncestor(sessionCoretide, sessionCoretide.commit, primaryCoretide.commit))))
+	{
+		return Failure("git-identity-mismatch");
+	}
 	// Two Plan maps: the primary tip drives healing and eligibility - including dependency blocking, so a behind
 	// session neither heals a peer's claim on a plan present only at primary nor claims past a dependency edge
 	// landed after its baseline; the session tree drives selection bytes and its own dependency evaluation.
 	std::unordered_map<std::wstring, Plan> plans; nlohmann::json diagnostics = nlohmann::json::array();
-	if (!BuildPlansAtCommit(*optionalPrimaryWorktree, Utf8ToWide(*optionalPrimaryCommit), plans, diagnostics))
+	if (!BuildPlansAtCommit(*optionalPrimaryWorktree, Utf8ToWide(*optionalPrimaryCommit), L"", plans, diagnostics) || !AddCoretidePlans(primaryCoretide, plans, diagnostics))
 	{
 		return Failure("scan-failed");
 	}
@@ -732,7 +836,7 @@ static int64_t RunClaimNext(const Arguments& rArguments)
 		return Failure("local-app-data-unavailable");
 	}
 	std::unordered_map<std::wstring, Plan> sessionPlans; nlohmann::json sessionDiagnostics = nlohmann::json::array();
-	if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), sessionPlans, sessionDiagnostics))
+	if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), L"", sessionPlans, sessionDiagnostics) || !AddCoretidePlans(sessionCoretide, sessionPlans, sessionDiagnostics))
 	{
 		return Failure("scan-failed");
 	}
@@ -992,7 +1096,7 @@ static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArgume
 		return Failure("claim-worktree-mismatch", kiExitStateConflict);
 	}
 	std::unordered_map<std::wstring, Plan> plans; nlohmann::json diagnostics = nlohmann::json::array();
-	if (!BuildPlans(worktree, plans, diagnostics))
+	if (!BuildWorktreePlans(worktree, plans, diagnostics))
 	{
 		return Failure("scan-failed");
 	}

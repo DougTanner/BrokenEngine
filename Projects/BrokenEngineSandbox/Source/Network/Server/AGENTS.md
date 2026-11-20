@@ -49,18 +49,21 @@ game state around the deterministic Frame tick.
   and the squadron number travels through fleet sync, the grid save, and replay
   fleet records. Squadron choice and the fleet size limit:
   `FindOpenFleetSquadron` in `../../Fleet.h`.
-- A squadron's settings are member flags (`../../Fleet.h`), equal on every
-  member of the squadron: a Fighter squadron's Patrol or Seek and Destroy and
-  Same Target are the `kFighterOrderFlags`, an Omni squadron's Escort or Patrol
-  Cell and Patrol Together the `kOmniOrderFlags`. The squadron-orders request
-  sets the whole squadron, and a member added to a non-empty squadron copies a
-  squadronmate's, so an emptied squadron's next member starts at the default.
-  They travel with the member flags through fleet sync, the grid save, and
+- A squadron's settings are stored once, in its fleet's slot
+  `Fleet::pSquadronOrders` (`../../Fleet.h`), as the `ShipOrders` setting bits
+  its rows hold: a Fighter squadron's Patrol or Seek and Destroy and Same
+  Target, an Omni squadron's Escort or Patrol Cell and Patrol Together, each
+  type's allowed bits `kpSquadronOrderBits`. The squadron-orders request sets
+  the slot, and the first member added to an empty squadron resets it to its
+  type's `kpDefaultSquadronOrders`, so an emptied squadron's next member starts
+  at the default. The slots travel through fleet sync, the grid save, and
   replay fleet records; the server's read of the grid save and replay fleet
-  records rejects a setting flag on the wrong member type and a squadron whose
-  members disagree. They reach a row as
-  `../../Frame/Collections/Fighters/AGENTS.md` and
+  records rejects a slot bit outside its type's allowed bits. They reach a row
+  as `../../Frame/Collections/Fighters/AGENTS.md` and
   `../../Frame/Collections/Omnis/AGENTS.md` state.
+- `FleetRows.h` is the only code that copies fleet values onto ship rows, as
+  spawns and status changes, so a fleet value a row carries is written there
+  and nowhere else.
 - Every member, the fleet's Battleship included, is added dead with an expired
   countdown, so its first spawn and every respawn take the same path. A member
   retained after ordinary death respawns automatically when its type's countdown
@@ -110,21 +113,30 @@ game state around the deterministic Frame tick.
   row's model, yawed by its heading, inheriting velocity and stored plane. The
   fleet step calls `CellStaticData::BuildNavigationDataIfUnbuilt` on the
   Battleship's cell before the bay terrain admission. A wholly refused batch
-  leaves `mNextFighterLaunchTicks` unchanged and retries next tick; every load
-  reset clears it.
+  leaves `Fleet::iNextFighterLaunchTick` unchanged and retries next tick; every
+  load reset clears it.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
   advancing updates, drains destroy-member requests into the first advancing
   tick's input once. Each request retires its sender-owned non-Battleship member
-  from the fleet and sends the reduced full fleet sync, even if death races the
-  request. A member not marked dead also queues staged destruction using its
-  current cell, ship type and UUID; a dying row ignores the destruction.
-  Battleships remain members. Squadron-orders requests drain next the same way:
-  each sets its sender-owned Fighter or Omni member's squadron settings,
-  ignoring a setting of the other type, queues `kUpdateSquadronOrders` into
-  each live squadron member's cell input, and sends the fleet sync only when a
-  setting changed. Paused updates retain both queues; consumption, disconnect,
-  reset and load clear them through the fleet request lifecycle.
+  from the fleet, even if death races the request. A member not marked dead
+  also queues staged destruction using its current cell, ship type and UUID; a
+  dying row ignores the destruction. Battleships remain members.
+  Squadron-orders requests drain next the same way: each sets the slot of its
+  sender-owned Fighter or Omni member's squadron, ignoring a setting of another
+  type or no change, and queues `kUpdateSquadronOrders` into each live squadron
+  member's cell input. Paused updates retain both queues; consumption,
+  disconnect, reset and load clear them through the fleet request lifecycle.
+- Fleet syncs have one sender, `ServerFleetManager::SendChangedFleetSyncs`,
+  called last in `AfterNetworkPoll` and after `DetectFleetMemberDeaths` in
+  `FinalizeTickClients`; no fleet change sends its own. It sends each connected
+  owner its FleetSync only when the packet's CRC differs from the one last sent
+  to that owner, so changes coalesce per poll and per tick. Every write of a
+  value FleetSync carries lands before one of those two calls. Connect and every
+  load reset give the owner a fresh `mGuidToClientId` entry, whose cleared CRC
+  forces the next send, because the client clears its fleets at both. The stored
+  CRCs are server-only transport state, never in `Frame::Crc`, the fleet
+  checksum, a grid save, or a replay record.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the
   spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
   walk owners in GUID order, because each fleet's direction draw consumes the
@@ -204,13 +216,12 @@ game state around the deterministic Frame tick.
   and a persistent fleet whose members are all dead still needs synchronization
   on reconnect.
 - During replay playback the fleet manager skips only that first-fleet creation,
-  since playback takes every fleet from the recording; it still maps the client
-  and sends its fleet sync. When playback ends by abort, load, or reset, the
-  load reset hands a client still without a fleet back to new-client
-  processing, which makes its first fleet. Accepted limit: a loop re-read that
-  fails on replay files changed during playback ends playback with no load
-  reset, so such a client stays without its first fleet until the next load
-  reset or reconnect.
+  since playback takes every fleet from the recording; it still maps the client.
+  When playback ends by abort, load, or reset, the load reset hands a client
+  still without a fleet back to new-client processing, which makes its first
+  fleet. Accepted limit: a loop re-read that fails on replay files changed
+  during playback ends playback with no load reset, so such a client stays
+  without its first fleet until the next load reset or reconnect.
 - The engine load reset (`engine::ServerSessionBase::ResetForLoad`) advances
   the debugging-load generation before notification, slot clearing, or
   transient reset, and rebuilds client ownership before it calls
@@ -219,9 +230,9 @@ game state around the deterministic Frame tick.
   saved course, then clears client and request transient state after restored
   fleet state is read; the engine then resets its two managers, which clear
   their own queues (engine Server contract), so no second clear belongs here.
-  It maps and syncs only handshake-complete clients; a client still before
-  `ClientHello` gets both from new-client processing once its handshake
-  completes. Do not erase restored fleet RNG.
+  It maps only handshake-complete clients; a client still before `ClientHello`
+  gets its mapping from new-client processing once its handshake completes. Do
+  not erase restored fleet RNG.
 
 ## See Also
 

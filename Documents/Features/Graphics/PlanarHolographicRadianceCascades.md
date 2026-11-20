@@ -315,10 +315,10 @@ Baseline tuning or cadence changes; ThirdParty edits; unit tests.
 
 ## Acceptance criteria
 
-Every harness check runs on the Debug|x64 client through `/agent-harness`: Release sets
-`kbDebugInput` and `kbProfiling` false (`Engine/Source/EngineSwitches.h`), so the Tweaks slider,
-replays and GPU timers are unavailable there. Estimate total harness time first; a run over 10
-minutes needs user approval, offering a shorter spot-check that records its reduced scope.
+Every harness check runs on the Debug|x64 client through `/agent-harness`:
+Release sets `kbDebugInput` and `kbProfiling` false
+(`Engine/Source/EngineSwitches.h`), so the Tweaks slider, replays and GPU timers
+are unavailable there.
 
 ### Stage 1
 

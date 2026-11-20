@@ -4,8 +4,14 @@ $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 $result=[ordered]@{schemaVersion='broken-engine-next-plan-list-error/v1';status='error';code='internal.error';message='Listing did not run.'}
 function Complete-Listing([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message){$result.status=$Status;$result.code=$Code;$result.message=$Message;[Console]::Out.Write(($result|ConvertTo-Json -Depth 20 -Compress));exit $ExitCode}
 try {
+	$sharedScripts=Join-Path $PSScriptRoot '..\..\..\scripts';if(-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))){$sharedScripts=Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'}
+	Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force -DisableNameChecking
 	Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
 	$context=Get-NextPlanContext
+	# plan list compares the session Coretide clone's HEAD with the primary Coretide HEAD inside the clone, so the clone
+	# is fetched first; a primary commit it has not fetched would otherwise read as unrelated rather than behind.
+	$coretide=Get-AgentCoretideRepository $context.Worktree
+	if($coretide){$fetch=Invoke-NextPlanProcess 'git.exe' @('-C',$coretide,'fetch') $coretide;if($fetch.ExitCode -ne 0){throw "git fetch failed in the session Coretide clone. $($fetch.Stderr.Trim())"}}
 	$response=Invoke-NextPlanProcess $context.WorktreeCli @('plan','list','--repo',$context.CommonDirectory,'--worktree',$context.Worktree) $context.Worktree
 	# WorktreeCli owns the listing contract; preserve its failure code. A successful listing is folded
 	# into a bounded projection — state counts plus the first -Top rows in selection order, each row

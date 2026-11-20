@@ -75,5 +75,5 @@ unlanded candidate commit, because the request is a choice under
 [`### Implementation approval`](../SKILL.md#implementation-approval), which
 decides whether step 7 presents; skip steps
 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome
-of the run; then dispatch a fresh `/finalize-changes` preparation with the
-step-10 result, because the claim exit already ran.
+of the run; then dispatch a fresh `implementer` for the `/finalize-changes`
+preparation with the step-10 result, because the claim exit already ran.

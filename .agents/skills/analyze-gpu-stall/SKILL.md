@@ -38,10 +38,12 @@ Dispatch one `implementer` with the shared task-brief fields from
 
 - `agent` — an agent-launched client under `/agent-harness`; the brief carries
   the latest `/compile` result for the Profile client and server, requested
-  with the agent-harness scenario trigger in `/compile` `## Inputs`.
+  with the agent-harness scenario trigger in `/compile` `## Inputs`, and states
+  a wall-clock budget for the harness run (`/agent-harness` `## Inputs`).
 - `focused` — a client the user plays with focus while the worker traces; main
   first presents `### Focused session request` below and dispatches once the
-  user is ready. The same `/compile` result is required.
+  user is ready. The same `/compile` result is required, and the brief states
+  the run budget, in wall-clock minutes, that the request promised the user.
 - `supplied` — an ETL the user handed back, with its client log and the noted
   stall time.
 
@@ -76,15 +78,16 @@ main presents the matching request below; use `none` when absent.
 `Status` is `PASS` when every captured stall is `proven` or
 `signature-matched`, and `NEEDS_ACTION` when any is `unclassified`, with a
 `Residuals` row naming what data would classify it, including a user capture
-request. It is `BLOCKED` only when no stall was captured within the run budget,
-or when the capture could not be set up or read, such as temporary
-instrumentation needing a build first (shared `Build required` names the
-targets and `Changed files` the instrumented files). `Findings` is `none`.
+request. It is `BLOCKED` only when no stall was captured within the run budget
+or before a `WM_KILLFOCUS` stop, or when the capture could not be set up or
+read, such as temporary instrumentation needing a build first (shared
+`Build required` names the targets and `Changed files` the instrumented
+files). `Findings` is `none`.
 
 ### Focused session request
 
-Main fills the angle-bracket values and presents this before a `focused`
-dispatch:
+Main fills the angle-bracket values, choosing `<minutes>` as the run budget,
+and presents this before a `focused` dispatch:
 
 ```text
 I will start the Profile server and client for you with a client log file, then

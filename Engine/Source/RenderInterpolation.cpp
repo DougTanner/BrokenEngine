@@ -144,6 +144,12 @@ void RenderInterpolation::UpdateRenderInterpolation(GameBase& rGame, const std::
 		// The sun follows on-screen game time. The clamp keeps a seed, rebase, or restart jump from turning it backward
 		// or moving it more than this frame's sim delta.
 		fSunDeltaTime = static_cast<float>(std::clamp(mfRenderTime - fRenderTimeBefore, 0.0, fSimulationDeltaSeconds));
+		if (gbGraphicsPinned)
+		{
+			fDeltaTime = 0.0f;
+			fSunDeltaTime = 0.0f;
+			gpCamera->mfSunAngle = CameraBase::kfDefaultSunAngle;
+		}
 	}
 	{
 		ScopedSuppressAllocationTracking suppress;

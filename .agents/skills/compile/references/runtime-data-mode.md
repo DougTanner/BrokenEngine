@@ -17,8 +17,8 @@ both client and server of its game project, `Projects\<Name>` below:
   primary data stamp, so worktrees resolve Local until the next clean refresh
   (`## Wrapper bootstrap Shared-data refresh`).
 
-The build resolves the mode by one rule, with no override and no generation
-authorization:
+The build resolves the mode by one rule, from the data inputs and the context's
+`thirdparty-candidate` row, with no override and no generation authorization:
 
 - The data inputs are `DataPacker/**`, `Engine/Data/**`,
   `Projects/<Name>/Data/**`, and `Common/DataFile.h`. A path whose filename is
@@ -31,20 +31,27 @@ authorization:
 - The build compares the worktree — committed, staged, unstaged, and untracked
   — with that commit over the data inputs and reports the outcome as
   `dataBuildModeReason`:
-  - `stamp-match` — no data input differs: Shared.
+  - `stamp-match` — no data input differs and no `thirdparty-candidate` row
+    fires: Shared.
   - `inputs-differ` — a data input differs: Local, with the differing paths
     reported.
   - `stamp-missing` — the stamp does not exist: Local. A refresh deletes the
     stamp for as long as its export runs, so a game build during a running
-    refresh resolves Local; when no data input of the worktree changed,
-    waiting for the refresh to finish and rebuilding resolves Shared again.
-    That refresh can come from another session
+    refresh resolves Local; when no data input of the worktree changed and no
+    `thirdparty-candidate` row fires, waiting for the refresh to finish and
+    rebuilding resolves Shared again. That refresh can come from another session
     (`## Wrapper bootstrap Shared-data refresh`), and Windows keeps a file's
     creation time when it is deleted and quickly recreated (NTFS file-name
     tunneling), so a stamp creation time older than the build does not prove
     the stamp existed when the build resolved its mode.
   - `stamp-unresolvable` — the stamp's text does not resolve to a commit:
     Local.
+  - `thirdparty-candidate` — no data input differs but the context's
+    `thirdparty-candidate` row in `recommendedTargets` fires (the rule is
+    `Get-ContextRecommendedTargets` in
+    [Resolve-CompileContext.ps1](../scripts/Resolve-CompileContext.ps1)):
+    Local, so the export runs with the DataPacker that links the session
+    ThirdParty candidate.
 
 Local never falls back to Shared data.
 
@@ -92,6 +99,14 @@ still decide the mode.
   only when neither `dataInputChanges` nor `git status` shows any of those
   files.
 
+An acceptance check whose evidence is the one-time Local DataPacker export of
+edited data inputs, such as an `is dirty` line, takes that evidence from the
+retained log of the first Local generation build that ran the DataPacker export
+into that game's Local Data directory after the last edit to those inputs — a
+Client, Server, or ModelViewer build, whichever `/compile` dispatch ran it —
+cited by that dispatch's envelope file. A later edit moves the evidence to the
+next Local generation build that runs the DataPacker export.
+
 ## Repository-root detection and mode derivation
 
 The game projects detect the authoritative repository-root Git marker. A linked
@@ -102,8 +117,7 @@ deliberate worktree generation; Shared rejects true.
 
 The resolved context's `changedPaths` is the changed-path set measured from the
 session baseline. Its `dataBuildMode` and `dataBuildModeReason` are the mode
-decision `## Mode selection` states, measured from the data stamp, and the build
-uses that mode.
+decision `## Mode selection` states, and the build uses that mode.
 
 ## Build invocation and derived properties
 
@@ -174,19 +188,20 @@ It skips the AgentTools and ThirdParty builds and the ModelViewer prebuild,
 keeps the DataPacker prebuild, the bootstrap mutex, and the DataPacker prebuild
 stamp and data stamp rules, and skips the DataPacker prebuild and the refresh,
 with a warning naming worktree creation, `/reset-worktree`, or explicit primary
-maintenance (a full run without `-SharedDataOnly`), when primary ThirdParty or
-its force-included `Common/DebugDefines.h` changed since the last prebuild or
-the DataPacker prebuild stamp is missing or unreadable. Every skip exits 0, so
-its `Refreshed primary data at` line is the only sign the refresh ran. It runs
-this worktree's copies of the bootstrap scripts against the primary checkout, so
-a session runs it without asking the user unless this worktree's own committed
-or uncommitted changes, measured from its merge base with primary main, touch
-`.agents/scripts/`; then it asks the user first. One run can outlast a
-tool-call timeout, up to
-`-WaitSeconds` for the bootstrap mutex, then the DataPacker prebuild and the
-export, so it runs where a tool-call timeout cannot kill it, for example with
-the host's background-execution parameter such as `run_in_background`; a killed
-shell stops the export midway and leaves the primary data unstamped.
+maintenance (a full run without `-SharedDataOnly`), when primary ThirdParty,
+its force-included `Common/DebugDefines.h`, or the `Common/ErrorUtils.h` its
+wrapper sources include changed since the last prebuild or the DataPacker
+prebuild stamp is missing or unreadable. Every skip exits 0, so its
+`Refreshed primary data at` line is the only sign the refresh ran. It runs this
+worktree's copies of the bootstrap scripts against the primary checkout, so a
+session runs it without asking the user unless this worktree's own committed or
+uncommitted changes, measured from its merge base with primary main, touch
+`.agents/scripts/`; then it asks the user first. One run can outlast a tool-call
+timeout, up to `-WaitSeconds` for the bootstrap mutex, then the DataPacker
+prebuild and the export, so it runs where a tool-call timeout cannot kill it,
+for example with the host's background-execution parameter such as
+`run_in_background`; a killed shell stops the export midway and leaves the
+primary data unstamped.
 
 Each game's refresh also writes the data stamp (`## Mode selection`). Before
 its export it deletes the stamp, aborting the

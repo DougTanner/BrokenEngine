@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Writing code and documentation; affected-site propagation; review-fix rounds; plan authoring.
+description: Writing code and documentation; affected-site propagation; review-fix rounds; follow-up plans; finalization.
 model: opus
 effort: medium
 disallowedTools: Agent

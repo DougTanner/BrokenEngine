@@ -72,7 +72,9 @@ pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <Pasca
 ```
 
 Its parameters, the `-DependsOn` single-token rule, its result shape, and its
-exit handling are in `../../../references/new-plan-file.md`.
+exit handling are in `../../../references/new-plan-file.md`. A Coretide Plan
+takes `-Area 'Projects/Coretide/Documents/Plans/<area>'`, per
+`Documents/Plans/AGENTS.md` `## Plan files`.
 
 Done when the Plan body exists and its Change Workflow tier trigger is recorded
 in it.

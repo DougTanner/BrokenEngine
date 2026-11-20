@@ -99,9 +99,10 @@ the execution and result discipline in
 - `Decisive checks` — one row per failing build: target, configuration, the
   game for a client or server build, `status`, `exitCode`, `failureKind`, and,
   with a `severity: error` diagnostic, the first one's `code` and `file`.
-- `Decisive checks` — for a game build, one row naming the game and the
-  envelope's `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory`
-  switch values.
+- `Decisive checks` — for a game build, ModelViewer included, one row naming
+  the game (BrokenEngineSandbox for a ModelViewer build) and the envelope's
+  `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory` switch
+  values.
 - `Decisive checks` — for a `-ClangTidy` build, one row naming whether analysis
   executed, the de-duplicated warning count, and the `clang-diagnostic-error`
   parse-error count with the first unparsable file.

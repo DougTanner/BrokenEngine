@@ -14,6 +14,10 @@ checklist.
 3. Use `describe_ui` before label-addressed `click` or `set_slider`, which
    activate the item even offscreen unless it is disabled; use `key` for key
    bindings and `wheel` for camera zoom.
+4. A client's first fleet (`ServerFleetManager::CreateFleet`) holds only its
+   Battleship. For another member, send the client
+   `click {"label":"[+F]##Fighter","window":"FleetPanel"}`, or `[+O]##Omni`
+   for an Omni (`kpSpawnButtons` in `HudScreen::RenderFleetPanel`).
 
 ### Chosen omni placement
 

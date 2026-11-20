@@ -274,8 +274,7 @@ Acceptance:
   Presentation mode and the sun override are identical on both sides (opening
   Graphics from the pause menu can snap the sun,
   `Engine/Source/Ui/Screens/AGENTS.md`), recorded before the first cohort and
-  rechecked after the last. A run expected over 10 minutes gets user approval
-  first.
+  rechecked after the last.
 - A7 memory: a payload inventory of each input target's format, extent and
   byte size from its `TextureInfo` (via `common::SizeInBytes`), checked against
   the resource list of one `renderdoc_capture`; no VMA delta or resize-peak

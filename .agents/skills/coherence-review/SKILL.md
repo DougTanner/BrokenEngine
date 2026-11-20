@@ -44,7 +44,11 @@ Verify the acceptance table steps in that one dispatch.
 - The tier and the mode; in Tier-1 mode, which Apply the triggered cleanup
   checks the change triggers and whether the Verify the acceptance table step
   applies.
-- Whether the dispatch allows edits. A `/codex-review` dispatch never does.
+- In Tier-1 mode, every input each triggered cleanup skill's `## Inputs`
+  requires, such as a focused re-review's `First-round findings`, and, when the
+  Verify the acceptance table step applies, every input `/verify-acceptance`
+  `## Inputs` requires.
+- Whether the dispatch allows edits.
 
 ## Handoff
 
