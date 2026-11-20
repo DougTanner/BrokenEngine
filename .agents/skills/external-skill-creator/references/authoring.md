@@ -41,12 +41,9 @@ The authoring steps, repository conventions, and writing guidance selected by
    compared against those thresholds.
 10. Remove duplicated guidance, speculative options, and examples that do not
     clarify a non-trivial requirement. Done when none of those remain.
-11. Restate each rule positively as the action to take, keeping a prohibition
-    only where it cannot be stated positively and pairing it with what to do
-    instead. Done when every rule is positive or paired that way.
-12. End each workflow step on a checkable done-condition. Done when every step
+11. End each workflow step on a checkable done-condition. Done when every step
     has one.
-13. Run the mechanical validator against the `external-skill-creator` package
+12. Run the mechanical validator against the `external-skill-creator` package
     and then the finished skill. Fix target mechanical findings and rerun until
     both return `VALID` with exit `0`; treat a setup, invocation, read, or
     internal-validator failure as `BLOCKED`. Record both results in the author
@@ -57,7 +54,7 @@ The authoring steps, repository conventions, and writing guidance selected by
     that review. Done when both author mechanical checks pass and the
     independent validation request is present in the handoff, or a `BLOCKED`
     result stopped the run.
-14. Apply [`validation.md`](validation.md): run a loader check when the authored
+13. Apply [`validation.md`](validation.md): run a loader check when the authored
     change affects loading or claims loader compatibility, and run focused host
     checks only for changed client-dependent behavior or claimed compatibility.
     Done when the handoff separates structural, loader, observed runtime, and

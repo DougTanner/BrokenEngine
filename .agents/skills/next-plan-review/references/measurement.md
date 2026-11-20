@@ -103,8 +103,8 @@ repeated operation.
 For every headless Codex launch through the bridge launcher in the routing
 inventory, evaluate the actual model and effort against the model and effort
 the commit-time launcher applies for the launched `-Agent` preset, not against
-the role table's Codex definitions. When the launched preset's model and effort
-cannot be established, do not infer compliance.
+the `.codex/agents/` role definitions. When the launched preset's model and
+effort cannot be established, do not infer compliance.
 
 Use only this allowed evidence chain from claim to conclusion: a headless
 launch is compliant only with its parent launcher invocation/result, the

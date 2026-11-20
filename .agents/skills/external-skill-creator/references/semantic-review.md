@@ -94,16 +94,14 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
   of abstract noun-stacks unless the stack is an established term or code
   identifier. Report a reintroduced synonym for an established term as a
   finding.
-- Recommended: phrase each rule positively as the action to take; keep a
-  prohibition only where the requirement cannot be stated positively, and pair
-  it with what to do instead.
 - Recommended: end each workflow step on a checkable done-condition, so the
   agent can tell done from not-done.
 - Do not promote ordinary quality advice to Critical unless discovery or
   invocation is concretely incorrect, or the finding is the step 6
   run-as-evidence check.
-- Progressive disclosure and body/reference size belong to
-  `/progressive-disclosure-review`; report neither here.
+- Progressive disclosure, the root `Instruction changes` directive, and
+  body/reference size belong to `/progressive-disclosure-review`; report none
+  of them here.
 - For validator changes, run the disposable `VALID`/`INVALID`/`SETUP_ERROR`
   matrix in [`frontmatter-schema.md`](frontmatter-schema.md). Do not commit
   test packages.

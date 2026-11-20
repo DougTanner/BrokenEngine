@@ -80,6 +80,14 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   carry local non-obvious rationale. A doc names the owning identifier and never
   copies a number, default, range, or tuning value that code owns. Comment
   content: `Documents/C++StyleGuide.txt` rule 64.
+- Instruction changes: in root `AGENTS.md` and the Markdown and role
+  definitions under `.agents/`, `.claude/`, and `.codex/`, remove or rewrite
+  existing text before adding any, and add only what that cannot cover. Make a
+  rule a script, hook, or tool result wherever a program can decide it, leaving
+  prose for judgment. State each rule as the action to take; keep a prohibition
+  only where no positive form exists, paired with what to do instead, and
+  prefer making the wrong action impossible. Name roles, not models; the
+  static-checks `model-names` row owns the exemptions.
 - Bounded reading: a citation that names a `##` section is the reading scope —
   locate that heading and read only that section, never the whole file.
 - One term per concept: use the established repository term or the code's own

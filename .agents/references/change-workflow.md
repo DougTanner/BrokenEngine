@@ -22,20 +22,21 @@ delivered at session start.
 
 ### Delegation roles
 
-This table owns role-to-definition routing and work assignments. The
-definitions own model and effort settings. Skills name a role and describe the
-work.
+This table owns the work assignments. Each role is defined at
+`.claude/agents/<subagent_type>.md` for Claude Code and
+`.codex/agents/<subagent_type>.toml` for Codex; the definitions own model and
+effort settings. Skills name a role and describe the work.
 
-| `subagent_type` | Claude Code definition | Codex definition | Work |
-| --- | --- | --- | --- |
-| `planner` | .claude/agents/planner.md | .codex/agents/astra-planner.toml | Preparation, plans, design |
-| `reviewer` | .claude/agents/reviewer.md | .codex/agents/astra.toml | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
-| `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Implementation, propagation, docs, follow-up plans, finalization |
-| `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives; `/code-quality-metrics` |
-| `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links |
-| `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
-| `runner` | .claude/agents/runner.md | .codex/agents/sonnet.toml | `/agent-harness` runs dispatched on their own |
-| `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
+| `subagent_type` | Work |
+| --- | --- |
+| `planner` | Preparation, plans, design |
+| `reviewer` | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
+| `implementer` | Implementation, propagation, docs, follow-up plans, finalization |
+| `researcher` | Research requiring judgment; approach options for /plan-alternatives; `/code-quality-metrics` |
+| `locator` | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links |
+| `builder` | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
+| `runner` | `/agent-harness` runs dispatched on their own |
+| `mechanic` | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate only by a `subagent_type` from the table above, including inside
   plan mode; an ad-hoc `model:` cannot lock in effort.

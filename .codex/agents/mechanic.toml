@@ -1,0 +1,5 @@
+name = "mechanic"
+description = "Mechanical checklist edits against a fixed rule set — /code-style-review, /update-vcxproj — and the findings-only checklist review /comment-review."
+developer_instructions = "Follow repository instructions for the assigned mechanical-edit role. Never dispatch another agent; return delegated work to the caller."
+model = "gpt-6-luna"
+model_reasoning_effort = "max"

@@ -3,12 +3,12 @@ name: progressive-disclosure-review
 description: >-
   Review session-changed instruction prose — AGENTS.md,
   `.agents/skills/**/*.md`, `.agents/references/**/*.md`,
-  `Documents/Architecture/**/*.md` — against the root
-  AGENTS.md progressive-disclosure directive. Use during the Change Workflow
-  Apply the triggered cleanup step after `/update-claude-docs` whenever the
-  session changed such a file, and when a reviewer suspects a skill body
-  restates a reference, a script, or a parent AGENTS.md, or exceeds the skill
-  size thresholds. Findings only; never edits.
+  `Documents/Architecture/**/*.md` — against the root AGENTS.md
+  progressive-disclosure and instruction-changes directives. Use during the
+  Change Workflow Apply the triggered cleanup step after `/update-claude-docs`
+  whenever the session changed such a file, and when a reviewer suspects a
+  skill body restates a reference, a script, or a parent AGENTS.md, or exceeds
+  the skill size thresholds. Findings only; never edits.
 allowed-tools: [Read, Grep, Glob, PowerShell]
 ---
 
@@ -17,8 +17,9 @@ allowed-tools: [Read, Grep, Glob, PowerShell]
 ## Purpose
 
 Findings on changed instruction prose that breaks the `Progressive disclosure`
-directive in root [AGENTS.md](../../../AGENTS.md) `## Directives`. That
-directive is the sole statement of the layering; this skill only enforces it.
+or `Instruction changes` directive in root [AGENTS.md](../../../AGENTS.md)
+`## Directives`. Those directives are the sole statement of their rules; this
+skill only enforces them.
 
 ## When to use
 
@@ -44,6 +45,8 @@ findings and fixes land, only the affected files receive a focused re-review.
   `Findings` row being re-checked, verbatim as the first round returned it,
   carried in the dispatch's `Continuation capsule:` field
   (`.agents/references/subagent-handoff.md` `## Continuation capsule`).
+- `Stated net size` — the net instruction size change the session's plan
+  states; omitted when the session has no plan or the plan states none.
 
 The reviewer derives the changed instruction-doc list itself from `Baseline`
 and `Scope` and never takes a caller-supplied list or diff in its place.
@@ -67,7 +70,7 @@ Files checked: <count and paths>
 Each `Findings` row is one line on this form:
 
 ```text
-file:line — class: duplication | misplacement | size — evidence: owning location or measurement — fix direction
+file:line — class: duplication | misplacement | size | instruction-change — evidence: owning location, measurement, or replacing text or mechanism — fix direction
 ```
 
 Example:

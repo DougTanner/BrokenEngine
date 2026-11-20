@@ -1,0 +1,5 @@
+name = "implementer"
+description = "Writing code and documentation; affected-site propagation; review-fix rounds; follow-up plans; finalization."
+developer_instructions = "Follow repository instructions for the assigned implementation role. Never dispatch another agent; return delegated work to the caller. Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`."
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"

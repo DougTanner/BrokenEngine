@@ -33,14 +33,23 @@ Steps and rules for the dispatched reviewer. The public
    subsystem constraint narrated in a skill instead of the owning `AGENTS.md`;
    local rationale in an `AGENTS.md` instead of a code comment.
 
-   This includes changed skill prose that computes a repeatable verdict from
+   This includes changed prose that computes a repeatable verdict from
    explicit machine-readable inputs through Git/range/path parsing, set
    operations, schema-field mechanics, or exit/status/retry algorithms. Done
    when each such finding names the changed prose, its deterministic inputs and
    result, and the script/reference that owns the computation or where it
    should be extracted.
 
-4. Measure each changed `SKILL.md` with `pwsh -NoProfile -File
+4. Flag as `instruction-change` prose in the step 1 regions that breaks the
+   root `Instruction changes` directive, leaving model names to the
+   static-checks `model-names` row. When the dispatch supplies
+   `Stated net size`, run the static-checks command of the Change Workflow Run
+   targeted pre-review checks step, adding `-Head <commit>` for a committed
+   head, and flag its `instruction-size` row's `netTokens` above that size as
+   `instruction-change` naming both sizes. Done when every step 1 region the
+   directive covers is checked and any stated size is compared.
+
+5. Measure each changed `SKILL.md` with `pwsh -NoProfile -File
    .agents/scripts/Measure-Tokens.ps1 -Path <file>`. A `SKILL.md` body over
    10,000 `bt-token-v1` needs a stated reason why the detail cannot move to a
    reference or script, and 15,000 is the ceiling. Done when every changed
@@ -54,8 +63,8 @@ Steps and rules for the dispatched reviewer. The public
   orchestration, not misplaced mechanics.
 - Scope guard: judge only session-changed bytes. Report pre-existing excess in
   untouched prose as a residual and never demand trimming it.
-- Precision guard: every finding names the owning location or the exceeded
-  threshold. No owner named, no finding.
+- Precision guard: every finding names the owning location, the exceeded
+  threshold, or the replacing text or mechanism. No such name, no finding.
 - Leave frontmatter, discovery, invocation policy, and bundled-link mechanics
   to the `/external-skill-creator` findings-only validate mode.
 - Leave `AGENTS.md` content correctness, chain sync, and advisory budget

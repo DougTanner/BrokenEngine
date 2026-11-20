@@ -27,9 +27,11 @@ the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 Apply questions 1 and 2 to every step that adds code or modifies
 non-documentation behavior; apply questions 3-5, 8, and 9 to every step that
-adds code or materially enlarges the solution; apply question 6 to every step
-that changes a non-documentation artifact; apply question 7 to a plan whose
-steps change product, user interface, tooling, or public interface behavior.
+adds code or materially enlarges the solution, and question 3 also to every
+step that adds prose to a file root `AGENTS.md` `Instruction changes` covers;
+apply question 6 to every step that changes a non-documentation artifact; apply
+question 7 to a plan whose steps change product, user interface, tooling, or
+public interface behavior.
 
 ## Review questions
 
@@ -57,7 +59,11 @@ steps change product, user interface, tooling, or public interface behavior.
 3. Simpler mechanism. For each applicable step, name the plainly simpler
    alternative when one exists: reuse of an existing mechanism, a change that
    leaves less code, state, or machinery in the finished codebase, deleting the
-   requirement, or fixing at the origin.
+   requirement, or fixing at the origin. For a step that adds that prose, the
+   alternatives include those the directive names; such a step whose plan does
+   not state the net size change it expects the static-checks `instruction-size`
+   row to report and what pays for each addition is an `overbuilt-mechanism`
+   finding.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
    later if it ever occurs. Honor the repository's no-useless-ASSERT rule

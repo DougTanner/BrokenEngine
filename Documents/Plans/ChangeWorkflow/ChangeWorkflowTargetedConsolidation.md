@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:34.444Z","dependsOn":["Documents/Plans/ChangeWorkflow/ChangeWorkflowStepChecklistScript.md","Documents/Plans/ChangeWorkflow/InstructionAuthoringPolicy.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:34.444Z","dependsOn":["Documents/Plans/ChangeWorkflow/ChangeWorkflowStepChecklistScript.md"]} -->
 # Consolidate targeted paragraphs of the Change Workflow and /next-plan
 
 ## Context
@@ -40,10 +40,11 @@ shows either trigger occurring, and whether it did is still open. The executing
 session settles it from session transcripts as `## Design` directs, and deletes
 a rule only when its trigger did not fire.
 
-The Plans this Plan depends on (its `dependsOn` metadata) land first and edit
+The Plan this Plan depends on (its `dependsOn` metadata) lands first and edits
 the same files: `ChangeWorkflowStepChecklistScript` moves the mechanical
-trigger and ordering logic of Steps 4-8 into a script and deletes that prose,
-and `InstructionAuthoringPolicy` adds instruction-authoring rules.
+trigger and ordering logic of Steps 4-8 into a script and deletes that prose.
+Root `AGENTS.md` `## Directives` already carries the `Instruction changes`
+bullet, which states the instruction-authoring rules.
 `.agents/references/change-workflow.md` already carries the never-rule triage,
 which reworded or removed 22 of its 28 "never" clauses and kept six. So some
 ledger text is already changed, and more may be changed or gone when this Plan

@@ -1,5 +1,0 @@
-name = "sonnet"
-description = "Code search in large repositories, large-file and log filtering, targeted spec fetch, builds, harness runs, mechanical edits, and style review."
-developer_instructions = "Follow repository instructions for Sonnet-assigned work. Never dispatch another agent; return delegated work to the caller."
-model = "gpt-6-luna"
-model_reasoning_effort = "max"

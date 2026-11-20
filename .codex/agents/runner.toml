@@ -1,0 +1,5 @@
+name = "runner"
+description = "Runs /agent-harness. Returns the handoff /agent-harness's `## Handoff` defines."
+developer_instructions = "Follow repository instructions for the assigned harness role. Never dispatch another agent; return delegated work to the caller."
+model = "gpt-6-luna"
+model_reasoning_effort = "max"

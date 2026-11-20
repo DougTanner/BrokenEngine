@@ -7,8 +7,14 @@
 # changed markdown file and `Documents/<name>.txt` guide: every line of the whole file, not only the
 # added lines, longer than 500 characters without its line ending (Grep elides such a line), apart
 # from, in a markdown file only, fence delimiters, lines inside a fence, table rows (first
-# non-space character `|`), and a line 1 starting with the Plan metadata marker prefix. The
-# first composes an existing script (the bundled skill validator). The
+# non-space character `|`), and a line 1 starting with the Plan metadata marker prefix. Two rows cover
+# the instruction-prose set (root `AGENTS.md`, `.md` under `.agents/` or `.claude/`, `.toml` under
+# `.codex/agents/`): the report-only `instruction-size`, which never fails, gives each changed entry's
+# baseline and head token counts as Measure-Tokens.ps1 measures a whole file, deletions included, and
+# their `netTokens` sum, leaving out an entry with a side that is not valid UTF-8; `model-names` fails
+# on a model family name or slug in an added line, apart from `.agents/skills/codex-bridge/` and a
+# `model` setting line in a `.claude/agents/` or `.codex/agents/` file.
+# `validate-skill` composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
 # safe under a read-only sandbox. Stdout carries only the result document.
@@ -19,8 +25,8 @@
 # setup failure (invalid root, missing composed script, unavailable inventory) exits 2 with no rows, and
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
-# files when checking the working tree. `markdown-links`, `file-hygiene`, and `line-length`
-# read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
+# files when checking the working tree. `markdown-links`, `file-hygiene`, `line-length`,
+# `instruction-size`, and `model-names` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
 # Every Git read of a Projects/Coretide/ entry runs in the session Coretide clone, against the inventory's
 # `coretide` baseline and head.
 [CmdletBinding()]
@@ -52,9 +58,12 @@ $script:HeadingSlugs = @{}
 # Inline markdown link: the target is everything up to the closing parenthesis or the optional title.
 $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
 $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
+# A model slug or family name, bounded as `git grep -w` bounds a word: no adjacent letter, digit, or
+# underscore, so a hyphen-joined name still matches.
+$script:ModelNamePattern = [regex]::new('(?<![A-Za-z0-9_])(?:gpt-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|claude-[A-Za-z]+-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|opus|sonnet|haiku|astra|sol|luna|fable)(?![A-Za-z0-9_])', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v5'
+	schemaVersion = 'broken-engine-static-checks/v6'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -414,8 +423,11 @@ function Test-SpaceIndentedLine([string] $Text) {
 	return $Text -cmatch '^ +[^ ]' -and $Text -cnotmatch '^ +\*(?:\s|/|$)'
 }
 
-function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures, [string] $Root = $script:Root, [string] $Prefix = '') {
+function Get-AddedLine([string[]] $DiffArguments, [string[]] $Paths, [string] $Root = $script:Root) {
+	# Each added line of the diff over Paths, with its new-side path and line number. -M pairs a rename
+	# only when Paths holds both of its paths.
 	$diff = Invoke-StaticCheckGit (@('-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff') + $DiffArguments + @('--') + $Paths) -Root $Root
+	$added = [Collections.Generic.List[object]]::new()
 	$path = $null
 	$number = 0
 	$inHunk = $false
@@ -426,8 +438,15 @@ function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths
 		if ($line -cmatch '^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@') { $inHunk = $true; $number = [int] $Matches[1]; continue }
 		# With -U0 a hunk holds no context lines, and only an added line advances the new-side number.
 		if (-not $inHunk -or -not $line.StartsWith('+')) { continue }
-		if ($null -ne $path -and (Test-SpaceIndentedLine $line.Substring(1))) { $Failures.Add([ordered]@{ path = $Prefix + $path; line = $number; problem = 'indent with spaces' }) }
+		if ($null -ne $path) { $added.Add([pscustomobject] @{ Path = $path; Line = $number; Text = $line.Substring(1) }) }
 		$number++
+	}
+	return , $added
+}
+
+function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures, [string] $Root = $script:Root, [string] $Prefix = '') {
+	foreach ($added in (Get-AddedLine $DiffArguments $Paths $Root)) {
+		if (Test-SpaceIndentedLine $added.Text) { $Failures.Add([ordered]@{ path = $Prefix + $added.Path; line = $added.Line; problem = 'indent with spaces' }) }
 	}
 }
 
@@ -514,6 +533,87 @@ function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
 	return New-CheckRow 'file-hygiene' $true 'pass' $detail
 }
 
+function Test-InstructionProsePath([string] $Path) {
+	# Ordinal, case-sensitive matches, so no Projects/Coretide/ path is in the set.
+	return $Path -ceq 'AGENTS.md' -or $Path -cmatch '^\.(?:agents|claude)/.+\.md$' -or $Path -cmatch '^\.codex/agents/.+\.toml$'
+}
+
+function Measure-InstructionTokenCount([byte[]] $Bytes) {
+	# Measure-Tokens.ps1's whole-file measure, or null for bytes that are not valid UTF-8, which
+	# `file-hygiene` reports for a head side.
+	try { return Measure-AgentTokenCount (Get-AgentNormalizedText $Bytes) }
+	catch { return $null }
+}
+
+function Invoke-InstructionSizeCheck([object] $Inventory, [bool] $Truncated) {
+	# Report only: a deletion counts against the sum, and a side outside the set or absent measures 0.
+	$files = [Collections.Generic.List[object]]::new()
+	$selectedCount = 0
+	$netTokens = [int64] 0
+	foreach ($entry in $Inventory.entries) {
+		if (-not (Test-InstructionProsePath $entry.path) -and -not (Test-InstructionProsePath $entry.oldPath)) { continue }
+		$selectedCount++
+		$baselinePath = if ($null -ne $entry.oldPath) { $entry.oldPath } else { $entry.path }
+		$baselineTokens = [int64] 0
+		if ($null -ne $entry.baseline -and (Test-InstructionProsePath $baselinePath)) {
+			$baselineTokens = Measure-InstructionTokenCount (Invoke-StaticCheckGit @('cat-file', 'blob', "$($Inventory.baselineSha):$baselinePath") -RawStdout)
+		}
+		$headTokens = [int64] 0
+		if ($entry.status -cne 'D' -and (Test-InstructionProsePath $entry.path)) {
+			# Plain assignments: an `if` expression would unroll the byte[] into the pipeline.
+			$head = $null
+			if ([string]::IsNullOrEmpty($script:HeadSha)) { $head = [IO.File]::ReadAllBytes((Join-Path $script:Root ($entry.path -replace '/', [IO.Path]::DirectorySeparatorChar))) }
+			else { $head = Invoke-StaticCheckGit @('cat-file', 'blob', "$($script:HeadSha):$($entry.path)") -RawStdout }
+			$headTokens = Measure-InstructionTokenCount $head
+		}
+		if ($null -eq $baselineTokens -or $null -eq $headTokens) { continue }
+		$netTokens += $headTokens - $baselineTokens
+		$files.Add([ordered]@{ path = $entry.path; baselineTokens = $baselineTokens; headTokens = $headTokens })
+	}
+	if ($selectedCount -eq 0) {
+		if (-not $Truncated) { return New-CheckRow 'instruction-size' $false 'skipped' $null }
+		return New-CheckRow 'instruction-size' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed instruction files could not be selected.' })
+	}
+	return New-CheckRow 'instruction-size' $true 'pass' ([ordered]@{ netTokens = $netTokens; files = [object[]] $files.ToArray() })
+}
+
+function Invoke-ModelNameCheck([object] $Inventory, [bool] $Truncated) {
+	$paths = Get-ChangedPath $Inventory { param($entry) Test-InstructionProsePath $entry.path }
+	if ($paths.Count -eq 0) {
+		if (-not $Truncated) { return New-CheckRow 'model-names' $false 'skipped' $null }
+		return New-CheckRow 'model-names' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed instruction files could not be selected.' })
+	}
+	# Untracked paths exist only against the working tree, and every line of one is added.
+	$untracked = @(if ([string]::IsNullOrEmpty($script:HeadSha)) { $script:UntrackedPaths })
+	$added = [Collections.Generic.List[object]]::new()
+	$pathspec = [Collections.Generic.List[string]]::new()
+	foreach ($entry in $Inventory.entries) {
+		# /codex-bridge selects models by name, and a role definition's model setting (below) names one by design.
+		if ($entry.status -ceq 'D' -or -not $paths.Contains($entry.path) -or $entry.path.StartsWith('.agents/skills/codex-bridge/', [StringComparison]::Ordinal)) { continue }
+		if ($untracked -ccontains $entry.path) {
+			$number = 0
+			foreach ($line in ((Get-HeadText $entry.path) -split "`r`n|`n|`r")) {
+				$number++
+				$added.Add([pscustomobject] @{ Path = $entry.path; Line = $number; Text = $line })
+			}
+			continue
+		}
+		$pathspec.Add($entry.path)
+		if ($null -ne $entry.oldPath) { $pathspec.Add($entry.oldPath) }
+	}
+	$diffArguments = @($Inventory.baselineSha)
+	if (-not [string]::IsNullOrEmpty($script:HeadSha)) { $diffArguments += $script:HeadSha }
+	# An empty pathspec would diff every path.
+	if ($pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $pathspec))) }
+	$failures = [Collections.Generic.List[object]]::new()
+	foreach ($line in $added) {
+		if ($line.Path -cmatch '^\.(?:claude|codex)/agents/' -and $line.Text -cmatch '^\s*model\s*[:=]') { continue }
+		foreach ($match in $script:ModelNamePattern.Matches($line.Text)) { $failures.Add([ordered]@{ path = $line.Path; line = $line.Line; term = $match.Value }) }
+	}
+	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
+	return New-CheckRow 'model-names' $true $status ([ordered]@{ failures = [object[]] $failures.ToArray() })
+}
+
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
@@ -537,12 +637,14 @@ try {
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 
-	# All four rows are always present, triggered or not.
+	# All six rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory $truncated)
 		(Invoke-FileHygieneCheck $inventory $truncated)
 		(Invoke-LineLengthCheck $inventory $truncated)
+		(Invoke-InstructionSizeCheck $inventory $truncated)
+		(Invoke-ModelNameCheck $inventory $truncated)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })
