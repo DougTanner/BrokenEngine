@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:33.753Z","dependsOn":["Documents/Plans/ChangeWorkflow/ChangeWorkflowNeverTriage.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:33.753Z","dependsOn":[]} -->
 # Compute the Change Workflow dispatches with a step script
 
 ## Context
@@ -201,13 +201,11 @@ card, a different input. Both are later stages under `## Out of scope`.
 
 ### Expected effect
 
-At baseline the replaced regions hold about 1,020 words and their
-replacements about 370, so `change-workflow.md` loses about 650 words net, from
-4,356 to about 3,710 if no other edit lands first; `ChangeWorkflowNeverTriage`
-landing first (`## Coordination`) lowers the deleted count by whatever it
-already removed from these regions. The Steps 4-6 and Steps 7-9
-session-context parts shrink accordingly. The four `session-context-part`
-markers stay where they are.
+The replaced regions hold about 1,010 words and their replacements about 360,
+so `change-workflow.md` loses about 650 words net, from 4,275 to about 3,625 if
+no other edit lands first. The Steps 4-6 and Steps 7-9 session-context parts
+shrink accordingly. The four `session-context-part` markers stay where they
+are.
 
 ## Critical files
 
@@ -253,24 +251,22 @@ key phrase (`## Coordination`).
      adding `-Landing` when the stage lands in this session and `-HarnessChecks`
      when the execution card's `Roles` field names the `runner`, which it does
      exactly when at least one acceptance check is an `/agent-harness` check; main
-     reads that field alone, never the card's `Acceptance checks` field. Main
-     dispatches the rows the output lists, in their order, through the Verify the
-     acceptance table step, and reruns the script as the Review and resolve
-     correctness step states. The script owns which dispatches the tier and the
-     changed files trigger, their roles, scopes, and order; each brief carries
-     what its skill's `## Inputs` requires.
+     reads that field alone. Main dispatches the rows the output lists, in their
+     order, through the Verify the acceptance table step, and reruns the script
+     as the Review and resolve correctness step states. The script owns which
+     dispatches the tier and the changed files trigger, their roles, scopes, and
+     order; each brief carries what its skill's `## Inputs` requires.
      ```
 
 4. `change-workflow.md`, `#### Step 5 — Run targeted pre-review checks`:
    replace the `Order:` paragraph and the three bullets (lines 285-306, from
-   "Order: the full applicable static pass" through "never from its
-   `Acceptance checks` field.") with:
+   "Order: the full applicable static pass" through "(Step 8 `runner`
+   bullet).") with:
 
    ```text
    Focused implementation self-checks remain inside the implementation slices.
    Main has an `implementer` rewrap every `line-length` failure the
-   static-checks runner reports, whether or not the change added the line, and
-   never records one as a residual.
+   static-checks runner reports, whether or not the change added the line.
    ```
 
    The paragraphs from "Full builds and runtime or harness scenarios" to the
@@ -374,13 +370,10 @@ key phrase (`## Coordination`).
 
 ## Coordination
 
-Two sibling Plans edit the same Steps 4-8 text. `ChangeWorkflowNeverTriage`
-lands before this Plan, so some "never" clauses in the regions `## In scope`
-names may already be reworded or deleted; `ChangeWorkflowTargetedConsolidation`
-lands after it. Locate each region by its key phrase; a region this Plan
-deletes needs no edit from the later Plan, and where a replacement text above
-restates a sentence `ChangeWorkflowNeverTriage` reworded, the replacement takes
-that Plan's wording.
+One sibling Plan edits the same Steps 4-8 text:
+`ChangeWorkflowTargetedConsolidation` lands after this Plan. Locate each region
+by its key phrase; a region this Plan deletes needs no edit from the later
+Plan.
 
 ## Risk tier
 

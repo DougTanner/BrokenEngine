@@ -223,9 +223,9 @@ order and removal-first ranking also govern code fixes and control work).
 User decision (recorded in `## Context`): one Codex file per role, named and
 `name`d exactly as the `subagent_type`, mirroring `.claude/agents/<role>.md`.
 This removes every model name from Codex role prose and the table's
-translation column, and makes "Delegate by `subagent_type`" literally true on
-Codex. It is small (five small files out, eight in) and preserves every role's
-current model and effort.
+translation column, and makes "Delegate only by a `subagent_type` from the
+table above" literally true on Codex. It is small (five small files out, eight
+in) and preserves every role's current model and effort.
 
 | New file | Settings source (baseline) | Handoff sentence |
 | --- | --- | --- |
@@ -336,15 +336,14 @@ the drafted text: about +580; the stated net size is at most +650.
 
 ## Coordination
 
-A separate never-rule triage Plan (draft `ChangeWorkflowNeverTriage`) edits
-`change-workflow.md` `### Delegation roles` (the `locator` row's Work cell and
-the bullets below the table). Neither Plan has a `dependsOn` edge to the other,
-so either may land first. Whichever lands second keeps the other's edits,
-locating each shared region by key phrase rather than line number: the
-paragraph that begins "This table owns", the header row that begins
-"| `subagent_type` |", and each row by its `subagent_type` cell. This Plan
-changes only that paragraph's first two sentences and the definition columns,
-and carries the other Plan's `Work` cell text unchanged.
+`.agents/references/change-workflow.md` `### Delegation roles` already carries
+the never-rule triage: the `locator` row's Work cell ends at "links", and one
+bullet beginning "Delegate only by a `subagent_type`" replaces the two bullets
+that followed the table. This Plan keeps those edits, locating each shared
+region by key phrase rather than line number: the paragraph that begins "This
+table owns", the header row that begins "| `subagent_type` |", and each row by
+its `subagent_type` cell. This Plan changes only that paragraph's first two
+sentences and the definition columns, and leaves every `Work` cell unchanged.
 
 ## Risk tier and invariants
 

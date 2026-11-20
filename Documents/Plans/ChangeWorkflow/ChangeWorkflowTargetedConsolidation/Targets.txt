@@ -9,8 +9,9 @@ One row per target. Fields:
   591184a4dbf802ac2f6d3c2cf9de168916e4714d, as line range plus first and last
   words. Line numbers are for the baseline only; locate by Key phrase.
 - Action — rewrite | merge | delete.
-- Recheck — the sibling Plan(s) that may already have changed or removed this
-  text: `NeverTriage` (ChangeWorkflowNeverTriage), `StepChecklistScript`
+- Recheck — the change that may already have changed or removed this text:
+  `NeverTriage` (the landed never-rule triage of
+  `.agents/references/change-workflow.md`), `StepChecklistScript`
   (ChangeWorkflowStepChecklistScript); `none` otherwise.
 - Intent — the restructuring the row makes, used only by the Plan's
   changed-text rule.

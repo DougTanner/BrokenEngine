@@ -32,15 +32,13 @@ work.
 | `reviewer` | .claude/agents/reviewer.md | .codex/agents/astra.toml | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
 | `implementer` | .claude/agents/implementer.md | .codex/agents/astra.toml | Implementation, propagation, docs, follow-up plans, finalization |
 | `researcher` | .claude/agents/researcher.md | .codex/agents/opus.toml | Research requiring judgment; approach options for /plan-alternatives; `/code-quality-metrics` |
-| `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
+| `locator` | .claude/agents/locator.md | .codex/agents/sonnet.toml | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links |
 | `builder` | .claude/agents/builder.md | .codex/agents/sonnet.toml | `/compile`, which owns the return contract and, in `## Purpose`, its one exception |
 | `runner` | .claude/agents/runner.md | .codex/agents/sonnet.toml | `/agent-harness` runs dispatched on their own |
 | `mechanic` | .claude/agents/mechanic.md | .codex/agents/sonnet.toml | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
-- Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort.
-- Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never
-  substitute for a role, including inside plan mode — route the work through the
-  table above.
+- Delegate only by a `subagent_type` from the table above, including inside
+  plan mode; an ad-hoc `model:` cannot lock in effort.
 - Do not follow review findings blindly. Use judgement on each one: accept it
   when the failure is real and reachable, and be especially careful with
   findings that add guards, options, or machinery for cases nobody has observed
@@ -48,9 +46,9 @@ work.
   reviewer could have read — a file and line, or a recorded user decision; that
   main prefers the plan, or wants to reject the finding, is not evidence. When
   the reason lies outside the repository and is not yet recorded, put the
-  finding to the user instead of rejecting it. Never add plan or document text
-  only because a reviewer lacked context; add context only when a human reader
-  or the implementer needs it.
+  finding to the user instead of rejecting it. Add plan or document text only
+  when a human reader or the implementer needs it; a reviewer's missing context
+  is not that need.
 
 ## Main-session conduct
 
@@ -60,7 +58,7 @@ work.
   answerable from the current message without hidden reasoning or remembered
   scrollback. Provide the FULL context needed to understand as rendered message
   text the user is guaranteed to see — text emitted before a question-tool call
-  may never be displayed, so present first and ask only after the context is
+  might not be displayed, so present first and ask only after the context is
   visible — and explain what the answer changes or blocks. When relevant, give
   options, trade-offs, and a recommendation. The user has NOT read the source
   code or plan file.
@@ -71,8 +69,7 @@ work.
   explanation stays skimmable.
 - Reporting work: state what was built and what was verified separately, and
   name every required check still open; "done" means those checks have closed. A
-  defect is stated with its evidence and effect, never as a verdict or count
-  alone.
+  defect is stated with its evidence and effect.
 - Comparing options: give each the same criteria, evidence, detail, and tone;
   recommend one without selling the favorite by benefit and the alternative by
   risk; prefer removing a cause to suppressing a symptom. Pros and cons cover
@@ -81,9 +78,9 @@ work.
   a drafted plan or current documents or code, touched wire, trust, or invariant
   surfaces as a cost in themselves, amount of change, or effort; a plan's scope
   or author's choice counts only when the user set it
-  (`.agents/references/authority-order.md`). Open each option with a written
-  label such as `Option 1:`, never a rendered list marker, and reuse those
-  labels in any question naming options.
+  (`.agents/references/authority-order.md`). Open each option with the text
+  label `Option 1:`, `Option 2:`, and so on, and reuse those labels in any
+  question naming options.
 - Footer: only the main-session message that asks the `/finalize-changes`
   landing confirmation question carries it; that message ends with
   `Follow-up Plans created:` and the single word `none`, or one line per Plan
@@ -95,7 +92,7 @@ work.
   context), otherwise `do now: no` with the failed condition in a few words.
   Example:
   `Documents/Plans/<area>/<Plan>.md — unlanded in worktree — do now: no (needs files not read this session)`.
-  The verdict answers, never asks; the user decides.
+  The verdict answers; the user decides.
 
 ### Resolving Ambiguity
 
@@ -113,20 +110,20 @@ work.
   (ordering, a lock, an exclusive handle, an atomic publish); rarity is no
   reason to keep it, because a rare timing failure is one a single user is
   unlikely ever to see or report. Treat a race no existing actor can perform as
-  impossible or ASSERT it; it is never a cost when comparing options and never a
-  user question.
-- Hand-edited files that have never been seen and have no named trigger: never a
-  cost when comparing options and never a user question. Trust-boundary
-  validation (`.agents/references/cpp-conventions.md`) still applies.
+  impossible or ASSERT it.
+- A race no existing actor can perform, and a hand-edited file state nobody has
+  seen and no named trigger produces, count for nothing when comparing options
+  and are settled without asking the user. Trust-boundary validation
+  (`.agents/references/cpp-conventions.md`) still applies to such a file.
 - Questions a build, an existing harness command, or a code read settles: settle
-  them that way, through the role that runs it, and never ask the user.
+  them that way, through the role that runs it.
 
 <!-- session-context-part: Change Workflow, Steps 1-3 (continues in the next part) -->
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
 This workflow governs every tracked artifact. An artifact type a step does not
 name is a case this workflow does not assign to anyone: resolve it with the
-user, never by treating the step as inapplicable.
+user.
 
 A sweep run, defined by `/sweep`, does not follow this workflow; `/sweep` owns
 what it keeps.
@@ -154,16 +151,15 @@ Definitions:
   `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper
   session reattaches only through the same wrapper with its explicit reattach
   worktree input — `--reattach-worktree <path>` for Claude and
-  `-ReattachWorktree <path>` for Codex; never adopt an arbitrary worktree. If
-  the user opens a session directly on main, work in that checkout and do not
-  use the worktree flow.
+  `-ReattachWorktree <path>` for Codex. If the user opens a session directly on
+  main, work in that checkout and do not use the worktree flow.
 - Primary — the shared main checkout and its main branch that finished session
   work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps
   below; outside this file a step is cited by its heading name
-  (`the Plan review step`), never by its number, so renumbering here changes
-  nothing elsewhere; a stage is one approved unit of session work that can
-  complete or land independently.
+  (`the Plan review step`), so renumbering here changes nothing elsewhere; a
+  stage is one approved unit of session work that can complete or land
+  independently.
 - Residual — a known leftover problem reported at the end of a task instead of
   fixed inside it.
 
@@ -240,10 +236,10 @@ plan snapshot.
   snapshot, after main accepts a finding; Tier 3 follows
   `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
 - fresh `reviewer` runs `/plan-simplicity-review` over only the difference those
-  findings added to the plan snapshot — Tier 2+, once per Plan review and never
-  repeated, when the findings main accepted from `/plan-audit` or a Tier-3 grill
-  round add mechanism (a new guard, check, option, or code path) rather than
-  only correcting statements.
+  findings added to the plan snapshot — Tier 2+, once per Plan review, when the
+  findings main accepted from `/plan-audit` or a Tier-3 grill round add
+  mechanism (a new guard, check, option, or code path) rather than only
+  correcting statements.
 
 At Tier 3 main only decides and interviews from the `planner` and `locator`
 handoffs, then presents the resolved plan for approval per `/next-plan`
@@ -259,10 +255,9 @@ run first, on the unedited tree; then the slices run in parallel;
 line search for that literal limited to the card's `Acceptance checks` field,
 the lines from its `- Acceptance checks:` line up to its `- Roles:` line,
 printing only the matched text because a host may hide a long matching line.
-It reads only each marked check, from its marked line to the check's end, never
-the rest of the card body or the `Slices`, and from that text takes the
-executor, the build (project and configuration, or none), and the scenario
-steps for the `builder` and `runner` briefs.
+It reads only each marked check, from its marked line to the check's end, and
+from that text takes the executor, the build (project and configuration, or
+none), and the scenario steps for the `builder` and `runner` briefs.
 
 - `builder` runs `/compile` for the unedited-tree build a check marked
   `before the first edit` needs — when it needs one — in the Local form its
@@ -293,8 +288,7 @@ self-checks remain inside the implementation slices.
   after propagation — every tier; the static-checks runner selects its own
   checks, and its header documents the result and options. Main has an
   `implementer` rewrap every `line-length` failure it reports in that same
-  pass, whether or not the change added the line, and never records one as a
-  residual.
+  pass, whether or not the change added the line.
 - `mechanic` runs `/code-style-review` — for changed C++; a later
   `/resolve-findings` round that changes C++ re-runs it over the newly changed
   ranges before that round's `Build required` handoff compiles.
@@ -303,7 +297,7 @@ self-checks remain inside the implementation slices.
   `## Inputs` defines, so a stage whose acceptance checks include an
   `/agent-harness` check also builds the client and the server. Main reads
   whether they do from the execution card's `Roles` field alone (Step 8
-  `runner` bullet), never from its `Acceptance checks` field.
+  `runner` bullet).
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
@@ -476,7 +470,6 @@ follow-up Plan where required.
 
 Once a stage's required checks pass, stop changing it: advance to the next
 stage, approval gate, blocker, or session end without adding untriggered tests,
-reviews, or process steps. This never shortens a valid build, lock, or harness
-deadline, and never licenses skipping a step this workflow does route — an
-unclear trigger is an ambiguity to surface, not grounds to call a check
-untriggered.
+reviews, or process steps. Every step this workflow routes, and every valid
+build, lock, or harness deadline, still applies; an unclear trigger is an
+ambiguity to surface, not grounds to call a check untriggered.
