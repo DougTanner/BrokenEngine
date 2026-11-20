@@ -77,7 +77,9 @@ changes no file.
 Use `NEEDS_ACTION` when the retrospective produces actionable findings, `PASS`
 only when it is clean, and `BLOCKED` when required evidence is missing.
 Main presents the retrospective, decides each returned finding, and owns every
-follow-up action.
+follow-up action. After a full audit, main records each finding it accepts in
+`Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` as its header
+directs.
 
 ## References
 

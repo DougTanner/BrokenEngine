@@ -105,9 +105,9 @@ those Plans. Failures in other files and other rows stay main's Step 5 work.
 Never create a request file, row, score, claim, or a commit that publishes a
 row.
 
-Done when exactly one row's route was taken for each proposal and a runner run
-after your last rewrap reports no `line-length` failure in a Plan you wrote or
-edited.
+Done when exactly one row's route was taken for each proposal, any incident rows
+deleted, and a runner run after your last rewrap reports no `line-length`
+failure in a Plan you wrote or edited.
 
 ## Rules
 
@@ -140,10 +140,10 @@ edited.
   `## Planning Trees`; do not disguise it as debt.
 - Reject each proposal class [`../SKILL.md`](../SKILL.md) `## When to use`
   excludes, stating why.
-- Tooling friction observed during a `/next-plan` run is a separate category.
-- So is a script or documented tool invocation that returned an oversized result
-  flooding the main context, cited by the context-efficiency envelope (tool,
-  invocation, measured size, checkpoint).
+- A proposal that arrives with the rows of one key of
+  `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` is a
+  tooling-friction proposal, a separate category; this worker deletes those
+  rows as that file's header directs.
 - For a tooling-friction proposal, and for any other proposal whose problem is
   proven and reproducible from the supplied evidence but whose root cause that
   evidence cannot confirm, these substitutions replace the corresponding
@@ -154,23 +154,18 @@ edited.
   symptom with its evidence substitutes for the confirmed root cause wherever
   one is required, including in the drafted Plan, which carries the
   investigation portion `Documents/Plans/AGENTS.md` `## Plan files` defines. For
-  a tooling-friction proposal, that evidence is the in-session citation — exact
-  command or script path, observed output or malformed result, and the rework or
-  workaround it forced — which also substitutes for the unmet acceptance
-  criterion or accepted residual. For a context-efficiency proposal, the
-  envelope fields — tool, invocation, measured size — plus the separately
-  supplied checkpoint substitute for the observed-output citation and for the
-  rework or workaround it forced.
+  a tooling-friction proposal, that evidence is its incident rows — owner,
+  symptom, and each row's evidence — which also substitute for the unmet
+  acceptance criterion or accepted residual.
 - For a proposal under the substitution above, proving the root cause is
   deferred to the fix session, by the route the Plan's `## Design` states.
   Grouping and duplicate detection key on the observed symptom instead of root
   cause; re-observing an already-recorded symptom updates nothing and is
-  rejected as a duplicate. For a tooling-friction
-  proposal, the grouping key is (skill or script, observed symptom), and the
-  pre-existing and out-of-scope proof verifies that the misbehaving skill or
-  script is outside the claimed Plan's `## In scope`; when it is inside, the
-  failure is an in-scope blocker of the active change and is rejected as a
-  friction follow-up.
+  rejected as a duplicate. For a tooling-friction proposal, the grouping key is
+  its incident key, and the pre-existing and out-of-scope proof verifies that
+  the key's owner is outside the claimed Plan's `## In scope`, when a Plan is
+  claimed; when it is inside, the failure is an in-scope blocker of the active
+  change and is rejected as a friction follow-up.
 - Plan files and the metadata line that must be their very first bytes are
   ordinary tracked Git content; write them directly, with or without a live Plan
   claim. `Documents/Features` remains manual and is not an alternate

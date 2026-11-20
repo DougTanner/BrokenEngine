@@ -22,10 +22,10 @@ main's recorded handoff line.
 
 | Measurement state | Reviewer summary line | Handoff line recorded |
 | --- | --- | --- |
-| `pass` envelope | `pass` | `Context-efficiency follow-ups: <isolation-lens Plan path(s) or none>` |
-| `needs-review` envelope, untruncated | `needs-review` | `Context-efficiency follow-ups:` Plan path(s) or none, from the reviewer's findings |
-| blocked or error envelope | `skipped (<code>)` | `Context-efficiency follow-ups: blocked (<code>), then any isolation-lens Plan path(s)` |
-| `breachRowsTruncated: true` envelope | `skipped (breach-rows-truncated)` | `Context-efficiency follow-ups: blocked (breach-rows-truncated), then any isolation-lens Plan path(s)` |
+| `pass` envelope | `pass` | `Context-efficiency follow-ups: <routing result>` |
+| `needs-review` envelope, untruncated | `needs-review` | `Context-efficiency follow-ups: <routing result>`, from the reviewer's findings |
+| blocked or error envelope | `skipped (<code>)` | `Context-efficiency follow-ups: blocked (<code>), then <routing result>` |
+| `breachRowsTruncated: true` envelope | `skipped (breach-rows-truncated)` | `Context-efficiency follow-ups: blocked (breach-rows-truncated), then <routing result>` |
 | transcript unresolvable, unreadable, or `transcript.not-found` | `none (BLOCKED handoff)` — the reviewer returns `BLOCKED` for the whole review and carries no summary block | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
 | Codex main session | none — no reviewer is dispatched and no lens runs | `none (codex)` on both lines |
 
@@ -41,25 +41,28 @@ returns `BLOCKED` instead. The review skill's
 exact reviewer summary output for each measurement state.
 
 The `Handoff line recorded` column is main's own record, written from what
-`## Follow-up routing` produced, not reviewer output; the `Friction follow-ups:`
-line records `<Plan path(s) or none>` in every row that does not name it.
+`## Follow-up routing` produced, not reviewer output: `<routing result>` is
+`logged <n>` for rows recorded, the Plan path(s) the routing produced, both, or
+`none`. The `Friction follow-ups:` line records `<routing result>` in every row
+that does not name it.
 
 ## Follow-up routing
 
-Each accepted finding follows the Leftovers rule of the Verify the acceptance
-table step in [change-workflow.md](../../../references/change-workflow.md); an
-`implementer` routes one that goes to `/create-follow-up-plans` as a
-tooling-friction or isolation proposal, supplying the observed symptom with its
-citation plus the provenance block sourced per
+Main records each accepted finding in
+`Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` as its header
+directs; a finding that header exempts keeps the Leftovers rule of the Verify
+the acceptance table step in
+[change-workflow.md](../../../references/change-workflow.md). The header's
+`/create-follow-up-plans` dispatch routes the key as a tooling-friction proposal
+with the provenance block sourced per
 [follow-up-provenance.md](follow-up-provenance.md). An `active-change-blocker`
-finding never becomes a follow-up Plan: it returns to the current change as a
-blocker.
+finding is never recorded: it returns to the current change as a blocker.
 
 The [post-checkpoint outcome table](../SKILL.md#post-checkpoint-outcomes) owns
 the authoritative claim disposition and whether a landing is followup-only.
 
 Friction first observed after this checkpoint — including friction in running
-the claim-exit script and in `/finalize-changes` itself — is recorded through
-`/create-follow-up-plans` by an `implementer` and lands at a later gate as its
-own content. On deferral, or when the run ends without a claim, the checkpoint's
-Plans are themselves the landed content and the landing gate applies to them.
+the claim-exit script and in `/finalize-changes` itself — is handled the same
+way and lands at a later gate as its own content. On deferral, or when the run
+ends without a claim, the checkpoint's rows and Plans are themselves the landed
+content and the landing gate applies to them.

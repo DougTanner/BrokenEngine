@@ -61,11 +61,14 @@ authorized by that script's completion result and owes no Review and resolve
 correctness row, so it is recorded in the table with no review row of its own;
 the `Executable Plan check` row below still applies to that reviewed diff.
 
-A modified `Documents/Investigations/Engine/RefactorCandidates.md` owes no
-Review and resolve correctness row, so it is recorded in the table with no
-review row of its own. Rows the Change Workflow Verify and land step adds are
-authorized by that step; any other edit, such as a reviewing session's row
-removals, is authorized by that session's instruction.
+A modified `Documents/Investigations/Engine/RefactorCandidates.md` or
+`Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` owes no Review
+and resolve correctness row, so it is recorded in the table with no review row
+of its own. Rows the Change Workflow Verify and land step adds to the
+refactor-candidate log are authorized by that step; any other edit to it, such
+as a reviewing session's row removals, is authorized by that session's
+instruction. Rows main records in the incident log are authorized by its
+header, and the `/create-follow-up-plans` worker's row deletions by that skill.
 
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their

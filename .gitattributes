@@ -34,5 +34,6 @@
 *.md -whitespace
 *.txt -whitespace
 
-# Concurrent sessions insert rows at the same place in this log; union keeps both sides' rows on rebase.
+# Concurrent sessions insert rows at the same place in these logs; union keeps both sides' rows on rebase.
 Documents/Investigations/Engine/RefactorCandidates.md merge=union
+Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md merge=union

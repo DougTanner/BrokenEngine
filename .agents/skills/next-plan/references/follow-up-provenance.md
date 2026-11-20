@@ -1,10 +1,9 @@
 # Follow-Up Provenance Sourcing
 
-Read this reference when a `/next-plan` run records a tooling-friction or
-context-efficiency follow-up and needs the provenance values. It covers only
-where this run sources those values; `/create-follow-up-plans` owns the
-provenance block's field shapes, and the routing rules stay in
-[`/next-plan`](../SKILL.md).
+Read this reference when a `/next-plan` run records a tooling-friction
+follow-up and needs the provenance values. It covers only where this run
+sources those values; `/create-follow-up-plans` owns the provenance block's
+field shapes, and the routing rules stay in [`/next-plan`](../SKILL.md).
 
 ## Where each field comes from
 

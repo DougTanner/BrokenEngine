@@ -5,10 +5,10 @@ profile-relative locator, never an absolute path, and no transcript path or
 transcript text ever enters the body.
 
 ```markdown
-# Fix: <skill or script> — <one-line symptom>
+# Fix: <incident owner> — <one-line symptom>
 
 ## Context
-<Observed symptom: exact command run, script path(:line if known), observed
+<One line per incident row: date, session branch, selector, observed
 output/behavior, what was repeated or worked around. No transcript text.>
 
 Session provenance (machine-local; not reproducible after cleanup). The Client
@@ -68,8 +68,7 @@ client and that review ref only. Then make the smallest fix inside the
 boundary, surface it for re-planning instead of expanding scope.
 
 ## Critical files
-- <each concrete SKILL.md and/or script file involved — these files are the
-  authorized fix boundary>
+- <each concrete file involved — these files are the authorized fix boundary>
 
 ## In scope
 - Root-cause investigation as `## Design` states
