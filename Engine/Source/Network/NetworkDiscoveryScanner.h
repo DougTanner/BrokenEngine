@@ -18,8 +18,7 @@ public:
 	bool IsScanning();
 	enum class DiscoveryScannerFlags : uint8_t
 	{
-		kStarted = 1 << 0,
-		kFound   = 1 << 1,
+		kFound = 1 << 1,
 	};
 
 private:

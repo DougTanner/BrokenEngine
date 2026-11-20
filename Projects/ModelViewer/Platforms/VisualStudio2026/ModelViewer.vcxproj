@@ -27,6 +27,7 @@
   <PropertyGroup>
     <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
     <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
+    <ThirdPartyLibraryDirectory Condition="'$(ThirdPartyLibraryDirectory)'==''">$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output</ThirdPartyLibraryDirectory>
     <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
     <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
     <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
@@ -73,13 +74,13 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
 if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
 if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
     "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
     if errorlevel 1 exit /b 1
@@ -215,6 +216,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
       <PreprocessorDefinitions>MI_DEFAULT_RESERVE_OS_MEMORY=10485760;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />
@@ -240,6 +242,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Common\Common.h" />
     <ClInclude Include="..\..\..\..\Common\Crc.h" />
     <ClInclude Include="..\..\..\..\Common\DataFile.h" />
+    <ClInclude Include="..\..\..\..\Common\DebugDefines.h" />
     <ClInclude Include="..\..\..\..\Common\Determinism.h" />
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h" />
     <ClInclude Include="..\..\..\..\Common\ExternalHeaders.h" />

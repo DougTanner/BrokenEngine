@@ -85,31 +85,7 @@ void BattleshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFra
 		return;
 	}
 
-	siCollisionLayerIndex = engine::Collision::AddLayer(
-	{
-		.pVecStartPositions = rPreviousFrame.interpolate.pBattleships->pVecPositions,
-		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pVecVelocities = rCurrentPostRender.pVecVelocities,
-		.iCount = rCurrentInterpolate.iCount,
-		.layerFlags = engine::CollisionLayerFlags::kHitboxes,
-		.uiCategory = CollisionCategory::kuiBattleship,
-		.uiCollidesWith = CollidesWith::kuiBattleship,
-		.pAlignments = rCurrentPostRender.pAlignments,
-	});
-
-	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-	}
-
-	std::span<float> radii = engine::Collision::GetLayerRadii(siCollisionLayerIndex);
-	std::span<engine::CollisionHitbox> hitboxes = engine::Collision::GetLayerHitboxes(siCollisionLayerIndex);
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		radii[static_cast<size_t>(i)] = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rCurrentPostRender.pController[i])].fRadius;
-		BuildShipHitbox(ShipType::kBattleship, rCurrentPostRender.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], hitboxes[static_cast<size_t>(i)]);
-	}
+	siCollisionLayerIndex = AddShipCollisionLayer(rCurrentInterpolate, rCurrentPostRender, *rPreviousFrame.interpolate.pBattleships, ShipType::kBattleship, CollisionCategory::kuiBattleship, CollidesWith::kuiBattleship);
 }
 
 void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -232,10 +208,9 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		// authored tube.
 		std::optional<engine::registry_id_t> optionalTarget;
 		float fNearestDistanceSquared = 0.0f;
-		XMVECTOR vecTargetPosition = XMVectorZero();
 		int64_t iLaunchTube = 0;
 		XMVECTOR vecTubePosition = XMVectorZero();
-		ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecEnemyVelocity)
+		ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecEnemyVelocity)
 		{
 			int64_t iEnemyFlightPlane = NearestFlightPlane(vecEnemyPosition);
 			// Set once the per-target cap has passed for this enemy.
@@ -261,16 +236,11 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 
 				if (!optionalEnemy)
 				{
-					engine::registry_id_t target = VisitShip(rFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
-					{
-						return rInterpolate.pRegistryIds[iRow];
-					});
-
 					const MissilesPostRender& rMissiles = *rFrame.postRender.pMissiles;
 					int64_t iTargetingCount = 0;
 					for (int64_t j = 0; j < rMissiles.iCount; ++j)
 					{
-						if (rMissiles.puiRegistryTargets[j] == target)
+						if (rMissiles.puiRegistryTargets[j] == registryId)
 						{
 							++iTargetingCount;
 						}
@@ -279,7 +249,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 					{
 						return;
 					}
-					optionalEnemy = target;
+					optionalEnemy = registryId;
 				}
 				if (!HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, static_cast<uint8_t>(iTubeFlightPlane), vecPosition, vecEnemyPosition))
 				{
@@ -288,7 +258,6 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 
 				optionalTarget = optionalEnemy;
 				fNearestDistanceSquared = fDistanceSquared;
-				vecTargetPosition = vecEnemyPosition;
 				iLaunchTube = k;
 				vecTubePosition = vecPosition;
 			}
@@ -304,16 +273,13 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&tubes[static_cast<size_t>(iLaunchTube)].f3Direction), 0.0f));
 		XMVECTOR vecTubeDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
-		MissileFlags_t missileFlags = (alignment == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
 		bool bSpawned = MissilesPostRender::Spawn(rFrame,
 		{
 			.vecPosition = vecTubePosition,
 			.vecDirection = vecTubeDirection,
 			.vecVelocity = XMVectorScale(vecTubeDirection, kfBattleshipMissileInitialVelocity),
-			.vecStoredDirection = common::DirectionTo(vecTubePosition, XMVectorSetZ(vecTargetPosition, XMVectorGetZ(vecTubePosition))),
 			.uiTarget = *optionalTarget,
 			.fAcceleration = kfBattleshipMissileAcceleration,
-			.flags = missileFlags,
 			.alignment = alignment,
 		});
 		// A refused launch leaves the cooldown unchanged.

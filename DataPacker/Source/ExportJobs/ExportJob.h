@@ -33,7 +33,7 @@ public:
 	std::string mRelativeFile;
 	std::filesystem::path mChunkFile;
 	std::filesystem::path mCacheMetadataFile;
-	// Set by SetContentKey; empty until CheckDirty on a job whose constructor sets no key, and after a failed fingerprint.
+	// Set by SetContentKey; empty until CheckDirty, and after a failed fingerprint.
 	std::string mContentKey;
 
 	std::future<std::vector<std::byte>&> mFuture;
@@ -49,9 +49,8 @@ protected:
 	virtual std::string GetInputFingerprint() const;
 	virtual void UpdateCacheMetadata() {}
 
-	// Called from a derived constructor or from CheckDirty, before any cache entry is touched. The key holds content
-	// fingerprints only, so trees with equal inputs resolve to one entry and trees with different inputs keep separate
-	// entries.
+	// Called from CheckDirty, before any cache entry is touched. The key holds content fingerprints only, so trees with
+	// equal inputs resolve to one entry and trees with different inputs keep separate entries.
 	void SetContentKey(common::crc_t uiContentKey);
 
 	// Output-freshness marker sidecar, shared by the jobs whose generated outputs are tracked in the checkout.

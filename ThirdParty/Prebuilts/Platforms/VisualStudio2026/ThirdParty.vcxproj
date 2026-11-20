@@ -87,7 +87,8 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;BT_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>$(ProjectDir)\..\..\..\..\Common\DebugDefines.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -109,7 +110,8 @@
       <Optimization>MaxSpeed</Optimization>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;BT_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>$(ProjectDir)\..\..\..\..\Common\DebugDefines.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -133,7 +135,8 @@
       <Optimization>MaxSpeed</Optimization>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>$(ProjectDir)\..\..\..\..\Common\DebugDefines.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ProcessorNumber>8</ProcessorNumber>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>

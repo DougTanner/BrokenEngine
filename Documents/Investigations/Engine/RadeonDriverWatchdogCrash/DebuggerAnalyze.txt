@@ -1,0 +1,400 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.157 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+Loading Dump File [%USERPROFILE%\AppData\Local\Temp\crashdiag\111926-16406-01.dmp]
+Mini Kernel Dump File: Only registers and stack trace are available
+
+WARNING: TriageDumpDataExtArray.HeaderSize is 0
+WARNING: Failed to read dump data exension data
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+Symbol search path is: srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+Executable search path is:
+Windows 10 Kernel Version 26100 MP (32 procs) Free x64
+Product: WinNt, suite: TerminalServer SingleUserTS Personal
+Kernel base = 0xfffff807`72800000 PsLoadedModuleList = 0xfffff807`736f56a0
+Debug session time: Thu Nov 19 15:22:27.828 2026 (UTC - 5:00)
+System Uptime: 6 days 8:04:42.703
+Loading Kernel Symbols
+...............................................................
+................................................................
+................................................................
+.......................................
+Loading User Symbols
+
+Loading unloaded module list
+................................................
+ReadVirtual() failed in GetXStateConfiguration() first read attempt (error == 0.)
+For analysis of this file, run !analyze -v
+1: kd> cdb: Reading initial command '!analyze -v; q'
+Loading Kernel Symbols
+...............................................................
+................................................................
+................................................................
+.......................................
+Loading User Symbols
+
+Loading unloaded module list
+................................................
+*******************************************************************************
+*                                                                             *
+*                        Bugcheck Analysis                                    *
+*                                                                             *
+*******************************************************************************
+
+DPC_WATCHDOG_VIOLATION (133)
+The DPC watchdog detected a prolonged run time at an IRQL of DISPATCH_LEVEL
+or above.
+Arguments:
+Arg1: 0000000000000001, The system cumulatively spent an extended period of time at
+	DISPATCH_LEVEL or above.
+Arg2: 0000000000001e00, The watchdog period (in ticks).
+Arg3: fffff807737c63c8, cast to nt!DPC_WATCHDOG_GLOBAL_TRIAGE_BLOCK, which contains
+	additional information regarding the cumulative timeout
+Arg4: 0000000000000000
+
+Debugging Details:
+------------------
+
+*** WARNING: Unable to verify timestamp for amdkmdag.sys
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Either you specified an unqualified symbol, or your debugger   ***
+***    doesn't have full symbol information.  Unqualified symbol      ***
+***    resolution is turned off by default. Please either specify a   ***
+***    fully qualified symbol module!symbolname, or enable resolution ***
+***    of unqualified symbols by typing ".symopt- 100". Note that     ***
+***    enabling unqualified symbol resolution with network symbol     ***
+***    server shares in the symbol path may cause the debugger to     ***
+***    appear to hang for long periods of time when an incorrect      ***
+***    symbol name is typed or the network symbol server is down.     ***
+***                                                                   ***
+***    For some commands to work properly, your symbol path           ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: TickPeriods                                   ***
+***                                                                   ***
+*************************************************************************
+
+KEY_VALUES_STRING: 1
+
+    Key  : Analysis.CPU.mSec
+    Value: 2562
+
+    Key  : Analysis.Elapsed.mSec
+    Value: 4795
+
+    Key  : Analysis.IO.Other.Mb
+    Value: 10
+
+    Key  : Analysis.IO.Read.Mb
+    Value: 1
+
+    Key  : Analysis.IO.Write.Mb
+    Value: 25
+
+    Key  : Analysis.Init.CPU.mSec
+    Value: 421
+
+    Key  : Analysis.Init.Elapsed.mSec
+    Value: 6135
+
+    Key  : Analysis.Memory.CommitPeak.Mb
+    Value: 87
+
+    Key  : Analysis.Version.DbgEng
+    Value: 10.0.29680.1004
+
+    Key  : Analysis.Version.Description
+    Value: 10.2608.26.1 amd64fre
+
+    Key  : Analysis.Version.Ext
+    Value: 1.2608.26.1
+
+    Key  : Bugcheck.Code.LegacyAPI
+    Value: 0x133
+
+    Key  : Bugcheck.Code.TargetModel
+    Value: 0x133
+
+    Key  : Dump.Attributes.AsUlong
+    Value: 0x21808
+
+    Key  : Dump.Attributes.DiagDataWrittenToHeader
+    Value: 1
+
+    Key  : Dump.Attributes.ErrorCode
+    Value: 0x0
+
+    Key  : Dump.Attributes.KernelGeneratedTriageDump
+    Value: 1
+
+    Key  : Dump.Attributes.LastLine
+    Value: Dump completed successfully.
+
+    Key  : Dump.Attributes.ProgressPercentage
+    Value: 0
+
+    Key  : Failure.Bucket
+    Value: 0x133_ISR_amdkmdag!unknown_function
+
+    Key  : Failure.Hash
+    Value: {ce335412-b260-6bc1-3af9-ea5584f041c4}
+
+    Key  : Hypervisor.Enlightenments.ValueHex
+    Value: 0x7497cf94
+
+    Key  : Hypervisor.Flags.AnyHypervisorPresent
+    Value: 1
+
+    Key  : Hypervisor.Flags.ApicEnlightened
+    Value: 1
+
+    Key  : Hypervisor.Flags.ApicVirtualizationAvailable
+    Value: 0
+
+    Key  : Hypervisor.Flags.AsyncMemoryHint
+    Value: 0
+
+    Key  : Hypervisor.Flags.CoreSchedulerRequested
+    Value: 0
+
+    Key  : Hypervisor.Flags.CpuManager
+    Value: 1
+
+    Key  : Hypervisor.Flags.DeprecateAutoEoi
+    Value: 0
+
+    Key  : Hypervisor.Flags.DynamicCpuDisabled
+    Value: 1
+
+    Key  : Hypervisor.Flags.Epf
+    Value: 0
+
+    Key  : Hypervisor.Flags.ExtendedProcessorMasks
+    Value: 1
+
+    Key  : Hypervisor.Flags.HardwareMbecAvailable
+    Value: 1
+
+    Key  : Hypervisor.Flags.MaxBankNumber
+    Value: 0
+
+    Key  : Hypervisor.Flags.MemoryZeroingControl
+    Value: 0
+
+    Key  : Hypervisor.Flags.NoExtendedRangeFlush
+    Value: 0
+
+    Key  : Hypervisor.Flags.NoNonArchCoreSharing
+    Value: 1
+
+    Key  : Hypervisor.Flags.Phase0InitDone
+    Value: 1
+
+    Key  : Hypervisor.Flags.PowerSchedulerQos
+    Value: 0
+
+    Key  : Hypervisor.Flags.RootScheduler
+    Value: 0
+
+    Key  : Hypervisor.Flags.SynicAvailable
+    Value: 1
+
+    Key  : Hypervisor.Flags.UseQpcBias
+    Value: 0
+
+    Key  : Hypervisor.Flags.Value
+    Value: 38408431
+
+    Key  : Hypervisor.Flags.ValueHex
+    Value: 0x24a10ef
+
+    Key  : Hypervisor.Flags.VpAssistPage
+    Value: 1
+
+    Key  : Hypervisor.Flags.VsmAvailable
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.AccessStats
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.CrashdumpEnlightened
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.CreateVirtualProcessor
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.DisableHyperthreading
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.HostTimelineSync
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.HypervisorDebuggingEnabled
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.IsHyperV
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.LivedumpEnlightened
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.MapDeviceInterrupt
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.MceEnlightened
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.Nested
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.StartLogicalProcessor
+    Value: 1
+
+    Key  : Hypervisor.RootFlags.Value
+    Value: 1015
+
+    Key  : Hypervisor.RootFlags.ValueHex
+    Value: 0x3f7
+
+    Key  : Stack.Pointer
+    Value: ISR
+
+    Key  : WER.OS.Platform
+    Value: Windows
+
+    Key  : WER.OS.Version
+    Value: 10.0.26100.9974
+
+
+BUGCHECK_CODE:  133
+
+BUGCHECK_P1: 1
+
+BUGCHECK_P2: 1e00
+
+BUGCHECK_P3: fffff807737c63c8
+
+BUGCHECK_P4: 0
+
+FILE_IN_CAB:  111926-16406-01.dmp
+
+TAG_NOT_DEFINED_202b:  *** Unknown TAG in analysis list 202b
+
+
+DUMP_FILE_ATTRIBUTES: 0x21808
+  Kernel Generated Triage Dump
+
+FAULTING_THREAD:  ffff90076e5d6040
+
+DPC_TIMEOUT_TYPE:  DPC_QUEUE_EXECUTION_TIMEOUT_EXCEEDED
+
+BLACKBOXBSD: 1 (!blackboxbsd)
+
+
+BLACKBOXNTFS: 1 (!blackboxntfs)
+
+
+BLACKBOXPNP: 1 (!blackboxpnp)
+
+
+BLACKBOXWINLOGON: 1 (!blackboxwinlogon) (!blackboxwinlogonnotify)
+
+
+CUSTOMER_CRASH_COUNT:  1
+
+PROCESS_NAME:  System
+
+STACK_TEXT:
+ffffa281`cd766c78 fffff807`72b51a7c     : 00000000`00000133 00000000`00000001 00000000`00001e00 fffff807`737c63c8 : nt!KeBugCheckEx
+ffffa281`cd766c80 fffff807`72b50fab     : 00000000`00000000 00000000`0216a6ac 00000000`00000000 ffffa281`cd74b180 : nt!KeAccumulateTicks+0x59c
+ffffa281`cd766cf0 fffff807`72b5015d     : 00000000`00000000 000004fa`b51eeb50 ffffa281`cd74b180 ffff9007`00000001 : nt!KiUpdateRunTime+0x9b
+ffffa281`cd766eb0 fffff807`72aee964     : ffff9007`6e624480 ffff9007`6e624530 fffff807`73790088 00000000`00000001 : nt!KeClockInterruptNotify+0x44d
+ffffa281`cd766fb0 fffff807`72ebdf1e     : ffff9007`881cf606 ffff9007`6e624480 00000000`00053442 00053442`ea4a9728 : nt!KiCallInterruptServiceRoutine+0x334
+ffffa281`cd767020 fffff807`72ebe72c     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : nt!KiInterruptSubDispatchNoLockNoEtw+0x4e
+ffffa281`cd767070 fffff807`4cc3e616     : fffff807`4ccb295d ffffa281`cd767470 ffff9007`87b93e50 ffff9007`7b1fb1d0 : nt!KiInterruptDispatchNoLockNoEtw+0x3c
+ffffa281`cd767208 fffff807`4ccb295d     : ffffa281`cd767470 ffff9007`87b93e50 ffff9007`7b1fb1d0 00000000`00000001 : amdkmdag+0x191e616
+ffffa281`cd767210 ffffa281`cd767470     : ffff9007`87b93e50 ffff9007`7b1fb1d0 00000000`00000001 00000000`0001016d : amdkmdag+0x199295d
+ffffa281`cd767218 ffff9007`87b93e50     : ffff9007`7b1fb1d0 00000000`00000001 00000000`0001016d 00000000`00000001 : 0xffffa281`cd767470
+ffffa281`cd767220 ffff9007`7b1fb1d0     : 00000000`00000001 00000000`0001016d 00000000`00000001 00000000`0001016e : 0xffff9007`87b93e50
+ffffa281`cd767228 00000000`00000001     : 00000000`0001016d 00000000`00000001 00000000`0001016e fffff807`4ccb25fc : 0xffff9007`7b1fb1d0
+ffffa281`cd767230 00000000`0001016d     : 00000000`00000001 00000000`0001016e fffff807`4ccb25fc ffff9007`881cf680 : 0x1
+ffffa281`cd767238 00000000`00000001     : 00000000`0001016e fffff807`4ccb25fc ffff9007`881cf680 00000000`00000000 : 0x1016d
+ffffa281`cd767240 00000000`0001016e     : fffff807`4ccb25fc ffff9007`881cf680 00000000`00000000 00000000`00000001 : 0x1
+ffffa281`cd767248 fffff807`4ccb25fc     : ffff9007`881cf680 00000000`00000000 00000000`00000001 fffff807`4b7e330b : 0x1016e
+ffffa281`cd767250 ffff9007`881cf680     : 00000000`00000000 00000000`00000001 fffff807`4b7e330b ffff9007`881cf680 : amdkmdag+0x19925fc
+ffffa281`cd767258 00000000`00000000     : 00000000`00000001 fffff807`4b7e330b ffff9007`881cf680 fffff807`4ccb303a : 0xffff9007`881cf680
+
+
+SYMBOL_NAME:  amdkmdag+191e616
+
+MODULE_NAME: amdkmdag
+
+IMAGE_NAME:  amdkmdag.sys
+
+STACK_COMMAND: .process /r /p 0xfffff807737d0f00; .thread /r /p 0xffff90076e5d6040 ; kb
+
+BUCKET_ID_FUNC_OFFSET:  191e616
+
+FAILURE_BUCKET_ID:  0x133_ISR_amdkmdag!unknown_function
+
+OS_VERSION:  10.0.26100.9974
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+FAILURE_ID_HASH:  {ce335412-b260-6bc1-3af9-ea5584f041c4}
+
+Followup:     MachineOwner
+---------
+
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Kernel.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Usb4Kd.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

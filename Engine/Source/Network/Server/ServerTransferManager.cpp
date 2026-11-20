@@ -24,29 +24,17 @@ bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) con
 	{
 		return true;
 	}
-	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
+	return std::ranges::any_of(engine::gpServer->mClients, [destination](const engine::ClientConnection& rClient)
 	{
-		for (const engine::ClientConnection::SlotState& rSlot : rClient.slots)
-		{
-			if ((rSlot.subscription.flags & engine::SubscriptionFlags::kActive) && rSlot.subscription.coordinate == destination)
-			{
-				return true;
-			}
-		}
-	}
-	return false;
+		return rClient.FindSlotForCoordinate(destination) >= 0;
+	});
 }
 
-void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTransfersArena)
+void ServerTransferManager::CollectTransfers()
 {
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
 		game::Frame& rNextFrame = (*game::gpGame->mCells.at(rCoord).pNext);
-		if (rNextFrame.postRender.transferRequests.empty())
-		{
-			continue;
-		}
-
 		for (const game::TransferRequest& rRequest : rNextFrame.postRender.transferRequests)
 		{
 			// Reject coordinate-edge transfers before queuing or creating a destination, preventing wraparound.
@@ -67,26 +55,14 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				continue;
 			}
 
-			auto it = game::gpGame->mCells.find(destination);
-			if (it == game::gpGame->mCells.end())
+			if (!game::gpGame->mCells.contains(destination))
 			{
 				game::gpGame->CreateCellAtCoordinate(destination);
 				engine::Cell& rCell = game::gpGame->mCells.at(destination);
 				std::swap(rCell.pCurrent, rCell.pNext);
-				it = game::gpGame->mCells.find(destination);
 			}
 
 			mTransfers.try_emplace(destination).first->second.push_back(rRequest.change);
-
-			if (game::IsOwnedEntityTransfer(rRequest.change) && (game::OwnedSpawnGlobalId(rRequest.change).iValue != 0))
-			{
-				rTransfersArena.mBuffer.PushBack(ClientTransferInfo
-				{
-					.globalId = game::OwnedSpawnGlobalId(rRequest.change),
-					.destination = destination,
-					.clientGuid = game::OwnedSpawnClientGuid(rRequest.change),
-				});
-			}
 		}
 	}
 }
@@ -131,118 +107,40 @@ void ServerTransferManager::SortTransfersByType()
 	}
 }
 
-void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
+void ServerTransferManager::SpawnTransfers()
 {
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
 		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
-			// Liveness filtering requires non-owned transfers to target live destinations, matching CollectTransfers.
-			// A spawn targets an active cell that need not be live. Replay spawning bypasses this check.
-			if (bFilterDestinationLiveness && game::IsTransferType(rTransfer.eType) && !game::IsOwnedEntityTransfer(rTransfer) && !IsDestinationLive(rCoord)) [[unlikely]]
-			{
-				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iQ, rCoord.iR, game::StatusChangeTypeName(rTransfer.eType));
-				DEBUG_BREAK();
-			}
-
 			game::ApplySpawnStatusChange(rDestinationFrame, rTransfer);
-		}
-	}
-}
 
-void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness)
-{
-	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-
-	{
-		common::ScopedWorkbufferArena preCrcsArena = rWorkbuffer.Push();
-
-		// Capture pre-transfer CRCs from frame state populated by RunFrameTick before the transfer tail. The
-		// destination frame is changed in place by SpawnTransfers, so index these values before that mutation.
-		for (const auto& [rCoord, rTransfers] : mTransfers)
-		{
-			const game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
-			preCrcsArena.mBuffer.PushBack(rDestinationFrame.postRender.uiSharedCrc);
-		}
-
-		SpawnTransfers(bFilterDestinationLiveness);
-
-		// Recompute CRCs for destination frames after transfers modified them. RunFrameTick computes CRCs before
-		// arrived transfers land, so this is required for both live publication and replay publication.
-		for (int64_t i = 0; const auto& [rCoord, rTransfers] : mTransfers)
-		{
-			game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
-			common::crc_t uiPreCrc = preCrcsArena.mBuffer.Span<const common::crc_t>()[i++];
-			rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crc();
-
-			char pcCrcPre[20] {}, pcCrcPost[20] {};
-			common::ToHex(std::span<char, 20>(pcCrcPre), uiPreCrc);
-			common::ToHex(std::span<char, 20>(pcCrcPost), rDestinationFrame.postRender.uiSharedCrc);
-
-			char pcOwnedIds[192] {};
-			char* pOwnedIdsWrite = pcOwnedIds;
-			int64_t iOwnedIdCount = 0;
-			for (const game::StatusChange& rTransfer : rTransfers)
-			{
-				if (!game::IsOwnedEntityTransfer(rTransfer))
-				{
-					continue;
-				}
-
-				if (iOwnedIdCount >= 8)
-				{
-					continue;
-				}
-
-				// The final byte stays the zero terminator.
-				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, pcOwnedIds + std::ssize(pcOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", game::OwnedSpawnGlobalId(rTransfer).iValue).out;
-				++iOwnedIdCount;
-			}
-
-			if (iOwnedIdCount > 0)
-			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iQ, rCoord.iR, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost, pcOwnedIds);
-			}
-			else
-			{
-				bool bAnySubscribed = std::ranges::any_of(engine::gpServer->mClients, [&rCoord](const engine::ClientConnection& rClient)
-				{
-					return rClient.FindSlotForCoordinate(rCoord) >= 0;
-				});
-				if (bAnySubscribed)
-				{
-					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iQ, rCoord.iR, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost);
-				}
-			}
-		}
-	}
-
-	TrackClientTransfers(rTransfersArena.mBuffer.Span<const ClientTransferInfo>());
-}
-
-void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers)
-{
-	for (const ClientTransferInfo& rClientTransfer : clientTransfers)
-	{
-		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rClientTransfer.destination).pNext;
-		for (const engine::RegistryOwnershipLayer& rDestinationLayer : game::Frame::OwnershipLayers(rDestinationFrame))
-		{
-			// An invalid uuid means the transferred owned entity did not land in this layer, so there is nothing to bind.
-			if (!(engine::RegistryUuidByGlobalId(rDestinationLayer, rClientTransfer.globalId).iValue != 0))
+			if (!game::IsOwnedEntityTransfer(rTransfer))
 			{
 				continue;
 			}
 
-			// Connected or not, the owner keeps its GUID in the destination; ServerSessionBase::RebuildOwnedEntities reports
-			// the cell change to a connected owner.
-			if (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0)
+			engine::GlobalId globalId = game::OwnedSpawnGlobalId(rTransfer);
+			engine::ClientGuid clientGuid = game::OwnedSpawnClientGuid(rTransfer);
+			if (globalId.iValue != 0 && (clientGuid.uiHigh != 0 || clientGuid.uiLow != 0))
 			{
-				engine::AssignRegistryClientGuid(rDestinationLayer, rClientTransfer.globalId, rClientTransfer.clientGuid);
-				game::gpServerSession->OnOwnedEntityChangedCell(rClientTransfer.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
+				game::gpServerSession->OnOwnedEntityChangedCell(clientGuid, globalId, rCoord);
 			}
-			break;
 		}
+	}
+}
+
+void ServerTransferManager::ApplyPreparedTransfers()
+{
+	SpawnTransfers();
+
+	// Recompute CRCs for destination frames after transfers modified them. RunFrameTick computes CRCs before
+	// arrived transfers land, so this is required for both live publication and replay publication.
+	for ([[maybe_unused]] const auto& [rCoord, rTransfers] : mTransfers)
+	{
+		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
+		rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crc();
 	}
 }
 
@@ -270,9 +168,7 @@ void ServerTransferManager::HarvestTransfers()
 
 	mTransfers.clear();
 
-	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	common::ScopedWorkbufferArena transfersArena = rWorkbuffer.Push();
-	CollectTransfers(transfersArena);
+	CollectTransfers();
 	DrainPendingSpawns();
 
 	SortTransfersByType();
@@ -287,7 +183,7 @@ void ServerTransferManager::HarvestTransfers()
 		}
 	}
 
-	ApplyPreparedTransfers(transfersArena, true);
+	ApplyPreparedTransfers();
 
 	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
 	for (const auto& [rCoordinate, rTransfers] : mTransfers)
@@ -310,32 +206,7 @@ void ServerTransferManager::ApplyReplayTransfers()
 	// Heap: replay transfer spawns may grow destination SOA buffers and update idToIndexMaps
 	ScopedSuppressAllocationTracking suppress;
 
-	common::ScopedWorkbufferArena clientTransfersArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const auto& [rCoord, rTransfers] : mTransfers)
-	{
-		for (const game::StatusChange& rTransfer : rTransfers)
-		{
-			if (!game::IsOwnedEntityTransfer(rTransfer))
-			{
-				continue;
-			}
-
-			engine::GlobalId globalId = game::OwnedSpawnGlobalId(rTransfer);
-			if (!(globalId.iValue != 0))
-			{
-				continue;
-			}
-
-			clientTransfersArena.mBuffer.PushBack(ClientTransferInfo
-			{
-				.globalId = globalId,
-				.destination = rCoord,
-				.clientGuid = game::OwnedSpawnClientGuid(rTransfer),
-			});
-		}
-	}
-
-	ApplyPreparedTransfers(clientTransfersArena, false);
+	ApplyPreparedTransfers();
 }
 
 void ServerTransferManager::ResetState()

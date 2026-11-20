@@ -62,6 +62,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\Common\Common.h" />
     <ClInclude Include="..\..\..\Common\DataFile.h" />
+    <ClInclude Include="..\..\..\Common\DebugDefines.h" />
     <ClInclude Include="..\..\..\Common\ErrorUtils.h" />
     <ClInclude Include="..\..\..\Common\ExternalHeaders.h" />
     <ClInclude Include="..\..\..\Common\Flags.h" />
@@ -129,6 +130,7 @@
     <RootNamespace>DataPacker</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
 	<DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))</DataRepositoryRoot>
+	<ThirdPartyLibraryDirectory Condition="'$(ThirdPartyLibraryDirectory)'==''">$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output</ThirdPartyLibraryDirectory>
   </PropertyGroup>
   <PropertyGroup>
     <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
@@ -207,12 +209,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
 if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" (
+if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" (
     echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2
     exit /b 1
 )</Command>
@@ -256,12 +258,12 @@ if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
 if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" (
+if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" (
     echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2
     exit /b 1
 )</Command>

@@ -222,9 +222,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.h">
-      <Filter>Engine\Network\Server</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
@@ -397,6 +394,9 @@
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h">
@@ -603,6 +603,15 @@
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStreamWriter.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStreamReader.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\DebugDefines.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -672,9 +681,6 @@
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.cpp">
-      <Filter>Engine\Network\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp">
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.cpp">
@@ -752,6 +758,9 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp">
       <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisUpdate.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Fighters\Fighters.cpp">
       <Filter>Game\Frame\Collections\Fighters</Filter>
     </ClCompile>
@@ -771,6 +780,9 @@
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.cpp">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipQueries.cpp">
@@ -872,9 +884,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp">
-      <Filter>Engine\Frame</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.cpp">
       <Filter>Engine\Frame\Collections\Pushers</Filter>
     </ClCompile>
@@ -905,6 +914,12 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.cpp">
       <Filter>Engine\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\DifferenceStreamWriter.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\DifferenceStreamReader.cpp">
+      <Filter>Engine\File</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

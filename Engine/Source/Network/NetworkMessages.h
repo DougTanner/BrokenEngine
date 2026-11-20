@@ -120,32 +120,23 @@ public:
 		}
 	}
 
-	void NullTerminatedString(const std::string_view& rValue) const
+	void TrailingString(const std::string_view& rValue) const
 	{
 		mrWorkbuffer.Append(rValue);
-		mrWorkbuffer.PushBack<uint8_t>(0);
 	}
 
-	void OptionalGuid(const ClientGuid& rGuid, const bool& rbHasGuid) const
-	{
-		if (rbHasGuid)
-		{
-			Field(rGuid.uiHigh);
-			Field(rGuid.uiLow);
-		}
-	}
-
-	void ConnectionResponseTail(const uint8_t& ruiAccepted, const uint8_t& ruiDebugInput, const uint8_t& ruiReplaying, const ClientGuid& rGuid, const bool& rbHasGuid, const std::string_view& rRejectionMessage) const
+	void ConnectionResponseTail(const uint8_t& ruiAccepted, const uint8_t& ruiDebugInput, const uint8_t& ruiReplaying, const ClientGuid& rGuid, const std::string_view& rRejectionMessage) const
 	{
 		if (ruiAccepted != 0)
 		{
 			Field(ruiDebugInput);
 			Field(ruiReplaying);
-			OptionalGuid(rGuid, rbHasGuid);
+			Field(rGuid.uiHigh);
+			Field(rGuid.uiLow);
 		}
 		else
 		{
-			mrWorkbuffer.Append(rRejectionMessage);
+			TrailingString(rRejectionMessage);
 		}
 	}
 
@@ -212,11 +203,6 @@ public:
 		}
 	}
 
-	bool AtEnd() const
-	{
-		return mCursor.Remaining() == 0;
-	}
-
 	void Field(GridCoord& rCoord)
 	{
 		if (!mCursor.Has(kiGridCoordSize))
@@ -238,45 +224,19 @@ public:
 		mCursor.pCursor += rPayload.iSize;
 	}
 
-	void NullTerminatedString(std::string_view& rValue)
+	void TrailingString(std::string_view& rValue)
 	{
 		if (!mbValid)
 		{
 			return;
 		}
 
-		const uint8_t* puiStart = mCursor.pCursor;
-		while (mCursor.pCursor < mCursor.pEnd && *mCursor.pCursor != 0)
-		{
-			++mCursor.pCursor;
-		}
-		rValue = std::string_view(reinterpret_cast<const char*>(puiStart), static_cast<size_t>(mCursor.pCursor - puiStart));
-		if (mCursor.pCursor < mCursor.pEnd)
-		{
-			++mCursor.pCursor;
-		}
+		rValue = std::string_view(reinterpret_cast<const char*>(mCursor.pCursor), static_cast<size_t>(mCursor.Remaining()));
+		mCursor.pCursor = mCursor.pEnd;
 	}
 
-	void OptionalGuid(ClientGuid& rGuid, bool& rbHasGuid)
+	void ConnectionResponseTail(const uint8_t& ruiAccepted, uint8_t& ruiDebugInput, uint8_t& ruiReplaying, ClientGuid& rGuid, std::string_view& rRejectionMessage)
 	{
-		rbHasGuid = false;
-		if (!mbValid)
-		{
-			return;
-		}
-
-		if (!mCursor.Has(kiGuidSize))
-		{
-			return;
-		}
-		Field(rGuid.uiHigh);
-		Field(rGuid.uiLow);
-		rbHasGuid = mbValid;
-	}
-
-	void ConnectionResponseTail(const uint8_t& ruiAccepted, uint8_t& ruiDebugInput, uint8_t& ruiReplaying, ClientGuid& rGuid, bool& rbHasGuid, std::string_view& rRejectionMessage)
-	{
-		rbHasGuid = false;
 		rRejectionMessage = {};
 		if (!mbValid)
 		{
@@ -287,12 +247,12 @@ public:
 		{
 			Field(ruiDebugInput);
 			Field(ruiReplaying);
-			OptionalGuid(rGuid, rbHasGuid);
+			Field(rGuid.uiHigh);
+			Field(rGuid.uiLow);
 			return;
 		}
 
-		rRejectionMessage = std::string_view(reinterpret_cast<const char*>(mCursor.pCursor), static_cast<size_t>(mCursor.Remaining()));
-		mCursor.pCursor = mCursor.pEnd;
+		TrailingString(rRejectionMessage);
 	}
 
 	void Invalidate()
@@ -318,114 +278,6 @@ private:
 public:
 
 	bool mbValid = true;
-};
-
-class CoordUpdateTickReader
-{
-public:
-
-	CoordUpdateTickReader(std::span<const uint8_t> packetData)
-	: mCursor {.pCursor = packetData.data(), .pEnd = packetData.data() + packetData.size()}
-	{
-	}
-
-	bool HasTick() const
-	{
-		return mbValid && mbHasTick;
-	}
-
-	void Type(PacketType eExpected)
-	{
-		if (!mCursor.Has(kiPacketTypeSize) || ReadUint8(mCursor.pCursor) != static_cast<uint8_t>(eExpected))
-		{
-			mbValid = false;
-		}
-	}
-
-	void Field(const uint8_t&)
-	{
-		Skip(sizeof(uint8_t));
-	}
-	void Field(const uint16_t&)
-	{
-		Skip(sizeof(uint16_t));
-	}
-	void Field(const int32_t&)
-	{
-		Skip(sizeof(int32_t));
-	}
-	void Field(const uint32_t&)
-	{
-		Skip(sizeof(uint32_t));
-	}
-	void Field(const uint64_t&)
-	{
-		Skip(sizeof(uint64_t));
-	}
-	void Field(const GridCoord&)
-	{
-		Skip(kiGridCoordSize);
-	}
-
-	void Field(int64_t& riValue)
-	{
-		if (mbHasTick)
-		{
-			return;
-		}
-		if (!mCursor.Has(sizeof(int64_t)))
-		{
-			mbValid = false;
-			return;
-		}
-		riValue = ReadInt64(mCursor.pCursor);
-		miTick = riValue;
-		mbHasTick = true;
-	}
-
-	void Payload(const PacketPayload&)
-	{
-	}
-	void NullTerminatedString(const std::string_view&)
-	{
-	}
-	void OptionalGuid(const ClientGuid&, const bool&)
-	{
-	}
-	void ConnectionResponseTail(const uint8_t&, const uint8_t&, const uint8_t&, const ClientGuid&, const bool&, const std::string_view&)
-	{
-	}
-	void Invalidate()
-	{
-		mbValid = false;
-	}
-
-private:
-
-	void Skip(int64_t iSize)
-	{
-		if (mbHasTick)
-		{
-			return;
-		}
-		if (!mbValid || !mCursor.Has(iSize))
-		{
-			mbValid = false;
-			return;
-		}
-		mCursor.pCursor += iSize;
-	}
-
-	BoundedCursor mCursor;
-
-public:
-
-	int64_t miTick = 0;
-
-private:
-
-	bool mbValid = true;
-	bool mbHasTick = false;
 };
 
 // The one corruption signal on the receive path: a reader that decided the peer's bytes are impossible
@@ -553,16 +405,13 @@ struct ClientHelloMessage
 {
 	static constexpr PacketType keType = PacketType::kClientHello;
 	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint32_t) + sizeof(int64_t) + sizeof(common::crc_t);
-	static constexpr int64_t kiMinSize = kiFixedSize;
-	static constexpr int64_t kiMaxBuildConfigurationBytes = 64;
-	static constexpr int64_t kiMaxSize = kiFixedSize + kiMaxBuildConfigurationBytes + kiGuidSize;
+	static constexpr int64_t kiMinSize = kiFixedSize + kiGuidSize;
+	static constexpr int64_t kiMaxSize = 101; // Admits an older version's larger Hello so it reaches the version rejection instead of a size violation.
 
 	uint32_t uiProtocolVersion = 0;
 	int64_t iFrameVersion = 0;
 	common::crc_t uiPackIntegrityToken = 0;
-	std::string_view buildConfiguration;
 	ClientGuid guid {};
-	bool bHasGuid = false;
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, ClientHelloMessage& rMessage)
@@ -571,8 +420,8 @@ struct ClientHelloMessage
 		rVisitor.Field(rMessage.uiProtocolVersion);
 		rVisitor.Field(rMessage.iFrameVersion);
 		rVisitor.Field(rMessage.uiPackIntegrityToken);
-		rVisitor.NullTerminatedString(rMessage.buildConfiguration);
-		rVisitor.OptionalGuid(rMessage.guid, rMessage.bHasGuid);
+		rVisitor.Field(rMessage.guid.uiHigh);
+		rVisitor.Field(rMessage.guid.uiLow);
 	}
 };
 
@@ -580,7 +429,6 @@ struct ServerConnectionResponseMessage
 {
 	static constexpr PacketType keType = PacketType::kServerConnectionResponse;
 	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
-	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + sizeof(uint8_t) + sizeof(uint8_t) + kiGuidSize;
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiAccepted = 0;
@@ -589,7 +437,6 @@ struct ServerConnectionResponseMessage
 	uint8_t uiDebugInput = 0;
 	uint8_t uiReplaying = 0; // server mbReplaying (0 or 1) when it accepted the client
 	ClientGuid guid {};
-	bool bHasGuid = false;
 	std::string_view rejectionMessage;
 
 	template <typename TVISITOR>
@@ -598,7 +445,7 @@ struct ServerConnectionResponseMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiAccepted);
-		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.uiDebugInput, rMessage.uiReplaying, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
+		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.uiDebugInput, rMessage.uiReplaying, rMessage.guid, rMessage.rejectionMessage);
 	}
 };
 
@@ -669,7 +516,6 @@ struct ClientCrashReportMessage
 struct ServerSubscribeAcceptMessage
 {
 	static constexpr PacketType keType = PacketType::kServerSubscribeAccept;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + kiGridCoordSize;
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
@@ -690,7 +536,6 @@ struct ServerSubscribeAcceptMessage
 struct ServerUnsubscribeAckMessage
 {
 	static constexpr PacketType keType = PacketType::kServerUnsubscribeAck;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t);
 
 	uint8_t uiSlotIndex = 0;
 
@@ -705,7 +550,6 @@ struct ServerUnsubscribeAckMessage
 struct ServerLoadNotificationMessage
 {
 	static constexpr PacketType keType = PacketType::kServerLoadNotification;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiReplaying = 0; // server mbReplaying (0 or 1) after the load
@@ -722,10 +566,10 @@ struct ServerLoadNotificationMessage
 struct ServerTimespeedUpdateMessage
 {
 	static constexpr PacketType keType = PacketType::kServerTimespeedUpdate;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(int64_t) + sizeof(int64_t);
 
 	int64_t iMultiply = 1;
 	int64_t iDivide = 1;
+	uint8_t uiPaused = 0; // server GameFlags::kPaused (0 or 1)
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, ServerTimespeedUpdateMessage& rMessage)
@@ -733,6 +577,7 @@ struct ServerTimespeedUpdateMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.iMultiply);
 		rVisitor.Field(rMessage.iDivide);
+		rVisitor.Field(rMessage.uiPaused);
 	}
 };
 
@@ -740,8 +585,8 @@ struct ClientChatMessage
 {
 	static constexpr PacketType keType = PacketType::kClientChat;
 	static constexpr int64_t kiMaxTextBytes = 256;
-	static constexpr int64_t kiMinSize = kiPacketTypeSize + 1 + sizeof(uint8_t); // one text byte plus the terminator
-	static constexpr int64_t kiMaxSize = kiPacketTypeSize + kiMaxTextBytes + sizeof(uint8_t);
+	static constexpr int64_t kiMinSize = kiPacketTypeSize + 1; // one text byte
+	static constexpr int64_t kiMaxSize = kiPacketTypeSize + kiMaxTextBytes;
 
 	std::string_view text;
 
@@ -749,7 +594,7 @@ struct ClientChatMessage
 	static void Visit(TVISITOR& rVisitor, ClientChatMessage& rMessage)
 	{
 		rVisitor.Type(keType);
-		rVisitor.NullTerminatedString(rMessage.text);
+		rVisitor.TrailingString(rMessage.text);
 	}
 };
 
@@ -765,7 +610,7 @@ struct ServerChatMessage
 	{
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.iSenderId);
-		rVisitor.NullTerminatedString(rMessage.text);
+		rVisitor.TrailingString(rMessage.text);
 	}
 };
 
@@ -822,8 +667,6 @@ struct ClientTimespeedRequestMessage
 struct ServerCoordFullStateMessage
 {
 	static constexpr PacketType keType = PacketType::kServerCoordinateFullState;
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + kiGridCoordSize;
-	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t) + sizeof(int32_t);
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
@@ -877,9 +720,6 @@ struct ServerCoordStaticDataMessage
 
 struct CoordUpdateFields
 {
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(uint64_t);
-	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t);
-
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiSlotIndex = 0;
 	uint16_t uiEpoch = 0;
@@ -905,8 +745,6 @@ struct CoordUpdateFields
 struct ServerCoordUpdateMessage : CoordUpdateFields
 {
 	static constexpr PacketType keType = PacketType::kServerCoordinateUpdate;
-	static constexpr int64_t kiEnvelopeSize = CoordUpdateFields::kiEnvelopeSize;
-	static constexpr int64_t kiFixedSize = CoordUpdateFields::kiFixedSize;
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, ServerCoordUpdateMessage& rMessage)
@@ -919,8 +757,6 @@ struct ServerCoordUpdateMessage : CoordUpdateFields
 struct ServerCoordResendMessage : CoordUpdateFields
 {
 	static constexpr PacketType keType = PacketType::kServerCoordinateResend;
-	static constexpr int64_t kiEnvelopeSize = CoordUpdateFields::kiEnvelopeSize;
-	static constexpr int64_t kiFixedSize = CoordUpdateFields::kiFixedSize;
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, ServerCoordResendMessage& rMessage)
@@ -933,8 +769,6 @@ struct ServerCoordResendMessage : CoordUpdateFields
 struct ServerDebugFrameMessage
 {
 	static constexpr PacketType keType = PacketType::kServerDebugFrame;
-	static constexpr int64_t kiEnvelopeSize = kiPacketTypeSize + sizeof(int64_t) + kiGridCoordSize;
-	static constexpr int64_t kiFixedSize = kiEnvelopeSize + sizeof(int32_t) + sizeof(int32_t);
 
 	int64_t iTick = 0;
 	GridCoord coord {};
@@ -952,21 +786,5 @@ struct ServerDebugFrameMessage
 		rVisitor.Payload(rMessage.compressedPayload);
 	}
 };
-
-inline int64_t GetCoordUpdateTickOrZero(std::span<const uint8_t> packetData)
-{
-	ServerCoordUpdateMessage update {};
-	CoordUpdateTickReader updateReader(packetData);
-	ServerCoordUpdateMessage::Visit(updateReader, update);
-	if (updateReader.HasTick())
-	{
-		return updateReader.miTick;
-	}
-
-	ServerCoordResendMessage resend {};
-	CoordUpdateTickReader resendReader(packetData);
-	ServerCoordResendMessage::Visit(resendReader, resend);
-	return resendReader.HasTick() ? resendReader.miTick : 0;
-}
 
 } // namespace engine::NetworkMessages

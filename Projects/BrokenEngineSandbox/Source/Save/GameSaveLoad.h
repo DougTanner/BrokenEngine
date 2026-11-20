@@ -9,8 +9,8 @@ struct ReplayStagedMeta;
 
 // The game half of the engine replay lifetime: metadata, the tick-keyed fleet records, and the per-tick fleet
 // checksums.
-bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename);
-bool ReadReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, int64_t iNextGlobalId, ReplayStagedMeta& rStagedMetadata);
+bool WriteReplayMetadata(const std::filesystem::path& rFilename);
+bool ReadReplayMetadata(const std::filesystem::path& rFilename, int64_t iNextGlobalId, ReplayStagedMeta& rStagedMetadata);
 void AdoptReplayMetadata(ReplayStagedMeta&& rStagedMetadata);
 
 // Recording start, after the tick's writers exist and its fleet step ran.

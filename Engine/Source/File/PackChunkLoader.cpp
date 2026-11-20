@@ -172,45 +172,38 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 				break;
 			}
 
-			bool bExistingWork = !mRequestQueue.empty();
-			bool bRealtimeWork = bExistingWork && mRequestQueue.top().ePriority == LoadPriority::kRealtime;
-#if defined(BT_CLIENT)
-			bool bAudioWork = mrPackChunks.HasQueuedAudioRead();
-#else
-			bool bAudioWork = false;
-#endif
+			bool bLoadersStalled = false;
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 			if constexpr (kbAudioStreamingHarnessRig)
 			{
 				if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->mbLoadersStalled.load(std::memory_order_seq_cst))
 				{
-					bExistingWork = false;
-					bRealtimeWork = false;
-					bAudioWork = false;
+					bLoadersStalled = true;
 				}
 			}
 #endif
-			if (bRealtimeWork || (bExistingWork && (!bAudioWork || !mbPreferAudio)))
+			if (!bLoadersStalled)
 			{
-				loadRequest = mRequestQueue.top();
-				mRequestQueue.pop();
-				bHaveWork = true;
-				if (bAudioWork)
+#if defined(BT_CLIENT)
+				bool bRealtimeWork = !mRequestQueue.empty() && mRequestQueue.top().ePriority == LoadPriority::kRealtime;
+				if (!bRealtimeWork && (mbPreferAudio || mRequestQueue.empty()) && mrPackChunks.TryClaimAudioRead(iAudioIndex, uiAudioGeneration))
 				{
+					bAudioRead = true;
+					bHaveWork = true;
+					if (!mRequestQueue.empty())
+					{
+						mbPreferAudio = false;
+					}
+				}
+#endif // BT_CLIENT
+				if (!bHaveWork && !mRequestQueue.empty())
+				{
+					loadRequest = mRequestQueue.top();
+					mRequestQueue.pop();
+					bHaveWork = true;
 					mbPreferAudio = true;
 				}
 			}
-#if defined(BT_CLIENT)
-			else if (bAudioWork && mrPackChunks.TryClaimAudioRead(iAudioIndex, uiAudioGeneration))
-			{
-				bAudioRead = true;
-				bHaveWork = true;
-				if (bExistingWork)
-				{
-					mbPreferAudio = false;
-				}
-			}
-#endif // BT_CLIENT
 			if (bHaveWork)
 			{
 				++miActiveLoadJobs;
@@ -267,7 +260,7 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 {
 	LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(rRequest.crc);
 
-	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
+	bool bCompressed = IsCompressed(DataTypeFromFlags(rLazyChunk.header.flags));
 
 	mrPackChunks.AllocateLazyChunkBuffer(rLazyChunk);
 
@@ -281,27 +274,16 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 
 	if (bCompressed)
 	{
-		// Trust boundary (both codecs): a corrupted .pack or a raw payload mistagged compressed makes the
+		// Trust boundary: a corrupted .pack, or a payload under a compressed type that is not LZ4 data, makes the
 		// decompress fail or under-fill; bad pack data halts.
-		// Texture chunks are LZ4 today; kZlibCompressed stays a legal decode branch.
-		if (rLazyChunk.header.flags & common::ChunkFlags::kLz4Compressed)
-		{
-			// LZ4_decompress_safe bounds writes to the chunk buffer's capacity and returns bytes produced (< 0 on
-			// malformed input); it allocates nothing, so it is allocation-tracking safe on the loading thread.
-			// Unlike zlib (self-terminating deflate stream), the LZ4 block format has no end marker: a full
-			// decode requires the EXACT compressed length or it errors on the final-literals parse check. Pass
-			// header.iSize (the exact compressed payload byte count), not iOnDiskSize, which is rounded up to
-			// kiAlignmentBytes and so carries up to 15 trailing pad bytes.
-			int64_t iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData.get()), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
-			// A short or negative decode leaves the chunk buffer partly filled, and the upload would publish it.
-			ASSERT(iLz4Result == rLazyChunk.iDataSize);
-		}
-		else
-		{
-			uLongf uiUncompressedSize = static_cast<uLongf>(rLazyChunk.iDataSize);
-			int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData.get()), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
-			ASSERT(iZlibResult == Z_OK && static_cast<int64_t>(uiUncompressedSize) == rLazyChunk.iDataSize);
-		}
+		// LZ4_decompress_safe bounds writes to the chunk buffer's capacity and returns bytes produced (< 0 on
+		// malformed input); it allocates nothing, so it is allocation-tracking safe on the loading thread.
+		// The LZ4 block format has no end marker: a full decode requires the EXACT compressed length or it
+		// errors on the final-literals parse check. Pass header.iSize (the exact compressed payload byte count),
+		// not iOnDiskSize, which is rounded up to kiAlignmentBytes and so carries up to 15 trailing pad bytes.
+		int64_t iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData.get()), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
+		// A short or negative decode leaves the chunk buffer partly filled, and it would still be published.
+		ASSERT(iLz4Result == rLazyChunk.iDataSize);
 	}
 
 	LOG(kLoading, kDebug, "Lazy chunk {} \"{}\" size {}", rRequest.crc, std::string_view(rLazyChunk.header.pcPath), rLazyChunk.location.uiSize);
@@ -327,8 +309,6 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 
 void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunkOffset, int64_t iSize, std::byte* pReadDestination, int64_t iThreadIndex)
 {
-	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
-
 	// Calculate sector-aligned read parameters for unbuffered I/O
 	int64_t iFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset + iChunkOffset;
 	int64_t iAlignedOffset = common::RoundDown(iFileOffset, PackChunks::kiSectorAlignment);
@@ -337,6 +317,7 @@ void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunk
 	std::byte* pReadBuffer = mrPackChunks.mpReadBuffers[iThreadIndex];
 
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
+	bool bCompressed = IsCompressed(eDataType);
 
 	// Bound each disk read to kiSubReadSize plus sector-alignment padding.
 	HANDLE handleFile = mrPackChunks.mpHandleLazyPackFile[eDataType];
@@ -369,7 +350,7 @@ void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunk
 		if (bCompressed)
 		{
 			// Compressed reads land in LoadChunk's scratch, which it decompresses right after this returns, so a
-			// regular memcpy (not _mm_stream_si128) keeps the bytes hot for the LZ4/zlib decompress.
+			// regular memcpy (not _mm_stream_si128) keeps the bytes hot for the LZ4 decompress.
 			std::memcpy(pDestination, pSource, iCopySize);
 		}
 		else

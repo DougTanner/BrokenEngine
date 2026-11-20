@@ -10,6 +10,11 @@ editing: move the behavior to its higher owner or obtain an architectural
 decision. Add public headers to `Common.h`, the single Common aggregation header
 included by `Pch.h`. The PCH-less AgentTools also compile `Sha256Hasher.h` by
 path. ServerMonitor compiles `ServerMonitorProtocol.h` by path.
+`DebugDefines.h` decides every project's `DEBUG`, `_DEBUG`, `NDEBUG`,
+and `_NDEBUG`: PCH units reach it through `ExternalHeaders.h`,
+`Engine/Source/Memory/Mimalloc.cpp` includes it by path, and the PCH-less
+ThirdParty, AgentTools, and ServerMonitor projects force-include it in every
+configuration beside their `BT_*` configuration define.
 
 Focused implementation contracts live in Log (`Log/AGENTS.md`), Math
 (`Math/AGENTS.md`), and Threading (`Threading/AGENTS.md`). This hub owns only

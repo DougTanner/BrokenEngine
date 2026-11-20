@@ -24,19 +24,27 @@ binaries.
   every consumer link), RTTI off except the Assimp-owned C++ units whose FBX
   object type checks require it, `/EHa`, OpenMP, `/bigobj`, `/Zc:__cplusplus`,
   no PCH, all warnings disabled (external code), MultiByte charset
-- Defines: `USING_XINPUT`, `VK_NO_PROTOTYPES`, `VK_USE_PLATFORM_WIN32_KHR`
+- Defines: `USING_XINPUT`, `VK_NO_PROTOTYPES`, `VK_USE_PLATFORM_WIN32_KHR`,
+  and `BT_DEBUG`, `BT_PROFILE`, or `BT_RELEASE` per configuration; every unit
+  force-includes `Common/DebugDefines.h`, which derives the debug/release
+  flags from them
 - Requires: `VK_SDK_PATH` environment variable for Vulkan SDK headers
 
 ## Consumer Provisioning
 
 Supported wrapper scripts link stable primary submodule trees and primary
-`Output/` into linked worktrees. Consumer PreBuildEvents provision and require
-`Output/ThirdParty.$(Configuration).lib`; they never build ThirdParty. Primary
-Debug, Profile, and Release libraries must remain nonempty while worktrees are
-active. Worktree creation or `/reset-worktree` runs
+`Output/` into linked worktrees. Consumer projects link, and their
+PreBuildEvents provision and require, `ThirdParty.$(Configuration).lib` in
+`$(ThirdPartyLibraryDirectory)`, whose default each consumer project's
+conditional `ThirdPartyLibraryDirectory` property owns; they never build
+ThirdParty. A linked worktree builds only a session candidate, never its linked
+`Output/`; `/compile` owns its output path and when consumers link it
+(`.agents/skills/compile/references/worker.md` step 3). Primary Debug, Profile,
+and Release libraries must remain nonempty while worktrees are active.
+Worktree creation or `/reset-worktree` runs
 `.agents/scripts/Bootstrap-AgentTools.ps1`, which incremental-rebuilds all
 three primary configurations so they track primary HEAD; beyond that, rebuild
-only as explicit primary maintenance.
+them only as explicit primary maintenance.
 
 Moving mimalloc compilation to the consumers requires no worktree ThirdParty
 rebuild. Before landing that migration and the first primary rebuild removes the

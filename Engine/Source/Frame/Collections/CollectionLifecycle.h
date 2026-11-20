@@ -41,11 +41,11 @@ inline int64_t AddElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender)
 }
 
 template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
-bool GrowPairedCollections(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)
+void GrowPairedCollections(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)
 {
 	if (rInterpolate.iCount + 1 <= rInterpolate.iCapacity)
 	{
-		return false;
+		return;
 	}
 
 	// Deterministic growth is 2 * capacity + 1 because capacity participates in the collection CRC.
@@ -54,8 +54,6 @@ bool GrowPairedCollections(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, 
 	ASSERT(rInterpolate.iCount == rPostRender.iCount);
 	GrowCapacityWithCopy(rInterpolate, iNewCapacity, rInterpolate.iCount, std::forward<INTERPOLATE_TUPLE>(rInterpolateTuple));
 	GrowCapacityWithCopy(rPostRender, iNewCapacity, rPostRender.iCount, std::forward<POST_RENDER_TUPLE>(rPostRenderTuple));
-
-	return true;
 }
 
 // Internal insertion primitive. Invokes rGenerateId exactly once, then records that ID at the new row.

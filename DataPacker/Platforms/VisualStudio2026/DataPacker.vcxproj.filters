@@ -281,6 +281,9 @@
     <ClInclude Include="..\..\..\Common\DataFile.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Common\DebugDefines.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Common\ExternalHeaders.h">
       <Filter>Common</Filter>
     </ClInclude>

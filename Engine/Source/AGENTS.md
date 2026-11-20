@@ -34,8 +34,10 @@ order, frame-phase order, or phase participation changes.
   a leaf document, is recorded here: it stores two game types by value, so
   each needs a complete definition — the per-coord tick input from
   `Frame/FrameInput.h` and, client only, `game::FrameInterpolate` from
-  `Frame/Frame.h`. Each game's `Pch.h` includes it, right after `Engine.h`;
-  that placement is a recorded exception, not license to add another.
+  `Frame/Frame.h`, held through the `RenderInterpolation` member that the
+  client-only `RenderInterpolation.h`, also such a header, declares. Each
+  game's `Pch.h` includes `GameBase.h`, right after `Engine.h`; that placement
+  is a recorded exception, not license to add another.
 - Switches: `EngineSwitches.h` holds the engine-read compile-time switches with
   one value for every program and the `keLogLevel*` compile floors; each
   program's `Pch.h` (each game's and ModelViewer's) includes it after

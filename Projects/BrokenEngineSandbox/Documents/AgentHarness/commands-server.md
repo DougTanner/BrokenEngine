@@ -239,9 +239,9 @@ adding the fields below; the other entries are its own commands. For the engine
 
   | `type` | Fields |
   |--------|--------|
-  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBeamFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
-  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
-  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextMissileFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBeamFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextMissileFireTime`, `arrivalGracePeriod`, `fDeltaRotation`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
   | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
@@ -252,12 +252,10 @@ adding the fields below; the other entries are its own commands. For the engine
   `iUuid` is the `uuid` of a `query_collection` row in the collection `eType`
   names, which changes when the ship crosses cells. An omitted field takes its
   payload struct default (for example `eController` `"Fleet"`, empty `orders`,
-  an omni's `flags` 8, `kBlasterSpawnLeft`, and `navigationDelay` 60), except
-  that `vecPosition` defaults to the cell center; `vecDirection`, `vecVelocity`,
-  and a missile's `vecStoredDirection` to `[1,0]`; `alignment` to `"fleet"`; a
-  ship's `fleetWantedCoordinate` to `coord`; a `SpawnMissile`'s `flags`, when
-  the entry has no `flags` key, to `kTargetRandom` (16) for a `"fleet"`
-  `alignment` and to `kTargetFleet` (8) otherwise; and the `UpdateFleet`
+  and an omni's `flags` 8, `kBlasterSpawnLeft`), except that `vecPosition`
+  defaults to the cell center; `vecDirection`, `vecVelocity`, and a missile's
+  `vecStoredDirection` to `[1,0]`; `alignment` to `"fleet"`; a ship's
+  `fleetWantedCoordinate` to `coord`; and the `UpdateFleet`
   `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`); the
   `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
   plane. A missile returns to plane 0 from any launch height. Ship spawn height
@@ -279,10 +277,8 @@ adding the fields below; the other entries are its own commands. For the engine
   [fleet or attack tactics](../../Source/Frame/Collections/Fighters/AGENTS.md),
   and a fleet or random-spawn Omni's on every tick outside its transfer lock
   ([Omni behavior](../../Source/Frame/Collections/Omnis/AGENTS.md)). Every
-  `UpdateShip` entry also applies its `navigationDelaySeconds`, default
-  included, and resets the ship's cell-change timer to that delay, so an entry
-  that only changes the plane restates the ship's current delay (`read_frame`
-  `pNavigationDelays`).
+  `UpdateShip` entry also resets the ship's cell-change timer to its
+  `navigationDelaySeconds`, default included.
 
   The batch also fails during replay playback, on an inactive `coord`, on an
   unknown key, on a value outside its member type's form above, on a non-finite
@@ -293,8 +289,8 @@ adding the fields below; the other entries are its own commands. For the engine
   (`'uiTargetFlightPlane' is not allowed for <type>`), on a `SpawnBlaster`
   `iTypeIndex` that is not an adoptable blaster type, on a `SpawnOmni`
   `vecVelocity` whose XY length exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a
-  `navigationDelay` or `navigationDelaySeconds` outside `[0,60]`, on a ship
-  spawn whose `vecDirection` is not a horizontal unit vector within
+  `navigationDelaySeconds` outside `[0,60]`, on a ship spawn whose
+  `vecDirection` is not a horizontal unit vector within
   `kfShipHeadingUnitTolerance` (`IsShipHeadingUnit`, `ShipBehaviours.h`), on a
   `nextBlasterFireTime` outside `[0,kBlasterFireInterval]`, on a
   `nextBeamFireTime` above `kFighterBeamCooldown` or a `nextMissileFireTime`

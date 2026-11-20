@@ -22,8 +22,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    repository toplevel>' -Baseline <full 40-character SHA> -Regions
    -OutputPath Temp/code-style-review-inventory.json`, whose result document
    is one `broken-engine-session-change-inventory/v1` object.
-   - When the caller supplied untracked paths, add
-     `-IncludeUntracked '<comma-separated paths>'` to that command.
+   - When the caller supplied untracked files, add the `-IncludeUntracked`
+     switch to that command.
    - When the caller supplied `Paths`, add
      `-PathPrefix '<comma-separated prefixes>'` to that command.
    - With no summary line the ranges are unavailable — report that instead of
@@ -303,11 +303,6 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
   edits are the reference updates that propagate a C++ rename (steps 12-15).
 - Rule 49 forwarding findings are routed, not auto-fixed — see
   `/repo-code-review` (`../../repo-code-review/SKILL.md`).
-- The untracked rule differs per script: the step-3 inventory covers an
-  untracked file only when `-IncludeUntracked '<comma-separated paths>'` lists
-  it, and its `counts.unlistedUntracked` reports how many it did not list; the
-  step-7 scanner takes `-IncludeUntracked` as a switch and enumerates the
-  untracked files itself.
 - Each `-OutputPath` run in steps 3 and 7 writes its result document to
   that file and prints one summary line naming its status, code, and message
   (the headers of `.agents/scripts/Get-SessionChangeInventory.ps1` and

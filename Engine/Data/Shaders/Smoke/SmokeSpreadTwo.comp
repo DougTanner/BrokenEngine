@@ -70,7 +70,7 @@ void main()
 		// re-sampled at that world position in plane 0's current area, where the wind texture lies.
 		int iPlane = int(pushConstantsLayout.f4Pipeline.x);
 		vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.pf4PreviousSmokeAreas[iPlane]);
-		vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea);
+		vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.visibleAreaToUv);
 		float fElevation = textureLod(elevationTextureSampler, f2VisibleAreaTexcoord, 0.0f).x;
 
 		vec2 f2WindTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[0], f2WorldPosition);

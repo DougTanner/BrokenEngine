@@ -156,15 +156,8 @@ inline void WriteGridCoord(common::Workbuffer& rWorkbuffer, GridCoord gridCoordi
 template <typename T>
 inline void PushSimplePacketArgument(common::Workbuffer& rWorkbuffer, const T& rArgument)
 {
-	if constexpr (std::is_same_v<T, GridCoord>)
-	{
-		WriteGridCoord(rWorkbuffer, rArgument);
-	}
-	else
-	{
-		static_assert(std::is_arithmetic_v<T>, "SendSimplePacket only supports arithmetic types and GridCoord; unwrap enums/ids/flags at the call site");
-		rWorkbuffer.PushBack<T>(rArgument);
-	}
+	static_assert(std::is_arithmetic_v<T>, "SendSimplePacket only supports arithmetic types; unwrap enums/ids/flags at the call site");
+	rWorkbuffer.PushBack<T>(rArgument);
 }
 
 } // namespace engine

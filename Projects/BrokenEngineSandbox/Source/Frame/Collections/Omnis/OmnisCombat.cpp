@@ -32,13 +32,6 @@ constexpr float kfExplosionSmoke = 0.25f;
 constexpr float kfDeathRadialPower = 0.3f;
 constexpr int64_t kiDeathTrailCount = 2;
 
-void XM_CALLCONV OmnisPostRender::UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection)
-{
-	// The reticle uses this unsmoothed lead-intercept direction; OmnisInterpolate::Update smooths hull rotation with kfRotateTowardsSpeed.
-	rVecWantedDirection = XMVector3Normalize(XMVectorSubtract(vecLookPosition, vecPosition));
-}
-
-
 static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, [[maybe_unused]] OmnisInterpolate& rOmniInterpolate, OmnisPostRender& rOmni, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition)
 {
 	if (rOmni.pfShields[i] > 0.0f)

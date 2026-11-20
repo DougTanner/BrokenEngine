@@ -9,30 +9,13 @@ namespace engine
 struct RegistryEntryTag;
 using registry_id_t = Id<RegistryEntryTag>;
 
-// Binds a foreign-typed id column as bytes. Viewing an Id<T> array through a const Uuid* or a
-// const registry_id_t* is undefined behavior — the specializations are not similar types — so the ownership
-// layer erases the element type here and reads each element back through Uuid.
-template <typename T>
-[[nodiscard]] const std::byte* RegistryIdBytes(const Id<T>* pIds)
-{
-	static_assert(sizeof(Id<T>) == sizeof(Uuid));
-	static_assert(std::is_trivially_copyable_v<Id<T>>);
-	return reinterpret_cast<const std::byte*>(pIds);
-}
-
 // Main-thread, post-tick identity and liveness. Held by value by its caller: a span over a builder's temporary
 // layer would dangle the moment the builder returned, so there is no multi-layer view type.
 struct RegistryOwnershipLayer
 {
-	const std::byte* pIdBytes = nullptr;     // Required; element stride sizeof(Uuid), bind via RegistryIdBytes
-	const GlobalId* pGlobalIds = nullptr; // Optional; a layer without it matches no global id
-	ClientGuid* pClientGuids = nullptr;      // Required; sole write channel, CRC-excluded columns only
+	const GlobalId* pGlobalIds = nullptr; // Required
+	ClientGuid* pClientGuids = nullptr;      // Required
 	int64_t iCount = 0; // The caller's choice of layer is the filter.
 };
-
-// The layer must hold a row for globalId; the caller proves it with RegistryUuidByGlobalId.
-void AssignRegistryClientGuid(const RegistryOwnershipLayer& rLayer, GlobalId globalId, const ClientGuid& rGuid);
-
-[[nodiscard]] Uuid RegistryUuidByGlobalId(const RegistryOwnershipLayer& rLayer, GlobalId globalId);
 
 } // namespace engine

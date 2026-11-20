@@ -111,7 +111,6 @@ public:
 	SlotState mpeSlotStates[kiBufferCount] {};
 private:
 	ChunkReadRequest mpReadRequests[kiBufferCount];
-	int64_t mpiSlotOffsets[kiBufferCount] {};
 	int64_t mpiSlotBytesRead[kiBufferCount] {};
 	bool mpbSlotLastBuffer[kiBufferCount] {};
 	uint8_t mpuiBuffers[kiBufferCount][kiBufferSize] {};

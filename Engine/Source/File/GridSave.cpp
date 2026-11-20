@@ -47,9 +47,9 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 	return bWritten;
 }
 
-bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, StagedGridSave& rStagedGrid)
+bool ReadGridSave(const std::filesystem::path& rFilename, StagedGridSave& rStagedGrid)
 {
-	std::fstream fileStream = engine::gpFileManager->OpenFile(rFlags, rFilename);
+	std::fstream fileStream = engine::gpFileManager->OpenFile({FileFlags::kRead}, rFilename);
 
 	int64_t iVersion = 0;
 	int64_t iSize = 0;

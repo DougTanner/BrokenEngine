@@ -25,11 +25,10 @@ itself.
   a clang-tidy run; never infer it from a routine compile, rebuild, or
   link-error check.
 - Not for AgentTools bootstrap or promotion.
-- When the changed set contains a non-Markdown path under `Tools/WorktreeCli/`,
-  `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or `Common/Sha256Hasher.h`, the
-  rebuilt tools are promoted through `/finalize-changes`, which owns that
-  promotion and bootstrap policy —
-  [`agenttools.md`](../finalize-changes/references/agenttools.md).
+- When the changed set meets the AgentTools trigger in
+  [`agenttools.md`](../finalize-changes/references/agenttools.md), the rebuilt
+  tools are promoted through `/finalize-changes`, which owns that promotion and
+  bootstrap policy.
 
 ## Inputs
 
@@ -38,15 +37,20 @@ Consumes the task-brief fields in
 skill-specific inputs:
 
 - the targets and configurations to build, and any selective `.cpp` file list.
-  Agents build DataPacker, WorktreeCli, AgentHarness, and ServerMonitor in
-  Release only, and the build script refuses any other configuration for them.
-  Agent tooling runs only the Release executables, since each Debug build is
-  named `<Project>.Debug.exe`. Those Debug configurations are for humans
-  debugging the tools, and DataPacker's Debug export is very slow. ThirdParty
-  builds run only in the primary checkout, per
+  The requested targets are a minimum: the worker adds the targets the changed
+  paths require ([`references/worker.md`](references/worker.md) step 3),
+  except in a `## Purpose` dispatch that interleaves file edits with builds,
+  which builds only its requested targets, though a `ThirdParty` row still
+  requires its candidate build first, per that step 3. Agents build DataPacker,
+  WorktreeCli, AgentHarness, and ServerMonitor in Release only, and the build
+  script refuses any other configuration for them. Agent tooling runs only the
+  Release executables, since each Debug build is named `<Project>.Debug.exe`.
+  Those Debug configurations are for humans debugging the tools, and
+  DataPacker's Debug export is very slow. ThirdParty builds in place only in
+  the primary checkout, per
   [`ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`](../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md)
-  `## Consumer Provisioning`: from any other checkout `-Target ThirdParty` is
-  blocked, so never request it from a session worktree;
+  `## Consumer Provisioning`; from a linked worktree `-Target ThirdParty`
+  builds a session candidate;
 - optionally, the game project (`Projects/<Name>`) a client or server build
   targets. With one game project none is needed; with several and none named,
   a game build request builds every game project in turn;
@@ -122,11 +126,10 @@ skill inside that dispatch's own task, as `## Purpose` routes, the decisive
 field is the build's entry in the success row above, or its failing-build row.
 That dispatch adds one row per build under its own shared `Decisive checks` —
 whether the expected observation was met, that run's `Status`, and the build's
-success-row entry or failing-build row — plus one row summarizing the resulting
-working-tree state, never pasting `git status --porcelain` output inline. It
-writes every build's complete handoff, not only past the character cap, to one
-gitignored `Temp/` file with one `## Run <n>` heading per build, by the overflow
-rule in
+decisive field — plus one row summarizing the resulting working-tree state,
+never pasting `git status --porcelain` output inline. It writes every build's
+complete handoff, not only past the character cap, to one gitignored `Temp/`
+file with one `## Run <n>` heading per build, by the overflow rule in
 [`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`;
 that handoff counts as that build's complete `/compile` handoff for landing. A
 running skill whose own `## Handoff` declares a field for the run's result puts

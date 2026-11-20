@@ -4,7 +4,6 @@
 
 #include "Network/Server/ServerSession.h"
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -211,17 +210,17 @@ void ServerSession::OnResetForLoad()
 
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 	{
+		if (!rClient.bHandshakeComplete)
+		{
+			continue;
+		}
+
 		mpFleetManager->OnResetForLoad(rClient.iClientId, rClient.clientGuid);
 	}
 
 	mpClientManager->ResetState();
 	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
-}
-
-void ServerSession::WriteFleetData(std::fstream& rFileStream) const
-{
-	::game::WriteFleetData(rFileStream, mpFleetManager->mFleets, mpFleetManager->mRandomEngine);
 }
 
 } // namespace game

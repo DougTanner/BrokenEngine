@@ -315,12 +315,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
 	RenderLightingSpreadIndirect(iCommandBuffer);
 
-	// Game-specific debug rendering (positions from fully-interpolated frame)
-	if constexpr (kbDebugRender)
-	{
-		game::FrameInterpolate::DebugRender(rRenderInterpolates, rActiveCoordinates);
-	}
-
 	DebugRenderNavigationData(rActiveCoordinates, cameraCoordinate);
 	DebugRenderCellEdges(rActiveCoordinates, cameraCoordinate);
 	DebugRenderIslandBoundaries(rActiveCoordinates, cameraCoordinate);

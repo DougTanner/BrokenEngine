@@ -88,6 +88,8 @@ $script:LandingClaimed = $false
 # re-expires a lease with its own recorded duration and can never lengthen it, so a continued caller
 # lease minted shorter than this could expire mid-advance and is refused instead.
 $script:LandingLeaseSeconds = 3600
+# Bounds how long cleanup waits for other worktrees' Git operations to end before retaining the lock.
+$script:CleanupWorktreeWaitSeconds = 480
 # Set only where the session branch could not be proven restored to the confirmed commit: while it is
 # set the lease is retained unconditionally, because releasing it would expose an unproven worktree.
 $script:LandingRestorationUnproven = $false
@@ -267,7 +269,7 @@ function Release-LandingLockIfSafe {
 		$result.residuals.Add('Landing lock retained: the confirmed session commit could not be proven restored.')
 		return
 	}
-	$clear = Test-FinalizeAllWorktreesClear $script:PrimaryIdentity.Worktree
+	$clear = Test-FinalizeAllWorktreesClear $script:PrimaryIdentity.Worktree $script:CleanupWorktreeWaitSeconds
 	$result.cleanup.worktreesClear = $clear.Clear
 	$result.cleanup.worktreeProblems = @($clear.Problems)
 	if (-not $clear.Clear) {

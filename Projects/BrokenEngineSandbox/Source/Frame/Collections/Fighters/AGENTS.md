@@ -133,9 +133,11 @@ client skeletal rendering. Battleships mirror this collection
 
 ## Rendering Invariants
 
-- Rendering across active coordinates is sequential on the main thread because
-  the running total used for what is displayed is process-wide rather than
-  thread-local. Do not parallelize the outer per-coordinate calls.
+- The per-pipeline call
+  (`../../../../../../Engine/Source/Frame/Collections/AGENTS.md`
+  `## Runtime Rules`) loops over the active coordinates sequentially on the
+  main thread, each coordinate's rows following the previous one's at a running
+  offset local to that call. Do not parallelize the per-coordinate loop.
 - Each controller draws through its own model pipeline. Within one coordinate
   and pipeline, culling and the controller partition happen first, followed by
   one up-front bulk reservation each for the mesh-data and joint-matrix blocks;

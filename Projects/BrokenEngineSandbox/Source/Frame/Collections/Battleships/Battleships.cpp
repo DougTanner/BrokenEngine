@@ -9,13 +9,14 @@
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Frame/Collections/Ships/ShipNavigationUtils.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #if defined(BT_CLIENT)
-#include "Data/Scene.h"
 #include "Frame/Collections/PointLights/PointLights.h"
+#include "Frame/Collections/Ships/ShipModels.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -95,7 +96,7 @@ static void XM_CALLCONV SyncBattleship(FrameInterpolate& rFrameInterpolate, engi
 		.vecPosition = vecPosition,
 		.fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(eController)].fPusherRadius,
 		.fIntensity = kfBattleshipPusherIntensity,
-		.fPower = kfBattleshipPusherPower,
+		.uiPower = kuiBattleshipPusherPower,
 		.flags = {engine::PusherFlags::kTypeDefault},
 	});
 }
@@ -113,7 +114,6 @@ static void RegisterBattleshipHitFlashEffect()
 	{
 		.iBaseTypeIndex = siBattleshipHitFlashTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -128,10 +128,6 @@ static void RegisterBattleshipHitFlashEffect()
 		.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
 	});
 }
-
-// Battleship models, one per ShipController (defined in BattleshipsRender.cpp)
-extern const common::crc_t kBattleshipFleetModel;
-extern const common::crc_t kBattleshipRandomModel;
 
 // Null unless the model's first animation has a positive duration.
 static const engine::AnimationData* LoopingAnimationData(common::crc_t uiModel)
@@ -159,7 +155,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 
 #if defined(BT_CLIENT)
 	// Indexed by ShipController: each row's clock advances through its own model's animation.
-	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kBattleshipFleetModel), LoopingAnimationData(kBattleshipRandomModel)};
+	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kuiBattleshipFleetModel), LoopingAnimationData(kuiBattleshipRandomModel)};
 #endif
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -260,7 +256,6 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.nextMissileFireTime = rCurrentPostRender.pNextMissileFireTimes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
-				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
 				.globalId = rCurrentPostRender.pGlobalIds[i],
 				.clientGuid = rCurrentPostRender.pClientGuids[i],
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
@@ -384,7 +379,6 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentPostRender.pFlagshipGlobalIds[iIndex] = rInfo.flagshipGlobalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
-	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
@@ -423,7 +417,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		std::chrono::duration<float> nextMissileFireTime = rPrevious.pNextMissileFireTimes[i] - deltaTime;
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
-		std::chrono::duration<float> navigationDelay = rPrevious.pNavigationDelays[i];
 		std::chrono::duration<float> cellChangeTimer = rPrevious.pCellChangeTimers[i];
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
@@ -532,7 +525,6 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		rCurrent.pNextMissileFireTimes[i] = nextMissileFireTime;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
-		rCurrent.pNavigationDelays[i] = navigationDelay;
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
@@ -587,7 +579,6 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
-		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);

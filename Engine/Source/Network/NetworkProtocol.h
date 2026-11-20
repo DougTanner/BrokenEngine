@@ -28,7 +28,7 @@ enum class PacketType : uint8_t
 	kServerSubscribeAccept,     // Server confirms subscription with assigned slot
 	kServerUnsubscribeAck,
 	kServerLoadNotification,    // Server loaded a save, clients must reset state
-	kServerTimespeedUpdate,     // Server broadcasts the current time scale to all clients
+	kServerTimespeedUpdate,     // Server broadcasts the current time scale and pause state to all clients
 	kClientCrashReport,         // Client sends the leading bytes of its crash report while crashing, or on its next accepted connection while that report is unsent
 	kClientChat,                // Client sends one chat message to the server
 	kServerChat,                // Server relays a validated chat message to every handshaken client
@@ -43,44 +43,7 @@ enum class PacketType : uint8_t
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes
 };
 
-inline constexpr const char* PacketTypeName(PacketType eType)
-{
-	switch (eType)
-	{
-		case PacketType::kServerCoordinateFullState:         return "kServerCoordFullState";
-		case PacketType::kServerCoordinateStaticData:        return "kServerCoordStaticData";
-		case PacketType::kServerCoordinateUpdate:            return "kServerCoordUpdate";
-		case PacketType::kServerCoordinateResend:            return "kServerCoordResend";
-		case PacketType::kServerDebugFrame:             return "kServerDebugFrame";
-		case PacketType::kClientDesynchronizationReport:           return "kClientDesyncReport";
-		case PacketType::kClientAcknowledgmentStream:              return "kClientAckStream";
-		case PacketType::kClientDebugFrameRequest:      return "kClientDebugFrameRequest";
-		case PacketType::kClientHello:                  return "kClientHello";
-		case PacketType::kServerConnectionResponse:     return "kServerConnectionResponse";
-		case PacketType::kClientSubscribe:              return "kClientSubscribe";
-		case PacketType::kClientUnsubscribe:            return "kClientUnsubscribe";
-		case PacketType::kClientResynchronizationRequest:          return "kClientResyncRequest";
-		case PacketType::kServerSubscribeAccept:        return "kServerSubscribeAccept";
-		case PacketType::kServerUnsubscribeAck:         return "kServerUnsubscribeAck";
-		case PacketType::kServerLoadNotification:       return "kServerLoadNotification";
-		case PacketType::kServerTimespeedUpdate:        return "kServerTimespeedUpdate";
-		case PacketType::kClientCrashReport:            return "kClientCrashReport";
-		case PacketType::kClientChat:                   return "kClientChat";
-		case PacketType::kServerChat:                   return "kServerChat";
-		case PacketType::kServerOwnedEntityState:       return "kServerOwnedEntityState";
-		case PacketType::kClientSaveRequest:            return "kClientSaveRequest";
-		case PacketType::kClientLoadRequest:            return "kClientLoadRequest";
-		case PacketType::kClientResetRequest:           return "kClientResetRequest";
-		case PacketType::kClientReplayRecordRequest:    return "kClientReplayRecordRequest";
-		case PacketType::kClientReplayPlaybackRequest:  return "kClientReplayPlaybackRequest";
-		case PacketType::kClientPauseRequest:           return "kClientPauseRequest";
-		case PacketType::kClientTimespeedRequest:       return "kClientTimespeedRequest";
-		case PacketType::kGamePacketStart:              return "kGamePacketStart";
-	}
-	return "Unknown";
-}
-
-inline constexpr int64_t kiProtocolVersion = 53;
+inline constexpr int64_t kiProtocolVersion = 56;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiCoordinateSlots = 16; // 7 visible subscriptions + 6 sticky + 3 spare
@@ -105,7 +68,6 @@ inline constexpr int64_t kiSimulationCeilingSlackTicks = 3;
 // and stays well below kiClockSnapThreshold, so a real server stop speculates at most this plus
 // kiSimulationCeilingSlackTicks past the latest received tick without a clock snap.
 inline constexpr int64_t kiMaximumEstimatedServerTickLead = 16;
-inline constexpr int64_t kiMaximumPacketSize = 64 * 1'024;
 // The report's header, exception text, and callstack lead the file; the log dump after them can reach tens of MiB.
 inline constexpr int64_t kiMaximumCrashReportSize = 1'024 * 1'024;
 // Initial per-cell status-change batch capacity; server and client buffers grow past it with a debug break, which means raise it.

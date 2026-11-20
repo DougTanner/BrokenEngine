@@ -6,7 +6,12 @@ operations shared by offline and runtime code.
 ## Deterministic Math
 
 - Simulation or CRC-fed code uses `DeterministicSinCos`, `ExponentialDecay`, and
-  related helpers instead of library transcendental functions. Respect each
+  related helpers instead of library transcendental functions: the C runtime's
+  `sinf`/`cosf`/`tanf` and its `pow`, `exp`, and `log` families (`powf`,
+  `expf`, `exp2f`, `logf`, `log2f`, `log10f` and their `double` and `std::`
+  forms), and DirectXMath's `XMVectorPow`. A whole-number power uses
+  `common::WholeNumberPower`. The reason is in
+  `../../Documents/FloatingPointDeterminism.txt` section 5. Respect each
   helper's documented input domain; clamp the result at the caller when the
   domain is wider.
 - `ValidateVector<IS_POSITION>` checks finiteness and the repository W-lane

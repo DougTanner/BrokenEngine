@@ -12,7 +12,6 @@ struct CellStaticData;
 
 struct SmokeTrailsType
 {
-	common::crc_t uiCrc = 0;
 	int64_t iColor = 0xFFFFFFFF;
 	float fWidth = 1.0f;
 };

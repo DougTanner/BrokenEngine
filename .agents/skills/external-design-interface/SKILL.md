@@ -110,11 +110,12 @@ worker.
       caller pattern found by research.
 
     Done when all three designs have returned.
-10. Require from each worker the planner extension and its complete shared
-    handoff: C++ interface declarations, representative usage, hidden
-    complexity, client/server guard impact, allocation behavior, threading and
-    frame-phase behavior, deterministic-state impact, and trade-offs. Done when
-    every returned design carries those items and the shared fields.
+10. In each step 9 dispatch brief, also put the `## Handoff` design-file
+    paragraph and that planner's per-axis design-file path. Require from each
+    planner the planner extension and its complete shared handoff, with the
+    full design written to that file as `## Handoff` defines. Done when every
+    returned planner handoff carries the extension and the shared fields, and
+    its `Evidence` cites its per-axis design file.
 11. Require each design to identify explicitly any proposed Collection or
     member. Done when every returned design names them and implements no bodies.
 
@@ -143,8 +144,8 @@ Pattern evidence: <one line: the dominant caller pattern and the closest live sy
 
 Planner extension:
 Design axis: Minimal surface | Data locality | Caller ergonomics
-Interface declarations: <header-style declarations>
-Representative usage: <dominant call-site example>
+Interface declarations: <the entry points by name>
+Representative usage: <the dominant call site>
 Hidden complexity: <internal machinery and ownership>
 Runtime contracts: <client/server guards, allocation, threading, frame phase, and deterministic-state effect>
 Collections and members: <each proposed Collection or SOA member, or none>
@@ -156,6 +157,14 @@ covering every step 7 pattern-list item with its `file:line` or symbol
 citations, to gitignored `Temp/design-interface-pattern-evidence.md` under one
 `## Pattern evidence` heading, and cites that path plus its `##` selector under
 `Evidence`.
+
+The full design does not travel inline either. Each planner writes it — the
+header-style declarations, the representative usage, and the detail behind
+every other planner row — to its own gitignored `Temp/` design file under one
+`## Design` heading: `Temp/design-interface-minimal-surface.md`,
+`Temp/design-interface-data-locality.md`, or
+`Temp/design-interface-caller-ergonomics.md` by axis. It cites that path plus
+its `##` selector under `Evidence`.
 
 `Changed files` and `Build required` are `none` for every worker because this
 workflow edits no tracked file and requires no build; the brief-writing
@@ -175,11 +184,12 @@ if accepted.
 
 ### Compare and Decide
 
-Present all three designs with their declarations, usage, and hidden
-complexity. Compare interface simplicity and depth, SOA friendliness,
-client/server gating, main-loop allocation, dispatch safety, frame-phase
-clarity, and deterministic-state placement. Give an opinionated recommendation
-grounded in the brief; do not rank by implementation effort.
+Read the three design files the planners cite under `Evidence`, and present all
+three designs with their declarations, usage, and hidden complexity. Compare
+interface simplicity and depth, SOA friendliness, client/server gating,
+main-loop allocation, dispatch safety, frame-phase clarity, and
+deterministic-state placement. Give an opinionated recommendation grounded in
+the brief; do not rank by implementation effort.
 
 Ask the user which design or explicit hybrid to carry forward. Do not silently
 choose a public interface when multiple meaningfully different shapes remain.
@@ -189,9 +199,10 @@ choose a public interface when multiple meaningfully different shapes remain.
 - The manager, the brief-writing `implementer`, the researcher, and the planners
   may inspect the repository, but they do not create, edit, or remove scratch
   source, build output, branches, or worktrees, and they do not compile
-  candidates. The two exceptions: the `implementer` writes its one gitignored
-  `Temp/` brief file, and the researcher writes its one gitignored `Temp/`
-  pattern-evidence file.
+  candidates. The three exceptions: the `implementer` writes its one gitignored
+  `Temp/` brief file, the researcher writes its one gitignored `Temp/`
+  pattern-evidence file, and each planner writes its one gitignored `Temp/`
+  design file.
 - The workflow ends at the decision and plan gate; do not begin implementation
   from this skill. Follow `.agents/references/change-workflow.md` for
   delegation, plan, review, and landing mechanics rather than restating them

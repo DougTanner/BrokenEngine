@@ -166,10 +166,8 @@ collision, terrain sampling, navigation, and generic collections.
   layer, which binds columns the collections already own: it copies no records,
   allocates nothing, and keeps no state, so nothing it produces is serialized,
   CRC'd, or transferred.
-- `AssignRegistryClientGuid` is the registry's only write. It is legal only on
-  the main thread after the tick, through an ownership layer whose client-GUID
-  column is CRC-excluded. The caller holds that layer by value and never retains
-  it across a tick, a transfer, or a reallocation.
+- The caller holds an ownership layer by value and never retains it across a
+  tick, a transfer, or a reallocation.
 
 ## Collection and Serialization Invariants
 
@@ -194,8 +192,10 @@ collision, terrain sampling, navigation, and generic collections.
 - Live clients prepare elevation and render queries before publishing a cell,
   using the ownership and lifetime rules in
   [Live Terrain Preparation](../Network/Client/AGENTS.md#live-terrain-preparation).
-  Menu and server ticks retain synchronous lazy terrain construction. Live tick
-  entry asserts readiness; it never repairs missing preparation.
+  Menu ticks retain synchronous lazy terrain construction; the server builds a
+  cell's elevation grid with its navigation data through
+  `CellStaticData::BuildNavigationDataIfUnbuilt`. Live tick entry asserts
+  readiness; it never repairs missing preparation.
 - An island-free cell is a supported state whose elevation samples all return
   the sea floor (no grid is built) and whose navigation data is built empty. A
   cell whose list holds only islands centred elsewhere is island-free to
@@ -224,12 +224,10 @@ collision, terrain sampling, navigation, and generic collections.
   list. Tick code still reads only its own `CellStaticData`: no per-site filter,
   owner flag, or neighbour lookup belongs on this path.
 - `kiMaximumIslandsPerCell` is a ceiling the generator asserts at the end of
-  cell listing, not a limit it enforces: region growth counts no cells.
-  Static-data deserialization trusts the count under the corrupt-input policy
-  (`../Network/AGENTS.md`), and the client's placement arena,
-  `kiMaxActivePlacements`, derives from that ceiling. Keep world/local
-  transforms, the placement bound, and the west/east/north/south convention
-  consistent across CPU sampling and shaders.
+  cell listing, not a limit it enforces: region growth counts no cells. The
+  client's placement arena, `kiMaxActivePlacements`, derives from that ceiling.
+  Keep world/local transforms, the placement bound, and the
+  west/east/north/south convention consistent across CPU sampling and shaders.
 - Saves regenerate placements instead of storing them, so a change to
   `GenerateIslandChain`'s output, or to the island set it picks from, bumps the
   game's `Frame::kiVersion` base literal. Nothing detects a missed bump: a
@@ -247,9 +245,11 @@ collision, terrain sampling, navigation, and generic collections.
   in `TerrainCollisionUtils.h` owns the snap and cell-exclusion behavior), but
   navigation polygons do not match the elevation grid: they come from inflated,
   simplified template contours the server traces once at startup at a different
-  height and builds into each cell's polygons on its first tick, and polygons of
-  different placements may overlap. A snapped start can therefore still overlap,
-  and a start outside every polygon is not moved; the query searches no further.
+  height and builds into each cell's polygons when
+  `CellStaticData::BuildNavigationDataIfUnbuilt` first runs for the cell, and
+  polygons of different placements may overlap. A snapped start can therefore
+  still overlap, and a start outside every polygon is not moved; the query
+  searches no further.
 - CPU and GPU terrain elevation deliberately disagree below sea level:
   `TerrainElevation.frag` applies a depth-compression curve to undersea samples
   that no CPU path mirrors, while the CPU folds raw max-blended samples from
@@ -301,11 +301,12 @@ collision, terrain sampling, navigation, and generic collections.
   deserialization trusts it under the corrupt-input policy
   (`../Network/AGENTS.md`); the acceleration build, runtime queries, and debug
   nav rendering must not validate it either.
-- `CellStaticData::Write`/`Read` own a network-only compact encoding. Preserve
-  placement and vertex bits and polygon and visibility-edge order: polygon
-  offsets use gaps, and visibility edges require source-grouped, ascending
-  targets for gap encoding. The client rebuilds navigation acceleration, never
-  visibility connections; elevation is not transmitted.
+- `WriteNavigationData`/`ReadNavigationData` (`CellStaticData.h`) own the
+  network-only compact navigation encoding. Preserve vertex bits and polygon
+  and visibility-edge order: polygon offsets use gaps, and visibility edges
+  require source-grouped, ascending targets for gap encoding. The client
+  rebuilds navigation acceleration, never visibility connections; elevation is
+  not transmitted.
 - The contour bake takes each entry's flight plane, clearance distance, and
   elevation threshold from the caller (the game derives them and the server
   passes them in at startup) and forwards them unchanged; engine navigation code

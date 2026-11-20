@@ -142,7 +142,9 @@ For CRC-fed or replay state, check deterministic RNG and math, stable iteration
 and reduction order, serialization/CRC coverage, and absence of wall-clock or
 platform-dependent decisions. Dispatched workers may write only owned state or
 per-thread accumulators; reductions, especially floating-point reductions, must
-preserve the declared order.
+preserve the declared order. Library transcendental calls are not
+deterministic math for CRC-fed state (`/Common/Math/AGENTS.md`
+`## Deterministic Math`).
 
 Keep Interpolate data visual/client-only and PostRender data committed and
 deterministic. Verify `AllocateAndCopy()` precedes current-frame access and that

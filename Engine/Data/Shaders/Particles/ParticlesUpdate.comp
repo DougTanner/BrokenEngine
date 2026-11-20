@@ -60,7 +60,7 @@ void main()
 	// Capture pre-collision z for the "kill on water hit" death test — survives the snap-to-terrain mutation below
 	float fPreCollisionZ = f4Position.z;
 
-	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f4Position.xyz, globalLayout.f4VisibleArea);
+	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f4Position.xyz, globalLayout.visibleAreaToUv);
 	float fTerrainElevation = textureLod(elevationTextureSampler, f2VisibleAreaTexcoord, 0.0f).x;
 	if (f4Position.z < fTerrainElevation)
 	{

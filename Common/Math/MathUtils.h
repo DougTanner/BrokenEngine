@@ -100,8 +100,6 @@ XMMATRIX XM_CALLCONV RotationMatrixFromDirection(FXMVECTOR vecDirection, FXMVECT
 
 float XM_CALLCONV Distance(FXMVECTOR vecOne, FXMVECTOR vecTwo);
 
-XMVECTOR XM_CALLCONV DirectionTo(FXMVECTOR vecFrom, FXMVECTOR vecTo);
-
 // Solves ||(T - S) + Vt*t|| = vp*t for the smallest positive t (the linear root when the quadratic coefficient is negligible) and returns T + Vt*t,
 // for a projectile that does not inherit shooter velocity. Returns vecTargetPosition when no positive t exists.
 XMVECTOR XM_CALLCONV ComputeLeadPosition(FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity, float fProjectileSpeed);
@@ -200,6 +198,18 @@ constexpr float ExponentialInterpolant(float fRate, float fDeltaTime)
 {
 	float fScaledTime = fRate * fDeltaTime;
 	return (2.0f * fScaledTime) / (2.0f + fScaledTime);
+}
+
+// Deterministic replacement for library pow with a whole-number exponent: plain IEEE multiplies in a fixed order.
+// iPower must be nonnegative; a power of 0 returns 1.
+constexpr float WholeNumberPower(float fBase, int64_t iPower)
+{
+	float fResult = 1.0f;
+	for (int64_t i = 0; i < iPower; ++i)
+	{
+		fResult *= fBase;
+	}
+	return fResult;
 }
 
 struct SinCos

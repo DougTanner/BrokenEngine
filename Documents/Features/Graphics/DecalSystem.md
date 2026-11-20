@@ -68,7 +68,7 @@ Changes (15 files)
    - Template instantiations for both collections
    - Register() -- empty initially, types registered by game layer
    - AllocateAndCopy for both structs (Allocate + memcpy for
-     Interpolate, AllocateAndCopyIds for PostRender)
+     Interpolate, AllocateAndCopyMembers for PostRender)
    - Spawn/Transfer/Destroy stubs
 
 3. Engine/Source/Frame/Collections/Decals/DecalsUpdate.cpp  [NEW]

@@ -51,7 +51,7 @@ struct ClientConnection
 	ENetPeer* pPeer = nullptr;
 	int64_t iClientId = 0;
 	bool bHandshakeComplete = false;
-	std::vector<GridCoord> authorizedCoordinates;
+	std::vector<OwnedEntity> ownedEntities;
 	ClientGuid clientGuid {};
 
 	// Slot-based coord subscriptions with independent ACK and resend tracking
@@ -149,7 +149,8 @@ public:
 	const ClientConnection* FindClient(int64_t iClientId) const;
 	void AdvanceLoadGeneration();
 	void BroadcastLoadNotification();
-	// Consume-once: sends only when TimeStep recorded an applied time-scale change since the last call.
+	// Sends when TimeStep recorded an applied time-scale change since the last call (consume-once) or GameFlags::kPaused
+	// differs from the last broadcast pause value.
 	void BroadcastTimespeedIfChanged();
 
 	std::vector<ClientConnection> mClients;
@@ -190,7 +191,7 @@ private:
 	void ClientCrashReport(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGuid);
 	void SendSubscribeAccept(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate);
-	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide);
+	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide, bool bPaused);
 
 	void RemoveClient(int64_t iClientId);
 
@@ -201,6 +202,7 @@ private:
 	std::chrono::steady_clock::time_point mPreviousPollEnd {};
 	std::chrono::steady_clock::time_point mBudgetGraceDeadline {};
 	int64_t miLoadGeneration = 0;
+	bool mbLastBroadcastPaused = false;
 
 	// Bounds the disk space clients can fill with crash reports however often they reconnect; counts per UTC calendar day.
 	static constexpr int64_t kiMaximumStoredCrashReports = 32;

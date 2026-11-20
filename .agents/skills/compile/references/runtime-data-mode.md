@@ -174,14 +174,15 @@ It skips the AgentTools and ThirdParty builds and the ModelViewer prebuild,
 keeps the DataPacker prebuild, the bootstrap mutex, and the DataPacker prebuild
 stamp and data stamp rules, and skips the DataPacker prebuild and the refresh,
 with a warning naming worktree creation, `/reset-worktree`, or explicit primary
-maintenance (a full run without `-SharedDataOnly`), when primary ThirdParty
-changed since the last prebuild or the DataPacker prebuild stamp is missing or
-unreadable. Every skip exits 0, so its `Refreshed primary data at` line is the
-only sign the refresh ran. It runs this worktree's copies of the bootstrap
-scripts against the primary checkout, so a session runs it without asking the
-user unless this worktree's own committed or uncommitted changes, measured from
-its merge base with primary main, touch `.agents/scripts/`; then it asks the
-user first. One run can outlast a tool-call timeout, up to
+maintenance (a full run without `-SharedDataOnly`), when primary ThirdParty or
+its force-included `Common/DebugDefines.h` changed since the last prebuild or
+the DataPacker prebuild stamp is missing or unreadable. Every skip exits 0, so
+its `Refreshed primary data at` line is the only sign the refresh ran. It runs
+this worktree's copies of the bootstrap scripts against the primary checkout, so
+a session runs it without asking the user unless this worktree's own committed
+or uncommitted changes, measured from its merge base with primary main, touch
+`.agents/scripts/`; then it asks the user first. One run can outlast a
+tool-call timeout, up to
 `-WaitSeconds` for the bootstrap mutex, then the DataPacker prebuild and the
 export, so it runs where a tool-call timeout cannot kill it, for example with
 the host's background-execution parameter such as `run_in_background`; a killed
@@ -209,19 +210,22 @@ Ordinary Shared work otherwise remains unchanged: primary Data, no
 ## Local generation
 
 Local mode may build the worktree Release DataPacker as a standalone compile
-check (`-Target DataPacker`). Every Local game build is a generation build: the
-invocation internally invokes the worktree DataPacker exactly once with
+check (`-Target DataPacker`). Every Local game build is a generation build:
+each invocation internally invokes the worktree DataPacker exactly once with
 `--materialize-data` over `Engine\Data` and `Projects\<Name>\Data` into the
-Local Data directory, requires exit `0`, then runs the one
-`RunDataPacker=true` game build. Because that
-invocation reads the whole of `Engine\Data`, it first restores any
-sparse-skipped tree itself — when the worktree's `core.sparseCheckout` is
-still `true` it runs `git sparse-checkout disable` in the worktree and blocks
-under `data.sparse-restore-failed` if that exits non-zero — so a generation
-build needs no manual restore. Materialization performs no exports and never
-creates, inspects, or materializes Attribution. In a validated linked
-worktree, dirty output uses copy-on-write materialization, staging primary
-files and atomically replacing only the affected recognized link.
+Local Data directory, requires exit `0`, then runs the `RunDataPacker=true`
+build of each game target it builds. Because that invocation reads the whole of
+`Engine\Data`, it first restores any sparse-skipped tree itself — when the
+worktree's `core.sparseCheckout` is still `true` it runs
+`git sparse-checkout disable` in the worktree and blocks under
+`data.sparse-restore-failed` if that exits non-zero — so a generation build
+needs no manual restore. In a linked worktree it then builds that DataPacker
+Release through WorktreeCli before invoking it (the `-LocalDataPacker` call in
+`.agents/skills/compile/scripts/Invoke-CompileBuild.ps1`). Materialization
+performs no exports and never creates, inspects, or materializes Attribution.
+In a validated linked worktree, dirty output uses copy-on-write
+materialization, staging primary files and atomically replacing only the
+affected recognized link.
 
 The data mode and the Local generation build are per game: a request that
 builds several games resolves each game's mode separately and runs a

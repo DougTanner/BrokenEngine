@@ -13,9 +13,9 @@ the same contiguous index space.
   contracts.
 - The manager holds engine and game rows together in one CPU counter array and
   one CPU timer array, allocated in its constructor at the game counts.
-- Recording code compiles out through `if constexpr (kbProfiling)`. Shared CPU
-  accessors and text formatters remain available to the main-thread Server
-  Monitor snapshot capture even when profiling is disabled.
+- Recording code compiles out through `if constexpr (kbProfiling)`, except the
+  server's full-update count, which the Server Monitor FPS row reads in every
+  build.
 
 ## CPU Timing
 
@@ -67,9 +67,9 @@ the slow-operation diagnostics.
 
 ## GPU Timing
 
-- GPU queries and ImGui output are client-only. Query reads never stall;
-  `VK_NOT_READY` retains the previous smoothed result, and devices without
-  timestamp support leave the pool unused.
+- GPU queries and ImGui output are client-only. Query reads never stall; a
+  `VK_NOT_READY` query is one the submission did not write, and its row reads
+  zero. Devices without timestamp support leave the pool unused.
 - Each command buffer resets one contiguous timer range. Insert a timer into the
   range recorded by that command buffer and keep the enum and name table
   aligned.
@@ -109,7 +109,7 @@ are upper bounds including up to one frame of poll delay. A hint naming
 `/analyze-gpu-stall` prints only when a world row without
 acquire-command-buffer work shows a gap with no measured region running and
 queued work, both above the hint threshold (`fQuarterIntervalMilliseconds` in
-`ProfileManager.cpp`, derived from the pending submission's expected interval).
+`GpuStallTimeline.cpp`, derived from the pending submission's expected interval).
 When that interval is zero, the breakdown and the hint are skipped and only
 the timeline rows print. Focus changes and teardown drop a pending stall
 timeline without printing it.

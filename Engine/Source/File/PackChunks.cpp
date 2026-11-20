@@ -11,23 +11,12 @@ namespace engine
 {
 
 #if defined(BT_CLIENT)
-constexpr uint64_t kuiAudioReadStateMask = 0x3;
 static_assert(static_cast<uint64_t>(AudioChunkReadState::kFree) == 0);
 static_assert(static_cast<uint64_t>(AudioChunkReadState::kReady) == kuiAudioReadStateMask);
 
 static constexpr uint64_t PackAudioReadOwnership(AudioChunkReadState eState, uint64_t uiGeneration)
 {
 	return (uiGeneration << 2) | static_cast<uint64_t>(eState);
-}
-
-static constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
-{
-	return static_cast<AudioChunkReadState>(uiOwnership & kuiAudioReadStateMask);
-}
-
-static constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
-{
-	return uiOwnership >> 2;
 }
 #endif // BT_CLIENT
 
@@ -99,17 +88,6 @@ PackChunks::~PackChunks()
 std::filesystem::path PackChunks::GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const
 {
 	return mDataDirectory / (std::string(data::kpcDataTypeNames[eDataType]) + std::string(extension));
-}
-
-constexpr bool IsEagerChunk(data::DataTypes eDataType)
-{
-	return eDataType == data::kDataTypeScene || eDataType == data::kDataTypeModel || eDataType == data::kDataTypeShader || eDataType == data::kDataTypeRaw;
-}
-
-constexpr bool IsServerChunk(data::DataTypes eDataType)
-{
-	// Server reads terrain from Islands and ship hitboxes from Model outlines; Audio + Texture are client-only.
-	return eDataType == data::kDataTypeIslands || eDataType == data::kDataTypeModel;
 }
 
 data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
@@ -197,8 +175,10 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 		return "chunk header magic mismatch";
 	}
 	// Consumers pick the pack file handle/path from these flags, but the offset and size above were validated
-	// against eExpectedDataType's pack, so a mismatched (or flagless) type would address a different file.
-	if (DataTypeFromFlags(rChunkHeader.flags) != eExpectedDataType)
+	// against eExpectedDataType's pack, so a mismatched (or flagless) type would address a different file. Lazy
+	// consumers also route chunks by the raw type bits, so the flags must name only the validated type.
+	if (DataTypeFromFlags(rChunkHeader.flags) != eExpectedDataType
+	 || !std::has_single_bit(rChunkHeader.flags.Mask({common::ChunkFlags::kScene, common::ChunkFlags::kIsland, common::ChunkFlags::kModel, common::ChunkFlags::kShader, common::ChunkFlags::kTexture, common::ChunkFlags::kChunkAudio, common::ChunkFlags::kRaw})))
 	{
 		return "chunk header data type mismatch";
 	}
@@ -217,16 +197,6 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 			return "model alignment scale is not positive";
 		}
 	}
-	// Audio streaming reads payload ranges straight from the pack, so a chunk flagged audio must be stored uncompressed.
-	if ((rChunkHeader.flags & common::ChunkFlags::kChunkAudio) && common::IsCompressed(rChunkHeader.flags))
-	{
-		return "audio chunk is compressed";
-	}
-	// A model's outline and hardpoint sections are placed from iSize, which bounds the payload only when stored uncompressed.
-	if (eExpectedDataType == data::kDataTypeModel && common::IsCompressed(rChunkHeader.flags))
-	{
-		return "model chunk is compressed";
-	}
 	if (rChunkHeader.crc != rChunkLocation.crc)
 	{
 		return "chunk header CRC mismatch";
@@ -236,35 +206,21 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 	{
 		return "chunk path is not NUL-terminated";
 	}
-	// iSize is the exact LZ4 compressed length passed to LZ4_decompress_safe as an int; zlib reads iOnDiskSize instead.
-	if (rChunkHeader.flags & common::ChunkFlags::kLz4Compressed)
-	{
-		if (rChunkHeader.iSize < 0)
-		{
-			return "chunk header size outside chunk";
-		}
-		if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
-		{
-			return "chunk header size outside chunk";
-		}
-		if (!std::in_range<int>(rChunkHeader.iSize))
-		{
-			return "chunk header size outside chunk";
-		}
-	}
 	// For an uncompressed chunk iSize is the payload extent its consumers read against (audio streaming derives
 	// its whole read range from it), so a header that outruns its own chunk is a corrupt pack and fails here at
-	// load rather than mid-stream. Zlib chunks are excluded: they size their decode from the on-disk extent.
-	if (!common::IsCompressed(rChunkHeader.flags))
+	// load rather than mid-stream. For an LZ4 chunk iSize is the exact compressed length passed to
+	// LZ4_decompress_safe as an int.
+	if (rChunkHeader.iSize < 0)
 	{
-		if (rChunkHeader.iSize < 0)
-		{
-			return "chunk header size outside chunk";
-		}
-		if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
-		{
-			return "chunk header size outside chunk";
-		}
+		return "chunk header size outside chunk";
+	}
+	if (rChunkHeader.iSize > static_cast<int64_t>(rChunkLocation.uiSize) - common::kiChunkDataOffset)
+	{
+		return "chunk header size outside chunk";
+	}
+	if (IsCompressed(eExpectedDataType) && !std::in_range<int>(rChunkHeader.iSize))
+	{
+		return "chunk header size outside chunk";
 	}
 	// Readers address the outline and hardpoint sections past iSize without bounds checks. The bounded iSize above keeps
 	// this end offset from overflowing.
@@ -277,8 +233,8 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 			return "model sections outside chunk";
 		}
 	}
-	// iUncompressedSize sizes the lazy chunk buffer and caps the decoder output for both codecs.
-	if (common::IsCompressed(rChunkHeader.flags))
+	// iUncompressedSize sizes the lazy chunk buffer and caps the LZ4 decoder output.
+	if (IsCompressed(eExpectedDataType))
 	{
 		if (rChunkHeader.iUncompressedSize <= 0)
 		{
@@ -298,8 +254,9 @@ void PackChunks::LoadPackFiles()
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 #if defined(BT_SERVER)
-		// Server consumes only Islands and Model chunks, so it skips opening the other packs.
-		if (!IsServerChunk(static_cast<data::DataTypes>(i)))
+		// The server reads terrain from Islands and ship hitboxes from Model outlines, so it skips opening (and
+		// locking) the other packs; Audio and Texture are client-only.
+		if (i != data::kDataTypeIslands && i != data::kDataTypeModel)
 		{
 			continue;
 		}
@@ -307,33 +264,11 @@ void PackChunks::LoadPackFiles()
 
 		mpPackFilePaths[i] = GetDataFilePath(static_cast<data::DataTypes>(i), ".pack");
 		std::filesystem::path manifestPath = GetDataFilePath(static_cast<data::DataTypes>(i), ".manifest");
-		std::fstream manifestStream(manifestPath, std::ios::in | std::ios::binary);
-		common::DataHeader dataHeader {};
-		manifestStream.read(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
-		// Trust boundary: a missing manifest leaves manifestStream failed and dataHeader zero-filled; a corrupt one
-		// mismatches magic/version. Either way the asset type is unusable — fail loud rather than ASSERT-terminate.
-		if (!manifestStream || dataHeader.iMagic != common::DataHeader::kiMagic || dataHeader.iVersion != common::DataHeader::kiVersion)
+		// Trust boundary: a missing, corrupt, or version-mismatched manifest, or a chunk count the file cannot hold, leaves
+		// the asset type unusable — fail loud rather than ASSERT-terminate.
+		if (const char* pcReason = common::ReadManifestChunkTable(manifestPath, mpChunkLocations[i]); pcReason != nullptr)
 		{
-			FailMissingRequiredAsset(manifestPath, "manifest header missing or version mismatch");
-		}
-
-		// Trust boundary: iChunkCount comes from the manifest header; a garbage count would drive an unbounded resize
-		// (bad_alloc terminate) or a torn read. Bound it by what the file can actually hold before allocating.
-		static constexpr int64_t kiChunkTableOffset = common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader)));
-		manifestStream.seekg(0, std::ios::end);
-		int64_t iManifestSize = static_cast<int64_t>(manifestStream.tellg());
-		int64_t iMaximumChunkCount = (iManifestSize - kiChunkTableOffset) / static_cast<int64_t>(sizeof(common::ChunkLocation));
-		if (!manifestStream || dataHeader.iChunkCount < 0 || dataHeader.iChunkCount > iMaximumChunkCount)
-		{
-			FailMissingRequiredAsset(manifestPath, "manifest chunk-count out of range");
-		}
-
-		manifestStream.seekg(kiChunkTableOffset);
-		mpChunkLocations[i].resize(dataHeader.iChunkCount);
-		manifestStream.read(reinterpret_cast<char*>(mpChunkLocations[i].data()), dataHeader.iChunkCount * sizeof(common::ChunkLocation));
-		if (!manifestStream)
-		{
-			FailMissingRequiredAsset(manifestPath, "manifest chunk table truncated");
+			FailMissingRequiredAsset(manifestPath, pcReason);
 		}
 		for (const common::ChunkLocation& rChunkLocation : mpChunkLocations[i])
 		{
@@ -342,7 +277,6 @@ void PackChunks::LoadPackFiles()
 				FailMissingRequiredAsset(manifestPath, "duplicate chunk CRC");
 			}
 		}
-		manifestStream.close();
 
 		if (IsEagerChunk(static_cast<data::DataTypes>(i)))
 		{
@@ -400,7 +334,7 @@ void PackChunks::LoadPackFiles()
 			// (i.e., what consumers see). For compressed chunks, that's the uncompressed size; otherwise
 			// it's the on-disk chunk-data size. The on-disk size is always recoverable from `location.uiSize`.
 			int64_t iOnDiskSize = rChunkLocation.uiSize - common::kiChunkDataOffset;
-			bool bCompressed = common::IsCompressed(chunkHeader.flags);
+			bool bCompressed = IsCompressed(static_cast<data::DataTypes>(i));
 			int64_t iDataSize = bCompressed ? chunkHeader.iUncompressedSize : iOnDiskSize;
 			mLazyChunkMap.try_emplace(rChunkLocation.crc, LazyChunk {.location = rChunkLocation, .header = chunkHeader, .iDataSize = iDataSize});
 
@@ -442,12 +376,12 @@ void PackChunks::LoadPackFiles()
 			{
 				continue;
 			}
-#if defined(BT_SERVER)
-			if (!IsServerChunk(static_cast<data::DataTypes>(i)))
+
+			// An empty pack path marks a type the server skipped opening; the client sets every path.
+			if (mpPackFilePaths[i].empty())
 			{
 				continue;
 			}
-#endif
 
 			std::vector<std::byte>& rPackBytes = mpPackFileData[i];
 
@@ -526,6 +460,8 @@ void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
 	mLoader.WaitForChunks(crcs);
 }
 
+#if defined(BT_CLIENT)
+
 void PackChunks::ResetTextureChunkStates()
 {
 	LOG(kLoading, kInfo, "All-texture chunk state reset");
@@ -564,7 +500,6 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 		{
 			// CPU data still valid, just needs re-upload
 			rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
-#if defined(BT_CLIENT)
 			// Maintain the pending-adoption counter: kUploading (uncounted) -> kDiskLoaded (counted) arms it;
 			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Only the
 			// all-texture reset reaches this branch, because per-island eviction requires bGpuResident, so its targets
@@ -573,35 +508,21 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 			{
 				gpTextureUploadManager->miPendingAdoptions.fetch_add(1, std::memory_order_relaxed);
 			}
-#endif // BT_CLIENT
 		}
 	}
 }
 
-#if defined(BT_CLIENT)
-
 ChunkReadResult PackChunks::PollChunkRead(ChunkReadRequest& rRequest, std::byte* pDestination)
 {
-	ASSERT(rRequest.miEntryIndex != kiInvalidAudioReadEntry);
-
-	auto ClearRequest = [&rRequest]
-	{
-		rRequest.miEntryIndex = kiInvalidAudioReadEntry;
-		rRequest.muiGeneration = 0;
-	};
-
 	AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(rRequest.miEntryIndex)];
 	uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
-	if (AudioReadGeneration(uiOwnership) != rRequest.muiGeneration)
-	{
-		ClearRequest();
-		return ChunkReadResult::kFailed;
-	}
+	ASSERT(AudioReadGeneration(uiOwnership) == rRequest.muiGeneration);
 
 	AudioChunkReadState eState = AudioReadState(uiOwnership);
+	ASSERT(eState != AudioChunkReadState::kFree);
 	if (eState != AudioChunkReadState::kReady)
 	{
-		return eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kLoading ? ChunkReadResult::kPending : ChunkReadResult::kFailed;
+		return ChunkReadResult::kPending;
 	}
 
 	std::memcpy(pDestination, rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
@@ -613,13 +534,13 @@ ChunkReadResult PackChunks::PollChunkRead(ChunkReadRequest& rRequest, std::byte*
 #endif
 	// Only the main thread moves an entry out of ready, so no other thread can change it before this store
 	rEntry.uiOwnership.store(PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration), std::memory_order_release);
-	ClearRequest();
+	rRequest.muiGeneration = 0;
 	return ChunkReadResult::kReady;
 }
 
 ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
 {
-	ASSERT(rRequest.miEntryIndex == kiInvalidAudioReadEntry);
+	ASSERT(rRequest.muiGeneration == 0);
 	ASSERT(!buffer.empty());
 	ASSERT(buffer.size() <= sizeof(AudioChunkReadEntry::data));
 
@@ -672,7 +593,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 {
-	if (rRequest.miEntryIndex == kiInvalidAudioReadEntry)
+	if (rRequest.muiGeneration == 0)
 	{
 		return;
 	}
@@ -683,10 +604,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 	while (AudioReadGeneration(uiOwnership) == uiRequestGeneration)
 	{
 		AudioChunkReadState eState = AudioReadState(uiOwnership);
-		if (eState != AudioChunkReadState::kQueued && eState != AudioChunkReadState::kReady && eState != AudioChunkReadState::kLoading)
-		{
-			break;
-		}
+		ASSERT(eState == AudioChunkReadState::kQueued || eState == AudioChunkReadState::kReady || eState == AudioChunkReadState::kLoading);
 		uint64_t uiCancelledGeneration = uiRequestGeneration + 1;
 		AudioChunkReadState eCancelledState = eState == AudioChunkReadState::kLoading
 			? AudioChunkReadState::kLoading
@@ -704,16 +622,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		}
 	}
 
-	rRequest.miEntryIndex = kiInvalidAudioReadEntry;
 	rRequest.muiGeneration = 0;
-}
-
-bool PackChunks::HasQueuedAudioRead() const
-{
-	return std::ranges::any_of(mAudioReadEntries, [](const AudioChunkReadEntry& rEntry)
-	{
-		return AudioReadState(rEntry.uiOwnership.load(std::memory_order_acquire)) == AudioChunkReadState::kQueued;
-	});
 }
 
 bool PackChunks::HasActiveAudioRead() const
@@ -788,32 +697,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 #endif
 
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
-	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-	HANDLE handleFile = mpHandleLazyPackFile[eDataType];
-
-	uint64_t uiOffset = static_cast<uint64_t>(iOffset);
-	uint64_t uiLength = static_cast<uint64_t>(iLength);
-	uint64_t uiDataFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
-	uint64_t uiLogicalFileOffset = uiDataFileOffset + uiOffset;
-	uint64_t uiAlignedOffset = common::RoundDown(uiLogicalFileOffset, static_cast<uint64_t>(kiSectorAlignment));
-	uint64_t uiPrefix = uiLogicalFileOffset - uiAlignedOffset;
-	uint64_t uiPhysicalSize = common::RoundUp(uiPrefix + uiLength, static_cast<uint64_t>(kiSectorAlignment));
-	ASSERT(uiPhysicalSize <= static_cast<uint64_t>(kiReadBufferSize));
-
-	OVERLAPPED overlapped {};
-	overlapped.Offset = static_cast<DWORD>(uiAlignedOffset & 0xffffffff);
-	overlapped.OffsetHigh = static_cast<DWORD>(uiAlignedOffset >> 32);
-	DWORD uiBytesRead = 0;
-	BOOL bRead = ReadFile(handleFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
-	if (bRead == FALSE)
-	{
-		FailMissingRequiredAsset(mpPackFilePaths[eDataType], "audio range read was incomplete");
-	}
-	if (uiBytesRead < uiPrefix + uiLength)
-	{
-		FailMissingRequiredAsset(mpPackFilePaths[eDataType], "audio range read was incomplete");
-	}
-	std::memcpy(rEntry.data.data(), mpReadBuffers[iThreadIndex] + uiPrefix, uiLength);
+	mLoader.ReadChunkRange(rLazyChunk, iOffset, iLength, rEntry.data.data(), iThreadIndex);
 
 	uint64_t uiExpectedOwnership = PackAudioReadOwnership(AudioChunkReadState::kLoading, uiGeneration);
 	uint64_t uiReadyOwnership = PackAudioReadOwnership(AudioChunkReadState::kReady, uiGeneration);

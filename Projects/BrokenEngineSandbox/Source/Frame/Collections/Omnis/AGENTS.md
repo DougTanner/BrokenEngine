@@ -89,9 +89,9 @@ sizing derives from the shared omni radius.
 
 ## State Boundaries
 
-- Shared CRC excludes client animation time, the local records tracking each
-  pusher, and server-assigned global identity, which simulation reads. Some
-  excluded state still participates in save or transfer.
+- Shared CRC excludes the server-local client GUID and the local records
+  tracking each pusher. Some excluded state still participates in save or
+  transfer.
 - The simulation keeps `pNextBlasterFireTimes` in [0, `kBlasterFireInterval`],
   which `SpawnBlasters` asserts. `PostRead` rejects out-of-range rows on every
   Frame read.

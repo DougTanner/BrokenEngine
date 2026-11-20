@@ -102,7 +102,7 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 		if (common::Random(10i64, randomEngine) == 0)
 		{
 			LOG(kGraphics, kDebug, "Randomly invalidating GLTF BRDF LUT cache");
-			gpFileManager->RemoveFile({FileFlags::kAppDataDirectory}, "BrdfLut.cache");
+			gpFileManager->RemoveFile("BrdfLut.cache");
 		}
 	}
 
@@ -182,12 +182,12 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	// Heap: the cached-payload vector below runs from GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable in the PipelineManager ctor, which also fires on pipeline-tier recreate (settings change / device loss) with the main-loop tracker armed. Mirrors SaveTextureToCache's CopyImageToHostMemory suppression.
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, rCachePath)))
+	if (!std::filesystem::exists(gpFileManager->GetFilePath(rCachePath)))
 	{
 		return false;
 	}
 
-	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, rCachePath);
+	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kRead}, rCachePath);
 	if (!fileStream.is_open())
 	{
 		return false;
@@ -240,7 +240,7 @@ void TextureCache::SaveTextureToCache(const std::filesystem::path& rCachePath, c
 	std::vector<std::byte> data;
 	CopyImageToHostMemory(rTexture.mVkImage, rTexture.mInfo.vkExtent3D, rTexture.mInfo.vkFormat, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
 
-	if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
+	if (gpFileManager->WriteFileAtomically({FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
 	{
 		WriteVersionHeader<TextureFileCacheHeader>(rStream);
 		common::Write(rStream, header);

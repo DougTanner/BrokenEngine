@@ -193,7 +193,6 @@ void MissilesInterpolate::Register()
 
 	engine::SmokeTrailsInterpolate::RegisterType(siSmokeTrailTypeIndex,
 	{
-		.uiCrc = 0,
 		.iColor = 0xFFFFFFFF,
 		.fWidth = kfTrailWidth,
 	});
@@ -271,8 +270,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 		XMVECTOR vecDirection = rCurrentInterpolate.pVecDirections[i];
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
-		MissileFlags_t missileFlags;
-		missileFlags.Set(alignment == rFrame.postRender.fleetAlignment ? kTargetRandom : kTargetFleet);
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo
@@ -280,9 +277,9 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.vecPosition = vecPosition,
 				.vecDirection = vecDirection,
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
-				.vecStoredDirection = vecDirection,
+				.vecStoredDirection = rCurrentPostRender.pVecStoredDirections[i],
 				.fAcceleration = rCurrentPostRender.pfAccelerations[i],
-				.flags = missileFlags,
+				.flags = rCurrentPostRender.pFlags[i],
 				.alignment = alignment,
 				.deltaRotationDelay = rCurrentPostRender.pDeltaRotationDelays[i],
 				.fDeltaRotation = rCurrentPostRender.pfDeltaRotations[i],

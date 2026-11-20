@@ -159,9 +159,7 @@ function Get-InventoryDocument() {
 	$arguments = @('-NoProfile', '-File', $script:InventoryScript, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline, '-Regions')
 	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
 	if ($IncludeUntracked) {
-		# The inventory reports an untracked path only when the caller lists it, so the pass-through
-		# switch asks it to list every untracked path.
-		$arguments += '-IncludeAllUntracked'
+		$arguments += '-IncludeUntracked'
 	}
 	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
 	$shell = [Environment]::ProcessPath

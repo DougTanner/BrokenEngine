@@ -12,7 +12,6 @@ param(
 	[Parameter(Mandatory)][string] $ScopeFile,
 	[Parameter(Mandatory)][string] $PromptPath,
 	[ValidateRange(1, 3)][int] $RiskTier = 0,
-	[string[]] $UntrackedPath,
 	[string] $Head,
 	[switch] $AdHocRole
 )
@@ -128,18 +127,6 @@ function Invoke-PromptGit([string[]] $Arguments, [bool] $AllowFailure = $false) 
 	return $run
 }
 
-function Get-PromptRelativePath([string] $Path) {
-	# The same normalization the inventory applies to its -IncludeUntracked values, so a listed path
-	# and an inventory entry compare as the same repository-relative path.
-	$normalized = $Path.Replace('\', '/').Trim()
-	if ([IO.Path]::IsPathRooted($normalized)) {
-		$rootPosix = $script:Root.Replace('\', '/').TrimEnd('/') + '/'
-		if ($normalized.StartsWith($rootPosix, [StringComparison]::OrdinalIgnoreCase)) { $normalized = $normalized.Substring($rootPosix.Length) }
-	}
-	if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
-	return $normalized
-}
-
 function Get-PromptFullPath([string] $RelativePath) {
 	return Join-Path $script:Root ($RelativePath -replace '/', [IO.Path]::DirectorySeparatorChar)
 }
@@ -239,10 +226,9 @@ function Write-GuardrailBlock([string] $Guardrails) {
 	Add-PromptText "`n"
 }
 
-function Get-ChangedFileSet([string[]] $Listed) {
+function Get-ChangedFileSet() {
 	$arguments = @('-NoProfile', '-File', $script:Inventory, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline)
-	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
-	if ($Listed.Count -gt 0) { $arguments += @('-IncludeUntracked', ($Listed -join ',')) }
+	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) } else { $arguments += '-IncludeUntracked' }
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = (Get-Process -Id $PID).Path
 	$start.WorkingDirectory = $script:Root
@@ -272,22 +258,18 @@ function Get-ChangedFileSet([string[]] $Listed) {
 	if ($exitCode -ne 0) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.inventory-blocked' "The session change inventory blocked with $($inventory.code): $($inventory.message)"
 	}
-	# Evidence is complete or the run blocks: a capped entry list, or an untracked path the manager
-	# did not name, would let the review report a clean result over bytes it never saw.
+	# Evidence is complete or the run blocks: a capped entry list would let the review report a clean
+	# result over bytes it never saw.
 	if ($inventory.truncated) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.inventory-truncated' 'The session change inventory truncated its entry list; narrow the baseline or the reviewed scope so every changed path is listed.'
-	}
-	if ($inventory.counts.unlistedUntracked -ne 0) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.inventory-truncated' "The worktree holds $($inventory.counts.unlistedUntracked) untracked path(s) that -UntrackedPath does not name; name them or remove them so the evidence is complete."
 	}
 	return $inventory
 }
 
-function Get-PromptTargetsText([string[]] $Listed) {
+function Get-PromptTargetsText() {
 	# /repo-code-review requires one canonical targets sequence, which assembly writes and embeds.
 	$arguments = @('-NoProfile', '-File', $script:Inventory, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline, '-EmitTargets')
-	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
-	if ($Listed.Count -gt 0) { $arguments += @('-IncludeUntracked', ($Listed -join ',')) }
+	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) } else { $arguments += '-IncludeUntracked' }
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = (Get-Process -Id $PID).Path
 	$start.WorkingDirectory = $script:Root
@@ -427,16 +409,6 @@ function Write-DiffEvidence() {
 }
 
 try {
-	$listed = [Collections.Generic.List[string]]::new()
-	# `pwsh -File` hands one literal string per token, so the documented comma-separated form is
-	# split here rather than by the parameter binder.
-	foreach ($path in @(@($UntrackedPath) -split ',')) {
-		if ([string]::IsNullOrWhiteSpace($path)) { continue }
-		$listed.Add($path.Trim())
-	}
-	if ($listed.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($Head)) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.head-untracked-conflict' 'A commit-valued -Head has no untracked side, so -UntrackedPath cannot be classified; drop one of the two.'
-	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-CodexReviewPrompt 2 'blocked' 'prompt.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
@@ -476,14 +448,18 @@ try {
 
 	# Not $inventory: a script-scope local by that name would overwrite the $script:Inventory script
 	# path, which the targets run below still needs.
-	$changeSet = Get-ChangedFileSet $listed.ToArray()
-	$listedSet = [Collections.Generic.HashSet[string]]::new([string[]] @($listed | ForEach-Object { Get-PromptRelativePath $_ }))
+	$changeSet = Get-ChangedFileSet
+	$untrackedPaths = @()
+	if ([string]::IsNullOrWhiteSpace($Head)) {
+		$untrackedPaths = @((Invoke-PromptGit @('ls-files', '--others', '--exclude-standard', '-z')).Stdout -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	}
+	$untrackedSet = [Collections.Generic.HashSet[string]]::new([string[]] $untrackedPaths)
 	$diffPath = [Collections.Generic.List[string]]::new()
 	$untracked = [Collections.Generic.List[object]]::new()
 	$fileLine = [Collections.Generic.List[string]]::new()
 	$binaryExcluded = 0
 	foreach ($entry in @($changeSet.entries)) {
-		if ($null -eq $entry.baseline -and $listedSet.Contains($entry.path)) {
+		if ($null -eq $entry.baseline -and $untrackedSet.Contains($entry.path)) {
 			# The inventory classifies by extension first; the content probe is what keeps a binary
 			# payload with a textual name out of the prompt.
 			$isBinary = $entry.class -ceq 'binary' -or (Test-PromptBinaryContent $entry.path)
@@ -501,19 +477,12 @@ try {
 		}
 		$fileLine.Add("$($entry.status) $($entry.path)")
 	}
-	# A named path the inventory never reported — ignored, already tracked and unchanged, or absent —
-	# would leave the prompt silently missing evidence the manager believes it carries.
-	$untrackedSet = [Collections.Generic.HashSet[string]]::new([string[]] @($untracked | ForEach-Object { $_.Path }))
-	$missing = @($listedSet | Where-Object { -not $untrackedSet.Contains($_) })
-	if ($missing.Count -gt 0) {
-		Complete-CodexReviewPrompt 2 'blocked' 'prompt.untracked-path-unknown' "The inventory reports no untracked entry for: $(($missing | Sort-Object) -join ', ')"
-	}
 	$script:DiffPath = $diffPath.ToArray()
 	$script:Untracked = $untracked.ToArray()
 	$script:DiffRange = if ([string]::IsNullOrEmpty($changeSet.headSha)) { @($changeSet.baselineSha) } else { @($changeSet.baselineSha, $changeSet.headSha) }
 	Test-PromptScopeEvidence
 	if ($null -ne $script:TargetsFile) {
-		Write-PromptTargets (Get-PromptTargetsText $listed.ToArray())
+		Write-PromptTargets (Get-PromptTargetsText)
 	}
 
 	$script:PromptStream = [IO.File]::Open($script:PromptFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)

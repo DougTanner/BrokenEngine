@@ -10,6 +10,7 @@
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
+#include "Ui/LightingWrappers.h"
 #include "Ui/SoundWrappers.h"
 #endif
 
@@ -31,7 +32,6 @@ extern int64_t giFighterBeamAreaLightTypeIndex;
 
 // Defined in Fighters.cpp.
 void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
-void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier);
 #endif
 
 void XM_CALLCONV FightersPostRender::BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
@@ -78,7 +78,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	std::optional<ShipLocator> optionalTarget;
 	bool bKeptTargetChosen = false;
 	float fNearestDistanceSquared = 0.0f;
-	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
 		if (NearestFlightPlane(vecPosition) != uiFlightPlane)
 		{
@@ -101,10 +101,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 		{
 			return;
 		}
-		bool bKeptTarget = registryTarget.uuid.iValue != 0 && VisitShip(rFrame, locator, [](const auto& rInterpolate, [[maybe_unused]] const auto& rPostRender, int64_t iRow)
-		{
-			return rInterpolate.pRegistryIds[iRow];
-		}) == registryTarget;
+		bool bKeptTarget = registryTarget.uuid.iValue != 0 && registryId == registryTarget;
 		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShooterPosition, vecPosition))
 		{
 			optionalTarget = locator;
@@ -132,7 +129,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 #if defined(BT_CLIENT)
 	engine::AreaLightsPostRender::Add(rFrame, rCurrentInterpolate.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex);
 	rCurrentInterpolate.pVecBeamEnds[i] = vecEnd;
-	SyncFighterBeam(rFrame.interpolate, rCurrentInterpolate.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecShooterPosition, vecEnd, 1.0f);
+	SyncFighterBeam(rFrame.interpolate, rCurrentInterpolate.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecShooterPosition, vecEnd, 0.5f * gFighterBeamWidth.mfCurrent, 1.0f);
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecShooterPosition, gFighterBlasterVolume.mfCurrent, gFighterBlasterPitchMinimum.mfCurrent, gFighterBlasterPitchRandom.mfCurrent);
 	engine::PointLightsPostRender::AddControlled(rFrame, rStaticData.coordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick), giFighterBeamImpactControllerTypeIndex, vecEnd, 0.0f);
 #endif
@@ -149,31 +146,7 @@ void FightersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	siCollisionLayerIndex = engine::Collision::AddLayer(
-	{
-		.pVecStartPositions = rPreviousFrame.interpolate.pFighters->pVecPositions,
-		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pVecVelocities = rCurrentPostRender.pVecVelocities,
-		.iCount = rCurrentInterpolate.iCount,
-		.layerFlags = engine::CollisionLayerFlags::kHitboxes,
-		.uiCategory = CollisionCategory::kuiFighter,
-		.uiCollidesWith = CollidesWith::kuiFighter,
-		.pAlignments = rCurrentPostRender.pAlignments,
-	});
-
-	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-	}
-
-	std::span<float> radii = engine::Collision::GetLayerRadii(siCollisionLayerIndex);
-	std::span<engine::CollisionHitbox> hitboxes = engine::Collision::GetLayerHitboxes(siCollisionLayerIndex);
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		radii[static_cast<size_t>(i)] = gShipHitboxShapes[std::to_underlying(ShipType::kFighter)][std::to_underlying(rCurrentPostRender.pController[i])].fRadius;
-		BuildShipHitbox(ShipType::kFighter, rCurrentPostRender.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], hitboxes[static_cast<size_t>(i)]);
-	}
+	siCollisionLayerIndex = AddShipCollisionLayer(rCurrentInterpolate, rCurrentPostRender, *rPreviousFrame.interpolate.pFighters, ShipType::kFighter, CollisionCategory::kuiFighter, CollidesWith::kuiFighter);
 }
 
 void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)

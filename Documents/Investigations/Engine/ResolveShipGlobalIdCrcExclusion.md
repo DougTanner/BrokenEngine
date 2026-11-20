@@ -2,8 +2,9 @@
 
 This is an Investigation, not a Plan. It is the options record for a choice
 the user has since made: `### Open choice for the user` records that choice,
-and `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md` is the Plan that
-carries it.
+and option 2's tuple and comment change has landed, so `pGlobalIds` is in
+each ship PostRender `SharedCrcMembers()`. The three ship PostRender collection
+version bumps took the place of that option's `Frame::kiVersion` base bump.
 
 ## Context
 
@@ -47,11 +48,10 @@ What the analysis found about the reason:
   commit `d87ad840`) says the shared CRC excludes "server-assigned global
   identity, which simulation reads" and gives no reason for leaving it out.
   `Ships/AGENTS.md:278-279` and `:289-290` document the reads themselves.
-- `Engine/Source/Frame/AGENTS.md` `## Frame Registry` requires CRC exclusion
-  only for the client-GUID column, which has a server-only post-tick writer
-  (`AssignRegistryClientGuid`,
-  `Engine/Source/Network/Server/ServerTransferManager.cpp:241`). `pGlobalIds`
-  has no such writer.
+- The client-GUID column has no post-tick writer: the server's `Spawn` writes
+  it from the server-local spawn payload, and client rows created from a spawn
+  or transfer status change hold zero. `pGlobalIds` has no post-tick writer
+  either.
 - `Engine/Source/Frame/AGENTS.md` `## Simulation and Visual State` lets a
   declared `SharedCrcMembers()` narrow the CRC and gives no criterion for what
   may be left out.
@@ -93,10 +93,11 @@ two options, in which option 1 also rewrote the three comments, before commit
 `7dae9a27` made that rewrite separately, and chose nothing then. This
 investigation chooses neither. The authoring agent's record of what the user
 chose afterwards, on 2026-11-14, when the session that authored the global-ID
-Plan, now part of `Documents/Plans/Game/ShipCrcTuplesAndOmniTransfer.md`,
-asked: `pGlobalIds` goes into `SharedCrcMembers()` for Fighters, Battleships,
-and Omnis, which is option 2 below. That Plan carries the choice, so no further Plan is written
-from this investigation, which stays as the record of the options.
+Plan asked: `pGlobalIds` goes into `SharedCrcMembers()` for Fighters,
+Battleships, and Omnis, which is option 2 below. Its tuple and comment change
+has landed, with the three ship PostRender collection version bumps in place
+of its `Frame::kiVersion` base bump, so no further Plan is written from this
+investigation, which stays as the record of the options.
 
 Author's recommendation: option 2. Rationale: it would catch a client/server
 `pGlobalIds` mismatch on its own tick instead of ticks later through downstream

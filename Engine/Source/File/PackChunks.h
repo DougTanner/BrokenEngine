@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FileManager.h" // EagerChunk/LazyChunk/ChunkState/MovableAtomicChunkState/LoadRequest/LoadPriority/MemoryStats + IsEagerChunk/IsServerChunk decls live here
+#include "FileManager.h" // EagerChunk/LazyChunk/ChunkState/MovableAtomicChunkState/LoadRequest/LoadPriority/MemoryStats + IsEagerChunk live here
 #include "PackChunkLoader.h"
 
 namespace engine
@@ -24,6 +24,18 @@ struct AudioChunkReadEntry
 	int64_t iLength = 0;
 	std::array<std::byte, 16 * 1'024> data {};
 };
+
+inline constexpr uint64_t kuiAudioReadStateMask = 0x3;
+
+constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
+{
+	return static_cast<AudioChunkReadState>(uiOwnership & kuiAudioReadStateMask);
+}
+
+constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
+{
+	return uiOwnership >> 2;
+}
 
 #endif // BT_CLIENT
 
@@ -49,7 +61,6 @@ public:
 	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
 	ChunkReadResult PollChunkRead(ChunkReadRequest& rRequest, std::byte* pDestination);
 	void CancelChunkRead(ChunkReadRequest& rRequest);
-#endif // BT_CLIENT
 
 	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk buffers and sizes are not
 	// touched. The caller owns exclusion for the chunks it resets — full recovery
@@ -57,6 +68,7 @@ public:
 	// descriptor window, which excludes Vulkan descriptor/image use and is not a loader drain.
 	void ResetTextureChunkStates();
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
+#endif // BT_CLIENT
 
 	// The only allocation (loader thread) and free (main thread) of a lazy chunk buffer, so the counters stay exact.
 	void AllocateLazyChunkBuffer(LazyChunk& rLazyChunk);
@@ -76,15 +88,9 @@ private:
 #if defined(BT_DEBUG)
 public:
 #endif
-	bool HasQueuedAudioRead() const;
 	bool HasOccupiedAudioRead() const;
 	static constexpr int64_t kiAudioReadEntryCount = 6;
 
-private:
-	static constexpr int64_t kiInvalidAudioReadEntry = 4'294'967'295i64;
-#if defined(BT_DEBUG)
-public:
-#endif
 	std::array<AudioChunkReadEntry, kiAudioReadEntryCount> mAudioReadEntries {};
 
 private:
@@ -125,7 +131,7 @@ private:
 	// Persistent pack file handles for lazy loading (opened with FILE_FLAG_NO_BUFFERING)
 	HANDLE mpHandleLazyPackFile[data::kDataTypeCount] {};
 
-	// Per-loading-thread scratch buffers for compressed chunks (LZ4 or zlib; one per thread, indexed by thread index).
+	// Per-loading-thread scratch buffers for LZ4-compressed chunks.
 	// Each sized at boot to the largest compressed chunk on disk; reused per chunk. Size is shared.
 	std::byte* mpDecompressScratches[PackChunkLoader::kiLoadingThreadCount] {};
 	int64_t miDecompressScratchSize = 0;

@@ -12,10 +12,10 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
      -RepositoryRoot '<absolute repository toplevel>' -Baseline <full
      40-character SHA> -Regions -OutputPath Temp/comment-review-inventory.json`,
-     adding `-IncludeUntracked '<comma-separated paths>'` when the caller
-     supplied untracked paths. The run prints one summary line naming its
-     status, code, and message; read the object from that file only after this
-     run printed that line, keeping the `entries` rows whose `class` is `cpp`,
+     adding the `-IncludeUntracked` switch when the caller supplied untracked
+     files. The run prints one summary line naming its status, code, and
+     message; read the object from that file only after this run printed that
+     line, keeping the `entries` rows whose `class` is `cpp`,
      `dual-language-header`, or `glsl` plus their `regions`.
    - Only `status` `pass` is usable; any other status, or no summary line from
      the run, means the ranges are unavailable — report that instead of

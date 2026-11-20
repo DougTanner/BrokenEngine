@@ -10,7 +10,7 @@ branch, adds `branch = <name>` to every `.gitmodules` entry, adds nlohmann/json
 as its own submodule, ports our code, verifies, and commits on `main`. Today 21
 submodules live under `ThirdParty/` (`.gitmodules:1-64`) and only lz4 carries a
 branch line (`.gitmodules:49`, `release`). nlohmann::json 3.10.4 comes from the
-copy tinygltf v2 vendors (`Common/ExternalHeaders.h:317-323`,
+copy tinygltf v2 vendors (`Common/ExternalHeaders.h:307-311`,
 `Tools/ToolCommon/ToolCliCommon.h:19-24`).
 
 The work runs in the primary checkout `C:\Users\dougt\Documents\BrokenEngine` on
@@ -18,10 +18,11 @@ The work runs in the primary checkout `C:\Users\dougt\Documents\BrokenEngine` on
 submodule trees and ThirdParty Output through link farms, so it cannot build a
 changed pin: provisioning rejects any pin that differs from primary
 (`.agents/scripts/Provision-WorktreeThirdParty.ps1:227-231`), and
-`-Target ThirdParty` builds only in primary
-(`.agents/skills/compile/scripts/Invoke-CompileBuild.ps1:252-258`). Provisioning
-returns early in primary (`Provision-WorktreeThirdParty.ps1:157-160`), so
-`/compile` there builds every target against primary's own trees.
+`-Target ThirdParty` there builds only a session candidate against primary's
+trees (`.agents/skills/compile/scripts/Invoke-CompileBuild.ps1:183-187`).
+Provisioning returns early in primary
+(`Provision-WorktreeThirdParty.ps1:157-160`), so `/compile` there builds every
+target against primary's own trees.
 
 Upstream facts below come from `git ls-remote`, `gh api`, and blobless clones
 under `Temp/upstream/<lib>.git` in session worktree
@@ -233,6 +234,14 @@ canonical form (root `AGENTS.md` `### Directives`).
       `Temp/ThirdPartyUpdate/BaselineData/`, and confirm `git status` shows no
       tracked change under `Engine/Data` or `Projects/BrokenEngineSandbox/Data`
       other than the `.PreExport` markers.
+    - Island chunks store only their payload LZ4HC-compressed, so the lz4
+      update alone can change it. For each island chunk, compare the
+      decompressed payload with the baseline's. When every payload matches,
+      accept only a different `ChunkHeader::iSize`, different bytes from
+      `kiChunkDataOffset` on, and different `ChunkLocation::uiOffset`,
+      `uiSize`, and `contentCrc` in `Islands.manifest`. Every other
+      `ChunkHeader` field, each `ChunkLocation::crc`, and the manifest's
+      `DataHeader` must match byte for byte.
     - Report any difference to the user before the commit, with the owning
       version bump (`DataPacker/Source/ExportJobs/AGENTS.md`
       `## Shared Pipeline`, `Island/AGENTS.md` `## Versioning`). Nothing
@@ -242,10 +251,10 @@ canonical form (root `AGENTS.md` `### Directives`).
     - Delete the cache entries that carry the temporary versions under
       `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<project>`:
       `*.v<temp>.*.chunk` and `*.v<temp>.*.meta` (`ExportJob::SetContentKey`;
-      the latter also matches the Shader `.deps.meta`, `ExportShader.cpp:195`),
-      plus `*.v<temp>.*.meta.pre-export`
-      (`ExportScene::GetPreExportSidecarPath`) and `*.t<temp>.textures`
-      (`ExportIsland.cpp:609`).
+      the latter also matches the Shader `.deps.meta`,
+      `ExportShader::GetDependencyMetadataPath`), plus
+      `*.v<temp>.*.meta.pre-export` (`ExportScene::GetPreExportSidecarPath`)
+      and `*.t<temp>.textures` (`ExportIsland.cpp:609`).
     - Re-run the step-12 generation build at the real versions only while
       `Resolve-CompileContext.ps1` reports Local. It re-splits and re-convolves
       once, because `SplitVersion.meta` and the IBL `.meta` files are not named
@@ -293,16 +302,16 @@ upstream clones. Upstream paths below are inside the named library. An
 identifier-removal scan of every consumed public header against our tree found
 nothing else we use.
 
-- tinygltf: `Common/ExternalHeaders.h:379-381` and
+- tinygltf: `Common/ExternalHeaders.h:380-384` and
   `ThirdParty/Prebuilts/Source/DataPacker/tinygltf.cpp:7` include
   `tinygltf/attic/tiny_gltf.h` after `#define TINYGLTF_NO_INCLUDE_JSON` and the
   json include. The `attic/tiny_gltf.h:1713-1719` guard skips its own
   `json.hpp`, and `:1874` uses `nlohmann::json`. The comment at
-  `ExternalHeaders.h:379-380` is corrected. The DataPacker glTF consumers stay
+  `ExternalHeaders.h:380-382` is corrected. The DataPacker glTF consumers stay
   as they are.
 - nlohmann::json 3.10.4 to develop `5683f5e0`. Its version macros still read
   3.12.0 (`json.hpp:84-86`).
-  - Includes: `Common/ExternalHeaders.h:317-323` (BT_ENGINE and BT_DATA_PACKER)
+  - Includes: `Common/ExternalHeaders.h:307-311` (BT_ENGINE and BT_DATA_PACKER)
     and `Tools/ToolCommon/ToolCliCommon.h:19-24` switch to
     `json/single_include/nlohmann/json.hpp`, and their comments name the
     `ThirdParty/json` submodule. Every project already has `ThirdParty` on its
@@ -418,7 +427,7 @@ nothing else we use.
     `Engine/Source/File/PackChunkLoader.cpp:369`; file set
     `ThirdParty.vcxproj:170-180` still exists).
   - glm master, through gli only (`GLM_STATIC_ASSERT` is already defined at
-    `ExternalHeaders.h:349`).
+    `ExternalHeaders.h:344`).
   - lz4 dev (`Engine/Source/Network/NetworkSerialization.cpp:347,365`,
     `PackChunkLoader.cpp:362`; `lz4hc.c:59-67` keeps the `LZ4_SRC_INCLUDED`
     reuse `ThirdParty/Prebuilts/Source/Engine/Lz4.cpp:6-9` relies on).
@@ -431,7 +440,7 @@ nothing else we use.
 ## Determinism, CRC, and data exposure
 
 - Simulation math does not change: Clipper2 (`Engine/Source/Frame/NavBuild.cpp`)
-  and PerlinNoise (client-only, `Common/ExternalHeaders.h:265-268`) keep their
+  and PerlinNoise (client-only, `Common/ExternalHeaders.h:258-261`) keep their
   pins, and glm is DataPacker-only.
 - lz4 network batches (`NetworkSerialization.cpp:347`) are outside the CRC and
   keep a stable block format. Grid saves and replays use neither lz4 nor zlib
@@ -445,12 +454,13 @@ nothing else we use.
   - meshoptimizer
   - stb_image_resize2 (mips)
   - zlib `compress2` intermediates
-  - LZ4HC texture chunks
+  - LZ4HC texture and island chunks
   - openexr (`Normals.exr` decode)
   - gli/glm (IBL pre-pass)
 - Island chunks feed deterministic placement through the hull
   (`DataPacker/Source/ExportJobs/Island/AGENTS.md` `## Island Outputs`), so step
-  12 must prove their bytes unchanged.
+  12 must prove their decompressed payload unchanged. Their stored LZ4HC bytes
+  may change with lz4 alone.
 - nlohmann::json's Zmij `dump()` can change the text of a fingerprint
   (`ExportScene.cpp:231,445`, `ExportIsland.cpp:501,535`,
   `ExportCubemapIbl.cpp:47,59`, `BakeRoute.cpp:91`,
@@ -509,9 +519,9 @@ compiled set:
   heads recorded in step 6. The four already at head keep theirs unless step 5
   finds a newer head.
 - `Common/ExternalHeaders.h`:
-  - `:317-323`: the json include path and comment, and removal of the C5311
+  - `:307-311`: the json include path and comment, and removal of the C5311
     pragmas.
-  - `:379-381`: `TINYGLTF_NO_INCLUDE_JSON`, the `tinygltf/attic/tiny_gltf.h`
+  - `:380-384`: `TINYGLTF_NO_INCLUDE_JSON`, the `tinygltf/attic/tiny_gltf.h`
     path, and the comment.
 - `Tools/ToolCommon/ToolCliCommon.h:19-24`: the json include path and comment,
   and removal of the C5311 pragmas.
@@ -575,8 +585,8 @@ compiled set:
 - The mimalloc startup check still warns and continues when the reserve is
   missing.
 - PostRender state stays bit-deterministic.
-- No pack, chunk, or intermediate format changes; island chunk bytes are
-  unchanged.
+- No pack, chunk, or intermediate format changes; the decompressed island chunk
+  payload is unchanged.
 - Primary's Debug/Profile/Release ThirdParty libraries stay nonempty and track
   primary `HEAD` after step 19
   (`ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`

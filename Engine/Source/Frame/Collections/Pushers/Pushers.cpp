@@ -22,7 +22,7 @@ bool PushersInterpolate::LogDifferences(const PushersInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pfRadii">(i, pfRadii[i], rOther.pfRadii[i]);
 		bEqual &= common::LogDifference<"pfIntensities">(i, pfIntensities[i], rOther.pfIntensities[i]);
-		bEqual &= common::LogDifference<"pfPowers">(i, pfPowers[i], rOther.pfPowers[i]);
+		bEqual &= common::LogDifference<"puiPowers">(i, puiPowers[i], rOther.puiPowers[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 	}
 

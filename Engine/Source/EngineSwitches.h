@@ -20,7 +20,6 @@ inline constexpr bool kbVulkanPipelineCache = true;
 inline constexpr bool kbVulkanWireframe = false;
 
 #if defined(BT_DEBUG)
-inline constexpr const char* kpcBuildConfigurationName = "Debug";
 inline constexpr bool kbMimallocDiagnostics = true;
 
 inline constexpr bool kbDebugBreak = true;
@@ -37,7 +36,6 @@ inline constexpr bool kbVulkanDebugLayers = true;
 inline constexpr bool kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache = true;
 inline constexpr bool kbShowProfileTextByDefault = false;
 #elif defined(BT_PROFILE)
-inline constexpr const char* kpcBuildConfigurationName = "Profile";
 inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbDebugBreak = false;
@@ -54,7 +52,6 @@ inline constexpr bool kbVulkanDebugLayers = false;
 inline constexpr bool kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache = false;
 inline constexpr bool kbShowProfileTextByDefault = true;
 #elif defined(BT_RELEASE)
-inline constexpr const char* kpcBuildConfigurationName = "Release";
 inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbDebugBreak = false;

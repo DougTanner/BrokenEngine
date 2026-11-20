@@ -23,18 +23,13 @@ struct WindRadialKeyframe
 			.fSize = std::lerp(rPreviousKeyframe.fSize, rNextKeyframe.fSize, fPercent),
 		};
 	}
-
-	bool operator==(const WindRadialKeyframe& rOther) const = default;
 };
 
 struct WindRadialControllerType
 {
 	int64_t iKeyframeCount = 2;
-	bool bDestroysSelf = true;
 	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};
 	WindRadialKeyframe pKeyframes[kiMaximumControllerKeyframes] {};
-
-	bool operator==(const WindRadialControllerType& rOther) const = default;
 };
 
 struct WindRadialsInterpolate : public Collection<WindRadialsInterpolate>,

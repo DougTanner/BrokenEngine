@@ -73,8 +73,9 @@ when that window must be observed or clicked.
   into it, `rotation` is radians with no normalized range, and `footprint` and
   `peak` are its template's scaled meters. `placements.liveCrc` is present only
   when that endpoint's `mCells` holds the coordinate: it folds the live cell's
-  list the way `crc` folds the generated one, so it witnesses what a load or a
-  static-data transfer left in the cell. In a `kbDebugInput` build the main-menu
+  list the way `crc` folds the generated one, so it witnesses what cell creation
+  (server, or the client main menu), a grid-save load (server), or pending-cell
+  creation (client) left in the cell. In a `kbDebugInput` build the main-menu
   origin cell instead holds the single island `BuildMenuIslandPlacement` picks,
   so there it need not match `crc`. Optional `navigation` is server-only; the
   client rejects it with `cell_coordinate_probe 'navigation' is server-only`.
@@ -156,7 +157,13 @@ when that window must be observed or clicked.
   framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>`
   using the process temp directory. Returns `{"path","width","height"}` — the
   saved file and its pixel dimensions, never image bytes. Requires
-  `kbScreenshots`.
+  `kbScreenshots`. To check that two captures match, take both with `format`
+  `png` and `maxWidth` 0 and compare the files with `Get-FileHash`; equal
+  hashes are matching frames. A paused comparison requires a 1:1 time ratio
+  (server `timescale` at 1/1), because at a slower ratio the camera chase does
+  not settle. Take captures until two consecutive hashes match before
+  comparing, since the camera and textures can still be settling after a
+  load.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
   `{"paths":[absolute .rdc paths]}`. Requires a client launched with
@@ -411,17 +418,19 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   harvest since the current game state began, cumulatively, and no spawn; it is
   zeroed on load, reset, every load-time client resynchronization, and entering
   replay playback, and does not move while paused or during playback.
-- `pause`: `{"paused":bool}`. Returns the applied `paused` value. To advance a
-  paused server by exactly one tick, send `timescale {"faster":false}` until it
-  returns `denominator` 32, then send `pause {"paused":false}` and
-  `pause {"paused":true}` back to back, with no wait or other command between
-  them, and confirm that `status.tick` rose by 1. The server takes one agent
-  request at the start of each update, before that update's tick wait: the
-  unpause lets the tick ending that update run, and the pause stops the next
-  tick only if it arrives before the next update starts. That window is one
-  update interval (`TimeStep::SimulationToWall(kTickNanoseconds)`), which at 1/1
-  is shorter than one AgentHarness call, so a wait between the two commands, or
-  a faster timescale, lets extra ticks run.
+- `pause`: `{"paused":bool}`. Returns the applied `paused` value. Connected
+  clients follow the server pause; confirm with client `describe_scene`
+  `gameFlags` (`kPaused`). To advance a paused server by exactly one tick, send
+  `timescale {"faster":false}` until it returns `denominator` 32, then send
+  `pause {"paused":false}` and `pause {"paused":true}` back to back, with no
+  wait or other command between them, and confirm that `status.tick` rose by 1.
+  The server takes one agent request at the start of each update, before that
+  update's tick wait: the unpause lets the tick ending that update run, and the
+  pause stops the next tick only if it arrives before the next update starts.
+  That window is one update interval
+  (`TimeStep::SimulationToWall(kTickNanoseconds)`), which at 1/1 is shorter
+  than one AgentHarness call, so a wait between the two commands, or a faster
+  timescale, lets extra ticks run.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns
   `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}`
   there changes nothing and still succeeds.
@@ -436,7 +445,8 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   under another game frame version, such as an older build's, fails with the
   error envelope and changes nothing. Absent/false leaves the normal post-load
   state unpaused; true atomically pauses after a successful load, before frame
-  inputs can be constructed. Returns `{"file","paused":bool}`.
+  inputs can be constructed, and connected clients follow that pause as under
+  `pause`. Returns `{"file","paused":bool}`.
 - `reset`: no params. Resets the server to a fresh game, game-owned server state
   included. Returns `{}`.
 - `create_cell`: `{"coord":[q,r]}`; `coord` is the only key. Creates a fresh

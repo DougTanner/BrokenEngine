@@ -142,7 +142,8 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		},
 		.MinAllocationSize = 1'024 * 1'024,
 	};
-	// ImGui_ImplVulkan_Init reports failures through internal IM_ASSERTs and always returns true.
+	// ImGui_ImplVulkan_Init always returns true; it reports failures only through internal IM_ASSERTs, which
+	// compile to nothing outside Debug, so Profile and Release init failures pass silently.
 	ImGui_ImplVulkan_Init(&initializationInfo);
 
 	// Minimized/zero-height: keep the 1.0f default scale rather than collapsing style to 0

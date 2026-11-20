@@ -6,7 +6,7 @@ unit roster grows enough that not every model is needed per session.
 ## Context
 
 Pack data types split into eager and lazy at runtime only, in `IsEagerChunk`
-(`Engine/Source/File/PackChunks.cpp`): Scene, Model, Shader, and Raw are eager;
+(`Engine/Source/File/FileManager.h`): Scene, Model, Shader, and Raw are eager;
 Audio, Islands, and Texture are lazy. Eager packs are read whole by the startup
 task in `PackChunks::LoadPackFiles`, and `PackChunks::GetEagerChunkMap` blocks
 until that task finishes. Lazy chunks are loaded on request by `PackChunkLoader`
@@ -39,15 +39,18 @@ precedent: `IslandTemplate` mesh data slices the lazy Islands chunk, which
 stays resident for the process, and lands in a stable mesh arena whose
 residency is published through indirect records rather than a re-record.
 
-The server eager-loads the Model pack for ship hitboxes: `IsServerChunk` accepts
-Islands and Model. On both builds, `InitializeShipHitboxes`
+The server eager-loads the Model pack for ship hitboxes: its accepted set in
+`PackChunks::LoadPackFiles` holds Islands and Model. On both builds,
+`InitializeShipHitboxes`
 (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipHitboxes.cpp`,
 called from the `Game` constructor) reads each ship model's outline from
 `GetEagerChunkMap` at boot, so moving Model to the lazy set must keep that
 outline available then. DataPacker has no notion of eager or lazy, Model chunks
 are written uncompressed, and the lazy open path already validates any chunk
 type's location and header, so moving Model to the lazy set changes no `.pack`
-or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump.
+or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump. Model
+must stay an uncompressed type (`IsCompressed`) when it moves to the lazy set,
+because its sections are placed from `iSize`.
 
 Sixteen models are tracked today: ten under `Engine/Data/Models` and six under
 the sandbox's `Data/Models`.

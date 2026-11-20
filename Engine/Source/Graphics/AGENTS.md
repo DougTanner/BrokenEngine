@@ -120,11 +120,11 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   constructed, and supplies only policy — `PullTarget` and `SunAngle` — as
   non-virtual members the engine calls by name through a `static_cast` to
   `game::Camera`. `CameraBase::Update` names no game type: the gameplay host's
-  `GameBase::UpdateCamera` reads the main menu from `GameBase::mGameFlags`,
-  pulls the target, and passes both with the interpolate frame, the
-  sim-scaled render delta, and the render clock's advance for the sun. The
-  camera also owns the reconciliation visual-error offset, client render state
-  outside the CRC: `AddVisualErrorOffset`
+  `RenderInterpolation::UpdateCamera` reads the main menu from
+  `GameBase::mGameFlags`, pulls the target, and passes both with the
+  interpolate frame, the sim-scaled render delta, and the render clock's
+  advance for the sun. The camera also owns the reconciliation visual-error
+  offset, client render state outside the CRC: `AddVisualErrorOffset`
   accumulates it, and the update decays it after `PullTarget` has read it. A
   tracked target's raw position updates the tracking velocity and last-known
   position; the offset is added only to the resolved target. The engine places
@@ -151,7 +151,8 @@ contracts, while Objects (`Objects/AGENTS.md`) own individual RAII handles.
   host may override the rendered framing with its own eased target and release
   it back to the world framing; the wheel is ignored while an override is
   active. Damage-driven shake decays here; after the update,
-  `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
+  `RenderInterpolation::UpdateCamera` sets controller vibration from the
+  decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame

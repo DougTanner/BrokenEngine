@@ -301,19 +301,6 @@ void AllocateAndCopyMembers(STRUCT& rCurrent, const STRUCT& rPrevious)
 	}
 }
 
-// Allocates and copies the ID array from previous frame. Used by PostRender collections
-// whose only persistent member is pIds.
-template <typename POST_RENDER>
-void AllocateAndCopyIds(POST_RENDER& rCurrent, const POST_RENDER& rPrevious)
-{
-	Allocate(rCurrent, rPrevious, rCurrent.Members());
-
-	if (rCurrent.iCount > 0)
-	{
-		std::memcpy(rCurrent.pIds, rPrevious.pIds, rCurrent.iCount * sizeof(rCurrent.pIds[0]));
-	}
-}
-
 template <typename STRUCT, typename TUPLE>
 void GrowCapacityWithCopy(STRUCT& rStruct, int64_t iNewCapacity, int64_t iCurrentCount, TUPLE&& rMembers)
 {

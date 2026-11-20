@@ -59,10 +59,7 @@ void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rF
 
 	const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
-	{
-		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	}, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		return AddElement(rInterpolate, rPostRender);
 	}, [&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)

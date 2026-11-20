@@ -162,7 +162,7 @@ std::filesystem::path ExportShader::PreprocessShader()
 // A shader's dependencies are unknown before it compiles, so every header under the input roots' Shaders directories
 // stands in for them; CheckDirty's dependency comparison stays the correctness check. Sorting keeps the key independent
 // of directory order.
-static common::crc_t ComputeShaderContentKey(std::string_view sourceFingerprint)
+std::string ExportShader::GetInputFingerprint() const
 {
 	std::vector<std::string> headerFingerprints;
 	for (const std::filesystem::path& rInputRoot : gpFileManager->mpInputDirectories)
@@ -177,22 +177,25 @@ static common::crc_t ComputeShaderContentKey(std::string_view sourceFingerprint)
 	}
 	std::ranges::sort(headerFingerprints);
 
-	std::string keyInput(sourceFingerprint);
+	std::string keyInput = ExportJob::GetInputFingerprint();
 	for (const std::string& rFingerprint : headerFingerprints)
 	{
 		keyInput += rFingerprint;
 	}
-	return common::Crc(keyInput);
+	return keyInput;
+}
+
+std::filesystem::path ExportShader::GetDependencyMetadataPath() const
+{
+	std::filesystem::path dependencyMetadataPath = gpFileManager->mCacheDirectory / mRelativeDirectory / mInputPath.filename();
+	dependencyMetadataPath += std::format(".v{}.{}.deps.meta", miVersion, mContentKey);
+	return dependencyMetadataPath;
 }
 
 ExportShader::ExportShader(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
 : ExportJob(rChunkFlags, rFile, kiVersion)
 {
-	SetContentKey(ComputeShaderContentKey(gpFileManager->mpInputFingerprintCache->Get(mInputPath)));
-
 	mDependencyFile = gpFileManager->mCacheDirectory / mRelativeDirectory / (mInputPath.filename().native() + L".d");
-	mDependencyMetadataFile = gpFileManager->mCacheDirectory / mRelativeDirectory / mInputPath.filename();
-	mDependencyMetadataFile += std::format(".v{}.{}.deps.meta", miVersion, mContentKey);
 
 	if (rFile.extension() == ".comp")
 	{
@@ -586,7 +589,7 @@ bool ExportShader::CheckDirty(const std::filesystem::path& rPackFile)
 		return true;
 	}
 
-	std::optional<std::vector<CachedDependencyFingerprint>> optionalDependencies = ReadDependencyMetadata(mDependencyMetadataFile);
+	std::optional<std::vector<CachedDependencyFingerprint>> optionalDependencies = ReadDependencyMetadata(GetDependencyMetadataPath());
 	if (!optionalDependencies.has_value())
 	{
 		mbDirty = true;
@@ -655,7 +658,7 @@ void ExportShader::CaptureDependencies()
 
 void ExportShader::UpdateCacheMetadata()
 {
-	std::fstream stream(mDependencyMetadataFile, std::ios::out | std::ios::binary);
+	std::fstream stream(GetDependencyMetadataPath(), std::ios::out | std::ios::binary);
 	int64_t iCount = std::ssize(mDependencyFingerprints);
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataMagic), sizeof(kiDependencyMetadataMagic));
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataVersion), sizeof(kiDependencyMetadataVersion));

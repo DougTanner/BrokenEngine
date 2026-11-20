@@ -197,7 +197,7 @@ bool InjectMalformedFullFrames(const Replay& rReplay, GridCoord coordinate, int6
 	}
 
 	std::filesystem::path fullFramesPath = std::filesystem::path(rCoordinateReplayPath).concat(".fullframes");
-	std::fstream fullFramesStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, fullFramesPath);
+	std::fstream fullFramesStream = gpFileManager->OpenFile({FileFlags::kRead}, fullFramesPath);
 	fullFramesStream.seekg(0, std::ios::end);
 	int64_t iBeforeBytes = fullFramesStream.tellg();
 	bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0 && std::in_range<std::streamsize>(iBeforeBytes);

@@ -32,7 +32,7 @@ void SaveTweaksSettings()
 	settings.uiShowImGui = static_cast<uint8_t>(gbShowImGui);
 	GetTweaksScreen().SaveState(settings.sectionState);
 
-	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcTweaksSettingsPath, settings);
+	WriteVersionedFile(kpcTweaksSettingsPath, settings);
 }
 
 void LoadTweaksSettings()
@@ -43,7 +43,7 @@ void LoadTweaksSettings()
 	}
 
 	TweaksSettings settings {};
-	if (!(ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcTweaksSettingsPath, settings) && settings.uiShowImGui <= 1))
+	if (!(ReadVersionedFile(kpcTweaksSettingsPath, settings) && settings.uiShowImGui <= 1))
 	{
 		LOG(kDefault, kWarning, "LoadTweaks FAILED to read file");
 		return;

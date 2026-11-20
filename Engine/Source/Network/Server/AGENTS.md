@@ -7,16 +7,16 @@ violation accounting for engine and game packets, including handler throws.
 state. `ServerSessionRuntime` owns host lifetime, fixed-tick pacing, discovery,
 poll/tick/paused sequencing, queue servicing, broadcast consumption, resend,
 flush, and transport reset. `ServerSessionBase`, which the game server session
-inherits, holds the owned-entity registry, the transfer manager, the
-broadcaster, and the runtime, and owns tick preparation, timescale stepping,
-the active set's ownership step, the owned-entity rebuild and its state
-notifications, the load reset, and the deferred client-packet drain with the
-debug-control request handlers. `OwnedEntityRegistry` owns per-client
-owned-entity records and keeps their `authorizedCoordinates` mirror
-index-parallel. The game server session (the game project's own
-`Source/Network/Server/AGENTS.md`) supplies game packet contracts and handlers,
-authorization, transfer payloads and classification, and the gameplay functions
-the engine calls by name.
+inherits, holds the transfer manager, the broadcaster, and the runtime, and owns
+tick preparation, timescale stepping, the active set's ownership step, the
+owned-entity rebuild and its state notifications, the load reset, and the
+deferred client-packet drain with the debug-control request handlers. Each
+`ClientConnection` holds its client's owned-entity list (`ownedEntities`), whose
+coordinates are the client's authorized coordinates, read by the subscribe check
+and the Server Monitor client count. The game server session (the game
+project's own `Source/Network/Server/AGENTS.md`) supplies game packet contracts
+and handlers, authorization, transfer payloads and classification, and the
+gameplay functions the engine calls by name.
 
 ## Affinity and Lifetime
 
@@ -31,12 +31,12 @@ the engine calls by name.
 
 - Accept a client only after protocol, Frame version, and ordered
   island-manifest identity pass. Repeated Hello preserves the stored GUID; mint
-  a GUID only for a first accepted client that supplied none. A nonempty GUID
-  belongs to at most one live handshaken client; a Hello carrying one already
-  held by another handshaken client is rejected and disconnected. A client
-  record is removed only through `RemoveClient`, which synchronously notifies
-  the game client manager (`ServerClientManager::OnClientDisconnected`) with the
-  record's id and stored GUID before erasing it, because the later ENet
+  a GUID only for a first accepted client that supplied the all-zero GUID. A
+  nonzero GUID belongs to at most one live handshaken client; a Hello carrying
+  one already held by another handshaken client is rejected and disconnected. A
+  client record is removed only through `RemoveClient`, which synchronously
+  notifies the game client manager (`ServerClientManager::OnClientDisconnected`)
+  with the record's id and stored GUID before erasing it, because the later ENet
   DISCONNECT event finds no record.
 - `Server` owns the current debugging-load generation and stamps connection
   bootstrap and all load-scoped subscription traffic. It rejects a subscription
@@ -94,22 +94,23 @@ the engine calls by name.
   creates a Frame for each entering coordinate and hands ownership of each
   departing current Frame directly to the engine replay owner before erasing the
   coordinate storage (`../../File/AGENTS.md#replay-streams`).
-- `ServerSessionBase::RebuildOwnedEntities` is the only writer of the
-  owned-entity registry apart from the disconnect erase and the load clear. For
-  each handshaken client it collects every row carrying the client's GUID in any
-  ownership layer of any cell (`game::Frame::OwnershipLayers`,
-  `../../Frame/AGENTS.md`), sorted by global ID, and reports the difference
-  against the previous list on the reliable channel the load notification also
-  uses: first `Died` for each lost entity, in descending global-ID order, each
-  followed by the game's `OnOwnedEntityDied`; then, in ascending order,
-  `Spawned` for each new entity and `ChangedCell` for each one that moved. It
-  runs at every poll after the deferred client-packet drain and before
-  `AfterNetworkPoll`, so new-client handling sees the rebuilt list; in
-  `CompleteTick` after resync servicing and before the game's
-  `FinalizeTickClients`; and inside the load reset. Transfers land before
-  `CompleteTick` and carry the owner's GUID onto the destination row, so a live
-  handoff is reported as `ChangedCell`, never as a death. A disconnected owner's
-  rows match no handshaken client and register again when that GUID reconnects.
+- `ServerSessionBase::RebuildOwnedEntities` is the only writer of each client
+  record's owned-entity list apart from the load clear; the list is destroyed
+  with the record. For each handshaken client it collects every row carrying
+  the client's GUID in any ownership layer of any cell
+  (`game::Frame::OwnershipLayers`, `../../Frame/AGENTS.md`), sorted by global
+  ID, and reports the difference against the previous list on the reliable
+  channel the load notification also uses: first `Died` for each lost entity,
+  in descending global-ID order, each followed by the game's
+  `OnOwnedEntityDied`; then, in ascending order, `Spawned` for each new entity
+  and `ChangedCell` for each one that moved. It runs at every poll after the
+  deferred client-packet drain and before `AfterNetworkPoll`, so new-client
+  handling sees the rebuilt list; in `CompleteTick` after resync servicing and
+  before the game's `FinalizeTickClients`; and inside the load reset. Transfers
+  land before `CompleteTick` and carry the owner's GUID onto the destination
+  row, so a live handoff is reported as `ChangedCell`, never as a death. A
+  disconnected owner's rows match no handshaken client and register again when
+  that GUID reconnects.
 - A subscription must be origin or within grid distance 1 (`GridDistance`,
   `../../Frame/FrameUtils.h`) of an authorized coordinate: that coordinate or
   one of its six edge neighbours. Subscription, ACK, and resend-log bookkeeping
@@ -169,17 +170,15 @@ the engine calls by name.
 - Both classes name `game::StatusChange` and read, create, and pass whole game
   Frames and their state, such as `postRender.transferRequests` — a deliberate
   exception to the engine/game contract, because the payload crossing a cell
-  boundary is game-defined while the machinery moving it is not. Owned-entity
-  identity is not part of that exception: it goes through the engine ownership
-  layer (`../../Frame/AGENTS.md`). Their headers stay out of the `Engine.h`
-  aggregation and consumers include them directly. The two managers also use
-  these game names directly, naming no gameplay type:
+  boundary is game-defined while the machinery moving it is not. Their headers
+  stay out of the `Engine.h` aggregation and consumers include them directly.
+  The two managers also use these game names directly, naming no gameplay type:
   `game::IsOwnedEntityTransfer` (whether a transfer carries an owned entity),
-  `game::Frame::OwnershipLayers`, `game::Frame::OwnedEntityCount`,
-  `game::ApplySpawnStatusChange`,
+  `game::Frame::OwnedEntityCount`, `game::ApplySpawnStatusChange`,
   `game::IsSpawnType`, `game::IsTransferType`, `game::SpawnPosition`,
-  `game::OwnedSpawnGlobalId`, `game::OwnedSpawnClientGuid`,
-  `game::StatusChangeTypeName`, `game::DrainPendingAgentStatusChanges`,
+  `game::OwnedSpawnGlobalId` and `game::OwnedSpawnClientGuid` (owned-entity
+  identity read from the transfer payload), `game::StatusChangeTypeName`,
+  `game::DrainPendingAgentStatusChanges`,
   `game::ResetPendingAgentStatusChanges`,
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.

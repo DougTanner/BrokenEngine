@@ -87,3 +87,6 @@ so each is this run's).
   `## Handoff` does not apply to them.
 - Settle pixel assertions with a script under `Temp`, per the image rule in
   [`worker.md`](worker.md) `## Rules`, rather than loading the PNG into context.
+  The viewer's water animation follows wall-clock time since launch, which no
+  `Invoke-ModelViewerCapture.ps1` parameter pins, so a before/after comparison
+  follows the before/after pixel baseline rule in that section.

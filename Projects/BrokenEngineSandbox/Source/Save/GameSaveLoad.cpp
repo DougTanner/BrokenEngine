@@ -17,16 +17,14 @@ namespace game
 // in PrepareReplayPlaybackTick. It is part of the replay metadata file format. Layout after the ReplayMeta version
 // header and value: the replay fleet record count, each record's tick and bytes, the first fleet checksum tick, the
 // fleet checksum count, and the fleet checksums.
-bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename)
+bool WriteReplayMetadata(const std::filesystem::path& rFilename)
 {
 	ReplayMeta metadata
 	{
 		.clientGridCoordinate = game::gpGame->mClientGridCoordinate,
-		.iClientOwnedEntityIdentifierValue = game::gpGame->ClientOwnedEntityIdentifier().iValue,
-		.fPreviousClientArmor = game::gpGame->mfPreviousClientArmor,
 	};
 	const ReplayFleetLog& rReplayLog = gpServerSession->mpFleetManager->mReplayLog;
-	return engine::gpFileManager->WriteFileAtomically(rFlags, rFilename, [&](std::fstream& rFileStream)
+	return engine::gpFileManager->WriteFileAtomically({engine::FileFlags::kWrite}, rFilename, [&](std::fstream& rFileStream)
 	{
 		engine::WriteVersionHeader<ReplayMeta>(rFileStream);
 		common::Write(rFileStream, metadata);
@@ -46,9 +44,9 @@ bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesyste
 	});
 }
 
-bool ReadReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, int64_t iNextGlobalId, ReplayStagedMeta& rStagedMetadata)
+bool ReadReplayMetadata(const std::filesystem::path& rFilename, int64_t iNextGlobalId, ReplayStagedMeta& rStagedMetadata)
 {
-	std::fstream fileStream = engine::gpFileManager->OpenFile(rFlags, rFilename);
+	std::fstream fileStream = engine::gpFileManager->OpenFile({engine::FileFlags::kRead}, rFilename);
 
 	int64_t iVersion = 0;
 	int64_t iSize = 0;

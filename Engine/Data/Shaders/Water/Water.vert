@@ -42,7 +42,7 @@ void main()
 
 	// Over land: skip the displacement sample — the Z scale below would collapse to 0 anyway. Emit a
 	// flat vertex at world-Z=0 with up-normal; the fragment shader handles all elevations directly.
-	float fTerrainElevation = textureLod(elevationTextureSampler, WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea), 0.0f).x;
+	float fTerrainElevation = textureLod(elevationTextureSampler, f2InTexcoord, 0.0f).x;
 	if (fTerrainElevation >= 0.0f)
 	{
 		f3OutPosition = vec3(f2WorldPosition, 0.0f);

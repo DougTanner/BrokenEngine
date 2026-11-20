@@ -31,11 +31,8 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 
 struct ReplayMeta
 {
-	static constexpr int64_t kiVersion = 7;
+	static constexpr int64_t kiVersion = 8;
 	engine::GridCoord clientGridCoordinate {};
-	int64_t iClientOwnedEntityIdentifierValue = 0;
-	float fPreviousClientArmor = 0.0f;
-	uint8_t puiPadding[4] {};
 };
 
 #if defined(BT_SERVER)
@@ -82,14 +79,15 @@ public:
 	std::unique_ptr<ClientSession> mpClientSession;
 #endif
 
+	void RestoreReplayMetadata(const ReplayMeta& rMetadata);
+
+#if defined(BT_CLIENT)
 	// Client owned-entity tracking (several per client)
 	engine::GlobalId ClientOwnedEntityIdentifier() const;
 	void AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate);
 	void RemoveClientOwnedEntity(engine::GlobalId identifier);
-	void RestoreReplayMetadata(const ReplayMeta& rMetadata);
 	std::optional<ShipLocator> ClientOwnedEntity(const Frame& rFrame) const;
 
-#if defined(BT_CLIENT)
 	void CaptureClientState();
 #endif
 
@@ -119,8 +117,10 @@ private:
 #endif
 
 public:
+#if defined(BT_CLIENT)
 	std::vector<engine::OwnedEntity> mClientOwnedEntities;
 	float mfPreviousClientArmor = 0.0f;
+#endif
 	engine::AlignmentIdentifier mFleetAlignment {};
 	engine::AlignmentIdentifier mRandomAlignment {};
 	engine::Alignments mAlignments {};

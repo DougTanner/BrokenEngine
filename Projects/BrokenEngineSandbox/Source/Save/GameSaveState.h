@@ -11,7 +11,6 @@ namespace game
 struct SaveStagedState
 {
 	std::unordered_map<engine::ClientGuid, std::vector<Fleet>> fleets;
-	std::unordered_map<engine::ClientGuid, int64_t> guidToClientId;
 	common::RandomEngine randomEngine;
 };
 

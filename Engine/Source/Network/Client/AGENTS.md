@@ -65,17 +65,15 @@ the same checks inline.
   order are on `SubscribeRequests` (`ClientSubscriptions.h`), relying on the
   server's answer rule in
   [Server Session Invariants](../Server/AGENTS.md#session-invariants); leaving
-  the desired set marks the coord's live record cancelled. The one exception is
-  the out-of-range accept branch in `Client::ServerSubscribeAccept`, which
-  consumes nothing. An accept whose consumed record was cancelled or missing
-  heals or commits and then unsubscribes. Full state and static data never
-  consume a record. Out-of-order full state may claim a `kUnsubscribed` or
-  `kUnsubscribing` slot only while its coord has a live record; otherwise it is
-  a ghost on `kUnsubscribed`, which sends an epoch-qualified unsubscribe and
-  retires its epoch there so the late accept for that subscription is dropped
-  instead of committed, and it is dropped on `kUnsubscribing`. A same-coord
-  active slot may heal its epoch on a legitimate re-subscribe. Load reset clears
-  every record.
+  the desired set marks the coord's live record cancelled. An accept whose
+  consumed record was cancelled or missing heals or commits and then
+  unsubscribes. Full state and static data never consume a record. Out-of-order
+  full state may claim a `kUnsubscribed` or `kUnsubscribing` slot only while its
+  coord has a live record; otherwise it is a ghost on `kUnsubscribed`, which
+  sends an epoch-qualified unsubscribe and retires its epoch there so the late
+  accept for that subscription is dropped instead of committed, and it is
+  dropped on `kUnsubscribing`. A same-coord active slot may heal its epoch on a
+  legitimate re-subscribe. Load reset clears every record.
 - Timeouts: a live record unanswered for `kSubscriptionTransitionTimeout` logs
   one warning and keeps waiting; it is never cancelled or resent. A
   `kWaitingFullState` slot has no client timeout
@@ -95,13 +93,11 @@ the same checks inline.
   `kUnsubscribing` state whose coord has no live record, is dropped. Resync is
   server full-state replacement; reconciliation is client rollback/replay
   ([Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md)).
-- A non-reject subscribe-accept slot outside the client pool immediately
-  unsubscribes so the server slot cannot leak. Transport activation and ACK
-  commitment stay at acceptance. Transfer every accepted static/full/delta
-  record into durable main-owned staging in that poll, carrying its coordinate,
-  assigned slot, epoch and load generation before `Client::Poll` clears its
-  buffers. Delayed publication must preserve accepted updates or initiate the
-  existing bounded-overflow resync.
+- Transport activation and ACK commitment stay at acceptance. Transfer every
+  accepted static/full/delta record into durable main-owned staging in that
+  poll, carrying its coordinate, assigned slot, epoch and load generation before
+  `Client::Poll` clears its buffers. Delayed publication must preserve accepted
+  updates or initiate the existing bounded-overflow resync.
 
 ## Live Terrain Preparation
 
@@ -131,13 +127,16 @@ render or reconciliation state. Empty terrain has explicit readiness.
 monotonic echoed client timestamp, and excludes resends because off-cadence
 arrivals would corrupt interarrival jitter. At load, `ClientSessionRuntime.cpp`
 resets timing history and skips the first restored interval so pre-load wall
-time cannot affect the new clock. When no active slot remains, it clears
-`miLatestServerTick` because that baseline sets the simulation ceiling; the
-clock reference the servo and ceiling read is its wall-clock estimate,
-`EstimatedLatestServerTick`. Signed clock correction floors the time-step
-remainder at zero so it cannot produce a negative target tick. Keep these
-behaviors at their existing boundaries; formulas and simulation-ceiling behavior
-are in [Network](../../../../Documents/Architecture/Network.md).
+time cannot affect the new clock. A paused server sends no deltas, so every
+paused `kServerTimespeedUpdate` (`Client.cpp`) both restarts the arrival clock
+and skips the next interval, keeping the jitter history. When no active slot
+remains, the runtime clears `miLatestServerTick` because that baseline sets the
+simulation ceiling; the clock reference the servo and ceiling read is its
+wall-clock estimate, `EstimatedLatestServerTick`. Signed clock correction
+floors the time-step remainder at zero so it cannot produce a negative target
+tick. Keep these behaviors at their existing boundaries; formulas and
+simulation-ceiling behavior are in
+[Network](../../../../Documents/Architecture/Network.md).
 
 ## Reconciliation Replay Chain
 

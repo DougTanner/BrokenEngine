@@ -75,8 +75,11 @@ All simulation math uses DirectXMath (SSE intrinsics). Under /fp:strict
 with consistent MXCSR, SSE operations are fully deterministic for IEEE
 754 basic operations (+, -, *, /, sqrt, comparisons).
 
-No direct calls to sinf/cosf/tanf exist in simulation code. These
-transcendental functions are known to differ across implementations;
+No direct calls to the C runtime's sinf/cosf/tanf or its pow, exp, and
+log families (powf, expf, exp2f, logf, log2f, log10f and their double and
+std:: forms) exist in simulation code, nor to DirectXMath's XMVectorPow,
+which calls powf per lane. Their result bits depend on runtime-library
+internals that no document guarantees across toolchain or SDK versions;
 avoiding them eliminates this class of non-determinism entirely.
 
 Where simulation code does need sin/cos (e.g. island placement
@@ -84,6 +87,10 @@ rotation), it routes through common::DeterministicSinCos (Common/Math/
 MathUtils.h), which wraps DirectXMath's header-inline XMScalarSinCos
 minimax polynomial (basic IEEE ops only, bit-identical under
 /fp:strict) rather than libm.
+
+Where simulation code needs a whole-number power (e.g. the pusher
+falloff), it routes through common::WholeNumberPower (Common/Math/
+MathUtils.h), which uses only IEEE multiplies, rather than powf.
 
 
 6. Deterministic RNG

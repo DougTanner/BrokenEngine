@@ -53,7 +53,7 @@ void XM_CALLCONV PushersInterpolate::Sync(game::FrameInterpolate& rFrameInterpol
 	rPushers.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rPushers.pfRadii[iIndex] = rData.fRadius;
 	rPushers.pfIntensities[iIndex] = rData.fIntensity;
-	rPushers.pfPowers[iIndex] = rData.fPower;
+	rPushers.puiPowers[iIndex] = rData.uiPower;
 	rPushers.pFlags[iIndex] = rData.flags;
 }
 
@@ -182,7 +182,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 			}
 
 			auto vecIntensity = XMVectorSubtract(XMVectorReplicate(1.0f), XMVectorDivide(vecDistanceSquared, XMVectorReplicate(fRadius * fRadius)));
-			vecIntensity = XMVectorPow(vecIntensity, XMVectorReplicate(rCurrent.pfPowers[i]));
+			vecIntensity = XMVectorReplicate(common::WholeNumberPower(XMVectorGetX(vecIntensity), rCurrent.puiPowers[i]));
 			vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
 
 			auto vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));

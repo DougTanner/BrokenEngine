@@ -22,6 +22,7 @@ protected:
 
 	void Export() override;
 	void CleanupOnFailure() override;
+	std::string GetInputFingerprint() const override;
 	void UpdateCacheMetadata() override;
 
 	std::vector<std::filesystem::path> mIntermediateFiles;
@@ -41,8 +42,8 @@ private:
 	std::filesystem::path CompileShader(const std::filesystem::path& rPreProcessedFile);
 	std::filesystem::path OptimizeShader(const std::filesystem::path& rSpirvFile);
 	void ReflectAndWriteShader(const std::filesystem::path& rSpirvFile);
+	std::filesystem::path GetDependencyMetadataPath() const;
 
 	std::filesystem::path mDependencyFile;
-	std::filesystem::path mDependencyMetadataFile;
 	std::vector<DependencyFingerprint> mDependencyFingerprints;
 };

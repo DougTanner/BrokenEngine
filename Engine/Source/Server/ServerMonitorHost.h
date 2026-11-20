@@ -34,9 +34,11 @@ private:
 	void Disconnect(std::string_view reason, bool bRejected = false);
 
 	int64_t miUpdateCount = 0;
-	std::atomic<bool> mbAuthenticated = false;
+	std::atomic<int64_t> miAuthenticatedGeneration = 0; // zero while not authenticated; written only by the worker
+	int64_t miConnectionGeneration = 0; // worker-only
 	std::mutex mSnapshotMutex;
 	std::shared_ptr<const Snapshot> mpLatestSnapshot;
+	int64_t miLatestSnapshotGeneration = 0; // mSnapshotMutex-guarded; the generation the capture read
 	std::string mSecretKey;
 	bool mbLoopbackOnly = false;
 	SOCKET mListenSocket = INVALID_SOCKET;

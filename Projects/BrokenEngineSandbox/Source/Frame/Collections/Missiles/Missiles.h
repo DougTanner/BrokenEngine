@@ -32,9 +32,7 @@ struct FrameInterpolate;
 
 enum class MissileFlags : uint8_t
 {
-	kTargetFleet  = 0x08,
-	kTargetRandom = 0x10,
-	kFalling      = 0x20,
+	kFalling = 0x20,
 };
 using MissileFlags_t = common::Flags<MissileFlags>;
 
@@ -104,14 +102,12 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	// Requests the model pipeline's textures when an active cell holds a row.
 	static void RequestTextures(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
-	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
-	static void EndRender(int64_t iCommandBuffer);
 #endif // BT_CLIENT
 };
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 17;
+	static constexpr int64_t kiVersion = 18;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);

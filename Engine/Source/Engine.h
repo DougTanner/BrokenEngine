@@ -81,7 +81,6 @@
 
 #if defined(BT_SERVER)
 #include "Network/NetworkDiscoveryResponder.h"
-#include "Network/Server/OwnedEntityRegistry.h"
 #include "Network/Server/Server.h"
 #include "Network/Server/ServerSessionRuntime.h"
 #include "Agent/AgentCommandsServerGeneric.h"

@@ -10,11 +10,7 @@ template struct Collection<PointLightsPostRender>;
 
 void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, TickToSimulationTime(rFrame.interpolate.iTick), [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
-	{
-		DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
-		--i;
-	});
+	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, TickToSimulationTime(rFrame.interpolate.iTick));
 }
 
 } // namespace engine

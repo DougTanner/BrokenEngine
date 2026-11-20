@@ -2,6 +2,7 @@
 
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
+#include "ShaderPatchBlending.h"
 
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
@@ -46,7 +47,7 @@ void main()
 	vec2 f2InitialDy = dFdy(f2InInitialPosition);
 	vec3 f3NormalDx = dFdx(f3InNormal);
 	vec3 f3NormalDy = dFdy(f3InNormal);
-	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f3InPosition, globalLayout.f4VisibleArea);
+	vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(f3InPosition, globalLayout.visibleAreaToUv);
 
 	float fTerrainElevation = texture(elevationTextureSampler, f2VisibleAreaTexcoord).x;
 
@@ -136,7 +137,7 @@ void main()
 	vec3 f3DirectionalLighting = f3PreLightingColor * fDirectionalLighting;
 	vec3 f3LightingColor = mix(f3PreLightingColor, f3DirectionalLighting, 0.75f);
 	// GlobalUniforms.cpp folds max-combined water sun/moon color plus /3 sun and ambient scalars from uniform inputs;
-	// at noon f4MoonColor is near zero. Separate scalars keep fShadowAffectAmbient on ambient while the combined
+	// at noon the moon color is near zero. Separate scalars keep fShadowAffectAmbient on ambient while the combined
 	// sun/moon color modulates skybox color.
 	float fSunScalar     = globalLayout.fWaterSunScalar;
 	float fAmbientScalar = globalLayout.fWaterAmbientScalar;
@@ -178,12 +179,12 @@ void main()
 	// luminance-weighted blend of the two shadow values rather than a per-channel split: the
 	// f3SkyboxColor mix above breaks pure linearity in (Sun + Moon), so a per-channel divide
 	// would zero entire channels when Sun.c + Moon.c happens to be ~0 (e.g. morning sun has B=0).
-	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ObjectShadowsArea)).x;
-	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ShadowArea));
+	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.objectShadowsAreaToUv)).x;
+	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.shadowAreaToUv));
 	// Rec.601 sun/moon weights and their guarded reciprocal-sum are folded CPU-side (GlobalUniforms.cpp).
 	float fEffectiveShadow = (fShadowSun * globalLayout.fWaterSunWeight + fShadowMoon * globalLayout.fWaterMoonWeight) * globalLayout.fWaterShadowWeightSumInverse;
 	// fShadowAffectAmbient relaxes shadow on the sky-ambient half only; sun + skybox specular keep full shadow.
-	// Mirrors SunLighting() at ShaderFunctions.h:76-80, reusing fEffectiveShadow as its fAmbientShadow (identical Rec.601-weighted formula).
+	// Mirrors SunLighting() at ShaderFunctions.h:103-104, reusing fEffectiveShadow as its fAmbientShadow (identical Rec.601-weighted formula).
 	float fAmbientShadowApplied = mix(1.0f, fEffectiveShadow, globalLayout.fShadowAffectAmbient);
 	vec3 f3SunContribution     = fEffectiveShadow      * (fSunScalar     * f3LightingColor + f3SkyboxSpecularDarkened);
 	vec3 f3AmbientContribution = fAmbientShadowApplied *  fAmbientScalar * f3LightingColor;
@@ -199,13 +200,13 @@ void main()
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f));
 	vec2 f2PositionAtBaseHeightFinal = ProjectWaterReflection(normalResult, f2WorldInitialPosition, f2PositionAtBaseHeight);
 
-	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec2 f2LightingTexcoordBaseHeight = WorldToVisibleArea(vec3(f2PositionAtBaseHeightFinal, 0.0f), globalLayout.pLightingAreaToUvs[0]);
 	vec4 pf4LightingBaseHeight[3];
 	ReadLighting(pf4LightingBaseHeight, pLightingSamplers, 0, f2LightingTexcoordBaseHeight);
 
 	// Ambient sample — straight-down base-height projection, no reflection offset.
 	// Uses the precomputed direction-averaged ambient texture from a single fetch.
-	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec2 f2LightingTexcoordBaseHeightAmbient = WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pLightingAreaToUvs[0]);
 	vec3 f3AmbientSum = ReadAmbientLighting(ambientLightingSamplers, 0, f2LightingTexcoordBaseHeightAmbient);
 
 	// Scale base-height lighting (hue-preserving: pow applied to per-direction luminance/average scalar)
@@ -252,7 +253,7 @@ void main()
 	// decouples smoke from wave normals). Plane k is lit by lighting layer k: plane 0 by the base-height ambient above,
 	// a higher plane by its layer's ambient at that plane's smoke position, read only where its smoke shows. Only plane 0
 	// receives the combined object shadow at the base-height projected position.
-	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4ObjectShadowsArea)).x;
+	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.objectShadowsAreaToUv)).x;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, vec3(f2WorldInitialPosition, 0.0f), iPlane);
@@ -262,7 +263,7 @@ void main()
 		vec3 f3SmokeAmbientSum = f3AmbientSum;
 		if (iPlane > 0 && fSmokePow > 0.0f)
 		{
-			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pf4LightingAreas[iPlane]));
+			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pLightingAreaToUvs[iPlane]));
 		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Terrain/Terrain.frag carries the identical scale.

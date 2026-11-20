@@ -39,17 +39,10 @@ static int64_t ReadCompactInteger(std::istream& rStream)
 	return uiValue;
 }
 
-void CellStaticData::Write(std::ostream& rStream) const
+void WriteNavigationData(std::ostream& rStream, const std::vector<NavData>& rNavigationData)
 {
-	common::Write(rStream, static_cast<int32_t>(std::ssize(islands)));
-	for (const IslandPlacement& rPlacement : islands)
-	{
-		common::Write(rStream, rPlacement.islandCrc);
-		common::Write(rStream, rPlacement.f2WorldPosition);
-		common::Write(rStream, rPlacement.fRotation);
-	}
-	common::Write(rStream, static_cast<int32_t>(std::ssize(navigationData)));
-	for (const NavData& rNavData : navigationData)
+	common::Write(rStream, static_cast<int32_t>(std::ssize(rNavigationData)));
+	for (const NavData& rNavData : rNavigationData)
 	{
 		common::Write(rStream, static_cast<int32_t>(std::ssize(rNavData.vertices)));
 		for (const XMFLOAT2& rVertex : rNavData.vertices)
@@ -87,21 +80,12 @@ void CellStaticData::Write(std::ostream& rStream) const
 	}
 }
 
-void CellStaticData::Read(std::istream& rStream)
+void ReadNavigationData(std::istream& rStream, std::vector<NavData>& rNavigationData)
 {
-	int32_t iCount = 0;
-	common::Read(rStream, iCount);
-	islands.resize(iCount);
-	for (IslandPlacement& rPlacement : islands)
-	{
-		common::Read(rStream, rPlacement.islandCrc);
-		common::Read(rStream, rPlacement.f2WorldPosition);
-		common::Read(rStream, rPlacement.fRotation);
-	}
 	int32_t iGraphCount = 0;
 	common::Read(rStream, iGraphCount);
-	navigationData.resize(iGraphCount);
-	for (NavData& rNavData : navigationData)
+	rNavigationData.resize(iGraphCount);
+	for (NavData& rNavData : rNavigationData)
 	{
 		int32_t iVertexCount = 0;
 		common::Read(rStream, iVertexCount);
@@ -138,8 +122,6 @@ void CellStaticData::Read(std::istream& rStream)
 		}
 		BuildNavigationAcceleration(rNavData);
 	}
-	// Server visibility is authoritative; an empty completed graph must still be marked built.
-	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 }
 
 #if defined(BT_SERVER)
@@ -151,9 +133,14 @@ void CellStaticData::BuildNavigationDataIfUnbuilt() const
 	}
 
 	// Heap: one-time build per cell grows the per-graph navigationData vector and each graph's vertex, polygon, and
-	// visibility-edge vectors in proportion to the cell's islands
+	// visibility-edge vectors in proportion to the cell's islands, and sizes the fixed-dimension elevation grid
+	// when the cell has islands
 	ScopedSuppressAllocationTracking suppress;
 	BuildCellNavigationData(navigationData, islands);
+	if (!islands.empty())
+	{
+		gpIslandTerrain->BuildElevationGrid(islands, elevationGrid);
+	}
 	flags.Set(CellStaticDataFlags::kNavigationDataBuilt);
 }
 #endif

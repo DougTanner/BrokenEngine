@@ -19,6 +19,51 @@ top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
 
+- 2026-11-19 claude/dc240152-a8d5-4109-98cc-1668cbc3fa7c —
+  Engine/Source/Profile/ProfileManager.h:402 — fill the ring slots with a
+  sequence value no real submission can have (submission sequences start at 1),
+  both at default construction and in Clear(), so that an empty slot never
+  matches sequence 0 — makes unnecessary:
+  Engine/Source/Profile/GpuStallTimeline.cpp:44, :60, and the
+  iNewestSequence != 0 term at :81
+- 2026-11-19 claude/2c24c0a5-8dd2-4c11-9afc-991d104208bc — size observation —
+  Engine/Data/Shaders/ShaderFunctions.h is 6,181 bt-token-v1, over ~5,000
+- 2026-11-19 claude/2c24c0a5-8dd2-4c11-9afc-991d104208bc — size observation —
+  Engine/Data/Shaders/ShaderGlobalLayout.h is 5,396 bt-token-v1, over ~5,000
+- 2026-11-19 claude/21ac1d45-ae10-43b8-9886-f9e8114750bf —
+  Engine/Source/Frame/TimeStep.cpp:82 — have TimeStep::SetTimeScale return
+  without setting mbTimeScaleChanged when the multiply and divide already
+  match, so no caller has to check the ratio first — makes unnecessary:
+  Engine/Source/Network/Client/Client.cpp:832 (and the pre-existing check at
+  Engine/Source/Network/Server/ServerSessionRuntime.cpp:51)
+- 2026-11-19 claude/21ac1d45-ae10-43b8-9886-f9e8114750bf —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.cpp:177
+  — have the grid-save read reject a non-dying ship row (Fighters, Battleships,
+  Omnis) whose registry id is 0, so every row ForEachEnemyShip visits holds a
+  nonzero id and a zero target can never match — makes unnecessary:
+  FightersCombat.cpp:104, ShipQueries.cpp:63, ShipQueries.cpp:177 (the
+  `uuid.iValue != 0 &&` prefix of the kept-target test)
+- 2026-11-19 claude/583d6a45-ee2d-4df1-b610-487ad6f08df3 —
+  Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/FightersRender.cpp:241
+  — the `kbDebugRender` tails of the Fighters, Omnis, and Battleships `Render`
+  are near-copies of one hitbox-plus-navigation row loop differing only in
+  ShipType, radius, and Omni combat aim — fold them into one ship-layer debug
+  draw that takes the radius from `kShipHitboxTypes` by ship type
+- 2026-11-19 claude/eb09a76a-7dd6-4c45-b102-0c8002fba1a8 —
+  Engine/Source/Graphics/Managers/DynamicPipelines.h:52 — make the two span
+  overloads take paired per-pipeline data whose sizes match by type (a span of
+  {crc, count}/{crc, present} pairs, or a template over two std::array<_, N> of
+  the same N), so a size mismatch cannot compile — makes unnecessary:
+  DynamicPipelines.cpp:82, DynamicPipelines.cpp:97
+- 2026-11-19 claude/eb09a76a-7dd6-4c45-b102-0c8002fba1a8 —
+  Engine/Source/Frame/CellStaticData.cpp:157 — make
+  IslandTerrain::BuildElevationGrid (Engine/Source/Frame/IslandTerrain.cpp:406)
+  leave the grid empty when there are no placements; MakeCellElevationSampler
+  already treats an empty grid as sea floor, so its callers would not each need
+  their own empty-islands check — makes unnecessary:
+  Engine/Source/Frame/CellStaticData.cpp:157,
+  Engine/Source/Network/Client/ClientSessionRuntime.cpp:228, the islands half
+  of Engine/Source/Frame/FrameBase.cpp:272
 - 2026-11-15 claude/8e00ea59-d178-42f1-831f-3608122b6db6 —
   Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:115 — move kTransfer (and
   kDestroy) out of the persisted pLifecycleFlags column into a column that is
@@ -27,7 +72,7 @@ top of the file. A session reviewing the log removes each row it handles.
   This changes the Collection layout and save format and needs every
   collection's kiVersion bumped; the plan's ## Out of scope excludes it — makes
   unnecessary: ValidateNoTransferRows (Frame.cpp:115-131) and its call at
-  Frame.cpp:821
+  Frame.cpp:806
 - 2026-11-15 claude/42225028-bbfa-4078-98f5-84becc296ea6 —
   Engine/Source/Graphics/GraphicsUtils.cpp:44 — now that surface loss throws
   instead of raising `meDestroyType` to `kSurface`, nothing sets a tier above

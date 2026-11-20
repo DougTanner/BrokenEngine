@@ -57,6 +57,39 @@ void InitializeShipHitboxes();
 // as far as it reaches, the box and outline.
 void XM_CALLCONV BuildShipHitbox(ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection, engine::CollisionHitbox& rHitbox);
 
+// The ship PreCollision body: adds the type's hitbox collision layer, marks dying rows already collided, and writes every
+// row's radius and posed hitbox. Returns the layer index.
+template <typename INTERPOLATE, typename POST_RENDER>
+int64_t AddShipCollisionLayer(const INTERPOLATE& rCurrentInterpolate, const POST_RENDER& rCurrentPostRender, const INTERPOLATE& rPreviousInterpolate, ShipType eType, uint16_t uiCategory, uint16_t uiCollidesWith)
+{
+	int64_t iLayerIndex = engine::Collision::AddLayer(
+	{
+		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
+		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
+		.pVecVelocities = rCurrentPostRender.pVecVelocities,
+		.iCount = rCurrentInterpolate.iCount,
+		.layerFlags = engine::CollisionLayerFlags::kHitboxes,
+		.uiCategory = uiCategory,
+		.uiCollidesWith = uiCollidesWith,
+		.pAlignments = rCurrentPostRender.pAlignments,
+	});
+
+	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(iLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+	}
+
+	std::span<float> radii = engine::Collision::GetLayerRadii(iLayerIndex);
+	std::span<engine::CollisionHitbox> hitboxes = engine::Collision::GetLayerHitboxes(iLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		radii[static_cast<size_t>(i)] = gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(rCurrentPostRender.pController[i])].fRadius;
+		BuildShipHitbox(eType, rCurrentPostRender.pController[i], rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], hitboxes[static_cast<size_t>(i)]);
+	}
+	return iLayerIndex;
+}
+
 #if defined(BT_CLIENT)
 // Returns the center-directed ray's outline contact in the cell-local frame; an inside start uses the exit surface.
 XMVECTOR XM_CALLCONV ShipHullContact(ShipType eType, ShipController eController, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecShooterPosition);

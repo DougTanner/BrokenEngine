@@ -352,6 +352,62 @@ using CpuStopFlags_t = common::Flags<CpuStopFlags>;
 
 #if defined(BT_CLIENT)
 struct AcquisitionDiagnostics;
+
+struct GpuSubmission
+{
+	int64_t iSequence = 0;
+	bool bWorld = false;
+	std::chrono::nanoseconds expectedInterval = 0ns;
+	std::chrono::steady_clock::time_point submitTime {};
+};
+
+struct GpuDiagnosticSample
+{
+	GpuSubmission submission;
+	int64_t iFramebuffer = 0;
+	std::array<std::optional<int64_t>, kGpuTimerCount> microseconds {};
+
+	std::optional<int64_t> RootMicroseconds() const;
+	void Log(std::string_view context) const;
+};
+
+class GpuStallTimeline
+{
+public:
+
+	void Clear();
+	void RecordTicks(int64_t iSequence, GpuTimers eGpuTimer, uint64_t uiStartTick, uint64_t uiEndTick);
+	void FenceObserved(int64_t iSequence);
+	void ImageWait(int64_t iNewestSequence, std::chrono::steady_clock::time_point waitStart, std::chrono::steady_clock::time_point waitEnd);
+	void LogGraphicsStall(const char* pcOperation, const AcquisitionDiagnostics* pAcquisitionDiagnostics, std::chrono::steady_clock::time_point stallStart, int64_t iNewestSequence, const GpuDiagnosticSample& rLatestSample);
+	void Retired(const GpuDiagnosticSample& rSample, bool bAnomaly);
+
+	// Created at submit and completed later by the fence, image-wait, and retirement hooks.
+	struct GpuFrameTimeline
+	{
+		int64_t iSequence = 0;
+		int64_t iFramebuffer = 0;
+		bool bWorld = false;
+		bool bAcquireBarriers = false;
+		std::chrono::steady_clock::time_point submitTime {};
+		// Start/end per root: Global, Main, Image, UiRender.
+		std::array<std::optional<uint64_t>, 8> rootTicks {};
+		std::optional<std::chrono::steady_clock::time_point> optionalFenceObservedTime;
+		// First prior-acquisition fence wait after this submission.
+		std::optional<std::chrono::steady_clock::time_point> optionalImageWaitStart;
+		std::optional<std::chrono::steady_clock::time_point> optionalImageWaitEnd;
+	};
+	static constexpr int64_t kiGpuTimelineCapacity = 16;
+	// Indexed by submission sequence modulo capacity.
+	std::array<GpuFrameTimeline, kiGpuTimelineCapacity> mGpuTimeline {};
+
+private:
+
+	// Graphics stall whose timeline prints when submission miPendingStallSequence retires; 0 = none.
+	int64_t miPendingStallSequence = 0;
+	const char* mpcPendingStallOperation = nullptr;
+	std::chrono::steady_clock::time_point mPendingStallStart {};
+};
 #endif // BT_CLIENT
 
 class ProfileManager : public common::Singleton<ProfileManager>
@@ -424,13 +480,6 @@ public:
 
 	ProfileScreen meProfileScreen = kbShowProfileTextByDefault ? ProfileScreen::kCpu : ProfileScreen::kOff;
 
-#if defined(BT_SERVER) && !defined(ENABLE_CRT_DEBUG_HEAP)
-	int64_t miMimallocCommittedMebibytes = 0;
-	int64_t miMimallocPeakCommittedMebibytes = 0;
-	int64_t miMimallocHeapUsedMebibytes = 0;
-	int64_t miMimallocPeakHeapUsedMebibytes = 0;
-#endif
-
 protected:
 
 #if defined(BT_CLIENT)
@@ -492,50 +541,11 @@ protected:
 	common::Flags<DiagnosticFlags> mDiagnosticFlags {DiagnosticFlags::kFocused};
 
 	VkQueryPool mVkQueryPool = VK_NULL_HANDLE;
-	struct GpuSubmission
-	{
-		int64_t iSequence = 0;
-		bool bWorld = false;
-		std::chrono::nanoseconds expectedInterval = 0ns;
-		std::chrono::steady_clock::time_point submitTime {};
-	};
-	struct GpuDiagnosticSample
-	{
-		GpuSubmission submission;
-		int64_t iFramebuffer = 0;
-		std::array<std::optional<int64_t>, kGpuTimerCount> microseconds {};
-
-		std::optional<int64_t> RootMicroseconds() const;
-	};
-	void LogGpuSample(const GpuDiagnosticSample& rSample, std::string_view pcContext);
 	std::vector<GpuSubmission> mGpuSubmissions;
 	int64_t miGpuSubmissionSequence = 0;
 	std::array<common::Smoothed<int64_t>, kGpuTimerCount> mGpuDiagnosticHistories {};
 	GpuDiagnosticSample mLatestGpuSample {};
-
-	// Created at submit and completed later by the fence, image-wait, and retirement hooks.
-	struct GpuFrameTimeline
-	{
-		int64_t iSequence = 0;
-		int64_t iFramebuffer = 0;
-		bool bWorld = false;
-		bool bAcquireBarriers = false;
-		std::chrono::steady_clock::time_point submitTime {};
-		// Start/end per root: Global, Main, Image, UiRender.
-		std::array<std::optional<uint64_t>, 8> rootTicks {};
-		std::optional<std::chrono::steady_clock::time_point> optionalFenceObservedTime;
-		// First prior-acquisition fence wait after this submission.
-		std::optional<std::chrono::steady_clock::time_point> optionalImageWaitStart;
-		std::optional<std::chrono::steady_clock::time_point> optionalImageWaitEnd;
-	};
-	static constexpr int64_t kiGpuTimelineCapacity = 16;
-	// Indexed by submission sequence modulo capacity.
-	std::array<GpuFrameTimeline, kiGpuTimelineCapacity> mGpuTimeline {};
-	// Graphics stall whose timeline prints when submission miPendingStallSequence retires; 0 = none.
-	int64_t miPendingStallSequence = 0;
-	const char* mpcPendingStallOperation = nullptr;
-	std::chrono::steady_clock::time_point mPendingStallStart {};
-	void LogStallTimeline(const GpuDiagnosticSample& rSample, bool bAnomaly);
+	GpuStallTimeline mGpuStallTimeline;
 
 	std::unique_ptr<common::DiagnosticLog> mpDumpLog;
 	std::chrono::steady_clock::time_point mDumpStartTime = std::chrono::steady_clock::time_point();

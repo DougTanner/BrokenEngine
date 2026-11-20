@@ -78,9 +78,10 @@ types it consumes.
 - `EagerChunk.iDataSize` is the chunk table's raw on-disk extent, not the chunk
   header size, which excludes a scene chunk's appended animation section and a
   model chunk's outline and hardpoint sections. Bound eager reads by
-  `iDataSize`, or that data silently truncates. `ValidateChunkHeader` admits a
-  model chunk at pack open only uncompressed and with its outline and hardpoint
-  sections inside the chunk.
+  `iDataSize`, or that data silently truncates. A chunk's type alone says
+  whether it is compressed (`IsCompressed`); no eager type is.
+  `ValidateChunkHeader` admits a model chunk only with its outline and
+  hardpoint sections inside the chunk.
 - Corrupt runtime `.pack` chunks and pack-backed textures halt both processes,
   even at call sites outside this subsystem: validate and `ASSERT`; never
   soft-fail, skip, or substitute a placeholder.
@@ -101,14 +102,15 @@ types it consumes.
   active loader keeps its entry until it acknowledges cancellation. File must
   outlive Audio.
 - Validate a streaming-audio request against its logical chunk payload before
-  publishing: pack open rejects compressed audio, so that payload is the on-disk
-  extent bounded at open. A lazy pack is locked against writes from before its
-  size and header reads until shutdown but shares delete, so DataPacker can
-  replace its name while the open file stays unchanged; every read, validation
-  included, uses that handle, not the path, so the loader checks only for a
-  complete read, before discarding a cancelled generation: corruption
-  stays fatal even for an unwanted result. Loaders write only Pack-owned result
-  storage; the polling main thread copies to Audio.
+  publishing: Audio is never a compressed type (`IsCompressed`), and pack open
+  admits only one type flag per chunk, which ties `kChunkAudio` to that type, so
+  that payload is the on-disk extent bounded at open. A lazy pack is locked
+  against writes from before its size and header reads until shutdown but
+  shares delete, so DataPacker can replace its name while the open file stays
+  unchanged; every read, validation included, uses that handle, not the path,
+  so the loader checks only for a complete read, before discarding a cancelled
+  generation: corruption stays fatal even for an unwanted result. Loaders write
+  only Pack-owned result storage; the polling main thread copies to Audio.
 - The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and
   use loader-queue synchronization only in gameplay client Debug builds;
   elsewhere that state stays private.
@@ -156,8 +158,8 @@ then resimulates against recorded tick checksums.
   generation. Keep reader state private and replay algorithms here.
 - Whether playback is running is one engine-owned `GameBase` flag because
   tick-path engine and game code read it every update. Republish it after every
-  live or pending reader-set change, including the clears on abort, retirement,
-  and loop transition.
+  live or pending reader-set change, including the clear on abort and each
+  reader retirement.
 - Recording and playback are mutually exclusive, a pending request counting as
   active: every path that sets a record-start or playback request refuses it,
   before changing anything, while the running-state or pending-request flags

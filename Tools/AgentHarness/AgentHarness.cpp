@@ -133,21 +133,14 @@ static bool ReadAllStandardInput(std::string& rInput)
 	return true;
 }
 
-static bool RefreshHeartbeatIfDue(std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, std::optional<std::chrono::steady_clock::time_point> optionalOperationDeadline = std::nullopt)
+static bool RefreshHeartbeatIfDue(std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, const std::chrono::steady_clock::time_point& rOperationDeadline)
 {
 	if (std::chrono::steady_clock::now() < rNextHeartbeatDue)
 	{
 		return true;
 	}
-	if (optionalOperationDeadline)
-	{
-		int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*optionalOperationDeadline - std::chrono::steady_clock::now()).count();
-		if (!RefreshHarnessHeartbeat(owner, iRemainingMilliseconds > 0 ? iRemainingMilliseconds : 0))
-		{
-			return false;
-		}
-	}
-	else if (!RefreshHarnessHeartbeat(owner))
+	int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(rOperationDeadline - std::chrono::steady_clock::now()).count();
+	if (!RefreshHarnessHeartbeat(owner, iRemainingMilliseconds > 0 ? iRemainingMilliseconds : 0))
 	{
 		return false;
 	}

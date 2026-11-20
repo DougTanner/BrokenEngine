@@ -361,6 +361,7 @@ and the handoff this run returns.
     - The launch script runs `Baseline`, `Register`, and the immediate `Check`
       for every launch. Run an action directly only for step 33's
       transport-failure `Check`, as its own shell call in the form shown below,
+      and for step 25's post-quit `Baseline`, in the form step 25 shows, each
       using the state path retained in step 20:
 
       ```powershell
@@ -457,7 +458,7 @@ and the handoff this run returns.
         `reportPath` and `headline` as `null` rather than inventing evidence.
     - Exit `1` is a setup or state failure, except code
       `check.no-registered-roles` after every registered role has exited and
-      been reported, which is expected.
+      been reported or been quit through step 25, which is expected.
     - Never delete, move, or rewrite a reported crash report or its retained
       evidence; report it by path.
     - The checker reports only through the command, poll, or check that is
@@ -524,20 +525,30 @@ and the handoff this run returns.
     - `launch.md` owns the concrete argument values and the evidence check
       around this call.
 
-25. Before relinking or relaunching, send `quit` and wait for the exact numeric
-    `pid` from the role's latest launch result. Done when that PID is gone.
+25. Before relinking or relaunching, send `quit`, wait for the exact numeric
+    `pid` from the role's latest launch result, and clear the role's
+    process-check registration. Done when that PID is gone and either the
+    role's `Baseline` passed or the quit's transport failure has its step 33
+    `Check` result reported.
 
-    - Use this independent shell call with the role's port and retained PID:
+    - Use this independent shell call with the role's port, retained PID, and
+      the `-Role`, `-GameName`, and app-data root of its launch call:
 
       ```powershell
       '{"cmd":"quit"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port <role port> --timeout-ms 3000 -
+      $quitExit = $LASTEXITCODE
       Wait-Process -Id <retained role PID> -Timeout 60
       if (Get-Process -Id <retained role PID> -ErrorAction SilentlyContinue) { throw 'Role did not exit.' }
+      if ($quitExit -eq 0) { pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role '<role>' -GameName '<role game name>' -ConfiguredAppDataRoot '<absolute app-data root>' } else { "quit exit $quitExit" }
       ```
 
       `Wait-Process` reports a non-terminating error on timeout; the subsequent
       exact-PID check proves exit. If the PID survives, treat the run as failed
       and investigate or release it through step 39 before continuing.
+    - `Baseline` leaves the deliberately quit role with no registered process,
+      so no later `Check` reports its exit; read its result as step 22 states.
+    - A failed quit skips `Baseline` because the role may already have crashed,
+      and step 33's `Check` must still report that exit.
     - A live executable locks its image.
     - Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a
       duplicate on the same port binds alongside the live listener instead of
@@ -551,9 +562,6 @@ and the handoff this run returns.
 26. Relaunch the role with its launch call (step 21), which baselines the role
     before it registers the new process. Done when the replacement process's
     launch result has returned.
-
-    - Between that deliberate quit and re-registration the role is not checked,
-      so run no process check in that window.
 
 ### Invoke commands
 
@@ -871,6 +879,29 @@ case.
   sized for UI readability. A "did terrain render at all" check does not need
   them; pass a `maxWidth` and `quality` matched to the assertion as part of
   designing the check.
+- A before/after pixel baseline pins every time-varying client visual input an
+  existing route reaches and records each pinned value with the recipe. For
+  the BrokenEngineSandbox sun angle, after the last tick advance with the game
+  paused, `set_slider` a chosen value on `##Sun Angle` in window `Tweaks`
+  (Debug-client and F3 mechanics: [`command-reference.md`](command-reference.md)
+  `set_slider` entry), close Tweaks, confirm `tweaksVisible:false`
+  (`describe_ui` entry), then have the driver sleep one fixed wall-clock
+  duration in milliseconds between the `describe_ui` reply and the
+  `screenshot`, recorded with the recipe and identical in every run, so the
+  terrain and object shadow refreshes (`Engine/Source/Graphics/Render/AGENTS.md`
+  `## Ordering and Publication`) and temporal history catch up. No harness
+  command waits for rendered frames, and this sleep is not a readiness wait,
+  which stays with the ping poll. Client render state accumulated since launch
+  or by wall-clock time, such as the water scroll or foam aging, has no pinning
+  route, so the recipe takes two baseline captures, and every capture, the
+  after-change one included, replays the full recipe on its own fresh client
+  launch. Judge the after-change capture only where the two baseline captures
+  agree within the check's pixel threshold, recorded with the recipe like the
+  sleep duration: every asserted region (hulls, wrecks, and the like) must lie
+  inside that agreement area, the run reports the excluded pixel count, and an
+  asserted region outside it leaves its criterion unsettled, never `PASS`. An
+  input whose pinning needs a new command or C++ is surfaced for re-planning,
+  never worked around by sweeping values until the pixels match.
 
 ### Performance investigations
 

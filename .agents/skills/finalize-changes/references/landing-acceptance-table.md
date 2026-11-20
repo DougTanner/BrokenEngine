@@ -80,9 +80,8 @@ undecided refutations are non-passing.
 For builds, require the authoritative `broken-engine-build-result/v1`: intended
 target/selection/arguments, status/exit/failure kind, complete retained log,
 decisive diagnostics, and all requested targets. A game build additionally
-requires the complete `/compile` handoff for that build, the envelope file it
-cites, and any mode-divergence `Decisive checks` row it returned, reporting
-success. Do not accept schema/result/exit mismatches.
+requires the complete `/compile` handoff for that build and the envelope file
+it cites, reporting success. Do not accept schema/result/exit mismatches.
 
 Skill changes require a complete `/external-skill-creator` findings-only
 validate-mode handoff with mechanical self-check, target validator exit/output,

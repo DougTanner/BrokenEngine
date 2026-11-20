@@ -7,6 +7,7 @@
 
 #if defined(BT_CLIENT)
 #include "Frame/Frame.h"
+#include "RenderInterpolation.h"
 #include "Ui/ChatLog.h"
 #endif
 #if defined(BT_SERVER)
@@ -207,14 +208,15 @@ public:
 	bool ShouldUseCrosshair() const;
 
 	void ProcessInput(bool bLostFocus);
+	void SetPaused(bool bPaused);
 	void ClientUpdate();
 	void Render();
-	float AdvanceRenderClock(double fWindowStartTime, bool bPaused, bool bHaveInterpolationWindow, double fSimulationDeltaSeconds);
 	game::Frame& RenderFrame(GridCoord coordinate) const;
-	void ResetRenderClock();
+	bool IsCoordinateRenderable(GridCoord coordinate) const;
 #endif // BT_CLIENT
 #if defined(BT_SERVER)
 	void ServerUpdate();
+	void RefreshReplayActiveSet();
 #endif // BT_SERVER
 
 	void ResetSession();
@@ -247,12 +249,6 @@ public:
 	// sim-time progression (e.g. game timers advanced once per update), use this to respect
 	// time-scaling without each one re-deriving the delta.
 	float mfLastDeltaTime = 0.0f;
-#if defined(BT_CLIENT)
-	// Sim-scaled seconds elapsed since the previous render frame: wall delta multiplied by the active time
-	// ratio (equal to wall time at ratio 1.0). Cached here so render-rate consumers share the render clock's
-	// delta; camera blend / shake decay / mfTime and visual-error-offset decay use the same timing units.
-	double mfLastRenderFrameSeconds = 0.0;
-#endif // BT_CLIENT
 	std::unordered_map<GridCoord, Cell> mCells;
 	// Awake cells for this update: the coords simulated, published, and rendered. Populated by the session runtimes
 	// (ClientSessionRuntime::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the
@@ -285,25 +281,14 @@ public:
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
-	// Per-coord render interpolation. Render() and the Main.cpp boot path own its lifecycle and forward
-	// it by const ref into Graphics::RenderMainPresentAcquire (Graphics never touches it). Kept here so
-	// storage and lifecycle share one object; the Frame/Frame.h include above supplies the complete type.
-	std::unordered_map<GridCoord, game::FrameInterpolate> mRenderInterpolates;
+	RenderInterpolation mRenderInterpolation;
 
 	// Frame-head skip check shared by Render() and the Main.cpp boot render loop; true means skip this frame.
 	bool HandleDeferredSwapchain();
 
-	// Pulls the game camera's target, runs the display-rate camera update for the coord the camera renders, and sets
-	// controller vibration from the decayed shake; shared by Render() and the Main.cpp boot render. fSunDeltaTime is the
-	// render clock's advance this frame limited to [0, this frame's sim delta], so the sun stops whenever on-screen game
-	// time stops.
-	void UpdateCamera(GridCoord cameraCoordinate, float fSunDeltaTime);
-
 private:
 
-	bool IsCoordinateRenderable(GridCoord coordinate) const;
 	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const;
-	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
 #endif // BT_CLIENT
 
 #if defined(BT_SERVER)
@@ -318,7 +303,6 @@ protected:
 
 	void PrepareActiveSet();
 #if defined(BT_SERVER)
-	void RefreshReplayActiveSet();
 	void SwapFrames();
 	void BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveCoordinates);
 	void FinalizeFrameTick();
@@ -335,11 +319,6 @@ protected:
 	MenuFlags_t mMenuFlags {MenuFlags::kMouseVisible};
 
 #if defined(BT_CLIENT)
-	// Render clock advances in simulation seconds, with wall time scaled by the current time ratio, and is clamped to the one-tick window starting at RenderFrame's source time. A midpoint seed sets phase; rebasing occurs only outside [source - kfDeltaTime, source + 2 * kfDeltaTime]. Single-tick commits preserve continuity through the Update(N, kfDeltaTime) == Update(N+1, 0) interpolation invariant.
-	double mfRenderTime = 0.0;
-	bool mbRenderClockSeeded = false;
-	common::Timer mRenderTimer;
-
 	// Minimized-render-loop throttle (HandleDeferredSwapchain()'s swapchain-recreate-deferred skip branch). While the
 	// recreate stays deferred the branch early-returns past vkQueuePresentKHR — the client loop's only
 	// vsync throttle — so a high-resolution waitable timer paces the skip loop to one sim tick's cadence.

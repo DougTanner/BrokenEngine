@@ -34,7 +34,7 @@ using PusherFlags_t = common::Flags<PusherFlags>;
 struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlags::kIdToIndex>
 {
 	// Bump on any SOA layout or push behavior change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 7;
+	static constexpr int64_t kiVersion = 8;
 
 	static void AllocateAndCopy(PushersInterpolate& rCurrent, const PushersInterpolate& rPrevious);
 
@@ -45,7 +45,7 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 		XMVECTOR vecPosition {};
 		float fRadius = 0.0f;
 		float fIntensity = 0.0f;
-		float fPower = 0.0f;
+		uint8_t uiPower = 0;
 		PusherFlags_t flags;
 	};
 
@@ -63,12 +63,12 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	float* __restrict pfRadii = nullptr;
 	float* __restrict pfIntensities = nullptr;
-	float* __restrict pfPowers = nullptr;
+	uint8_t* __restrict puiPowers = nullptr;
 	PusherFlags_t* __restrict pFlags = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pfRadii, rSelf.pfIntensities, rSelf.pfPowers, rSelf.pFlags);
+		return std::tie(rSelf.pVecPositions, rSelf.pfRadii, rSelf.pfIntensities, rSelf.puiPowers, rSelf.pFlags);
 	}
 
 	bool LogDifferences(const PushersInterpolate& rOther) const;

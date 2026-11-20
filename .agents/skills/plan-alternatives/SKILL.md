@@ -135,9 +135,11 @@ drafted plan included:
 
 - Unique advantages: what it offers that the other options do not, each named
   with a short label, such as DRY (reuses an existing mechanism instead of
-  adding a second one), KISS/YAGNI (less code, state, or machinery), root-cause
-  fix (the `### Comparison` cause criterion), or codebase-improving refactor
-  (the `### Comparison` codebase criterion) — or `none`.
+  adding a second one), KISS/YAGNI (less code, state, or machinery in the
+  finished codebase, judged by the `### User Interaction` rule for comparing
+  options), root-cause fix (the `### Comparison` cause criterion), or
+  codebase-improving refactor (the `### Comparison` codebase criterion) — or
+  `none`.
 - Pros and cons: the `### Comparison` criteria stated as pros and cons,
   including what it adds and deletes and when it pays off, worded by the
   `### User Interaction` rule for comparing options.

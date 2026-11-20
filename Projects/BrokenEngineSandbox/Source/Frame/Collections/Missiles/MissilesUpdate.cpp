@@ -144,11 +144,13 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
 			{
+				// A targeted missile keeps its stored direction current, so losing the target, the crossing included,
+				// leaves it flying on along the heading it had.
+				vecStoredDirection = rCurrentInterpolate.pVecDirections[i];
 				bRetained = FindLowestPlaneShipByRegistryId(rFrame, rPreviousFrame, uiTarget, vecTargetPreviousPosition);
 				if (!bRetained)
 				{
 					uiTarget = {};
-					vecStoredDirection = rCurrentInterpolate.pVecDirections[i];
 				}
 			}
 

@@ -40,7 +40,7 @@ void SaveSoundSettings()
 		.uiMuteInBackground = static_cast<uint8_t>(gMuteInBackground.Get<bool>()),
 	};
 
-	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcSoundSettingsPath, soundSettings);
+	WriteVersionedFile(kpcSoundSettingsPath, soundSettings);
 }
 
 static const char* FindInvalidSoundSetting(const SoundSettings& rSoundSettings)
@@ -67,7 +67,7 @@ void LoadSoundSettings()
 {
 	SoundSettings soundSettings {};
 
-	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcSoundSettingsPath, soundSettings))
+	if (ReadVersionedFile(kpcSoundSettingsPath, soundSettings))
 	{
 		const char* pcInvalidField = FindInvalidSoundSetting(soundSettings);
 		if (pcInvalidField != nullptr)

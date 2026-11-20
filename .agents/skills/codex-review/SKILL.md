@@ -118,16 +118,14 @@ wrapper. Use that file as `<promptPath>`, then continue at step 9 with
    the session worktree root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-UntrackedPath <comma-separated paths>] [-Head <rev>] [-AdHocRole]
+   pwsh -NoProfile -File .agents/skills/codex-review/scripts/New-CodexReviewPrompt.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character baseline SHA> -AssignedSkill <assigned skill> -ScopeFile <scope file> -PromptPath <new prompt path> [-RiskTier <1|2|3>] [-Head <rev>] [-AdHocRole]
    ```
 
    `-RiskTier` adds one `Risk tier: <n>` line above that text. `-PromptPath`
    must not already exist.
 
-   `-UntrackedPath` names every visible, non-gitignored untracked file in the
-   worktree — [receipts.md](references/receipts.md) lists the blocks
-   an unnamed, unknown, or ignored path produces — and does not combine with
-   `-Head`.
+   Without `-Head`, the script includes every visible, non-gitignored untracked
+   file in the worktree.
 
    Done when the script has run from the session worktree root and printed its
    receipt.

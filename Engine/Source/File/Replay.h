@@ -2,7 +2,8 @@
 
 #if defined(BT_SERVER)
 
-#include "File/DifferenceStream.h"
+#include "File/DifferenceStreamReader.h"
+#include "File/DifferenceStreamWriter.h"
 
 #include "Save/GameSaveLoad.h"
 
@@ -53,16 +54,14 @@ private:
 		std::unique_ptr<DifferenceStreamReader> pReader;
 		std::unique_ptr<game::Frame> pSavedStart;
 		game::FrameInput initialInput;
-		int64_t iActivationTick = 0;
 	};
 
 	std::unordered_map<GridCoord, std::unique_ptr<DifferenceStreamReader>> mReplayReaders;
 	std::vector<PendingReplayReader> mPendingReplayReaders;
-	int64_t miReplayInitialTick = 0;
 
 	void InvalidateReplayRecording();
 	void UpdateTerminalReplayWriter(GridCoord coordinate, const ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
-	void ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rPendingReader);
+	void ActivateReplayReader(PendingReplayReader&& rPendingReader);
 };
 
 inline Replay* gpReplay = nullptr;

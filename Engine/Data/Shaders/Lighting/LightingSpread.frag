@@ -72,7 +72,7 @@ void main()
 	{
 		// World position of this spread texel and its on-screen (visible-area) UV for the height-fade elevation sample.
 		vec2 f2WorldPos = VisibleAreaToWorld(f2InTexcoord, globalLayout.f4LightingArea);
-		vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.f4VisibleArea);
+		vec2 f2ElevTexcoord = WorldToVisibleArea(vec3(f2WorldPos, 0.0f), globalLayout.visibleAreaToUv);
 
 		float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
 		float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
@@ -81,9 +81,10 @@ void main()
 		fDecay *= 1.0f - fHeightFade;
 	}
 
-	// World-to-texcoord conversion: texcoord 0-1 covers the lighting area
-	float fAspectRatioX = globalLayout.f2LightingAreaExtentInverse.x;
-	float fAspectRatioY = globalLayout.f2LightingAreaExtentInverse.y;
+	// World-to-texcoord conversion: texcoord 0-1 covers the lighting area. The mapping's y scale carries the Y flip, so
+	// its negation is the positive reciprocal extent.
+	float fAspectRatioX = globalLayout.lightingAreaToUv.f4ScaleOffset.x;
+	float fAspectRatioY = -globalLayout.lightingAreaToUv.f4ScaleOffset.y;
 
 	f4OutRed = vec4(0.0f);
 	f4OutGreen = vec4(0.0f);

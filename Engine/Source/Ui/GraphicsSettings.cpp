@@ -126,7 +126,7 @@ void SaveGraphicsSettings()
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kWind, gWindEnabled.Get<bool>());
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kLighting, gLightingEnabled.Get<bool>());
 
-	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
+	WriteVersionedFile(kpcGraphicsSettingsPath, graphicsSettings);
 }
 
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
@@ -255,7 +255,7 @@ void LoadGraphicsSettings()
 {
 	GraphicsSettings graphicsSettings {};
 
-	bool bRead = ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGraphicsSettingsPath, graphicsSettings);
+	bool bRead = ReadVersionedFile(kpcGraphicsSettingsPath, graphicsSettings);
 	if (bRead)
 	{
 		const char* pcInvalidField = FindInvalidGraphicsSetting(graphicsSettings);

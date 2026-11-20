@@ -12,10 +12,9 @@ its output.
   dependency sidecar names carry that job's export-format version. Every job's
   entry names also carry a content key from `ExportJob::SetContentKey`, built
   from content fingerprints only, so trees with equal key inputs share one entry
-  and trees with different key inputs keep separate entries. The Shader and
-  Blender-source Scene constructors set their own keys, and
-  `ExportJob::CheckDirty` keys every other job from `GetInputFingerprint`. The
-  Shader key covers its source and every `.h` under both input roots' `Shaders`
+  and trees with different key inputs keep separate entries.
+  `ExportJob::CheckDirty` keys every job from `GetInputFingerprint`. The Shader
+  key covers its source and every `.h` under both input roots' `Shaders`
   directories. Checkout-local packs and manifests can be rebuilt from clean
   shared chunks without re-exporting sources. The `.meta` also records the chunk
   body's CRC, so comparing a clean job with the manifest reads no chunk body.
@@ -31,6 +30,13 @@ its output.
   need the owning manual version bump; the layout `static_assert`s in
   `Common/DataFile.h` name which job's version owns each payload struct, so read
   the failing assertion message instead of guessing which version to bump.
+- Because an entry name identifies the exporter only by its version (first
+  bullet), a raw version bumped by one can, rarely, land on a value an unlanded
+  or reverted build already wrote, and DataPacker then reuses that build's
+  stale entries (seen once as stale zlib texture chunks tripping the client's
+  LZ4 decode assert). Watch for it when rebasing over another change that bumps
+  the same job's version or after reverting a bump, and bump to a value neither
+  side used.
 - A job may version an expensive sub-stage independently of its chunk payload
   when that stage's outputs are tracked in the checkout, giving the stage its
   own marker and a fingerprint covering only its own inputs. Name and key that
@@ -65,15 +71,17 @@ its output.
 `Handles()` determines both ownership and initial chunk flags. Filename tags and
 path components are inputs the output actually depends on: `[C]` marks cubemaps,
 `[BC4]`/`[BC5]`/`[BC7]` select block formats, and a `Raw` component marks raw
-assets. Shader stage flags and compression flags are added by their owning jobs.
-Scene discovery ignores `Intermediates` paths so generated Gaea meshes do not
-become standalone scenes.
+assets. Shader stage flags are added by the shader job. No chunk carries a
+compression flag: the chunk type alone says whether a chunk is compressed
+(`engine::IsCompressed`), so the texture and island jobs LZ4-compress exactly
+those types and no other job compresses. Scene discovery ignores
+`Intermediates` paths so generated Gaea meshes do not become standalone scenes.
 
 Regular images generate a full mip chain; raw BCn/R16 and half-float
 intermediates preserve their supplied mip/face layout; KTX and live six-face
 cubemaps preserve cubemap ordering. Before encoding each live-cubemap face, the
 exporter requires the first face to be square and later faces to match its
-dimensions. Every final texture chunk is LZ4-compressed.
+dimensions.
 
 Texture encoding and chunk routing are described in `Texture/AGENTS.md`.
 Island/Gaea ingest is described in `Island/AGENTS.md`.
@@ -111,13 +119,13 @@ file's own transparency properties; `DataPacker/Source/AGENTS.md`
 `## Architecture` owns when such an override is allowed. Before export, the
 script drops animation actions that move nothing.
 
-The authored scene's primary fingerprint hashes its Blender source, not the GLB
-that conversion replaces after the fingerprint is captured. A separate shared
-cache marker uses the converter's own version, independent of scene payload
-and `.PreExport` versions. It records source, tool identity/content, script and
-recipe, consumed external dependency hashes, and published GLB content.
-The Blender key covers the source, script, and candidate image fingerprints
-(`BlenderExportContentKey`).
+The authored scene's primary fingerprint, and so its key, covers its Blender
+source, script, and candidate image fingerprints
+(`BlenderExportContentKeyInput`), not the GLB that conversion replaces after
+the fingerprint is captured. A separate shared cache marker uses the
+converter's own version, independent of scene payload and `.PreExport`
+versions. It records source, tool identity/content, script and recipe, consumed
+external dependency hashes, and published GLB content.
 The key leaves out the tool and every dependency conversion alone discovers, so
 trees differing only in those still convert in turn.
 Dependencies include transitive linked Blender data and unpacked images used

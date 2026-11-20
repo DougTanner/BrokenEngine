@@ -179,7 +179,7 @@ void ServerSessionRuntime::HandleResyncRequests()
 				continue;
 			}
 
-			mpServer->mBufferedFrames.SendCoordinateFullState(iClientId, i, game::gpGame->miTickCounter, coord, it->second.pCurrent.get());
+			mpServer->mBufferedFrames.SendCoordinateFullState(*pClient, i, game::gpGame->miTickCounter, coord, it->second.pCurrent.get());
 		}
 	}
 
@@ -219,7 +219,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 	for (int64_t i = 0; i < std::ssize(rPendingSubscriptions);)
 	{
 		engine::PendingNewSubscription& rSubscription = rPendingSubscriptions.at(i);
-		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
+		engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
 		bool bSlotStillValid = (pClient != nullptr
 		                     && (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
 		                     && pClient->slots.at(rSubscription.iSlot).subscription.coordinate == rSubscription.coordinate);
@@ -238,7 +238,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 
 		if (rSubscription.bStaticDataDelivered)
 		{
-			mpServer->mBufferedFrames.SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
+			mpServer->mBufferedFrames.SendCoordinateFullState(*pClient, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
 			rPendingSubscriptions.erase(rPendingSubscriptions.begin() + i);
 			continue;
 		}

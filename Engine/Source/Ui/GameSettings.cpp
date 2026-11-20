@@ -46,7 +46,7 @@ void SaveGameSettings()
 		.eUiTheme = GetUiTheme(),
 	};
 
-	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGameSettingsPath, gameSettings);
+	WriteVersionedFile(kpcGameSettingsPath, gameSettings);
 }
 
 static const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
@@ -78,7 +78,7 @@ void LoadGameSettings()
 {
 	GameSettings gameSettings {};
 
-	if (!ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGameSettingsPath, gameSettings))
+	if (!ReadVersionedFile(kpcGameSettingsPath, gameSettings))
 	{
 		return;
 	}

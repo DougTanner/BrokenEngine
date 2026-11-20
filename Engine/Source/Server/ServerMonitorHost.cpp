@@ -13,41 +13,6 @@
 namespace engine
 {
 
-static std::array<int64_t, std::size(game::kServerEntityCountNames)> sTotalEntityCounts {};
-
-static void UpdateStatistics()
-{
-	if constexpr (!kbProfiling)
-	{
-		return;
-	}
-
-	sTotalEntityCounts.fill(0);
-
-	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
-	{
-		game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(rCoordinate).pCurrent));
-		for (int64_t i = 0; i < std::ssize(sTotalEntityCounts); ++i)
-		{
-			sTotalEntityCounts[i] += cellStatistics.entityCounts[i];
-		}
-	}
-
-#if !defined(ENABLE_CRT_DEBUG_HEAP)
-	mi_stats_t mimallocStatistics = {};
-	mimallocStatistics.size = sizeof(mi_stats_t);
-	mimallocStatistics.version = MI_STAT_VERSION;
-	mi_stats_get(&mimallocStatistics);
-
-	gpProfileManager->miMimallocCommittedMebibytes = mimallocStatistics.committed.current / (1'024 * 1'024);
-	gpProfileManager->miMimallocPeakCommittedMebibytes = mimallocStatistics.committed.peak / (1'024 * 1'024);
-	gpProfileManager->miMimallocHeapUsedMebibytes = mimallocStatistics.page_committed.current / (1'024 * 1'024);
-	gpProfileManager->miMimallocPeakHeapUsedMebibytes = mimallocStatistics.page_committed.peak / (1'024 * 1'024);
-#endif
-
-	gpProfileManager->UpdateProfileText();
-}
-
 ServerMonitorHost::ServerMonitorHost()
 {
 	std::string secret = common::GetFileOrStringContent(gpFileManager->mAppDataDirectory / L"ServerMonitorSecret.txt").second;
@@ -70,85 +35,55 @@ ServerMonitorHost::~ServerMonitorHost()
 
 void ServerMonitorHost::Update()
 {
-	UpdateStatistics();
+	gpProfileManager->UpdateProfileText();
 	if (++miUpdateCount < 8)
 	{
 		return;
 	}
 	miUpdateCount = 0;
-	if (!mbAuthenticated.load(std::memory_order_relaxed))
+	int64_t iGeneration = miAuthenticatedGeneration.load(std::memory_order_relaxed);
+	if (iGeneration == 0)
 	{
 		return;
 	}
 
+	// Heap: immutable snapshot strings and cell records own their storage.
+	ScopedSuppressAllocationTracking suppress;
 	std::shared_ptr<const Snapshot> pSnapshot = Capture();
 	{
 		std::lock_guard lock(mSnapshotMutex);
 		mpLatestSnapshot.swap(pSnapshot);
+		miLatestSnapshotGeneration = iGeneration;
 	}
 }
 
 std::shared_ptr<const ServerMonitorHost::Snapshot> ServerMonitorHost::Capture()
 {
 	auto pSnapshot = std::make_shared<Snapshot>();
-#if !defined(ENABLE_CRT_DEBUG_HEAP)
 	pSnapshot->statistics.reserve(4);
 	pSnapshot->profile.reserve(4);
-#else
-	pSnapshot->statistics.reserve(3);
-	pSnapshot->profile.reserve(3);
-#endif
-	int64_t iMicroseconds = gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average();
-	int64_t iPotential = iMicroseconds > 0 ? 1'000'000 / iMicroseconds : 0;
-	int64_t iFps = gpProfileManager->mFullUpdatesInTheLastSecond.Get();
-	game::ServerCellStats origin = game::GetServerCellStatistics(*game::gpGame->mCells.at(kOriginCoordinate).pCurrent);
-	pSnapshot->statistics.push_back({.uiColor = RGB(100, 180, 255), .text = std::format("FPS: {}\nPotential: {}\n\n", iFps, iPotential)});
-	pSnapshot->statistics.push_back({.uiColor = RGB(200, 200, 200), .text = std::format("Tick: {}\nTime: {:.2f} s\nActive cells: {}\nClients: {}\n", origin.iTick, origin.durationCurrentTime.count(), std::ssize(game::gpGame->mActiveCoordinates), std::ssize(gpServer->mClients))});
-	std::string entities;
-	for (int64_t i = 0; i < std::ssize(sTotalEntityCounts); ++i)
-	{
-		entities += std::format("{}: {}\n", game::kServerEntityCountNames[i], sTotalEntityCounts[i]);
-	}
-	pSnapshot->statistics.push_back({.uiColor = RGB(150, 220, 150), .text = std::move(entities)});
-	pSnapshot->profile.push_back({.uiColor = RGB(100, 180, 255), .text = std::format("FPS: {}  Potential: {}\n", iFps, iPotential)});
-	bool bReevaluate = gpProfileManager->TickVisibilityCadence();
-	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	{
-		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		FormatCpuTimersText(rWorkbuffer, bReevaluate);
-		pSnapshot->profile.push_back({.uiColor = RGB(220, 220, 220), .text = std::string(rWorkbuffer.View())});
-	}
-	{
-		common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
-		FormatCpuCountersText(rWorkbuffer, bReevaluate);
-		pSnapshot->profile.push_back({.uiColor = RGB(150, 220, 150), .text = std::string(rWorkbuffer.View())});
-	}
-#if !defined(ENABLE_CRT_DEBUG_HEAP)
-	std::string memory = std::format("Committed: {} MiB\nPeak cmtd: {} MiB\nHeap used: {} MiB\nPeak heap: {} MiB\n", gpProfileManager->miMimallocCommittedMebibytes, gpProfileManager->miMimallocPeakCommittedMebibytes, gpProfileManager->miMimallocHeapUsedMebibytes, gpProfileManager->miMimallocPeakHeapUsedMebibytes);
-	pSnapshot->statistics.push_back({.uiColor = RGB(220, 180, 100), .text = "\n" + memory});
-	pSnapshot->profile.push_back({.uiColor = RGB(220, 180, 100), .text = std::move(memory)});
-#endif
-
 	std::unordered_map<GridCoord, common::ServerMonitorCell> cells;
 	auto Cell = [&cells](const GridCoord& rCoordinate) -> common::ServerMonitorCell&
 	{
 		return cells.try_emplace(rCoordinate, common::ServerMonitorCell {.iX = rCoordinate.iQ, .iY = rCoordinate.iR, .uiClientCount = 0, .uiFlags = 0, .iEntityCount = 0}).first->second;
 	};
+	std::array<int64_t, std::size(game::kServerEntityCountNames)> totalEntityCounts {};
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
 		common::ServerMonitorCell& rCell = Cell(rCoordinate);
 		rCell.uiFlags |= common::kuiServerMonitorCellActive;
 		game::ServerCellStats statistics = game::GetServerCellStatistics(*game::gpGame->mCells.at(rCoordinate).pCurrent);
-		for (int64_t iCount : statistics.entityCounts)
+		for (int64_t i = 0; i < std::ssize(statistics.entityCounts); ++i)
 		{
-			rCell.iEntityCount += iCount;
+			rCell.iEntityCount += statistics.entityCounts[i];
+			totalEntityCounts[i] += statistics.entityCounts[i];
 		}
 	}
 	for (const ClientConnection& rClient : gpServer->mClients)
 	{
-		for (const GridCoord& rCoordinate : rClient.authorizedCoordinates)
+		for (const OwnedEntity& rOwnedEntity : rClient.ownedEntities)
 		{
-			++Cell(rCoordinate).uiClientCount;
+			++Cell(rOwnedEntity.coord).uiClientCount;
 		}
 		for (const ClientConnection::SlotState& rSlot : rClient.slots)
 		{
@@ -158,6 +93,54 @@ std::shared_ptr<const ServerMonitorHost::Snapshot> ServerMonitorHost::Capture()
 			}
 		}
 	}
+
+	int64_t iFps = gpProfileManager->mFullUpdatesInTheLastSecond.Get();
+	std::string potentialStatistics;
+	std::string potentialProfile;
+	if constexpr (kbProfiling)
+	{
+		int64_t iMicroseconds = gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average();
+		int64_t iPotential = iMicroseconds > 0 ? 1'000'000 / iMicroseconds : 0;
+		potentialStatistics = std::format("Potential: {}\n", iPotential);
+		potentialProfile = std::format("  Potential: {}", iPotential);
+	}
+	game::ServerCellStats origin = game::GetServerCellStatistics(*game::gpGame->mCells.at(kOriginCoordinate).pCurrent);
+	pSnapshot->statistics.push_back({.uiColor = RGB(100, 180, 255), .text = std::format("FPS: {}\n{}\n", iFps, potentialStatistics)});
+	pSnapshot->statistics.push_back({.uiColor = RGB(200, 200, 200), .text = std::format("Tick: {}\nTime: {:.2f} s\nActive cells: {}\nClients: {}\n", origin.iTick, origin.durationCurrentTime.count(), std::ssize(game::gpGame->mActiveCoordinates), std::ssize(gpServer->mClients))});
+	std::string entities;
+	for (int64_t i = 0; i < std::ssize(totalEntityCounts); ++i)
+	{
+		entities += std::format("{}: {}\n", game::kServerEntityCountNames[i], totalEntityCounts[i]);
+	}
+	pSnapshot->statistics.push_back({.uiColor = RGB(150, 220, 150), .text = std::move(entities)});
+	pSnapshot->profile.push_back({.uiColor = RGB(100, 180, 255), .text = std::format("FPS: {}{}\n", iFps, potentialProfile)});
+	if constexpr (kbProfiling)
+	{
+		bool bReevaluate = gpProfileManager->TickVisibilityCadence();
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		{
+			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+			FormatCpuTimersText(rWorkbuffer, bReevaluate);
+			pSnapshot->profile.push_back({.uiColor = RGB(220, 220, 220), .text = std::string(rWorkbuffer.View())});
+		}
+		{
+			common::ScopedWorkbufferArena arena = rWorkbuffer.Push();
+			FormatCpuCountersText(rWorkbuffer, bReevaluate);
+			pSnapshot->profile.push_back({.uiColor = RGB(150, 220, 150), .text = std::string(rWorkbuffer.View())});
+		}
+	}
+#if !defined(ENABLE_CRT_DEBUG_HEAP)
+	mi_stats_t mimallocStatistics = {};
+	mimallocStatistics.size = sizeof(mi_stats_t);
+	mimallocStatistics.version = MI_STAT_VERSION;
+	mi_stats_get(&mimallocStatistics);
+	int64_t iCommittedMebibytes = mimallocStatistics.committed.current / (1'024 * 1'024);
+	int64_t iPeakCommittedMebibytes = mimallocStatistics.committed.peak / (1'024 * 1'024);
+	std::string memory = std::format("Committed: {} MiB\nPeak cmtd: {} MiB\n", iCommittedMebibytes, iPeakCommittedMebibytes);
+	pSnapshot->statistics.push_back({.uiColor = RGB(220, 180, 100), .text = "\n" + memory});
+	pSnapshot->profile.push_back({.uiColor = RGB(220, 180, 100), .text = std::move(memory)});
+#endif
+
 	pSnapshot->cells.reserve(cells.size());
 	for (const auto& [rCoordinate, rCell] : cells)
 	{
@@ -209,7 +192,7 @@ void ServerMonitorHost::Disconnect(std::string_view reason, bool bRejected)
 	}
 	closesocket(mMonitorSocket);
 	mMonitorSocket = INVALID_SOCKET;
-	mbAuthenticated.store(false, std::memory_order_relaxed);
+	miAuthenticatedGeneration.store(0, std::memory_order_relaxed);
 	mSendBytes.clear();
 	miSentSize = 0;
 	miResponseSize = 0;
@@ -273,15 +256,19 @@ void ServerMonitorHost::Run(std::stop_token stopToken, std::promise<void> startu
 
 	while (!stopToken.stop_requested())
 	{
-		bool bAuthenticated = mbAuthenticated.load(std::memory_order_relaxed);
+		int64_t iGeneration = miAuthenticatedGeneration.load(std::memory_order_relaxed);
+		bool bAuthenticated = iGeneration != 0;
 		if (bAuthenticated && mSendBytes.empty())
 		{
 			std::shared_ptr<const Snapshot> pSnapshot;
+			int64_t iSnapshotGeneration = 0;
 			{
 				std::lock_guard lock(mSnapshotMutex);
 				pSnapshot = mpLatestSnapshot;
+				iSnapshotGeneration = miLatestSnapshotGeneration;
 			}
-			if (pSnapshot != nullptr && pSnapshot != mpSentSnapshot)
+			// A capture that read an earlier connection's generation can publish after this connection authenticated.
+			if (iSnapshotGeneration == iGeneration && pSnapshot != mpSentSnapshot)
 			{
 				Serialize(*pSnapshot);
 				mpSentSnapshot = std::move(pSnapshot);
@@ -383,7 +370,7 @@ void ServerMonitorHost::Run(std::stop_token stopToken, std::promise<void> startu
 						Disconnect("wrong response", true);
 						continue;
 					}
-					mbAuthenticated.store(true, std::memory_order_relaxed);
+					miAuthenticatedGeneration.store(++miConnectionGeneration, std::memory_order_relaxed);
 					LOG(kNetwork, kInfo, "ServerMonitorHost authenticated");
 				}
 			}

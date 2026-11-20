@@ -347,9 +347,9 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		// Heap: try_emplace may allocate the origin entry.
 		ScopedSuppressAllocationTracking suppress;
-		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate);
+		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolation.mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate);
 	}
-	pGame->UpdateCamera(kOriginCoordinate, 0.0f);
+	pGame->mRenderInterpolation.UpdateCamera(*pGame, kOriginCoordinate, 0.0f);
 
 	// Render and present once per framebuffer, then show window. An iteration whose head check recreates or defers the
 	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
@@ -365,7 +365,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 		}
 		std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.iTick).time_since_epoch()));
 		gpGraphics->RenderGlobal({}, elapsedTime);
-		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, elapsedTime);
+		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolation.mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, elapsedTime);
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
 
@@ -497,11 +497,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 			auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);
 			pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
 #else
-			{
-				// Heap: immutable snapshot strings and cell records own their storage.
-				ScopedSuppressAllocationTracking suppress;
-				pServerMonitorHost->Update();
-			}
+			pServerMonitorHost->Update();
 #endif // BT_CLIENT
 		}
 	}

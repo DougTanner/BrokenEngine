@@ -185,7 +185,8 @@ generating/consuming StatusChange events.
   normal mismatch/replay path. Excess wall-clock time is absorbed back into the
   tick accumulator (bounded by the existing `kiMaximumAccumulatorTicks` cap).
   During a clamp, rendering only interpolates within the current render window
-  and never extrapolates past committed ticks (`GameBase::AdvanceRenderClock`)
+  and never extrapolates past committed ticks
+  (`RenderInterpolation::AdvanceRenderClock`)
 - **Clock error** =
   `preReconcileTick - (estimatedLatestServerTick - miCurrentTargetBehind)`.
   Positive error up to `kiSimulationCeilingSlackTicks` is normal steady state
@@ -286,11 +287,12 @@ generating/consuming StatusChange events.
   promotes matching updates without replay.
 - **Render**: the frame `kiRenderBehindTicks` behind the ring tail
   (`GameBase::RenderFrame`) is used as the base Frame; the render clock's
-  sub-tick offset into that frame (`GameBase::AdvanceRenderClock`) is passed as
-  `fDeltaTime` to each collection's `game::FrameInterpolate::Update(...)`
-  (`GameBase::UpdateRenderInterpolation`), which does per-collection sub-tick
-  smoothing (positions, orientations, animation state) rather than a single
-  global velocity extrapolation
+  sub-tick offset into that frame (`RenderInterpolation::AdvanceRenderClock`)
+  is passed as `fDeltaTime` to each collection's
+  `game::FrameInterpolate::Update(...)`
+  (`RenderInterpolation::UpdateRenderInterpolation`), which does
+  per-collection sub-tick smoothing (positions, orientations, animation state)
+  rather than a single global velocity extrapolation
 
 ## Client → Server Contract
 
@@ -395,7 +397,7 @@ sizes are the full packet including the type byte.
   appends every admitted debug-control request, type byte removed, to the same
   deferred list as game packets, so both run in arrival order at the deferred
   drain. The accepted `kServerConnectionResponse` carries the server's
-  `kbDebugInput` as one byte (0 or 1) ahead of the optional GUID; a Debug client
+  `kbDebugInput` as one byte (0 or 1) ahead of the GUID; a Debug client
   sends no debug-control request to a server that does not accept them.
 - **Replay playback byte**: the accepted `kServerConnectionResponse`, after its
   `kbDebugInput` byte, and every `kServerLoadNotification`, after its load
@@ -411,7 +413,7 @@ sizes are the full packet including the type byte.
 
 | Packet | Min | Max | /tick | Handshake | Over-cap | Residual semantic validation |
 |--------|----|----|------|-----------|----------|------------------------------|
-| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` then `Model.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
+| `kClientHello` | 37 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` then `Model.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); idempotent re-Hello; duplicate live nonzero GUID rejects+disconnects |
 | `kClientAcknowledgmentStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
 | `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); grid distance at most 1 (`GridDistance`) from an authorized coord, that coord or one of its six edge neighbours (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
@@ -419,7 +421,7 @@ sizes are the full packet including the type byte.
 | `kClientDesynchronizationReport` | 33 | 33 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown; independent per-client two-second wall-clock cooldown after contract validation; immediate repeats silently drop |
 | `kClientDebugFrameRequest` | 17 | 17 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown in every build; independent per-client two-second wall-clock cooldown; otherwise a no-op when `kbDesynchronizationDebugFrames == false` |
 | `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; a report whose header is not the one `HandleException` writes, including its crash-report version line, → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per UTC calendar day, counted in memory so a restart resets the count, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root; GitHub posting: `Engine/Source/AGENTS.md` `## Crash Reporting`; the server sends no reply |
-| `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
+| `kClientChat` | 2 | 257 | 8 | yes | violation | `IsValidChatText` on the whole text after the type byte (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
 | `kClientFleetNavigation` | `GameMessages::FleetNavigationRequestMessage::kiSize` + 1 | `GameMessages::FleetNavigationRequestMessage::kiSize` + 1 | 8 | yes | violation | nav delay non-finite or outside `[0,60]` → corrupt, never clamped; behaviour byte at or above `FleetBehaviour::kCount` → corrupt; hold coordinate (0,0) → corrupt; fleet-guid lookup |
 | `kClientCreateFleetRequest` | `GameMessages::CreateFleetRequestMessage::kiSize` + 1 | `GameMessages::CreateFleetRequestMessage::kiSize` + 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
 | `kClientSpawnIntoFleetRequest` | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | `GameMessages::SpawnIntoFleetRequestMessage::kiSize` + 1 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; no open squadron of that type (`FindOpenFleetSquadron`) → refused with a warning |
@@ -432,42 +434,49 @@ sizes are the full packet including the type byte.
 
 Server→client types and unknown type bytes resolve to the sentinel (not
 client-sendable). The current wire-protocol version is `kiProtocolVersion`.
-Version 53 renamed the fighter-orders request `kClientSquadronOrdersRequest`
-and its status change `kUpdateSquadronOrders`, which gained a ship-type byte;
-the request now also carries the Omni squadron settings (`kOmniOrderFlags`),
-which FleetSync member flags also gained, and the status change the
-`ShipOrders` bits `kPatrolCell` and `kPatrolTogether`; version 52 appended the
+Version 56 added a pause byte after the time ratio to `kServerTimespeedUpdate`;
+version 55 removed the island placements from the `kServerCoordinateStaticData`
+body, which now carries navigation only, removed the `kClientHello`
+build-configuration string, made the `kClientHello` and accepted
+`kServerConnectionResponse` GUID a fixed field, and carried `kClientChat` and
+`kServerChat` text to the end of the packet with no terminator; version 54
+removed `navigationDelay` from the three ship `SpawnInfo` payloads and
+`animationTime` from the Omni one, and the shared collection columns lost the
+ship `pNavigationDelays` and `OmnisInterpolate::pAnimationTimes`; version 53
+renamed the fighter-orders request `kClientSquadronOrdersRequest` and its status
+change `kUpdateSquadronOrders`, which gained a ship-type byte; the request now
+also carries the Omni squadron settings (`kOmniOrderFlags`), which FleetSync
+member flags also gained, and the status change the `ShipOrders` bits
+`kPatrolCell` and `kPatrolTogether`; version 52 appended the
 `kClientFighterOrdersRequest` packet and the `kUpdateFighterOrders` status
-change, and FleetSync member flags gained the `kFighterOrderFlags` bits;
-version 51 renamed the fleet navigation-delay request
-`kClientFleetNavigation` and added the fleet behaviour byte and hold coordinate
-to it and to each FleetSync fleet header; version 50 appended the
-`kClientMapFleetMarkersRequest` and `kServerMapFleetMarkers` packets; version
-49 removed the `kSpawnExplosion` status change and its
-`ExplosionsPostRender::SpawnInfo` payload, so every later `StatusChangeType`
-value moved down one; version 47 added a squadron byte to each FleetSync
-member; version 43 made the `kServerCoordinateStaticData` count one navigation
-graph per game `kNavigationGraphs` entry (clearance tier and flight plane)
-instead of one per flight plane; version 42 added the missile cooldown
-`nextMissileFireTime` to the Battleship `SpawnInfo` `Fields()`;
-version 41 removed the client update-owned-entity request, so every later
-game packet type moved down one value, and dropped the weapon-mode fields from
-the `UpdateShip` payload and the Omni `SpawnInfo` `Fields()`; version 40
-replaced the beam cooldown `nextBeamFireTime` in the Battleship `SpawnInfo`
-`Fields()` with the missile tube slot `uiNextMissileTube`; version 39 replaced
-the two Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()`
-with the one beam cooldown `nextBeamFireTime`; version 38 made every cell a
-flat-top hexagon: each `GridCoord` on the wire carries axial coordinates
-(`iQ`, `iR`), every cell-local position is local to its hexagon, and a
-`kClientSubscribe` coord must lie within grid distance 1 of an authorized
-coord; version 37 added the replay playback byte to the accepted
-`kServerConnectionResponse` and to `kServerLoadNotification`; version 36
-dropped `bIsFlagship` and `flagshipGlobalId` from the `UpdateFleetData`
-`Fields()` list and removed `kClientRespawnInFleetRequest` and
-`kClientDeleteFleetRequest`, shifting the later `GamePacketType` values;
-version 35 made the `kClientCrashReport` payload a crash report whose header,
-including its crash-report version line, the server parses and rejects as
-corrupt when it does not match; version 34 added
+change, and FleetSync member flags gained the `kFighterOrderFlags` bits; version
+51 renamed the fleet navigation-delay request `kClientFleetNavigation` and added
+the fleet behaviour byte and hold coordinate to it and to each FleetSync fleet
+header; version 50 appended the `kClientMapFleetMarkersRequest` and
+`kServerMapFleetMarkers` packets; version 49 removed the `kSpawnExplosion`
+status change and its `ExplosionsPostRender::SpawnInfo` payload, so every later
+`StatusChangeType` value moved down one; version 47 added a squadron byte to
+each FleetSync member; version 43 made the `kServerCoordinateStaticData` count
+one navigation graph per game `kNavigationGraphs` entry (clearance tier and
+flight plane) instead of one per flight plane; version 42 added the missile
+cooldown `nextMissileFireTime` to the Battleship `SpawnInfo` `Fields()`; version
+41 removed the client update-owned-entity request, so every later game packet
+type moved down one value, and dropped the weapon-mode fields from the
+`UpdateShip` payload and the Omni `SpawnInfo` `Fields()`; version 40 replaced
+the beam cooldown `nextBeamFireTime` in the Battleship `SpawnInfo` `Fields()`
+with the missile tube slot `uiNextMissileTube`; version 39 replaced the two
+Battleship blaster cooldowns in the Battleship `SpawnInfo` `Fields()` with the
+one beam cooldown `nextBeamFireTime`; version 38 made every cell a flat-top
+hexagon: each `GridCoord` on the wire carries axial coordinates (`iQ`, `iR`),
+every cell-local position is local to its hexagon, and a `kClientSubscribe`
+coord must lie within grid distance 1 of an authorized coord; version 37 added
+the replay playback byte to the accepted `kServerConnectionResponse` and to
+`kServerLoadNotification`; version 36 dropped `bIsFlagship` and
+`flagshipGlobalId` from the `UpdateFleetData` `Fields()` list and removed
+`kClientRespawnInFleetRequest` and `kClientDeleteFleetRequest`, shifting the
+later `GamePacketType` values; version 35 made the `kClientCrashReport` payload
+a crash report whose header, including its crash-report version line, the server
+parses and rejects as corrupt when it does not match; version 34 added
 `uiFlightPlane` to the Fighters, Omnis, and Battleships `SpawnInfo` `Fields()`
 lists (commit `a1b4bbb91`); version 33 made the `kServerCoordinateStaticData`
 payload carry one navigation graph per flight plane (an `int32_t` plane count,
@@ -541,14 +550,16 @@ no virtual function or runtime type erasure is involved.
   hydration and smoke continuity, and UI transitions.
 - `ServerSessionRuntime` owns host/discovery/pacing lifetime and enforces poll,
   tick, paused, resend, and flush order. `ServerSessionBase` owns the
-  owned-entity registry and its rebuild from the Frame ownership layers, tick
-  preparation, timescale stepping, the active set's ownership step, the load
-  reset, and the deferred client-packet drain with the debug-control request
-  handlers. `game::ServerSession` owns the client and fleet managers, the game
-  packet handlers, and the game half of the load reset. Hello acceptance always
-  sends the engine-owned `kServerTimespeedUpdate` synchronously, carrying the
-  server's current time ratio. Tick publication workbuffer-backed views are
-  consumed synchronously by the runtime before the owning outer arena exits.
+  owned-entity rebuild from the Frame ownership layers into each client
+  record's list, tick preparation, timescale stepping, the active set's
+  ownership step, the load reset, and the deferred client-packet drain with the
+  debug-control request handlers. `game::ServerSession` owns the client and
+  fleet managers, the game packet handlers, and the game half of the load
+  reset. Hello acceptance always sends the engine-owned `kServerTimespeedUpdate`
+  synchronously, and every later pause or time-scale change broadcasts it; it
+  carries the server's current time ratio and pause state, which the client
+  adopts. Tick publication workbuffer-backed views are consumed synchronously
+  by the runtime before the owning outer arena exits.
 - `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive
   drains, ACK/flush, buffering, resend, and persistent queue drains are
   runtime-only operations surfaced through the session bases or game session

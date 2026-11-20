@@ -128,12 +128,12 @@ void main()
 	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, f3InPosition);
 	if (fLayerBlend < 1.0f)
 	{
-		ReadLighting(pf4LightingLow, pLightingSamplers, 0, WorldToVisibleArea(f3InPosition, globalLayout.pf4LightingAreas[0]));
-		f3AmbientSumLow = ReadAmbientLighting(ambientLightingSamplers, 0, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pf4LightingAreas[0]));
+		ReadLighting(pf4LightingLow, pLightingSamplers, 0, WorldToVisibleArea(f3InPosition, globalLayout.pLightingAreaToUvs[0]));
+		f3AmbientSumLow = ReadAmbientLighting(ambientLightingSamplers, 0, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.pLightingAreaToUvs[0]));
 	}
 	if (fLayerBlend > 0.0f)
 	{
-		vec2 f2HighTexcoord = WorldToVisibleArea(vec3(FlightPlanePosition(globalLayout, mainLayout, f3InPosition, 1), 0.0f), globalLayout.pf4LightingAreas[1]);
+		vec2 f2HighTexcoord = WorldToVisibleArea(vec3(FlightPlanePosition(globalLayout, mainLayout, f3InPosition, 1), 0.0f), globalLayout.pLightingAreaToUvs[1]);
 		ReadLighting(pf4LightingHigh, pLightingSamplers, 1, f2HighTexcoord);
 		f3AmbientSumHigh = ReadAmbientLighting(ambientLightingSamplers, 1, f2HighTexcoord);
 	}
@@ -155,8 +155,8 @@ void main()
 
 	// Shadow with smoke at world position. Moon bypasses the terrain ray-march shadow only;
 	// object shadows and smoke volumetric attenuation still apply to both lights.
-	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ObjectShadowsArea)).x;
-	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ShadowArea));
+	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.pfSmokeShadowIntensities) * texture(objectShadowsTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.objectShadowsAreaToUv)).x;
+	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.shadowAreaToUv));
 	// AO: sample the per-island occlusion and fold `fIslandAmbientOcclusion` into the SunLighting
 	// occlusion factor below.
 	float fAmbientOcclusionRaw = texture(ambientOcclusionTextureSamplers[nonuniformEXT(uiInTextureSlot)], f2InIslandTexcoord).x;
@@ -169,7 +169,7 @@ void main()
 	// eye blends last; plane k is lit by lighting layer k's ambient at that same position, which is where the blend above
 	// read it, so a layer the blend skipped is read here only where its plane's smoke shows. Only plane 0 receives the
 	// combined object shadow at the base-height projected position.
-	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.f4ObjectShadowsArea)).x;
+	float fSmokeObjectShadow = texture(objectShadowsTextureSampler, WorldToVisibleArea(vec3(f2PositionAtBaseHeight, 0.0f), globalLayout.objectShadowsAreaToUv)).x;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InPosition, iPlane);
@@ -180,7 +180,7 @@ void main()
 		bool bLayerRead = iPlane == 0 ? fLayerBlend < 1.0f : fLayerBlend > 0.0f;
 		if (!bLayerRead && fSmokePow > 0.0f)
 		{
-			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pf4LightingAreas[iPlane]));
+			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pLightingAreaToUvs[iPlane]));
 		}
 		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.

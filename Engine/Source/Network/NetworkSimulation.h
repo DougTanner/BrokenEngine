@@ -151,10 +151,8 @@ inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSim
 			if (NetworkManager::IsCoordinateChannel(rEvent.channelID))
 			{
 				int64_t iSlot = NetworkManager::ChannelToSlot(rEvent.channelID);
-				int64_t iPacketType = (rEvent.packet->dataLength > 0) ? rEvent.packet->data[0] : 0;
-				int64_t iTick = NetworkMessages::GetCoordUpdateTickOrZero(std::span<const uint8_t>(rEvent.packet->data, rEvent.packet->dataLength));
 				++rState.piCoordinateDropCounts[iSlot];
-				LOG(kNetwork, kVerbose, "NetworkSimulation::Dropped Coord Slot: {} Tick: {} Type: {} Size: {} TotalDrops: {} Consecutive: {}", iSlot, iTick, PacketTypeName(static_cast<PacketType>(iPacketType)), rEvent.packet->dataLength, rState.piCoordinateDropCounts[iSlot], dropResult.iConsecutive);
+				LOG(kNetwork, kVerbose, "NetworkSimulation::Dropped Coord Slot: {} Size: {} TotalDrops: {} Consecutive: {}", iSlot, rEvent.packet->dataLength, rState.piCoordinateDropCounts[iSlot], dropResult.iConsecutive);
 			}
 			else
 			{

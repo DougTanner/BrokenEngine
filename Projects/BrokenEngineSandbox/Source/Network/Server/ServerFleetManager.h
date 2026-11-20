@@ -61,7 +61,7 @@ public:
 
 	void DetectFleetMemberDeaths();
 
-	// Destructive wipe of all fleet state (mFleets, mGuidToClientId, pending requests).
+	// Destructive wipe of all fleet state (mFleets, mGuidToClientId).
 	// Use ONLY for fresh-game flows (ServerReset, including the client reset request it serves).
 	// Do NOT call from the load path — ReadFleetData is authoritative there; use ClearPendingRequests() instead.
 	void ResetState();

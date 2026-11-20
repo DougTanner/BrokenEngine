@@ -55,8 +55,9 @@ steps change product, user interface, tooling, or public interface behavior.
    (`.agents/references/cpp-conventions.md`) is never dropped; severity alone is
    neither occurrence evidence nor grounds for a clean `PASS`.
 3. Simpler mechanism. For each applicable step, name the plainly simpler
-   alternative when one exists: reuse of an existing mechanism, a narrower
-   change, deleting the requirement, or fixing at the origin.
+   alternative when one exists: reuse of an existing mechanism, a change that
+   leaves less code, state, or machinery in the finished codebase, deleting the
+   requirement, or fixing at the origin.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
    later if it ever occurs. Honor the repository's no-useless-ASSERT rule
@@ -112,7 +113,9 @@ steps change product, user interface, tooling, or public interface behavior.
   there; post-implementation diff minimality belongs to the Review and resolve
   correctness reviews.
 - Rival approaches belong to `/plan-alternatives`, which ran before this review,
-  so findings here stay within the plan's chosen approach.
+  so findings here stay within the plan's chosen approach; a wider change inside
+  that approach that leaves less finished code is a question 3 alternative, not
+  a rival approach.
 - A clean pass is the expected common outcome, because this pass must not become
   its own source of over-engineering.
 - Classify occurrence and likelihood evidence explicitly:

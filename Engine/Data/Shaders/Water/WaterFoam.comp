@@ -2,6 +2,7 @@
 
 #include "ShaderLayouts.h"
 #include "ShaderFunctions.h"
+#include "ShaderPatchBlending.h"
 
 layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
 

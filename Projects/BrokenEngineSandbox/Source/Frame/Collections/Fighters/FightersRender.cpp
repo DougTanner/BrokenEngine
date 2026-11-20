@@ -2,20 +2,16 @@
 
 #include "Fighters.h"
 
-#include "Data/Scene.h"
 #include "File/PackChunks.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Frame/Collections/Ships/ShipModels.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game
 {
-
-// One model per ShipController, also used for animation lookup.
-extern const common::crc_t kFighterFleetModel = data::kModelsRavenStarConflictV2scenegltfCrc;
-extern const common::crc_t kFighterRandomModel = data::kModelsSpaceshipscenegltfCrc;
 
 constexpr float kfRoll = 0.2f;
 
@@ -23,7 +19,7 @@ constexpr float kfRoll = 0.2f;
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"FightersFleet", "FightersRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("FightersFleet"), common::CrcConsteval("FightersRandom")};
-const std::array<common::crc_t, kiPipelineCount> kuiModels {kFighterFleetModel, kFighterRandomModel};
+const std::array<common::crc_t, kiPipelineCount> kuiModels {kuiFighterFleetModel, kuiFighterRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
 
@@ -31,54 +27,7 @@ void FightersInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
-		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], pStorageBuffers);
-	}
-}
-
-static std::array<int64_t, kiPipelineCount> siRendered {};
-// Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
-// accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
-static std::atomic<bool> sbRenderActive = false;
-
-// sbRenderActive must clear during exception unwinding so subsequent Render calls do not fail the concurrency ASSERT.
-struct [[nodiscard]] FightersRenderActiveGuard
-{
-	FightersRenderActiveGuard()
-	{
-		ASSERT(!sbRenderActive.exchange(true));
-	}
-
-	FightersRenderActiveGuard(const FightersRenderActiveGuard&) = delete;
-	FightersRenderActiveGuard& operator=(const FightersRenderActiveGuard&) = delete;
-
-	~FightersRenderActiveGuard()
-	{
-		sbRenderActive.store(false);
-	}
-};
-
-void FightersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
-{
-	siRendered = {};
-
-	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const FightersInterpolate&
-	{
-		return *rInterpolate.pFighters;
-	});
-
-	if (iTotalCapacity == 0)
-	{
-		return;
-	}
-
-	// Any row can use either pipeline, so each reserves the whole capacity.
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
-		{
-			engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiPipelineCrcs[i], iCommandBuffer, 2, pBuffer);
-		}
+		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], kiDynamicBufferInitialCapacity);
 	}
 }
 
@@ -101,21 +50,13 @@ void FightersInterpolate::RequestTextures(const std::unordered_map<engine::GridC
 		}
 	}
 
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		if (bPresent[i])
-		{
-			engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs[i]);
-		}
-	}
+	engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs, bPresent);
 }
 
-// Draws the rows whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for every row.
-static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const FightersPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
+// Draws the rows whose controller selects iPipeline from pLayouts on and returns how many it wrote. piVisibleIndices is
+// scratch for every row.
+static int64_t RenderPipeline(const FightersInterpolate& __restrict rCurrent, const FightersPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, shaders::ModelLayout* pLayouts, int64_t iCommandBuffer)
 {
-	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
-	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
-
 	const engine::AnimationData* pAnimationData = nullptr;
 	if (engine::gAnimationDataMap.contains(kuiModels[iPipeline]))
 	{
@@ -156,7 +97,6 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iVisibleCount);
 	}
 
-	int64_t iRenderedOffset = siRendered[iPipeline];
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kFighter)].models[iPipeline]);
@@ -178,8 +118,6 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 			}
 
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
-			XMFLOAT4A f4Position {};
-			XMStoreFloat4A(&f4Position, vecPosition);
 
 			XMMATRIX matScaling = XMMatrixScaling(fDeathScale, fDeathScale, fDeathScale);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
@@ -188,87 +126,77 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 			XMMATRIX matInstanceTransform = matScaling * matRoll * matClimbTilt * matYaw * matTranslation;
-			XMMATRIX matTransform = matAlignment * matInstanceTransform;
-
-			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
-			rModelLayout.f4PositionLayer = f4Position;
-			rModelLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matInstanceTransform, vecPosition)};
-			rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
-			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
-			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
-
-			rModelLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
-			rModelLayout.uiMeshDataBase = 0;
-
-			if (pAnimationData != nullptr)
-			{
-				rModelLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(skinningReservation, j, rCurrent.pAnimationTimes[i].count()));
-			}
+			int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
+			engine::FillModelLayout(shadowBounds, matAlignment, matInstanceTransform, vecPosition, iPlane, pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[j]);
 		}
 	};
 
 	gpProfileManager->GetCpuTimer(game::kCpuTimerRenderFighters).iThreads = common::gpMultithreading->WorkerCount() + 1;
 	common::gpMultithreading->Dispatch(iVisibleCount, ProcessRange);
 
-	siRendered[iPipeline] += iVisibleCount;
+	return iVisibleCount;
 }
 
-void FightersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
+void FightersInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderFighters);
 
-	const FightersInterpolate& rCurrent = *rFrameInterpolate.pFighters;
-	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-
-	if (rCurrent.iCount == 0)
+	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const FightersInterpolate&
 	{
-		return;
-	}
+		return *rInterpolate.pFighters;
+	});
 
-	FightersRenderActiveGuard renderActiveGuard;
-
-	// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
-	const FightersPostRender& rPostRender = *gpGame->RenderFrame(rBasis.coordinate).postRender.pFighters;
-
-	auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(rCurrent.iCount * static_cast<int64_t>(sizeof(int64_t)));
-
+	// Any row can use either pipeline, so each reserves the whole capacity. Each cell's rows follow the previous cell's.
+	int64_t iRendered = 0;
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		RenderPipeline(rCurrent, rPostRender, rBasis, i, visibleIndicesAllocation.mpData, iCommandBuffer);
-	}
-}
+		iRendered += engine::gpPipelineManager->mDynamicPipelines.RenderModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], iCommandBuffer, iTotalCapacity, [&](shaders::ModelLayout* pLayouts)
+		{
+			int64_t iCount = 0;
+			for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+			{
+				auto it = rRenderInterpolates.find(rCoordinate);
+				if (it == rRenderInterpolates.end() || it->second.pFighters->iCount == 0)
+				{
+					continue;
+				}
 
-void FightersInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
-{
+				const FightersInterpolate& rCurrent = *it->second.pFighters;
+				// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
+				const Frame& rRenderFrame = gpGame->RenderFrame(rCoordinate);
+				auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(rCurrent.iCount * static_cast<int64_t>(sizeof(int64_t)));
+				iCount += RenderPipeline(rCurrent, *rRenderFrame.postRender.pFighters, it->second.renderBasis, i, visibleIndicesAllocation.mpData, pLayouts + iCount, iCommandBuffer);
+			}
+			return iCount;
+		});
+	}
+
 	if constexpr (kbProfiling)
 	{
-		gpProfileManager->GetCpuCounter(game::kCpuCounterFightersRendered).iCount = siRendered[0] + siRendered[1];
-	}
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiPipelineCrcs[i], iCommandBuffer, siRendered[i]);
+		gpProfileManager->GetCpuCounter(game::kCpuCounterFightersRendered).iCount = iRendered;
 	}
 }
 
-void FightersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)
+void FightersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (!kbDebugRender)
-	{
-		return;
-	}
+	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderFighters);
 
-	// Positions come from rFrameInterpolate (the fully-interpolated frame); PostRender supplies only flags, metadata, and
-	// static world positions.
-	const FightersInterpolate& rFighters = *rFrameInterpolate.pFighters;
-	const Frame& rRenderFrame = gpGame->RenderFrame(coordinate);
-	const FightersPostRender& rPostRender = *rRenderFrame.postRender.pFighters;
-
-	for (int64_t i = 0; i < rFighters.iCount; ++i)
+	if constexpr (kbDebugRender)
 	{
-		DebugRenderShipHitbox(rFrameInterpolate.renderBasis, ShipType::kFighter, rPostRender.pController[i], rFighters.pVecPositions[i], rFighters.pVecDirections[i]);
-		if (rPostRender.pController[i] == ShipController::kFleet)
+		const FightersInterpolate& rCurrent = *rFrameInterpolate.pFighters;
+		const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
+		const Frame& rRenderFrame = gpGame->RenderFrame(rBasis.coordinate);
+		const FightersPostRender& rPostRender = *rRenderFrame.postRender.pFighters;
+
+		// Positions come from rFrameInterpolate (the fully-interpolated frame); PostRender supplies only flags, metadata,
+		// and static world positions.
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
-			DebugRenderNavigation(rFrameInterpolate, rRenderFrame, rFighters.pVecPositions[i], rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfFighterRadius);
+			DebugRenderShipHitbox(rBasis, ShipType::kFighter, rPostRender.pController[i], rCurrent.pVecPositions[i], rCurrent.pVecDirections[i]);
+			if (rPostRender.pController[i] == ShipController::kFleet)
+			{
+				DebugRenderNavigation(rFrameInterpolate, rRenderFrame, rCurrent.pVecPositions[i], rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfFighterRadius);
+			}
 		}
 	}
 }

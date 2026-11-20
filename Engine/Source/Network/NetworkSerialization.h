@@ -41,13 +41,6 @@ constexpr int64_t MaxCompressedStatusChangeBatchBytes(int64_t iStatusChangeCount
 	return static_cast<int64_t>(sizeof(int32_t)) + LZ4_COMPRESSBOUND(MaxSerializedStatusChangeBatchBytes(iStatusChangeCount));
 }
 
-// Type-specific serialization (no compression)
-// Returns bytes written to pDestination
-int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, void* pDestination);
-
-// Returns number of StatusChanges written to rDestination, which grows when the batch exceeds its size
-int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination);
-
 // Serialization + LZ4 compression
 // Returns bytes written to destination (4-byte uncompressed size prefix + compressed data)
 int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, std::span<uint8_t> destination);

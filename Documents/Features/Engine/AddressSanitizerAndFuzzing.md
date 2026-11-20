@@ -36,12 +36,13 @@ No sanitizer configuration exists today: nothing in the tree outside
   at process init. ASan only guards allocations made through the CRT allocator
   it intercepts. The existing `ENABLE_CRT_DEBUG_HEAP` switch already routes all
   of these to the CRT and compiles out every mimalloc call (including the
-  statistics in `ServerMonitorHost::Update`, whose main-thread allocation
-  suppression lives in `Engine/Source/Main.cpp`); the ASan configuration reuses
-  that routing. Check: whether its CRT debug-heap pieces (`_CRTDBG_MAP_ALLOC`,
-  `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with ASan; if not, the ASan
-  configuration selects the same CRT operators without them. The ASan executable
-  builds also drop the `Mimalloc.cpp` unit so the arena reserve never runs.
+  statistics in `ServerMonitorHost::Capture`, whose main-thread allocation
+  suppression lives in `ServerMonitorHost::Update`); the ASan configuration
+  reuses that routing. Check: whether its CRT debug-heap pieces
+  (`_CRTDBG_MAP_ALLOC`, `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with
+  ASan; if not, the ASan configuration selects the same CRT operators without
+  them. The ASan executable builds also drop the `Mimalloc.cpp` unit so the
+  arena reserve never runs.
 - **Sub-allocators hide interior bounds.** ASan sees only the outer edges of a
   block:
   - A collection's SoA storage is one `common::MakeAligned` block that
@@ -156,7 +157,7 @@ hostile bytes arrive.
 
 ### 2. Grid save reading
 
-`engine::ReadGridSave(const FileFlags_t&, const std::filesystem::path&, StagedGridSave&)`
+`engine::ReadGridSave(const std::filesystem::path&, StagedGridSave&)`
 (`Engine/Source/File/GridSave.cpp`) is the file trust boundary. It runs
 `ReadAndValidateVersionHeader<game::Frame>`, `game::ReadSaveState`, per-cell
 static data and island placement checks, then

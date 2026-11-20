@@ -2,11 +2,13 @@
 
 What the three ship collections — Fighters, Omnis, Battleships — share: the
 vocabulary (`ShipTypes.h`), the per-row behaviours each type's PostRender script
-calls (`ShipBehaviours`), the cross-type queries (`ShipQueries`), the fleet
-coordination fleet Fighters and Omnis steer by (`FleetCoordination`), the ship
-status changes (`ShipStatusChanges`), and the collision hitboxes
-(`ShipHitboxes`). This folder holds no collection; each type's own `AGENTS.md`
-documents its script. The ramped heading turn in `ShipBehaviours` follows the
+calls (`ShipBehaviours`), the fleet navigation (`ShipNavigationUtils`), the
+cross-type queries (`ShipQueries`), the fleet coordination fleet Fighters and
+Omnis steer by (`FleetCoordination`), the ship status changes
+(`ShipStatusChanges`), the collision hitboxes (`ShipHitboxes`), and the
+client-only model of each type and controller (`ShipModels`). This folder holds
+no collection; each type's own `AGENTS.md` documents its script. The ramped
+heading turn in `ShipBehaviours` follows the
 [turning rule](#turning-invariants).
 
 ## Ship Invariants
@@ -36,18 +38,18 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   names: the box and radius come from its convex hull and the outline level from
   its outline polygon, so an outline inset moves neither radius nor pusher. Ship
   models require uniform authored scale. `kShipHitboxTypes` must name each
-  controller's Render model. Each ship
-  PreCollision writes every row's radius and posed hitbox from its current pose
+  controller's Render model. Each ship PreCollision writes every row's radius
+  and posed hitbox from its current pose
   (`../../../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`), and
-  each type's DebugRender draws it; the hitbox ignores roll, climb tilt, and
-  death shrink. Only the row's own cell tests its hitbox, so a hull part past
-  the cell edge is never hit from the neighbour cell; this is accepted by
-  design. A row's pusher radius is its hitbox sphere radius times its type's
-  `kShipHitboxTypes` pusher radius scale. Each `kShipHitboxTypes` model's Z
-  range also contains its local origin, which the bake keeps inside its outline
-  and so its box: `ShipHullContact`'s center-directed ray asserts that it meets
-  that prism, and the bake tests the origin against the outline only
-  (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
+  each type's Render draws it in debug rendering; the hitbox ignores roll,
+  climb tilt, and death shrink. Only the row's own cell tests its hitbox, so a
+  hull part past the cell edge is never hit from the neighbour cell; this is
+  accepted by design. A row's pusher radius is its hitbox sphere radius times
+  its type's `kShipHitboxTypes` pusher radius scale. Each `kShipHitboxTypes`
+  model's Z range also contains its local origin, which the bake keeps inside
+  its outline and so its box: `ShipHullContact`'s center-directed ray asserts
+  that it meets that prism, and the bake tests the origin against the outline
+  only (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
   `## Model Alignment`), so a sidecar `offset` must not move the Z range off it.
 - Shared startup caches each controller model's minimum origin height from its
   aligned upright geometry, keeping the hull at least 1 meter above water.
@@ -89,11 +91,7 @@ documents its script. The ramped heading turn in `ShipBehaviours` follows the
   targeting and the Fighter beam in PostCollision read the current frame, after
   every ship's Update. Changing a read's source frame shifts CRC-visible
   behavior by one tick.
-- Every ship type's `pNavigationDelays` stays within the range
-  `IsNavigationDelayInRange` tests, between `kfMinimumNavigationDelaySeconds`
-  and `kfMaximumNavigationDelaySeconds` (`ShipTypes.h`), which every
-  navigation-delay admission shares. Each type's PostRender `PostRead` rejects
-  a non-finite or out-of-range navigation delay, an unknown controller, a
+- Each ship type's PostRender `PostRead` rejects an unknown controller, a
   nonzero `pClientGuids` or `pGlobalIds` on a row that is not
   `ShipController::kFleet`, a target flight plane the type disallows, and an AI
   direction that fails `IsShipHeadingValid`. On every Frame read, Interpolate

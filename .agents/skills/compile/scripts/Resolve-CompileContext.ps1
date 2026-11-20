@@ -37,6 +37,7 @@ $script:Result = [ordered]@{
 	code = 'internal.error'
 	message = 'Compile context resolution did not run.'
 	repositoryRoot = $null
+	isLinkedWorktree = $null
 	primaryCheckout = $null
 	baseline = $null
 	project = $null
@@ -113,31 +114,40 @@ function Get-ContextNormalizedPaths([string] $Text) {
 	return $paths
 }
 
-function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
-	# A changed path under one of the shared roots recommends both executables; any other path
-	# contributes nothing, so this stays advisory and the worker still fixes the final list.
-	if ([string]::IsNullOrEmpty($Project)) { return @() }
-	$sharedPrefixes = @('Common/', 'Engine/', "Projects/$Project/Source/")
-	$viewerChanged = @($Paths | Where-Object {
-		$_.StartsWith('Projects/ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
-		$_.StartsWith('Common/', [StringComparison]::OrdinalIgnoreCase) -or
-		$_.StartsWith('Engine/', [StringComparison]::OrdinalIgnoreCase)
-	}).Count -gt 0
-	$viewerTargets = @(if ($viewerChanged -or $Target -eq 'ModelViewer') {
-		@([pscustomobject][ordered]@{ project = 'ModelViewer'; configuration = 'Debug'; reason = 'viewer' })
-	})
-	foreach ($path in $Paths) {
-		foreach ($prefix in $sharedPrefixes) {
-			if ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-				return @(
-					[pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'shared-code' }
-					[pscustomobject][ordered]@{ project = "$($Project)Server"; configuration = 'Debug'; reason = 'shared-code' }
-				) + $viewerTargets
+function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project, [bool] $IsLinkedWorktree) {
+	# One row per target whose source roots or forced includes contain a changed path; the worker builds every row, and
+	# a `.md` path or a path under no target's roots adds none. ModelViewer compiles only BrokenEngineSandbox's shader layouts.
+	$changedUnder = {
+		param([string[]] $Prefixes)
+		foreach ($path in $Paths) {
+			if ($path.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase)) { continue }
+			foreach ($prefix in $Prefixes) {
+				if ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { return $true }
 			}
 		}
+		return $false
 	}
-	if ($viewerTargets.Count -gt 0) { return $viewerTargets }
-	return @([pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'default' })
+	$targets = [Collections.Generic.List[object]]::new()
+	# A linked worktree's consumer builds link the session ThirdParty candidate once a ThirdParty/
+	# path or Common/DebugDefines.h (force-included) changed, and Invoke-CompileBuild.ps1 reads this row as that trigger.
+	if ($IsLinkedWorktree -and (& $changedUnder @('ThirdParty/', 'Common/DebugDefines.h'))) {
+		$targets.Add([pscustomobject][ordered]@{ project = 'ThirdParty'; configuration = $null; reason = 'thirdparty-candidate' })
+	}
+	if ([string]::IsNullOrEmpty($Project)) { return $targets.ToArray() }
+	if (& $changedUnder @('Common/', 'Engine/', "Projects/$Project/Source/", "Projects/$Project/Data/Shaders/", "Projects/$Project/Platforms/")) {
+		$targets.Add([pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'shared-code' })
+		$targets.Add([pscustomobject][ordered]@{ project = "$($Project)Server"; configuration = 'Debug'; reason = 'shared-code' })
+	}
+	if ($Target -eq 'ModelViewer' -or (& $changedUnder @('Projects/ModelViewer/', 'Common/', 'Engine/', 'Projects/BrokenEngineSandbox/Data/Shaders/'))) {
+		$targets.Add([pscustomobject][ordered]@{ project = 'ModelViewer'; configuration = 'Debug'; reason = 'viewer' })
+	}
+	if (& $changedUnder @('Common/', 'DataPacker/')) {
+		$targets.Add([pscustomobject][ordered]@{ project = 'DataPacker'; configuration = 'Release'; reason = 'data-packer' })
+	}
+	if (& $changedUnder @('Common/ServerMonitorProtocol.h', 'Common/DebugDefines.h', 'Tools/ServerMonitor/')) {
+		$targets.Add([pscustomobject][ordered]@{ project = 'ServerMonitor'; configuration = 'Release'; reason = 'server-monitor' })
+	}
+	return $targets.ToArray()
 }
 
 function Get-ContextDevEnvDirectory {
@@ -170,6 +180,10 @@ try {
 		Stop-CompileContext 'repository-root.mismatch' "RepositoryRoot '$root' is not its own Git top level '$topLevel'."
 	}
 	$script:Result.repositoryRoot = $root
+	# The primary is identified by its .git being an ordinary directory, as Bootstrap-AgentTools.ps1 and
+	# Provision-WorktreeThirdParty.ps1 do.
+	$rootGit = Get-Item -LiteralPath (Join-Path $root '.git') -Force -ErrorAction SilentlyContinue
+	$script:Result.isLinkedWorktree = $null -eq $rootGit -or -not $rootGit.PSIsContainer -or [bool]($rootGit.Attributes -band [IO.FileAttributes]::ReparsePoint)
 
 	# With several game projects and none named, the project stays null and the caller picks from projects.
 	$projects = @(Get-AgentGameProjects $root)
@@ -272,7 +286,7 @@ try {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
 
-	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project)
+	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project $script:Result.isLinkedWorktree)
 	$modeText = if ($null -eq $script:Result.dataBuildMode) { 'unresolved without a game project' } else { "$($script:Result.dataBuildMode) ($($script:Result.dataBuildModeReason))" }
 	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $modeText."
 }

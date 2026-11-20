@@ -9,8 +9,7 @@ param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][string] $Baseline,
 	[string] $Head,
-	[string[]] $IncludeUntracked,
-	[switch] $IncludeAllUntracked,
+	[switch] $IncludeUntracked,
 	[string[]] $PathPrefix,
 	[switch] $Regions,
 	[switch] $Landing,
@@ -475,13 +474,12 @@ function Test-InventoryUntrackedBinary([string] $RelativePath) {
 	return $false
 }
 
-function Get-InventoryUntrackedEntry([string[]] $Listed, [bool] $ListAll, [ref] $UnlistedCount) {
+function Get-InventoryUntrackedEntry([bool] $ListAll, [ref] $UnlistedCount) {
 	$tracked = @((Invoke-InventoryGit @('ls-files', '--others', '--exclude-standard', '-z')).Stdout -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
-	$listedSet = [Collections.Generic.HashSet[string]]::new([string[]] $Listed)
 	$entries = [Collections.Generic.List[object]]::new()
 	$unlisted = 0
 	foreach ($path in $tracked) {
-		if (-not $ListAll -and -not $listedSet.Contains($path)) { $unlisted++; continue }
+		if (-not $ListAll) { $unlisted++; continue }
 		$mode = Get-InventoryWorkingMode $path
 		# The binary rule is ordered after every extension rule, so the per-file Git probe only
 		# runs for a path no earlier rule already claimed.
@@ -732,13 +730,13 @@ function Write-SessionTargets([object[]] $Entries) {
 
 try {
 	$modes = @(@($Regions.IsPresent, $Landing.IsPresent, $EmitTargets.IsPresent) | Where-Object { $_ })
-	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $PSBoundParameters.ContainsKey('IncludeUntracked') -or $IncludeAllUntracked)
+	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $IncludeUntracked)
 	# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
 	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
 	# Those two modes keep their own stdout contracts.
 	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($EmitTargets -or $EmitManifest)
 	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, -IncludeUntracked, and -IncludeAllUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -787,19 +785,6 @@ try {
 		exit 0
 	}
 
-	$listed = [Collections.Generic.List[string]]::new()
-	# `pwsh -File` hands one literal string per token, so the documented comma-separated form is
-	# split here rather than by the parameter binder.
-	foreach ($path in @(@($IncludeUntracked) -split ',')) {
-		if ([string]::IsNullOrWhiteSpace($path)) { continue }
-		$normalized = $path.Replace('\', '/').Trim()
-		if ([IO.Path]::IsPathRooted($normalized)) {
-			$rootPosix = $script:Root.Replace('\', '/').TrimEnd('/') + '/'
-			if ($normalized.StartsWith($rootPosix, [StringComparison]::OrdinalIgnoreCase)) { $normalized = $normalized.Substring($rootPosix.Length) }
-		}
-		if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
-		$listed.Add($normalized)
-	}
 	$prefixes = [Collections.Generic.List[string]]::new()
 	foreach ($prefix in @(@($PathPrefix) -split ',')) {
 		$normalized = $prefix.Replace('\', '/').Trim()
@@ -817,7 +802,7 @@ try {
 	if ([string]::IsNullOrEmpty($headSha)) {
 		# Untracked paths exist only against the working tree; a commit-valued head has none.
 		$unlistedReference = 0
-		$untrackedEntries = @(Get-InventoryUntrackedEntry $listed.ToArray() $IncludeAllUntracked.IsPresent ([ref] $unlistedReference))
+		$untrackedEntries = @(Get-InventoryUntrackedEntry $IncludeUntracked.IsPresent ([ref] $unlistedReference))
 		$unlistedUntracked = $unlistedReference
 		foreach ($entry in $untrackedEntries) { $entries.Add($entry) }
 	}

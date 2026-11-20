@@ -228,8 +228,8 @@ static void PopulateWaterFoam(shaders::GlobalLayout& rGlobalLayout, std::chrono:
 	{
 		ShiftArea(f4PreviousArea, f2Offset);
 	}
-	// Wave elapsedTime follows simulation time; foam lifetime uses wall time across render gaps.
-	float fDeltaTime = sbInitialized && !bClockReset ? std::chrono::duration<float>(updateTime - sPreviousUpdate).count() : 0.0f;
+	// Wave elapsedTime follows simulation time; foam lifetime uses wall time across render gaps and holds while gameplay is paused.
+	float fDeltaTime = sbInitialized && !bClockReset && !gbGameplayPaused ? std::chrono::duration<float>(updateTime - sPreviousUpdate).count() : 0.0f;
 	float fJStart = gWaterFoamJStart.mfCurrent;
 	float fJFull = std::min(gWaterFoamJFull.mfCurrent, fJStart - 0.001f);
 	rGlobalLayout.f4WaterFoamArea = f4Area;

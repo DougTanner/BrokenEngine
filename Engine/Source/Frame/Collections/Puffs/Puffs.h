@@ -12,7 +12,6 @@ struct CellStaticData;
 
 struct PuffsType
 {
-	common::crc_t uiCrc = 0;
 	uint32_t uiColor = 0xFFFFFFFF;
 };
 
@@ -31,23 +30,18 @@ struct PuffKeyframe
 			.fRotation = std::lerp(rPreviousKeyframe.fRotation, rNextKeyframe.fRotation, fPercent),
 		};
 	}
-
-	bool operator==(const PuffKeyframe& rOther) const = default;
 };
 
 struct PuffControllerType
 {
 	int64_t iBaseTypeIndex = 0;
 	int64_t iKeyframeCount = 2;
-	bool bDestroysSelf = true;
 	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};
 	PuffKeyframe pKeyframes[kiMaximumControllerKeyframes] {};
 
 	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
 	Wrapper* ppAreaScales[kiMaximumControllerKeyframes] {};
 	Wrapper* ppIntensityScales[kiMaximumControllerKeyframes] {};
-
-	bool operator==(const PuffControllerType& rOther) const = default;
 };
 
 struct PuffsInterpolate : public Collection<PuffsInterpolate>,
@@ -92,7 +86,7 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 
 	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
 
-	// Destroy removes expired puffs whose controller has bDestroysSelf set.
+	// Destroy marks expired puffs for removal.
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;

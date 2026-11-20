@@ -66,7 +66,6 @@ void NetworkDiscoveryScanner::StartScan()
 	}
 
 	mTimer.Reset();
-	mFlags.Set(DiscoveryScannerFlags::kStarted);
 }
 
 void NetworkDiscoveryScanner::Poll()
@@ -88,16 +87,6 @@ void NetworkDiscoveryScanner::Poll()
 
 bool NetworkDiscoveryScanner::IsScanning()
 {
-	if (!(mFlags & DiscoveryScannerFlags::kStarted))
-	{
-		return false;
-	}
-
-	if (mFlags & DiscoveryScannerFlags::kFound)
-	{
-		return false;
-	}
-
 	return mTimer.GetDeltaNs() < kDiscoveryScanDuration;
 }
 

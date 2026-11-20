@@ -8,7 +8,7 @@ shields provide an additional surface-normal depositor from Objects
 
 ## Pipeline Contracts
 
-- Readers sample lighting layer k through `pf4LightingAreas[k]`;
+- Readers sample lighting layer k through `pLightingAreaToUvs[k]`;
   `f4LightingArea` holds the area of the refreshing layer,
   `uiLightingRefreshLayer`. The spread's terrain height fade applies only to
   layer 0; layer 1's plane lies above every island. Which passes the layers

@@ -297,6 +297,19 @@ function Resolve-PathMapping
 			}
 		}
 
+		# ModelViewer compiles a hand-chosen client engine subset, so no rule decides its membership.
+		if ($engineSource -and $affinityProjects -contains 'client')
+		{
+			return [ordered]@{
+				mapping = 'conditional'
+				code = 'mapping.engine-source-modelviewer-conditional'
+				projects = $affinityProjects
+				itemType = $itemType
+				filter = (Get-FilterPath $filterRoot $RelativePath $trimSegments)
+				detail = 'Game membership follows the affinity above; ModelViewer membership is per-file scoped authority.'
+			}
+		}
+
 		return [ordered]@{
 			mapping = 'resolved'
 			code = if ($engineSource) { 'mapping.engine-source' } else { 'mapping.game-source' }
@@ -307,7 +320,8 @@ function Resolve-PathMapping
 		}
 	}
 
-	# Row 10 — Common: game client/server by affinity; DataPacker only by scoped authority.
+	# Row 10 — Common: game client/server by affinity; DataPacker, and ModelViewer for a client or
+	# shared file, only by scoped authority.
 	if ($RelativePath -imatch '^Common/')
 	{
 		if ($affinityProjects.Count -eq 0)
@@ -319,6 +333,18 @@ function Resolve-PathMapping
 				itemType = $itemType
 				filter = (Get-FilterPath 'Common' $RelativePath 1)
 				detail = 'Affinity is unprovable, so the owning projects cannot be derived from it.'
+			}
+		}
+
+		if ($affinityProjects -contains 'client')
+		{
+			return [ordered]@{
+				mapping = 'conditional'
+				code = 'mapping.common-datapacker-modelviewer-conditional'
+				projects = $affinityProjects
+				itemType = $itemType
+				filter = (Get-FilterPath 'Common' $RelativePath 1)
+				detail = 'Game membership is determined; DataPacker and ModelViewer membership are per-file scoped authority.'
 			}
 		}
 

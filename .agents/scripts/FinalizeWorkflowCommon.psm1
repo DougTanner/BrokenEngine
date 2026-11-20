@@ -156,22 +156,31 @@ function Test-FinalizeWorktreeRegistration([string] $RepositoryWorktree, [string
 	return [pscustomobject]@{ Registered = $true; Message = 'Worktree registration matches canonical identity.' }
 }
 
-function Test-FinalizeAllWorktreesClear([string] $RepositoryWorktree) {
-	$problems = [Collections.Generic.List[string]]::new()
-	$inspected = [Collections.Generic.List[string]]::new()
-	foreach ($record in @(Get-FinalizeWorktreeRecords $RepositoryWorktree)) {
-		if ($record.Prunable -or $record.Bare) { continue }
-		try {
-			$worktree = Get-FinalizeExistingWindowsIdentity $record.Path 'Registered worktree'
-			$inspected.Add($worktree)
-			foreach ($marker in @('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer')) {
-				$markerPath = (Invoke-FinalizeGit $worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()
-				if (Test-Path -LiteralPath $markerPath) { $problems.Add("${worktree}: active Git marker $marker") }
+function Test-FinalizeAllWorktreesClear([string] $RepositoryWorktree, [int] $WaitSeconds = 0) {
+	$budgetMilliseconds = $WaitSeconds * 1000
+	$clock = [Diagnostics.Stopwatch]::StartNew()
+	while ($true) {
+		$problems = [Collections.Generic.List[string]]::new()
+		$inspected = [Collections.Generic.List[string]]::new()
+		foreach ($record in @(Get-FinalizeWorktreeRecords $RepositoryWorktree)) {
+			if ($record.Prunable -or $record.Bare) { continue }
+			try {
+				$worktree = Get-FinalizeExistingWindowsIdentity $record.Path 'Registered worktree'
+				$inspected.Add($worktree)
+				foreach ($marker in @('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer')) {
+					$markerPath = (Invoke-FinalizeGit $worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()
+					if (Test-Path -LiteralPath $markerPath) { $problems.Add("${worktree}: active Git marker $marker") }
+				}
+			}
+			catch {
+				$problems.Add("$($record.Path): unreadable ($($_.Exception.Message))")
 			}
 		}
-		catch {
-			$problems.Add("$($record.Path): unreadable ($($_.Exception.Message))")
-		}
+		$remaining = $budgetMilliseconds - $clock.Elapsed.TotalMilliseconds
+		if ($problems.Count -eq 0 -or $remaining -le 0) { break }
+		# A coarse poll: each inspection spawns several git rev-parse processes per worktree. The last
+		# sleep is clamped to what the budget still allows, so the inspection it pays for still runs.
+		Start-Sleep -Milliseconds ([int][Math]::Min(5000, [Math]::Ceiling($remaining)))
 	}
 	return [pscustomobject]@{ Clear = $problems.Count -eq 0; Inspected = $inspected.ToArray(); Problems = $problems.ToArray() }
 }

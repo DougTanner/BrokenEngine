@@ -11,8 +11,9 @@ each `.wav` to float, runs `audiorepair::RepairAudio`, resamples to
 16-bit PCM with a `WAVE_FORMAT_PCM` `AudioHeader` (`Common/DataFile.h`). Music
 and sound effects share this path; a `Music` path component only limits repair.
 
-At runtime the Audio pack is lazy and client-only (`IsEagerChunk`,
-`IsServerChunk` in `Engine/Source/File/PackChunks.cpp`). `StreamingVoice`
+At runtime the Audio pack is lazy and client-only (`IsEagerChunk` in
+`Engine/Source/File/FileManager.h`, and the server's accepted set in
+`PackChunks::LoadPackFiles`). `StreamingVoice`
 (`Engine/Source/Audio/StreamingVoice.h`) plays music from start to end. It reads
 ahead through three 16 KiB slots (`kiBufferCount`, `kiBufferSize`) with
 `PackChunks::TryReadChunkData`. File loader threads do the reads, and
@@ -66,9 +67,9 @@ output of 2026-10-06; this worktree has no built packs):
   modified.
 - **Pack format.** `AudioHeader` must mark the codec. It also needs the decoded
   length, because `GetRemainingTime` can no longer derive time from compressed
-  bytes. Pack open rejects audio chunks that carry `kLz4Compressed` or
-  `kZlibCompressed`, so those flags cannot mark the codec. Bump
-  `DataHeader::kiVersion` and `ExportAudio::kiVersion` so older packs are
+  bytes. A chunk's type alone decides pack chunk compression, and Audio is
+  never a compressed type, so pack chunk compression cannot mark the codec.
+  Bump `DataHeader::kiVersion` and `ExportAudio::kiVersion` so older packs are
   rejected. Music has no PCM fallback.
 - **Runtime decode.** `StreamingVoice` keeps its ordered range reads and slot
   pipeline, and also feeds the compressed bytes through a per-voice decoder into

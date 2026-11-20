@@ -531,12 +531,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderFunctions.h">
-      <Filter>Engine\Data\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderRandom.h">
-      <Filter>Engine\Data\Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Data\Shaders\ShaderGlobalLayout.h">
       <Filter>Engine\Data\Shaders</Filter>
     </ClInclude>
@@ -586,6 +580,12 @@
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipModels.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.h">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h">
@@ -927,6 +927,12 @@
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\RenderInterpolation.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\DebugDefines.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -1157,6 +1163,9 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp">
       <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisUpdate.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisRender.cpp">
       <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
@@ -1185,6 +1194,9 @@
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.cpp">
       <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipQueries.cpp">
@@ -1381,9 +1393,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Sounds\SoundsUpdate.cpp">
       <Filter>Engine\Frame\Collections\Sounds</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp">
-      <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Billboards\Billboards.cpp">
       <Filter>Engine\Frame\Collections\Billboards</Filter>
@@ -1593,6 +1602,12 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp">
       <Filter>Engine\Ui\Screens</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\RenderInterpolation.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp">
+      <Filter>Engine\Profile</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\Terrain.frag">
@@ -1800,6 +1815,15 @@
       <Filter>Engine\Data\Shaders\Water</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\DebugTexture.vert">
+      <Filter>Engine\Data\Shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\ShaderPatchBlending.h">
+      <Filter>Engine\Data\Shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\ShaderFunctions.h">
+      <Filter>Engine\Data\Shaders</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\ShaderRandom.h">
       <Filter>Engine\Data\Shaders</Filter>
     </None>
   </ItemGroup>

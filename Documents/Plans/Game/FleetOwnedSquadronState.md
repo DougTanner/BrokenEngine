@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-13T18:27:23.891Z","dependsOn":["Documents/Plans/Game/FleetSerializationCleanup.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-13T18:27:23.891Z","dependsOn":[]} -->
 # Fleet-Owned Squadron and Fleet State
 
 ## Context
@@ -55,7 +55,7 @@ the baseline tree:
 - The row columns `pClientGuids`, `pFlagshipGlobalIds`,
   `pFleetWantedCoordinates`, and `puiPendingFleetWantedCoordinateTicks`, and
   the row bit `ShipOrders::kIsFlagship`, must stay per row: in-frame navigation,
-  `FleetBoard`, and the owned-entity registry read them inside the cell-local
+  `FleetBoard`, and the owned-entity rebuild read them inside the cell-local
   tick. None causes a defect.
 - `pNavigationDelays` is not a copy of `Fleet::navigationDelaySeconds` and has
   no simulation reader; only the harness rig produces `kUpdateShip`.
@@ -317,9 +317,11 @@ Slice 1 keeps the hand-placed `SendFleetSyncToClient` calls and writes no
    `ProcessDestroyFleetMemberRequests`. `SpawnFleetMember` becomes placement
    only: it reads the fleet and member, never writes them, never calls the
    fleet manager, and returns the spawn's cell (the origin, or the flagship's
-   cell for a Fighter) or `std::nullopt`. `TickRespawnTimers` writes the
-   member's liveness and coordinate and sends the spawn's fleet sync, which is
-   the `SendFleetSyncToClient` call moved out of `SpawnFleetMember`. The other
+   cell for a Fighter) or `std::nullopt`. The Fighter case keeps its
+   `BuildNavigationDataIfUnbuilt` call on the flagship cell before the
+   Battleship lookup and the bay loop. `TickRespawnTimers` writes the member's
+   liveness and coordinate and sends the spawn's fleet sync, which is the
+   `SendFleetSyncToClient` call moved out of `SpawnFleetMember`. The other
    hand-placed `SendFleetSyncToClient` calls stay where they are. The
    navigation pick log loses its `MembersUpdated` count, since
    `QueueUpdateFleet` returns nothing; nothing reads that field.
@@ -596,7 +598,7 @@ No harness run backs this Plan; its source was a code read.
    and `SendFleetSyncToClient` is called only from `FlushFleetSyncs`. The
    baseline fails both.
 6. Code read: `engine::kiProtocolVersion`, the `Frame::kiVersion` base, and
-   `ReplayMeta::kiVersion` are each above their baseline values 53, 188, and 7.
+   `ReplayMeta::kiVersion` are each above their baseline values 53, 188, and 8.
 7. Code read: `ReadFleet` throws for a slot holding a bit outside its type's
    `kpSquadronOrderBits`, for a member flag other than `kIsDead`, and for a
    non-finite member countdown; `ServerSession::HandleGamePacket` throws a
@@ -624,22 +626,15 @@ No harness run backs this Plan; its source was a code read.
 
 Mandatory coordination:
 
-- `Documents/Plans/Game/ReplayMetaClientStateAndFighterAdmission.md` also
-  bumps `ReplayMeta::kiVersion`, edits `WriteReplayMetadata` in
-  `Save/GameSaveLoad.cpp`, and adds an elevation grid build to the Fighter
-  case of `ServerClientManager::SpawnFleetMember`, directly before the bay
-  loop. Each Plan raises the version once from the value it finds at claim;
-  whichever lands second bumps again and does not reuse the first one's bump.
-  The baseline 7 this Plan names for `ReplayMeta::kiVersion` is then the value
-  found at claim. Whichever lands second applies its change to
-  `SpawnFleetMember` as the other left it, keeping that build before the bay
-  loop.
-- `Documents/Plans/Game/FleetSerializationCleanup.md` (a `dependsOn`
-  prerequisite) removes the owner client-id out-parameter of `ReadFleetData`,
-  so slice 1 item 7's "still dropping the all-disconnected owner map"
-  describes nothing: `ReadReplayFleetRecord` is the `ReadFleetData` call with
-  that Plan's parameter list.
-- `Documents/Plans/Game/FleetSerializationCleanup.md` also replaces the four
-  queue clears in `ServerFleetManager::ResetState` with a
-  `ClearPendingRequests()` call. This Plan keeps that edit: the function ends
-  up with that call and slice 2's `mChangedFleetOwners` clear.
+- `ReadFleetData` (`ServerFleetSerialization.h`) takes no owner client-id
+  parameter, so slice 1 item 7's "still dropping the all-disconnected owner
+  map" describes nothing: `ReadReplayFleetRecord` is the `ReadFleetData` call
+  with its current parameter list.
+- `ServerFleetManager::ResetState` clears no request queue; the fresh-game
+  reset's queues are cleared by the `ClearPendingRequests()` call in
+  `ServerSession::OnResetForLoad`. The function holds the `mFleets` and
+  `mGuidToClientId` clears and slice 2's added `mChangedFleetOwners` clear.
+- The per-client loop of `ServerSession::OnResetForLoad` (`ServerSession.cpp`)
+  skips a record whose `bHandshakeComplete` is false. Slice 2 keeps that skip
+  on the loop, and its `MarkAllFleetsChanged` and `FlushFleetSyncs` calls
+  follow the loop.

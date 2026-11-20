@@ -91,16 +91,6 @@ FileManager::FileManager()
 	LOG(kLoading, kDebug, "AppData directory: \"{}\"", mAppDataDirectory.string());
 
 	wchar_t pcDirectory[MAX_PATH] {};
-	GetTempPathW(static_cast<DWORD>(std::size(pcDirectory) - 1), pcDirectory);
-	mTempDirectory = pcDirectory;
-	mTempDirectory.append(game::kGameName);
-	LOG(kLoading, kDebug, "Temp directory: \"{}\"", mTempDirectory.string());
-	std::error_code tempDirectoryError;
-	std::filesystem::create_directory(mTempDirectory, tempDirectoryError);
-	if (tempDirectoryError)
-	{
-		FailCreateDirectory("temp", mTempDirectory, tempDirectoryError);
-	}
 
 	std::filesystem::path dataDirectory;
 	if (!gLaunchOptions.dataDirectory.empty())
@@ -128,25 +118,9 @@ FileManager::~FileManager()
 	mpPackChunks.reset();
 }
 
-std::filesystem::path FileManager::GetFilePath(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
+std::filesystem::path FileManager::GetFilePath(const std::filesystem::path& rFilename)
 {
-	std::filesystem::path filePath;
-	if (rFlags & kAppDataDirectory)
-	{
-		filePath = mAppDataDirectory;
-	}
-	else if (rFlags & kTempDirectory)
-	{
-		filePath = mTempDirectory;
-	}
-	else
-	{
-		ASSERT(false);
-		std::unreachable();
-	}
-
-	filePath /= rFilename;
-	return filePath;
+	return mAppDataDirectory / rFilename;
 }
 
 std::fstream FileManager::OpenFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
@@ -154,7 +128,7 @@ std::fstream FileManager::OpenFile(const FileFlags_t& rFlags, const std::filesys
 	// kWrite must opt into raw streaming via kStreaming; one-shot writes use WriteFileAtomically.
 	ASSERT(!(rFlags & kWrite) || (rFlags & kStreaming));
 
-	std::filesystem::path file = GetFilePath(rFlags, rFilename);
+	std::filesystem::path file = GetFilePath(rFilename);
 	std::fstream fileStream(file, (rFlags & kRead ? std::ios::in : std::ios::out) | std::ios::binary);
 	LOG(kLoading, kDebug, "{} \"{}\" at \"{}\"", fileStream.is_open() ? (rFlags & kRead ? "Reading" : "Writing") : "Failed to open", rFilename.string(), file.string());
 	return fileStream;
@@ -164,7 +138,7 @@ void FileManager::BackupExistingFile(const FileFlags_t& rFlags, const std::files
 {
 	ASSERT((rFlags & kWrite) != 0);
 
-	std::filesystem::path file = GetFilePath(rFlags, rFilename);
+	std::filesystem::path file = GetFilePath(rFilename);
 	std::error_code existsErrorCode;
 	bool bExists = std::filesystem::exists(file, existsErrorCode);
 	if (existsErrorCode)
@@ -197,9 +171,9 @@ void FileManager::BackupExistingFile(const FileFlags_t& rFlags, const std::files
 	}
 }
 
-void FileManager::RemoveFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
+void FileManager::RemoveFile(const std::filesystem::path& rFilename)
 {
-	std::filesystem::path file = GetFilePath(rFlags, rFilename);
+	std::filesystem::path file = GetFilePath(rFilename);
 	LOG(kLoading, kDebug, "Remove \"{}\" at \"{}\"", rFilename.string(), file.string());
 	std::filesystem::remove(file);
 }
@@ -222,9 +196,9 @@ bool FileManager::ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 
 	return true;
 }
 
-bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut)
+bool FileManager::ComputeOrdinaryFileSha256(const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut)
 {
-	std::filesystem::path filePath = GetFilePath(rFlags, rFilename);
+	std::filesystem::path filePath = GetFilePath(rFilename);
 	FileHandle file(::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
 	if (file.mHandleFile == INVALID_HANDLE_VALUE)
 	{
@@ -258,12 +232,12 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	return true;
 }
 
-bool FileManager::CommitAtomicWrite(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, bool bWriteSucceeded)
+bool FileManager::CommitAtomicWrite(const std::filesystem::path& rFilename, bool bWriteSucceeded)
 {
 	std::filesystem::path temporaryFilename = rFilename;
 	temporaryFilename += ".tmp";
-	std::filesystem::path temporaryPath = GetFilePath(rFlags, temporaryFilename);
-	std::filesystem::path destinationPath = GetFilePath(rFlags, rFilename);
+	std::filesystem::path temporaryPath = GetFilePath(temporaryFilename);
+	std::filesystem::path destinationPath = GetFilePath(rFilename);
 
 	if (!bWriteSucceeded)
 	{

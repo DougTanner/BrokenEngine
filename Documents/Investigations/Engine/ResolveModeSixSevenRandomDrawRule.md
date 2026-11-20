@@ -9,39 +9,41 @@ This is an Investigation, not a Plan: it becomes a Plan under
 `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/AGENTS.md`
 `## Fleet Navigation Invariants` states a rule the code does not follow. Paths
 below are relative to `Projects/BrokenEngineSandbox/Source/Frame/Collections`
-unless they start at the repository root; line numbers are as of commit
-`fe1fb69b`.
+unless they start at the repository root; line numbers in `Ships/AGENTS.md` and
+`Ships/ShipNavigationUtils.cpp` are as of the change that moved
+`ComputeNavigation` into that file, and the others as of commit `fe1fb69b`.
 
 The document side:
 
-- `Ships/AGENTS.md:304-306`: modes 6 and 7 "must consume the same number of
+- `Ships/AGENTS.md:306-308`: modes 6 and 7 "must consume the same number of
   random draws on any tick they can flip between", so mode 7 mirrors mode 6's
   three entry draws on every tick it runs.
-- `Ships/AGENTS.md:312-315`: only the draw count matters, so mode 7's mirror
+- `Ships/AGENTS.md:314-317`: only the draw count matters, so mode 7's mirror
   draws are "load-bearing, not dead code".
-- The comment at `Ships/ShipBehaviours.cpp:604-606` repeats the mirror claim.
+- The comment at `Ships/ShipNavigationUtils.cpp:286-288` repeats the mirror
+  claim.
 
-The code side, all in `ComputeNavigation` in `Ships/ShipBehaviours.cpp`:
+The code side, all in `ComputeNavigation` in `Ships/ShipNavigationUtils.cpp`:
 
 - The mode is settled before any draw: `UpdateFleetAndFlagshipNavigation`
-  (`:595`) may change it, and the draws follow the mode it leaves (`:600`,
-  `:622`).
+  (`:277`) may change it, and the draws follow the mode it leaves (`:282`,
+  `:304`).
 - Mode 7 draws three values every tick in a cell with a centred island
-  (`:607-615`) and throws them away.
+  (`:289-297`) and throws them away.
 - Mode 6 without a patrol flagship draws three values only when the stored
-  destination's W is zero (`:647`, `:696-708`), and none otherwise.
-- Roaming (mode -1) and the cross-cell modes draw none (`:757-786`).
-- In a cell with no centred island neither mode draws (`:608`, `:689-693`).
+  destination's W is zero (`:329`, `:378-390`), and none otherwise.
+- Roaming (mode -1) and the cross-cell modes draw none (`:439-468`).
+- In a cell with no centred island neither mode draws (`:290`, `:371-375`).
 - `FollowFlagship` sets mode 7 whenever the flagship is beyond
   `kfFlagshipFollowDistanceSquared`, without testing the entry mode
-  (`:274-277`), and returns to mode 6 with a zeroed destination when it is
-  close (`:279-286`).
+  (`:122-125`), and returns to mode 6 with a zeroed destination when it is
+  close (`:127-134`).
 
 Flip by flip, against the same row staying in its entry mode:
 
 | Flip | Draws after the flip | Draws had it stayed | Equal |
 |---|---|---|---|
-| 7 to 6 (destination zeroed at `:284-285`) | 3 | 3 | yes |
+| 7 to 6 (destination zeroed at `:132-133`) | 3 | 3 | yes |
 | 6 with no stored destination to 7 | 3 | 3 | yes |
 | 6 with a stored destination to 7 | 3 | 0 | no |
 | Roaming or a cross-cell mode to 7 | 3 | 0 | no |
@@ -88,15 +90,15 @@ simulation results and is Tier 3, where option 1 is documentation-only.
 ### Option 1 — correct the document and the comment, keep the draws
 
 - Rewrite the `Ships/AGENTS.md` `## Fleet Navigation Invariants` bullet at
-  `:303-315` to what the code does: mode 7 draws three values on every tick in
+  `:305-317` to what the code does: mode 7 draws three values on every tick in
   a cell with a centred island and discards them, mode 6 draws three only on a
   tick it has no stored destination, and the counts are equal on the two flips
   the table above marks equal and unequal on the other two. Remove "must
   consume the same number" and "load-bearing, not dead code". Keep the bullet's
   other statements (the throttle sentence, the no-centred-island case, and the
   fleet Omni draw counts).
-- Rewrite the comment at `Ships/ShipBehaviours.cpp:604-606` so it no longer
-  presents the three draws as a required mirror.
+- Rewrite the comment at `Ships/ShipNavigationUtils.cpp:286-288` so it no
+  longer presents the three draws as a required mirror.
 - No code statement changes, so simulation results, CRC values, and
   `Frame::kiVersion` stay as they are.
 
@@ -107,10 +109,10 @@ simulation results and is Tier 3, where option 1 is documentation-only.
   search for any reader that relies on mode 7 advancing the stream. If a
   dependency is found, stop and return to the user with that evidence; do not
   widen the change.
-- Remove the mode 7 mirror block at `Ships/ShipBehaviours.cpp:607-615` (the
-  `centredIslands` local and the three discarded `common::Random` calls) and
-  the mirror wording in the comment at `:604-606`.
-- In the `Ships/AGENTS.md` bullet at `:303-315`, remove the equal-count rule,
+- Remove the mode 7 mirror block at `Ships/ShipNavigationUtils.cpp:289-297`
+  (the `centredIslands` local and the three discarded `common::Random` calls)
+  and the mirror wording in the comment at `:286-288`.
+- In the `Ships/AGENTS.md` bullet at `:305-317`, remove the equal-count rule,
   the mirror sentence, and the "load-bearing" sentence, and reword what refers
   to them (the no-centred-island sentence and the fleet Omni clause about
   flipping between the modes). Keep the throttle sentence and the draw counts
@@ -137,7 +139,7 @@ through `Frame::kiVersion`. No layout, wire, or serialization format change.
 ## What a Plan from this would touch
 
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/AGENTS.md`
-- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipBehaviours.cpp`
+- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipNavigationUtils.cpp`
 - `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp` (option 2 only)
 
 ## Proposed scope
@@ -179,9 +181,9 @@ Under option 2:
 
 ## Related
 
-`Documents/Plans/Game/SplitOmnisAndShipBehaviours.md` may move
-`ComputeNavigation` out of `ShipBehaviours.cpp`. A Plan written from this
-investigation after that lands re-derives its sites from the landed source.
+`ComputeNavigation` lives in `ShipNavigationUtils.cpp`, not
+`ShipBehaviours.cpp`; a Plan written from this investigation derives its sites
+from the current source.
 
 A Plan written from
 `Documents/Investigations/Engine/ResolveShipGlobalIdCrcExclusion.md` under its

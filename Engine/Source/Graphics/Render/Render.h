@@ -51,6 +51,25 @@ inline XMFLOAT2 XM_CALLCONV ComputeModelShadowRange(const ModelShadowBounds& rBo
 	return f2Range;
 }
 
+// vecPosition is in the camera cell's frame. The caller passes its nearest flight plane because FlightPlanes.h follows
+// this header in Engine.h. A null pAnimationData leaves the instance unskinned.
+inline void XM_CALLCONV FillModelLayout(const ModelShadowBounds& rShadowBounds, FXMMATRIX matAlignment, CXMMATRIX matInstanceTransform, FXMVECTOR vecPosition, int64_t iPlane, const AnimationData* pAnimationData, const SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
+{
+	XMMATRIX matTransform = matAlignment * matInstanceTransform;
+	XMStoreFloat4(&rModelLayout.f4PositionLayer, vecPosition);
+	rModelLayout.f2ShadowWorldXRange = {ComputeModelShadowRange(rShadowBounds, matInstanceTransform, vecPosition)};
+	rModelLayout.f4PositionLayer.w = static_cast<float>(iPlane);
+	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
+	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
+	rModelLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
+	rModelLayout.uiMeshDataBase = 0;
+
+	if (pAnimationData != nullptr)
+	{
+		rModelLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(rReservation, iInstance, animationTime.count()));
+	}
+}
+
 struct WorldSizedTexelArea
 {
 	XMFLOAT4 f4Area {};
@@ -119,6 +138,13 @@ inline XMFLOAT4 ScaleAreaAboutCenter(const XMFLOAT4& rf4Area, float fScale)
 	return {fCenterX - fHalfWidth, fCenterY + fHalfHeight, fCenterX + fHalfWidth, fCenterY - fHalfHeight};
 }
 
+inline void PopulateAreaToUv(shaders::AreaToUvLayout& rAreaToUv, const XMFLOAT4& rf4Area)
+{
+	float fWidthInverse = 1.0f / (rf4Area.z - rf4Area.x);
+	float fHeightInverse = 1.0f / (rf4Area.y - rf4Area.w);
+	rAreaToUv.f4ScaleOffset = {fWidthInverse, -fHeightInverse, -rf4Area.x * fWidthInverse, rf4Area.y * fHeightInverse};
+}
+
 // A teleport: the visible area's center lies outside the area a retained texture was last written for. Only a teleport
 // forces an early refresh; a view edge that pans past the retained area samples outside it until the next scheduled one.
 inline bool IsVisibleCenterOutsideArea(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4RetainedArea)
@@ -135,7 +161,7 @@ struct TemporalAreaLatch
 	XMFLOAT4 f4PreviousArea {};
 	float fBlend = 1.0f;
 
-	float Update(const XMFLOAT4& rf4CurrentArea, bool& rbReset, float fRequestedBlend, XMFLOAT4& rf4PreviousArea)
+	float Update(const XMFLOAT4& rf4CurrentArea, bool& rbReset, float fRequestedBlend)
 	{
 		if (rbReset)
 		{
@@ -157,7 +183,6 @@ struct TemporalAreaLatch
 			f4CurrentArea = rf4CurrentArea;
 		}
 
-		rf4PreviousArea = f4PreviousArea;
 		fBlend = fResolvedBlend;
 		return fBlend;
 	}

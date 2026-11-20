@@ -51,7 +51,7 @@ struct ReceivedCoordFullState
 struct ReceivedStaticData
 {
 	ReceivedCellIdentity identity;
-	CellStaticData staticData;
+	std::vector<NavData> navigationData;
 };
 
 struct ReceivedDebugFrame
@@ -109,6 +109,7 @@ public:
 		kCrashReportChecked       = 1 << 8, // PollPendingCrashReport has looked for an unsent report on this connection
 		kCrashReportSent          = 1 << 9, // this connection carried a crash report; the server counts a second as a violation
 		kServerReplaying          = 1 << 10, // the server plays a replay, per its latest connection response or load notification
+		kServerPaused             = 1 << 11, // the server is paused, per its latest timespeed update
 	};
 
 	ENetPeer* mpServerPeer = nullptr;

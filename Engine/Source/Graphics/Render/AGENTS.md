@@ -55,8 +55,8 @@ may feed simulation state.
   refresh runs on the cadence, on first use, object-shadow texture recreation,
   or the world's return from hiding (`gbObjectShadowsReset`, `Render.h`), or on
   a teleport; it sets the held area to the live visible area scaled about its
-  center by `gExtraArea`. Global publishes the held area as
-  `f4ObjectShadowsArea` and the decision as `gbObjectShadowsRefreshFrame`
+  center by `gExtraArea`. Global publishes the held area's mapping as
+  `objectShadowsAreaToUv` and the decision as `gbObjectShadowsRefreshFrame`
   (`Render.h`), which Main's model shadow draw counts read. A skipped frame
   writes zero shadow draw and blur dispatch work; the raster pass still clears
   the unblurred texture, and the blurred texture consumers read keeps its last
@@ -140,8 +140,10 @@ may feed simulation state.
   zero delta instead of advancing across the disabled interval. The Tweaks foam
   checkbox controls presentation only, so retained coverage continues updating
   while that checkbox hides it. Active foam delta uses `steady_clock` between
-  published updates, including render gaps; simulation time detects rewinds
-  only. First use, recreation, and rewind reset history;
+  published updates, including render gaps, and is zero while gameplay is
+  paused, as wind's is, so foam reset or newly exposed while paused stays
+  empty until the resume; simulation time detects rewinds only. First use,
+  recreation, and rewind reset history;
   ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
   without resetting retained coverage. Threshold resolution preserves a positive
   J range.

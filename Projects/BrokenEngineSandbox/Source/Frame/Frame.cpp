@@ -581,7 +581,6 @@ std::array<engine::RegistryOwnershipLayer, std::to_underlying(ShipType::kCount)>
 	{
 		layers[std::to_underlying(eType)] =
 		{
-			.pIdBytes = engine::RegistryIdBytes(rShipPostRender.pIds),
 			.pGlobalIds = rShipPostRender.pGlobalIds,
 			.pClientGuids = rShipPostRender.pClientGuids,
 			.iCount = rShipPostRender.iCount,
@@ -651,20 +650,6 @@ void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 void FrameInterpolate::UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	engine::ForEachRequestTextures(GameInterpolateTypes {}, rRenderInterpolates, rActiveCoordinates);
-}
-
-void FrameInterpolate::DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
-{
-	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
-	{
-		auto it = rRenderInterpolates.find(rCoordinate);
-		if (it != rRenderInterpolates.end())
-		{
-			FightersInterpolate::DebugRender(it->second, rCoordinate);
-			OmnisInterpolate::DebugRender(it->second, rCoordinate);
-			BattleshipsInterpolate::DebugRender(it->second, rCoordinate);
-		}
-	}
 }
 
 #endif // BT_CLIENT

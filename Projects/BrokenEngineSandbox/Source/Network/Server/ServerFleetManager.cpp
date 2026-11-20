@@ -62,7 +62,6 @@ void ServerFleetManager::ProcessCreateFleetRequests()
 			continue;
 		}
 		CreateFleet(guid);
-		mGuidToClientId.insert_or_assign(guid, rRequest.iClientId);
 		SendFleetSyncToClient(guid);
 	}
 
@@ -507,10 +506,6 @@ void ServerFleetManager::UpdateFleetNavigation(const engine::ClientGuid& rGuid, 
 void ServerFleetManager::ResetState()
 {
 	// mRandomEngine intentionally not re-seeded: constructor TimeSeeds once; ReadFleetData restores from save for replay determinism.
-	mPendingCreateFleetRequests.clear();
-	mPendingSpawnIntoFleetRequests.clear();
-	mPendingDestroyFleetMemberRequests.clear();
-	mPendingSquadronOrdersRequests.clear();
 	mFleets.clear();
 	mGuidToClientId.clear();
 }

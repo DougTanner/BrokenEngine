@@ -254,14 +254,17 @@ and overwrites the artifact; the stale receipt is never reused, because its
   landed commit or tree it did not verify. A run that waited reports one
   `git.index-lock-wait` diagnostic naming the seconds spent, on a landed result
   as well as a failed one. Allow a landing invocation on the default budget a
-  command timeout of up to 20 minutes; its worst case is about 15 minutes — the
+  command timeout of up to 28 minutes; its worst case is about 23 minutes — the
   omitted-token route's 300-second lock-claim wait, this index-lock budget at
-  its `-IndexLockWaitSeconds` default, and the landing's own Git work, plus
+  its `-IndexLockWaitSeconds` default, the cleanup worktree wait bounded by
+  `$script:CleanupWorktreeWaitSeconds`, and the landing's own Git work, plus
   about 2 minutes (unvalidated) for its at most one history commit Snapshot
   (when one is taken is in
   [`HistoryContract.md`](../../code-quality-metrics/references/HistoryContract.md)
   `## Source table and decision`) — so a caller raising that budget must raise
-  its host timeout by the same amount. Pass the post-confirmation claim's owner
+  its host timeout by the same amount. A caller whose host's foreground command
+  limit is shorter than that timeout runs the landing invocation in the
+  background and awaits its completion. Pass the post-confirmation claim's owner
   token as `-OwnerToken` so landing continues under that same lease, which it
   accepts only as a same-actor continuation under the `worker.md`
   `## Bundled scripts` ownership rule, preserving the raw `$SessionLabel`.
@@ -343,14 +346,17 @@ and overwrites the artifact; the stale receipt is never reused, because its
   it invokes no `plan` command at all.
 
 Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
-before an open-ended user wait. After a failed landing the lock is released once
-every registered worktree is inspectable and provably free of Git operation
-markers, on both the supplied-token and omitted-token routes. When that cannot
-be proven the claim is retained and reported: a supplied token's retained claim
-stays the caller's lease, released the same way once the worktrees are provably
-clear; an omitted-token claim is discoverable by a later invocation only when
-its derived session and canonical worktree match, and every foreign or
-unverifiable claim stays untouched until its normal expiry or external repair.
+before an open-ended user wait. At the end of every landing, successful or
+failed, on both the supplied-token and omitted-token routes, the lock is
+released once every registered worktree is inspectable and provably free of Git
+operation markers; the landing re-inspects the worktrees until they are clear or
+`$script:CleanupWorktreeWaitSeconds` elapses. When that cannot be proven the
+claim is retained and reported, and a landing that otherwise succeeded reports
+blocked `cleanup.incomplete`: a supplied token's retained claim stays the
+caller's lease, released the same way once the worktrees are provably clear; an
+omitted-token claim is discoverable by a later invocation only when its derived
+session and canonical worktree match, and every foreign or unverifiable claim
+stays untouched until its normal expiry or external repair.
 
 ### Session fork-point repair
 

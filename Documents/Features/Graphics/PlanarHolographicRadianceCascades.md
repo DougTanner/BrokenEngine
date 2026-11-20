@@ -59,8 +59,10 @@ shader are unchanged and all three modes reach the screen through identical code
   (incoming light 0, T = 1 at the boundary). Output is written only over [0,W) x [0,H), 1:1 with no
   resampling. Lighting-texture +y is south (`LightingSpread.frag`); quadrant rotation follows that.
 - Path lengths use the per-axis world texel size derived in the shader as 1 /
-  (`f2LightingAreaExtentInverse` * imageSize of the target); lighting texels are only approximately
-  square (`ComputeWorldSizedTexelArea`, `Render.h`). Nothing new is published for it.
+  (reciprocal extent * imageSize of the target), the reciprocal extent being
+  `lightingAreaToUv.f4ScaleOffset` x and the negated y, as in
+  `LightingSpread.frag`; lighting texels are only approximately square
+  (`ComputeWorldSizedTexelArea`, `Render.h`). Nothing new is published for it.
 - The deposit-resolution grid was rejected: at 1440p its N would need an interval image taller than
   a typical 16,384 `maxImageDimension2D` and hundreds of MiB.
 

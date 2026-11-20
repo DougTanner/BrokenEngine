@@ -10,6 +10,7 @@
 #include "CrashReport.h"
 
 #include "Network/Server/ServerClientManager.h"
+#include "Network/Server/ServerSession.h"
 #include "Game.h"
 
 namespace engine
@@ -163,7 +164,7 @@ void Server::Connect(const ENetEvent& rEvent)
 	ClientConnection connection {};
 	connection.pPeer = rEvent.peer;
 	connection.iClientId = miNextClientId++;
-	connection.slots.resize(NetworkManager::kiMaximumEnetCoordinateSlots);
+	connection.slots.resize(kiCoordinateSlots);
 
 	rEvent.peer->data = reinterpret_cast<void*>(connection.iClientId);
 
@@ -522,7 +523,7 @@ void Server::ClientAcknowledgementStream(std::span<const uint8_t> packetData, Cl
 		return;
 	}
 
-	mBufferedFrames.ApplyAckStream(rClient, message, rClient.iClientId);
+	mBufferedFrames.ApplyAckStream(rClient, message);
 }
 
 void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, ClientConnection& rClient)
@@ -576,8 +577,7 @@ void Server::ClientChat(std::span<const uint8_t> packetData, ClientConnection& r
 {
 	NetworkMessages::ClientChatMessage message {};
 	NetworkMessages::Read(packetData, message);
-	// Before the token bucket, so corrupt text does not spend a token. Bytes after an embedded NUL are never relayed,
-	// because only the validated text is re-encoded below.
+	// Before the token bucket, so corrupt text does not spend a token.
 	if (!IsValidChatText(message.text))
 	{
 		NetworkMessages::ThrowCorruptStream("Server::ClientChat");
@@ -649,16 +649,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 		return;
 	}
 
-	char pcClientConfiguration[64] = {};
-	int64_t iCopyLength = std::min(std::ssize(message.buildConfiguration), std::ssize(pcClientConfiguration) - 1);
-	std::memcpy(pcClientConfiguration, message.buildConfiguration.data(), static_cast<size_t>(iCopyLength));
-
-	if (std::strcmp(pcClientConfiguration, kpcBuildConfigurationName) != 0)
-	{
-		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", rClient.iClientId, kpcBuildConfigurationName, pcClientConfiguration);
-	}
-
-	ClientGuid clientGuid = message.bHasGuid ? message.guid : ClientGuid {};
+	ClientGuid clientGuid = message.guid;
 
 	// Idempotent replay: an already-handshaken client re-sends the accept using its STORED GUID.
 	// Do not overwrite established identity (game entity ownership is GUID-keyed) or mint a fresh GUID.
@@ -666,7 +657,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 	{
 		LOG(kNetwork, kInfo, "Server::ClientHello Replay Client: {} GUID: {} {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
 		SendConnectionResponse(rClient.pPeer, true, nullptr, &rClient.clientGuid);
-		SendTimespeedUpdate(rClient.pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
+		SendTimespeedUpdate(rClient.pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide, game::gpGame->mGameFlags & GameFlags::kPaused);
 		return;
 	}
 
@@ -699,10 +690,10 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 	rClient.bHandshakeComplete = true;
 	rClient.clientGuid = clientGuid;
 
-	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} Config: {} GUID: {} {}", rClient.iClientId, pcClientConfiguration, clientGuid.uiHigh, clientGuid.uiLow);
+	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} GUID: {} {}", rClient.iClientId, clientGuid.uiHigh, clientGuid.uiLow);
 	SendConnectionResponse(rClient.pPeer, true, nullptr, &clientGuid);
 
-	SendTimespeedUpdate(rClient.pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
+	SendTimespeedUpdate(rClient.pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide, game::gpGame->mGameFlags & GameFlags::kPaused);
 }
 
 void Server::RejectHello(const ClientConnection& rClient, const char* pcMessage)
@@ -737,11 +728,11 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 
 	// The origin is always simulated and permits the initial game spawn.
 	bool bAdjacent = (coordinate == kOriginCoordinate);
-	bAdjacent |= std::ranges::any_of(rClient.authorizedCoordinates, [&coordinate](const GridCoord& rOwnedCoordinate)
+	bAdjacent |= std::ranges::any_of(rClient.ownedEntities, [&coordinate](const OwnedEntity& rOwnedEntity)
 	{
 		// The client-supplied coord is hostile input, so its difference from an owned coord can overflow int32;
 		// GridDistance takes both differences and their sum in int64.
-		return GridDistance(rOwnedCoordinate, coordinate) <= 1;
+		return GridDistance(rOwnedEntity.coord, coordinate) <= 1;
 	});
 	if (!bAdjacent)
 	{
@@ -866,7 +857,7 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 	char pcFilename[96] {};
 	std::format_to_n(pcFilename, std::ssize(pcFilename) - 1, "CrashReport-{:%Y%m%dT%H%M%SZ}-{}-{:016X}{:016X}.txt", now, miStoredCrashReportCount, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
 
-	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path(pcFilename), [&message](std::fstream& rStream)
+	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kWrite}, std::filesystem::path(pcFilename), [&message](std::fstream& rStream)
 	{
 		rStream.write(reinterpret_cast<const char*>(message.report.puiData), message.report.iSize);
 	});
@@ -878,7 +869,7 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 
 	++miStoredCrashReportCount;
 	LOG(kNetwork, kInfo, "Server::ClientCrashReport Stored Client: {} File: {}", rClient.iClientId, pcFilename);
-	gpCrashReportPoster->PostAsync(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, pcFilename));
+	gpCrashReportPoster->PostAsync(gpFileManager->GetFilePath(pcFilename));
 }
 
 void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGloballyUniqueIdentifier)
@@ -893,7 +884,6 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 		.uiDebugInput = static_cast<uint8_t>(kbDebugInput ? 1 : 0),
 		.uiReplaying = static_cast<uint8_t>(game::gpGame->mbReplaying ? 1 : 0),
 		.guid = (pGloballyUniqueIdentifier != nullptr) ? *pGloballyUniqueIdentifier : ClientGuid {},
-		.bHasGuid = bAccepted && pGloballyUniqueIdentifier != nullptr,
 		.rejectionMessage = (!bAccepted && pcMessage != nullptr) ? pcMessage : "",
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
@@ -940,26 +930,33 @@ void Server::BroadcastLoadNotification()
 	}
 }
 
-void Server::SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide)
+void Server::SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide, bool bPaused)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ServerTimespeedUpdateMessage message {.iMultiply = iMultiply, .iDivide = iDivide};
+	NetworkMessages::ServerTimespeedUpdateMessage message
+	{
+		.iMultiply = iMultiply,
+		.iDivide = iDivide,
+		.uiPaused = static_cast<uint8_t>(bPaused ? 1 : 0),
+	};
 	NetworkMessages::Write(rWorkbuffer, message);
 	NetworkManager::SendPacket(pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void Server::BroadcastTimespeedIfChanged()
 {
-	if (!game::gpGame->mTimeStep.mbTimeScaleChanged) [[likely]]
+	bool bPaused = game::gpGame->mGameFlags & GameFlags::kPaused;
+	if (!game::gpGame->mTimeStep.mbTimeScaleChanged && bPaused == mbLastBroadcastPaused) [[likely]]
 	{
 		return;
 	}
 	game::gpGame->mTimeStep.mbTimeScaleChanged = false;
+	mbLastBroadcastPaused = bPaused;
 
 	int64_t iMultiply = game::gpGame->mTimeStep.miTimeMultiply;
 	int64_t iDivide = game::gpGame->mTimeStep.miTimeDivide;
-	LOG(kNetwork, kDebug, "Server::BroadcastTimespeedIfChanged Multiply: {} Divide: {}", iMultiply, iDivide);
+	LOG(kNetwork, kDebug, "Server::BroadcastTimespeedIfChanged Multiply: {} Divide: {} Paused: {}", iMultiply, iDivide, bPaused);
 
 	for (const ClientConnection& rClient : mClients)
 	{
@@ -968,7 +965,7 @@ void Server::BroadcastTimespeedIfChanged()
 			continue;
 		}
 
-		SendTimespeedUpdate(rClient.pPeer, iMultiply, iDivide);
+		SendTimespeedUpdate(rClient.pPeer, iMultiply, iDivide, bPaused);
 	}
 }
 

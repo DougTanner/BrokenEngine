@@ -1,10 +1,9 @@
 # Network Server - Game Session and Managers
 
 Server-only game networking. `ServerSession` inherits
-`engine::ServerSessionBase`, which holds the owned-entity registry, the
-engine-owned transfer and broadcast managers, and
-`engine::ServerSessionRuntime`, the owner of host/discovery/pacing and the fixed
-poll/tick/paused phase order
+`engine::ServerSessionBase`, which holds the engine-owned transfer and broadcast
+managers and `engine::ServerSessionRuntime`, the owner of host/discovery/pacing
+and the fixed poll/tick/paused phase order
 (`../../../../../Engine/Source/Network/Server/AGENTS.md`). `ServerSession` owns
 the client and fleet managers and supplies the game payloads and policy queues
 the engine managers work on; the game functions the engine calls by name mutate
@@ -12,11 +11,12 @@ game state around the deterministic Frame tick.
 
 ## State Ownership
 
-- The engine session base rebuilds the `engine::OwnedEntityRegistry` from the
-  Frame ownership layers and reports each entity whose row is gone from every
-  cell to `OnOwnedEntityDied`, which the game leaves empty. Game code uses those
-  per-client global ID and coordinate records, not the engine-authoritative
-  `authorizedCoordinates`, for owned-entity lookup.
+- The engine session base rebuilds each client record's owned-entity list
+  (`engine::ClientConnection::ownedEntities`) from the Frame ownership layers
+  and reports each entity whose row is gone from every cell to
+  `OnOwnedEntityDied`, which the game leaves empty. Game code reads those
+  per-client global ID and coordinate records from the client's
+  `engine::ClientConnection` for owned-entity lookup.
 - Fleets are keyed by persistent `ClientGuid` so they survive disconnect:
   disconnect clears that GUID's client id and that client's queued fleet
   requests, never the fleet, and its ships keep running.
@@ -107,9 +107,11 @@ game state around the deterministic Frame tick.
   member stays dead and is retried on the next tick. `ServerClientManager.cpp`
   owns the candidate set, the clearance, and the blocked-episode logging. A
   Fighter launches in its fleet Battleship's cell from a packed bay of that
-  row's model, yawed by its heading, inheriting velocity and stored plane. A
-  wholly refused batch leaves `mNextFighterLaunchTicks` unchanged and retries
-  next tick; every load reset clears it.
+  row's model, yawed by its heading, inheriting velocity and stored plane. The
+  fleet step calls `CellStaticData::BuildNavigationDataIfUnbuilt` on the
+  Battleship's cell before the bay terrain admission. A wholly refused batch
+  leaves `mNextFighterLaunchTicks` unchanged and retries next tick; every load
+  reset clears it.
 - `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset on
   advancing updates, drains destroy-member requests into the first advancing
@@ -212,13 +214,14 @@ game state around the deterministic Frame tick.
 - The engine load reset (`engine::ServerSessionBase::ResetForLoad`) advances
   the debugging-load generation before notification, slot clearing, or
   transient reset, and rebuilds client ownership before it calls
-  `OnResetForLoad`. That function rebuilds
-  every owner's fleet members from the cells' ownership rows
-  (`RebuildFleetMembersForLoad`), and leaves every fleet's saved course, then
-  clears client and request transient state after restored fleet state is read;
-  the engine then resets its two managers, which clear their own queues (engine
-  Server contract), so no second clear belongs here. Do not erase restored
-  fleet RNG.
+  `OnResetForLoad`. That function rebuilds every owner's fleet members from the
+  cells' ownership rows (`RebuildFleetMembersForLoad`), and leaves every fleet's
+  saved course, then clears client and request transient state after restored
+  fleet state is read; the engine then resets its two managers, which clear
+  their own queues (engine Server contract), so no second clear belongs here.
+  It maps and syncs only handshake-complete clients; a client still before
+  `ClientHello` gets both from new-client processing once its handshake
+  completes. Do not erase restored fleet RNG.
 
 ## See Also
 

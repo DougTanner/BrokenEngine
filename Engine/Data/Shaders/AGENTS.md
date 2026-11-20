@@ -36,11 +36,12 @@ single-sourced. GLSL indents with tabs and aligns with spaces after them, as
   projection/render modes where command buffers are recorded once; the selector
   values are named constants in the shared layout header, which C++ recording
   and GLSL decoding both use.
-- `ShaderFunctions.h` owns shared transforms, projection, normal mapping,
-  randomized patch blending, smoke blending, wind magnitude factor, and lighting
-  helpers. `ShaderRandom.h` mirrors the engine's 32-bit RNG family.
-- Randomized patch blending (`ShaderFunctions.h`): each blended read has its
-  own lattice from `PopulatePatchLattice` (`Render.h`), and passes the
+- `ShaderFunctions.h` owns shared transforms, projection, normal mapping, smoke
+  blending, wind magnitude factor, and lighting helpers. `ShaderRandom.h`
+  mirrors the engine's 32-bit RNG family.
+- Randomized patch blending (`ShaderPatchBlending.h`, included after
+  `ShaderFunctions.h` by the water shaders that use it): each blended read has
+  its own lattice from `PopulatePatchLattice` (`Render.h`), and passes the
   camera-cell position its UV derives from, before any rotation or time scroll.
 
 ## Lighting and Vector Invariants

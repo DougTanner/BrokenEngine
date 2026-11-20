@@ -15,7 +15,6 @@ struct PointLightsType
 {
 	common::crc_t uiCrc = 0;
 	uint32_t uiColor = 0xFFFFFFFF;
-	float fVisibleArea = 1.0f;
 	float fVisibleIntensity = 1.0f;
 	float fLightingArea = 1.0f;
 	float fLightingIntensity = 1.0f;
@@ -26,9 +25,44 @@ struct PointLightsType
 	Wrapper* pLightingIntensityWrapper = nullptr;
 };
 
+struct ControllerKeyframe
+{
+	float fVisibleArea = 0.0f;
+	float fVisibleIntensity = 0.0f;
+	float fLightingArea = 0.0f;
+	float fLightingIntensity = 0.0f;
+	float fRotation = 0.0f;
+
+	static ControllerKeyframe Interpolate(const ControllerKeyframe& rA, const ControllerKeyframe& rB, float fPercent)
+	{
+		return
+		{
+			.fVisibleArea = std::lerp(rA.fVisibleArea, rB.fVisibleArea, fPercent),
+			.fVisibleIntensity = std::lerp(rA.fVisibleIntensity, rB.fVisibleIntensity, fPercent),
+			.fLightingArea = std::lerp(rA.fLightingArea, rB.fLightingArea, fPercent),
+			.fLightingIntensity = std::lerp(rA.fLightingIntensity, rB.fLightingIntensity, fPercent),
+			.fRotation = std::lerp(rA.fRotation, rB.fRotation, fPercent),
+		};
+	}
+};
+
+struct ControllerType
+{
+	int64_t iBaseTypeIndex = 0;                                // Base Type for color/texture
+	int64_t iKeyframeCount = 2;                                // Actual keyframes used (2-4)
+	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};                  // Keyframe times (relative to start)
+	ControllerKeyframe pKeyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
+
+	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
+	Wrapper* ppVisibleAreaScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppVisibleIntensityScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppLightingAreaScales[kiMaximumControllerKeyframes] {};
+	Wrapper* ppLightingIntensityScales[kiMaximumControllerKeyframes] {};
+};
+
 struct PointLightsInterpolate : public Collection<PointLightsInterpolate, CollectionFlags::kIdToIndex>,
 	public TypeRegistry<PointLightsType>,
-	public ControllerTypeRegistry<PointLightsInterpolate>
+	public ControllerTypeRegistry<PointLightsInterpolate, ControllerType>
 {
 	static constexpr const char* kpcName = "PointLights";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("PointLights");
@@ -85,11 +119,11 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 	// Add non-controlled point light
 	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex);
 
-	// Fire-and-forget keyframe animation; the controller's bDestroysSelf enables removal after the final keyframe.
+	// Fire-and-forget keyframe animation; the row is removed after the final keyframe.
 	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
 
 
-	// Destroy handles auto-removal of expired controlled lights
+	// Destroy marks expired controlled lights for removal.
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	point_lights_t* __restrict pIds = nullptr;

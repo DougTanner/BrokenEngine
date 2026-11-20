@@ -155,17 +155,15 @@ void IslandTerrain::WaitForElevationMaps()
 		// Chunk payload layout (set by ExportIsland::Export): [heightmap R16 halfs][float2 mesh positions][uint32 mesh indices]
 		// [int32 thumbnail width, height][RGBA8 thumbnail][float2 valid-area hull verts].
 		// Validate every count from the pack header before forming payload pointers.
-		// iSize excludes the pack's alignment pad, so it must describe the layout exactly and fit the
-		// chunk buffer's extent.
-		if (common::IsCompressed(rLazyChunk.header.flags) || rLazyChunk.pData == nullptr || rLazyChunk.iDataSize <= 0
-		 || rLazyChunk.header.iSize <= 0 || rLazyChunk.header.iSize > rLazyChunk.iDataSize || rIslandHeader.iHeightmapWidth <= 0
-		 || rIslandHeader.iHeightmapHeight <= 0 || rIslandHeader.iMeshVertexCount <= 0 || rIslandHeader.iMeshIndexCount <= 0
-		 || rIslandHeader.iValidAreaVertexCount < 3)
+		// Island chunks are compressed, so iDataSize is the decompressed payload extent, which must describe the
+		// layout exactly.
+		if (rIslandHeader.iHeightmapWidth <= 0 || rIslandHeader.iHeightmapHeight <= 0 || rIslandHeader.iMeshVertexCount <= 0
+		 || rIslandHeader.iMeshIndexCount <= 0 || rIslandHeader.iValidAreaVertexCount < 3)
 		{
 			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");
 		}
 
-		int64_t iBytesRemaining = rLazyChunk.header.iSize;
+		int64_t iBytesRemaining = rLazyChunk.iDataSize;
 		if (rIslandHeader.iHeightmapWidth > iBytesRemaining / static_cast<int64_t>(sizeof(uint16_t)) / rIslandHeader.iHeightmapHeight)
 		{
 			throw std::ios_base::failure("IslandTerrain::WaitForElevationMaps");

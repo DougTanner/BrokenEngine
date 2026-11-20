@@ -15,6 +15,8 @@ constexpr float kfFramingPerWheelTick = 0.1f;
 constexpr float kfFramingBlendDuration = 0.35f;
 
 constexpr float kfCameraPositionBlend = 8.0f;
+// The blend alone stalls a rounding step short of a still target; snapping makes it land exactly. Sized for a 1:1 time ratio.
+constexpr float kfCameraChaseSnapDistance = 0.01f;
 constexpr float kfJumpDistanceThreshold = 50.0f;
 constexpr float kfJumpDuration = 2.0f;
 constexpr float kfJumpCancelThreshold = 5.0f;
@@ -325,6 +327,10 @@ void CameraBase::UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime)
 		float fAdaptiveBlend = kfCameraPositionBlend * (mfCameraFraming / kfCameraFramingDefault);
 		float fBlend = std::clamp(fDeltaTime * fAdaptiveBlend, 0.0f, 1.0f);
 		mVecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fBlend), vecTargetPosition, XMVectorMultiply(XMVectorReplicate(1.0f - fBlend), mVecPosition));
+		if (XMVectorGetX(XMVector3Length(XMVectorSubtract(vecTargetPosition, mVecPosition))) < kfCameraChaseSnapDistance)
+		{
+			mVecPosition = vecTargetPosition;
+		}
 	}
 
 	mVecPreviousTargetPosition = vecTargetPosition;

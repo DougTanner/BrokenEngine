@@ -63,10 +63,8 @@ It writes no file and prints one `broken-engine-session-change-inventory/v1`
 object with `entries` and their `class` values, `counts`, `triggers`, and the
 per-hunk `regions` table. Only `status` `pass` is usable; any other status means
 the inventory is missing for the rule below. The implementer reports `truncated`
-with the brief so a shortfall is never presented as a complete inventory. An
-untracked file appears only when the caller supplies it with
-`-IncludeUntracked '<comma-separated paths>'`, and `counts.unlistedUntracked`
-reports how many untracked files the run did not list.
+with the brief so a shortfall is never presented as a complete inventory. Add
+the `-IncludeUntracked` switch when the audit scope includes untracked files.
 
 Main dispatches one preparation `implementer` to assemble that brief from
 repository state and to map the user-authorized audit scope to the same named

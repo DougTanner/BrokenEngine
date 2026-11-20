@@ -146,10 +146,7 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 		mbDirty = true;
 		return mbDirty;
 	}
-	if (mContentKey.empty())
-	{
-		SetContentKey(common::Crc(inputFingerprint));
-	}
+	SetContentKey(common::Crc(inputFingerprint));
 
 	if (!std::filesystem::exists(mChunkFile))
 	{

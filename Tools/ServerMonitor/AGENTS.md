@@ -4,9 +4,9 @@
 
 This standalone Windows program displays statistics, the Map tab, and the
 Profile tab from a local or remote server. It compiles standard and Windows
-headers and `Common/ServerMonitorProtocol.h` by path; it compiles no engine or
-game code. The channel contract belongs to
-`../../Engine/Source/Server/AGENTS.md` `## Monitor Channel`.
+headers, `Common/ServerMonitorProtocol.h` by path, and the forced include
+`Common/DebugDefines.h`; it compiles no engine or game code. The channel
+contract belongs to `../../Engine/Source/Server/AGENTS.md` `## Monitor Channel`.
 
 ## Connection and Threading
 

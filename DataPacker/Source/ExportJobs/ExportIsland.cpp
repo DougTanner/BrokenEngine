@@ -735,7 +735,30 @@ void ExportIsland::Export()
 	int64_t iThumbnailDimensionBytes = 2 * static_cast<int64_t>(sizeof(int32_t));
 	int64_t iThumbnailPixelBytes = std::ssize(exported.thumbnailPixels);
 	int64_t iValidAreaBytes = std::ssize(exported.cpuValidAreaVertices) * static_cast<int64_t>(sizeof(float));
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes + iThumbnailDimensionBytes + iThumbnailPixelBytes + iValidAreaBytes);
+	int64_t iUncompressedSize = iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes + iThumbnailDimensionBytes + iThumbnailPixelBytes + iValidAreaBytes;
+
+	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][int32 thumbnail width, height]
+	// [RGBA8 thumbnail][valid-area hull verts]. Runtime IslandTerrain slices these contiguously using
+	// IslandHeader's count fields and the thumbnail's own dimensions.
+	std::vector<std::byte> payload(static_cast<size_t>(iUncompressedSize));
+	int32_t piThumbnailDimensions[2] = {static_cast<int32_t>(exported.iThumbnailWidth), static_cast<int32_t>(exported.iThumbnailHeight)};
+	std::byte* pData = payload.data();
+	std::memcpy(pData, heightmapHalf.data(), static_cast<size_t>(iHeightmapDataSize));
+	pData += iHeightmapDataSize;
+	std::memcpy(pData, exported.cpuMeshPositions.data(), static_cast<size_t>(iMeshPositionBytes));
+	pData += iMeshPositionBytes;
+	std::memcpy(pData, exported.cpuMeshIndices.data(), static_cast<size_t>(iMeshIndexBytes));
+	pData += iMeshIndexBytes;
+	std::memcpy(pData, piThumbnailDimensions, static_cast<size_t>(iThumbnailDimensionBytes));
+	pData += iThumbnailDimensionBytes;
+	std::memcpy(pData, exported.thumbnailPixels.data(), static_cast<size_t>(iThumbnailPixelBytes));
+	pData += iThumbnailPixelBytes;
+	std::memcpy(pData, exported.cpuValidAreaVertices.data(), static_cast<size_t>(iValidAreaBytes));
+
+	std::vector<std::byte> compressed = Lz4Compress(payload);
+
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
+	pHeader->iUncompressedSize = iUncompressedSize;
 
 	std::filesystem::path ambientOcclusionFile(relativeFile);
 	ambientOcclusionFile /= kpcIslandAmbientOcclusion;
@@ -764,21 +787,5 @@ void ExportIsland::Export()
 	pHeader->islandHeader.fPeakHeightMeters = exported.fPeakHeightMeters;
 	pHeader->islandHeader.uiPeakTexelX = static_cast<uint16_t>(exported.iPeakTexelX);
 	pHeader->islandHeader.uiPeakTexelY = static_cast<uint16_t>(exported.iPeakTexelY);
-
-	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][int32 thumbnail width, height]
-	// [RGBA8 thumbnail][valid-area hull verts]. Runtime IslandTerrain slices these contiguously using
-	// IslandHeader's count fields and the thumbnail's own dimensions.
-	int32_t piThumbnailDimensions[2] = {static_cast<int32_t>(exported.iThumbnailWidth), static_cast<int32_t>(exported.iThumbnailHeight)};
-	std::byte* pData = dataSpan.data();
-	std::memcpy(pData, heightmapHalf.data(), iHeightmapDataSize);
-	pData += iHeightmapDataSize;
-	std::memcpy(pData, exported.cpuMeshPositions.data(), iMeshPositionBytes);
-	pData += iMeshPositionBytes;
-	std::memcpy(pData, exported.cpuMeshIndices.data(), iMeshIndexBytes);
-	pData += iMeshIndexBytes;
-	std::memcpy(pData, piThumbnailDimensions, iThumbnailDimensionBytes);
-	pData += iThumbnailDimensionBytes;
-	std::memcpy(pData, exported.thumbnailPixels.data(), iThumbnailPixelBytes);
-	pData += iThumbnailPixelBytes;
-	std::memcpy(pData, exported.cpuValidAreaVertices.data(), iValidAreaBytes);
+	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }

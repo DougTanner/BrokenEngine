@@ -212,7 +212,7 @@ FleetBoard::FleetBoard(const Frame& rPreviousFrame)
 
 		XMVECTOR vecFlagshipPosition = rInterpolate.pVecPositions[i];
 		FleetStance eStance = FleetStance::kEscort;
-		ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, rPostRender.pAlignments[i], [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
+		ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, rPostRender.pAlignments[i], [&]([[maybe_unused]] ShipLocator locator, [[maybe_unused]] engine::registry_id_t registryId, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 		{
 			if (HorizontalDistanceSquared(vecFlagshipPosition, vecPosition) <= kfWeaponsFreeDistanceSquared)
 			{

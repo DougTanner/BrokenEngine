@@ -251,15 +251,15 @@ void main()
 
 	// Engine-specific lighting. Sun and moon split: the sun receives terrain and object shadow, the moon only
 	// object shadow. The sun/moon color terms are precomputed CPU-side (GlobalUniforms.cpp PopulateDayCycleColors):
-	// the per-target Objects intensity and fPbrSun fold into f4PhysicallyBasedRenderingSun/MoonColorObjects, and the
+	// the per-target Objects intensity and gPbrSun fold into f4PhysicallyBasedRenderingSun/MoonColorObjects, and the
 	// IBL specular path multiplies in the Rec.709 luminance / fPbrDayBrightness via the separate
 	// f4PhysicallyBasedRenderingSun/MoonColorObjectsImageBasedLighting. Kept as two fields so the IBL path stays
-	// linear in fPbrSun, because its luminance comes from the UNSCALED color.
+	// linear in gPbrSun, because its luminance comes from the UNSCALED color.
 	vec3 f3AmbientColor = globalLayout.f4AmbientColor.rgb;
 
-	vec2 f2ObjectShadowsPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ObjectShadowsArea);
-	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
-	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ShadowArea);
+	vec2 f2ObjectShadowsPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.objectShadowsAreaToUv);
+	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.lightingAreaToUv);
+	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.shadowAreaToUv);
 	float fShadow = max(mainLayout.fPbrShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
 	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
 	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
@@ -309,9 +309,9 @@ void main()
 	// between the two planes, reading only the layers the weight needs.
 	vec3 f3ToEye = ToEyeLine(mainLayout, f3InWorldPosition);
 	vec2 f2LightingWorldPosition = f3InWorldPosition.xy - (fInHeightAboveBase / f3ToEye.z) * f3ToEye.xy;
-	vec2 f2LightingTexcoordLow = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec2 f2LightingTexcoordLow = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.pLightingAreaToUvs[0]);
 	vec2 f2LightingWorldPositionHigh = f3InWorldPosition.xy - ((fInHeightAboveBase + globalLayout.fBaseHeight - globalLayout.pfFlightPlaneHeights[1]) / f3ToEye.z) * f3ToEye.xy;
-	vec2 f2LightingTexcoordHigh = WorldToVisibleArea(vec3(f2LightingWorldPositionHigh, 0.0f), globalLayout.pf4LightingAreas[1]);
+	vec2 f2LightingTexcoordHigh = WorldToVisibleArea(vec3(f2LightingWorldPositionHigh, 0.0f), globalLayout.pLightingAreaToUvs[1]);
 	float fLayerBlend = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fLightingLayerHeightInverse, 0.0f, 1.0f);
 	vec4 pf4LightingLow[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
 	vec4 pf4LightingHigh[3] = vec4[3](vec4(0.0f), vec4(0.0f), vec4(0.0f));
@@ -331,13 +331,13 @@ void main()
 	vec3 directionalLighting = f3Lighting * mix(baseColor.rgb, vec3(1.0f), globalLayout.fLightingObjectsAdd);
 	#else
 	// Engine directional lighting
-	vec2 f2DirectTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.pf4LightingAreas[0]);
+	vec2 f2DirectTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.pLightingAreaToUvs[0]);
 	vec4 pf4DirectLighting[3];
 	ReadLighting(pf4DirectLighting, pLightingSamplers, 0, f2DirectTexcoord);
 	vec3 f3Direct = DirectionalLighting(pf4DirectLighting, n, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
 
 	vec2 f2AmbientPosition = BaseHeightPosition(globalLayout, mainLayout, f3InWorldPosition);
-	vec2 f2AmbientTexcoord = WorldToVisibleArea(vec3(f2AmbientPosition, 0.0f), globalLayout.pf4LightingAreas[0]);
+	vec2 f2AmbientTexcoord = WorldToVisibleArea(vec3(f2AmbientPosition, 0.0f), globalLayout.pLightingAreaToUvs[0]);
 	vec4 pf4Lighting[3];
 	ReadLighting(pf4Lighting, pLightingSamplers, 0, f2AmbientTexcoord);
 	vec3 f3Ambient = AmbientLighting(pf4Lighting, mainLayout.fLightingAmbientIntensity, mainLayout.fLightingAmbientPower, mainLayout.fLightingAmbientPowerMode);

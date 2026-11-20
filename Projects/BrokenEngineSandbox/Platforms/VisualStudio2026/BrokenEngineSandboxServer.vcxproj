@@ -45,6 +45,7 @@
     <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
     <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..\..'))</DataRepositoryRoot>
     <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
+    <ThirdPartyLibraryDirectory Condition="'$(ThirdPartyLibraryDirectory)'==''">$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output</ThirdPartyLibraryDirectory>
     <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
     <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
     <GameDataDirectory Condition="'$(GameDataDirectory)'=='' and '$(DataBuildMode)'=='Local'">$(ProjectDir)Output\Data</GameDataDirectory>
@@ -105,7 +106,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ThirdPartyLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>wWinMainCRTStartup</EntryPointSymbol>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -121,7 +122,7 @@
     <PreBuildEvent>
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
 if errorlevel 1 exit /b %errorlevel%
-if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
 if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
     "$(DevEnvDir)devenv" "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(SolutionDir)..\..\..\..\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
 )
@@ -268,7 +269,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\Server.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.h" />
@@ -294,6 +294,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\FleetCoordination.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.h" />
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h" />
@@ -336,6 +337,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\FrameEdit.h" />
     <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h" />
     <ClInclude Include="..\..\..\..\Common\ModelMetadata.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStreamWriter.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\DifferenceStreamReader.h" />
+    <ClInclude Include="..\..\..\..\Common\DebugDefines.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -365,7 +369,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\CellStaticData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
@@ -408,7 +411,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\Server.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
@@ -423,6 +425,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\FleetCoordination.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipHitboxes.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipNavigationUtils.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipQueries.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.cpp" />
     <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
@@ -433,6 +436,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\Omnis.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisNavigation.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp" />
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisUpdate.cpp" />
     <ClCompile Include="..\..\Source\Game.cpp" />
     <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp" />
@@ -446,6 +450,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\File\DifferenceStreamWriter.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\File\DifferenceStreamReader.cpp" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

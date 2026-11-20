@@ -30,10 +30,6 @@ public:
 	// Set by a fleet spawn search that found every candidate crowded and cleared by one that succeeds, so a blocked
 	// episode logs one warning.
 	bool mbFleetSpawnBlocked = false;
-
-private:
-
-	void LogConnectingClientDiagnostic(const engine::ClientConnection& rClient);
 };
 
 } // namespace game

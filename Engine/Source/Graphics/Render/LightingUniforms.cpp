@@ -77,7 +77,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	if (iRefreshLayer >= 0)
 	{
 		TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[iRefreshLayer];
-		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent, rGlobalLayout.f4LightingAreaPrevious);
+		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent);
 		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
 	}
 	else
@@ -85,7 +85,6 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 		// No deposit or chain work runs; the chain fields carry layer 0's held values.
 		const TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[0];
 		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
-		rGlobalLayout.f4LightingAreaPrevious = rTemporalAreaLatch.f4PreviousArea;
 		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.fBlend;
 	}
 	int64_t iChainLayer = iRefreshLayer >= 0 ? iRefreshLayer : 0;
@@ -93,16 +92,12 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
 		rGlobalLayout.pf4LightingAreas[i] = spTemporalAreaLatches[i].f4CurrentArea;
+		PopulateAreaToUv(rGlobalLayout.pLightingAreaToUvs[i], spTemporalAreaLatches[i].f4CurrentArea);
 		gPresentationContinuity.pLighting[i].f4CurrentArea = spTemporalAreaLatches[i].f4CurrentArea;
 		gPresentationContinuity.pLighting[i].f4PreviousArea = spTemporalAreaLatches[i].f4PreviousArea;
 	}
-
-	// Lighting-area extent reciprocal (LightingSpread.frag world->texcoord multiply).
-	const XMFLOAT4& rf4LightingArea = spTemporalAreaLatches[iChainLayer].f4CurrentArea;
-	float fLightingAreaWidth = rf4LightingArea.z - rf4LightingArea.x;
-	float fLightingAreaHeight = rf4LightingArea.y - rf4LightingArea.w;
-	rGlobalLayout.f2LightingAreaExtentInverse.x = 1.0f / fLightingAreaWidth;
-	rGlobalLayout.f2LightingAreaExtentInverse.y = 1.0f / fLightingAreaHeight;
+	PopulateAreaToUv(rGlobalLayout.lightingAreaToUv, spTemporalAreaLatches[iChainLayer].f4CurrentArea);
+	PopulateAreaToUv(rGlobalLayout.lightingAreaPreviousToUv, spTemporalAreaLatches[iChainLayer].f4PreviousArea);
 
 	// Edge-fade denominator reciprocal (LightingDepositEdgeFade), deliberately floored unlike smoke/wind's ceil-based
 	// full-coverage dispatch grids. The minimum of one keeps the tile count nonzero if a device clamp produces a
@@ -311,7 +306,6 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.fPbrIblDiffusePower = gPbrIblDiffusePower.mfCurrent;
 	rMainLayout.fPbrIblSpecular = gPbrIblSpecular.mfCurrent;
 	rMainLayout.fPbrIblSpecularPower = gPbrIblSpecularPower.mfCurrent;
-	rMainLayout.fPbrSun = gPbrSun.mfCurrent;
 	rMainLayout.fPbrLighting = gPbrLighting.mfCurrent;
 	rMainLayout.fPbrLightingPower = gPbrLightingPower.mfCurrent;
 	rMainLayout.fPbrLightingSpecular = gPbrLightingSpecular.mfCurrent;

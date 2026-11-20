@@ -182,10 +182,10 @@ void ServerSessionBase::HandleDebugControlPacket(const DeferredClientPacket& rPa
 
 void ServerSessionBase::RebuildOwnedEntities()
 {
-	// Heap: registry entries and authorizedCoordinates may grow
+	// Heap: each client's owned-entity list may grow
 	ScopedSuppressAllocationTracking suppress;
 
-	for (const ClientConnection& rClient : mpRuntime->mpServer->mClients)
+	for (ClientConnection& rClient : mpRuntime->mpServer->mClients)
 	{
 		if (!rClient.bHandshakeComplete)
 		{
@@ -213,9 +213,9 @@ void ServerSessionBase::RebuildOwnedEntities()
 			return rLeft.globalId.iValue < rRight.globalId.iValue;
 		});
 
-		// Every rebuild writes the registry list in this sorted order, so walking it backward is descending by global ID.
-		auto ownedIt = mClientOwnedEntities.mOwned.find(rClient.iClientId);
-		std::span<const OwnedEntity> previous = ownedIt != mClientOwnedEntities.mOwned.end() ? std::span<const OwnedEntity>(ownedIt->second) : std::span<const OwnedEntity>();
+		// Every rebuild writes the client's owned-entity list in this sorted order, so walking it backward is descending
+		// by global ID.
+		std::span<const OwnedEntity> previous = rClient.ownedEntities;
 
 		// Deaths go first, in descending global-ID order, so the earliest-spawned of several entities dying together
 		// reaches the game hook last.
@@ -226,7 +226,7 @@ void ServerSessionBase::RebuildOwnedEntities()
 			{
 				continue;
 			}
-			SendOwnedEntityState(rClient.iClientId, OwnedEntityState::kDied, rPrevious.globalId, rPrevious.coord);
+			SendOwnedEntityState(rClient, OwnedEntityState::kDied, rPrevious.globalId, rPrevious.coord);
 			game::gpServerSession->OnOwnedEntityDied(rClient.clientGuid, rPrevious.globalId);
 		}
 
@@ -235,20 +235,15 @@ void ServerSessionBase::RebuildOwnedEntities()
 			auto previousIt = std::ranges::find(previous, rEntity.globalId, &OwnedEntity::globalId);
 			if (previousIt == previous.end())
 			{
-				SendOwnedEntityState(rClient.iClientId, OwnedEntityState::kSpawned, rEntity.globalId, rEntity.coord);
+				SendOwnedEntityState(rClient, OwnedEntityState::kSpawned, rEntity.globalId, rEntity.coord);
 			}
 			else if (previousIt->coord != rEntity.coord)
 			{
-				SendOwnedEntityState(rClient.iClientId, OwnedEntityState::kChangedCell, rEntity.globalId, rEntity.coord);
+				SendOwnedEntityState(rClient, OwnedEntityState::kChangedCell, rEntity.globalId, rEntity.coord);
 			}
 		}
 
-		mClientOwnedEntities.Clear(rClient.iClientId);
-		mClientOwnedEntities.Reserve(rClient.iClientId, std::ssize(entities));
-		for (const OwnedEntity& rEntity : entities)
-		{
-			mClientOwnedEntities.Add(rClient.iClientId, rEntity.globalId, rEntity.coord);
-		}
+		rClient.ownedEntities.assign(entities.begin(), entities.end());
 	}
 }
 
@@ -263,26 +258,24 @@ void ServerSessionBase::AddOwnedEntityCoordinates()
 	}
 }
 
-void ServerSessionBase::SendOwnedEntityState(int64_t iClientId, OwnedEntityState eState, GlobalId globalId, GridCoord coordinate)
+void ServerSessionBase::SendOwnedEntityState(const ClientConnection& rClient, OwnedEntityState eState, GlobalId globalId, GridCoord coordinate)
 {
-	ClientConnection* pClient = gpServer->FindClient(iClientId);
-
 	const OwnedEntityStateDescriptor& rDescriptor = kpOwnedEntityStateDescriptors[static_cast<size_t>(eState)];
-	LOG(kNetwork, kInfo, "ServerSessionBase::SendOwnedEntityState State: {} Client: {} GlobalId: {} Grid: ({},{})", rDescriptor.pcName, iClientId, globalId.iValue, coordinate.iQ, coordinate.iR);
+	LOG(kNetwork, kInfo, "ServerSessionBase::SendOwnedEntityState State: {} Client: {} GlobalId: {} Grid: ({},{})", rDescriptor.pcName, rClient.iClientId, globalId.iValue, coordinate.iQ, coordinate.iR);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	NetworkMessages::ServerOwnedEntityStateMessage message {.uiState = static_cast<uint8_t>(eState), .iGlobalId = globalId.iValue, .coordinate = coordinate};
 	NetworkMessages::Write(rWorkbuffer, message);
 	ASSERT(rWorkbuffer.Count<uint8_t>() == NetworkMessages::ServerOwnedEntityStateMessage::kiFixedSize);
-	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void ServerSessionBase::ResetForLoad()
 {
 	mpRuntime->mpServer->AdvanceLoadGeneration();
 	LOG(kDefault, kDebug, "ServerSessionBase::ResetForLoad");
-	// Heap: the rebuild may allocate registry entries and authorizedCoordinates
+	// Heap: the rebuild may grow each client's owned-entity list
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->mpServer->BroadcastLoadNotification();
@@ -298,15 +291,15 @@ void ServerSessionBase::ResetForLoad()
 			}
 		}
 
-		mClientOwnedEntities.Clear(rClient.iClientId);
+		rClient.ownedEntities.clear();
 	}
 
-	// The cleared registry makes every surviving entity Spawned and reports no death.
+	// The cleared owned-entity lists make every surviving entity Spawned and report no death.
 	RebuildOwnedEntities();
 
 	for (const ClientConnection& rClient : rClients)
 	{
-		if (rClient.bHandshakeComplete && mClientOwnedEntities.mOwned.at(rClient.iClientId).empty())
+		if (rClient.bHandshakeComplete && rClient.ownedEntities.empty())
 		{
 			LOG(kDefault, kDebug, "ServerSessionBase::ResetForLoad Client: {} no GUID match, will respawn", rClient.iClientId);
 		}

@@ -20,8 +20,8 @@ as `../Smoke/AGENTS.md` describes.
 When the object chain refreshes is owned by Render
 (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
 The raster and every consumer map world positions through the held
-`f4ObjectShadowsArea`, never the live `f4VisibleArea`; a consumer sample
-outside it reads the clamped edge texels until the next refresh.
+`objectShadowsAreaToUv`, never the live `visibleAreaToUv`; a consumer sample
+outside the held area reads the clamped edge texels until the next refresh.
 
 ## Terrain Shadow Contract
 

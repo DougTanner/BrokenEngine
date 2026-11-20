@@ -21,10 +21,11 @@ rather than direct collision damage.
   missiles do not perform this return.
 - Validate and clear target handles on target loss, falling, explosion,
   transfer, and destruction. Removal is idempotent.
-- Lifetime, velocity, falling state, boost-ramp delay, and turn rate cross cell
-  boundaries; an arrival restores them verbatim and draws no fresh ramp delay.
-  Falling disables propulsion and homing random draws; terrain impact at or
-  below sea level removes the missile without explosion damage or effects.
+- Lifetime, velocity, falling state, stored direction, boost-ramp delay, and
+  turn rate cross cell boundaries; an arrival restores them verbatim and draws
+  no fresh ramp delay. Falling disables propulsion and homing random draws;
+  terrain impact at or below sea level removes the missile without explosion
+  damage or effects.
 - Resolve the earliest entity, terrain, or boundary event before applying
   explosion or transfer behavior. All missile damage enters through the
   area-damage registration at explosion time.

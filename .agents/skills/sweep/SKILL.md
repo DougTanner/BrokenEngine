@@ -171,8 +171,8 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
   single landing confirmation.
 - Out-of-bound findings reach the deferred-fixes record for the user to decide
   on; the sweep creates no follow-up Plans on its own.
-- `Tools/` changes to WorktreeCli or AgentHarness, or a `Common/Sha256Hasher.h`
-  change, follow `/compile`'s AgentTools policy.
+- A change that meets the AgentTools trigger follows `/finalize-changes`
+  [`agenttools.md`](../finalize-changes/references/agenttools.md).
 - A finding whose fix needs an `.agents/` edit is declined and reaches the
   deferred-fixes record. A Codex git warning that it cannot read the user's
   global ignore file is harmless. Codex writing its own helper scripts and file

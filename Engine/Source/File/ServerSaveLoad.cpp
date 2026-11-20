@@ -20,7 +20,7 @@ bool ServerSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 {
 	// Heap: the sorted coord key list, file paths, and grid save file I/O
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoordinate);
+	return engine::WriteGridSave({engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoordinate);
 }
 
 bool ServerSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
@@ -30,7 +30,7 @@ bool ServerSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 	gpProfileManager->LatchRawCpuTimers(false);
 
 	engine::StagedGridSave stagedGrid;
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, stagedGrid))
+	if (!engine::ReadGridSave(rFilename, stagedGrid))
 	{
 		return false;
 	}
@@ -65,7 +65,7 @@ bool ServerSaveLoad::Autosave()
 {
 	// Heap: the sorted coord key list, file paths, the backup copy, and grid save file I/O
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path(kAutosaveFilename), game::gpGame->mClientGridCoordinate);
+	return engine::WriteGridSave({engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path(kAutosaveFilename), game::gpGame->mClientGridCoordinate);
 }
 
 void ServerSaveLoad::TickAutosave()
@@ -119,13 +119,13 @@ bool ServerSaveLoad::Autoload()
 	// Heap: file paths, grid save file I/O, and the staged snapshot's frames
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename))))
+	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath(std::filesystem::path(kAutosaveFilename))))
 	{
 		return false;
 	}
 
 	engine::StagedGridSave stagedGrid;
-	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path(kAutosaveFilename), stagedGrid))
+	if (!engine::ReadGridSave(std::filesystem::path(kAutosaveFilename), stagedGrid))
 	{
 		return false;
 	}

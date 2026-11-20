@@ -60,7 +60,7 @@ void SendMapFleetMarkers(int64_t iClientId, const engine::ClientGuid& rClientGui
 
 void WriteFleetData(std::ostream& rStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom);
 
-void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom);
+void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom);
 
 // The replay fleet record bytes of the live fleet state: the WriteFleetData bytes, each member's respawn countdown in
 // the same walk order, then the Fighter launch ticks in fleet GUID order. Owner client IDs and queued fleet requests

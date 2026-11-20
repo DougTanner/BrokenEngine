@@ -93,18 +93,6 @@ float XM_CALLCONV Distance(FXMVECTOR vecOne, FXMVECTOR vecTwo)
 	return XMVectorGetX(XMVector3Length(XMVectorSubtract(vecTwo, vecOne)));
 }
 
-XMVECTOR XM_CALLCONV DirectionTo(FXMVECTOR vecFrom, FXMVECTOR vecTo)
-{
-	// Compare all three spatial lanes so points equal only in X are not treated as coincident.
-	static constexpr float kfCoincidentEpsilon = 1.0e-6f;
-	if (XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecTo, vecFrom))) < kfCoincidentEpsilon * kfCoincidentEpsilon) [[unlikely]]
-	{
-		return XMVectorZero();
-	}
-
-	return XMVector3Normalize(XMVectorSubtract(vecTo, vecFrom));
-}
-
 XMVECTOR XM_CALLCONV ComputeLeadPosition(FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition, FXMVECTOR vecTargetVelocity, float fProjectileSpeed)
 {
 	XMVECTOR vecOffset = XMVectorSubtract(vecTargetPosition, vecShooterPosition);

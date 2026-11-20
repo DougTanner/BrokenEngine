@@ -71,7 +71,6 @@ Changes (11 files)
      uiFrameCount, fFrameRate, fSize
    - FlipbookControllerType: iBaseTypeIndex, iKeyframeCount,
      times[], FlipbookKeyframe keyframes[] (fSize, fAlpha, fRotation).
-     bDestroysSelf = true
    - FlipbooksInterpolate: Collection<FlipbooksInterpolate> with
      ControllerTypeRegistry. SOA members: puiTypeIndices,
      pVecPositions, pfAlphas, pfSizes, pfRotations,
@@ -88,7 +87,7 @@ Changes (11 files)
    - Template instantiations for both collections
    - Register(): empty (game registers types)
    - AllocateAndCopy: Allocate + memcpy all SOA arrays
-   - FlipbooksPostRender: AllocateAndCopyIds, empty Spawn/Transfer/Destroy
+   - FlipbooksPostRender: AllocateAndCopyMembers, empty Spawn/Transfer/Destroy
      stubs
 
 6. Engine/Source/Frame/Collections/Flipbooks/FlipbooksUpdate.cpp  [NEW]

@@ -36,12 +36,12 @@ Require a self-contained brief containing:
 - a `broken-engine-code-quality-targets/v1` targets file, produced for a
   manager-saved run by
   `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -EmitTargets > Temp/code-review-targets.json`,
-  adding `-IncludeUntracked '<comma-separated paths>'` for authorized untracked
-  additions and `-Head <commit>` for a committed head, from that authorized diff
-  (or focused re-review), listing the script-selected baseline and current C++
-  paths of additions, deletions, and renames; it excludes pre-existing and
-  concurrently owned changes. Its `paths` are the C++ target set selected by the
-  same run's `cpp` and `dual-language-header` classes, requiring no separately
+  adding `-IncludeUntracked` for authorized untracked additions and
+  `-Head <commit>` for a committed head, from that authorized diff (or focused
+  re-review), listing the script-selected baseline and current C++ paths of
+  additions, deletions, and renames; its tracked changes are every change since
+  the session baseline. Its `paths` are the C++ target set selected by the same
+  run's `cpp` and `dual-language-header` classes, requiring no separately
   supplied class decision. Those script class rules are the only statement of
   which `.h` files are GLSL-only, and every `dual-language-header` entry routes
   to both this C++ review and the GLSL review;

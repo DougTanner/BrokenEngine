@@ -12,20 +12,9 @@
 namespace engine
 {
 
-constexpr uint64_t kuiAudioReadStateMask = 0x3;
 constexpr uint64_t kuiHoldStateMask = 0x3;
 constexpr uint64_t kuiHoldOwnerMask = 0xc;
 constexpr uint64_t kuiHoldGenerationShift = 4;
-
-static constexpr AudioChunkReadState AudioReadState(uint64_t uiOwnership)
-{
-	return static_cast<AudioChunkReadState>(uiOwnership & kuiAudioReadStateMask);
-}
-
-static constexpr uint64_t AudioReadGeneration(uint64_t uiOwnership)
-{
-	return uiOwnership >> 2;
-}
 
 static constexpr uint64_t PackHoldToken(AudioStreamingHarnessRigHoldOwner eOwner, AudioStreamingHarnessRigHoldState eState, uint64_t uiGeneration)
 {

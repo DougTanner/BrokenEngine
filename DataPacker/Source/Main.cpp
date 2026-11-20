@@ -232,69 +232,6 @@ static std::optional<int64_t> GetReadableFileSize(const std::filesystem::path& r
 	return static_cast<int64_t>(uiFileSizeValue);
 }
 
-static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManifestFile, std::fstream& rManifestFileStream, int64_t iManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
-{
-	static constexpr int64_t kiChunkTableOffset = common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader)));
-
-	std::optional<int64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
-	if (!optionalManifestFileSize.has_value())
-	{
-		return false;
-	}
-
-	int64_t iManifestFileSize = optionalManifestFileSize.value();
-	if (iManifestFileSize < kiChunkTableOffset)
-	{
-		return false;
-	}
-
-	int64_t iManifestTableBytes = iManifestFileSize - kiChunkTableOffset;
-	int64_t iMaxChunks = iManifestTableBytes / static_cast<int64_t>(sizeof(common::ChunkLocation));
-	if (iManifestChunkCount < 0)
-	{
-		return false;
-	}
-	if (iManifestChunkCount > iMaxChunks)
-	{
-		return false;
-	}
-
-	int64_t iChunkTableBytes = iManifestChunkCount * static_cast<int64_t>(sizeof(common::ChunkLocation));
-
-	try
-	{
-		rManifestChunkLocations.resize(static_cast<size_t>(iManifestChunkCount));
-	}
-	catch (const std::exception&)
-	{
-		return false;
-	}
-
-	rManifestFileStream.seekg(static_cast<std::streamoff>(kiChunkTableOffset), std::ios::beg);
-	if (!rManifestFileStream)
-	{
-		return false;
-	}
-	if (iChunkTableBytes == 0)
-	{
-		return true;
-	}
-
-	rManifestFileStream.read(reinterpret_cast<char*>(rManifestChunkLocations.data()), static_cast<std::streamsize>(iChunkTableBytes));
-	return rManifestFileStream && rManifestFileStream.gcount() == static_cast<std::streamsize>(iChunkTableBytes);
-}
-
-static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, int64_t& riManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
-{
-	// A lone kiVersion bump must re-export everything — the engine ASSERTs on a stale-version manifest and there is no recovery CLI
-	common::DataHeader dataHeader {};
-	std::fstream manifestFileStream(rManifestFile, std::ios::in | std::ios::binary);
-	manifestFileStream.read(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
-	bool bDirty = !manifestFileStream || dataHeader.iMagic != common::DataHeader::kiMagic || dataHeader.iVersion != common::DataHeader::kiVersion;
-	riManifestChunkCount = dataHeader.iChunkCount;
-	return !bDirty && LoadPublishedManifestChunkTable(rManifestFile, manifestFileStream, riManifestChunkCount, rManifestChunkLocations);
-}
-
 static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
 	std::optional<int64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
@@ -607,9 +544,9 @@ std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunS
 	manifestFile += ".manifest";
 	bDirty |= !std::filesystem::exists(manifestFile);
 
-	int64_t iManifestChunkCount = -1;
 	std::vector<common::ChunkLocation> manifestChunkLocations;
-	if (!bDirty && !LoadPublishedManifest(manifestFile, iManifestChunkCount, manifestChunkLocations))
+	// A lone kiVersion bump must re-export everything — the engine rejects a stale-version manifest at startup and there is no recovery CLI
+	if (!bDirty && common::ReadManifestChunkTable(manifestFile, manifestChunkLocations) != nullptr)
 	{
 		bDirty = true;
 	}

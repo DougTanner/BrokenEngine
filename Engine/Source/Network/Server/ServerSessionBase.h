@@ -23,8 +23,6 @@ public:
 	void StepTimescale(bool bFaster); // step time scale one notch (faster/slower) and broadcast; shared by the packet handler and the agent command
 	void ResetForLoad();
 
-	OwnedEntityRegistry mClientOwnedEntities;
-
 	std::unique_ptr<ServerTransferManager> mpTransferManager;
 	std::unique_ptr<ServerBroadcaster> mpBroadcaster;
 	std::unique_ptr<ServerSessionRuntime> mpRuntime;
@@ -36,7 +34,7 @@ private:
 	void HandleDebugControlPacket(const DeferredClientPacket& rPacket);
 	void RebuildOwnedEntities();
 	void AddOwnedEntityCoordinates();
-	void SendOwnedEntityState(int64_t iClientId, OwnedEntityState eState, GlobalId globalId, GridCoord coordinate);
+	void SendOwnedEntityState(const ClientConnection& rClient, OwnedEntityState eState, GlobalId globalId, GridCoord coordinate);
 };
 
 } // namespace engine

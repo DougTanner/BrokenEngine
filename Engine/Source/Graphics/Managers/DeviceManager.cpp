@@ -364,7 +364,7 @@ DeviceManager::~DeviceManager()
 		if (vkResult == VK_SUCCESS)
 		{
 			common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data(), uiDataSize));
-			if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
+			if (gpFileManager->WriteFileAtomically({FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
 			{
 				rStream.write(reinterpret_cast<const char*>(&uiCrc), static_cast<std::streamsize>(sizeof(uiCrc)));
 				rStream.write(reinterpret_cast<const char*>(cacheData.data()), static_cast<std::streamsize>(uiDataSize));
@@ -399,7 +399,7 @@ static std::vector<uint8_t> ReadPipelineCacheFile()
 
 	try
 	{
-		if (!std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, "pipeline.cache")))
+		if (!std::filesystem::exists(gpFileManager->GetFilePath("pipeline.cache")))
 		{
 			return {};
 		}
@@ -410,7 +410,7 @@ static std::vector<uint8_t> ReadPipelineCacheFile()
 		return {};
 	}
 
-	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, "pipeline.cache");
+	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kRead}, "pipeline.cache");
 	if (!fileStream.is_open())
 	{
 		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache");

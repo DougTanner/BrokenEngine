@@ -10,11 +10,13 @@
 #include "Frame/Collections/Ships/FleetCoordination.h"
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Frame/Collections/Ships/ShipNavigationUtils.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Profile/ProfileRows.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
+#include "Frame/Collections/Ships/ShipModels.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -68,7 +70,6 @@ constexpr int64_t kiFighterExplosionSecondaryCount = 1;
 constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 
 constexpr std::chrono::duration<float> kFighterBeamFadeTime(0.5f);
-constexpr float kfFighterBeamHalfWidth = 0.15f;
 constexpr float kfFighterBeamStartOffset = 1.0f;
 #endif // BT_CLIENT
 
@@ -124,13 +125,13 @@ static void XM_CALLCONV SyncFighter(FrameInterpolate& rFrameInterpolate, engine:
 		.vecPosition = vecPosition,
 		.fRadius = gShipHitboxShapes[std::to_underlying(ShipType::kFighter)][std::to_underlying(eController)].fPusherRadius,
 		.fIntensity = kfFighterPusherIntensity,
-		.fPower = kfFighterPusherPower,
+		.uiPower = kuiFighterPusherPower,
 		.flags = {engine::PusherFlags::kTypeDefault},
 	});
 }
 
 #if defined(BT_CLIENT)
-void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fIntensityMultiplier)
+void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, int64_t iTypeIndex, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fHalfWidth, float fIntensityMultiplier)
 {
 	XMVECTOR vecStartToEnd = XMVectorSubtract(vecEnd, vecStart);
 	XMVECTOR vecDirection = XMVector3Normalize(vecStartToEnd);
@@ -138,7 +139,6 @@ void XM_CALLCONV SyncFighterBeam(FrameInterpolate& rFrameInterpolate, engine::ar
 	float fStartOffset = std::min(kfFighterBeamStartOffset, fDistance);
 	XMVECTOR vecOffsetStart = XMVectorMultiplyAdd(XMVectorReplicate(fStartOffset), vecDirection, vecStart);
 	float fLength = fDistance - fStartOffset;
-	float fHalfWidth = iTypeIndex == giFighterBeamAreaLightTypeIndex ? 0.5f * gFighterBeamWidth.mfCurrent : kfFighterBeamHalfWidth;
 	auto [vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight] = common::CalculateArea(vecOffsetStart, vecDirection, fLength, 0.0f, fHalfWidth);
 	engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 	{
@@ -161,7 +161,6 @@ static void RegisterFighterBeamImpactEffect()
 	{
 		.iBaseTypeIndex = siFighterBeamImpactTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -189,7 +188,6 @@ static void RegisterFighterHitFlashEffect()
 	{
 		.iBaseTypeIndex = siFighterHitFlashTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -228,10 +226,6 @@ void SpawnFighterExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCo
 	}, randomEngine);
 }
 
-// Fighter models, one per ShipController (defined in FightersRender.cpp)
-extern const common::crc_t kFighterFleetModel;
-extern const common::crc_t kFighterRandomModel;
-
 // Null unless the model's first animation has a positive duration.
 static const engine::AnimationData* LoopingAnimationData(common::crc_t uiModel)
 {
@@ -259,7 +253,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 #if defined(BT_CLIENT)
 	float fClimbStep = kfFighterClimbRate * deltaTime.count();
 	// Indexed by ShipController: each row's clock advances through its own model's animation.
-	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kFighterFleetModel), LoopingAnimationData(kFighterRandomModel)};
+	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kuiFighterFleetModel), LoopingAnimationData(kuiFighterRandomModel)};
 #endif
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -343,7 +337,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 			std::chrono::duration<float> fade = rPreviousPostRender.pNextBeamFireTimes[i] - deltaTime - (kFighterBeamCooldown - kFighterBeamFadeTime);
 			if (fade > std::chrono::duration<float>::zero())
 			{
-				SyncFighterBeam(rCurrentFrameInterpolate, rCurrent.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecPosition, rCurrent.pVecBeamEnds[i], fade / kFighterBeamFadeTime);
+				SyncFighterBeam(rCurrentFrameInterpolate, rCurrent.pBeamAreaLights[i], giFighterBeamAreaLightTypeIndex, vecPosition, rCurrent.pVecBeamEnds[i], 0.5f * gFighterBeamWidth.mfCurrent, fade / kFighterBeamFadeTime);
 			}
 		}
 #endif // BT_CLIENT
@@ -382,7 +376,6 @@ void FightersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.nextBeamFireTime = rCurrentPostRender.pNextBeamFireTimes[i],
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
-				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
 				.globalId = rCurrentPostRender.pGlobalIds[i],
 				.clientGuid = rCurrentPostRender.pClientGuids[i],
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
@@ -530,7 +523,6 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pFlagshipGlobalIds[iIndex] = rInfo.flagshipGlobalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
-	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	rCurrentPostRender.pVecAiDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
@@ -574,7 +566,6 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
-		std::chrono::duration<float> navigationDelay = rPrevious.pNavigationDelays[i];
 		std::chrono::duration<float> cellChangeTimer = rPrevious.pCellChangeTimers[i];
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
@@ -714,7 +705,6 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
-		rCurrent.pNavigationDelays[i] = navigationDelay;
 		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
@@ -771,7 +761,6 @@ bool FightersPostRender::LogDifferences(const FightersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
-		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);

@@ -50,7 +50,6 @@ void BlastersInterpolate::Register()
 	{
 		.iBaseTypeIndex = siTerrainCraterTypeIndex,
 		.iKeyframeCount = 4,
-		.bDestroysSelf = true,
 		.pTimes = {0s, kTerrainCraterTimeOne, kTerrainCraterTimeTwo, kTerrainCraterTimeThree},
 		.pKeyframes =
 		{
@@ -67,7 +66,6 @@ void BlastersInterpolate::Register()
 
 	engine::PuffsInterpolate::RegisterType(siTerrainPuffTypeIndex,
 	{
-		.uiCrc = data::kTexturesSmokeBC44jpgCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
 
@@ -75,7 +73,6 @@ void BlastersInterpolate::Register()
 	{
 		.iBaseTypeIndex = siTerrainPuffTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {0s, kTerrainPuffTime, 0s, 0s},
 		.pKeyframes =
 		{

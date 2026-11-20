@@ -33,7 +33,7 @@ $capabilityScript = Join-Path $PSScriptRoot 'Invoke-AgentToolsCapabilitiesCheck.
 function Get-AgentToolsSourceStamp {
 	# The stamp records built-source provenance only; a rev-parse failure must never block the
 	# build, so on failure the stamp is simply left unwritten.
-	try { return (@(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Tools/WorktreeCli', 'HEAD:Tools/AgentHarness', 'HEAD:Tools/ToolCommon', 'HEAD:Common/Sha256Hasher.h')) -join "`n") }
+	try { return (@(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Tools/WorktreeCli', 'HEAD:Tools/AgentHarness', 'HEAD:Tools/ToolCommon', 'HEAD:Common/Sha256Hasher.h', 'HEAD:Common/DebugDefines.h')) -join "`n") }
 	catch { return $null }
 }
 
@@ -45,13 +45,13 @@ $claimOwner = [guid]::NewGuid().ToString()
 Register-WorktreeCliSession -RepositoryRoot $root -Owner $claimOwner -Label 'agenttools bootstrap' -Worktree $root -WaitSeconds $WaitSeconds | Out-Null
 try {
 	# Never compile uncertified working-tree bytes into the shared binaries: if the primary has
-	# uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, which the
-	# AgentTools compile by path, skip all builds and start on the existing binaries.
-	$dirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Tools', 'ThirdParty', 'Common/Sha256Hasher.h'))
+	# uncommitted changes under Tools/ or ThirdParty/, to Common/Sha256Hasher.h (AgentTools include it by path),
+	# or to Common/DebugDefines.h (AgentTools and ThirdParty force-include it), skip all builds and start on the existing binaries.
+	$dirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Tools', 'ThirdParty', 'Common/Sha256Hasher.h', 'Common/DebugDefines.h'))
 	if ($dirty.Count -ne 0) {
-		Write-Warning "Primary has uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, so shared AgentTools and ThirdParty binaries were NOT rebuilt: $($dirty -join '; ')."
+		Write-Warning "Primary has uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h or Common/DebugDefines.h, so shared AgentTools and ThirdParty binaries were NOT rebuilt: $($dirty -join '; ')."
 		if (-not (Test-Path -LiteralPath $worktreeCli -PathType Leaf) -or -not (Test-Path -LiteralPath $agentHarness -PathType Leaf)) {
-			throw "Primary AgentTools executables are missing and uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, block a rebuild. Commit or stash those changes, then retry."
+			throw "Primary AgentTools executables are missing and uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h or Common/DebugDefines.h, block a rebuild. Commit or stash those changes, then retry."
 		}
 		& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
 		Write-Host ''
@@ -196,12 +196,12 @@ try {
 			catch { Write-Warning "Could not snapshot ModelViewer prebuild inputs, so the prebuild was skipped: $($_.Exception.Message)" }
 		}
 		if ($SharedDataOnly -and $null -ne $dataPackerPreSnapshot) {
-			# The prebuild links the existing ThirdParty Release lib, built from the ThirdParty tree on the
-			# existing stamp's third line, so a new stamp must not record a different tree.
-			$stampThirdPartyTree = $null
-			try { $stampThirdPartyTree = @([IO.File]::ReadAllLines($dataPackerStampPath))[2] } catch { }
-			if ($stampThirdPartyTree -cne $dataPackerPreSnapshot.Trees[2]) {
-				Write-Warning "Primary ThirdParty changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. Worktree creation, /reset-worktree, or explicit primary maintenance (a full Bootstrap-AgentTools.ps1 run without -SharedDataOnly) is needed to rebuild ThirdParty and refresh the data."
+			# The prebuild links the existing ThirdParty Release lib, built from the existing stamp's ThirdParty tree (third line) and
+			# its Common tree's force-included DebugDefines.h, so a new stamp must not record a different tree or header.
+			$stampLines = $null
+			try { $stampLines = @([IO.File]::ReadAllLines($dataPackerStampPath)); $debugDefinesBlobs = @(Invoke-AgentGit @('-C', $root, 'rev-parse', "$($stampLines[1]):DebugDefines.h", 'HEAD:Common/DebugDefines.h')) } catch { $stampLines = $null }
+			if ($null -eq $stampLines -or $stampLines[2] -cne $dataPackerPreSnapshot.Trees[2] -or $debugDefinesBlobs[0] -cne $debugDefinesBlobs[1]) {
+				Write-Warning "Primary ThirdParty or Common/DebugDefines.h changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. Worktree creation, /reset-worktree, or explicit primary maintenance (a full Bootstrap-AgentTools.ps1 run without -SharedDataOnly) is needed to rebuild ThirdParty and refresh the data."
 				$dataPackerPreSnapshot = $null
 			}
 		}
@@ -212,8 +212,8 @@ try {
 		}
 		# The DataPacker prebuild links the primary ThirdParty Release lib, built just above, or under
 		# -SharedDataOnly matched to the existing stamp's ThirdParty tree. The pre-mutex Tools/, ThirdParty/,
-		# and Common/Sha256Hasher.h dirty early-return (lines 50-59) plus the routine's scoped gate keep the
-		# normal path clean.
+		# Common/Sha256Hasher.h, and Common/DebugDefines.h dirty early-return (lines 50-59) plus the
+		# routine's scoped gate keep the normal path clean.
 		$dataPackerPrebuiltClean = Invoke-StampedPrebuild 'DataPacker' $dataPackerPreSnapshot $dataPackerSolution $dataPackerExe $dataPackerStampPath $dataPackerTrees
 		# Refresh the primary's generated data that Shared-mode worktrees consume. Gated on the prebuild's
 		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from

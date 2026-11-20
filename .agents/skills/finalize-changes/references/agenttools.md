@@ -2,10 +2,10 @@
 
 Load only when the landing-commit/landed diff changes a non-Markdown path under
 `Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or changes
-`Common/Sha256Hasher.h`, which the tools compile by path. This is the exhaustive
-authoritative shared-artifact trigger; ordinary Git changes, Markdown in those
-trees, landing-commit build outputs, data reads, locks, and claims do not
-qualify.
+`Common/Sha256Hasher.h` or `Common/DebugDefines.h`, which the tools compile by
+path. This is the exhaustive authoritative shared-artifact trigger; ordinary
+Git changes, Markdown in those trees, landing-commit build outputs, data reads,
+locks, and claims do not qualify.
 
 These trigger paths are shared tool infrastructure: every linked worktree
 consumes the same authoritative binaries. When a change to them could break

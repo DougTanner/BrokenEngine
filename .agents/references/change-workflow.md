@@ -264,8 +264,9 @@ Order: the acceptance checks the execution card marks `before the first edit`
 run first, on the unedited tree; then the slices run in parallel;
 `/update-affected-code` runs after them. Main finds the marked checks by one
 line search for that literal limited to the card's `Acceptance checks` field,
-the lines from its `- Acceptance checks:` line up to its `- Roles:` line. It
-reads only each marked check, from its marked line to the check's end, never
+the lines from its `- Acceptance checks:` line up to its `- Roles:` line,
+printing only the matched text because a host may hide a long matching line.
+It reads only each marked check, from its marked line to the check's end, never
 the rest of the card body or the `Slices`, and from that text takes the
 executor, the build (project and configuration, or none), and the scenario
 steps for the `builder` and `runner` briefs.
@@ -427,9 +428,15 @@ paragraph below.
   execution card is Tier 1 (Step 1), and no Tier 1 change carries an
   `/agent-harness` acceptance check (`.agents/skills/verify-acceptance/SKILL.md`
   `## Inputs`), so main dispatches no `runner` for it. The brief cites the
-  checks in the execution-card form `/agent-harness` `## Inputs` defines, writes
-  no step sequence of its own, and sets no wall-clock budget; main reads no
-  check.
+  checks in the execution-card form `/agent-harness` `## Inputs` defines and
+  writes no step sequence of its own; main reads no check. The brief sets no
+  wall-clock budget, with one exception after a budget stop: when the `runner`
+  returns criteria left unsettled by the run budget, main asks the user under
+  Long test runs from the runner's budget-stop `Residuals` rows
+  (`/agent-harness` `## Handoff`). Only after the user approves either the
+  estimate or the shorter budget does main dispatch a fresh `runner` that cites
+  the whole set of card `/agent-harness` checks again, with a brief that sets
+  the budget the user approved.
 - fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing
   without landing; a stage landing in the same session gets this from Step 9's
   landing table instead, and where the Step 6 combined pass applies that pass is

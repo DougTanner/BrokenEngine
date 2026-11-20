@@ -47,9 +47,9 @@ Game::Game()
 
 }
 
+#if defined(BT_CLIENT)
 engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 {
-#if defined(BT_CLIENT)
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
@@ -60,7 +60,6 @@ engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 			return it->globalId;
 		}
 	}
-#endif
 	return {};
 }
 
@@ -88,7 +87,6 @@ std::optional<ShipLocator> Game::ClientOwnedEntity(const Frame& rFrame) const
 	return FindShipByGlobalId(rFrame, ClientOwnedEntityIdentifier());
 }
 
-#if defined(BT_CLIENT)
 bool Game::HasFocusedClientEntity() const
 {
 	return ClientOwnedEntityIdentifier().iValue != 0;
@@ -162,14 +160,14 @@ Game::~Game()
 
 void Game::ResetGameState()
 {
-	mClientOwnedEntities.clear();
 #if defined(BT_CLIENT)
+	mClientOwnedEntities.clear();
 	mFleetSelection.Clear();
 	mMapFleetMarkers.clear();
 	// Close the map with no ease, so no world-hidden frame runs over the menu.
 	engine::gpCamera->mbFramingOverride = false;
-#endif
 	mfPreviousClientArmor = 0.0f;
+#endif
 }
 
 #if defined(BT_CLIENT)
@@ -296,12 +294,6 @@ void Game::InitializeFramePostRender(Frame& rFrame)
 void Game::RestoreReplayMetadata(const ReplayMeta& rMetadata)
 {
 	SetClientGridCoordinate(rMetadata.clientGridCoordinate);
-	if (rMetadata.iClientOwnedEntityIdentifierValue != 0)
-	{
-		engine::GlobalId globalIdentifier {.iValue = rMetadata.iClientOwnedEntityIdentifierValue};
-		AddClientOwnedEntity(globalIdentifier, rMetadata.clientGridCoordinate);
-	}
-	mfPreviousClientArmor = rMetadata.fPreviousClientArmor;
 }
 
 } // namespace game

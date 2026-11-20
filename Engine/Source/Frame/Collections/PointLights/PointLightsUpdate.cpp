@@ -118,11 +118,7 @@ void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rF
 
 	const ControllerType& rController = PointLightsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
-	{
-		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	},
-	[&rInterpolate, &rPostRender, &rFrame]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender, &rFrame]()
 	{
 		auto [iSpawnIndex, newId] = AddVisualIndexableElement(rInterpolate, rPostRender, rFrame.postRender);
 		rPostRender.pIds[iSpawnIndex] = newId;

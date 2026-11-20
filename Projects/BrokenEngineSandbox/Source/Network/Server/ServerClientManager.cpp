@@ -111,8 +111,7 @@ ServerClientManager::ServerClientManager()
 }
 
 // NewClients, OnClientDisconnected, and ResetState track handled clients in mProcessedClientIds, which is game-agnostic
-// apart from the mpFleetManager calls, the connecting-client diagnostic, and mNextFighterLaunchTicks: a future project
-// may want it moved into shared engine code, depending on its requirements.
+// apart from the mpFleetManager calls and mNextFighterLaunchTicks.
 void ServerClientManager::NewClients()
 {
 	// Heap: processed-client-ID set insert
@@ -131,47 +130,13 @@ void ServerClientManager::NewClients()
 			continue;
 		}
 
-		LogConnectingClientDiagnostic(rClient);
-
 		gpServerSession->mpFleetManager->OnClientConnected(rClient.iClientId, rClient.clientGuid);
 		mProcessedClientIds.insert(rClient.iClientId);
 
-		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
-		if (ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty())
+		if (rClient.ownedEntities.empty())
 		{
 			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Client: {} connected with no owned entities", rClient.iClientId);
 		}
-	}
-}
-
-void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConnection& rClient)
-{
-	LOG(kNetwork, kInfo, "ServerClientManager::NewClients Connecting Client: {} Guid: ({},{}) Empty: {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow, (rClient.clientGuid.uiHigh == 0 && rClient.clientGuid.uiLow == 0));
-	LOG(kNetwork, kInfo, "  FleetGuids: {}", gpServerSession->mpFleetManager->mFleets.size());
-	for (const auto& [rExistingGuid, rExistingFleets] : gpServerSession->mpFleetManager->mFleets)
-	{
-		LOG(kNetwork, kInfo, "    Guid: ({},{}) FleetCount: {} Match: {}", rExistingGuid.uiHigh, rExistingGuid.uiLow, std::ssize(rExistingFleets), rExistingGuid == rClient.clientGuid);
-	}
-	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
-	{
-		const Frame& rFrame = *rCell.pCurrent;
-		int64_t iOwnedCount = Frame::OwnedEntityCount(rFrame);
-		if (iOwnedCount == 0)
-		{
-			continue;
-		}
-		LOG(kNetwork, kInfo, "  Coord: ({},{}) OwnedCount: {}", rCoordinate.iQ, rCoordinate.iR, iOwnedCount);
-		ForEachShipType(rFrame, [&](ShipType eType, [[maybe_unused]] const auto& rInterpolate, const auto& rPostRender)
-		{
-			for (int64_t i = 0; i < rPostRender.iCount; ++i)
-			{
-				if (rPostRender.pController[i] != ShipController::kFleet)
-				{
-					continue;
-				}
-				LOG(kNetwork, kInfo, "    Type: {} Global: {} Guid: ({},{}) Match: {}", ShipTypeName(eType), rPostRender.pGlobalIds[i].iValue, rPostRender.pClientGuids[i].uiHigh, rPostRender.pClientGuids[i].uiLow, rPostRender.pClientGuids[i] == rClient.clientGuid);
-			}
-		});
 	}
 }
 
@@ -247,6 +212,10 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 			{
 				return false;
 			}
+			// A cell just loaded or transferred into has no elevation grid until it ticks, so build its terrain here: the bay
+			// terrain admission reaches the fleet checksum, and playback can hold an unbuilt cell where the recording had a
+			// built one. No tick runs during the fleet step, so this build cannot race RunFrameTick.
+			gpGame->mCells.at(flagshipCoordinate).staticData.BuildNavigationDataIfUnbuilt();
 			const Frame& rBattleshipFrame = *gpGame->mCells.at(flagshipCoordinate).pCurrent;
 			std::optional<ShipLocator> optionalBattleship = FindShipByGlobalId(rBattleshipFrame, rFleet.flagshipGlobalId);
 			if (!optionalBattleship)
@@ -301,28 +270,19 @@ bool ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 
 void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid)
 {
-	// Heap: registry and fleet-manager bookkeeping
-	ScopedSuppressAllocationTracking suppress;
-
-	LOG(kNetwork, kVerbose, "ServerClientManager::OnClientDisconnected Client: {} OwnedEntities: {}", iClientId, [&]()
-	{
-		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
-		return ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
-	}());
+	LOG(kNetwork, kVerbose, "ServerClientManager::OnClientDisconnected Client: {} OwnedEntities: {}", iClientId, std::ssize(engine::gpServer->FindClient(iClientId)->ownedEntities));
 	mProcessedClientIds.erase(iClientId);
 
 	gpServerSession->mpFleetManager->OnClientDisconnected(iClientId, rClientGuid);
-
-	gpServerSession->mClientOwnedEntities.mOwned.erase(iClientId);
 }
 
 void ServerClientManager::ResetState()
 {
-	// Runs after the load rebuilt the registry: a client left with no owned entity is handled again by NewClients.
+	// Runs after the load rebuilt the owned-entity lists: a client left with no owned entity is handled again by
+	// NewClients.
 	std::erase_if(mProcessedClientIds, [](int64_t iClientId)
 	{
-		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
-		return ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty();
+		return engine::gpServer->FindClient(iClientId)->ownedEntities.empty();
 	});
 	// The load may move the tick counter backward; the next launch of each fleet may then come at once.
 	mNextFighterLaunchTicks.clear();

@@ -88,10 +88,6 @@ public:
 // vecThreat as seen from vecPosition. Recomputed from the current positions on every call; nothing is stored.
 [[nodiscard]] XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane);
 
-// Fleet navigation: roaming, cross-cell movement, island destinations, following the row's own flagship, and a fleet
-// Omni's patrol around its flagship while that flagship is in the cell.
-void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecAiDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
-
 // Random-spawn steering destination: the next route waypoint toward the nearest island center when returning or with
 // no enemy, else the nearest enemy. Updates the kReturnToIslandCenter hysteresis from the raw distance to that island
 // center; rbHasDestination is false in an island-free cell with no enemy.

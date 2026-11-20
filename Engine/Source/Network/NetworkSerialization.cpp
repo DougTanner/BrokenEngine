@@ -59,14 +59,9 @@ static void GroupIndicesByType(std::span<const game::StatusChange> changes, int6
 	}
 }
 
-int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, void* pDestination)
+static int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, void* pDestination)
 {
 	int64_t iCount = static_cast<int64_t>(changes.size());
-
-	if (iCount == 0)
-	{
-		return 0;
-	}
 
 	uint8_t* pCursor = static_cast<uint8_t*>(pDestination);
 
@@ -87,7 +82,7 @@ int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, 
 	return pCursor - static_cast<uint8_t*>(pDestination);
 }
 
-int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination)
+static int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination)
 {
 	int64_t iSourceSize = static_cast<int64_t>(source.size());
 
@@ -136,8 +131,7 @@ int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, s
 
 	// Serialize into a workbuffer reservation (SerializeStatusChangeBatch writes only iSerializedSize bytes and only
 	// those are compressed, so no zero-fill), then LZ4 compress into destination
-	static constexpr int64_t kiMaxGroupHeaders = kiTypeCount * 3;
-	int64_t iMaxSerializedSize = kiMaxGroupHeaders + iCount * kiMaxStatusChangeBytesPerItem;
+	int64_t iMaxSerializedSize = MaxSerializedStatusChangeBatchBytes(iCount);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferAllocation<uint8_t*> serializedAllocation = rWorkbuffer.PushBuffer<uint8_t*>(iMaxSerializedSize);

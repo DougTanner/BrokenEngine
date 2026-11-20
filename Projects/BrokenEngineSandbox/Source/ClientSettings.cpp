@@ -40,7 +40,7 @@ void SaveClientState()
 		.fMenuCameraFraming   = rCamera.mfMenuFraming,
 		.f2MenuCameraPosition = rCamera.mf2MenuPosition,
 	};
-	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcClientStatePath, settings);
+	engine::WriteVersionedFile(kpcClientStatePath, settings);
 }
 
 void LoadClientState()
@@ -49,7 +49,7 @@ void LoadClientState()
 	ScopedSuppressAllocationTracking suppress;
 
 	ClientStateSettings settings {};
-	if (!engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcClientStatePath, settings))
+	if (!engine::ReadVersionedFile(kpcClientStatePath, settings))
 	{
 		return;
 	}

@@ -31,7 +31,7 @@ layout (location = 0) out vec4 f4OutColor;
 
 void main()
 {
-	float fTerrainElevation = texture(elevationTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4VisibleArea)).x;
+	float fTerrainElevation = texture(elevationTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.visibleAreaToUv)).x;
 	const float fBaseHeight = globalLayout.fBaseHeight;
 	const float fFalloff = 0.25f * fBaseHeight;
 	float fHeightPercent = 1.0f;

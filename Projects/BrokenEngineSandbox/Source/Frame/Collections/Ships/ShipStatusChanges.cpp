@@ -74,7 +74,6 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			const UpdateShipData& rUpdate = std::get<UpdateShipData>(rStatusChange.data);
 			bool bFound = VisitShipByUuid(rFrame, rUpdate.eType, rUpdate.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
-				rPostRender.pNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds;
 				rPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
 				if (rUpdate.uiTargetFlightPlane != kuiKeepTargetFlightPlane)
 				{

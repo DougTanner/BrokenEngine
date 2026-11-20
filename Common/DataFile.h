@@ -85,19 +85,8 @@ enum class ChunkFlags : uint64_t
 
 	kChunkAudio      = 0x00020000,
 	kRaw             = 0x00040000,
-	kZlibCompressed  = 0x00080000,
-	kLz4Compressed   = 0x00100000,
 };
 using ChunkFlags_t = Flags<ChunkFlags>;
-
-// A chunk payload is compressed on disk (and must be decompressed into the lazy pool at load) when it
-// carries either compression flag. Texture chunks are LZ4-compressed today; kZlibCompressed stays a
-// legal on-disk form (the chunk decode path still handles it). Single predicate so every
-// "is this chunk compressed" test covers both codecs rather than double-checking each flag at each site.
-constexpr bool IsCompressed(ChunkFlags_t flags)
-{
-	return (flags & ChunkFlags::kLz4Compressed) || (flags & ChunkFlags::kZlibCompressed);
-}
 
 struct SceneHeader
 {
@@ -526,7 +515,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 66 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 68 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;
@@ -535,6 +524,60 @@ static_assert(sizeof(DataHeader) == 24, "DataHeader layout changed — bump Data
 static_assert(BT_OFFSETOF(DataHeader, iMagic) == 0, "DataHeader::iMagic offset changed — bump DataHeader::kiVersion");
 static_assert(BT_OFFSETOF(DataHeader, iVersion) == 8, "DataHeader::iVersion offset changed — bump DataHeader::kiVersion");
 static_assert(BT_OFFSETOF(DataHeader, iChunkCount) == 16, "DataHeader::iChunkCount offset changed — bump DataHeader::kiVersion");
+
+inline constexpr int64_t kiChunkTableOffset = RoundUp<int64_t, kiAlignmentBytes>(static_cast<int64_t>(sizeof(DataHeader)));
+
+// Reads a manifest's chunk table into rChunkLocations, bounding the header's chunk count by what the file holds
+// before allocating. Returns nullptr on success, or the reason the manifest was rejected.
+inline const char* ReadManifestChunkTable(const std::filesystem::path& rManifestPath, std::vector<ChunkLocation>& rChunkLocations)
+{
+	std::fstream manifestStream(rManifestPath, std::ios::in | std::ios::binary);
+	DataHeader dataHeader {};
+	manifestStream.read(reinterpret_cast<char*>(&dataHeader), sizeof(dataHeader));
+	if (!manifestStream || dataHeader.iMagic != DataHeader::kiMagic || dataHeader.iVersion != DataHeader::kiVersion)
+	{
+		return "manifest header missing or version mismatch";
+	}
+
+	manifestStream.seekg(0, std::ios::end);
+	int64_t iManifestSize = static_cast<int64_t>(manifestStream.tellg());
+	if (!manifestStream || iManifestSize < kiChunkTableOffset)
+	{
+		return "manifest chunk-count out of range";
+	}
+	int64_t iMaximumChunkCount = (iManifestSize - kiChunkTableOffset) / static_cast<int64_t>(sizeof(ChunkLocation));
+	if (dataHeader.iChunkCount < 0 || dataHeader.iChunkCount > iMaximumChunkCount)
+	{
+		return "manifest chunk-count out of range";
+	}
+
+	try
+	{
+		rChunkLocations.resize(static_cast<size_t>(dataHeader.iChunkCount));
+	}
+	catch (const std::exception&)
+	{
+		return "manifest chunk table truncated";
+	}
+
+	manifestStream.seekg(kiChunkTableOffset, std::ios::beg);
+	if (!manifestStream)
+	{
+		return "manifest chunk table truncated";
+	}
+	if (dataHeader.iChunkCount == 0)
+	{
+		return nullptr;
+	}
+
+	int64_t iChunkTableBytes = dataHeader.iChunkCount * static_cast<int64_t>(sizeof(ChunkLocation));
+	manifestStream.read(reinterpret_cast<char*>(rChunkLocations.data()), static_cast<std::streamsize>(iChunkTableBytes));
+	if (!manifestStream)
+	{
+		return "manifest chunk table truncated";
+	}
+	return nullptr;
+}
 
 struct ModelVertex
 {

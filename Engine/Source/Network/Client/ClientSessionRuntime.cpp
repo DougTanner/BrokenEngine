@@ -31,7 +31,7 @@ static ClientGuid LoadClientGuidFromDisk()
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
 	ClientGuidFile loadedFile {};
-	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, std::filesystem::path("ClientGuid.bin"), loadedFile) && (loadedFile.guid.uiHigh != 0 || loadedFile.guid.uiLow != 0))
+	if (ReadVersionedFile(std::filesystem::path("ClientGuid.bin"), loadedFile) && (loadedFile.guid.uiHigh != 0 || loadedFile.guid.uiLow != 0))
 	{
 		LOG(kNetwork, kInfo, "ClientSessionRuntime loaded GUID from disk: {} {}", loadedFile.guid.uiHigh, loadedFile.guid.uiLow);
 		return loadedFile.guid;
@@ -44,7 +44,7 @@ static void PersistClientGuidToDisk(const ClientGuid& rGuid)
 	// Heap: filesystem path and file stream operations for GUID persistence
 	ScopedSuppressAllocationTracking suppress;
 	ClientGuidFile guidFile {.guid = rGuid};
-	if (!WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path("ClientGuid.bin"), guidFile))
+	if (!WriteVersionedFile(std::filesystem::path("ClientGuid.bin"), guidFile))
 	{
 		LOG(kNetwork, kError, "Failed to persist ClientGuid.bin (next session will re-handshake as a new client)");
 	}
@@ -164,7 +164,7 @@ void ClientSessionRuntime::StageStaticData(ReceivedStaticData received)
 		return;
 	}
 	PendingCell& rPending = PendingForIdentity(received.identity);
-	rPending.optionalNavigationData = std::move(received.staticData.navigationData);
+	rPending.optionalNavigationData = std::move(received.navigationData);
 }
 
 void ClientSessionRuntime::PollTerrainPreparation()
@@ -468,6 +468,14 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	{
 		mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted);
 		game::gpGame->ChangeFrameToGame();
+		// ChangeFrameToGame's ResetSession clears kPaused after the Hello-time timespeed update set it, but not the note a
+		// previous connection may have left, and the client keeps its ratio across connections so the Hello may not
+		// flag a ratio change. Flagging one here makes this ClientUpdate rewrite the note from the ratio, except on a
+		// paused 1:1 server, where that rewrite would clear the PAUSED note SetPaused just wrote.
+		bool bServerPaused = mpClient->mStateFlags & Client::ClientStateFlags::kServerPaused;
+		game::gpGame->SetPaused(bServerPaused);
+		TimeStep& rTimeStep = game::gpGame->mTimeStep;
+		rTimeStep.mbTimeScaleChanged = !bServerPaused || rTimeStep.miTimeMultiply != 1 || rTimeStep.miTimeDivide != 1;
 	}
 	game::gpClientSession->PollDesynchronizationState();
 	if (mpClient == nullptr)
@@ -561,7 +569,7 @@ void ClientSessionRuntime::AdoptFullState(ReceivedCoordFullState& rFullState)
 			int64_t iTickCounter = iTick - iAppliedBehind;
 			ASSERT(iTickCounter >= 0);
 			game::gpGame->miTickCounter = iTickCounter;
-			game::gpGame->ResetRenderClock();
+			game::gpGame->mRenderInterpolation.ResetRenderClock();
 		}
 	}
 	else
@@ -1143,7 +1151,7 @@ void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 		ASSERT(iTickCounter >= 0);
 		game::gpGame->miTickCounter = iTickCounter;
 		game::gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
-		game::gpGame->ResetRenderClock();
+		game::gpGame->mRenderInterpolation.ResetRenderClock();
 		miClockError = 0;
 	}
 	else

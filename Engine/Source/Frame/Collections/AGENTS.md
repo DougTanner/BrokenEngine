@@ -57,15 +57,14 @@ SOA layout change.
   acts on, or a row marked for removal. Simulation code marks a row for removal
   only through `engine::MarkDestroy`, which sets `kDestroy` and `kDying`
   together. `AddElement` zeroes `pLifecycleFlags` on every new row. Transfer and
-  Destroy hooks only set these bits and build transfer requests; the one removal
-  a hook makes is `DestroyExpiredControlled` dropping expired controlled rows,
-  which no handle names. `engine::CompactCollections` (`FrameUtils.h`), called
-  once as the last step of the game's Destroy phase, is the only removal of a
-  `kTransfer` or `kDestroy` row, and the rows a marked row's `OwnedHandles()`
-  name leave in their owner's tick whatever the tuple order. `OwnedHandles()`
-  returns a `std::tie` of the handle columns naming rows the struct owns, each
-  also a `Members()` column and client-only ones only under `BT_CLIENT`; handles
-  that name no collection row, such as frame registry handles, stay out of it.
+  Destroy hooks only set these bits and build transfer requests.
+  `engine::CompactCollections` (`FrameUtils.h`), called once as the last step
+  of the game's Destroy phase, is the only removal of a `kTransfer` or
+  `kDestroy` row, and the rows a marked row's `OwnedHandles()` name leave in
+  their owner's tick whatever the tuple order. `OwnedHandles()` returns a
+  `std::tie` of the handle columns naming rows the struct owns, each also a
+  `Members()` column and client-only ones only under `BT_CLIENT`; handles that
+  name no collection row, such as frame registry handles, stay out of it.
   An owner that drops a held row while it stays alive calls
   `ReleaseIndexableElementAndClearHandle(rFrame, rId)`. Its lookup reaches only
   the engine `Collections()`, so only engine collections can be owned.
@@ -75,10 +74,8 @@ SOA layout change.
 - Optional ID maps are part of collection identity. Add/remove/swap operations
   must keep map entries and row indices synchronized.
 - Collection code calls `DestroyElement()` on a mapped row only from the
-  removals the `## Core Contract` row-lifecycle bullet names: the
-  `CompactCollections` fold and a `DestroyExpiredControlled` callback.
-  Generated insertion callables are invoked exactly once so each helper
-  preserves its assigned ID stream.
+  `CompactCollections` fold. Generated insertion callables are invoked exactly
+  once so each helper preserves its assigned ID stream.
 - ID maps are not serialized. Once both frame halves are read,
   `engine::ValidateCollectionPair` checks each pair's count/capacity parity and
   then rebuilds the map from the paired PostRender `pIds`, rejecting a zero or
@@ -146,16 +143,18 @@ SOA layout change.
   `Render` fills it per cell; `EndRender` publishes Rendered counters and writes
   the indirect draw count. Sizing from a single cell's count overflows the
   buffer as soon as a second cell activates. `kbManualRender` collections opt
-  out and own their own path.
-  A collection whose `EndRender` writes a model pipeline also declares a
-  static `RequestTextures(rRenderInterpolates, rActiveCoordinates)` beside
-  `BeginRender` that calls `DynamicPipelines::RequestModelPipelineTextures`
-  for each pipeline a row in an active cell would draw, writing nothing to the
-  GPU, so a type that first appears behind the map starts loading its textures
-  while the world is hidden;
+  out and own their own path. A model-pipeline collection instead fills and
+  publishes in `BeginRender`, with one `DynamicPipelines::RenderModelPipelines`
+  call per pipeline over every active cell, and has no `EndRender`. A
+  collection that draws a model pipeline also declares a static
+  `RequestTextures(rRenderInterpolates, rActiveCoordinates)` beside
+  `BeginRender` that calls `DynamicPipelines::RequestModelPipelineTextures` for
+  each pipeline a row in an active cell would draw, writing nothing to the GPU,
+  so a type that first appears behind the map starts loading its textures while
+  the world is hidden;
   `../../../../Documents/Architecture/FrameUpdatePipeline.md` owns the
-  world-hidden step that runs it. A missed hook only defers that request to
-  the first world frame.
+  world-hidden step that runs it. A missed hook only defers that request to the
+  first world frame.
 
 ## See Also
 

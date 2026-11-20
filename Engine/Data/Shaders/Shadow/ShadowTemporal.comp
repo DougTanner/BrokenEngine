@@ -33,7 +33,7 @@ void main()
 	// grid moves refresh-to-refresh). Disocclusion (reprojected UV outside [0,1] = newly revealed): keep current.
 	vec2 f2Uv = (vec2(float(uiX), float(uiY)) + 0.5f) * globalLayout.f2ShadowTextureSizeInverse;
 	vec2 f2World = VisibleAreaToWorld(f2Uv, globalLayout.f4ShadowArea);
-	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.f4ShadowAreaPrevious);
+	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.shadowAreaPreviousToUv);
 
 	float fBlended = fCurrent;
 	if (globalLayout.fShadowTemporalBlend < 1.0f && all(greaterThanEqual(f2PreviousUv, vec2(0.0f))) && all(lessThanEqual(f2PreviousUv, vec2(1.0f))))

@@ -1,0 +1,196 @@
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.016 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29680.1004 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+Loading Dump File [%USERPROFILE%\AppData\Local\Temp\crashdiag\111926-16406-01.dmp]
+Mini Kernel Dump File: Only registers and stack trace are available
+
+WARNING: TriageDumpDataExtArray.HeaderSize is 0
+WARNING: Failed to read dump data exension data
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+Symbol search path is: srv*%USERPROFILE%\AppData\Local\Temp\crashdiag\sym*https://msdl.microsoft.com/download/symbols
+Executable search path is:
+Windows 10 Kernel Version 26100 MP (32 procs) Free x64
+Product: WinNt, suite: TerminalServer SingleUserTS Personal
+Kernel base = 0xfffff807`72800000 PsLoadedModuleList = 0xfffff807`736f56a0
+Debug session time: Thu Nov 19 15:22:27.828 2026 (UTC - 5:00)
+System Uptime: 6 days 8:04:42.703
+Loading Kernel Symbols
+...............................................................
+................................................................
+................................................................
+.......................................
+Loading User Symbols
+
+Loading unloaded module list
+................................................
+ReadVirtual() failed in GetXStateConfiguration() first read attempt (error == 0.)
+For analysis of this file, run !analyze -v
+1: kd> cdb: Reading initial command 'lmvm amdkmdag; !thread; !blackboxpnp; !blackboxbsd; !blackboxwinlogon; dt nt!_DPC_WATCHDOG_GLOBAL_TRIAGE_BLOCK fffff807737c63c8; !sysinfo machineid; q'
+Browse full module list
+start             end                 module name
+fffff807`4b320000 fffff807`50987000   amdkmdag   (deferred)
+    Image path: amdkmdag.sys
+    Image name: amdkmdag.sys
+    Browse all global symbols  functions  data  Symbol Reload
+    Timestamp:        ***** Invalid (8D2F1149)
+    CheckSum:         055F79BE
+    ImageSize:        05667000
+    Mapping Form:     Loaded
+    Translations:     0000.04b0 0000.04e4 0409.04b0 0409.04e4
+    Information from resource tables:
+THREAD ffff90076e5d6040  Cid 0000.0000  Teb: 0000000000000000 Win32Thread: 0000000000000000 RUNNING on processor 1
+Not impersonating
+GetUlongFromAddress: unable to read from fffff8077360b394
+Owning Process            fffff807737d0f00       Image:
+Attached Process          ffff90076e563040       Image:         System
+Wait Start TickCount      34975635       Ticks: 63258 (0:00:16:28.406)
+Context Switch Count      206307056      IdealProcessor: 1
+ReadMemory error: Cannot get nt!KeMaximumIncrement value.
+UserTime                  00:00:00.000
+KernelTime                00:00:00.000
+Win32 Start Address nt!KiIdleLoop (0xfffff80772ebccf0)
+Stack Init ffff82091e04f5f0 Current ffff82091e04f580
+Base ffff82091e050000 Limit ffff82091e049000 Call 0000000000000000
+Priority 0  BasePriority 0  IoPriority 0  PagePriority 0
+*** WARNING: Unable to verify timestamp for amdkmdag.sys
+Child-SP          RetAddr               : Args to Child                                                           : Call Site
+ffffa281`cd766c78 fffff807`72b51a7c     : 00000000`00000133 00000000`00000001 00000000`00001e00 fffff807`737c63c8 : nt!KeBugCheckEx
+ffffa281`cd766c80 fffff807`72b50fab     : 00000000`00000000 00000000`0216a6ac 00000000`00000000 ffffa281`cd74b180 : nt!KeAccumulateTicks+0x59c
+ffffa281`cd766cf0 fffff807`72b5015d     : 00000000`00000000 000004fa`b51eeb50 ffffa281`cd74b180 ffff9007`00000001 : nt!KiUpdateRunTime+0x9b
+ffffa281`cd766eb0 fffff807`72aee964     : ffff9007`6e624480 ffff9007`6e624530 fffff807`73790088 00000000`00000001 : nt!KeClockInterruptNotify+0x44d
+ffffa281`cd766fb0 fffff807`72ebdf1e     : ffff9007`881cf606 ffff9007`6e624480 00000000`00053442 00053442`ea4a9728 : nt!KiCallInterruptServiceRoutine+0x334
+ffffa281`cd767020 fffff807`72ebe72c     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : nt!KiInterruptSubDispatchNoLockNoEtw+0x4e (TrapFrame @ ffffa281`cd766ee0)
+ffffa281`cd767070 fffff807`4cc3e616     : fffff807`4ccb295d ffffa281`cd767470 ffff9007`87b93e50 ffff9007`7b1fb1d0 : nt!KiInterruptDispatchNoLockNoEtw+0x3c (TrapFrame @ ffffa281`cd767070)
+ffffa281`cd767208 fffff807`4ccb295d     : ffffa281`cd767470 ffff9007`87b93e50 ffff9007`7b1fb1d0 00000000`00000001 : amdkmdag+0x191e616
+ffffa281`cd767210 ffffa281`cd767470     : ffff9007`87b93e50 ffff9007`7b1fb1d0 00000000`00000001 00000000`0001016d : amdkmdag+0x199295d
+ffffa281`cd767218 ffff9007`87b93e50     : ffff9007`7b1fb1d0 00000000`00000001 00000000`0001016d 00000000`00000001 : 0xffffa281`cd767470
+ffffa281`cd767220 ffff9007`7b1fb1d0     : 00000000`00000001 00000000`0001016d 00000000`00000001 00000000`0001016e : 0xffff9007`87b93e50
+ffffa281`cd767228 00000000`00000001     : 00000000`0001016d 00000000`00000001 00000000`0001016e fffff807`4ccb25fc : 0xffff9007`7b1fb1d0
+ffffa281`cd767230 00000000`0001016d     : 00000000`00000001 00000000`0001016e fffff807`4ccb25fc ffff9007`881cf680 : 0x1
+ffffa281`cd767238 00000000`00000001     : 00000000`0001016e fffff807`4ccb25fc ffff9007`881cf680 00000000`00000000 : 0x1016d
+ffffa281`cd767240 00000000`0001016e     : fffff807`4ccb25fc ffff9007`881cf680 00000000`00000000 00000000`00000001 : 0x1
+ffffa281`cd767248 fffff807`4ccb25fc     : ffff9007`881cf680 00000000`00000000 00000000`00000001 fffff807`4b7e330b : 0x1016e
+ffffa281`cd767250 ffff9007`881cf680     : 00000000`00000000 00000000`00000001 fffff807`4b7e330b ffff9007`881cf680 : amdkmdag+0x19925fc
+ffffa281`cd767258 00000000`00000000     : 00000000`00000001 fffff807`4b7e330b ffff9007`881cf680 fffff807`4ccb303a : 0xffff9007`881cf680
+
+    PnpActivityId      : {00000000-0000-0000-0000-000000000000}
+    PnpActivityTime    : 134395722106735615
+    PnpEventInformation: 3
+    PnpEventInProgress : 0
+    PnpProblemCode     : 24
+    PnpVetoType        : 0
+    DeviceId           : STORAGE\VolumeSnapshot\HarddiskVolumeSnapshot2
+    VetoString         :
+
+Version: 0xc8
+Product type: 1
+
+Auto advanced boot: FALSE
+Advanced boot menu timeout: 30
+Last boot succeeded: TRUE
+Last boot shutdown: FALSE
+Sleep in progress: FALSE
+
+Power button timestamp: 0x0
+System running: TRUE
+Connected standby in progress: FALSE
+User shutdown in progress: FALSE
+System shutdown in progress: FALSE
+Sleep in progress: 0
+Connected standby scenario instance id: 0
+Connected standby entry reason: 20
+Connected standby exit reason: 25
+System sleep transitions to on: 7
+Last reference time: 0x1dd78200b99e13a
+	2026-11-19T12:18:11.990Z
+Last reference time checksum: 0x200056f7
+Last update boot id: 18
+
+Boot attempt count: 1
+Last boot checkpoint: TRUE
+Checksum: 0x8c
+Last boot id: 18
+Last successful shutdown boot id: 16
+Last reported abnormal shutdown boot id: 17
+
+Error info boot id: 0
+Error info repeat count: 0
+Error info other error count: 0
+Error info code: 0
+Error info status: 0x0
+
+Power button last press time: 0x0
+Power button cumulative press count: 0
+Power button last press boot id: 0
+Power button last power watchdog stage: 0
+Power button watchdog armed: FALSE
+Power button shutdown in progress: FALSE
+Power button last release time: 0x0
+Power button cumulative release count: 0
+Power button last release boot id: 0
+Power button error count: 0
+Power button current connected standby phase: 0
+Power button transition latest checkpoint id: 0
+Power button transition latest checkpoint type: 0
+Power button transition latest checkpoint sequence number: 0
+
+Power transition Shutdown Device Type: 255
+Power transition Setup In Progress: FALSE
+Power transition OOBE In Progress: FALSE
+Power transition Sleep Checkpoint Source: 0
+Power transition Sleep Checkpoint: 16
+Power transition Connected Standby Entry Reason Category: 0
+Power transition Connected Standby Exit Reason Category: 0
+Power transition Connected Standby Entry Scenario Instance Id: 0x1a
+
+Feature Configuration State : Boot Pending
+
+    ThreadName         : WluiReleaseUI
+    IsOperationPending : 0
+
+Symbol nt!_DPC_WATCHDOG_GLOBAL_TRIAGE_BLOCK not found.
+sysinfo: could not find necessary interfaces.
+sysinfo: note that mssmbios.sys must be loaded (XPSP2+).
+quit:
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Kernel.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Usb4Kd.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2611.4001.0_x64__8wekyb3d8bbwe\amd64\Visualizers\winrt.natvis'

@@ -2,16 +2,19 @@
 # fresh shell: identities, data mode, directories, and tool paths are re-derived per call, and no
 # state persists between calls.
 #
-# Stdout contract: when WorktreeCli runs, its `broken-engine-build-result/v1` object is the only
-# thing on stdout - this script never captures, rewrites, or impersonates it, and its exit code is
-# returned unchanged. When the build never runs, stdout carries exactly one
+# Stdout contract: each WorktreeCli build writes one newline-terminated
+# `broken-engine-build-result/v1` object, and those objects are the only thing on stdout - one per
+# build run, two for ClientServer with Client first. This script never captures, rewrites, or
+# impersonates them; a linked worktree's Local game build first runs a DataPacker Release build
+# whose envelope goes to stderr, or to stdout in place of the game builds' when it fails. When no
+# build runs, stdout carries exactly one
 # `broken-engine-compile-invoke-result/v1` object instead; the schema name, not the exit code, is
 # what distinguishes the two.
-# Exit codes: WorktreeCli's own code once the build ran, 2 for a structured pre-invocation block,
-# 1 for an internal error.
+# Exit codes: once a build ran, the first nonzero WorktreeCli build code, else 1 after a post-build
+# failure, else 0; 2 for a structured pre-invocation block, 1 for an internal error.
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ModelViewer', 'ServerMonitor', 'WorktreeCli', 'AgentHarness')][string] $Target,
+	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ClientServer', 'ModelViewer', 'ServerMonitor', 'WorktreeCli', 'AgentHarness')][string] $Target,
 	[ValidateSet('Debug', 'Profile', 'Release')][string] $Configuration,
 	[string[]] $Files,
 	[switch] $AllowGaeaExport,
@@ -43,7 +46,9 @@ foreach ($parameterName in @('Target', 'Configuration')) {
 	Set-Variable -Name $parameterName -Value @($declared | Where-Object { $_ -eq $boundValue })[0]
 }
 
-$script:GameTargets = @('Client', 'Server', 'ModelViewer')
+$script:GameTargets = @('Client', 'Server', 'ClientServer', 'ModelViewer')
+# ClientServer builds a game's Client then Server on one resolved context, so both carry one data mode.
+$script:BuildTargets = if ($Target -ceq 'ClientServer') { @('Client', 'Server') } else { @($Target) }
 $script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness', 'ServerMonitor')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
@@ -64,9 +69,10 @@ $script:SelectiveTargetFiles = @{ ModelViewer = 'Projects\ModelViewer\Platforms\
 $script:DataOutputSuffix = $null
 
 $script:BlockedCode = $null
-# Set the moment WorktreeCli's inherited stdout can carry its envelope: after that, nothing this
-# script does may write a second stdout object, so every later failure is stderr plus an exit code.
+# Set the moment WorktreeCli's inherited stdout can carry its envelope: after that, this script
+# itself may write no stdout object, so every later failure is stderr plus an exit code.
 $script:BuildStreamed = $false
+# The first nonzero build exit code, kept when a later build of the same call succeeds.
 $script:BuildExitCode = 0
 $script:Summary = [Collections.Generic.List[string]]::new()
 # The running pwsh image is the interpreter for every child script invocation.
@@ -138,12 +144,12 @@ function Test-JsonProperty([object] $Object, [string] $Name) {
 
 # --- Build invocation --------------------------------------------------------------------------
 
-function Get-AnalysisArguments {
-	if ($Prefast) {
+function Get-AnalysisArguments([bool] $Requested) {
+	if ($Requested -and $Prefast) {
 		# EnableMicrosoftCodeAnalysis=true only guards against an upstream default change.
 		return @('/p:EnableClangTidyCodeAnalysis=false', '/p:EnableMicrosoftCodeAnalysis=true', '/p:RunCodeAnalysis=true', '/verbosity:minimal')
 	}
-	if ($ClangTidy) {
+	if ($Requested -and $ClangTidy) {
 		# EnableMicrosoftCodeAnalysis=false keeps the rule-set path off under RunCodeAnalysis=true. Normal verbosity
 		# names the ClangTidy target and its invocation per project, the only execution trace a --quiet clean run leaves.
 		return @('/p:EnableClangTidyCodeAnalysis=true', '/p:EnableMicrosoftCodeAnalysis=false', '/p:RunCodeAnalysis=true', '/verbosity:normal')
@@ -151,24 +157,37 @@ function Get-AnalysisArguments {
 	return @('/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 }
 
-function Invoke-WorktreeCliBuild([string[]] $DataProperties) {
+# -LocalDataPacker builds plain DataPacker Release instead of the requested target and returns its
+# captured envelope, so the requested builds' envelopes stay the only ones on stdout.
+function Invoke-WorktreeCliBuild([string] $TargetPath, [string[]] $DataProperties, [switch] $LocalDataPacker) {
 	$arguments = [Collections.Generic.List[string]]::new()
 	$arguments.Add('build')
-	if ($script:SelectedFiles.Count -gt 0) {
+	if ($script:SelectedFiles.Count -gt 0 -and -not $LocalDataPacker) {
 		$arguments.Add('--files')
 		foreach ($file in $script:SelectedFiles) { $arguments.Add($file) }
 		$arguments.Add('--')
 	}
-	$arguments.Add($script:TargetPath)
-	$arguments.Add("/p:Configuration=$($script:ResolvedConfiguration)")
+	if ($LocalDataPacker) {
+		$arguments.Add((Join-Path $script:Root $script:TargetFiles.DataPacker))
+		$arguments.Add('/p:Configuration=Release')
+	}
+	else {
+		$arguments.Add($TargetPath)
+		$arguments.Add("/p:Configuration=$($script:ResolvedConfiguration)")
+	}
 	$arguments.Add('/p:Platform=x64')
 	if ($Target -cin $script:AgentToolsTargets) {
 		# The default Output is the shared immutable primary Output the running driver holds.
 		$arguments.Add("/p:OutDir=$($script:Root)\Temp\AgentToolsCandidate\")
 	}
+	if ($Target -ceq 'ThirdParty' -and $script:IsLinkedWorktree) {
+		# A linked worktree's ThirdParty Output is a link to the primary's shared library, so its build
+		# writes a session candidate instead.
+		$arguments.Add("/p:OutDir=$($script:ThirdPartyCandidateDirectory)\")
+	}
 	foreach ($property in $DataProperties) { $arguments.Add($property) }
-	foreach ($argument in (Get-AnalysisArguments)) { $arguments.Add($argument) }
-	if (($Prefast -or $ClangTidy) -and $script:SelectedFiles.Count -eq 0) {
+	foreach ($argument in (Get-AnalysisArguments (-not $LocalDataPacker))) { $arguments.Add($argument) }
+	if (($Prefast -or $ClangTidy) -and $script:SelectedFiles.Count -eq 0 -and -not $LocalDataPacker) {
 		# RunNativeCodeAnalysis and ClangTidy are incremental, so an up-to-date full build would report green without analyzing.
 		# The --files path reuses this argument list for its MSBuild evaluation query, so it stays incremental.
 		$arguments.Add('/t:Rebuild')
@@ -177,9 +196,11 @@ function Invoke-WorktreeCliBuild([string[]] $DataProperties) {
 	# A private PDB server endpoint keeps this build's cl/link off the shared per-user mspdbsrv, which runs
 	# inside the kill-on-close job of whichever build started it and dies with that job, failing concurrent builds.
 	[Environment]::SetEnvironmentVariable('_MSPDBSRV_ENDPOINT_', [guid]::NewGuid().ToString('N'))
+	if ($LocalDataPacker) { return Start-CompileChild $script:WorktreeCliPath $arguments.ToArray() $true }
 	# Stdout is not redirected: WorktreeCli's result envelope is the caller's stdout, byte-verbatim.
-	$script:BuildExitCode = (Start-CompileChild $script:WorktreeCliPath $arguments.ToArray() $false).ExitCode
-	return $script:BuildExitCode
+	$exitCode = (Start-CompileChild $script:WorktreeCliPath $arguments.ToArray() $false).ExitCode
+	if ($script:BuildExitCode -eq 0) { $script:BuildExitCode = $exitCode }
+	return $exitCode
 }
 
 function Complete-CompileBuild([int] $BuildExitCode) {
@@ -222,10 +243,11 @@ try {
 			@{ Set = [bool]$AllowGaeaExport; Name = '-AllowGaeaExport' },
 			@{ Set = [bool]$ForbidExpensiveExport; Name = '-ForbidExpensiveExport' },
 			@{ Set = -not [string]::IsNullOrWhiteSpace($Project); Name = '-Project' })) {
-			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client, Server or ModelViewer builds only." }
+			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client, Server, ClientServer or ModelViewer builds only." }
 		}
 	}
 	if ($null -ne $Files) {
+		if ($Target -ceq 'ClientServer') { Stop-CompileInvoke 'parameter.files-invalid' '-Files selects one project; ClientServer builds the full Client and Server pair only.' }
 		# Elements split on ',' so the single-argument -File form carries a whole list.
 		$script:SelectedFiles = @($Files | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_.Length -gt 0 })
 		if ($script:SelectedFiles.Count -eq 0) { Stop-CompileInvoke 'parameter.files-invalid' '-Files was supplied without any source path.' }
@@ -246,14 +268,15 @@ try {
 	$script:Root = [string]$context.repositoryRoot
 	$primary = [string]$context.primaryCheckout
 
-	if ($Target -ceq 'ThirdParty') {
-		# Only the primary checkout owns a real ThirdParty Output; in a linked worktree it is a link to the
-		# primary's shared library, so a build here would overwrite it. The primary is identified by its .git
-		# being an ordinary directory, as Bootstrap-AgentTools.ps1 and Provision-WorktreeThirdParty.ps1 do.
-		$rootGit = Get-Item -LiteralPath (Join-Path $script:Root '.git') -Force -ErrorAction SilentlyContinue
-		if ($null -eq $rootGit -or -not $rootGit.PSIsContainer -or ($rootGit.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-			Stop-CompileInvoke 'thirdparty.worktree-not-primary' "ThirdParty builds run in the primary checkout only ('$primary'); this checkout's ThirdParty Output is a link to the primary's shared library. Rebuild ThirdParty as explicit primary maintenance (wrapper bootstrap rebuilds it at worktree creation or /reset-worktree)."
-		}
+	$script:IsLinkedWorktree = [bool]$context.isLinkedWorktree
+	$script:ThirdPartyCandidateDirectory = "$($script:Root)\Temp\ThirdPartyCandidate"
+	# Resolve-CompileContext.ps1 emits the ThirdParty row only when this linked worktree's consumers
+	# link the session candidate.
+	if ($Target -cin @('Client', 'Server', 'ClientServer', 'ModelViewer', 'DataPacker') -and @($context.recommendedTargets | Where-Object { $_.project -ceq 'ThirdParty' }).Count -gt 0) {
+		# An environment variable, not a /p: switch, so the nested devenv DataPacker build of a Local
+		# PreBuildEvent, which receives no global property, links the same candidate.
+		[Environment]::SetEnvironmentVariable('ThirdPartyLibraryDirectory', $script:ThirdPartyCandidateDirectory)
+		$script:Summary.Add("ThirdPartyLibraryDirectory=$($script:ThirdPartyCandidateDirectory) (thirdparty-candidate row).")
 	}
 
 	# The data mode resolves from the read-only context alone, before provisioning or any other side
@@ -289,10 +312,13 @@ try {
 		}
 	}
 
-	$relativeTarget = if ($script:SelectedFiles.Count -gt 0) { $script:SelectiveTargetFiles[$Target] } else { $script:TargetFiles[$Target] }
-	$script:TargetPath = Get-AgentCanonicalPath (Join-Path $script:Root $relativeTarget)
-	if (-not (Test-Path -LiteralPath $script:TargetPath -PathType Leaf)) {
-		Stop-CompileInvoke 'target.missing' "Build target does not exist: '$($script:TargetPath)'."
+	$targetPaths = @{}
+	foreach ($buildTarget in $script:BuildTargets) {
+		$relativeTarget = if ($script:SelectedFiles.Count -gt 0) { $script:SelectiveTargetFiles[$buildTarget] } else { $script:TargetFiles[$buildTarget] }
+		$targetPaths[$buildTarget] = Get-AgentCanonicalPath (Join-Path $script:Root $relativeTarget)
+		if (-not (Test-Path -LiteralPath $targetPaths[$buildTarget] -PathType Leaf)) {
+			Stop-CompileInvoke 'target.missing' "Build target does not exist: '$($targetPaths[$buildTarget])'."
+		}
 	}
 	$resolvedFiles = [Collections.Generic.List[string]]::new()
 	foreach ($file in $script:SelectedFiles) {
@@ -318,8 +344,8 @@ try {
 	}
 
 	if (-not $isGameTarget) {
-		$script:Summary.Add("Target $Target ($($script:ResolvedConfiguration)) at $($script:TargetPath); no runtime data mode applies.")
-		Complete-CompileBuild (Invoke-WorktreeCliBuild @())
+		$script:Summary.Add("Target $Target ($($script:ResolvedConfiguration)) at $($targetPaths[$Target]); no runtime data mode applies.")
+		Complete-CompileBuild (Invoke-WorktreeCliBuild $targetPaths[$Target] @())
 	}
 
 	# Game target: the data mode is already resolved, so this runs the mode's directories.
@@ -365,15 +391,17 @@ try {
 				Stop-CompileInvoke 'shared-data.refresh-overlap' "A primary Shared data refresh is running or ended without rewriting the stamp, or completed with a different commit since data mode selection, so the Shared data listing may not match the published data. Rerun /compile once the primary SharedDataStamp.txt exists again; a rerun while it is missing resolves Local and runs a full Local generation build."
 			}
 		}
-		$buildExitCode = Invoke-WorktreeCliBuild $dataProperties
-		if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
-			Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory $sharedDataListing
+		foreach ($buildTarget in $script:BuildTargets) {
+			$buildExitCode = Invoke-WorktreeCliBuild $targetPaths[$buildTarget] $dataProperties
+			if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
+				Write-AgentSharedDataRecord $script:Root $gameProject $buildTarget $script:ResolvedConfiguration $gameDataDirectory $sharedDataListing
+			}
 		}
-		Complete-CompileBuild $buildExitCode
+		Complete-CompileBuild $script:BuildExitCode
 	}
 
-	# Local generation: materialize, then run the one RunDataPacker=true build under the Gaea guard
-	# unless -AllowGaeaExport is passed, and under the expensive-export guard when
+	# Local generation: materialize once, then run each build target's RunDataPacker=true build under
+	# the Gaea guard unless -AllowGaeaExport is passed, and under the expensive-export guard when
 	# -ForbidExpensiveExport is passed.
 	if (-not (Test-JsonProperty $context 'devEnvDir') -or [string]::IsNullOrWhiteSpace($context.devEnvDir)) {
 		Stop-CompileInvoke 'dev-env-dir.unresolved' 'The generation build requires DevEnvDir, which the compile context did not report.'
@@ -396,6 +424,17 @@ try {
 			Stop-CompileInvoke 'data.sparse-restore-failed' "git sparse-checkout disable exited $($restore.ExitCode) in '$($script:Root)', so the generation build may still be missing sparse-skipped Engine\Data inputs$suffix"
 		}
 	}
+	if ($script:IsLinkedWorktree) {
+		# The PreBuildEvent's nested devenv DataPacker build can skip DataPacker as up to date after
+		# ThirdPartyLibraryDirectory switches, leaving it linked to the other library; MSBuild relinks.
+		# A failure reports this build's envelope in place of the requested builds' envelopes.
+		$localDataPackerBuild = Invoke-WorktreeCliBuild $null @() -LocalDataPacker
+		if ($localDataPackerBuild.ExitCode -ne 0) {
+			[Console]::Out.Write($localDataPackerBuild.Stdout)
+			Complete-CompileBuild $localDataPackerBuild.ExitCode
+		}
+		$script:Summary.Add("DataPacker Release build result: $($localDataPackerBuild.Stdout.Trim())")
+	}
 	$dataPacker = Join-Path $script:Root 'DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe'
 	if (-not (Test-Path -LiteralPath $dataPacker -PathType Leaf)) {
 		Stop-CompileInvoke 'datapacker.missing' "The worktree DataPacker is missing: '$dataPacker'. Build -Target DataPacker first."
@@ -407,8 +446,8 @@ try {
 		$primaryStampPath = Get-AgentSharedDataStampPath $primary $gameProject
 		if (Test-Path -LiteralPath $primaryStampPath -PathType Leaf) { [IO.File]::Delete($primaryStampPath) }
 	}
-	# DataPacker writes progress and mutex-wait notices to stdout, which is reserved for the single
-	# JSON envelope, so its output is captured and forwarded as a diagnostic instead.
+	# DataPacker writes progress and mutex-wait notices to stdout, which is reserved for the JSON
+	# envelopes, so its output is captured and forwarded as a diagnostic instead.
 	$materialize = Start-CompileChild $dataPacker @(
 		'--materialize-data',
 		(Join-Path $script:Root 'Engine\Data'),
@@ -445,7 +484,13 @@ try {
 			[Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, '1')
 			$script:Summary.Add("Expensive-export guard applied: $($script:ExpensiveExportGuardVariable)=1 for the generation build.")
 		}
-		$buildExitCode = Invoke-WorktreeCliBuild $generationProperties
+		foreach ($buildTarget in $script:BuildTargets) {
+			$buildExitCode = Invoke-WorktreeCliBuild $targetPaths[$buildTarget] $generationProperties
+			# Local output needs no listing: the comparison skips data directories under the worktree root.
+			if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
+				Write-AgentSharedDataRecord $script:Root $gameProject $buildTarget $script:ResolvedConfiguration $gameDataDirectory @()
+			}
+		}
 	}
 	finally {
 		if (-not $AllowGaeaExport) {
@@ -461,22 +506,18 @@ try {
 			else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
 		}
 	}
-	if ($buildExitCode -ne 0 -and -not $AllowGaeaExport) {
+	if ($script:BuildExitCode -ne 0 -and -not $AllowGaeaExport) {
 		$script:Summary.Add("A failure reporting 'Gaea.Swarm export blocked by $($script:GaeaGuardVariable)=1' means this worktree's island inputs differ from the shared Gaea bake. When this worktree is behind primary main, rebase onto it. A change to this worktree's own island inputs exports only through -AllowGaeaExport, which only an approved plan or acceptance criterion requiring that island re-bake authorizes.")
 	}
-	# Local output needs no listing: the comparison skips data directories under the worktree root.
-	if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
-		Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory @()
-	}
 
-	Complete-CompileBuild $buildExitCode
+	Complete-CompileBuild $script:BuildExitCode
 }
 catch {
 	foreach ($line in $script:Summary) { Write-CompileDiagnostic $line }
 	$code = if ($null -ne $script:BlockedCode) { $script:BlockedCode } else { 'internal.error' }
 	if ($script:BuildStreamed) {
-		# The build envelope already owns stdout, so this failure is stderr only: the build's own code
-		# when it failed, otherwise the internal-error code.
+		# The build envelope already owns stdout, so this failure is stderr
+		# only: the first nonzero build code, otherwise the internal-error code.
 		Write-CompileDiagnostic "post-build failure $code - $($_.Exception.Message)"
 		if ($script:BuildExitCode -ne 0) { exit $script:BuildExitCode }
 		exit 1

@@ -338,7 +338,7 @@ static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector
 	BuildNavigationAcceleration(rNavigationData);
 
 	// Empty cells must retain the cleared derived state produced by BuildNavigationAcceleration,
-	// matching CellStaticData::Read on the client.
+	// matching ReadNavigationData on the client.
 	if (!rNavigationData.vertices.empty())
 	{
 		BuildCellVisibilityGraph(rNavigationData);

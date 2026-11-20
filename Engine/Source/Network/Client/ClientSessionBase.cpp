@@ -84,7 +84,7 @@ void ClientSessionBase::ResetSessionForServerLoad()
 	game::gpGame->miTickCounter = 0;
 	game::gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 	game::gpGame->mTimeStep.mRealTime.Reset();
-	game::gpGame->ResetRenderClock();
+	game::gpGame->mRenderInterpolation.ResetRenderClock();
 
 	// Discard cells, the camera tracking, smoke, and particles from the previous server state.
 	game::gpGame->mCells.clear();

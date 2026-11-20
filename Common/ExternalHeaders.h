@@ -20,22 +20,7 @@
 	#pragma clang diagnostic ignored "-Weverything"
 #endif
 
-// Debug defines
-#if defined(BT_DEBUG)
-	#undef DEBUG
-	#define DEBUG 1
-	#undef NDEBUG
-	#undef _DEBUG
-	#define _DEBUG 1
-	#undef _NDEBUG
-#else
-	#undef NDEBUG
-	#define NDEBUG 1
-	#undef DEBUG
-	#undef _NDEBUG
-	#define _NDEBUG 1
-	#undef _DEBUG
-#endif
+#include "DebugDefines.h"
 
 // Visual Studio
 #define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR // https://stackoverflow.com/questions/78598141/first-stdmutexlock-crashes-in-application-built-with-latest-visual-studio
@@ -308,9 +293,6 @@ inline constexpr bool XmIsInf(float fValue)
 	#include "lz4/lib/lz4hc.h"
 #endif
 
-// zlib
-#include "zlib/zlib.h"
-
 // ENet
 #if defined(BT_ENGINE)
 	#include "enet/enet.h"
@@ -345,6 +327,9 @@ inline constexpr bool XmIsInf(float fValue)
 #endif
 
 #if defined(BT_DATA_PACKER)
+	// zlib
+	#include "zlib/zlib.h"
+
 	// Offline file traversal needs reparse-point FSCTL queries.
 	#include <winioctl.h>
 

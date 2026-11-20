@@ -498,7 +498,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 
 		rMemory.pClosed[iCurrent] = true;
 
-		auto TryNeighbor = [&](int64_t iNeighbor)
+		auto TryNeighbor = [&](int64_t iNeighbor, bool bTestObstacles)
 		{
 			if (rMemory.pClosed[iNeighbor])
 			{
@@ -514,7 +514,13 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 				return;
 			}
 
-			// The length alone prunes first, because the penalty costs a clip per rectangle.
+			// An empty graph has no grid and blocks nothing.
+			if (bTestObstacles && iVertexCount != 0 && SegmentBlockedByObstacle(f2Current, f2Neighbor, pVertices, rNavData))
+			{
+				return;
+			}
+
+			// The length and the polygons prune first, because the penalty costs a clip per rectangle.
 			fTentativeG += RectangleCrossingPenalty(f2Current, f2Neighbor, rectangles);
 
 			if (fTentativeG < rMemory.pGCost[iNeighbor])
@@ -534,17 +540,13 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			}
 		};
 
-		// Corners have no adjacency, so their edges test the polygons here, closed nodes first to skip the grid walk. An
-		// empty graph has no grid and blocks nothing.
+		// Corners have no adjacency, so their edges test the polygons in TryNeighbor, after its closed and length tests
+		// skip the grid walk.
 		auto TryVisibleNeighbors = [&](int64_t iBegin, int64_t iStop)
 		{
-			XMFLOAT2 f2Current = GetPosition(iCurrent);
 			for (int64_t i = iBegin; i < iStop; ++i)
 			{
-				if (!rMemory.pClosed[i] && (iVertexCount == 0 || !SegmentBlockedByObstacle(f2Current, GetPosition(i), pVertices, rNavData)))
-				{
-					TryNeighbor(i);
-				}
+				TryNeighbor(i, true);
 			}
 		};
 
@@ -554,7 +556,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			{
 				if (rMemory.pStartVisible[i])
 				{
-					TryNeighbor(i);
+					TryNeighbor(i, false);
 				}
 			}
 
@@ -564,7 +566,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			// the crossing case offers the edge, at its penalty, so a sealed ship can still choose to cross.
 			if (!bStaticBlocked)
 			{
-				TryNeighbor(iEndNode);
+				TryNeighbor(iEndNode, false);
 			}
 		}
 		else if (iCurrent < iVertexCount)
@@ -574,13 +576,13 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			int64_t iStop = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent) + 1);
 			for (int64_t k = iBegin; k < iStop; ++k)
 			{
-				TryNeighbor(rNavData.adjacencyNeighbors.at(static_cast<size_t>(k)));
+				TryNeighbor(rNavData.adjacencyNeighbors.at(static_cast<size_t>(k)), false);
 			}
 
 			// Lazy end-visibility: computed only for the vertices A* actually expands (each expands at most once).
 			if (!SegmentBlockedByObstacle(f2End, pVertices[iCurrent], pVertices, rNavData))
 			{
-				TryNeighbor(iEndNode);
+				TryNeighbor(iEndNode, false);
 			}
 
 			TryVisibleNeighbors(iVertexCount, iStartNode);

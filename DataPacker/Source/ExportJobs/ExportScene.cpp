@@ -25,12 +25,6 @@ ExportScene::ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem
 : ExportJob(rChunkFlags, IsBlenderSource(rFile) ? std::filesystem::path(rFile) += ".glb" : rFile, kiVersion)
 , mBlenderSourcePath(IsBlenderSource(rFile) ? rFile : std::filesystem::path())
 {
-	// The chunk and .meta take the key with the conversion marker: the .meta holds the source hash alone, so trees that
-	// differ only in the script would otherwise share one chunk and publish each other's scene without a dirty report.
-	if (!mBlenderSourcePath.empty())
-	{
-		SetContentKey(BlenderExportContentKey(mBlenderSourcePath));
-	}
 }
 
 std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
@@ -61,14 +55,16 @@ std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::
 
 bool ExportScene::CheckDirty(const std::filesystem::path& rPackFile)
 {
-	if (!mBlenderSourcePath.empty() && BlenderExportDirty(mBlenderSourcePath, mInputPath, ReadMarkerFile(GetBlenderExportMarkerPath())))
+	bool bDirty = ExportJob::CheckDirty(rPackFile);
+	// The marker is named by the content key, which a failed fingerprint leaves unset; a dirty job forces pre-export,
+	// and Export checks the marker again.
+	if (!bDirty && !mBlenderSourcePath.empty() && BlenderExportDirty(mBlenderSourcePath, mInputPath, ReadMarkerFile(GetBlenderExportMarkerPath())))
 	{
 		mbDirty = true;
 		mbNeedsPreExport = true;
 		return true;
 	}
 
-	bool bDirty = ExportJob::CheckDirty(rPackFile);
 	if (IsAssimpScene(mInputPath) && SceneDependenciesDirty())
 	{
 		mbDirty = true;
@@ -213,7 +209,7 @@ std::string ExportScene::GetInputFingerprint() const
 	if (!mBlenderSourcePath.empty())
 	{
 		// RunExport snapshots this before Export replaces the generated GLB.
-		return gpFileManager->mpInputFingerprintCache->Get(mBlenderSourcePath);
+		return BlenderExportContentKeyInput(mBlenderSourcePath);
 	}
 
 	nlohmann::json fingerprint;

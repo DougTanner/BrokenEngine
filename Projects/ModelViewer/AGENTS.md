@@ -306,6 +306,10 @@ Source and header membership is explicit in the project and filters.
 Viewer-owned items use the Viewer filter; generated headers use DataFiles.
 Engine/Common items follow their directory structure, as in the sandbox project.
 
+A file is a project member exactly when a source the project already compiles,
+or that the same `/update-vcxproj` run adds to it, needs the file: the source
+calls a symbol the `.cpp` defines or includes the header.
+
 The project directly compiles `Engine/Source/Memory/Mimalloc.cpp`. That source
 disables PCH and forced includes and uses the vendor-wrapper warning policy
 documented in

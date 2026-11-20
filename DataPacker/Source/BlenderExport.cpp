@@ -159,10 +159,10 @@ static std::vector<std::filesystem::path> FindBlenderCandidateImages(const std::
 	return images;
 }
 
-// Runs from the job's constructor, where a throw would kill the run. The tool stays out of the key: it does not vary by
-// tree, and FindBlender throws. A failed image walk leaves the images out, and BlenderExportDirty's catch then reports
-// dirty, so the failure stays per asset. Sorting keeps the key independent of directory order.
-common::crc_t BlenderExportContentKey(const std::filesystem::path& rSource)
+// The tool stays out of the key: it does not vary by tree, and FindBlender throws. A failed image walk leaves the images
+// out, and BlenderExportDirty's catch then reports dirty, so the failure stays per asset. Sorting keeps the key
+// independent of directory order.
+std::string BlenderExportContentKeyInput(const std::filesystem::path& rSource)
 {
 	std::string keyInput = gpFileManager->mpInputFingerprintCache->Get(rSource) + gpFileManager->mpInputFingerprintCache->Get(BlenderScript());
 	try
@@ -184,7 +184,7 @@ common::crc_t BlenderExportContentKey(const std::filesystem::path& rSource)
 	{
 		LOG(kDefault, kWarning, "Could not fingerprint the candidate images of \"{}\": {}", rSource.string(), rException.what());
 	}
-	return common::Crc(keyInput);
+	return keyInput;
 }
 
 bool BlenderExportDirty(const std::filesystem::path& rSource, const std::filesystem::path& rOutput, const std::optional<std::string>& rOptionalMarker) noexcept

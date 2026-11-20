@@ -67,8 +67,8 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 	return vecSunMoonNormal;
 }
 
-// Piecewise day-cycle sun/moon color + ambient ramp, the sun/moon intensity stores, and the precomputed
-// uniform-only sun/moon/ambient products consumed by SunLighting, the smoke helpers, and Water.frag. Returns
+// Piecewise day-cycle sun/moon color + ambient ramp, the ambient color store, and the precomputed
+// uniform-only sun/moon/ambient products consumed by SunLighting, the smoke helpers, Water.frag, and Model.frag. Returns
 // the finished ambient color so the shadow-ambient split can be folded without re-reading write-only memory.
 static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent)
 {
@@ -132,14 +132,11 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 		DEBUG_BREAK();
 	}
 
-	// Sun: piecewise lerp goes naturally to (0,0,0) at midnight; no moon-floor clamp here.
-	XMStoreFloat4(&rGlobalLayout.f4SunColor, vecSunMoon);
-
+	// vecSunMoon is the sun color alone, (0,0,0) at midnight with no moon-floor clamp.
 	// Moon: floor color modulated by the moonrise/moonset envelope, following its own rise/set
 	// schedule independent of the shadow night gate.
 	float fMoonAmount = MoonAmount(fSunAngle);
 	XMVECTOR vecMoon = XMVectorScale(vecMoonFloor, fMoonAmount);
-	XMStoreFloat4(&rGlobalLayout.f4MoonColor, vecMoon);
 
 	// Per-target sun/moon intensities. Every target captures these values as locals and folds them into precomputed products.
 	float fSunIntensityTerrain = gSunMoonSunIntensityTerrain.mfCurrent;
@@ -188,8 +185,8 @@ static XMVECTOR XM_CALLCONV PopulateDayCycleColors(shaders::GlobalLayout& rGloba
 	rGlobalLayout.fWaterShadowWeightSumInverse = 1.0f / std::max(0.001f, fWaterSunWeight + fWaterMoonWeight);
 
 	// Fold Main-phase PBR tunables here while day-cycle colors are CPU-local; reading mapped write-combined uniforms back stalls. Direct BRDF
-	// products include Object intensity and fPbrSun. IBL uses separate unscaled Rec.709 luminance / fPbrDayBrightness so it stays linear in
-	// fPbrSun. The brightness reciprocal is intentionally unguarded.
+	// products include Object intensity and gPbrSun. IBL uses separate unscaled Rec.709 luminance / fPbrDayBrightness so it stays linear in
+	// gPbrSun. The brightness reciprocal is intentionally unguarded.
 	XMVECTOR vecRecommendation709 = XMVectorSet(0.2126f, 0.7152f, 0.0722f, 0.0f);
 	float fPhysicallyBasedRenderingSun = gPbrSun.mfCurrent;
 	float fPhysicallyBasedRenderingDayBrightnessInverse = 1.0f / gPbrDayBrightness.mfCurrent;
@@ -315,15 +312,16 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 	                        || IsVisibleCenterOutsideArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
 	if (bShadowRefreshFrame)
 	{
-		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.mfCurrent, rGlobalLayout.f4ShadowAreaPrevious);
+		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.mfCurrent);
 		rGlobalLayout.f4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
 	}
 	else
 	{
 		rGlobalLayout.f4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
-		rGlobalLayout.f4ShadowAreaPrevious = sTemporalAreaLatch.f4PreviousArea;
 		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.fBlend;
 	}
+	PopulateAreaToUv(rGlobalLayout.shadowAreaToUv, sTemporalAreaLatch.f4CurrentArea);
+	PopulateAreaToUv(rGlobalLayout.shadowAreaPreviousToUv, sTemporalAreaLatch.f4PreviousArea);
 	gPresentationContinuity.shadow.f4CurrentArea = sTemporalAreaLatch.f4CurrentArea;
 	gPresentationContinuity.shadow.f4PreviousArea = sTemporalAreaLatch.f4PreviousArea;
 
@@ -368,7 +366,7 @@ static void PopulateObjectShadowsArea(int64_t iCommandBuffer, shaders::GlobalLay
 	{
 		sf4HeldArea = ScaleAreaAboutCenter(rf4VisibleArea, gExtraArea.mfCurrent);
 	}
-	rGlobalLayout.f4ObjectShadowsArea = sf4HeldArea;
+	PopulateAreaToUv(rGlobalLayout.objectShadowsAreaToUv, sf4HeldArea);
 	gPresentationContinuity.f4ObjectShadowArea = sf4HeldArea;
 
 	// Main's recorded blur dispatches read these counts; a skip zeroes Z. As with the terrain chain, write them every
@@ -639,6 +637,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	rGlobalLayout.f2CameraPosition.x = f4CameraPositionGlobal.x;
 	rGlobalLayout.f2CameraPosition.y = f4CameraPositionGlobal.y;
 	rGlobalLayout.f4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
+	PopulateAreaToUv(rGlobalLayout.visibleAreaToUv, engine::gpCamera->mf4RenderVisibleArea);
 	// Analytic inverse of the float basis the cell centers use, in double: columns (r.y, -q.y) and (-r.x, q.x) over det.
 	double fBasisQX = static_cast<double>(kCellDirections.f2BasisQ.x);
 	double fBasisQY = static_cast<double>(kCellDirections.f2BasisQ.y);

@@ -41,7 +41,7 @@ void main()
 
 	// This texel's world position -> last-refresh UV. Disocclusion (reprojected UV outside [0,1] = newly
 	// revealed): keep current (the history fetch would be off-grid / stale).
-	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.f4LightingAreaPrevious);
+	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.lightingAreaPreviousToUv);
 	if (any(lessThan(f2PreviousUv, vec2(0.0f))) || any(greaterThan(f2PreviousUv, vec2(1.0f))))
 		return;
 

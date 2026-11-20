@@ -58,10 +58,7 @@ void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, 
 
 	const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
-	{
-		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
-	}, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		return AddElement(rInterpolate, rPostRender);
 	}, [&rInterpolate, &rController](int64_t iSpawnIndex)

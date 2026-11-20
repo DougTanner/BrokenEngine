@@ -7,9 +7,6 @@ namespace engine
 
 enum class FileFlags : uint64_t
 {
-	kAppDataDirectory = 0x01,
-	kTempDirectory    = 0x02,
-
 	kRead      = 0x08,
 	kWrite     = 0x10,
 	kBackup    = 0x20,
@@ -64,9 +61,11 @@ struct LazyChunk
 	common::AlignedUniquePtr<std::byte> pData;
 	int64_t iDataSize = 0;
 
+#if defined(BT_CLIENT)
 	// GPU upload results (written by upload thread, read by main thread)
 	VkImage vkUploadImage = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
+#endif // BT_CLIENT
 };
 
 enum class LoadPriority : uint32_t
@@ -109,7 +108,6 @@ enum class ChunkReadResult : uint8_t
 	kRetry,
 	kPending,
 	kReady,
-	kFailed,
 };
 
 class ChunkReadRequest
@@ -128,16 +126,22 @@ public:
 private:
 	friend class PackChunks;
 
-	int64_t miEntryIndex = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+	int64_t miEntryIndex = 0;
 	uint64_t muiGeneration = 0;
 };
 
 #endif // BT_CLIENT
 
-constexpr bool IsEagerChunk(data::DataTypes eDataType);
-// Server-only predicate: which data types the headless server actually consumes.
-// Used to skip opening (and locking) pack files the server never reads — Audio, Texture, etc.
-constexpr bool IsServerChunk(data::DataTypes eDataType);
+constexpr bool IsEagerChunk(data::DataTypes eDataType)
+{
+	return eDataType == data::kDataTypeScene || eDataType == data::kDataTypeModel || eDataType == data::kDataTypeShader || eDataType == data::kDataTypeRaw;
+}
+
+// DataPacker LZ4-compresses every chunk of exactly these types; the loader decompresses them into the lazy chunk buffer.
+constexpr bool IsCompressed(data::DataTypes eDataType)
+{
+	return eDataType == data::kDataTypeTexture || eDataType == data::kDataTypeIslands;
+}
 
 class FileManager : public common::Singleton<FileManager>
 {
@@ -150,9 +154,9 @@ public:
 	FileManager& operator=(const FileManager&) = delete;
 
 	std::fstream OpenFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
-	void RemoveFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
+	void RemoveFile(const std::filesystem::path& rFilename);
 	[[nodiscard]] bool ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 32>& rOut);
-	[[nodiscard]] bool ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut);
+	[[nodiscard]] bool ComputeOrdinaryFileSha256(const std::filesystem::path& rFilename, std::array<uint8_t, 32>& rOut);
 
 	// Writes through "<rFilename>.tmp"; a stream or rename failure leaves the destination intact and attempts temporary-file cleanup.
 	template <typename FN>
@@ -162,15 +166,14 @@ public:
 	
 
 public:
-	std::filesystem::path GetFilePath(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
+	std::filesystem::path GetFilePath(const std::filesystem::path& rFilename);
 private:
-	bool CommitAtomicWrite(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, bool bWriteSucceeded);
+	bool CommitAtomicWrite(const std::filesystem::path& rFilename, bool bWriteSucceeded);
 	void BackupExistingFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 
 public:
 
 	std::filesystem::path mAppDataDirectory;
-	std::filesystem::path mTempDirectory;
 
 	// The out-of-line destructor destroys the unique_ptr where PackChunks is complete; consumers that access its
 	// members include PackChunks.h.
@@ -212,7 +215,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 	stream.close();
 	bool bGood = !stream.fail();
 
-	return CommitAtomicWrite(rFlags, rFilename, bGood);
+	return CommitAtomicWrite(rFilename, bGood);
 }
 
 // Shared version+size on-disk header convention. Writes int64 version then int64 size (sizeof for
@@ -236,9 +239,9 @@ bool ReadAndValidateVersionHeader(std::fstream& rFileStream, int64_t& riVersion,
 }
 
 template <typename STRUCT_TYPE>
-bool WriteVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, const STRUCT_TYPE& rStructure)
+bool WriteVersionedFile(const std::filesystem::path& rFilename, const STRUCT_TYPE& rStructure)
 {
-	return gpFileManager->WriteFileAtomically(rFlags, rFilename, [&](std::fstream& rFileStream)
+	return gpFileManager->WriteFileAtomically({FileFlags::kWrite}, rFilename, [&](std::fstream& rFileStream)
 	{
 		int64_t iVersion = STRUCT_TYPE::kiVersion;
 		int64_t iSize = std::is_trivially_copyable_v<STRUCT_TYPE> ? sizeof(STRUCT_TYPE) : 0;
@@ -257,9 +260,9 @@ bool WriteVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& 
 }
 
 template <typename STRUCT_TYPE>
-bool ReadVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, STRUCT_TYPE& rStructure)
+bool ReadVersionedFile(const std::filesystem::path& rFilename, STRUCT_TYPE& rStructure)
 {
-	std::fstream fileStream = gpFileManager->OpenFile(rFlags, rFilename);
+	std::fstream fileStream = gpFileManager->OpenFile({FileFlags::kRead}, rFilename);
 
 	LOG(kLoading, kDebug, "ReadVersionedFile {} iVersion: {} iSize: {}", rFilename, STRUCT_TYPE::kiVersion, sizeof(STRUCT_TYPE));
 	int64_t iVersion = 0;

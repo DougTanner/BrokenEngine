@@ -84,11 +84,8 @@ committed with the Plan. A ledger support file holds only rows the Plan acts on,
 never excluded false positives. Each file keeps its real format and extension,
 except that a Markdown file is saved as `.txt`: the scheduler reads every `.md`
 under this tree as a plan document, so no `.md` file lives in a support folder.
-No support file's name contains a comma: the session change inventory splits its
-untracked-path list on commas, and a new support file stays untracked until its
-session lands. Every support folder has its Plan beside it, and an area holds
-only Plans, their support folders, and `AGENTS.md`. Delete a support folder only
-with
+Every support folder has its Plan beside it, and an area holds only Plans, their
+support folders, and `AGENTS.md`. Delete a support folder only with
 `pwsh -NoProfile -File .agents/scripts/Remove-PlanSupportFolder.ps1 -Plan '<Plan path>'`,
 never with a deletion command of your own; `/next-plan`'s claim exit runs it for
 every Plan it completes or rejects, and a Plan removed by hand takes its folder

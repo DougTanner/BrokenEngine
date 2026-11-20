@@ -102,7 +102,6 @@ void ExportTexture::ProcessKtxCubemap()
 
 	int64_t iUncompressedSize = static_cast<int64_t>(textureCube.size());
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(static_cast<const std::byte*>(textureCube.data()), static_cast<size_t>(iUncompressedSize)));
-	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -184,7 +183,6 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	const std::vector<std::byte>& rRawBytes = bRawHalfFloat ? data : inflated;
 
 	std::vector<std::byte> compressed = Lz4Compress(rRawBytes);
-	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -229,7 +227,6 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 
 	int64_t iUncompressedSize = std::ssize(data);
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
-	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
@@ -250,7 +247,6 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 
 	int64_t iUncompressedSize = std::ssize(data);
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
-	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;

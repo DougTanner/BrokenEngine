@@ -122,7 +122,6 @@ struct MainLayout
 	float fPbrIblDiffusePower INIT;
 	float fPbrIblSpecular INIT;
 	float fPbrIblSpecularPower INIT;
-	float fPbrSun INIT;
 	float fPbrLighting INIT;
 	float fPbrLightingPower INIT;
 	float fPbrLightingSpecular INIT;

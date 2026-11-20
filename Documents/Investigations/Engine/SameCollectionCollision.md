@@ -78,8 +78,8 @@ with `i < j`. Both rows receive the result through the existing routing.
 - Determinism and CRC: the sort stays total because each pair is unique. The
   collision scratch is `thread_local` outside the Frame (`Collision.h:127-145`);
   damage outcomes enter the CRC
-  (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:651`). Bump
-  `Frame::kiVersion` (`Frame.cpp:106`) so replays recorded under the old rules
+  (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:717`). Bump
+  `Frame::kiVersion` (`Frame.cpp:136`) so replays recorded under the old rules
   are rejected.
 - Cost: n²/2 tests per zone for dense fleets. The candidate preallocation of 512
   (`Collision.h:13`) overflows with a `DEBUG_BREAK` (`Collision.cpp:604-609`).

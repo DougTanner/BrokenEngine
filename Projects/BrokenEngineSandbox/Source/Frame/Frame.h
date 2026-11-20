@@ -51,7 +51,6 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	// Runs on a world-hidden frame instead of the render walk: requests the textures of the model pipelines present,
 	// writing no GPU buffer.
 	static void UpdateWorldHidden(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
-	static void DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 #endif
 
 	FrameInterpolate();

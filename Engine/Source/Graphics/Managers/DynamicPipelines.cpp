@@ -59,8 +59,9 @@ ModelPipeline* DynamicPipelines::CreateModelPipeline(const ModelPipelineSpec& rM
 	return pResult;
 }
 
-void DynamicPipelines::CreateModelPipelines(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
+void DynamicPipelines::CreateModelPipelines(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, int64_t iInitialCapacity)
 {
+	Buffer* pStorageBuffers = gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, sizeof(shaders::ModelLayout), iInitialCapacity);
 	CreateMainModelPipeline(crc, name, sceneCrc, pStorageBuffers);
 	CreateShadowModelPipeline(crc, name, sceneCrc, pStorageBuffers);
 }
@@ -81,6 +82,18 @@ void DynamicPipelines::RequestModelPipelineTextures(common::crc_t crc)
 {
 	mpModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->RequestTextures();
 	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->RequestTextures();
+}
+
+void DynamicPipelines::RequestModelPipelineTextures(std::span<const common::crc_t> crcs, std::span<const bool> presentFlags)
+{
+	ASSERT(crcs.size() == presentFlags.size());
+	for (int64_t i = 0; i < std::ssize(crcs); ++i)
+	{
+		if (presentFlags[i])
+		{
+			RequestModelPipelineTextures(crcs[i]);
+		}
+	}
 }
 
 void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)

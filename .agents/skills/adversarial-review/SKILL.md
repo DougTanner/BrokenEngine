@@ -43,10 +43,8 @@ and message. Pass that path to the reviewer only after this run printed that
 line naming status `pass`; otherwise, or with no summary line, do not dispatch
 and report the complete changed-artifact list unavailable. The reviewer reads
 `status` and `truncated` from the file and returns `BLOCKED` unless they are
-`pass` and false. An untracked file appears only when the caller supplies it
-with `-IncludeUntracked '<comma-separated paths>'`, and
-`counts.unlistedUntracked` reports how many untracked files the run did not
-list. Never enumerate the changed artifacts inline.
+`pass` and false. Add the `-IncludeUntracked` switch when the change includes
+untracked files. Never enumerate the changed artifacts inline.
 
 For a direct user request about a supplied diff, treat the supplied intent,
 declared invariants, and behavioral or contract statements expressed by the diff

@@ -2,11 +2,11 @@
 
 #include "Battleships.h"
 
-#include "Data/Scene.h"
 #include "File/PackChunks.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipHitboxes.h"
+#include "Frame/Collections/Ships/ShipModels.h"
 #include "Frame/Collections/Wrecks/Wrecks.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
@@ -14,15 +14,11 @@
 namespace game
 {
 
-// One model per ShipController, also used for animation lookup.
-extern const common::crc_t kBattleshipFleetModel = data::kModelsBattleshipJesterz86scenegltfCrc;
-extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceBattleshipAquamarinescenegltfCrc;
-
 // One model pipeline per ShipController, indexed by it.
 constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"BattleshipsFleet", "BattleshipsRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("BattleshipsFleet"), common::CrcConsteval("BattleshipsRandom")};
-const std::array<common::crc_t, kiPipelineCount> kuiModels {kBattleshipFleetModel, kBattleshipRandomModel};
+const std::array<common::crc_t, kiPipelineCount> kuiModels {kuiBattleshipFleetModel, kuiBattleshipRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 256;
 
@@ -30,60 +26,7 @@ void BattleshipsInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
-		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], pStorageBuffers);
-	}
-}
-
-static std::array<int64_t, kiPipelineCount> siRendered {};
-// Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
-// accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
-static std::atomic<bool> sbRenderActive = false;
-
-// sbRenderActive must clear during exception unwinding so subsequent Render calls do not fail the concurrency ASSERT.
-struct [[nodiscard]] BattleshipsRenderActiveGuard
-{
-	BattleshipsRenderActiveGuard()
-	{
-		ASSERT(!sbRenderActive.exchange(true));
-	}
-
-	BattleshipsRenderActiveGuard(const BattleshipsRenderActiveGuard&) = delete;
-	BattleshipsRenderActiveGuard& operator=(const BattleshipsRenderActiveGuard&) = delete;
-
-	~BattleshipsRenderActiveGuard()
-	{
-		sbRenderActive.store(false);
-	}
-};
-
-static int64_t siWrecksRendered = 0;
-
-void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
-{
-	siRendered = {};
-	siWrecksRendered = 0;
-
-	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BattleshipsInterpolate&
-	{
-		return *rInterpolate.pBattleships;
-	}) + engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const WrecksInterpolate&
-	{
-		return *rInterpolate.pWrecks;
-	});
-
-	if (iTotalCapacity == 0)
-	{
-		return;
-	}
-
-	// Any row can use either pipeline, so each reserves the whole capacity.
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
-		{
-			engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiPipelineCrcs[i], iCommandBuffer, 2, pBuffer);
-		}
+		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], kiDynamicBufferInitialCapacity);
 	}
 }
 
@@ -106,50 +49,26 @@ void BattleshipsInterpolate::RequestTextures(const std::unordered_map<engine::Gr
 		}
 	}
 
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		if (bPresent[i])
-		{
-			engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs[i]);
-		}
-	}
+	engine::gpPipelineManager->mDynamicPipelines.RequestModelPipelineTextures(kuiPipelineCrcs, bPresent);
 }
 
 // Writes one model instance; vecPosition is local to rBasis's cell, and vecTilt applies after the yaw.
 static void XM_CALLCONV WriteModelLayout(const engine::RenderBasis& rBasis, const engine::ModelShadowBounds& rShadowBounds, FXMMATRIX matAlignment, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecTilt, const engine::AnimationData* pAnimationData, const engine::SkinningReservation& rReservation, int64_t iInstance, std::chrono::duration<float> animationTime, shaders::ModelLayout& rModelLayout)
 {
 	XMVECTOR vecRenderPosition = engine::Rebase(rBasis, vecPosition);
-	XMFLOAT4A f4Position {};
-	XMStoreFloat4A(&f4Position, vecRenderPosition);
 
 	XMMATRIX matYaw = common::RotationMatrixFromDirection(vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 	XMMATRIX matTilt = XMMatrixRotationQuaternion(vecTilt);
 	XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecRenderPosition);
 	XMMATRIX matInstanceTransform = matYaw * matTilt * matTranslation;
-	XMMATRIX matTransform = matAlignment * matInstanceTransform;
-
-	rModelLayout.f4PositionLayer = f4Position;
-	rModelLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(rShadowBounds, matInstanceTransform, vecRenderPosition)};
-	rModelLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(f4Position.z));
-	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
-	XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
-
-	rModelLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
-	rModelLayout.uiMeshDataBase = 0;
-
-	if (pAnimationData != nullptr)
-	{
-		rModelLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(rReservation, iInstance, animationTime.count()));
-	}
+	int64_t iPlane = engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecRenderPosition));
+	engine::FillModelLayout(rShadowBounds, matAlignment, matInstanceTransform, vecRenderPosition, iPlane, pAnimationData, rReservation, iInstance, animationTime, rModelLayout);
 }
 
-// Draws the rows and wrecks whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for
-// every row and wreck.
-static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const WrecksInterpolate& __restrict rWrecks, const WrecksPostRender& __restrict rWrecksPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
+// Draws the rows and wrecks whose controller selects iPipeline from pLayouts on, adds the wrecks to riWrecks, and returns
+// how many it wrote. piVisibleIndices is scratch for every row and wreck.
+static int64_t RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const WrecksInterpolate& __restrict rWrecks, const WrecksPostRender& __restrict rWrecksPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, shaders::ModelLayout* pLayouts, int64_t& riWrecks, int64_t iCommandBuffer)
 {
-	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
-	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
-
 	const engine::AnimationData* pAnimationData = nullptr;
 	if (engine::gAnimationDataMap.contains(kuiModels[iPipeline]))
 	{
@@ -209,7 +128,6 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iVisibleCount + iWreckCount);
 	}
 
-	int64_t iRenderedOffset = siRendered[iPipeline];
 	const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
 	const common::SceneHeader& rSceneHeader = rChunkMap.at(kuiModels[iPipeline]).pHeader->sceneHeader;
 	ASSERT(rSceneHeader.modelCrc == kShipHitboxTypes[std::to_underlying(ShipType::kBattleship)].models[iPipeline]);
@@ -223,86 +141,91 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
 			int64_t i = piVisibleIndices[j];
-			WriteModelLayout(rBasis, shadowBounds, matAlignment, rCurrent.pVecPositions[i], rCurrent.pVecDirections[i], XMQuaternionIdentity(), pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[iRenderedOffset + j]);
+			WriteModelLayout(rBasis, shadowBounds, matAlignment, rCurrent.pVecPositions[i], rCurrent.pVecDirections[i], XMQuaternionIdentity(), pAnimationData, skinningReservation, j, rCurrent.pAnimationTimes[i], pLayouts[j]);
 		}
 	};
 
 	gpProfileManager->GetCpuTimer(game::kCpuTimerRenderBattleships).iThreads = common::gpMultithreading->WorkerCount() + 1;
 	common::gpMultithreading->Dispatch(iVisibleCount, ProcessRange);
 
-	ASSERT(iRenderedOffset + iVisibleCount + iWreckCount <= iBufferCapacity);
 	for (int64_t k = 0; k < iWreckCount; ++k)
 	{
 		int64_t iWreck = piVisibleIndices[iVisibleCount + k];
 		int64_t iInstance = iVisibleCount + k;
-		WriteModelLayout(rBasis, shadowBounds, matAlignment, rWrecks.pVecPositions[iWreck], rWrecks.pVecDirections[iWreck], WreckTilt(rWrecks, rWrecksPostRender, iWreck), pAnimationData, skinningReservation, iInstance, rWrecks.pAnimationTimes[iWreck], pLayouts[iRenderedOffset + iInstance]);
+		WriteModelLayout(rBasis, shadowBounds, matAlignment, rWrecks.pVecPositions[iWreck], rWrecks.pVecDirections[iWreck], WreckTilt(rWrecks, rWrecksPostRender, iWreck), pAnimationData, skinningReservation, iInstance, rWrecks.pAnimationTimes[iWreck], pLayouts[iInstance]);
 	}
 
-	siRendered[iPipeline] += iVisibleCount + iWreckCount;
-	siWrecksRendered += iWreckCount;
+	riWrecks += iWreckCount;
+	return iVisibleCount + iWreckCount;
 }
 
-void BattleshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
+void BattleshipsInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderBattleships);
 
-	const BattleshipsInterpolate& rCurrent = *rFrameInterpolate.pBattleships;
-	const WrecksInterpolate& rWrecks = *rFrameInterpolate.pWrecks;
-	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-
-	if (rCurrent.iCount == 0 && rWrecks.iCount == 0)
+	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BattleshipsInterpolate&
 	{
-		return;
-	}
+		return *rInterpolate.pBattleships;
+	}) + engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const WrecksInterpolate&
+	{
+		return *rInterpolate.pWrecks;
+	});
 
-	BattleshipsRenderActiveGuard renderActiveGuard;
-
-	// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
-	const Frame& rRenderFrame = gpGame->RenderFrame(rBasis.coordinate);
-	const BattleshipsPostRender& rPostRender = *rRenderFrame.postRender.pBattleships;
-	const WrecksPostRender& rWrecksPostRender = *rRenderFrame.postRender.pWrecks;
-
-	auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>((rCurrent.iCount + rWrecks.iCount) * static_cast<int64_t>(sizeof(int64_t)));
-
+	// Any row can use either pipeline, so each reserves the whole capacity. Each cell's rows follow the previous cell's.
+	int64_t iRendered = 0;
+	int64_t iWrecks = 0;
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		RenderPipeline(rCurrent, rPostRender, rWrecks, rWrecksPostRender, rBasis, i, visibleIndicesAllocation.mpData, iCommandBuffer);
-	}
-}
+		iRendered += engine::gpPipelineManager->mDynamicPipelines.RenderModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], iCommandBuffer, iTotalCapacity, [&](shaders::ModelLayout* pLayouts)
+		{
+			int64_t iCount = 0;
+			for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+			{
+				auto it = rRenderInterpolates.find(rCoordinate);
+				if (it == rRenderInterpolates.end() || (it->second.pBattleships->iCount == 0 && it->second.pWrecks->iCount == 0))
+				{
+					continue;
+				}
 
-void BattleshipsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
-{
+				const BattleshipsInterpolate& rCurrent = *it->second.pBattleships;
+				const WrecksInterpolate& rWrecks = *it->second.pWrecks;
+				// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
+				const Frame& rRenderFrame = gpGame->RenderFrame(rCoordinate);
+				auto visibleIndicesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>((rCurrent.iCount + rWrecks.iCount) * static_cast<int64_t>(sizeof(int64_t)));
+				iCount += RenderPipeline(rCurrent, *rRenderFrame.postRender.pBattleships, rWrecks, *rRenderFrame.postRender.pWrecks, it->second.renderBasis, i, visibleIndicesAllocation.mpData, pLayouts + iCount, iWrecks, iCommandBuffer);
+			}
+			return iCount;
+		});
+	}
+
 	if constexpr (kbProfiling)
 	{
-		// siRendered also counts the wrecks, which the indirect draw needs.
-		gpProfileManager->GetCpuCounter(game::kCpuCounterBattleshipsRendered).iCount = siRendered[0] + siRendered[1] - siWrecksRendered;
-		gpProfileManager->GetCpuCounter(game::kCpuCounterBattleshipWrecks).iCount = siWrecksRendered;
-	}
-	for (int64_t i = 0; i < kiPipelineCount; ++i)
-	{
-		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiPipelineCrcs[i], iCommandBuffer, siRendered[i]);
+		// iRendered also counts the wrecks, which the indirect draw needs.
+		gpProfileManager->GetCpuCounter(game::kCpuCounterBattleshipsRendered).iCount = iRendered - iWrecks;
+		gpProfileManager->GetCpuCounter(game::kCpuCounterBattleshipWrecks).iCount = iWrecks;
 	}
 }
 
-void BattleshipsInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)
+void BattleshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] int64_t iCommandBuffer)
 {
-	if constexpr (!kbDebugRender)
-	{
-		return;
-	}
+	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderBattleships);
 
-	// Positions come from rFrameInterpolate (the fully-interpolated frame); PostRender supplies only flags, metadata, and
-	// static world positions.
-	const BattleshipsInterpolate& rBattleships = *rFrameInterpolate.pBattleships;
-	const Frame& rRenderFrame = gpGame->RenderFrame(coordinate);
-	const BattleshipsPostRender& rPostRender = *rRenderFrame.postRender.pBattleships;
-
-	for (int64_t i = 0; i < rBattleships.iCount; ++i)
+	if constexpr (kbDebugRender)
 	{
-		DebugRenderShipHitbox(rFrameInterpolate.renderBasis, ShipType::kBattleship, rPostRender.pController[i], rBattleships.pVecPositions[i], rBattleships.pVecDirections[i]);
-		if (rPostRender.pController[i] == ShipController::kFleet)
+		const BattleshipsInterpolate& rCurrent = *rFrameInterpolate.pBattleships;
+		const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
+		const Frame& rRenderFrame = gpGame->RenderFrame(rBasis.coordinate);
+		const BattleshipsPostRender& rPostRender = *rRenderFrame.postRender.pBattleships;
+
+		// Positions come from rFrameInterpolate (the fully-interpolated frame); PostRender supplies only flags, metadata,
+		// and static world positions.
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
-			DebugRenderNavigation(rFrameInterpolate, rRenderFrame, rBattleships.pVecPositions[i], rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfBattleshipRadius);
+			DebugRenderShipHitbox(rBasis, ShipType::kBattleship, rPostRender.pController[i], rCurrent.pVecPositions[i], rCurrent.pVecDirections[i]);
+			if (rPostRender.pController[i] == ShipController::kFleet)
+			{
+				DebugRenderNavigation(rFrameInterpolate, rRenderFrame, rCurrent.pVecPositions[i], rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfBattleshipRadius);
+			}
 		}
 	}
 }

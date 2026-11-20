@@ -443,7 +443,7 @@ void ModelViewerApplication::SaveLightingPreset(const std::array<float, 21>& rVa
 	ScopedSuppressAllocationTracking suppress;
 	LightingPreset preset {.values = rValues};
 	const char* pcPath = kLightingPresetPaths.at(miSelectedLightingPreset);
-	if (!engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, pcPath, preset))
+	if (!engine::WriteVersionedFile(pcPath, preset))
 	{
 		LOG(kLoading, kError, "ModelViewer preset save failed: {}", pcPath);
 	}
@@ -455,7 +455,7 @@ void ModelViewerApplication::SelectLightingPreset(int64_t iSlot)
 	ScopedSuppressAllocationTracking suppress;
 	LightingPreset preset {};
 	const char* pcPath = kLightingPresetPaths.at(iSlot);
-	bool bRead = engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, pcPath, preset);
+	bool bRead = engine::ReadVersionedFile(pcPath, preset);
 	if (bRead)
 	{
 		for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
@@ -789,8 +789,7 @@ void ModelViewerApplication::CreateGraphicsResources()
 {
 	for (const Preview& rPreview : mPreviews)
 	{
-		engine::Buffer* pBuffers = engine::gpBufferManager->CreateDynamicBuffer(rPreview.crc, engine::kBufferMain, rPreview.pcPath, sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
-		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(rPreview.crc, rPreview.pcPath, rPreview.crc, pBuffers);
+		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(rPreview.crc, rPreview.pcPath, rPreview.crc, kiDynamicBufferInitialCapacity);
 	}
 }
 
@@ -804,56 +803,58 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 	for (int64_t i = 0; i < std::ssize(mPreviews); ++i)
 	{
 		const Preview& rPreview = mPreviews.at(i);
-		if (i != miSelected)
+		engine::gpPipelineManager->mDynamicPipelines.RenderModelPipelines(rPreview.crc, rPreview.pcPath, iCommandBuffer, kiDynamicBufferInitialCapacity, [&](shaders::ModelLayout* pLayouts) -> int64_t
 		{
-			engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(rPreview.crc, iCommandBuffer, 0);
-			continue;
-		}
-		shaders::ModelLayout& rLayout = *engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(rPreview.crc, engine::kBufferMain, iCommandBuffer).pData;
-		rLayout = {};
-		const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
-		const common::SceneHeader& rSceneHeader = rChunkMap.at(rPreview.crc).pHeader->sceneHeader;
-		const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
-		engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
-		XMMATRIX matPackedAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
-		XMMATRIX matAlignmentDelta = XMMatrixInverse(nullptr, matPackedAlignment) * mMatModelAlignment;
-		XMMATRIX matInstanceTransform = XMMatrixIdentity();
-		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-		if (mFlags & ViewerFlags::kFlying)
-		{
-			XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
-			matInstanceTransform = matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
-			vecPosition = mFlightBody.vecPosition;
-			XMStoreFloat4(&rLayout.f4PositionLayer, mFlightBody.vecPosition);
-			rLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(mFlightBody.vecPosition)));
-		}
-		XMMATRIX matTransform = mMatModelAlignment * matInstanceTransform;
-		rLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matAlignmentDelta * matInstanceTransform, vecPosition)};
-		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4Transform[0]), matTransform);
-		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
-		if (!rPreview.meshData.empty())
-		{
-			const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
-			engine::SkinningReservation reservation = rAnimation.ReserveSkinning(iCommandBuffer, 1);
-			if (miSelectedAnimation >= 0)
+			if (i != miSelected)
 			{
-				rAnimation.EvaluateAnimation(miSelectedAnimation, mAnimationTime.count(), std::span(reservation.pMeshData + reservation.iMeshDataBase, static_cast<size_t>(reservation.iMaterialCount)), reservation.pJointMatrices, reservation.iJointBase);
+				return 0;
 			}
-			else
+			shaders::ModelLayout& rLayout = pLayouts[0];
+			rLayout = {};
+			const std::unordered_map<common::crc_t, engine::EagerChunk>& rChunkMap = engine::gpFileManager->mpPackChunks->GetEagerChunkMap();
+			const common::SceneHeader& rSceneHeader = rChunkMap.at(rPreview.crc).pHeader->sceneHeader;
+			const engine::EagerChunk& rModelChunk = rChunkMap.at(rSceneHeader.modelCrc);
+			engine::ModelShadowBounds shadowBounds = engine::ComputeModelShadowBounds(rModelChunk);
+			XMMATRIX matPackedAlignment = common::GetModelAlignment(rModelChunk.pHeader->modelHeader);
+			XMMATRIX matAlignmentDelta = XMMatrixInverse(nullptr, matPackedAlignment) * mMatModelAlignment;
+			XMMATRIX matInstanceTransform = XMMatrixIdentity();
+			XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+			if (mFlags & ViewerFlags::kFlying)
 			{
-				for (int64_t j = 0; j < reservation.iMaterialCount; ++j)
+				XMMATRIX matFlightRotation = XMMatrixRotationX(-0.2f * mFlightBody.fDeltaRotation) * XMMatrixRotationY(-mFlightBody.fClimbTilt) * common::RotationMatrixFromDirection(mFlightBody.vecDirection, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
+				matInstanceTransform = matFlightRotation * XMMatrixTranslationFromVector(mFlightBody.vecPosition);
+				vecPosition = mFlightBody.vecPosition;
+				XMStoreFloat4(&rLayout.f4PositionLayer, mFlightBody.vecPosition);
+				rLayout.f4PositionLayer.w = static_cast<float>(engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(mFlightBody.vecPosition)));
+			}
+			XMMATRIX matTransform = mMatModelAlignment * matInstanceTransform;
+			rLayout.f2ShadowWorldXRange = {engine::ComputeModelShadowRange(shadowBounds, matAlignmentDelta * matInstanceTransform, vecPosition)};
+			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4Transform[0]), matTransform);
+			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
+			if (!rPreview.meshData.empty())
+			{
+				const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
+				engine::SkinningReservation reservation = rAnimation.ReserveSkinning(iCommandBuffer, 1);
+				if (miSelectedAnimation >= 0)
 				{
-					common::MeshData meshData = rPreview.meshData.at(j);
-					meshData.uiJointMatrixOffset += static_cast<uint32_t>(reservation.iJointBase);
-					reservation.pMeshData[reservation.iMeshDataBase + j] = meshData;
+					rAnimation.EvaluateAnimation(miSelectedAnimation, mAnimationTime.count(), std::span(reservation.pMeshData + reservation.iMeshDataBase, static_cast<size_t>(reservation.iMaterialCount)), reservation.pJointMatrices, reservation.iJointBase);
 				}
-				std::copy(rPreview.jointMatrices.begin(), rPreview.jointMatrices.end(), reservation.pJointMatrices + reservation.iJointBase);
+				else
+				{
+					for (int64_t j = 0; j < reservation.iMaterialCount; ++j)
+					{
+						common::MeshData meshData = rPreview.meshData.at(j);
+						meshData.uiJointMatrixOffset += static_cast<uint32_t>(reservation.iJointBase);
+						reservation.pMeshData[reservation.iMeshDataBase + j] = meshData;
+					}
+					std::copy(rPreview.jointMatrices.begin(), rPreview.jointMatrices.end(), reservation.pJointMatrices + reservation.iJointBase);
+				}
+				rLayout.uiMeshDataBase = static_cast<uint32_t>(reservation.iMeshDataBase);
+				rLayout.uiMaterialCount = static_cast<uint32_t>(reservation.iMaterialCount);
 			}
-			rLayout.uiMeshDataBase = static_cast<uint32_t>(reservation.iMeshDataBase);
-			rLayout.uiMaterialCount = static_cast<uint32_t>(reservation.iMaterialCount);
-		}
-		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(rPreview.crc, iCommandBuffer, 1);
-		if (!(mFlags & ViewerFlags::kFlying))
+			return 1;
+		});
+		if (i == miSelected && !(mFlags & ViewerFlags::kFlying))
 		{
 			engine::gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(rPreview.crc)->WriteIndirectBuffer(iCommandBuffer, 0);
 		}

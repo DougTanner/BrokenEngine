@@ -24,6 +24,7 @@ $script:MaximumRecords = 16
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 8192
 $script:DataPackerNote = 'DataPacker membership is per-file scoped authority and was left untouched.'
+$script:ModelViewerNote = 'ModelViewer membership is per-file scoped authority and was left untouched.'
 $script:Utf8 = [Text.UTF8Encoding]::new($false, $true)
 
 $script:Records = [System.Collections.Generic.List[object]]::new()
@@ -488,7 +489,7 @@ try
 				itemType = $null
 				filter = $null
 				projectFiles = @($projectFiles)
-				note = if ($entry.Relative -match '^Common/') { $script:DataPackerNote } else { $null }
+				note = if ($entry.Relative -match '^Common/') { "$script:DataPackerNote $script:ModelViewerNote" } elseif ($entry.Relative -match '^Engine/Source/') { $script:ModelViewerNote } else { $null }
 			})
 		}
 	}
@@ -508,8 +509,10 @@ try
 			{
 				'non-member|mapping.deliberate-non-member' { $accepted = $false; $note = 'non-member: deliberately never a project item; skipped.' }
 				'resolved|mapping.engine-source' { }
+				'conditional|mapping.engine-source-modelviewer-conditional' { $note = $script:ModelViewerNote }
 				'resolved|mapping.shader-stage' { }
 				'conditional|mapping.common-datapacker-conditional' { $note = $script:DataPackerNote }
+				'conditional|mapping.common-datapacker-modelviewer-conditional' { $note = "$script:DataPackerNote $script:ModelViewerNote" }
 				'conditional|mapping.shader-tree-header-conditional'
 				{
 					if (-not $membershipSupplied)

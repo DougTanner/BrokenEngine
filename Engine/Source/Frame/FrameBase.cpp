@@ -256,43 +256,37 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	const CellStaticData& rStaticData = *rReference.pStaticData;
 
 #if defined(BT_SERVER)
-	// NavData is derived from placements + per-template NavContour. Build it here on the
-	// per-coord dispatch thread (naturally parallel across coords) when a coord reaches a tick
-	// with it not yet built. Client receives prebuilt navigationData over the
-	// wire and never makes this call (server-only NavContour).
+	// NavData is derived from placements + per-template NavContour, and the elevation grid from
+	// placements. Build both here on the per-coord dispatch thread (naturally parallel across coords)
+	// when a coord reaches a tick with them not yet built. Client receives prebuilt navigationData over
+	// the wire, prepares its own elevation grid, and never makes this call (server-only NavContour).
 	rStaticData.BuildNavigationDataIfUnbuilt();
 #endif
 
-	// Live client cells arrive prepared; menu and server cells retain synchronous terrain setup.
 #if defined(BT_CLIENT)
+	// Live client cells arrive prepared; menu cells prepare terrain synchronously.
 	bool bSynchronousTerrain = static_cast<bool>(game::gpGame->mGameFlags & GameFlags::kMainMenu);
 	ASSERT(bSynchronousTerrain || (rStaticData.flags & CellStaticDataFlags::kTerrainPrepared));
 	if (bSynchronousTerrain)
 	{
-#endif
-	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
-	{
-		// Heap: BuildElevationGrid sizes the cell's elevation grid on its first menu or server tick, and again after a menu island change clears it
-		ScopedSuppressAllocationTracking suppress;
-#if defined(BT_CLIENT)
-		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
-#endif
-		gpIslandTerrain->BuildElevationGrid(rStaticData.islands, rStaticData.elevationGrid);
-#if defined(BT_CLIENT)
-		RecordPhase(Phase::kElevationGridBuild, buildStartTime);
-#endif
-	}
+		if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
+		{
+			// Heap: BuildElevationGrid sizes the cell's elevation grid on its first menu tick, and again after a menu island change clears it
+			ScopedSuppressAllocationTracking suppress;
+			std::chrono::steady_clock::time_point buildStartTime = StartPhase();
+			gpIslandTerrain->BuildElevationGrid(rStaticData.islands, rStaticData.elevationGrid);
+			RecordPhase(Phase::kElevationGridBuild, buildStartTime);
+		}
 
-#if defined(BT_CLIENT)
-	if (rStaticData.islandRenderQueries.empty() && !rStaticData.islands.empty())
-	{
-		// Heap: BuildRenderPlacementCache sizes one query per island on a menu tick, and again after a menu island change clears the cache
-		ScopedSuppressAllocationTracking suppress;
-		std::chrono::steady_clock::time_point buildStartTime = StartPhase();
-		rStaticData.BuildRenderPlacementCache(*gpIslandTerrain);
-		RecordPhase(Phase::kRenderPlacementCacheBuild, buildStartTime);
-	}
-	rStaticData.flags.Set(CellStaticDataFlags::kTerrainPrepared);
+		if (rStaticData.islandRenderQueries.empty() && !rStaticData.islands.empty())
+		{
+			// Heap: BuildRenderPlacementCache sizes one query per island on a menu tick, and again after a menu island change clears the cache
+			ScopedSuppressAllocationTracking suppress;
+			std::chrono::steady_clock::time_point buildStartTime = StartPhase();
+			rStaticData.BuildRenderPlacementCache(*gpIslandTerrain);
+			RecordPhase(Phase::kRenderPlacementCacheBuild, buildStartTime);
+		}
+		rStaticData.flags.Set(CellStaticDataFlags::kTerrainPrepared);
 	}
 	RecordPhase(Phase::kCellSetup, phaseStartTime);
 #endif

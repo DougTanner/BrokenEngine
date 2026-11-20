@@ -4,7 +4,6 @@
 
 #include "Network/Server/ServerFleetSerialization.h"
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -246,10 +245,9 @@ void WriteFleetData(std::ostream& rStream, const std::unordered_map<engine::Clie
 	common::Write(rStream, rRandom.State());
 }
 
-void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom)
+void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom)
 {
 	rFleets.clear();
-	rGuidToClientId.clear();
 
 	int64_t iFleetOwnerCount = 0;
 	common::Read(rFileStream, iFleetOwnerCount);
@@ -299,8 +297,6 @@ void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unorde
 		{
 			throw std::ios_base::failure("duplicate Fleet owner ClientGuid");
 		}
-		// All loaded fleets start as disconnected
-		rGuidToClientId.insert_or_assign(guid, 0i64);
 	}
 
 	uint64_t uiRandomState = 0;
@@ -342,9 +338,7 @@ std::string ReplayFleetRecordBytes()
 
 void ReadReplayFleetRecord(std::fstream& rFileStream, int64_t iNextGlobalId, ReplayFleetRecord& rRecord)
 {
-	// A record carries no owner client IDs, so ReadFleetData's all-disconnected map is dropped.
-	std::unordered_map<engine::ClientGuid, int64_t> guidToClientId;
-	ReadFleetData(rFileStream, iNextGlobalId, rRecord.fleets, guidToClientId, rRecord.randomEngine);
+	ReadFleetData(rFileStream, iNextGlobalId, rRecord.fleets, rRecord.randomEngine);
 
 	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (const engine::ClientGuid& rGuid : SortedGuidKeys(rRecord.fleets, ownersArena))
@@ -375,12 +369,13 @@ void ReadReplayFleetRecord(std::fstream& rFileStream, int64_t iNextGlobalId, Rep
 
 void WriteSaveState(std::fstream& rFileStream)
 {
-	gpServerSession->WriteFleetData(rFileStream);
+	const ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;
+	WriteFleetData(rFileStream, rFleetManager.mFleets, rFleetManager.mRandomEngine);
 }
 
 void ReadSaveState(std::fstream& rFileStream, int64_t iNextGlobalId, SaveStagedState& rStagedState)
 {
-	ReadFleetData(rFileStream, iNextGlobalId, rStagedState.fleets, rStagedState.guidToClientId, rStagedState.randomEngine);
+	ReadFleetData(rFileStream, iNextGlobalId, rStagedState.fleets, rStagedState.randomEngine);
 }
 
 // Trust boundary (save file): fleet member lookups take the first row matching a global ID in Fighters, Omnis,
@@ -429,7 +424,7 @@ void AdoptSaveState(SaveStagedState&& rStagedState)
 {
 	ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;
 	rFleetManager.mFleets = std::move(rStagedState.fleets);
-	rFleetManager.mGuidToClientId = std::move(rStagedState.guidToClientId);
+	rFleetManager.mGuidToClientId.clear();
 	rFleetManager.mRandomEngine = std::move(rStagedState.randomEngine);
 }
 

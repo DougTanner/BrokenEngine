@@ -6,14 +6,19 @@ Server-only statistics aggregation and the separate Server Monitor channel.
 
 - `Main.cpp` owns the host after the game and NetworkManager, and stops and
   joins it before those objects or the profile and file managers are destroyed.
-- The main thread aggregates statistics on every update with the existing
-  profiling configuration gates, preserving raw `query_profile` rows even
-  without a monitor. Every eighth update while authenticated, it captures
-  owning text strings and cell records. Capture reads game, ENet and profile
-  state only on the main thread, using the profile formatters' existing locks.
-- One mutex-protected latest immutable snapshot slot replaces unsent state.
-  The mutex covers pointer exchange only; allocation, formatting, serialization,
-  socket operations and replaced-snapshot destruction stay outside it.
+- While `kbProfiling` is on, the main thread refreshes the profile text on
+  every update, preserving raw `query_profile` rows even without a monitor.
+  On the capture cadence `ServerMonitorHost::Update` sets, while
+  authenticated, it captures owning text strings and cell records, computing
+  the entity totals and mimalloc statistics at capture. Capture reads game,
+  ENet and profile state only on the main thread, using the profile formatters'
+  existing locks.
+- One mutex-protected latest immutable snapshot slot replaces unsent state and
+  carries the connection generation its capture read; the worker sends only a
+  snapshot whose generation matches its current connection. The mutex covers
+  the pointer and generation exchange only; allocation, formatting,
+  serialization, socket operations and replaced-snapshot destruction stay
+  outside it.
 - An ordinary `ThreadLocal::Entry` jthread owns sockets, authentication and wire
   serialization. It reads only host-owned state and immutable snapshots, never
   live manager or game objects. Startup waits for listen success or its logged
@@ -65,5 +70,7 @@ Server-to-monitor data is trusted; the monitor checks protocol magic/version.
 Use one `TickVisibilityCadence` decision per snapshot for both CPU timer and
 counter formatters. Build transient text in the thread-local workbuffer and
 copy it into owning snapshot strings. Display rows hide sustained zeros;
-raw server agent profile queries include them. Profiling-disabled builds keep
-the same configuration policy and never read absent raw-timer storage.
+raw server agent profile queries include them. A profiling-disabled snapshot
+omits the Potential row and the CPU timer and counter sections, otherwise
+matches a profiling-enabled snapshot of the same build, and never reads absent
+raw-timer storage.

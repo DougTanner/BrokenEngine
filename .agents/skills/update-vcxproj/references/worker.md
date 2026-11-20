@@ -19,9 +19,9 @@ unique lowercase-hex `{8-4-4-4-12}` GUID.
    | `DataPacker/Source/**` | DataPacker | source item; `DataPacker[...]` |
    | `Projects/ModelViewer/Source/**` | ModelViewer | source item; `Viewer` |
    | `Tools/ServerMonitor/**` | ServerMonitor | source item; `ServerMonitor[...]` |
-   | `Engine/Source/**` | client/server/both by structural affinity | source item; `Engine[...]` |
+   | `Engine/Source/**` | client/server/both by structural affinity; ModelViewer only by scoped authority | source item; `Engine[...]` |
    | game `Source/**` | client/server/both by structural affinity | source item; `Game[...]` |
-   | `Common/**` | game client/server; DataPacker only by scoped authority | source item; `Common[...]` |
+   | `Common/**` | game client/server; DataPacker and ModelViewer only by scoped authority | source item; `Common[...]` |
 
    Resolve whole-file affinity and the owning row with one run over every
    affected path that exists on disk — additions, new names, affinity changes;
@@ -37,26 +37,27 @@ unique lowercase-hex `{8-4-4-4-12}` GUID.
    with its `affinityCode`, and `mapping` (`resolved`, `conditional`,
    `unresolved`, `non-member`) with its `mappingCode`, `projects`, `itemType`,
    and `filter`. `resolved` is authoritative. `conditional` settles everything
-   except the one named question — generated `$(GameDataDirectory)` headers,
-   `.h` under a shader tree, DataPacker membership for `Common/**` — which
-   scoped authority decides. `non-member` is a path deliberately never carried
-   as a project item, a routine result and not a blocker. Stop and report the
-   path, never guess, when `affinity` is `unprovable`, when `mapping` is
-   `unresolved`, or when the run omits a record; on `files.truncated`, reinvoke
-   in smaller batches until every path has a record. Preserve a documented
-   forced-include exception and report `NOTE`. Done when every affected path on
-   disk has a record whose `affinity` and `mapping` are read, or the blocking
-   path is reported.
+   except its named questions — generated `$(GameDataDirectory)` headers, `.h`
+   under a shader tree, DataPacker membership for `Common/**`, ModelViewer
+   membership for a client or shared `Engine/Source/**` or `Common/**` path —
+   which scoped authority decides. `non-member` is a path deliberately never
+   carried as a project item, a routine result and not a blocker. Stop and
+   report the path, never guess, when `affinity` is `unprovable`, when
+   `mapping` is `unresolved`, or when the run omits a record; on
+   `files.truncated`, reinvoke in smaller batches until every path has a
+   record. Preserve a documented forced-include exception and report `NOTE`.
+   Done when every affected path on disk has a record whose `affinity` and
+   `mapping` are read, or the blocking path is reported.
 
 For each affected project pair:
 
 2. Take a `resolved` record's ownership and logical filter as given. On a
-   `conditional` record, answer only its one named question from scoped
-   authority
-   (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`) and
-   take the rest of the record as given; re-derive nothing by hand. In fix mode,
-   require each intended item once and forbidden/stale old-name items zero
-   times.
+   `conditional` record, answer only its named questions from scoped authority
+   (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`; for
+   ModelViewer membership, `Projects/ModelViewer/AGENTS.md`
+   `## Build and data ownership`) and take the rest of the record as given;
+   re-derive nothing by hand. In fix mode, require each intended item once and
+   forbidden/stale old-name items zero times.
 
    In fix mode, an `Engine/**` or `Common/**` path that gains membership — an
    addition, a rename's new name, or the added side of an affinity change —
@@ -83,9 +84,12 @@ For each affected project pair:
    ```
 
    The removed side of an affinity change, game, tool, and DataPacker paths,
-   generated `$(GameDataDirectory)` headers, and DataPacker membership of
-   `Common/**` stay hand edits. Done when every affected item's ownership and
-   filter come from its record and those counts hold in the pair.
+   generated `$(GameDataDirectory)` headers, DataPacker membership of
+   `Common/**`, and ModelViewer membership of `Engine/Source/**` and
+   `Common/**` stay hand edits; a ModelViewer hand edit uses the record's item
+   type and filter in that pair's existing item form. Done when every affected
+   item's ownership and filter come from its record and those counts hold in
+   the pair.
 3. Run once after inspection or hand repair:
 
    ```powershell

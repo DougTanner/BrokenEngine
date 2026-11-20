@@ -157,17 +157,15 @@ int64_t ServerBufferedFrames::CompressToBuffer(std::span<const char> data)
 	return LZ4_compress_default(data.data(), reinterpret_cast<char*>(mCompressionBuffer.data()), static_cast<int>(iSize), static_cast<int>(iMaxCompressed));
 }
 
-void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, int64_t iSlot, int64_t iTick, GridCoord coordinate, const game::Frame* pFrame)
+void ServerBufferedFrames::SendCoordinateFullState(ClientConnection& rClient, int64_t iSlot, int64_t iTick, GridCoord coordinate, const game::Frame* pFrame)
 {
-	ClientConnection* pClient = mrServer.FindClient(iClientIdentifier);
-
 	// Adopting this full state makes iTick the client's ACK floor, which moves that floor backward whenever the
 	// client had already received later ticks. Record the tick so ServerBufferedFrames::ApplyAckStream admits that one
 	// regression; without it the monotonic floor guard rejects every later ack for this slot, the ticks the
 	// client discarded on adoption are never resent, and the client self-disconnects on its frozen floor.
 	// Pre-adoption ACKs keep raising the server's floor until the reliable full state arrives.
-	ClientConnection::SlotState& rSlot = pClient->slots.at(iSlot);
-	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{}) AckFloor: {}", iClientIdentifier, iTick, iSlot, coordinate.iQ, coordinate.iR, rSlot.ack.iAcknowledgmentFloor);
+	ClientConnection::SlotState& rSlot = rClient.slots.at(iSlot);
+	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{}) AckFloor: {}", rClient.iClientId, iTick, iSlot, coordinate.iQ, coordinate.iR, rSlot.ack.iAcknowledgmentFloor);
 	rSlot.iPendingFullStateTick = iTick;
 
 	// Serialize frame into the reusable scratch (server main thread only - single-writer contract)
@@ -195,7 +193,7 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
 
-	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, Cell& rCell, ENetPacketFreeCallback pFreeCallback)
@@ -208,7 +206,7 @@ ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnectio
 		ScopedSuppressAllocationTracking suppress;
 		mSendScratch.clear();
 		mFrameStreamBuffer.mpTarget = &mSendScratch;
-		rCell.staticData.Write(mFrameStream);
+		WriteNavigationData(mFrameStream, rCell.staticData.navigationData);
 		int64_t iRawSize = std::ssize(mSendScratch);
 		ASSERT(iRawSize <= INT32_MAX - NetworkMessages::ServerCoordStaticDataMessage::kiFixedSize);
 		int64_t iCompressedSize = CompressToBuffer(std::span<const char>(mSendScratch.data(), mSendScratch.size()));
@@ -300,7 +298,7 @@ void ServerBufferedFrames::SendUpdate(ClientConnection& rClient, int64_t iTick)
 			rSlot.bHoldUpdatesUntilFullStateAck = true;
 			if (rSlot.iPendingFullStateTick != iTick)
 			{
-				SendCoordinateFullState(rClient.iClientId, i, iTick, coordinate, &(*game::gpGame->mCells.at(coordinate).pCurrent));
+				SendCoordinateFullState(rClient, i, iTick, coordinate, &(*game::gpGame->mCells.at(coordinate).pCurrent));
 			}
 		}
 		if (rSlot.bHoldUpdatesUntilFullStateAck)
@@ -411,7 +409,7 @@ void ServerBufferedFrames::UpdateResendLogState(ClientConnection& rClient, int64
 	rClient.slots.at(iSlot).iPreviousResendCount = iSlotResendCount;
 }
 
-void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const NetworkMessages::ClientAckStreamMessage& rMessage, int64_t iClientId)
+void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const NetworkMessages::ClientAckStreamMessage& rMessage)
 {
 	int64_t iFloorAdvanceCount = 0;
 	for (int64_t i = 0; i < rMessage.uiSlotCount; ++i)
@@ -445,7 +443,7 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 			bool bFullStateAcknowledgement = bFullStateRebaseline || (rSlot.bHoldUpdatesUntilFullStateAck && rSlot.iPendingFullStateTick >= 0 && rAcknowledgementState.iAcknowledgmentFloor < rSlot.iPendingFullStateTick && iSlotAcknowledgementFloor >= rSlot.iPendingFullStateTick);
 			if (bFullStateRebaseline)
 			{
-				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", iClientId, iSlotIndex, rAcknowledgementState.iAcknowledgmentFloor, iSlotAcknowledgementFloor, rSlot.iPendingFullStateTick);
+				LOG(kNetwork, kDebug, "Server::ClientAckStream Full-state floor re-baseline Client: {} Slot: {} Floor: {} -> {} FullStateTick: {}", rClient.iClientId, iSlotIndex, rAcknowledgementState.iAcknowledgmentFloor, iSlotAcknowledgementFloor, rSlot.iPendingFullStateTick);
 			}
 			if (iSlotAcknowledgementFloor == rAcknowledgementState.iAcknowledgmentFloor)
 			{
@@ -491,7 +489,7 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 		}
 		else if (iSlotEpoch != rSlot.ack.uiEpoch)
 		{
-			LOG(kNetwork, kVerbose, "Server::ClientAckStream EpochMismatch Client: {} Slot: {} ClientEpoch: {} ServerEpoch: {}", iClientId, iSlotIndex, iSlotEpoch, rSlot.ack.uiEpoch);
+			LOG(kNetwork, kVerbose, "Server::ClientAckStream EpochMismatch Client: {} Slot: {} ClientEpoch: {} ServerEpoch: {}", rClient.iClientId, iSlotIndex, iSlotEpoch, rSlot.ack.uiEpoch);
 		}
 	}
 
@@ -501,7 +499,7 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 		{
 			if (rClient.iPeakConsecutiveStallAcks >= kiFloorStallLogThreshold)
 			{
-				LOG(kNetwork, kVerbose, "Server::ClientAckStream FloorStallResolved Client: {} PeakStalledAcks: {} Slots: {}", iClientId, rClient.iPeakConsecutiveStallAcks, rMessage.uiSlotCount);
+				LOG(kNetwork, kVerbose, "Server::ClientAckStream FloorStallResolved Client: {} PeakStalledAcks: {} Slots: {}", rClient.iClientId, rClient.iPeakConsecutiveStallAcks, rMessage.uiSlotCount);
 			}
 			rClient.bFloorStalled = false;
 			rClient.iPeakConsecutiveStallAcks = 0;

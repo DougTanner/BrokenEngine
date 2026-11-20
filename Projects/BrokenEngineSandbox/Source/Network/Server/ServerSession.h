@@ -17,8 +17,6 @@ public:
 	ServerSession();
 	~ServerSession();
 
-	void WriteFleetData(std::fstream& rFileStream) const;
-
 	// Engine ServerBroadcaster::BuildFrameInputs calls this once per advancing update, after the frame-input reset and
 	// before the first tick's PrepareTickStatusChanges drain.
 	void BuildAdvancingFrameInputs();

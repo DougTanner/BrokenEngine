@@ -135,6 +135,7 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp"><Filter>Engine\Memory</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp"><Filter>Engine\Profile</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\GpuStallTimeline.cpp"><Filter>Engine\Profile</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\CurveWidget.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp"><Filter>Engine\Ui</Filter></ClCompile>
@@ -160,6 +161,7 @@
     <ClInclude Include="..\..\..\..\Common\Common.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Crc.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\DataFile.h"><Filter>Common</Filter></ClInclude>
+    <ClInclude Include="..\..\..\..\Common\DebugDefines.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\Determinism.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h"><Filter>Common</Filter></ClInclude>
     <ClInclude Include="..\..\..\..\Common\ExternalHeaders.h"><Filter>Common</Filter></ClInclude>

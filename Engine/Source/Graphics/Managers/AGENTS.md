@@ -151,11 +151,9 @@ re-record mechanism.
 - Foam activation follows
   [Render's history policy](../Render/AGENTS.md#precision-and-history). Changes
   to Graphics Water Foam or water quality request command-buffer recreation.
-  Inactive recordings omit every foam transition, dispatch, copy, and mip blit,
-  while retaining paired total, Compute, and History timestamps so empty results
-  replace previous samples. Compute includes the current image's transitions
-  around dispatch; History includes the history copy, mip chain, and final
-  transitions.
+  Inactive recordings omit every foam transition, dispatch, copy, and mip
+  blit. Compute includes the current image's transitions around dispatch;
+  History includes the history copy, mip chain, and final transitions.
 - The image pass records a timed UI depth prepass before the debug-texture
   branch. With `GraphicsFlags::kDrawModelsOverWorld` clear, opaque models
   precede terrain, water and shields. With it set, those world draws precede a
@@ -189,16 +187,17 @@ buffers are indexed by CRC.
 
 - Collections create storage buffers in `GraphicsResources()` through the
   CRC-keyed dynamic buffer system with two categories (main, visible lights).
-  Access is templated with runtime size validation, and
-  automatic resizing defers destruction to avoid validation errors from
-  in-flight command buffers. Each creator passes its own file-local
-  `kiDynamicBufferInitialCapacity` to `CreateDynamicBuffer` as the buffer's
-  starting element count. The `DebugRender` buffers take theirs from
-  `PipelineManager.cpp` `CreateDebugRenderPipelines`; a grow warning names
-  `DebugRender`, whose own file holds no count. The `DynamicPipelines` helpers
-  create no buffer, so the creator creates it before registering the pipeline.
-  A buffer that must grow doubles its own size until it fits, and each grow
-  logs a warning naming that constant and calls `DEBUG_BREAK()`.
+  Access is templated with runtime size validation, and automatic resizing
+  defers destruction to avoid validation errors from in-flight command buffers.
+  Each creator passes its own file-local `kiDynamicBufferInitialCapacity` to
+  `CreateDynamicBuffer`, or for a model pipeline to `CreateModelPipelines`, as
+  the buffer's starting element count. The `DebugRender` buffers take theirs
+  from `PipelineManager.cpp` `CreateDebugRenderPipelines`; a grow warning names
+  `DebugRender`, whose own file holds no count. `CreateModelPipelines` creates
+  its pipeline pair's buffer; every other `DynamicPipelines` helper creates no
+  buffer, so its creator creates it before registering the pipeline. A buffer
+  that must grow doubles its own size until it fits, and each grow logs a
+  warning naming that constant and calls `DEBUG_BREAK()`.
 - Skinning bump-allocates mesh data and joint matrices per frame with
   per-command-buffer offset tracking, auto-grows by doubling, and propagates
   descriptor updates to model pipelines. Joint matrices use a compact 3-row

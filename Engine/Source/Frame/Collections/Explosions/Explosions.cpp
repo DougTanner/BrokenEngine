@@ -37,7 +37,6 @@ void ExplosionsInterpolate::Register()
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
-		.fVisibleArea = game::gExplosionPrimaryVisibleAreaOne.mfCurrent,
 		.fVisibleIntensity = game::gExplosionPrimaryVisibleIntensityOne.mfCurrent,
 		.fLightingArea = game::gExplosionPrimaryLightingAreaOne.mfCurrent,
 		.fLightingIntensity = game::gExplosionPrimaryLightingIntensityOne.mfCurrent,
@@ -48,7 +47,6 @@ void ExplosionsInterpolate::Register()
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), 0.4f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -67,7 +65,6 @@ void ExplosionsInterpolate::Register()
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), 1.0f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -84,7 +81,6 @@ void ExplosionsInterpolate::Register()
 
 	PuffsInterpolate::RegisterType(siExplosionPuffTypeIndex,
 	{
-		.uiCrc = 0,
 		.uiColor = 0xFFFFFFFF,
 	});
 
@@ -92,7 +88,6 @@ void ExplosionsInterpolate::Register()
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {kPrimaryPuffStartTime, kPrimaryPuffEndTime, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -109,7 +104,6 @@ void ExplosionsInterpolate::Register()
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), kSecondaryPuffTimes, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes =
 		{
@@ -124,7 +118,6 @@ void ExplosionsInterpolate::Register()
 
 	SmokeTrailsInterpolate::RegisterType(siExplosionTrailTypeIndex,
 	{
-		.uiCrc = 0,
 		.iColor = 0xFFFFFFFF,
 		.fWidth = kfExplosionTrailWidth,
 	});
@@ -132,7 +125,6 @@ void ExplosionsInterpolate::Register()
 	WindRadialsInterpolate::RegisterControllerType(giExplosionWindRadialControllerTypeIndex,
 	{
 		.iKeyframeCount = 2,
-		.bDestroysSelf = true,
 		.pTimes = {std::chrono::duration<float>(0.0f), kWindDepositDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.pKeyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});

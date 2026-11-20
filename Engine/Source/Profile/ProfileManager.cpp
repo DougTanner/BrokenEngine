@@ -21,19 +21,6 @@ constexpr std::chrono::seconds kProfileVisibilityInterval = 2s;
 // kbProfilingDump mode: one CSV sample of every timer/counter per interval, written for offline analysis.
 constexpr std::chrono::seconds kProfileDumpInterval = 1s;
 constexpr double kfGpuAnomalyMultiplier = 1.9;
-
-constexpr GpuTimers kpeGpuTimelineRoots[] {kGpuTimerGlobal, kGpuTimerMain, kGpuTimerImage, kGpuTimerUiRender};
-enum GpuTimelineTick : size_t
-{
-	kTimelineGlobalStart,
-	kTimelineGlobalEnd,
-	kTimelineMainStart,
-	kTimelineMainEnd,
-	kTimelineImageStart,
-	kTimelineImageEnd,
-	kTimelineUiRenderStart,
-	kTimelineUiRenderEnd,
-};
 #endif // BT_CLIENT
 
 ProfileManager::ProfileManager()
@@ -138,8 +125,7 @@ void ProfileManager::Destroy()
 		mLatestGpuSample = {};
 		if constexpr (kbProfilingFrameSpike)
 		{
-			mGpuTimeline.fill({});
-			miPendingStallSequence = 0;
+			mGpuStallTimeline.Clear();
 		}
 
 		// mpDumpLog deliberately not reset: Destroy() also runs on swapchain-tier recreates (resize, settings), and the dump file must span the whole session. The unique_ptr closes it at ProfileManager destruction.
@@ -391,7 +377,8 @@ void ProfileManager::GpuSubmitted(int64_t iCommandBuffer, bool bWorld, bool bAcq
 			return;
 		}
 		std::chrono::steady_clock::time_point submitTime = std::chrono::steady_clock::now();
-		mGpuSubmissions.at(iCommandBuffer) = GpuSubmission {
+		mGpuSubmissions.at(iCommandBuffer) = GpuSubmission
+		{
 			.iSequence = ++miGpuSubmissionSequence,
 			.bWorld = bWorld,
 			.expectedInterval = mExpectedRenderedFrameInterval,
@@ -399,7 +386,7 @@ void ProfileManager::GpuSubmitted(int64_t iCommandBuffer, bool bWorld, bool bAcq
 		};
 		if constexpr (kbProfilingFrameSpike)
 		{
-			mGpuTimeline[static_cast<size_t>(miGpuSubmissionSequence % kiGpuTimelineCapacity)] = GpuFrameTimeline
+			mGpuStallTimeline.mGpuTimeline[static_cast<size_t>(miGpuSubmissionSequence % GpuStallTimeline::kiGpuTimelineCapacity)] = GpuStallTimeline::GpuFrameTimeline
 			{
 				.iSequence = miGpuSubmissionSequence,
 				.iFramebuffer = iCommandBuffer,
@@ -426,15 +413,6 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer)
 		{
 			return;
 		}
-		GpuFrameTimeline* pTimeline = nullptr;
-		if constexpr (kbProfilingFrameSpike)
-		{
-			GpuFrameTimeline& rTimeline = mGpuTimeline[static_cast<size_t>(sample.submission.iSequence % kiGpuTimelineCapacity)];
-			if (rTimeline.iSequence == sample.submission.iSequence)
-			{
-				pTimeline = &rTimeline;
-			}
-		}
 		int64_t iStart = sample.submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
 		for (int64_t i = iStart; i < kGpuTimerCount; ++i)
 		{
@@ -444,19 +422,14 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer)
 			VkResult vkResultGetQueryPoolResults = vkGetQueryPoolResults(gpDeviceManager->mVkDevice, mVkQueryPool, static_cast<uint32_t>(iCounterIndex), 2, sizeof(puiResults), puiResults, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 			if (vkResultGetQueryPoolResults == VK_NOT_READY)
 			{
+				mpGpuTimers[eGpuTimer].smoothedMicroseconds = 0;
 				continue;
 			}
 			CHECK_VK(vkResultGetQueryPoolResults);
 
 			if constexpr (kbProfilingFrameSpike)
 			{
-				const GpuTimers* peRoot = std::ranges::find(kpeGpuTimelineRoots, eGpuTimer);
-				if (pTimeline != nullptr && peRoot != std::end(kpeGpuTimelineRoots))
-				{
-					int64_t iTick = 2 * (peRoot - std::begin(kpeGpuTimelineRoots));
-					pTimeline->rootTicks[static_cast<size_t>(iTick)] = puiResults[0];
-					pTimeline->rootTicks[static_cast<size_t>(iTick + 1)] = puiResults[1];
-				}
+				mGpuStallTimeline.RecordTicks(sample.submission.iSequence, eGpuTimer, puiResults[0], puiResults[1]);
 			}
 
 			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1'000.0f);
@@ -495,18 +468,15 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer)
 				mLatestGpuSample = sample;
 				if (bAnomaly)
 				{
-					LogGpuSample(sample, "GPU anomaly");
+					sample.Log("GPU anomaly");
 				}
 			}
-			if (sample.submission.iSequence == miPendingStallSequence)
-			{
-				LogStallTimeline(sample, bAnomaly);
-			}
+			mGpuStallTimeline.Retired(sample, bAnomaly);
 		}
 	}
 }
 
-std::optional<int64_t> ProfileManager::GpuDiagnosticSample::RootMicroseconds() const
+std::optional<int64_t> GpuDiagnosticSample::RootMicroseconds() const
 {
 	int64_t iTotal = 0;
 	for (GpuTimers eRoot : {kGpuTimerGlobal, kGpuTimerMain, kGpuTimerImage, kGpuTimerUiRender})
@@ -524,12 +494,12 @@ std::optional<int64_t> ProfileManager::GpuDiagnosticSample::RootMicroseconds() c
 	return iTotal;
 }
 
-void ProfileManager::LogGpuSample(const GpuDiagnosticSample& rSample, std::string_view pcContext)
+void GpuDiagnosticSample::Log(std::string_view context) const
 {
-	float fAgeMilliseconds = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - rSample.submission.submitTime).count();
-	double fExpectedMilliseconds = std::chrono::duration<double, std::milli>(rSample.submission.expectedInterval).count();
-	LOG(kGraphics, kWarning, "{}: submission={} framebuffer={} mode={} age={}ms expected={}ms threshold={}ms", pcContext, rSample.submission.iSequence, rSample.iFramebuffer, rSample.submission.bWorld ? "world" : "UI", common::Wb(fAgeMilliseconds, 3), common::Wb(static_cast<float>(fExpectedMilliseconds), 3), common::Wb(static_cast<float>(kfGpuAnomalyMultiplier * fExpectedMilliseconds), 3));
-	std::optional<int64_t> optionalRootMicroseconds = rSample.RootMicroseconds();
+	float fAgeMilliseconds = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - submission.submitTime).count();
+	double fExpectedMilliseconds = std::chrono::duration<double, std::milli>(submission.expectedInterval).count();
+	LOG(kGraphics, kWarning, "{}: submission={} framebuffer={} mode={} age={}ms expected={}ms threshold={}ms", context, submission.iSequence, iFramebuffer, submission.bWorld ? "world" : "UI", common::Wb(fAgeMilliseconds, 3), common::Wb(static_cast<float>(fExpectedMilliseconds), 3), common::Wb(static_cast<float>(kfGpuAnomalyMultiplier * fExpectedMilliseconds), 3));
+	std::optional<int64_t> optionalRootMicroseconds = RootMicroseconds();
 	if (optionalRootMicroseconds)
 	{
 		LOG(kGraphics, kWarning, "  Measured GPU regions: {}us", *optionalRootMicroseconds);
@@ -538,12 +508,12 @@ void ProfileManager::LogGpuSample(const GpuDiagnosticSample& rSample, std::strin
 	{
 		LOG(kGraphics, kWarning, "  Measured GPU regions: unavailable (missing root)");
 	}
-	int64_t iStart = rSample.submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
+	int64_t iStart = submission.bWorld ? kGpuTimerGlobal : kGpuTimerUiRender;
 	for (int64_t i = iStart; i < kGpuTimerCount; ++i)
 	{
-		if (rSample.microseconds[i])
+		if (microseconds[i])
 		{
-			LOG(kGraphics, kWarning, "  {}: {}us", kpGpuTimerNames[i], *rSample.microseconds[i]);
+			LOG(kGraphics, kWarning, "  {}: {}us", kpGpuTimerNames[i], *microseconds[i]);
 		}
 		else
 		{
@@ -562,19 +532,7 @@ void ProfileManager::GpuFenceObserved(int64_t iFramebuffer)
 			return;
 		}
 		int64_t iSequence = mGpuSubmissions.at(iFramebuffer).iSequence;
-		GpuFrameTimeline& rTimeline = mGpuTimeline[static_cast<size_t>(iSequence % kiGpuTimelineCapacity)];
-		if (iSequence == 0)
-		{
-			return;
-		}
-		if (rTimeline.iSequence != iSequence)
-		{
-			return;
-		}
-		if (!rTimeline.optionalFenceObservedTime)
-		{
-			rTimeline.optionalFenceObservedTime = std::chrono::steady_clock::now();
-		}
+		mGpuStallTimeline.FenceObserved(iSequence);
 	}
 }
 
@@ -586,21 +544,7 @@ void ProfileManager::GpuImageWait(std::chrono::steady_clock::time_point waitStar
 		{
 			return;
 		}
-		if (miGpuSubmissionSequence == 0)
-		{
-			return;
-		}
-		GpuFrameTimeline& rTimeline = mGpuTimeline[static_cast<size_t>(miGpuSubmissionSequence % kiGpuTimelineCapacity)];
-		if (rTimeline.iSequence != miGpuSubmissionSequence)
-		{
-			return;
-		}
-		if (rTimeline.optionalImageWaitStart)
-		{
-			return;
-		}
-		rTimeline.optionalImageWaitStart = waitStart;
-		rTimeline.optionalImageWaitEnd = waitEnd;
+		mGpuStallTimeline.ImageWait(miGpuSubmissionSequence, waitStart, waitEnd);
 	}
 }
 
@@ -608,273 +552,7 @@ void ProfileManager::LogGraphicsStall(const char* pcOperation, const Acquisition
 {
 	if constexpr (kbProfilingFrameSpike)
 	{
-		// A pending dump at least kiGpuTimelineCapacity submissions old has lost its ring entries, so the new stall replaces it.
-		// Destroy clears the ring without resetting the sequence, so the newest submission's slot no longer matches until the next GpuSubmitted.
-		bool bSetPending = miGpuSubmissionSequence != 0 && mGpuTimeline[static_cast<size_t>(miGpuSubmissionSequence % kiGpuTimelineCapacity)].iSequence == miGpuSubmissionSequence && (miPendingStallSequence == 0 || miGpuSubmissionSequence - miPendingStallSequence >= kiGpuTimelineCapacity);
-		if (bSetPending)
-		{
-			miPendingStallSequence = miGpuSubmissionSequence;
-			mpcPendingStallOperation = pcOperation;
-			mPendingStallStart = stallStart;
-		}
-
-		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-		common::ScopedWorkbufferArena summary = rWorkbuffer.Push();
-		rWorkbuffer.Append("  ");
-		if (pAcquisitionDiagnostics != nullptr)
-		{
-			const AcquisitionDiagnostics& rDetails = *pAcquisitionDiagnostics;
-			rWorkbuffer.Append("Acquisition ");
-			rWorkbuffer.Append(static_cast<int64_t>(rDetails.uiSequence));
-			rWorkbuffer.Append(" frame=");
-			rWorkbuffer.Append(rDetails.iFrameCounter);
-			rWorkbuffer.Append(" fb=");
-			rWorkbuffer.Append(rDetails.iIncomingFramebuffer);
-			rWorkbuffer.Append(" fence=");
-			if (!rDetails.bFenceWaitRequired)
-			{
-				rWorkbuffer.Append("skipped");
-			}
-			else if (rDetails.optionalFenceNanoseconds)
-			{
-				rWorkbuffer.AppendFloat(static_cast<float>(*rDetails.optionalFenceNanoseconds) / 1'000'000.0f, 3);
-				rWorkbuffer.Append("ms");
-			}
-			else
-			{
-				rWorkbuffer.Append("-");
-			}
-			rWorkbuffer.Append(" acquire=");
-			if (rDetails.optionalAcquireCall)
-			{
-				rWorkbuffer.AppendFloat(static_cast<float>(rDetails.optionalAcquireCall->iNanoseconds) / 1'000'000.0f, 3);
-				rWorkbuffer.Append("ms result=");
-				rWorkbuffer.Append(static_cast<int64_t>(rDetails.optionalAcquireCall->vkResult));
-			}
-			else
-			{
-				rWorkbuffer.Append("- result=-");
-			}
-			rWorkbuffer.Append(" index=");
-			if (rDetails.optionalImageIndex)
-			{
-				rWorkbuffer.Append(static_cast<int64_t>(*rDetails.optionalImageIndex));
-			}
-			else
-			{
-				rWorkbuffer.Append("-");
-			}
-			rWorkbuffer.Append(" | ");
-		}
-		if (mLatestGpuSample.submission.iSequence == 0)
-		{
-			rWorkbuffer.Append("newest completed unavailable");
-		}
-		else
-		{
-			rWorkbuffer.Append("newest completed ");
-			rWorkbuffer.Append(mLatestGpuSample.submission.iSequence);
-			rWorkbuffer.Append(" fb=");
-			rWorkbuffer.Append(mLatestGpuSample.iFramebuffer);
-			rWorkbuffer.Append(mLatestGpuSample.submission.bWorld ? " world GPU=" : " UI GPU=");
-			std::optional<int64_t> optionalRootMicroseconds = mLatestGpuSample.RootMicroseconds();
-			if (optionalRootMicroseconds)
-			{
-				rWorkbuffer.AppendFloat(static_cast<float>(*optionalRootMicroseconds) / 1'000.0f, 1);
-				rWorkbuffer.Append("ms");
-			}
-			else
-			{
-				rWorkbuffer.Append("-");
-			}
-			rWorkbuffer.Append(" age=");
-			rWorkbuffer.AppendFloat(std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - mLatestGpuSample.submission.submitTime).count(), 1);
-			rWorkbuffer.Append("ms");
-		}
-		if (bSetPending)
-		{
-			rWorkbuffer.Append(" | timeline after ");
-			rWorkbuffer.Append(miPendingStallSequence);
-			rWorkbuffer.Append(" retires");
-		}
-		else if (miPendingStallSequence != 0)
-		{
-			rWorkbuffer.Append(" | timeline pending ");
-			rWorkbuffer.Append(miPendingStallSequence);
-		}
-		LOG(kGraphics, kWarning, "{}", summary);
-	}
-}
-
-void ProfileManager::LogStallTimeline(const GpuDiagnosticSample& rSample, bool bAnomaly)
-{
-	if constexpr (kbProfilingFrameSpike)
-	{
-		// Skipped after an anomaly, which has just printed the same breakdown. A zero interval is a submission stamped before the rendered-interval warmup completes, at launch or after a focus change.
-		bool bExpectedInterval = rSample.submission.expectedInterval != 0ns;
-		std::optional<int64_t> optionalRootMicroseconds = rSample.RootMicroseconds();
-		if (!bAnomaly && bExpectedInterval && optionalRootMicroseconds && std::chrono::microseconds(*optionalRootMicroseconds) > rSample.submission.expectedInterval)
-		{
-			LogGpuSample(rSample, "Stalled submission");
-		}
-
-		// One calibration pairs device tick uiCalibrationTick with steady_clock time calibrationTime through the QPC domain.
-		bool bCalibrated = gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kCalibratedTimestampsEnabled;
-		uint64_t uiCalibrationTick = 0;
-		std::chrono::steady_clock::time_point calibrationTime {};
-		if (bCalibrated)
-		{
-			VkCalibratedTimestampInfoKHR pVkCalibratedTimestampInfos[2]
-			{
-				{.sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, .pNext = nullptr, .timeDomain = VK_TIME_DOMAIN_DEVICE_KHR},
-				{.sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, .pNext = nullptr, .timeDomain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR},
-			};
-			uint64_t puiTimestamps[2] {};
-			uint64_t uiMaxDeviation = 0;
-			CHECK_VK(gpDeviceManager->mpVkGetCalibratedTimestamps(gpDeviceManager->mVkDevice, 2, pVkCalibratedTimestampInfos, puiTimestamps, &uiMaxDeviation));
-			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-			LARGE_INTEGER performanceCounter {};
-			QueryPerformanceCounter(&performanceCounter);
-			LARGE_INTEGER performanceFrequency {};
-			QueryPerformanceFrequency(&performanceFrequency);
-			uiCalibrationTick = puiTimestamps[0];
-			calibrationTime = now - std::chrono::nanoseconds((performanceCounter.QuadPart - static_cast<int64_t>(puiTimestamps[1])) * 1'000'000'000 / performanceFrequency.QuadPart);
-			LOG(kGraphics, kWarning, "  Stall timeline ({}, {}): maxDeviation={}ns", mpcPendingStallOperation, miPendingStallSequence, uiMaxDeviation);
-		}
-		else
-		{
-			LOG(kGraphics, kWarning, "  Stall timeline ({}, {}): calibration unavailable", mpcPendingStallOperation, miPendingStallSequence);
-		}
-
-		int64_t iTimestampValidBits = gpInstanceManager->mVkQueueFamilyProperties.at(gpInstanceManager->miGraphicsQueueFamilyIndex).timestampValidBits;
-		double fTimestampPeriod = static_cast<double>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod);
-		// GPU-clock milliseconds from uiFrom to uiTo; the tick difference wraps at timestampValidBits and is sign-extended.
-		auto TickMilliseconds = [&](uint64_t uiFrom, uint64_t uiTo) -> double
-		{
-			uint64_t uiDelta = uiTo - uiFrom;
-			if (iTimestampValidBits < 64)
-			{
-				uint64_t uiSignBit = 1ui64 << (iTimestampValidBits - 1);
-				uiDelta = ((uiDelta & ((uiSignBit << 1) - 1)) ^ uiSignBit) - uiSignBit;
-			}
-			return static_cast<double>(static_cast<int64_t>(uiDelta)) * fTimestampPeriod / 1'000'000.0;
-		};
-		auto CpuMilliseconds = [](std::chrono::steady_clock::time_point from, std::chrono::steady_clock::time_point to) -> double
-		{
-			return std::chrono::duration<double, std::milli>(to - from).count();
-		};
-		// CPU time of a device tick relative to the stall start.
-		auto TickStallMilliseconds = [&](uint64_t uiTick) -> double
-		{
-			return CpuMilliseconds(mPendingStallStart, calibrationTime) + TickMilliseconds(uiCalibrationTick, uiTick);
-		};
-
-		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-		auto AppendColumn = [&](std::string_view pcName, std::optional<double> optionalMilliseconds)
-		{
-			rWorkbuffer.Append(pcName);
-			if (optionalMilliseconds)
-			{
-				rWorkbuffer.AppendFloat(static_cast<float>(*optionalMilliseconds), 1);
-			}
-			else
-			{
-				rWorkbuffer.Append("-");
-			}
-		};
-
-		double fQuarterIntervalMilliseconds = 0.25 * std::chrono::duration<double, std::milli>(rSample.submission.expectedInterval).count();
-		int64_t iHintSequence = 0;
-		double fHintIdleMilliseconds = 0.0;
-		const GpuFrameTimeline* pPrevious = nullptr;
-		for (int64_t i = std::max(1i64, miPendingStallSequence - kiGpuTimelineCapacity + 1); i <= miPendingStallSequence; ++i)
-		{
-			const GpuFrameTimeline& rRow = mGpuTimeline[static_cast<size_t>(i % kiGpuTimelineCapacity)];
-			if (rRow.iSequence != i)
-			{
-				pPrevious = nullptr;
-				continue;
-			}
-			const std::array<std::optional<uint64_t>, 8>& rTicks = rRow.rootTicks;
-			std::optional<uint64_t> optionalStartTick = rTicks[rRow.bWorld ? kTimelineGlobalStart : kTimelineUiRenderStart];
-			std::optional<uint64_t> optionalEndTick = rTicks[kTimelineUiRenderEnd];
-
-			std::optional<double> optionalIdle;
-			std::optional<double> optionalQueued;
-			std::optional<double> optionalGlobalToMain;
-			std::optional<double> optionalImage;
-			std::optional<double> optionalSpan;
-			std::optional<double> optionalLate;
-			if (bCalibrated && optionalStartTick && pPrevious != nullptr && pPrevious->rootTicks[kTimelineUiRenderEnd])
-			{
-				optionalIdle = TickMilliseconds(*pPrevious->rootTicks[kTimelineUiRenderEnd], *optionalStartTick);
-			}
-			if (bCalibrated && optionalStartTick)
-			{
-				optionalQueued = TickStallMilliseconds(*optionalStartTick) - CpuMilliseconds(mPendingStallStart, rRow.submitTime);
-			}
-			if (bCalibrated && rTicks[kTimelineGlobalEnd] && rTicks[kTimelineMainStart])
-			{
-				optionalGlobalToMain = TickMilliseconds(*rTicks[kTimelineGlobalEnd], *rTicks[kTimelineMainStart]);
-			}
-			if (rTicks[kTimelineImageStart] && rTicks[kTimelineImageEnd])
-			{
-				optionalImage = TickMilliseconds(*rTicks[kTimelineImageStart], *rTicks[kTimelineImageEnd]);
-			}
-			// A world row spans the Global, Main, and UI submissions; a UI-only row lies inside one submission.
-			if ((bCalibrated || !rRow.bWorld) && optionalStartTick && optionalEndTick)
-			{
-				optionalSpan = TickMilliseconds(*optionalStartTick, *optionalEndTick);
-			}
-			if (bCalibrated && optionalEndTick && rRow.optionalFenceObservedTime)
-			{
-				optionalLate = CpuMilliseconds(mPendingStallStart, *rRow.optionalFenceObservedTime) - TickStallMilliseconds(*optionalEndTick);
-			}
-
-			{
-				common::ScopedWorkbufferArena row = rWorkbuffer.Push();
-				rWorkbuffer.Append("  ");
-				rWorkbuffer.Append(rRow.iSequence);
-				rWorkbuffer.Append(" fb=");
-				rWorkbuffer.Append(rRow.iFramebuffer);
-				rWorkbuffer.Append(rRow.bWorld ? " world" : " UI");
-				if (rRow.bAcquireBarriers)
-				{
-					rWorkbuffer.Append(" A");
-				}
-				AppendColumn(" submit=", CpuMilliseconds(mPendingStallStart, rRow.submitTime));
-				AppendColumn(" idle=", optionalIdle);
-				AppendColumn(" queued=", optionalQueued);
-				AppendColumn(" g2m=", optionalGlobalToMain);
-				AppendColumn(" image=", optionalImage);
-				AppendColumn(" span=", optionalSpan);
-				AppendColumn(" fence=", rRow.optionalFenceObservedTime ? std::optional<double>(CpuMilliseconds(mPendingStallStart, *rRow.optionalFenceObservedTime)) : std::nullopt);
-				AppendColumn(" late=", optionalLate);
-				if (rRow.optionalImageWaitStart)
-				{
-					AppendColumn(" imgwait=", CpuMilliseconds(mPendingStallStart, *rRow.optionalImageWaitStart));
-					AppendColumn("..", CpuMilliseconds(mPendingStallStart, *rRow.optionalImageWaitEnd));
-				}
-				else
-				{
-					rWorkbuffer.Append(" imgwait=-");
-				}
-				LOG(kGraphics, kWarning, "{}", row);
-			}
-
-			// UI-only rows may start after their image wait, and the acquire command buffer runs unmeasured before the first tick.
-			if (bExpectedInterval && iHintSequence == 0 && rRow.bWorld && !rRow.bAcquireBarriers && optionalIdle && optionalQueued && *optionalIdle > fQuarterIntervalMilliseconds && *optionalQueued > fQuarterIntervalMilliseconds)
-			{
-				iHintSequence = rRow.iSequence;
-				fHintIdleMilliseconds = *optionalIdle;
-			}
-			pPrevious = &rRow;
-		}
-		if (iHintSequence != 0)
-		{
-			LOG(kGraphics, kWarning, "  no measured GPU region ran for {}ms before submission {} started, with its work already queued; run /analyze-gpu-stall", common::Wb(static_cast<float>(fHintIdleMilliseconds), 1), iHintSequence);
-		}
-		miPendingStallSequence = 0;
+		mGpuStallTimeline.LogGraphicsStall(pcOperation, pAcquisitionDiagnostics, stallStart, miGpuSubmissionSequence, mLatestGpuSample);
 	}
 }
 
@@ -1045,8 +723,7 @@ void ProfileManager::SetDiagnosticFocus(bool bHasFocus)
 		mExpectedRenderedFrameInterval = 0ns;
 		mGpuDiagnosticHistories.fill({});
 		mLatestGpuSample = {};
-		mGpuTimeline.fill({});
-		miPendingStallSequence = 0;
+		mGpuStallTimeline.Clear();
 		for (GpuSubmission& rSubmission : mGpuSubmissions)
 		{
 			rSubmission.expectedInterval = 0ns;

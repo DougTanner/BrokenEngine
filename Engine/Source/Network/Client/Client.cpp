@@ -543,7 +543,7 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 
 	ReceivedStaticData received {};
 	received.identity = {.coordinate = coord, .iSlot = iSlotIndex, .iEpoch = iEpoch, .iLoadGeneration = message.uiLoadGeneration};
-	received.staticData.Read(staticStream);
+	ReadNavigationData(staticStream, received.navigationData);
 
 	// Heap: received static data vector grows on new subscription
 	mReceivedStaticData.push_back(std::move(received));
@@ -675,16 +675,13 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 		}
 		mStateFlags.Set(ClientStateFlags::kServerReplaying, message.uiReplaying != 0);
 
-		if (message.bHasGuid)
-		{
-			mClientGuid = message.guid;
-			LOG(kNetwork, kInfo, "Client GUID assigned: {} {}", mClientGuid.uiHigh, mClientGuid.uiLow);
+		mClientGuid = message.guid;
+		LOG(kNetwork, kInfo, "Client GUID assigned: {} {}", mClientGuid.uiHigh, mClientGuid.uiLow);
 
-			// Persist via the session-provided callback (keeps GUID disk I/O out of the transport layer)
-			if (mpGuidAssignedCallback != nullptr)
-			{
-				mpGuidAssignedCallback(mClientGuid);
-			}
+		// Persist via the session-provided callback (keeps GUID disk I/O out of the transport layer)
+		if (mpGuidAssignedCallback != nullptr)
+		{
+			mpGuidAssignedCallback(mClientGuid);
 		}
 
 		// Seed smoothed pipeline RTT from game-layer handshake measurement so the value flows through the network sim
@@ -726,19 +723,6 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		// Server rejected subscription (not adjacent / no free slot)
 		mSubscriptions.mSubscribeRequests.TakeAnswer(coord);
 		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Rejected Coord: ({},{})", coord.iQ, coord.iR);
-		return;
-	}
-
-	// Defensive (trust boundary: network input): a non-sentinel slot the client cannot host would
-	// throw at mCoordinateSlots.at() below. Unsubscribe so a server-side slot cannot leak, then drop.
-	if (iSlotIndex >= std::ssize(mSubscriptions.mCoordinateSlots))
-	{
-		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Out-of-range, unsubscribing Slot: {} Coord: ({},{})", iSlotIndex, coord.iQ, coord.iR);
-		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
-		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 		return;
 	}
 
@@ -840,8 +824,26 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 	NetworkMessages::ServerTimespeedUpdateMessage message {};
 	NetworkMessages::Read(packetData, message);
 
-	LOG(kNetwork, kDebug, "Client::ServerTimespeedUpdate Multiply: {} Divide: {}", message.iMultiply, message.iDivide);
-	game::gpGame->mTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
+	LOG(kNetwork, kDebug, "Client::ServerTimespeedUpdate Multiply: {} Divide: {} Paused: {}", message.iMultiply, message.iDivide, message.uiPaused);
+
+	// SetTimeScale always flags a change, and ClientUpdate clears the debug note on a 1:1 change, so an unchanged ratio
+	// must not call it or the echo of a SPACE pause would erase the PAUSED note.
+	TimeStep& rTimeStep = game::gpGame->mTimeStep;
+	if (message.iMultiply != rTimeStep.miTimeMultiply || message.iDivide != rTimeStep.miTimeDivide)
+	{
+		rTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
+	}
+
+	bool bPaused = message.uiPaused != 0;
+	mStateFlags.Set(ClientStateFlags::kServerPaused, bPaused);
+	game::gpGame->SetPaused(bPaused);
+	if (bPaused)
+	{
+		// A paused server sends no deltas, so the first interval after the unpause would span the whole pause. Both
+		// flags are needed: a delta sent before the pause can arrive after this message and restart the arrival clock.
+		mStateFlags.Set(ClientStateFlags::kHasLastUpdateArrival, false);
+		mStateFlags.Set(ClientStateFlags::kSkipNextJitterInterval);
+	}
 }
 
 void Client::ServerChat(std::span<const uint8_t> packetData)
@@ -1061,9 +1063,7 @@ void Client::SendHello()
 		.uiProtocolVersion = static_cast<uint32_t>(kiProtocolVersion),
 		.iFrameVersion = game::Frame::kiVersion,
 		.uiPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken,
-		.buildConfiguration = kpcBuildConfigurationName,
 		.guid = mClientGuid,
-		.bHasGuid = true,
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
 

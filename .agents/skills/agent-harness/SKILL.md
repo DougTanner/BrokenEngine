@@ -134,7 +134,14 @@ extended with these fields:
   passes only when its existing runtime check passes.
 
 Each shared `Residuals` row names a missing capability or environment, or a
-criterion left unsettled by the run budget; use `none` when absent.
+criterion left unsettled by the run budget; use `none` when absent. Each row
+for a criterion left unsettled by the run budget gives what that criterion
+checks. The first such row also gives, once for the whole fresh run (a
+redispatch reclaims and restarts the scenario), the runner's estimate of the
+wall-clock time that run needs to settle every unsettled criterion, and a
+shorter run budget with the criteria it would likely settle, because
+[`change-workflow.md`](../../references/change-workflow.md)
+`### User Interaction` Long test runs needs all three and main reads no check.
 A `shared-data.changed` or `shared-data.record-missing` residual from the claim
 or a launch routes `/compile` for the named target, and a
 `claim.data-directory-mismatch` residual routes `/compile` of both the Server

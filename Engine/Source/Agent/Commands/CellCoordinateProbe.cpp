@@ -14,8 +14,8 @@
 namespace engine
 {
 
-// Fold the placements field by field in generation order, matching CellStaticData::Write's member order rather
-// than hashing the struct's object representation, whose tail padding is not guaranteed equal between endpoints.
+// Fold the placements field by field in generation order rather than hashing the struct's object representation,
+// whose tail padding is not guaranteed equal between endpoints.
 static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacements)
 {
 	common::crc_t crc = common::Crc(std::ssize(rPlacements));

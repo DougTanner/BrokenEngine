@@ -31,15 +31,6 @@ struct Uuid
 
 	constexpr bool operator==(const Uuid& rOther) const = default;
 	constexpr std::strong_ordering operator<=>(const Uuid& rOther) const = default;
-
-	void Write(std::ostream& rStream) const
-	{
-		common::Write(rStream, iValue);
-	}
-	void Read(std::istream& rStream)
-	{
-		common::Read(rStream, iValue);
-	}
 };
 
 template <typename T>
@@ -67,15 +58,6 @@ struct Id
 
 	constexpr bool operator==(const Id& rOther) const = default;
 	constexpr std::strong_ordering operator<=>(const Id& rOther) const = default;
-
-	void Write(std::ostream& rStream) const
-	{
-		uuid.Write(rStream);
-	}
-	void Read(std::istream& rStream)
-	{
-		uuid.Read(rStream);
-	}
 };
 
 } // namespace engine

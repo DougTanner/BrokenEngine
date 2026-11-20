@@ -14,8 +14,8 @@ The finder pass runs steps 1-3; the validator pass runs steps 4-8.
      -RepositoryRoot '<absolute repository toplevel>' -Baseline <full
      40-character SHA> -Regions -OutputPath
      Temp/over-engineering-review-inventory.json`.
-   - Add `-IncludeUntracked '<comma-separated paths>'` when the brief supplies
-     untracked paths.
+   - Add the `-IncludeUntracked` switch when the brief supplies untracked
+     paths.
    - The run prints one summary line naming its status, code, and message.
      Read the file only after that line; only `status` `pass` is usable.
    - Keep the `entries` rows whose `class` is `cpp`, and the `regions` rows on

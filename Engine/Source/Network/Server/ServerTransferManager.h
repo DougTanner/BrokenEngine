@@ -12,13 +12,6 @@
 namespace engine
 {
 
-struct ClientTransferInfo
-{
-	engine::GlobalId globalId {};
-	engine::GridCoord destination {};
-	engine::ClientGuid clientGuid {};
-};
-
 class ServerTransferManager
 {
 public:
@@ -47,12 +40,11 @@ private:
 		game::StatusChange spawn;
 	};
 
-	void CollectTransfers(common::ScopedWorkbufferArena& rTransfersArena);
+	void CollectTransfers();
 	void DrainPendingSpawns();
 	void SortTransfersByType();
-	void SpawnTransfers(bool bFilterDestinationLiveness);
-	void ApplyPreparedTransfers(const common::ScopedWorkbufferArena& rTransfersArena, bool bFilterDestinationLiveness);
-	void TrackClientTransfers(std::span<const ClientTransferInfo> clientTransfers);
+	void SpawnTransfers();
+	void ApplyPreparedTransfers();
 
 	std::unordered_map<engine::GridCoord, std::vector<PendingSpawn>> mPendingSpawns;
 };

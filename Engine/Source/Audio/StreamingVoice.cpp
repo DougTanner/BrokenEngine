@@ -58,14 +58,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		{
 			mpeSlotStates[i] = SlotState::kReady;
 		}
-		else if (eResult == ChunkReadResult::kFailed)
-		{
-			mpiSlotBytesRead[i] = 0;
-			mpbSlotLastBuffer[i] = true;
-			mbReadDone = true;
-			mpeSlotStates[i] = SlotState::kReady;
-			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mpiSlotOffsets[i]);
-		}
 	}
 
 	if (!bAllowRequests)
@@ -81,17 +73,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 	{
 		int64_t iSlot = miNextRequest;
 		int64_t iRemainingData = mpLazyChunk->header.iSize - miNextReadOffset;
-		if (iRemainingData == 0)
-		{
-			mpiSlotBytesRead[iSlot] = 0;
-			mpiSlotOffsets[iSlot] = miNextReadOffset;
-			mpbSlotLastBuffer[iSlot] = true;
-			mbReadDone = true;
-			mpeSlotStates[iSlot] = SlotState::kReady;
-			LOG(kAudio, kDebug, "Music streaming: No remaining data to read, position: {}/{}", miNextReadOffset, mpLazyChunk->header.iSize);
-			return;
-		}
-
 		int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
 		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mpuiBuffers[iSlot]), iBytesToRead);
 		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mpReadRequests[iSlot], mpLazyChunk->location.crc, miNextReadOffset, destination);
@@ -101,7 +82,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		}
 
 		mpiSlotBytesRead[iSlot] = iBytesToRead;
-		mpiSlotOffsets[iSlot] = miNextReadOffset;
 		miNextReadOffset += iBytesToRead;
 		mpbSlotLastBuffer[iSlot] = miNextReadOffset >= mpLazyChunk->header.iSize;
 		mpeSlotStates[iSlot] = eResult == ChunkReadResult::kReady ? SlotState::kReady : SlotState::kPending;
@@ -133,15 +113,6 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 
 		int64_t iBytesRead = mpiSlotBytesRead[miNextSubmit];
 		bool bLastBuffer = mpbSlotLastBuffer[miNextSubmit];
-
-		if (iBytesRead == 0)
-		{
-			// An empty slot represents end of stream or a read failure.
-			mFlags.Set(kLastBufferSubmitted);
-			mpeSlotStates[miNextSubmit] = SlotState::kEmpty;
-			miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
-			break;
-		}
 
 		XAUDIO2_BUFFER xaudio2Buffer
 		{
