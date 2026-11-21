@@ -65,7 +65,7 @@ function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
 
 # Session identity is entirely Git-derived: the branch names the session, the Git common directory
 # names the primary checkout, and the baseline is the attribution point the session diverged from.
-# A checkout not on a claude/, codex/, or opencode/ session branch has no session sidecar, so it resolves with
+# A checkout not on a claude/, codex/, opencode/, or agy/ session branch has no session sidecar, so it resolves with
 # SessionId $null instead of failing.
 # A session worktree's primary branch is the one its wrapper recorded in the session sidecar, not the
 # branch the primary checkout currently has checked out.
@@ -75,7 +75,7 @@ function Get-AgentWorktreeSessionContext {
 	try { $top = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $Worktree @('rev-parse', '--show-toplevel') 'repository top-level') }
 	catch { throw "'$Worktree' is not inside a Git worktree: $($_.Exception.Message)" }
 	$branch = Get-AgentWorktreeGitValue $top @('branch', '--show-current') 'current branch'
-	$sessionId = if ($branch -cmatch '^(?:claude|codex|opencode)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') { $Matches[1] } else { $null }
+	$sessionId = if ($branch -cmatch '^(?:claude|codex|opencode|agy)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') { $Matches[1] } else { $null }
 	$common = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $top @('rev-parse', '--path-format=absolute', '--git-common-dir') 'Git common directory')
 	$primaryRoot = Get-AgentCanonicalPath (Split-Path -Parent $common)
 	$primaryBranch = if ($null -ne $sessionId) {

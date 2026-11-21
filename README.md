@@ -159,10 +159,11 @@ The suggested launch commands below bypass permission prompts and other
 safeguards. Use them only in a repository and environment where that level of
 access is intentional.
 
-Use separate Windows Terminal profiles for the three clients: run Claude Code
-from Git Bash, and run Codex CLI and OpenCode from PowerShell 7. The repository
-wrappers and command examples use the native syntax of those shells; `pwsh` must
-also be available to Git Bash for shared PowerShell helpers.
+Use separate Windows Terminal profiles for the four clients: run Claude Code
+from Git Bash, and run Codex CLI, Antigravity CLI, and OpenCode from
+PowerShell 7. The repository wrappers and command examples use the native
+syntax of those shells; `pwsh` must also be available to Git Bash for shared
+PowerShell helpers.
 
 ### Claude Code
 
@@ -310,6 +311,25 @@ active state with `codex plugin list` and `codex mcp list`. The profile disables
 Visualize, Google Calendar, Slack, Browser, Documents, PDF, Spreadsheets,
 Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`,
 `node_repl`, and `sites-design-picker`; it retains `openaiDeveloperDocs`.
+
+### Antigravity CLI
+
+- Install Antigravity CLI from PowerShell:
+	```powershell
+	irm https://antigravity.google/cli/install.ps1 | iex
+	```
+- Close and reopen the terminal, then verify the installation with
+  `agy --version`. Run `agy` once and complete its one-time sign-in.
+- From a PowerShell 7 tab inside Windows Terminal, opened at the primary
+  checkout root, launch `agy` in a UUID-named worktree:
+	```powershell
+	.\.agents\agy-worktree.ps1
+	```
+- The wrapper creates branch `agy/<uuid>`, stores the worktree under
+  `~/.agy/worktrees/<repository>/<uuid>`, and launches `agy` with
+  `--dangerously-skip-permissions`. `-ReattachWorktree <path>` reopens an
+  existing session worktree. The wrapper trusts the new worktree for that
+  session only and leaves the saved `agy` settings unchanged.
 
 ### OpenCode
 

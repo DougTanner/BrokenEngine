@@ -23,7 +23,7 @@ Per [README.md](../README.md): Visual Studio 2026 Community (Desktop development
 with C++, Game development with C++, Windows 11 SDK), the Vulkan SDK, Git for
 Windows, PowerShell 7 (`pwsh`), Windows Terminal, x64 CPython 3.12 or newer,
 Gaea 2 (session setup may bake island terrain), and the agent CLIs (Claude
-Code, Codex CLI, and/or OpenCode).
+Code, Codex CLI, Antigravity CLI, and/or OpenCode).
 
 Every skill that needs host Python requires x64 CPython 3.12 or newer.
 `code-quality-metrics` selects the first `python` Application resolved through
@@ -107,6 +107,8 @@ The session wrappers need no one-time coordination-state initialization:
   `./.claude/claude-worktree.sh`
 - Codex CLI, from PowerShell 7 at the primary checkout root:
   `.\.codex\codex-worktree.ps1`
+- Antigravity CLI, from PowerShell 7 at the primary checkout root:
+  `.\.agents\agy-worktree.ps1`
 - OpenCode, from PowerShell 7 at the primary checkout root:
   `pwsh -NoProfile -File .opencode/opencode-worktree.ps1`
 
@@ -119,9 +121,9 @@ executables (WorktreeCli, AgentHarness) and ThirdParty in Debug/Profile/Release
 — so they always match primary HEAD, re-exports the primary game data with the
 rebuilt DataPacker, prebuilds ModelViewer Release in the primary against that
 data, provisions links to the primary ThirdParty/tool outputs, verifies the
-worktree's skills are available (the `.claude/skills` link for Claude Code and
-Codex, `.agents/skills` for OpenCode), and seeds or builds the worktree's
-DataPacker and ModelViewer. Reattaching runs none of this setup.
+worktree's skills are available (the `.claude/skills` link for Claude Code,
+Codex, and Antigravity CLI, `.agents/skills` for OpenCode), and seeds or builds
+the worktree's DataPacker and ModelViewer. Reattaching runs none of this setup.
 
 A newly created worktree skips the `Engine/Data/Islands` and
 `Engine/Data/Textures` source trees (~989 MB) through Git sparse checkout, so

@@ -24,6 +24,7 @@ $script:SweepRoots = @(
 	[ordered]@{ name = 'Documents/'; prefix = 'Documents/' }
 	[ordered]@{ name = '.claude/agents/'; prefix = '.claude/agents/' }
 	[ordered]@{ name = '.codex/agents/'; prefix = '.codex/agents/' }
+	[ordered]@{ name = '.agents/agents/'; prefix = '.agents/agents/' }
 	[ordered]@{ name = '.opencode/'; prefix = '.opencode/' }
 )
 

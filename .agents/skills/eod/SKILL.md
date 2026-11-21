@@ -68,6 +68,7 @@ resumes the work.
    | --- | --- | --- | --- |
    | `claude/` | Git Bash | `.claude/claude-worktree.sh --reattach-worktree '<path>'` | The wrapper adds `--resume`; pick this conversation. |
    | `codex/` | PowerShell 7 | `.\.codex\codex-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
+   | `agy/` | PowerShell 7 | `.\.agents\agy-worktree.ps1 -ReattachWorktree '<path>'` | Starts a new conversation. |
 
 7. End the turn. Done when its final message names what stopped, step 5's
    landing outcome, uncommitted files, open builds or checks, pending questions,

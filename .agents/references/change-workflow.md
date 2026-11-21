@@ -22,9 +22,10 @@ delivered at session start.
 ### Delegation roles
 
 This table owns the work assignments. Each role is defined at
-`.claude/agents/<subagent_type>.md` for Claude Code and
-`.codex/agents/<subagent_type>.toml` for Codex; the definitions own model and
-effort settings. Skills name a role and describe the work.
+`.claude/agents/<subagent_type>.md` for Claude Code,
+`.codex/agents/<subagent_type>.toml` for Codex, and
+`.agents/agents/<subagent_type>.md` for Antigravity CLI; the definitions own
+model and effort settings. Skills name a role and describe the work.
 
 | `subagent_type` | Work |
 | --- | --- |
@@ -147,11 +148,12 @@ Definitions:
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero
   `broken-engine-plan/v1` metadata; selection and marker rules:
   `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
-- Wrapper session — session started through `.claude/claude-worktree.sh` or
-  `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper
-  session reattaches only through the same wrapper's reattach input, whose
-  command `/eod` gives. If the user opens a session directly on main, work in
-  that checkout and do not use the worktree flow.
+- Wrapper session — session started through `.claude/claude-worktree.sh`,
+  `.codex/codex-worktree.ps1`, or `.agents/agy-worktree.ps1`, owning an
+  isolated worktree. A retained wrapper session reattaches only through the
+  same wrapper's reattach input, whose command `/eod` gives. If the user opens
+  a session directly on main, work in that checkout and do not use the
+  worktree flow.
 - Primary — the shared main checkout and its main branch that finished session
   work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps

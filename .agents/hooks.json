@@ -1,0 +1,33 @@
+{
+  "change-workflow": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "pwsh -NoProfile -File scripts/Write-SessionWorkflowContext.ps1 -Part 1 -InjectStepsJson"
+      },
+      {
+        "type": "command",
+        "command": "pwsh -NoProfile -File scripts/Write-SessionWorkflowContext.ps1 -Part 2 -InjectStepsJson"
+      },
+      {
+        "type": "command",
+        "command": "pwsh -NoProfile -File scripts/Write-SessionWorkflowContext.ps1 -Part 3 -InjectStepsJson"
+      },
+      {
+        "type": "command",
+        "command": "pwsh -NoProfile -File scripts/Write-SessionWorkflowContext.ps1 -Part 4 -InjectStepsJson"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File scripts/Invoke-PreToolUseHook.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

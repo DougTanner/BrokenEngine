@@ -3,8 +3,6 @@ param(
 	[string] $ReattachWorktree
 )
 
-if ($MyInvocation.InvocationName -eq '.') { return }
-
 function Invoke-CodexWorktree([string] $ReattachWorktree) {
 	$repositoryRoot = git rev-parse --show-toplevel 2>$null
 
@@ -21,5 +19,7 @@ function Invoke-CodexWorktree([string] $ReattachWorktree) {
 	& (Join-Path $repositoryRoot '.agents\scripts\Start-AgentWorktreeSession.ps1') @startArguments
 	exit $LASTEXITCODE
 }
+
+if ($MyInvocation.InvocationName -eq '.') { return }
 
 Invoke-CodexWorktree -ReattachWorktree $ReattachWorktree

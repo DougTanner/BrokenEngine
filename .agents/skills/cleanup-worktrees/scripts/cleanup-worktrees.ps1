@@ -240,7 +240,7 @@ try {
 			continue
 		}
 		# Only wrapper-created session branches are disposable; any other branch is the user's.
-		if (-not ($current.Branch.StartsWith('claude/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('codex/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('opencode/', [StringComparison]::Ordinal))) {
+		if (-not ($current.Branch.StartsWith('claude/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('codex/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('opencode/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('agy/', [StringComparison]::Ordinal))) {
 			$removed.Add([pscustomobject] @{ Path = $candidate; Branch = $current.Branch; BranchStatus = 'left (not a session branch)' })
 			continue
 		}

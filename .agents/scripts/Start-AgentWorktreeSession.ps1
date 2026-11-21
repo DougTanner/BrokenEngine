@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode')][string] $Client,
+	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode', 'agy')][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[string] $ClientExecutable,
 	[string[]] $ClientArguments = @(),
@@ -10,7 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Client -cne 'claude' -and $Client -cne 'codex' -and $Client -cne 'opencode') { throw "Client must be lowercase 'claude', 'codex', or 'opencode'." }
+if ($Client -cne 'claude' -and $Client -cne 'codex' -and $Client -cne 'opencode' -and $Client -cne 'agy') { throw "Client must be lowercase 'claude', 'codex', 'opencode', or 'agy'." }
 
 # Claude carries client arguments out of band because -File treats a leading dash as a
 # PowerShell parameter. Do not clear the transport variable until reattach validation succeeds:
@@ -105,6 +105,8 @@ try {
 		& (Join-Path $PSScriptRoot 'Initialize-AgentWorktreeSession.ps1') -Client $Client -RepositoryRoot $root -Worktree $identity.Worktree -TargetBranch $identity.TargetBranch -Baseline $identity.Baseline -WaitSeconds $WaitSeconds
 	}
 	if ($clearClaudeArgumentTransport) { $env:BROKEN_ENGINE_CLIENT_ARGUMENTS = $null }
+	# Each session opens a directory agy has not trusted; trust it for this session only.
+	if ($Client -ceq 'agy') { $ClientArguments += @('--settings', (ConvertTo-Json -Compress @{ trustedWorkspaces = @($identity.Worktree) })) }
 	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
 		$ClientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	}

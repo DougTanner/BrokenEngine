@@ -1,5 +1,7 @@
 # Writes one part of the Change Workflow context to stdout for the SessionStart
-# hooks in .claude/settings.json and .codex/config.toml.
+# hooks in .claude/settings.json, .codex/config.toml, and .agents/hooks.json;
+# -InjectStepsJson wraps the part as {"injectSteps":[{"userMessage":...}]}, the
+# output form Antigravity CLI reads.
 # Claude Code caps a single hook output at 10,000 characters and replaces
 # anything longer with a saved-file preview, so change-workflow.md carries four
 # `<!-- session-context-part: <title> -->` marker lines that name where it splits
@@ -13,7 +15,8 @@
 
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet(1, 2, 3, 4)][int] $Part
+	[Parameter(Mandatory)][ValidateSet(1, 2, 3, 4)][int] $Part,
+	[switch] $InjectStepsJson
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,7 +64,11 @@ if ($oversized.Count -gt 0) {
 # Raw bytes rather than Write-Output: the hook text must reach the session
 # byte-identical to the reference files, and PowerShell's own output re-encodes
 # and terminates the stream with the platform newline.
+$output = $outputs[$Part - 1]
+if ($InjectStepsJson) {
+	$output = ConvertTo-Json -Compress -Depth 3 @{ injectSteps = @(@{ userMessage = $output }) }
+}
 $stdout = [Console]::OpenStandardOutput()
-$bytes = $script:Utf8.GetBytes($outputs[$Part - 1])
+$bytes = $script:Utf8.GetBytes($output)
 $stdout.Write($bytes, 0, $bytes.Length)
 $stdout.Flush()

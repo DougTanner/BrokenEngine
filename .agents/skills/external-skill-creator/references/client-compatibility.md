@@ -7,10 +7,11 @@ another focused reference.
 
 ## Shared Package
 
-Claude Code and Codex consume the skill directory and `SKILL.md`, but their
-policy surfaces are independent. Write portable instructions in ordinary
-language, then configure every supported client explicitly. Never infer
-invocation behavior from an `external-` name.
+Claude Code, Codex, and Antigravity CLI consume the skill directory and
+`SKILL.md`. Claude Code and Codex have independent policy surfaces;
+Antigravity CLI follows the Claude frontmatter (`## Antigravity CLI`). Write
+portable instructions in ordinary language, then configure Claude Code and Codex
+explicitly. Never infer invocation behavior from an `external-` name.
 
 Repository frontmatter follows [`frontmatter-schema.md`](frontmatter-schema.md).
 The repository validator, not a client installation, owns its accepted fields
@@ -95,15 +96,23 @@ skill behavior. Express the intended outcome in the shared workflow and use
 Codex-native interaction, collaboration, shell, and permission mechanisms at
 execution time.
 
+## Antigravity CLI
+
+Antigravity CLI reads `.agents/skills` directly and exposes each skill as
+`/skill-name`. It honors Claude `disable-model-invocation: true`: such a skill
+runs when the user types it and is absent from the model's skill list.
+
 ## Cross-Client Check
 
-Before claiming support across both clients, verify:
+Before claiming support across every supported client, verify:
 
 1. shared instructions do not require one client's syntax;
 2. Claude frontmatter matches Claude automatic, manual, and chaining behavior;
 3. `agents/openai.yaml` matches Codex implicit and explicit behavior;
-4. every referenced resource exists and is linked from `SKILL.md` when needed;
-5. `/external-skill-creator` validate mode passes for frontmatter and bundled
+4. Claude `disable-model-invocation` matches the intended Antigravity CLI
+   behavior;
+5. every referenced resource exists and is linked from `SKILL.md` when needed;
+6. `/external-skill-creator` validate mode passes for frontmatter and bundled
    links.
 
 Use [`validation.md`](validation.md) to record those checks by evidence class.

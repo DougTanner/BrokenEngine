@@ -1,5 +1,6 @@
-# Claude Code PreToolUse hook for the Bash and PowerShell tools, registered in
-# .claude/settings.json. Reads the hook JSON from stdin and blocks the shell
+# PreToolUse hook for the Claude Code Bash and PowerShell tools, registered in
+# .claude/settings.json, and for the Antigravity CLI run_command tool, registered
+# in .agents/hooks.json. Reads the hook JSON from stdin and blocks the shell
 # forms the root AGENTS.md rules forbid:
 #   - directory change: cd, chdir, pushd, popd, Set-Location, sl,
 #     Push-Location, or Pop-Location as a command word;
@@ -23,6 +24,8 @@
 #   0 - allowed, including every non-shell tool, input that cannot be parsed,
 #       and any unexpected script error
 #   2 - blocked; one stderr line names the rule and the correct form
+# Antigravity CLI input (a toolCall property) always exits 0; a block is
+# {"decision":"deny","reason":...} on stdout, the reason naming the rule.
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -670,6 +673,22 @@ function Get-ShellRuleViolation([string] $Command, [bool] $IsBash, [string] $Cwd
 try {
 	$reader = [IO.StreamReader]::new([Console]::OpenStandardInput(), $script:Utf8)
 	$hook = $reader.ReadToEnd() | ConvertFrom-Json
+	# A property test, not a read: strict mode throws on a missing property, and
+	# the fail-open catch would then allow every Claude Code command.
+	if ($hook.PSObject.Properties['toolCall']) {
+		if ($hook.toolCall.name -cne 'run_command') { exit 0 }
+		$command = $hook.toolCall.args.CommandLine
+		if ($command -isnot [string]) { exit 0 }
+		# Antigravity CLI runs run_command in PowerShell 7.
+		$message = Get-ShellRuleViolation $command $false ([string]$hook.cwd)
+		if ($message) {
+			$stdout = [Console]::OpenStandardOutput()
+			$bytes = $script:Utf8.GetBytes((ConvertTo-Json -Compress ([ordered]@{ decision = 'deny'; reason = "Invoke-PreToolUseHook: $message" })))
+			$stdout.Write($bytes, 0, $bytes.Length)
+			$stdout.Flush()
+		}
+		exit 0
+	}
 	if (@('Bash', 'PowerShell') -cnotcontains $hook.tool_name) { exit 0 }
 	$command = $hook.tool_input.command
 	if ($command -isnot [string]) { exit 0 }

@@ -7,8 +7,8 @@ The user directed that OpenCode support be removed from the repository
 entirely. They also chose to leave `.opencode/` out of the repository-wide
 instruction-authoring policy and its static checks, so after that policy lands
 the `.opencode/` role definitions are the only agent role definitions it does
-not govern. Removing the client keeps one supported set of clients: Claude Code
-and Codex CLI.
+not govern. Removing the client keeps one supported set of clients: Claude Code,
+Codex CLI, and Antigravity CLI.
 
 OpenCode support at baseline `88a5c0740d49b7a0f1c8c87aeaf96d7ecb1cb75e`
 consists of:
@@ -49,17 +49,17 @@ No C++ source, project file, `.gitignore`, or `.gitattributes` names OpenCode
 ## Design
 
 Delete every tracked `.opencode/` file with `git rm`, and remove the `opencode`
-client from each site listed in `## Context`, leaving the Claude Code and Codex
-behavior byte-for-byte equivalent:
+client from each site listed in `## Context`, leaving the Claude Code, Codex,
+and Antigravity CLI behavior byte-for-byte equivalent:
 
-- Session scripts: the `ValidateSet` becomes `'claude', 'codex'`; the client
-  guard tests only those two and its message names only them;
+- Session scripts: the `ValidateSet` becomes `'claude', 'codex', 'agy'`; the
+  client guard tests only those three and its message names only them;
   `Initialize-AgentWorktreeSession.ps1` drops
   `Assert-AgentWorktreeOpenCodeSkills` and calls `Assert-AgentWorktreeSkillsLink`
   unconditionally.
-- Branch prefix: the regex alternation becomes `(?:claude|codex)`, the
+- Branch prefix: the regex alternation becomes `(?:claude|codex|agy)`, the
   cleanup test drops its `opencode/` clause, and both comments and messages
-  name only `claude/` and `codex/`.
+  name only `claude/`, `codex/`, and `agy/`.
 - Sweep roots: drop the `.opencode/` entry; the per-root counts follow from
   `$script:SweepRoots`, and `semantic-review.md` names no root list, so no
   documentation changes with it. `schemaVersion` stays unchanged, because the
@@ -68,7 +68,7 @@ behavior byte-for-byte equivalent:
 - Documentation: remove the Node.js prerequisite bullet, the `### OpenCode`
   README section, and the FreshMachineSetup OpenCode wrapper bullet; reword the
   client-count and shell sentences and the skills-check parenthetical to name
-  Claude Code and Codex only.
+  Claude Code, Codex, and Antigravity CLI only.
 
 Per the root `AGENTS.md` rule against backward compatibility, no alias,
 deprecation message, or `opencode/` branch handling is kept, so an existing
@@ -80,10 +80,10 @@ Change Workflow tier: Tier 2. Trigger: scoped tool behavior — the session
 wrapper scripts' accepted client set and session-branch recognition shrink,
 across the independently owned session, cleanup-worktrees, next-plan, and
 external-skill-creator scripts (Tier 2 "independently owned cross-subsystem
-integration"). The Claude Code and Codex paths are unchanged, so no
-build/bootstrap coordination behavior changes; no determinism/CRC, wire,
-serialization, `.pack`/`kiVersion`, replay, threading, allocation, shader,
-build, or affinity exposure.
+integration"). The Claude Code, Codex, and Antigravity CLI paths are
+unchanged, so no build/bootstrap coordination behavior changes; no
+determinism/CRC, wire, serialization, `.pack`/`kiVersion`, replay, threading,
+allocation, shader, build, or affinity exposure.
 
 ## Critical files
 
@@ -144,7 +144,8 @@ build, or affinity exposure.
 
 ## Notes
 
-- `.claude/claude-worktree.sh` and `.codex/codex-worktree.ps1` call the same
-  session scripts with `claude` and `codex`; their behavior must not change.
+- `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, and
+  `.agents/agy-worktree.ps1` call the same session scripts with `claude`,
+  `codex`, and `agy`; their behavior must not change.
 - Live verification: none required; the next wrapper-started session exercises
   the edited session scripts.

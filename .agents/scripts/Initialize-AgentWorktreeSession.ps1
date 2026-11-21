@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode')][string] $Client,
+	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode', 'agy')][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][string] $Worktree,
 	[Parameter(Mandatory)][string] $TargetBranch,
