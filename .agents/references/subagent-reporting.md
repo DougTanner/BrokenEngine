@@ -138,7 +138,9 @@ exceeds such a limit is unavailable for that session. When no compliant native
 wait is advertised, rely on the host's available completion delivery and do
 not invent a wait operation. The timeout, no-progress, and interruption rules
 below are the exception route; a wait in them is a bounded host wait call where
-the client provides one.
+the client provides one. A `/codex-bridge` run instead follows the launch and
+`-Wait` contract in
+[`../skills/codex-bridge/SKILL.md`](../skills/codex-bridge/SKILL.md).
 
 Completion can return a wait early. If a healthy worker's wait times out
 without failure or no-progress evidence, wait again; the timeout alone does not

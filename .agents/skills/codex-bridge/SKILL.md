@@ -1,144 +1,117 @@
 ---
 name: codex-bridge
 description: >-
-  Run one task — an existing subagent role and skill such as a reviewer,
-  researcher, planner, or implementer — on Codex headless from Claude Code
-  under one of two presets and a selectable sandbox, and return its result. Use
-  only when the user explicitly asks to run a task on Codex. Codex callers never
-  invoke it.
-allowed-tools: [Read, Write, Bash]
+  Run one routed review skill on Codex headless from a non-Codex host (Claude
+  Code, Antigravity CLI, OpenCode) under the launcher's route table. Dispatched
+  automatically for routed review roles; never user-triggered or invoked by
+  Codex callers.
+user-invocable: false
+allowed-tools: [Read, Write, Bash, PowerShell]
 ---
 
 # Codex Bridge
 
 ## Purpose
 
-Runs one task brief on Codex headless in a worktree, read-only or with edits,
-and returns its result and out-file path without the run's work entering this
-session. A bridge run of an assigned role and skill is that role's delegated
-execution context
+Runs one routed review brief on Codex headless in a worktree from a non-Codex
+host and returns its result and out-file path without its work entering this
+session. A bridge run is the assigned role's delegated execution context
 ([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
 `## Delegated execution context`), not an inline run; since `codex exec` loads
-no role definition, the task brief's `Role` line carries it.
+no role definition, the brief's `Role` line carries it.
 
 ## When to use
 
-- The user explicitly asks, in the current session, to run an existing subagent
-  role and skill on Codex from Claude Code.
+- A non-Codex host (Claude Code, Antigravity CLI, OpenCode) dispatches a
+  [`scripts/Invoke-Codex.ps1`](scripts/Invoke-Codex.ps1) `$routes` review per
+  [`../../references/change-workflow.md`](../../references/change-workflow.md)
+  `### Delegation roles`.
 
-Codex callers never invoke it.
+Never user-triggered; Codex callers never invoke it.
 
 ## Inputs
 
-- Prompt — a fresh repo-relative file under `Temp/` holding one task brief on
-  the form in
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-  `## Task brief`, filled exactly as a Claude subagent dispatch of that role and
-  skill would be.
+- Prompt — fresh repo-relative `Temp/` file holding one task brief
+  (`subagent-reporting.md` `## Task brief`), filled as a native dispatch would
+  be.
 - Worktree — this session's worktree.
-- `-Agent` — omit it unless the user asks for `astra`. The launcher's `$Agent`
-  default and preset table own the preset and each preset's model and effort,
-  which replace the role definition's.
-- `-Sandbox` — `read-only` by default and for findings-only or research work;
-  `workspace-write` only when the task must edit files in the worktree. A
-  `workspace-write` run writes the worktree's files and permitted temporary
-  storage only: it cannot write the worktree's `.agents/` directory, the linked
-  worktree's Git index or refs, which live in the main repository's `.git`, or
-  the machine-local lock storage under `%LOCALAPPDATA%`, and this launch
-  restricts its network access. No sandbox mode reaches those resources.
+- `-Skill` — bare skill name from `Invoke-Codex.ps1` `$routes` (whose `$routes`
+  and `$presets` solely own preset/sandbox mappings, replacing role model and
+  effort, and reject unrouted entries before spawning Codex); see
+  [`change-workflow.md`](../../references/change-workflow.md)
+  `### Delegation roles` for partial-skill routing limits.
+- `-Mode` — required whenever the skill's `Invoke-Codex.ps1` `$routes` key has a
+  `<skill>:<mode>` suffix; omit otherwise.
 
 ## Steps
 
-1. Before the first launch in this Claude Code session, run the model check from
-   the worktree root:
+1. Once per non-Codex session before the first launch, run from the worktree
+   root:
+   `pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -CheckModels`.
+   Exit `0` passes; on exit `2` halt and show each `checks` row with `reason`
+   (`slug`, `newest`); on exit `1` halt and report `message`. Done when passed
+   or reported.
+2. End the prompt with the verdict-line contract: the worker's last non-empty
+   response line must be `PASS`, `CHANGES-REQUIRED: <n>`, or
+   `BLOCKED: <reason>`, outside the skill's or lens's complete output — after
+   `Residuals` for the shared handoff
+   ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+   `## Handoffs`), or after a lens's own output shape (e.g.
+   `/external-architecture-review` Step 9) — supplementing `Status` (without
+   replacing it) where that shape declares it. Done when the prompt states it.
+3. Launch with one bare call placing `-Skill` (and `-Mode`) before `-Worktree`,
+   never looped or chained, with a fresh repo-relative `Temp/` `<out>`. Wait
+   rule: on blocking-shell hosts (e.g. Claude Code) pass a timeout `>= 600000`
+   ms; on Antigravity CLI (`run_command`, cap `10000` ms) pass
+   `WaitMsBeforeAsync: 10000` and await async reactive wakeup without polling,
+   then act on stdout:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -CheckModels
+   pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile <out>
    ```
 
-   It prints one JSON line. Exit `0` passes. On exit `2`, a block, halt and show
-   the user each `checks` row whose `reason` is set: the pinned `slug` and the
-   `newest` listed name. On exit `1`, an error, halt and report its `message`.
-
-   Done when the check has passed this session, or the user has been shown the
-   block or error.
-2. End the prompt, after the role's handoff, with the final-line contract: its
-   last non-empty line must be `PASS`, `CHANGES-REQUIRED: <n>`, or
-   `BLOCKED: <reason>`, where `PASS` on a task that is not a review means the
-   task finished. The verdict line follows the skill's complete handoff, outside
-   it, so the handoff still ends with `Residuals` as
-   [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
-   `## Handoffs` requires, and its token supplements the handoff's `Status`,
-   never replacing it.
-
-   Done when the prompt file states that contract.
-3. Launch with one bare blocking call, issued with a call timeout of at least
-   `600000` ms and never wrapped in a loop or chained with another command:
-
-   ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile <out> [-Agent <agent>] [-Sandbox <read-only|workspace-write>]
-   ```
-
-   Pass a repo-relative `<out>` such as `Temp/<name>-out.md`; the launch
-   tolerates an existing out-file, so `<out>` must be a fresh path that does not
-   yet exist.
-
-   A `completed` receipt carries the result on the same stdout, so the success
-   path never reads `<out>`; the launcher's `.NOTES` One-call contract owns the
-   receipt, wait, and separator.
-
-   Done when that single call has returned its receipt.
-4. A run that outruns the budget answers `running` with its `runId`. Resume it
-   with exactly one further bare call per wake, also issued with a call timeout
-   of at least `600000` ms and never in a loop:
+   A `completed` receipt prints the result on stdout (do not read `<out>`);
+   `Invoke-Codex.ps1` `.NOTES` owns receipt, wait, and separator. Done when the
+   receipt returns.
+4. If `running`, resume per wake with one bare call under step 3's per-host wait
+   rule, never looped or chained:
 
    ```powershell
    pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Wait <runId>
    ```
 
-   The launcher's `.NOTES` One-call contract owns how that wait resumes the run.
-   Duration alone is never a failure: a run that stays `running` across many
-   waits is progressing normally.
-
-   Done when the wait ends in `completed`, `malformed`, or `failed`.
-5. Act on the terminal status: `completed` proceeds, and `retried: true` needs
-   no action; `malformed` or `failed` goes to `## Rules`.
-
-   Done when a `completed` result is in hand or `## Rules` is applied to a
-   `malformed` or `failed` one.
+   Duration alone is not a failure. Done on `completed`, `malformed`, or
+   `failed`.
+5. Proceed on `completed` (`retried: true` needs no action); route `malformed`
+   or `failed` to `## Rules`. Done when handled.
 
 ## Rules
 
-- A genuine failure is a `failed` status, a `malformed` status, a non-zero
-  launcher exit, or a step 1 block or error. Report it to the user with the
-  receipt's `reason` — for the model check, its `checks` rows with `reason` set
-  or its `message` — and without a further diagnostic call.
-- One bounded exception covers what the verdict-line check cannot see: when a
-  `completed` read-only result passed it but this session judges it malformed
-  anyway — leaked drafting notes, or an answer to a different task — re-dispatch
-  the identical prompt exactly once, with a fresh `<out>` and `-NoRetry` added
-  to the same launch arguments. That result is final; a second malformed result
-  is a genuine failure.
-- Never launch a task that needs a resource the `-Sandbox` input says no mode
-  reaches — `.agents/` writes, Git index or refs writes, lock storage, or the
-  network; run it in a Claude role instead. Such tasks include skill-file edits
-  (any change under `.agents/`), `/compile`, `/finalize-changes`, and Plan
-  creation through `New-PlanFile.ps1`.
-- Attempt a `workspace-write` run exactly once, never re-dispatching it: report
-  any failed or judged-malformed outcome to the user together with the
-  worktree's `git status`.
-- Leave the worktree to Codex while a `workspace-write` run is live; edit it
-  only after the run reaches a terminal status.
-- To verify a change to the launcher on a machine without the Codex CLI, issue
-  the same call from the Bash tool with a stand-in `codex` first on `PATH` —
-  `PATH=<stub dir>:$PATH pwsh -NoProfile -File
-  .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 ...` — which stays one
-  invocation; PowerShell has no inline prefix form, so this verification form is
-  Bash-tool only.
+- Report genuine failures (`failed`, `malformed`, non-zero exit, or step 1
+  block/error) to the user with `reason` (or `checks`/`message`) without another
+  diagnostic call.
+- If a `completed` `read-only` result passes the verdict-line check but is
+  judged malformed (leaked notes or wrong task), re-dispatch the identical
+  prompt once with a fresh `<out>` and `-NoRetry`; a second malformed result is
+  a genuine failure.
+- `read-only` runs cannot write `<worktree>/Temp/` or `$env:TEMP`; keep handoffs
+  within the `subagent-handoff.md` `## Handoffs` shared character cap without
+  `Temp/` overflow writes (`Invoke-Codex.ps1` captures full output to `<out>`).
+- For `workspace-write` routes in `Invoke-Codex.ps1` `$routes`, attempt each run
+  once (never re-dispatch; report failed or judged-malformed outcomes with
+  `git status`). Findings-only `workspace-write` runs write only their skill's
+  gitignored `Temp/` files, never edit tracked files, and may run alongside
+  `read-only` Step 6 peers. While an editing `workspace-write` run is live, hold
+  `Invoke-StaticChecks.ps1`, concurrent writers, and any review reading C++ or
+  dual-language headers — such as an overlapping `/glsl-review` during Step 6
+  post-validator or post-round re-runs — until it terminates.
+- Verify launcher changes without Codex CLI from Bash with a stub `codex` first
+  on `PATH` (`PATH=<stub dir>:$PATH pwsh -NoProfile -File
+  .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Skill ...`; PowerShell
+  has no inline prefix form).
 
 ## References
 
-- [scripts/Invoke-Codex.ps1](scripts/Invoke-Codex.ps1) — the launcher; its
-  `.NOTES` owns the receipt fields, exit codes, verdict-line check, and
-  automatic read-only retry, and the `-CheckModels` receipt, block conditions,
-  and exit codes.
+- [scripts/Invoke-Codex.ps1](scripts/Invoke-Codex.ps1) — launcher (`$routes`,
+  `$presets`, and `.NOTES` for receipts, exit codes, verdict check, retry, and
+  `-CheckModels`).

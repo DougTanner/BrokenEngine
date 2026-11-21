@@ -7,23 +7,20 @@ are the isolation lens.
 
 ## Steps
 
-1. Resolve and measure this run's transcript before applying any lens. On
-   Claude, `$env:CLAUDE_CODE_SESSION_ID` is main's ID; resolve it with
+1. Resolve and measure this run's transcript first. On Claude,
+   `$env:CLAUDE_CODE_SESSION_ID` is main's ID; resolve
    `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`.
-   On `agy`, `$env:ANTIGRAVITY_CONVERSATION_ID` is the worker's ID; import
-   `./.agents/scripts/AgentTranscriptCommon.psm1`, call
+   On `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`, call
    `Resolve-AgentAgyParentSession -SessionId $env:ANTIGRAVITY_CONVERSATION_ID`,
-   and require non-null `ParentSessionId`, `CycleDetected` false, and empty
-   `ReadErrors` before using `RootTranscriptPath` (otherwise return
-   `BLOCKED`). Measure from the session worktree root:
+   and require non-null `RootTranscriptPath`, `CycleDetected` false, and empty
+   `ReadErrors` (else `BLOCKED`). From the worktree root run
    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -TranscriptPath '<resolved path>'`
-   (or `-SessionId <root id>`), and classify via `## Measurement states` in
-   `../../next-plan/references/run-checkpoint.md`. Return `BLOCKED` for the
-   whole review if resolution fails, yields no readable transcript, or returns
-   `transcript.not-found`, since no lens has evidence; other blocked or error
-   codes skip only context-efficiency while friction and isolation still run.
-   Done when one transcript path and measurement state are in hand, or the
-   review is `BLOCKED`.
+   (or `-SessionId <root id>`) and classify via `## Measurement states` in
+   `../../next-plan/references/run-checkpoint.md`. Return `BLOCKED` if
+   resolution fails, yields no readable transcript, or returns
+   `transcript.not-found`; other blocked/error codes skip only
+   context-efficiency. Done when transcript path and measurement state are in
+   hand, or `BLOCKED`.
 2. Report as friction: a bundled script errored, returned a malformed or
    contradictory result, or could not be run as documented; a workaround or
    deviation was needed; work was repeated because a skill's instructions were
@@ -49,33 +46,35 @@ are the isolation lens.
    `active-change-blocker`, not a follow-up. Done when every friction finding
    carries a class.
 6. Before applying any lens, establish this checkpoint's transcript span
-   through step 12's projection. End immediately before this review's own
-   dispatch. If the same transcript contains an immediately preceding
-   `/next-plan-checkpoint-review` dispatch, start immediately after that
-   dispatch and exclude only its correlated completed-handoff record; otherwise
-   start at the transcript beginning. Retain every other record between the
-   boundaries. Apply the span to friction and isolation records and, by
-   `toolUseId`, to context-efficiency `topResults`. Running the claim-exit
-   script and `/finalize-changes` happens after this dispatch and is outside
-   this review; `## Follow-up routing` in
-   `../../next-plan/references/run-checkpoint.md` and `/next-plan-review` own
-   those. Done when no finding or checked telemetry row comes from outside the
-   span or from the excluded handoff — except step 3's friction finding on step
-   1's own measurement state, which the span does not exclude — including a run
-   that stopped before or without a claim.
+   through step 12's projection. Anchor boundaries to distinct `/next-plan`
+   checkpoints, grouping any `-NoRetry` re-dispatch (and its `-Wait` calls)
+   with its original checkpoint dispatch. End immediately before this
+   checkpoint's dispatch group (and its bridged prompt write). If an earlier
+   distinct `/next-plan` checkpoint exists in this transcript, start after its
+   final dispatch and exclude only its correlated completed-handoff record;
+   otherwise start at line 1. Retain every other record between the boundaries.
+   Apply the span to friction and isolation records and, by `toolUseId`, to
+   context-efficiency `topResults`. Running the claim-exit script and
+   `/finalize-changes` happens after this dispatch and is outside this review;
+   `## Follow-up routing` in `../../next-plan/references/run-checkpoint.md` and
+   `/next-plan-review` own those. Done when no finding or checked telemetry row
+   comes from outside the span or from the excluded handoff — except step 3's
+   friction finding on step 1's own measurement state, which the span does not
+   exclude — including a run that stopped before or without a claim.
 7. Precision guard: name in each friction finding the exact command or script
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
    finding names all three, and the rest are dropped.
 8. Review every `topResults` row marked `overThreshold: true`. The other rows
    are context only. Done when every such row has been read.
-9. Identify the emitting invocation for each row from `toolName` plus
-   `inputSummary`: the repository script, skill instruction, or documented
-   command that produced that output. Read the emitter in the tree. Done when
-   each row names one emitter or is recorded as unidentifiable. An `Agent` or
-   `SendMessage` (Claude) or `invoke_subagent` (`agy`) row is a completed
-   subagent's handoff; its emitter is the return format of the skill the
-   dispatch named.
+9. Identify each row's emitter from `toolName` and `inputSummary` (script,
+   skill, or command) and read it in the tree. An `Agent`/`SendMessage`
+   (Claude), `invoke_subagent` (`agy`), or `Bash`/`PowerShell`/`run_command`
+   `Invoke-Codex.ps1` (`-Skill` or `-Wait <runId>`) row is a subagent handoff
+   emitted by that skill's return format (for `-Skill`, that `-Skill`/`-Mode`;
+   for `-Wait <runId>`, trace `<runId>` to its launch `-Skill`/`-Mode`). For a
+   bridged handoff, use step 12's bridged delivery selector. Done when each row
+   names an emitter or is unidentifiable.
 10. Classify each row, done when every row carries one class:
     - `fixable-defect` — a bounded projection, a count plus the
       decision-relevant rows, an explicit cap with a truncation flag, or a file
@@ -95,37 +94,41 @@ are the isolation lens.
     `../../../references/subagent-handoff.md`. No named emitter and mechanism,
     no finding. Done when every such finding names both, and the rest are
     dropped.
-12. Select the transcript records to read only through the bundled script, whose
-    header comment states the row shapes, never by reading the transcript
-    whole-file:
+12. Select records only through the bundled script (header owns row shapes),
+    never by reading the transcript whole-file:
     `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<transcript path>'`
 
-    In the projection, inspect candidate `use Agent` or `use invoke_subagent`
-    rows and open only those needed to identify this review's
-    `/next-plan-checkpoint-review` dispatch, any immediately preceding matching
-    dispatch, and their tool-use IDs (the paired `result` row ID on `agy`)
-    for step 6's boundaries. Match the preceding dispatch's tool-use ID to a
-    `result` row, a Claude task-notification/queued-attachment string record's
-    tool-use-ID tag, or an `agy` `SYSTEM_MESSAGE` `delivery=` marker to
-    locate its completed-handoff record. Do not assume the delegation tool is
-    named `Task`.
+    Before deciding the step 6 span, inspect `use Agent`,
+    `use invoke_subagent`, and `use Bash`/`PowerShell`/`run_command` rows —
+    opening any `Invoke-Codex.ps1` row whose summary omits `-Skill`/`-Wait` and
+    any truncated shell row whose `Get-TranscriptProjection.ps1` summary cap
+    cannot rule out `Invoke-Codex.ps1` — for this checkpoint's
+    `/next-plan-checkpoint-review` group (original dispatch, any `-NoRetry`
+    re-dispatch, and bridged `Write`/`write_file` prompt call, so step 6 ends
+    before it), any preceding distinct checkpoint's group and `-Wait <runId>`,
+    and their tool-use IDs (`result` row ID on `agy`). Match that preceding
+    checkpoint's final dispatch (or final `-Wait`) tool-use ID to a `result`
+    row, Claude task-notification/queued-attachment `<tool-use-id>` tag, or
+    `agy` `SYSTEM_MESSAGE` `delivery=` record to exclude its handoff. Bridged
+    delivery selector: accept any matching delivery record (paired `result`
+    row, Claude notification/attachment, or `agy` `SYSTEM_MESSAGE` `delivery=`)
+    sharing the launch or final `-Wait` tool-use ID that carries the
+    `completed` bridge receipt and `--- findings ---` separator, ignoring any
+    background-task launch stub that lacks them (such as `agy`'s shared-ID
+    stub). Do not assume the tool is named `Task`.
 
-    Open selected records with `Read` (`offset` = line, `limit` 1) or
-    `read_file` (`StartLine`/`EndLine` = line); the `len` column only
-    selects which records to open and is never a `chars:` value.
+    Open one selected record line at a time with `Read` (`offset` = line,
+    `limit` 1), `read_file` (`StartLine`/`EndLine` = line), or on Codex:
+    `Get-Content -LiteralPath '<path>' -TotalCount <line> | Select-Object -Last 1`.
+    `len` selects lines only and is never `chars:`.
 
-    Report as isolation: content that entered main's context which main did not
-    need verbatim to decide anything and a subagent could have consumed instead
-    — main reading a source or reference file a worker's brief could have named,
-    raw script output main only forwarded, evidence pasted inline in a handoff
-    instead of cited as path plus selector, or a handoff restating its own
-    brief. Size does not gate this: content below the measured threshold still
-    qualifies. Detect the first case from the projection's `match` rows, keeping
-    only those whose own line and `read-at` line both fall inside the step 6
-    span: each names a read path a brief lists. Such a read is a finding whose
-    emitter is the skill instruction main was executing when it made that read
-    and whose step 11 bounding mechanism is that brief's dispatched role. Done
-    when every such observation in span is either a finding or excluded by
+    Report as isolation any content main did not need verbatim that a subagent
+    could have consumed: reading a file a worker's brief could name, forwarding
+    raw script output, pasting evidence inline instead of path plus selector, or
+    a handoff restating its brief (regardless of size). Detect the first case
+    via in-span `match` rows whose `read-at` line is also in span: emitter is
+    main's active skill instruction; step 11 bounding mechanism is that brief's
+    role. Done when every in-span observation is a finding or excluded by
     step 13.
 13. Exclude from isolation, beyond the exclusions below: content main's own
     decision required verbatim, classified `necessary-evidence` under step 10

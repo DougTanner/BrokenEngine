@@ -23,7 +23,9 @@ Per [README.md](../README.md): Visual Studio 2026 Community (Desktop development
 with C++, Game development with C++, Windows 11 SDK), the Vulkan SDK, Git for
 Windows, PowerShell 7 (`pwsh`), Windows Terminal, x64 CPython 3.12 or newer,
 Gaea 2 (session setup may bake island terrain), and the agent CLIs (Claude
-Code, Codex CLI, Antigravity CLI, and/or OpenCode).
+Code, Codex CLI, Antigravity CLI, and/or OpenCode). Codex CLI — signed in with
+a ChatGPT login and without `OPENAI_API_KEY` set — is required alongside any
+non-Codex agent CLI so automated bridged reviews can run.
 
 Every skill that needs host Python requires x64 CPython 3.12 or newer.
 `code-quality-metrics` selects the first `python` Application resolved through

@@ -101,20 +101,21 @@ repeated operation.
 ## Verify execution-model routing
 
 For every headless Codex launch through the bridge launcher in the routing
-inventory, evaluate the actual model and effort against the model and effort
-the commit-time launcher applies for the launched `-Agent` preset, not against
-the `.codex/agents/` role definitions. When the launched preset's model and
-effort cannot be established, do not infer compliance.
+inventory, evaluate actual model and effort against what the commit-time
+launcher applies for the launched route (`-Skill`/optional `-Mode` via
+`$routes`/`$presets`, or the commit-time selector on earlier commits), not
+`.codex/agents/` role definitions. When that route's model and effort cannot be
+established, do not infer compliance.
 
 Use only this allowed evidence chain from claim to conclusion: a headless
 launch is compliant only with its parent launcher invocation/result, the
 commit-time model and effort pins the commit's launcher
 (`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`, or its earlier path)
-applies for the launched `-Agent` preset, and fixed structured output. A
-requested role, explicit requested model/effort, or configured mapping proves
-intent only; when required model or effort evidence cannot be proved, the
-verdict is `unverified`. Record the parent launcher event, the commit-time
-pinned model and effort with their proof, the verdict, and the citation.
+applies for the launched route, and fixed structured output. A requested role,
+explicit requested model/effort, or configured mapping proves intent only; when
+required model or effort evidence cannot be proved, the verdict is
+`unverified`. Record the parent launcher event, the commit-time pinned model
+and effort with their proof, the verdict, and the citation.
 
 Verdicts are `compliant`, `violation`, `unverified`, or `not-executed`.
 `not-executed` is a nonfinding only when the parent event/result conclusively

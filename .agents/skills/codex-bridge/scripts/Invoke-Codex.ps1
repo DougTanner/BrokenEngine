@@ -1,12 +1,10 @@
 <#
 .SYNOPSIS
-	Run one Claude Code task on Codex headless in a worktree and capture its result.
+	Run one routed review task on Codex headless in a worktree from a non-Codex host and capture its result.
 
-	-Agent selects one of the two $presets entries for model and reasoning effort (default sol).
-	-Sandbox read-only (default) lets Codex only read the worktree; workspace-write also lets it edit
-	files there. The skill's -Sandbox input owns the resources neither mode reaches, and its Rules
-	route tasks needing them to Claude roles. -CheckModels checks the presets' models instead of
-	launching.
+	-Skill and optional -Mode select one of the $routes entries, which fixes the $presets model/effort
+	pair and the sandbox mode (read-only or workspace-write). Unrouted skills or modes fail before
+	spawning Codex. -CheckModels checks the presets' models instead of launching.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -16,8 +14,8 @@
 	(~1.5x speed for ~2.5x subscription credit burn); if the model does not advertise that tier
 	Codex warns and runs standard.
 
-	One-call contract: a launch call (-Worktree/-PromptFile/-OutFile) starts Codex detached, then
-	waits up to 540 seconds for it and returns a single-line JSON receipt naming the run identifier
+	One-call contract: a launch call (-Skill [-Mode]/-Worktree/-PromptFile/-OutFile) starts Codex detached,
+	then waits up to 540 seconds for it and returns a single-line JSON receipt naming the run identifier
 	and its status. A completed receipt is followed by the line `--- findings ---` and then the
 	out-file's bytes verbatim, so the result needs no separate read. If the budget expires with the
 	run still alive the receipt reports running, and one further -Wait <run identifier> call resumes
@@ -40,12 +38,12 @@
 	edits.
 
 	Exit codes (launch and -Wait calls; -CheckModels has its own below): 0 for every wait whatever
-	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, any other
-	non-zero only for a script error. None of these retry. When the codex CLI itself exits non-zero,
-	the failed receipt's reason carries its last non-empty stderr line capped at 200 characters, with
-	the full stderr retained as <runId>.stderr.txt beside the run records; when the CLI printed
-	nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed or
-	malformed status is `.agents/skills/codex-bridge/SKILL.md`, `## Rules`.
+	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, 1 for
+	an unrouted -Skill/-Mode or any other script error. None of these retry. When the codex CLI itself
+	exits non-zero, the failed receipt's reason carries its last non-empty stderr line capped at 200
+	characters, with the full stderr retained as <runId>.stderr.txt beside the run records; when the
+	CLI printed nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed
+	or malformed status is `.agents/skills/codex-bridge/SKILL.md`, `## Rules`.
 
 	-CheckModels checks each $presets model against the live Codex model catalog
 	(`codex debug models`) and prints one compact JSON receipt: schemaVersion
@@ -57,6 +55,12 @@
 #>
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
+	[Parameter(Mandatory, ParameterSetName = 'Launch')]
+	[string] $Skill,                                      # routed review skill name from $routes
+
+	[Parameter(ParameterSetName = 'Launch')]
+	[string] $Mode = '',                                  # optional sub-mode for multi-mode skills in $routes
+
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $Worktree,                                   # session worktree checkout Codex runs in (codex -C)
@@ -73,15 +77,13 @@ param(
 	[Parameter(ParameterSetName = 'InternalRun')]
 	[switch] $NoRetry,                                    # spend no in-process retry: exactly one Codex attempt
 
-	[Parameter(ParameterSetName = 'Launch')]
-	[Parameter(ParameterSetName = 'InternalRun')]
+	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[ValidateSet('sol', 'astra')]
-	[string] $Agent = 'sol',                              # $presets entry used for model and effort
+	[string] $Agent,                                      # $presets entry resolved from $routes; internal only
 
-	[Parameter(ParameterSetName = 'Launch')]
-	[Parameter(ParameterSetName = 'InternalRun')]
+	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[ValidateSet('read-only', 'workspace-write')]
-	[string] $Sandbox = 'read-only',                      # codex --sandbox; workspace-write never retries
+	[string] $Sandbox,                                    # codex --sandbox resolved from $routes; internal only
 
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
@@ -106,11 +108,32 @@ $waitSleepSeconds = 5
 # 'default' or 'fast'. Fast is disabled for now; set 'fast' to re-enable it (see .NOTES for the cost).
 $serviceTier = 'default'
 
-# The only presets: -Agent picks one, and -CheckModels checks their models.
+# The only presets: $routes maps each routed skill/mode to one, and -CheckModels checks their models.
 $presets = @{
 	sol = @{ Model = 'gpt-6.2-sol'; Effort = 'xhigh' }
 	astra = @{ Model = 'gpt-6.2-astra'; Effort = 'high' }
 }
+
+# Exact case-sensitive (Skill[:Mode]) -> (Agent, Sandbox) routing table for non-Codex review dispatch.
+$routes = [Collections.Hashtable]::new([StringComparer]::Ordinal)
+# Astra (gpt-6.2-astra, high)
+$routes['repo-code-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+$routes['glsl-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+$routes['adversarial-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+$routes['plan-audit'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+$routes['plan-simplicity-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+$routes['over-engineering-review:finder'] = @{ Agent = 'astra'; Sandbox = 'workspace-write' }
+$routes['external-architecture-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
+# Sol (gpt-6.2-sol, xhigh)
+$routes['code-style-review'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
+$routes['comment-review'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
+$routes['coherence-review:coherence'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+$routes['coherence-review:combined'] = @{ Agent = 'sol'; Sandbox = 'workspace-write' }
+$routes['progressive-disclosure-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+$routes['external-skill-creator:validate'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+$routes['verify-acceptance'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+$routes['next-plan-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+$routes['next-plan-checkpoint-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
 
 function Write-Receipt([hashtable] $Fields)
 {
@@ -355,6 +378,20 @@ if ($PSCmdlet.ParameterSetName -ceq 'CheckModels')
 
 	[Console]::Out.Write(($result | ConvertTo-Json -Depth 8 -Compress))
 	exit $exitCode
+}
+
+if ($PSCmdlet.ParameterSetName -ceq 'Launch')
+{
+	$routeKey = if ([string]::IsNullOrWhiteSpace($Mode)) { $Skill } else { "${Skill}:${Mode}" }
+	if ($Skill.Contains(':') -or ($PSBoundParameters.ContainsKey('Mode') -and [string]::IsNullOrWhiteSpace($Mode)) -or (-not $routes.ContainsKey($routeKey)))
+	{
+		Write-Error "unrouted skill or mode '$routeKey'; see `$routes in $PSCommandPath" -ErrorAction Continue
+		exit 1
+	}
+
+	$route = $routes[$routeKey]
+	$Agent = $route.Agent
+	$Sandbox = $route.Sandbox
 }
 
 # Only the modes that start Codex refuse the key; a wait or a model check runs in any environment.

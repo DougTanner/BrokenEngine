@@ -234,12 +234,13 @@ setting is needed to suppress that confirmation.
   shared primary binaries under a bootstrap mutex before launch, tracks the
   client with kill-on-host-close lifetime, propagates its exit code, and
   preserves partial artifacts on provisioning failure.
-- The Codex headless route
-  (`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`, driven by the
-  `/codex-bridge` skill) runs one existing role's task on Codex only on
-  explicit request, read-only or with worktree edits, under one of two fixed
-  model and effort presets; normal workflow delegation does not use it.
-  Headless Codex runs bill the ChatGPT subscription, not metered API credits.
+- Non-Codex sessions (Claude Code, Antigravity CLI, OpenCode) dispatch routed
+  review skills automatically through the Codex headless bridge
+  (`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` with `-Skill <skill>`
+  and optional `-Mode <mode>`, driven by the subagent-dispatch-only
+  `/codex-bridge` skill, never user-triggered), while Codex sessions use native
+  Codex subagents. Headless Codex runs bill the ChatGPT subscription, not
+  metered API credits, and refuse to run when `OPENAI_API_KEY` is set.
 
 #### Optional Current Maintainer Configuration
 

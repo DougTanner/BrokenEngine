@@ -21,16 +21,14 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    [`scope-authorization.md`](../../../references/scope-authorization.md) over
    the same regions. Done when each pass has run against the supplied
    authorization source, or its absence is reported as that reference directs.
-4. When the dispatch allows edits, fix the meaning-preserving wording and
-   formatting problems in the changed regions yourself and self-check each edit,
-   and route what you cannot fix that way with the semantic findings. Done when
-   each such problem is either fixed and self-checked, or reported.
-5. In Tier-1 mode, run in this same context, in full, every Apply the triggered
-   cleanup check the brief lists as carried; never route one to another worker.
-   Each passes on its own skill's pass condition. Done when each triggered skill
-   has run in full and its handoff is placed as `../SKILL.md` `## Handoff`
-   states.
-6. In Tier-1 mode, when the Verify the acceptance table step applies — a stage
+4. Report wording and formatting problems in the changed regions as findings
+   alongside the semantic findings. Done when every such problem is reported.
+5. In combined mode, run in this same context, in full, every Apply the
+   triggered cleanup check the brief lists as carried; never route one to
+   another worker. Each passes on its own skill's pass condition. Done when each
+   triggered skill has run in full and its handoff is placed as `../SKILL.md`
+   `## Handoff` states.
+6. In combined mode, when the Verify the acceptance table step applies — a stage
    completing without landing — verify the acceptance table as
    [`../../verify-acceptance/SKILL.md`](../../verify-acceptance/SKILL.md)
    requires, under the Tier-1 evidence ceiling it applies. This component passes
@@ -42,8 +40,9 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 - The Apply the triggered cleanup mechanic and implementer checks —
   `/update-vcxproj`, `/update-claude-docs` — are not reviewer dispatches and are
   unaffected by the combined mode.
-- Change no repository file apart from the wording and formatting fixes step 4
-  requires; every semantic problem is a finding for the manager to decide.
+- Edit no tracked file; in combined mode, write only the `Temp/` file
+  [`../SKILL.md`](../SKILL.md) `## Handoff` requires. Every problem is a
+  finding for the manager to decide.
 - The Review and resolve correctness step's fix-round rule is unchanged: main
   decides once, accepted fixes go to a separate `implementer`, and only affected
   regions are re-reviewed.
