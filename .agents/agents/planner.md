@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Preparing changes and producing plans and designs — change preparation, implementation plans, and interface/API design proposals.
-model: pro
+model: inherit
 commandExecutionPolicy: eager
 tools: [read_file, write_file, edit_file, run_command, manage_task, search_web]
 ---

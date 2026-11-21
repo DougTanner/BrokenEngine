@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Writing code and documentation; affected-site propagation; review-fix rounds; follow-up plans; finalization.
-model: pro
+model: inherit
 commandExecutionPolicy: eager
 tools: [read_file, write_file, edit_file, run_command, manage_task, search_web]
 ---
