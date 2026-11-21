@@ -23,3 +23,5 @@ created, mapped, or rejected.
 
 | Owner | Symptom | Date | Session branch | Evidence |
 | --- | --- | --- | --- | --- |
+| `.agents/references/change-workflow.md` | main reads and edits a reviewed file itself for a one-line accepted finding | 2026-11-20 | claude/76739fc5-521a-4c6f-907a-53abe8ac86f7 | selector: Step 7 heading and Step 4 paragraph ranges of change-workflow.md; result: main read both ranges and added one pointer line; bounding: `/resolve-findings` `implementer` briefed with path plus selector |
+| `.agents/references/change-workflow.md` | main reads and edits a reviewed file itself for a one-line accepted finding | 2026-11-20 | claude/76739fc5-521a-4c6f-907a-53abe8ac86f7 | selector: Step 5 build-timing paragraph of change-workflow.md; result: main read it and applied a re-review finding; bounding: `/resolve-findings` `implementer` briefed with path plus selector |

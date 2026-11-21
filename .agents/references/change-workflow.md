@@ -251,14 +251,14 @@ handoffs, then presents the resolved plan for approval per `/next-plan`
 #### Step 4 — Implement and propagate
 
 Order: the acceptance checks the execution card marks `before the first edit`
-run first, on the unedited tree; then the slices run in parallel;
-`/update-affected-code` runs after them. Main finds the marked checks by one
-line search for that literal limited to the card's `Acceptance checks` field,
-the lines from its `- Acceptance checks:` line up to its `- Roles:` line,
-printing only the matched text because a host may hide a long matching line.
-It reads only each marked check, from its marked line to the check's end, and
-from that text takes the executor, the build (project and configuration, or
-none), and the scenario steps for the `builder` and `runner` briefs.
+run first, on the unedited tree; then the slices run in parallel. Main finds
+the marked checks by one line search for that literal limited to the card's
+`Acceptance checks` field, the lines from its `- Acceptance checks:` line up to
+its `- Roles:` line, printing only the matched text because a host may hide a
+long matching line. It reads only each marked check, from its marked line to
+the check's end, and from that text takes the executor, the build (project and
+configuration, or none), and the scenario steps for the `builder` and `runner`
+briefs.
 
 - `builder` runs `/compile` for the unedited-tree build a check marked
   `before the first edit` needs — when it needs one — in the Local form its
@@ -271,34 +271,34 @@ none), and the scenario steps for the `builder` and `runner` briefs.
   `implementer` records the others, on the unedited tree — a card with none
   adds no step.
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
-- `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
+
+When the slices return, main runs
+`pwsh -NoProfile -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -Tier <tier>`,
+adding `-Landing` when the stage lands in this session and `-HarnessChecks`
+when the execution card's `Roles` field names the `runner`, which it does
+exactly when at least one acceptance check is an `/agent-harness` check; main
+reads that field alone. Main dispatches the rows the output lists, step by step
+through the Verify the acceptance table step; within a step, rows run in
+parallel except that a row waits for the rows its `after` clause names. Main
+reruns the script as the Review and resolve correctness step states. The rows
+the output lists under a step are what that step names. The script owns which
+dispatches the tier and the changed files trigger, their roles, scopes, and
+order; each brief carries what its skill's `## Inputs` requires.
 
 Main splits the work into disjoint slices where possible. Review-fix exceptions
 belong to `/resolve-findings`.
 
 #### Step 5 — Run targeted pre-review checks
 
-Order: the full applicable static pass and `/code-style-review` run after
-propagation; each `Build required` handoff compiles as it arrives and may run in
-parallel with the static pass, except that when the change touches C++ the
-pre-review build waits for `/code-style-review`. Focused implementation
-self-checks remain inside the implementation slices.
+Focused implementation self-checks remain inside the implementation slices.
+The static-checks runner is
+`pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked`;
+it selects its own checks, and its header documents the result and options.
+Main has an `implementer` rewrap every `line-length` failure it reports,
+whether or not the change added the line.
 
-- main runs
-  `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked`
-  after propagation — every tier; the static-checks runner selects its own
-  checks, and its header documents the result and options. Main has an
-  `implementer` rewrap every `line-length` failure it reports in that same
-  pass, whether or not the change added the line.
-- `mechanic` runs `/code-style-review` — for changed C++; a later
-  `/resolve-findings` round that changes C++ re-runs it over the newly changed
-  ranges before that round's `Build required` handoff compiles.
-- `builder` runs `/compile` — every `Build required` handoff, before the covered
-  work advances; the brief states the agent-harness trigger `/compile`
-  `## Inputs` defines, so a stage whose acceptance checks include an
-  `/agent-harness` check also builds the client and the server. Main reads
-  whether they do from the execution card's `Roles` field alone (Step 8
-  `runner` bullet).
+Each `Build required` handoff compiles as it arrives, waiting only for its
+row's `after` clause.
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
@@ -314,115 +314,51 @@ its baseline text, which Git holds.
 
 #### Step 6 — Review and resolve correctness
 
-Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
-after them; `/verify-external-claims` runs whenever a review or
-`/resolve-findings` handoff raises requests, before main decides the dependent
-finding or resolution; `/resolve-findings` runs after each finding main accepts,
-followed by re-review and retest of the affected regions only, each re-review
-brief carrying the first-round findings its skill's `## Inputs` requires; a
-reviewer with no accepted finding whose region a fix changed reruns as a fresh
-first-round pass; a second round needs a reproducible blocker;
-`/external-diagnose-bug` runs before any further `/resolve-findings` attempt on
-a cause whose fix failed its retest, and its proven cause returns to
-`/resolve-findings` or a plan. Whenever the `/over-engineering-review` validator
-or a `/resolve-findings` round changed C++, `/code-style-review` runs over the
-newly changed ranges and `/compile` builds its `Build required`, as in Step 5,
-and only then do `/repo-code-review` and `/comment-review` start, after a round
-as that round's re-reviews of the affected regions; when
-`/over-engineering-review` runs, its finder and validator run before
-`/repo-code-review` and `/comment-review` start, with the validator's handoff,
-or the finder's when the validator is skipped, as `/repo-code-review`'s
-implementation handoff. Other per-artifact reviews and re-reviews wait for
-neither `/over-engineering-review` nor that `/code-style-review` run and build.
-`/over-engineering-review` runs once per stage; a later `/resolve-findings`
-round's re-review covers its own fix.
+At any tier main may add a `reviewer` running `/adversarial-review` on the
+trigger its `## When to use` states.
 
-- fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a
-  fresh `implementer` runs its validator pass — when a `cpp`-class file changed
-  (`overEngineeringReview`), every tier; skip the validator when the finder
-  returns no removal candidates.
-- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its
-  brief carries what `.agents/skills/repo-code-review/SKILL.md` `## Inputs`
-  requires.
-- fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
-- `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
-- fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier
-  1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and
-  also carries Steps 7 and 8; its brief carries what
-  `.agents/skills/coherence-review/SKILL.md` `## Inputs` requires.
-- fresh `reviewer` runs `/coherence-review` — other Tier-2+ artifacts; the
-  reviewer must be new to the change; its brief carries what
-  `.agents/skills/coherence-review/SKILL.md` `## Inputs` requires.
-- `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier
-  for one concrete unresolved hypothesis; its brief carries what
-  `.agents/skills/adversarial-review/SKILL.md` `## Inputs` requires.
-- main runs `/verify-external-claims`, dispatching one `locator` as its evidence
-  worker — for the external claims a review or `/resolve-findings` handoff
-  raises.
-- separate `implementer` runs `/resolve-findings` — whenever main accepts a
-  finding.
-- `implementer` runs `/external-diagnose-bug` — when a fix fails its retest.
+Main runs `/verify-external-claims`, dispatching one `locator`, on the external
+claims a review or `/resolve-findings` handoff raises, before deciding the
+dependent finding or resolution. A separate `implementer` runs
+`/resolve-findings` for each finding main accepts; then only the affected
+regions are re-reviewed and retested, each re-review brief carrying the
+first-round findings its skill's `## Inputs` requires, and a reviewer with no
+accepted finding whose region a fix changed reruns as a fresh first-round pass.
+A second round needs a reproducible blocker. Before any further
+`/resolve-findings` attempt on a cause whose fix failed its retest, an
+`implementer` runs `/external-diagnose-bug`; its proven cause returns to
+`/resolve-findings` or a plan. When the `/over-engineering-review` validator or
+a round changes C++, `/code-style-review` over the newly changed ranges, then
+`/compile` of its `Build required`, run before `/repo-code-review` and
+`/comment-review` start (after a round, as its re-reviews); no other review
+waits for them. `/over-engineering-review` runs once per stage; a later round's
+re-review covers its own fix. Main reruns the step script after
+`/update-affected-code`, `/update-claude-docs`, the validator, and each round
+that changed files, and dispatches each row a rerun first lists in the current
+step or a later one.
 
-Main dispatches one fresh `reviewer` per changed artifact type, plus the
-`mechanic` for `/comment-review` and, for C++, the `/over-engineering-review`
-finder `reviewer` and validator `implementer`, scoped to the changed bytes and
-the rules they touch. Main decides each finding once. A finding a later round's
-reviewer raises again at the same site for the same issue stays rejected when
-main rejected it, and is not decided again; when it was fixed, the re-raise
-counts as a fix that failed its retest, and main decides it as a new finding.
-Churn — a new finding at the site of an applied fix that undoing that fix would
-resolve — is resolved by first considering undoing or reworking that fix rather
-than patching on top of it. `/over-engineering-review` candidates are not
-findings: the validator's re-proof, not main, decides each one, the landing
-reconciliation records the pair as one review row from the validator handoff, or
-the finder's when the validator is skipped, and the later reviews check the
-applied removals like any other changed bytes. Main decides each design
-suggestion from either pass once, by putting it to the user before Step 9 under
-`### User Interaction`; an accepted one follows the Step 8 Leftovers rule, and
-one the user does not accept is logged at Step 9, where one still unanswered
-counts as not accepted.
+Main decides each finding once. A finding a later round's reviewer raises again
+at the same site for the same issue stays rejected when main rejected it, and
+is not decided again; when it was fixed, the re-raise counts as a fix that
+failed its retest, and main decides it as a new finding. Churn — a new finding
+at the site of an applied fix that undoing that fix would resolve — is resolved
+by first considering undoing or reworking that fix rather than patching on top
+of it. `/over-engineering-review` candidates are not findings: the validator's
+re-proof, not main, decides each one, the landing reconciliation records the
+pair as one review row from the validator handoff, or the finder's when the
+validator is skipped, and the later reviews check the applied removals like any
+other changed bytes. Main decides each design suggestion from either pass once,
+by putting it to the user before Step 9 under `### User Interaction`; an
+accepted one follows the Step 8 Leftovers rule, and one the user does not accept
+is logged at Step 9, where one still unanswered counts as not accepted.
 
 <!-- session-context-part: Change Workflow, Steps 7-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 7 — Apply the triggered cleanup
 
-Order: all run in parallel, except `/progressive-disclosure-review` runs after
-`/update-claude-docs` so the prose that step generates is in scope.
-
-- `mechanic` runs `/update-vcxproj` — for changes to file membership or to which
-  executable a whole file belongs to.
-- fresh `reviewer` runs `/external-skill-creator` in findings-only validate mode
-  — when the session changed any file in a `.agents/skills/*/` package that has
-  a `SKILL.md`; where the Step 6 combined pass applies it runs inside that pass
-  instead of its own dispatch.
-- `implementer` runs `/update-claude-docs` — after C++ or GLSL changes.
-- fresh `reviewer` runs `/progressive-disclosure-review` — when the session
-  changed a file its `## When to use` names; where the Step 6 combined pass
-  applies it runs inside that pass like the `/external-skill-creator` validate
-  mode.
+Dispatches: the step script's rows (Step 4).
 
 #### Step 8 — Verify the acceptance table
 
-Order: after Step 7 the `runner` runs first, then `/verify-acceptance`; at a
-landing stage the `runner` runs before Step 9's `/finalize-changes` dispatch;
-`/create-follow-up-plans` runs when a leftover is proven, per the Leftovers
-paragraph below.
-
-- `runner` runs `/agent-harness` for every `/agent-harness` acceptance check on
-  the execution card, on the edited tree — every stage, landing or not,
-  including checks marked `before the first edit`, which Step 4 ran only on the
-  unedited tree. The card's `Roles` field names this `runner` exactly when at
-  least one acceptance check is an `/agent-harness` check; main dispatches it
-  when `Roles` names it, reading that field alone. A change without an
-  execution card is Tier 1 (Step 1), and no Tier 1 change carries an
-  `/agent-harness` acceptance check (`.agents/skills/verify-acceptance/SKILL.md`
-  `## Inputs`), so main dispatches no `runner` for it. The brief cites the
-  checks in the execution-card form `/agent-harness` `## Inputs` defines and
-  writes no step sequence of its own; main reads no check.
-- fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing
-  without landing; a stage landing in the same session gets this from Step 9's
-  landing table instead, and where the Step 6 combined pass applies that pass is
-  this reviewer, read-only apart from the one `Temp/` handoff file
-  `/coherence-review` `## Handoff` requires.
 - `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope
   leftover not fixed inside the current change.
 

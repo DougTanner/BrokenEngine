@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:34.444Z","dependsOn":["Documents/Plans/ChangeWorkflow/ChangeWorkflowStepChecklistScript.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T22:14:34.444Z","dependsOn":[]} -->
 # Consolidate targeted paragraphs of the Change Workflow and /next-plan
 
 ## Context
@@ -40,16 +40,15 @@ shows either trigger occurring, and whether it did is still open. The executing
 session settles it from session transcripts as `## Design` directs, and deletes
 a rule only when its trigger did not fire.
 
-The Plan this Plan depends on (its `dependsOn` metadata) lands first and edits
-the same files: `ChangeWorkflowStepChecklistScript` moves the mechanical
-trigger and ordering logic of Steps 4-8 into a script and deletes that prose.
 Root `AGENTS.md` `## Directives` already carries the `Instruction changes`
 bullet, which states the instruction-authoring rules.
-`.agents/references/change-workflow.md` already carries the never-rule triage,
-which reworded or removed 22 of its 28 "never" clauses and kept six. So some
-ledger text is already changed, and more may be changed or gone when this Plan
-runs; each row's `Recheck` field names the change that may have touched it, and
-the changed-text rule in `## Design` decides what happens.
+`.agents/references/change-workflow.md` already carries two landed changes:
+`.agents/scripts/Get-ChangeWorkflowSteps.ps1` computes the Steps 4-8
+dispatches, so that trigger and ordering prose is gone from Steps 4-8, and
+the never-rule triage reworded or removed 22 of its 28 "never" clauses and
+kept six. So some ledger text is already changed or gone; each row's
+`Recheck` field names the change that may have touched it, and the
+changed-text rule in `## Design` decides what happens.
 
 ## Design
 
@@ -221,8 +220,8 @@ Invariants:
   (`NP01`), and the step 4 brief read limits (`NP02`).
 - Every heading, section anchor, and phrase another file cites survives,
   including `#### Step 2 — Prepare and explore alternatives`,
-  `### Resolving Ambiguity`, the `/coherence-review` combined-pass bullet, the
-  `Leftovers` label, and `### IMPORTANT: Session-complete marker`.
+  `### Resolving Ambiguity`, the `Leftovers` label, and
+  `### IMPORTANT: Session-complete marker`.
 - No replacement has more words than the text it replaces.
 - `change-workflow.md` keeps exactly four `session-context-part` markers.
 

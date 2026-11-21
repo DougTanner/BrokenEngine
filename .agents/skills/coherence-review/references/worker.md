@@ -25,13 +25,11 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    formatting problems in the changed regions yourself and self-check each edit,
    and route what you cannot fix that way with the semantic findings. Done when
    each such problem is either fixed and self-checked, or reported.
-5. In Tier-1 mode, run in this same context, in full, every reviewer-role check
-   the Change Workflow Apply the triggered cleanup step lists — today the
-   `/external-skill-creator` findings-only validate mode and
-   `/progressive-disclosure-review`, each on the trigger that step states;
-   never route one to another worker. Each passes on its own skill's pass
-   condition. Done when each triggered skill has run in full and its handoff is
-   placed as `../SKILL.md` `## Handoff` states.
+5. In Tier-1 mode, run in this same context, in full, every Apply the triggered
+   cleanup check the brief lists as carried; never route one to another worker.
+   Each passes on its own skill's pass condition. Done when each triggered skill
+   has run in full and its handoff is placed as `../SKILL.md` `## Handoff`
+   states.
 6. In Tier-1 mode, when the Verify the acceptance table step applies — a stage
    completing without landing — verify the acceptance table as
    [`../../verify-acceptance/SKILL.md`](../../verify-acceptance/SKILL.md)

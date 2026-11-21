@@ -69,10 +69,6 @@ behavior byte-for-byte equivalent:
   README section, and the FreshMachineSetup OpenCode wrapper bullet; reword the
   client-count and shell sentences and the skills-check parenthetical to name
   Claude Code and Codex only.
-- If `Documents/Plans/ChangeWorkflow/ChangeWorkflowStepChecklistScript.md`
-  still exists at execution, drop `.opencode/opencode.json` from its
-  `### Coherence trigger classes` example list (prose only, marker preserved);
-  if it is gone, skip this item.
 
 Per the root `AGENTS.md` rule against backward compatibility, no alias,
 deprecation message, or `opencode/` branch handling is kept, so an existing
@@ -100,8 +96,6 @@ build, or affinity exposure.
 - `.agents/skills/external-skill-creator/scripts/Find-SkillInboundReferences.ps1`
 - `README.md`
 - `Documents/FreshMachineSetup.md`
-- `Documents/Plans/ChangeWorkflow/ChangeWorkflowStepChecklistScript.md`
-  (conditional)
 
 ## In scope
 
@@ -126,8 +120,6 @@ build, or affinity exposure.
 - `Documents/FreshMachineSetup.md`: the `## 2. Install prerequisites` agent CLI
   list, the `## 6. First wrapper run` OpenCode bullet, and the skills-check
   parenthetical in that section.
-- `ChangeWorkflowStepChecklistScript.md` `### Coherence trigger classes`
-  example list, only when that Plan still exists.
 
 ## Out of scope
 

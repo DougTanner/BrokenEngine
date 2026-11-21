@@ -37,8 +37,9 @@ $script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shade
 $script:CppClasses = @('cpp', 'dual-language-header')
 # The classes whose addition, deletion, rename, or type change can move a project item.
 $script:SourceMembershipClasses = @('cpp', 'dual-language-header', 'glsl')
-# The changed-file classes that make a landing owe its Review and resolve correctness /coherence-review row.
-$script:CoherenceReviewClasses = @('doc', 'plan', 'script', 'skill', 'vcxproj')
+# The changed-file classes that make a landing owe its Review and resolve correctness /coherence-review row: every
+# class but the C++ and GLSL ones.
+$script:CoherenceReviewClasses = @('doc', 'plan', 'script', 'skill', 'vcxproj', 'binary', 'other')
 # One BLOCKED acceptance row per triggered check in this set; this order is the emitted row order.
 $script:AcceptanceSkeletonChecks = [ordered]@{
 	coherenceReview = '/coherence-review'

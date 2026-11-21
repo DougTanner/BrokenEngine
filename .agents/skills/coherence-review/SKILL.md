@@ -23,9 +23,9 @@ Verify the acceptance table steps in that one dispatch.
 
 ## When to use
 
-- Tier-1 combined mode: the Review and resolve correctness combined pass, under
-  the condition the `/coherence-review` combined-pass bullet in the Change
-  Workflow Review and resolve correctness step states.
+- Tier-1 combined mode: the Review and resolve correctness combined pass,
+  whenever `.agents/scripts/Get-ChangeWorkflowSteps.ps1` lists
+  `/coherence-review` in combined mode.
 - Coherence mode: every Tier-2+ change with a changed non-C++ artifact type, and
   every Tier-1 change with a changed non-C++ artifact type that pass does not
   cover. These keep their separate Apply the triggered cleanup and Verify the

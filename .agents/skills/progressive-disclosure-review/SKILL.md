@@ -23,10 +23,8 @@ skill only enforces them.
 
 ## When to use
 
-- The Change Workflow Apply the triggered cleanup step, after
-  `/update-claude-docs`, whenever the session
-  changed `AGENTS.md`, `.agents/skills/**/*.md`,
-  `.agents/references/**/*.md`, or `Documents/Architecture/**/*.md`.
+- The Change Workflow Apply the triggered cleanup step, whenever the session
+  change inventory's `progressiveDisclosureReview` trigger fires.
 - When a reviewer suspects a skill body restates a reference, a script, or a
   parent `AGENTS.md`, or exceeds the skill size thresholds.
 

@@ -11,8 +11,9 @@ One row per target. Fields:
 - Action — rewrite | merge | delete.
 - Recheck — the change that may already have changed or removed this text:
   `NeverTriage` (the landed never-rule triage of
-  `.agents/references/change-workflow.md`), `StepChecklistScript`
-  (ChangeWorkflowStepChecklistScript); `none` otherwise.
+  `.agents/references/change-workflow.md`), `StepChecklistScript` (the landed
+  move of the Steps 4-8 dispatch lookup into
+  `.agents/scripts/Get-ChangeWorkflowSteps.ps1`); `none` otherwise.
 - Intent — the restructuring the row makes, used only by the Plan's
   changed-text rule.
 - Reason — why; for delete rows, the evidence status.
