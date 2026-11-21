@@ -247,3 +247,13 @@ Graphics, engine collection renderers, shaders, and the agent probe.
    Lighting turned off does not.
 7. A ModelViewer flight-mode screenshot (`/agent-harness` ModelViewer
    reference) renders the world lit.
+
+## Coordination
+
+- With `CullLightingDepositsByProjectedFootprint.md`, preserve independent
+  sprite and projected deposit predicates when collapsing the plane selection
+  and area latches. Apply the projected test to the active padded area.
+- With `SkipEmptyLightingSpread.md`, retain the effective deposit count
+  publication when collapsing the collection buffers and refresh gate. The
+  new gate still applies to spread draws while combine, temporal and history
+  copy follow the refresh.
