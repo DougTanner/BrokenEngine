@@ -13,12 +13,11 @@ delivered at session start.
   caller.
 - Give subagents only the instructions and context their task needs; they return
   a short handoff that main routes. Handoff format:
-  `.agents/references/subagent-handoff.md`. Task brief and worker
+  `.agents/references/subagent-handoff.md`. Task brief, waiting, and worker
   interruption/recovery: `.agents/references/subagent-reporting.md`.
 - While workers run, continue useful independent work when available; avoid
   unnecessary status checks, duplicating their investigation or implementation,
-  and context-heavy work unless it advances a useful independent task. Waiting
-  and recovery mechanics: `.agents/references/subagent-reporting.md`.
+  and context-heavy work unless it advances a useful independent task.
 
 ### Delegation roles
 
@@ -150,10 +149,9 @@ Definitions:
   `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh` or
   `.codex/codex-worktree.ps1`, owning an isolated worktree. A retained wrapper
-  session reattaches only through the same wrapper with its explicit reattach
-  worktree input — `--reattach-worktree <path>` for Claude and
-  `-ReattachWorktree <path>` for Codex. If the user opens a session directly on
-  main, work in that checkout and do not use the worktree flow.
+  session reattaches only through the same wrapper's reattach input, whose
+  command `/eod` gives. If the user opens a session directly on main, work in
+  that checkout and do not use the worktree flow.
 - Primary — the shared main checkout and its main branch that finished session
   work lands into.
 - Step and stage — a step is one of the nine numbered Change Workflow steps
@@ -196,21 +194,19 @@ and Tier-1 routes.
   (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds
   Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared
   task-brief form with `Skill: /plan-alternatives`, the objective, evidence
-  paths under `Governing paths:`, the tier, fixed user decisions, one line
-  naming the drafted mechanism as candidate zero, and the assigned axis — never
-  the plan's rationale, never the plan's `## In scope`/`## Out of scope`
-  sections, and never the plan file's path, in any field and in any form,
-  positive or negative. `Governing paths:` never names a path under `Temp/`,
-  `Documents/Plans/`, `Documents/Features/`, or `Documents/Investigations/`
-  other than the `AGENTS.md` of those three `Documents/` trees; main restates
-  any fact held only in such a path as text in the brief, under the same
-  exclusions. Main writes the candidate-zero line from the
-  `Mechanism` row of the preparation handoff's `Candidate zero` field whenever
-  a preparation handoff returned that field with a value other than `none`,
-  reading that row inline or in the file section the handoff's `Evidence`
-  cites for it, and no other part of the plan snapshot or the plan file.
-  Main compares the handoffs per that skill's `## Handoff`
-  and presents per that skill's `### User presentation`.
+  paths under `Governing paths:`, the tier, fixed user decisions, the assigned
+  axis, and one candidate-zero line naming the drafted mechanism. When a
+  preparation handoff returned a `Candidate zero` field other than `none`, main
+  writes that line from its `Mechanism` row, read inline or in the file section
+  the handoff's `Evidence` cites for it, and reads no other part of the plan
+  snapshot or plan file. Blindness: no field, in any form, positive or
+  negative, carries the plan's rationale, its `## In scope`/`## Out of scope`
+  sections, or the plan file's path; `Governing paths:` names no path under
+  `Temp/`, `Documents/Plans/`, `Documents/Features/`, or
+  `Documents/Investigations/` except those three `Documents/` trees'
+  `AGENTS.md`, and main restates a fact held only in such a path as brief text
+  under the same exclusions. Main compares the handoffs per that skill's
+  `## Handoff` and presents per that skill's `### User presentation`.
 
 #### Step 3 — Plan review
 
@@ -251,12 +247,12 @@ handoffs, then presents the resolved plan for approval per `/next-plan`
 #### Step 4 — Implement and propagate
 
 Order: the acceptance checks the execution card marks `before the first edit`
-run first, on the unedited tree; then the slices run in parallel. Main finds
-the marked checks by one line search for that literal limited to the card's
-`Acceptance checks` field, the lines from its `- Acceptance checks:` line up to
-its `- Roles:` line, printing only the matched text because a host may hide a
-long matching line. It reads only each marked check, from its marked line to
-the check's end, and from that text takes the executor, the build (project and
+run first, on the unedited tree; then the slices run in parallel. To find the
+marked checks, main runs one line search for that literal over the card's
+`Acceptance checks` field alone (its `- Acceptance checks:` line up to its
+`- Roles:` line), printing only the matched text, since a host may hide a long
+matching line. Main then reads only each marked check, from its marked line to
+the check's end, taking from it the executor, the build (project and
 configuration, or none), and the scenario steps for the `builder` and `runner`
 briefs.
 
@@ -337,20 +333,24 @@ re-review covers its own fix. Main reruns the step script after
 that changed files, and dispatches each row a rerun first lists in the current
 step or a later one.
 
-Main decides each finding once. A finding a later round's reviewer raises again
-at the same site for the same issue stays rejected when main rejected it, and
-is not decided again; when it was fixed, the re-raise counts as a fix that
-failed its retest, and main decides it as a new finding. Churn — a new finding
-at the site of an applied fix that undoing that fix would resolve — is resolved
-by first considering undoing or reworking that fix rather than patching on top
-of it. `/over-engineering-review` candidates are not findings: the validator's
-re-proof, not main, decides each one, the landing reconciliation records the
-pair as one review row from the validator handoff, or the finder's when the
-validator is skipped, and the later reviews check the applied removals like any
-other changed bytes. Main decides each design suggestion from either pass once,
-by putting it to the user before Step 9 under `### User Interaction`; an
-accepted one follows the Step 8 Leftovers rule, and one the user does not accept
-is logged at Step 9, where one still unanswered counts as not accepted.
+Main decides each finding once:
+
+- A finding a later round's reviewer raises again at the same site for the
+  same issue: when main rejected it, it stays rejected and is not decided
+  again; when it was fixed, the fix failed its retest, and main decides the
+  re-raise as a new finding.
+- Churn, a new finding at the site of an applied fix that undoing that fix
+  would resolve: first consider undoing or reworking that fix rather than
+  patching on top of it.
+- `/over-engineering-review` candidates are not findings: the validator's
+  re-proof, not main, decides each one; the landing reconciliation records the
+  pair as one review row from the validator handoff, or the finder's when the
+  validator is skipped; the later reviews check the applied removals like any
+  other changed bytes.
+- Main puts each design suggestion from either pass to the user once, before
+  Step 9, under `### User Interaction`; an accepted one follows the Step 8
+  Leftovers rule, and one not accepted, including one still unanswered, is
+  logged at Step 9.
 
 <!-- session-context-part: Change Workflow, Steps 7-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 7 — Apply the triggered cleanup
@@ -362,29 +362,32 @@ Dispatches: the step script's rows (Step 4).
 - `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope
   leftover not fixed inside the current change.
 
-Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded,
-decidable from evidence already in hand), such as the same defect at a sibling
-site, is fixed inside the current change without asking: record it as approved
-scope (on the execution card when one exists), reclassify the whole change at
-the highest applicable tier, run every step that tier triggers for the touched
-regions (plan review included), and report the expansion in the message already
-being sent. This rule governs over a plan's `## Out of scope` entry that would
-route such a leftover to residuals or a follow-up Plan, except an entry the
-user's own words chose (`.agents/references/authority-order.md`). When the
-footer marks a follow-up Plan `unlanded in worktree` as `do now: yes` and the
-user directs it before the landing confirmation, main executes that Plan as
-approved scope of the current change regardless of the current change's tier,
-with the same recording, reclassification, and triggered steps; its Plan file is
-deleted from the worktree, and its support folder through
-`Remove-PlanSupportFolder.ps1` (`Documents/Plans/AGENTS.md` `## Plan files`),
-instead of landing, so nothing is claimed or completed. Every other proven
-out-of-scope leftover, including one the user directs to defer, goes through
-`/create-follow-up-plans`; one whose root cause is not yet confirmed need not be
-diagnosed first but becomes a Plan whose investigation portion
-(`Documents/Plans/AGENTS.md` `## Plan files`) leaves diagnosis to the session
-executing it. One proven before the Step 6 dispatch is authored first, with the
-Plan path and its support-folder files recorded as approved scope, so that
-round's reviews cover it; one proven later routes here unchanged.
+Leftovers:
+
+- A proven leftover that is itself small (Tier 1 or 2, bounded, decidable from
+  evidence already in hand), such as the same defect at a sibling site, is
+  fixed inside the current change without asking: record it as approved scope
+  (on the execution card when one exists), reclassify the whole change at the
+  highest applicable tier, run every step that tier triggers for the touched
+  regions (plan review included), and report the expansion in the message
+  already being sent. This governs over a plan's `## Out of scope` entry that
+  would route it to residuals or a follow-up Plan, except an entry the user's
+  own words chose (`.agents/references/authority-order.md`).
+- A follow-up Plan the footer marks `unlanded in worktree` as `do now: yes`,
+  when the user directs it before the landing confirmation, is executed as
+  approved scope of the current change regardless of the current change's
+  tier, with the same recording, reclassification, and triggered steps; its
+  Plan file is deleted from the worktree, and its support folder through
+  `Remove-PlanSupportFolder.ps1` (`Documents/Plans/AGENTS.md` `## Plan files`),
+  instead of landing, so nothing is claimed or completed.
+- Every other proven out-of-scope leftover, including one the user directs to
+  defer, goes through `/create-follow-up-plans`. One whose root cause is not
+  yet confirmed need not be diagnosed first; its Plan's investigation portion
+  (`Documents/Plans/AGENTS.md` `## Plan files`) leaves diagnosis to the
+  executing session. One proven before the Step 6 dispatch is authored first,
+  with the Plan path and its support-folder files recorded as approved scope,
+  so that round's reviews cover it; one proven later follows this route
+  unchanged.
 
 #### Step 9 — Verify and land
 
