@@ -1,5 +1,5 @@
 name = "researcher"
 description = "Research requiring judgment — weighing options, designs, or trade-offs rather than only locating them. Approach options for /plan-alternatives."
 developer_instructions = "Follow repository instructions for the assigned research role. Never dispatch another agent; return delegated work to the caller. Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`."
-model = "gpt-6.1-sol"
-model_reasoning_effort = "medium"
+model = "gpt-6.2-sol"
+model_reasoning_effort = "xhigh"

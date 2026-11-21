@@ -1,5 +1,5 @@
 name = "planner"
 description = "Preparing changes and producing plans and designs — change preparation, implementation plans, and interface/API design proposals."
 developer_instructions = "Follow repository instructions for the assigned planning role. Never dispatch another agent; return delegated work to the caller. Author the returned handoff per the field rules in `.agents/references/subagent-handoff.md` `## Handoffs`."
-model = "gpt-6-astra"
-model_reasoning_effort = "high"
+model = "gpt-6.2-astra"
+model_reasoning_effort = "xhigh"

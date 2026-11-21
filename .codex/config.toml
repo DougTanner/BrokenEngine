@@ -1,3 +1,6 @@
+model = "gpt-6.2-astra"
+model_reasoning_effort = "xhigh"
+
 [features.multi_agent_v2]
 enabled = true
 min_wait_timeout_ms = 500000
