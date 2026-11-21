@@ -7,11 +7,11 @@ field shapes, and the routing rules stay in [`/next-plan`](../SKILL.md).
 
 ## Where each field comes from
 
-The block names the client (the session-branch `claude`/`codex` prefix), the
-worktree/branch UUID, the session branch, a profile-relative worktree locator
-with the user-profile prefix stripped, and, on Claude, the conversation session
-ID. Take the client, worktree/branch UUID, session branch, and worktree locator
-from the `Get-NextPlanContext` result already resolved at
+The block names the client (the session-branch `claude`/`codex`/`agy` prefix),
+the worktree/branch UUID, the session branch, a profile-relative worktree
+locator with the user-profile prefix stripped, and, on Claude or `agy`, the
+conversation session ID. Take the client, worktree/branch UUID, session branch,
+and worktree locator from the `Get-NextPlanContext` result already resolved at
 [the `/next-plan` steps](../SKILL.md#steps) step 1, or from
 `git branch --show-current` and
 `git rev-parse --show-toplevel`.
@@ -19,14 +19,14 @@ from the `Get-NextPlanContext` result already resolved at
 ## Conversation session ID
 
 Those sources name the worktree only, so none of them yields the conversation
-session ID that lets `/next-plan-review` skip discovery. Any shell of the
-session reads it from the `CLAUDE_CODE_SESSION_ID` environment variable, a
-dispatched worker's shell included, because a subagent shell carries the parent
-session's value; the value differs per conversation and resume, so read it when
-the friction is recorded. Codex sessions record no conversation session ID,
-because they have no runtime source for one; `/next-plan-review` discovers
-Codex transcripts by bounded commit window, and a recorded Claude ID is the
-Claude override.
+session ID that lets `/next-plan-review` skip discovery. On Claude, any shell
+reads `CLAUDE_CODE_SESSION_ID` because subagents inherit the parent session's
+value; on `agy`, `ANTIGRAVITY_CONVERSATION_ID` is worker-scoped, so read
+`.RootSessionId` from `Resolve-AgentAgyParentSession` in
+`.agents/scripts/AgentTranscriptCommon.psm1`. Both vary per conversation or
+resume, so read them when friction is recorded. Codex records no conversation
+session ID and relies on bounded commit-window discovery, while a recorded
+Claude or `agy` ID overrides discovery.
 
 ## Friction observed in a different session
 
@@ -40,6 +40,6 @@ landing ref is stated.
 ## What never enters a Plan
 
 Never record a transcript file path or transcript text; reference the session by
-client, worktree/branch UUID, on Claude the conversation session ID, and, for an
-earlier observing session, its landed commit hash, never its branch, as the
-review ref.
+client, worktree/branch UUID, on Claude or `agy` the conversation session ID,
+and, for an earlier observing session, its landed commit hash, never its branch,
+as the review ref.

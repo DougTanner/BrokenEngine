@@ -8,7 +8,7 @@ routing for [`/next-plan-review`](../SKILL.md).
 
 The main session runs the most expensive model, so concern 4 asks what entered
 its context and what each entry bought; a subagent's own context is out of
-scope. Measure before judging. For a Claude parent transcript, run once
+scope. Measure before judging. For a Claude or `agy` parent transcript, run once
 `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<parent transcript path>'`,
 whose header comment states the row shapes: its rows select which records to
 open, and the `len` column only orders that selection. Measure a finding's

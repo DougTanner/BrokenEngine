@@ -55,21 +55,23 @@ step owns.
    - Done when the commit facts and those contracts are in hand.
 5. Build the transcript path from the finder's result: a locator is
    store-relative with its first segment naming the store, so join the remaining
-   segments to that store's root. The result exposes no store root, so derive it
-   exactly as the finder's store-root parameters default to, from the user
-   profile. Never guess an ID from timestamps, prescribe a private local path,
-   or sweep client data. Read a Claude transcript through the projection
-   invocation documented in [`measurement.md`](measurement.md)
-   `## Measure main-session token efficiency`, opening only the records that
-   projection selects; never hand-compose a projection or read a transcript
-   whole. Done when the transcript to read is fixed or the review is `BLOCKED`
-   for want of an exact ID.
+   segments to that store's root. The result exposes no store root, so derive
+   every other store from the user profile as the finder defaults, and `brain`
+   via `Get-AgentAgyBrainRoot` in `.agents/scripts/AgentTranscriptCommon.psm1`.
+   Never guess an ID from timestamps, prescribe a private local path, or sweep
+   client data. Read a Claude or `agy` transcript through the projection
+   invocation documented in [`measurement.md`](measurement.md) `## Measure
+   main-session token efficiency`, opening only the records that projection
+   selects; never hand-compose a projection or read a transcript whole. Done
+   when the transcript to read is fixed or the review is `BLOCKED` for want of
+   an exact ID.
 6. Prove production of the commit, then build the routing inventory.
    - Prove the parent started before and covered the commit and recorded
      finalization producing the full hash. An exact ID or filename is selection
      evidence, not production proof.
-   - Claude, on a bounded result: the finder's commit-time span and full-hash
-     mention select the transcript and are not production proof by themselves.
+   - Claude or `agy`, on a bounded result: the finder's commit-time span and
+     full-hash mention select the transcript and are not production proof by
+     themselves.
    - Codex: prove the parent used the eligible retained registered worktree
      selected by the finder. On a bounded result the finder's eligible-worktree
      gate already settles it; on a `selection.mode: explicit-session-id` result,
@@ -100,8 +102,8 @@ step owns.
      and fixed return window.
    - Do not use the finder or its `descendants` list as inventory authority: it
      is discovery metadata recording a *claimed* relationship, while the parent
-     delegation event this step requires lives in the parent's own
-     `sub_agent_activity` records.
+     delegation event this step requires lives in the parent's own delegation
+     records.
    - A `needs-selection` listing reports `descendantCount` only and may mix
      clients; the full `descendants` list appears only on a single-candidate
      `pass` result, and a candidate's descendant fields may be null, which is
@@ -138,20 +140,22 @@ step owns.
      [`measurement.md`](measurement.md) `## Measure main-session token
      efficiency` before assessing concern 4.
    - Only when the usage-analysis request was supplied and provenance is
-     proven, run once per proven Claude transcript — the parent and each Claude
-     child row Step 6 inventoried —
+     proven, run once per proven Claude or `agy` transcript (parent and Step 6
+     child rows):
      `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Get-TranscriptUsage.ps1 -TranscriptPath '<path>'`,
-     assigning its output to a variable and piping it to `ConvertFrom-Json`. A
+     assigning its output to a variable and piping it to `ConvertFrom-Json`.
+     A Claude child's path is
+     `<parent transcript dir>/<parent session ID>/subagents/agent-<agentId>.jsonl`
+     with `<agentId>` (`^[A-Za-z0-9]+$`) from the parent tool-result's
+     `toolUseResult.agentId`, else `unsupported (no agent ID)`. An `agy`
      child's path is
-     `<directory containing the proven parent transcript>/<parent session ID>/subagents/agent-<agentId>.jsonl`,
-     where `<agentId>` is the `toolUseResult.agentId` on the parent's
-     tool-result record answering that child's delegation `tool_use`; never
-     glob the directory. A child whose agent ID is absent or does not match
-     `^[A-Za-z0-9]+$` gets an `unsupported (no agent ID)` row, and every Codex
-     transcript an `unsupported (codex)` row, each with no helper run. Report
-     the rows per [`measurement.md`](measurement.md) `## Report observed
-     usage`; a derived path is a helper argument only. Without the request this
-     bullet runs nothing.
+     `<brain root>/<childId>/.system_generated/logs/transcript_full.jsonl`
+     with lowercase-UUID `<childId>` from `invoke_subagent`'s `GENERIC`
+     `"conversationId"`, else `unsupported (no conversation ID)`. Never glob
+     child directories. Codex transcripts get `unsupported (codex)` with no
+     helper run. Report rows per [`measurement.md`](measurement.md) `## Report
+     observed usage`; a derived path is a helper argument only. Without the
+     request this bullet runs nothing.
    - Done when every requirement above has been completed for the proven parent
      and every routing-inventory row.
 9. Use the shared handoff form and extension block in

@@ -63,8 +63,9 @@ Require the shared handoff form in
   `<transcript label> | partial | none` row for a `partial` result with no
   resolved model; and one `<transcript label> | unsupported (<reason>)` row per
   unsupported transcript. The label is the parent's session ID, a Claude child's
-  `<parent session ID>/agent-<agentId>`, or a Codex row's own session ID; child
-  rows come after the parent's rows and are never merged with them.
+  `<parent session ID>/agent-<agentId>`, or an `agy` child's or Codex row's own
+  session ID; child rows come after the parent's rows and are never merged with
+  them.
 
 The shared `Decisive checks` rows carry provenance, sessions read, sourced
 timeline, pauses, and conformance, minimality, and process evidence. Each

@@ -7,10 +7,17 @@ param(
 	[int] $WindowMinutes = 360,
 	[string] $SessionStoreRoot,
 	[string] $ArchivedSessionStoreRoot,
-	[string] $ClaudeSessionStoreRoot
+	[string] $ClaudeSessionStoreRoot,
+	[string] $AgySessionStoreRoot
 )
 
 $ErrorActionPreference = 'Stop'
+
+$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
+if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentTranscriptCommon.psm1'))) {
+	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
+}
+Import-Module (Join-Path $sharedScripts 'AgentTranscriptCommon.psm1') -Force
 
 function ConvertTo-UtcTimestamp([string] $Value) {
 	if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
@@ -24,34 +31,13 @@ function ConvertTo-UtcTimestamp([string] $Value) {
 	catch { return $null }
 }
 
-function ConvertTo-LexicalCanonicalPath([string] $Path) {
-	if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
-	try {
-		$fullPath = [IO.Path]::GetFullPath($Path).Replace([IO.Path]::AltDirectorySeparatorChar, [IO.Path]::DirectorySeparatorChar)
-		$root = [IO.Path]::GetPathRoot($fullPath)
-		if ([string]::IsNullOrWhiteSpace($root)) { return $null }
-		if ($fullPath.Length -gt $root.Length) {
-			$fullPath = $fullPath.TrimEnd([char[]]@('\', '/'))
-		}
-		return $fullPath
-	}
-	catch { return $null }
-}
-
 function Get-CanonicalMetadataCwd([string] $Path) {
 	if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
 	if (-not [IO.Path]::IsPathFullyQualified($Path)) { return $null }
 	foreach ($segment in $Path.Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries)) {
 		if ($segment -eq '.' -or $segment -eq '..') { return $null }
 	}
-	return ConvertTo-LexicalCanonicalPath $Path
-}
-
-function Get-StringProperty($Object, [string] $Name) {
-	if ($null -eq $Object) { return $null }
-	$property = $Object.PSObject.Properties[$Name]
-	if ($null -eq $property) { return $null }
-	return [string] $property.Value
+	return ConvertTo-AgentLexicalCanonicalPath $Path
 }
 
 function Invoke-Git([string[]] $Arguments) {
@@ -115,56 +101,26 @@ function Get-EligibleWorktreeRoots([string] $CommitHash, [string] $CommonDirecto
 	$roots = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 	foreach ($record in $records) {
 		if ($record.Bare -or $record.Prunable -or [string]::IsNullOrWhiteSpace($record.Path) -or [string]::IsNullOrWhiteSpace($record.Head)) { continue }
-		$root = ConvertTo-LexicalCanonicalPath $record.Path
+		$root = ConvertTo-AgentLexicalCanonicalPath $record.Path
 		if ($null -eq $root) { throw 'Git worktree metadata is malformed.' }
 		if (Test-CommitContainedBy $CommitHash $record.Head) { [void] $roots.Add($root) }
 	}
 	return (, $roots)
 }
 
-function Test-PathWithin([string] $Candidate, [string] $Root) {
-	$candidatePath = ConvertTo-LexicalCanonicalPath $Candidate
-	$rootPath = ConvertTo-LexicalCanonicalPath $Root
-	if ($null -eq $candidatePath -or $null -eq $rootPath) { return $false }
-	$prefix = if ($rootPath.EndsWith([IO.Path]::DirectorySeparatorChar)) { $rootPath } else { "$rootPath$([IO.Path]::DirectorySeparatorChar)" }
-	return $candidatePath.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase) -or
-		$candidatePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
-}
-
 function Get-Locator([string] $Path) {
 	foreach ($store in @(
 		@{ Name = 'sessions'; Root = $SessionStoreRoot },
 		@{ Name = 'archived_sessions'; Root = $ArchivedSessionStoreRoot },
-		@{ Name = 'projects'; Root = $ClaudeSessionStoreRoot }
+		@{ Name = 'projects'; Root = $ClaudeSessionStoreRoot },
+		@{ Name = 'brain'; Root = $AgySessionStoreRoot }
 	)) {
-		if (-not [string]::IsNullOrWhiteSpace($store.Root) -and (Test-PathWithin $Path $store.Root)) {
+		if (-not [string]::IsNullOrWhiteSpace($store.Root) -and (Test-AgentPathWithin $Path $store.Root)) {
 			$relative = [IO.Path]::GetRelativePath($store.Root, $Path).Replace('\', '/')
 			return "$($store.Name)/$relative"
 		}
 	}
 	return [IO.Path]::GetFileName($Path)
-}
-
-function Get-PathSafety([string] $Path) {
-	$fullPath = ConvertTo-LexicalCanonicalPath $Path
-	if ($null -eq $fullPath) { return [pscustomobject]@{ Status = 'error'; Item = $null; Path = $null } }
-	$root = [IO.Path]::GetPathRoot($fullPath)
-	$segments = $fullPath.Substring($root.Length).Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries)
-	$current = $root
-	foreach ($segment in @('') + $segments) {
-		if ($segment.Length -ne 0) { $current = Join-Path $current $segment }
-		try { $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop }
-		catch {
-			if ($_.Exception -is [Management.Automation.ItemNotFoundException]) {
-				return [pscustomobject]@{ Status = 'missing'; Item = $null; Path = $fullPath }
-			}
-			return [pscustomobject]@{ Status = 'error'; Item = $null; Path = $fullPath }
-		}
-		if (([IO.FileAttributes] $item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-			return [pscustomobject]@{ Status = 'unsafe'; Item = $null; Path = $fullPath }
-		}
-	}
-	return [pscustomobject]@{ Status = 'safe'; Item = $item; Path = $fullPath }
 }
 
 function Add-ReadError([Collections.Generic.Dictionary[string, object]] $ReadErrors, [string] $Locator, [string] $Code, [string] $Message) {
@@ -175,7 +131,7 @@ function Add-ReadError([Collections.Generic.Dictionary[string, object]] $ReadErr
 }
 
 function Get-SafeStoreRoot([string] $Name, [string] $Root, [Collections.Generic.Dictionary[string, object]] $ReadErrors) {
-	$safety = Get-PathSafety $Root
+	$safety = Get-AgentPathSafety $Root
 	if ($safety.Status -eq 'missing') { return $null }
 	if ($safety.Status -ne 'safe' -or -not $safety.Item.PSIsContainer) {
 		$code = if ($safety.Status -eq 'unsafe') { 'transcript.unsafe-path' } else { 'transcript.read-failed' }
@@ -213,20 +169,22 @@ function Get-TranscriptMetadata([string] $Path, [string] $CommitHash) {
 			if ([string]::IsNullOrWhiteSpace($line)) { continue }
 			if ($line.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { $commitHashMentions++ }
 			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
-			$eventTime = ConvertTo-UtcTimestamp (Get-StringProperty $record 'timestamp')
+			$eventTime = ConvertTo-UtcTimestamp ([string](Get-AgentTranscriptField $record 'timestamp'))
 			if ($null -ne $eventTime) {
 				if ($null -eq $start -or $eventTime -lt $start) { $start = $eventTime }
 				if ($null -eq $end -or $eventTime -gt $end) { $end = $eventTime }
 			}
 			if ($record.type -eq 'session_meta') {
-				$cwd = Get-StringProperty $record.payload 'cwd'
+				$cwd = [string](Get-AgentTranscriptField $record.payload 'cwd')
 				# `payload.session_id` is the root thread id, not this transcript's own id, so the two
 				# are kept apart: identity comes from `id`, and their relationship classifies the record.
-				$transcriptId = Get-StringProperty $record.payload 'id'
-				$rootSessionId = Get-StringProperty $record.payload 'session_id'
+				$transcriptId = [string](Get-AgentTranscriptField $record.payload 'id')
+				$rootSessionIdVal = Get-AgentTranscriptField $record.payload 'session_id'
+				$rootSessionId = if ($null -ne $rootSessionIdVal) { [string] $rootSessionIdVal } else { $null }
 				$threadSpawn = Get-ThreadSpawn $record.payload
 				if ($null -ne $threadSpawn) {
-					$agentPath = Get-StringProperty $threadSpawn 'agent_path'
+					$agentPathVal = Get-AgentTranscriptField $threadSpawn 'agent_path'
+					$agentPath = if ($null -ne $agentPathVal) { [string] $agentPathVal } else { $null }
 					$depthProperty = $threadSpawn.PSObject.Properties['depth']
 					if ($null -ne $depthProperty) { $depth = $depthProperty.Value }
 				}
@@ -262,8 +220,9 @@ function Get-TranscriptSessionMeta([string] $Path) {
 			if ([string]::IsNullOrWhiteSpace($line)) { continue }
 			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
 			if ($record.type -ne 'session_meta') { continue }
-			$transcriptId = Get-StringProperty $record.payload 'id'
-			$rootSessionId = Get-StringProperty $record.payload 'session_id'
+			$transcriptId = [string](Get-AgentTranscriptField $record.payload 'id')
+			$rootSessionIdVal = Get-AgentTranscriptField $record.payload 'session_id'
+			$rootSessionId = if ($null -ne $rootSessionIdVal) { [string] $rootSessionIdVal } else { $null }
 			$id = if ([string]::IsNullOrWhiteSpace($transcriptId)) { $rootSessionId } else { $transcriptId }
 			if ([string]::IsNullOrWhiteSpace($id)) { throw 'Required session metadata is missing.' }
 			return [pscustomobject]@{
@@ -301,13 +260,13 @@ function Get-ClaudeTranscriptMetadata([string] $Path, [string] $CommitHash, [swi
 			if ([string]::IsNullOrWhiteSpace($line)) { continue }
 			if ($line.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { $commitHashMentions++ }
 			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
-			$eventTime = ConvertTo-UtcTimestamp (Get-StringProperty $record 'timestamp')
+			$eventTime = ConvertTo-UtcTimestamp ([string](Get-AgentTranscriptField $record 'timestamp'))
 			if ($null -ne $eventTime) {
 				if ($null -eq $start -or $eventTime -lt $start) { $start = $eventTime }
 				if ($null -eq $end -or $eventTime -gt $end) { $end = $eventTime }
 			}
-			if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = Get-StringProperty $record 'cwd' }
-			if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = Get-StringProperty $record 'sessionId' }
+			if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = [string](Get-AgentTranscriptField $record 'cwd') }
+			if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = [string](Get-AgentTranscriptField $record 'sessionId') }
 		}
 		if ($null -eq $start -or $null -eq $end -or [string]::IsNullOrWhiteSpace($cwd) -or [string]::IsNullOrWhiteSpace($sessionId)) {
 			throw 'Required session metadata is missing.'
@@ -330,6 +289,55 @@ function Get-ClaudeTranscriptMetadata([string] $Path, [string] $CommitHash, [swi
 	}
 }
 
+function Get-AgyTranscriptMetadata([string] $Path, [string] $SessionId, [string] $CommitHash, [switch] $RequireCommitHash) {
+	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$reader = [IO.StreamReader]::new($stream)
+	try {
+		$text = $reader.ReadToEnd()
+		if ($RequireCommitHash -and -not $text.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { return $null }
+		$lines = [IO.StringReader]::new($text)
+		$start = $null
+		$end = $null
+		$commitHashMentions = 0
+		$hasUserExplicit = $false
+		while (($line = $lines.ReadLine()) -ne $null) {
+			if ([string]::IsNullOrWhiteSpace($line)) { continue }
+			if ($line.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { $commitHashMentions++ }
+			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
+			if ($record -isnot [Management.Automation.PSCustomObject]) { throw 'Transcript record is not a JSON object.' }
+			$eventTime = ConvertTo-UtcTimestamp ([string](Get-AgentTranscriptField $record 'created_at'))
+			if ($null -ne $eventTime) {
+				if ($null -eq $start -or $eventTime -lt $start) { $start = $eventTime }
+				if ($null -eq $end -or $eventTime -gt $end) { $end = $eventTime }
+			}
+			$recordType = [string](Get-AgentTranscriptField $record 'type')
+			$recordSource = [string](Get-AgentTranscriptField $record 'source')
+			if ($recordType -ceq 'USER_INPUT' -and $recordSource -ceq 'USER_EXPLICIT') {
+				$hasUserExplicit = $true
+			}
+		}
+		if ($null -eq $start -or $null -eq $end) {
+			throw 'Required session metadata is missing.'
+		}
+		return [pscustomobject]@{
+			SessionId = $SessionId
+			RootSessionId = $null
+			IsRoot = $hasUserExplicit
+			Depth = $null
+			AgentPath = $null
+			CommitHashMentions = $commitHashMentions
+			Start = $start
+			End = $end
+			Cwd = $null
+			HasUserExplicit = $hasUserExplicit
+		}
+	}
+	finally {
+		$reader.Dispose()
+		$stream.Dispose()
+	}
+}
+
 function Add-Files(
 	[Collections.Generic.Dictionary[string, IO.FileInfo]] $Files,
 	[Collections.Generic.Dictionary[string, object]] $ReadErrors,
@@ -340,7 +348,7 @@ function Add-Files(
 	[scriptblock] $IncludeReparseDirectory
 ) {
 	if ([string]::IsNullOrWhiteSpace($Root)) { return }
-	$rootSafety = Get-PathSafety $Root
+	$rootSafety = Get-AgentPathSafety $Root
 	if ($rootSafety.Status -eq 'missing') { return }
 	if ($rootSafety.Status -ne 'safe' -or -not $rootSafety.Item.PSIsContainer) {
 		$code = if ($rootSafety.Status -eq 'unsafe') { 'transcript.unsafe-path' } else { 'transcript.read-failed' }
@@ -374,7 +382,7 @@ function Add-Files(
 				Add-ReadError $ReadErrors (Get-Locator $entry.FullName) 'transcript.unsafe-path' 'Transcript candidate is an unsafe reparse path.'
 				continue
 			}
-			$safety = Get-PathSafety $entry.FullName
+			$safety = Get-AgentPathSafety $entry.FullName
 			if ($safety.Status -ne 'safe') {
 				$code = if ($safety.Status -eq 'unsafe') { 'transcript.unsafe-path' } else { 'transcript.read-failed' }
 				Add-ReadError $ReadErrors (Get-Locator $entry.FullName) $code 'Transcript candidate path could not be safely read.'
@@ -392,13 +400,13 @@ function Write-Result($Result, [int] $ExitCode) {
 }
 
 try {
-	$RepositoryRoot = ConvertTo-LexicalCanonicalPath $RepositoryRoot
+	$RepositoryRoot = ConvertTo-AgentLexicalCanonicalPath $RepositoryRoot
 	if ($null -eq $RepositoryRoot) { throw 'RepositoryRoot is invalid.' }
-	$actualRoot = ConvertTo-LexicalCanonicalPath (@(Invoke-Git @('rev-parse', '--show-toplevel'))[0].Trim())
+	$actualRoot = ConvertTo-AgentLexicalCanonicalPath (@(Invoke-Git @('rev-parse', '--show-toplevel'))[0].Trim())
 	if ($null -eq $actualRoot -or -not $actualRoot.Equals($RepositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
 		throw 'RepositoryRoot is not the selected Git worktree root.'
 	}
-	$commonDirectory = ConvertTo-LexicalCanonicalPath (@(Invoke-Git @('rev-parse', '--path-format=absolute', '--git-common-dir'))[0].Trim())
+	$commonDirectory = ConvertTo-AgentLexicalCanonicalPath (@(Invoke-Git @('rev-parse', '--path-format=absolute', '--git-common-dir'))[0].Trim())
 	if ($null -eq $commonDirectory) { throw 'Git common directory is invalid.' }
 	$commitHash = @(Invoke-Git @('rev-parse', "$Commit^{commit}"))[0].Trim()
 	$commitDates = @(Invoke-Git @('show', '-s', '--format=%aI%n%cI', $commitHash))
@@ -414,17 +422,21 @@ try {
 	if ([string]::IsNullOrWhiteSpace($SessionStoreRoot)) { $SessionStoreRoot = Join-Path $userProfile '.codex\sessions' }
 	if ([string]::IsNullOrWhiteSpace($ArchivedSessionStoreRoot)) { $ArchivedSessionStoreRoot = Join-Path $userProfile '.codex\archived_sessions' }
 	if ([string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot)) { $ClaudeSessionStoreRoot = Join-Path $userProfile '.claude\projects' }
-	$SessionStoreRoot = ConvertTo-LexicalCanonicalPath $SessionStoreRoot
-	$ArchivedSessionStoreRoot = ConvertTo-LexicalCanonicalPath $ArchivedSessionStoreRoot
-	$ClaudeSessionStoreRoot = ConvertTo-LexicalCanonicalPath $ClaudeSessionStoreRoot
-	if ($null -eq $SessionStoreRoot -or $null -eq $ArchivedSessionStoreRoot -or $null -eq $ClaudeSessionStoreRoot) { throw 'Transcript store path is invalid.' }
+	if ([string]::IsNullOrWhiteSpace($AgySessionStoreRoot)) { $AgySessionStoreRoot = Get-AgentAgyBrainRoot }
+	$SessionStoreRoot = ConvertTo-AgentLexicalCanonicalPath $SessionStoreRoot
+	$ArchivedSessionStoreRoot = ConvertTo-AgentLexicalCanonicalPath $ArchivedSessionStoreRoot
+	$ClaudeSessionStoreRoot = ConvertTo-AgentLexicalCanonicalPath $ClaudeSessionStoreRoot
+	$AgySessionStoreRoot = ConvertTo-AgentLexicalCanonicalPath $AgySessionStoreRoot
+	if ($null -eq $SessionStoreRoot -or $null -eq $ArchivedSessionStoreRoot -or $null -eq $ClaudeSessionStoreRoot -or $null -eq $AgySessionStoreRoot) { throw 'Transcript store path is invalid.' }
 
 	$files = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::OrdinalIgnoreCase)
 	$claudeFiles = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::OrdinalIgnoreCase)
+	$agyFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 	$readErrors = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 	$SessionStoreRoot = Get-SafeStoreRoot 'sessions' $SessionStoreRoot $readErrors
 	$ArchivedSessionStoreRoot = Get-SafeStoreRoot 'archived_sessions' $ArchivedSessionStoreRoot $readErrors
 	$ClaudeSessionStoreRoot = Get-SafeStoreRoot 'projects' $ClaudeSessionStoreRoot $readErrors
+	$AgySessionStoreRoot = Get-SafeStoreRoot 'brain' $AgySessionStoreRoot $readErrors
 	$selection = if ([string]::IsNullOrWhiteSpace($SessionId)) { 'bounded-commit-window' } else { 'explicit-session-id' }
 	$windowStart = $commitTimestamp.AddMinutes(-$WindowMinutes)
 	$windowEnd = $commitTimestamp.AddMinutes($WindowMinutes)
@@ -441,6 +453,15 @@ try {
 			}
 			foreach ($projectDirectory in $projectDirectories) {
 				Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root $projectDirectory.FullName -Filter "$SessionId.jsonl"
+			}
+		}
+		if (-not [string]::IsNullOrWhiteSpace($AgySessionStoreRoot)) {
+			$resolvedAgy = Resolve-AgentAgyTranscriptPath -SessionId $SessionId -BrainRoot $AgySessionStoreRoot
+			switch ($resolvedAgy.Status) {
+				'safe' { $agyFiles[$resolvedAgy.Path] = [pscustomobject]@{ SessionId = $SessionId; Path = $resolvedAgy.Path } }
+				'missing' { }
+				'unsafe' { Add-ReadError $readErrors (Get-Locator $resolvedAgy.Path) 'transcript.unsafe-path' 'Transcript candidate path could not be safely read.' }
+				default { Add-ReadError $readErrors (Get-Locator $resolvedAgy.Path) 'transcript.read-failed' 'Transcript candidate path could not be safely read.' }
 			}
 		}
 	}
@@ -476,6 +497,39 @@ try {
 				Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root $projectDirectory.FullName -Filter '*.jsonl' -Include $includeClaudeFileTimes
 			}
 		}
+		if (-not [string]::IsNullOrWhiteSpace($AgySessionStoreRoot)) {
+			try { $brainDirectories = @(Get-ChildItem -LiteralPath $AgySessionStoreRoot -Force -ErrorAction Stop) }
+			catch {
+				$brainDirectories = @()
+				Add-ReadError $readErrors (Get-Locator $AgySessionStoreRoot) 'transcript.read-failed' 'Transcript store contents could not be read.'
+			}
+			foreach ($entry in $brainDirectories) {
+				if (-not $entry.PSIsContainer) { continue }
+				if (([IO.FileAttributes] $entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+					Add-ReadError $readErrors (Get-Locator $entry.FullName) 'transcript.unsafe-path' 'Transcript store contents could not be safely read.'
+					continue
+				}
+				if ($entry.Name -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { continue }
+				$resolvedAgy = Resolve-AgentAgyTranscriptPath -SessionId $entry.Name -BrainRoot $AgySessionStoreRoot
+				if ($resolvedAgy.Status -ceq 'missing') { continue }
+				if ($resolvedAgy.Status -ceq 'unsafe') {
+					Add-ReadError $readErrors (Get-Locator $resolvedAgy.Path) 'transcript.unsafe-path' 'Transcript candidate path could not be safely read.'
+					continue
+				}
+				if ($resolvedAgy.Status -cne 'safe') {
+					Add-ReadError $readErrors (Get-Locator $resolvedAgy.Path) 'transcript.read-failed' 'Transcript candidate path could not be safely read.'
+					continue
+				}
+				try { $logFile = Get-Item -LiteralPath $resolvedAgy.Path -Force -ErrorAction Stop }
+				catch {
+					Add-ReadError $readErrors (Get-Locator $resolvedAgy.Path) 'transcript.read-failed' 'Transcript candidate path could not be safely read.'
+					continue
+				}
+				if ($logFile.LastWriteTimeUtc -ge $windowStart.UtcDateTime -and $logFile.CreationTimeUtc -le $commitTimestamp.UtcDateTime) {
+					$agyFiles[$resolvedAgy.Path] = [pscustomobject]@{ SessionId = $entry.Name; Path = $resolvedAgy.Path }
+				}
+			}
+		}
 	}
 
 	$records = [Collections.Generic.List[object]]::new()
@@ -497,6 +551,16 @@ try {
 		}
 		if ($null -eq $metadata) { continue }
 		$records.Add([pscustomobject]@{ Client = 'claude'; Locator = $locator; Metadata = $metadata })
+	}
+	foreach ($entry in @($agyFiles.Values | Sort-Object Path)) {
+		$locator = Get-Locator $entry.Path
+		try { $metadata = Get-AgyTranscriptMetadata $entry.Path $entry.SessionId $commitHash -RequireCommitHash:($selection -eq 'bounded-commit-window') }
+		catch {
+			Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript metadata could not be read.'
+			continue
+		}
+		if ($null -eq $metadata) { continue }
+		$records.Add([pscustomobject]@{ Client = 'agy'; Locator = $locator; Metadata = $metadata })
 	}
 
 	# The bounded set supplies the descendant count for a needs-selection result. A single candidate
@@ -539,10 +603,18 @@ try {
 				if ($null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot)) { continue }
 			}
 			if ($metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
+			if ($record.Client -ceq 'agy') {
+				if (-not $metadata.HasUserExplicit) { continue }
+				$parentInfo = Resolve-AgentAgyParentSession -SessionId $metadata.SessionId -BrainRoot $AgySessionStoreRoot
+				foreach ($readError in $parentInfo.ReadErrors) {
+					Add-ReadError $readErrors $readError.locator $readError.code $readError.message
+				}
+				if ($parentInfo.CycleDetected -or $null -ne $parentInfo.ParentSessionId) { continue }
+			}
 		}
 		$descendants = $null
-		# A Claude session's children live under a sibling directory rather than in the store's sessions,
-		# so both descendant fields stay null rather than falsely asserting that it has no children.
+		# Claude and agy sessions track children outside the flat Codex rollout store (sibling subagents/
+		# directories), so both descendant fields stay null rather than falsely asserting zero children.
 		if ($selection -eq 'bounded-commit-window' -and $record.Client -ceq 'codex') {
 			$descendants = @()
 			if ($descendantsByRoot.ContainsKey($metadata.SessionId)) {
@@ -678,7 +750,7 @@ try {
 			'No transcript matched the requested session ID; commit-time and eligible-worktree gates were not applied.'
 		}
 		else {
-			'No root transcript spanned the commit time with its client rule met: a Codex root needs an eligible retained worktree, a Claude root a full commit hash mention.'
+			'No root transcript spanned the commit time with its client rule met: a Codex root needs an eligible retained worktree, a Claude root a full commit hash mention, and an agy root a USER_EXPLICIT entry, full commit hash mention, and no parent subagent registration.'
 		}
 		Write-Result $result 2
 	}

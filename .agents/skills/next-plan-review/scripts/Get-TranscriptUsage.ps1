@@ -1,18 +1,21 @@
-# Sums the usage counters one Claude Code JSONL transcript, given as a path, records on its assistant replies, per model.
-# The transcript is untrusted data: each nonblank line is only parsed as JSON. A line that does not parse to one JSON
-# object is malformed. The supported envelope is a record whose `type` is the string `assistant` and whose `message` is
-# an object; such a record with any other `message` is malformed, and every other record is ignored.
-# The host writes one reply as several envelopes (fragments), so fragments group by `message.id`. A group resolves when
-# every fragment has a nonempty string `message.model` and the four `message.usage` counters `input_tokens`,
-# `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens` as nonnegative JSON integers, and all
-# fragments share the model and the three input-side counters; it counts once, with the largest `output_tokens`. Any
-# other group, and each fragment without a nonempty string `message.id`, is unresolved and contributes nothing.
-# Output is one compact JSON object:
+# Sums the usage counters one Claude Code or native `agy` JSONL transcript, given as a path, records on its assistant
+# replies, per model. The transcript is untrusted data: each nonblank line is only parsed as JSON. A line that does not
+# parse to one JSON object is malformed. The supported envelopes are:
+# - Claude Code: `type` is `assistant` and `message` is an object; such a record with any other `message` is malformed,
+#   and fragments group by `message.id`. A group resolves when every fragment has a nonempty string `message.model` and
+#   the four `message.usage` counters `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and
+#   `cache_creation_input_tokens` as nonnegative JSON integers, and all fragments share model and input-side counters;
+#   it counts once, with the largest `output_tokens`.
+# - Antigravity CLI (`agy`): `type` is `PLANNER_RESPONSE`; each record counts as one fragment, resolving when `status`
+#   is `DONE`, `model` is a nonempty string, and `input_tokens`, `output_tokens`, and `cache_read_tokens` are nonnegative
+#   JSON integers (`cacheCreationInputTokens` is 0).
+# Every other valid JSON object record is ignored; any non-resolving fragment or group is unresolved and contributes
+# nothing. Output is one compact JSON object:
 # `status` — `complete` (fragments found, none unresolved or malformed), `partial` (fragments found, some unresolved or
 #   malformed), or `unsupported` (no fragment, or the file could not be read).
 # `reason` — `no-supported-envelope` or `read-failed` when `unsupported`, otherwise null.
-# `assistantFragmentCount`, `uniqueMessageCount` (resolved groups), `duplicateFragmentCount` (fragments beyond the first
-#   in every group), `unresolvedMessageCount`, `malformedLineCount`; the first is the sum of the next three.
+# `assistantFragmentCount`, `uniqueMessageCount` (resolved messages/groups), `duplicateFragmentCount` (fragments beyond
+#   the first in every group), `unresolvedMessageCount`, `malformedLineCount`; the first is the sum of the next three.
 # `models` — an array sorted by ordinal model name, each `model`, `messageCount`, `inputTokens`, `outputTokens`,
 #   `cacheReadInputTokens`, `cacheCreationInputTokens` summed over its resolved messages.
 # A read failure keeps only the malformed lines already counted. No message text, path, or error text is ever written;
@@ -25,12 +28,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Get-Field($Object, [string] $Name) {
-	if ($Object -isnot [Management.Automation.PSCustomObject]) { return $null }
-	$property = $Object.PSObject.Properties[$Name]
-	if ($null -eq $property) { return $null }
-	return $property.Value
+$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
+if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentTranscriptCommon.psm1'))) {
+	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
 }
+Import-Module (Join-Path $sharedScripts 'AgentTranscriptCommon.psm1') -Force
 
 function Test-NonemptyString($Value) {
 	return $Value -is [string] -and $Value.Length -ne 0
@@ -41,18 +43,43 @@ function Test-Counter($Value) {
 }
 
 function New-Fragment($Message) {
-	$usage = Get-Field $Message 'usage'
+	$usage = Get-AgentTranscriptField $Message 'usage'
 	$fragment = [pscustomobject]@{
-		Model = Get-Field $Message 'model'
-		Input = Get-Field $usage 'input_tokens'
-		Output = Get-Field $usage 'output_tokens'
-		CacheRead = Get-Field $usage 'cache_read_input_tokens'
-		CacheCreation = Get-Field $usage 'cache_creation_input_tokens'
+		Model = Get-AgentTranscriptField $Message 'model'
+		Input = Get-AgentTranscriptField $usage 'input_tokens'
+		Output = Get-AgentTranscriptField $usage 'output_tokens'
+		CacheRead = Get-AgentTranscriptField $usage 'cache_read_input_tokens'
+		CacheCreation = Get-AgentTranscriptField $usage 'cache_creation_input_tokens'
 		Valid = $false
 	}
 	$fragment.Valid = (Test-NonemptyString $fragment.Model) -and (Test-Counter $fragment.Input) -and
 		(Test-Counter $fragment.Output) -and (Test-Counter $fragment.CacheRead) -and (Test-Counter $fragment.CacheCreation)
 	return $fragment
+}
+
+function Add-ModelUsage(
+	[Collections.Generic.Dictionary[string, object]] $Totals,
+	[string] $Model,
+	[Numerics.BigInteger] $InputTokens,
+	[Numerics.BigInteger] $OutputTokens,
+	[Numerics.BigInteger] $CacheReadTokens,
+	[Numerics.BigInteger] $CacheCreationTokens
+) {
+	if (-not $Totals.ContainsKey($Model)) {
+		$Totals[$Model] = [pscustomobject]@{
+			MessageCount = [long] 0
+			Input = [Numerics.BigInteger]::Zero
+			Output = [Numerics.BigInteger]::Zero
+			CacheRead = [Numerics.BigInteger]::Zero
+			CacheCreation = [Numerics.BigInteger]::Zero
+		}
+	}
+	$total = $Totals[$Model]
+	$total.MessageCount++
+	$total.Input += $InputTokens
+	$total.Output += $OutputTokens
+	$total.CacheRead += $CacheReadTokens
+	$total.CacheCreation += $CacheCreationTokens
 }
 
 function Write-Usage([string] $Status, [string] $Reason, [long] $Fragments, [long] $Unique, [long] $Unresolved, [long] $Malformed, $Models) {
@@ -70,13 +97,21 @@ function Write-Usage([string] $Status, [string] $Reason, [long] $Fragments, [lon
 }
 
 $groups = [Collections.Generic.Dictionary[string, Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+$totals = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
 $fragmentCount = 0
 $idlessCount = 0
+$agyUniqueCount = 0
+$agyUnresolvedCount = 0
 $malformedCount = 0
 $stream = $null
 $reader = $null
 try {
-	$stream = [IO.FileStream]::new($TranscriptPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$resolved = Resolve-AgentAgyTranscriptPath -TranscriptPath $TranscriptPath
+	if ($resolved.Status -cne 'safe' -and $resolved.Status -cne 'passthrough') {
+		Write-Usage 'unsupported' 'read-failed' 0 0 0 $malformedCount @()
+		exit 0
+	}
+	$stream = [IO.FileStream]::new($resolved.Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
 	$reader = [IO.StreamReader]::new($stream)
 	while ($null -ne ($line = $reader.ReadLine())) {
 		if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -89,21 +124,39 @@ try {
 			$malformedCount++
 			continue
 		}
-		$type = Get-Field $record 'type'
-		if ($type -isnot [string] -or $type -cne 'assistant') { continue }
-		$message = Get-Field $record 'message'
-		if ($message -isnot [Management.Automation.PSCustomObject]) {
-			$malformedCount++
-			continue
+		$type = Get-AgentTranscriptField $record 'type'
+		if ($type -isnot [string]) { continue }
+		if ($type -ceq 'assistant') {
+			$message = Get-AgentTranscriptField $record 'message'
+			if ($message -isnot [Management.Automation.PSCustomObject]) {
+				$malformedCount++
+				continue
+			}
+			$fragmentCount++
+			$id = Get-AgentTranscriptField $message 'id'
+			if (-not (Test-NonemptyString $id)) {
+				$idlessCount++
+				continue
+			}
+			if (-not $groups.ContainsKey($id)) { $groups[$id] = [Collections.Generic.List[object]]::new() }
+			$groups[$id].Add((New-Fragment $message))
 		}
-		$fragmentCount++
-		$id = Get-Field $message 'id'
-		if (-not (Test-NonemptyString $id)) {
-			$idlessCount++
-			continue
+		elseif ($type -ceq 'PLANNER_RESPONSE') {
+			$fragmentCount++
+			$replyStatus = Get-AgentTranscriptField $record 'status'
+			$model = Get-AgentTranscriptField $record 'model'
+			$inputTokens = Get-AgentTranscriptField $record 'input_tokens'
+			$outputTokens = Get-AgentTranscriptField $record 'output_tokens'
+			$cacheReadTokens = Get-AgentTranscriptField $record 'cache_read_tokens'
+			if ($replyStatus -is [string] -and $replyStatus -ceq 'DONE' -and (Test-NonemptyString $model) -and
+				(Test-Counter $inputTokens) -and (Test-Counter $outputTokens) -and (Test-Counter $cacheReadTokens)) {
+				$agyUniqueCount++
+				Add-ModelUsage $totals $model ([Numerics.BigInteger] $inputTokens) ([Numerics.BigInteger] $outputTokens) ([Numerics.BigInteger] $cacheReadTokens) ([Numerics.BigInteger]::Zero)
+			}
+			else {
+				$agyUnresolvedCount++
+			}
 		}
-		if (-not $groups.ContainsKey($id)) { $groups[$id] = [Collections.Generic.List[object]]::new() }
-		$groups[$id].Add((New-Fragment $message))
 	}
 }
 catch {
@@ -120,9 +173,8 @@ if ($fragmentCount -eq 0) {
 	exit 0
 }
 
-$totals = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-$uniqueCount = 0
-$unresolvedCount = $idlessCount
+$uniqueCount = $agyUniqueCount
+$unresolvedCount = $idlessCount + $agyUnresolvedCount
 foreach ($group in $groups.Values) {
 	$first = $group[0]
 	$resolved = $true
@@ -140,21 +192,7 @@ foreach ($group in $groups.Values) {
 		continue
 	}
 	$uniqueCount++
-	if (-not $totals.ContainsKey($first.Model)) {
-		$totals[$first.Model] = [pscustomobject]@{
-			MessageCount = [long] 0
-			Input = [Numerics.BigInteger]::Zero
-			Output = [Numerics.BigInteger]::Zero
-			CacheRead = [Numerics.BigInteger]::Zero
-			CacheCreation = [Numerics.BigInteger]::Zero
-		}
-	}
-	$total = $totals[$first.Model]
-	$total.MessageCount++
-	$total.Input += [Numerics.BigInteger] $first.Input
-	$total.Output += $output
-	$total.CacheRead += [Numerics.BigInteger] $first.CacheRead
-	$total.CacheCreation += [Numerics.BigInteger] $first.CacheCreation
+	Add-ModelUsage $totals $first.Model ([Numerics.BigInteger] $first.Input) $output ([Numerics.BigInteger] $first.CacheRead) ([Numerics.BigInteger] $first.CacheCreation)
 }
 
 [string[]] $modelNames = @($totals.Keys)

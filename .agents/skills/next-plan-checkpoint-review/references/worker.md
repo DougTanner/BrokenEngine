@@ -7,20 +7,22 @@ are the isolation lens.
 
 ## Steps
 
-1. Resolve this run's transcript and measure it before applying any lens. The
-   reviewer's shell carries the dispatching main session's ID, so resolve the
-   transcript from the PowerShell tool:
-   `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`
-   then measure it from the session worktree root:
-   `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -SessionId <id>`
-   (or `-TranscriptPath '<resolved path>'`). Classify the returned envelope by
-   the states `## Measurement states` in
-   `../../next-plan/references/run-checkpoint.md` keeps. Return `BLOCKED` for
-   the whole review when that glob resolves to nothing, the transcript file
-   cannot be read, or the measurement returns `transcript.not-found`, because
-   then no lens has evidence; every other blocked or error code skips only the
-   context-efficiency lens, while the friction and isolation lenses still run.
-   Done when one transcript path and one measurement state are in hand, or the
+1. Resolve and measure this run's transcript before applying any lens. On
+   Claude, `$env:CLAUDE_CODE_SESSION_ID` is main's ID; resolve it with
+   `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`.
+   On `agy`, `$env:ANTIGRAVITY_CONVERSATION_ID` is the worker's ID; import
+   `./.agents/scripts/AgentTranscriptCommon.psm1`, call
+   `Resolve-AgentAgyParentSession -SessionId $env:ANTIGRAVITY_CONVERSATION_ID`,
+   and require non-null `ParentSessionId`, `CycleDetected` false, and empty
+   `ReadErrors` before using `RootTranscriptPath` (otherwise return
+   `BLOCKED`). Measure from the session worktree root:
+   `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -TranscriptPath '<resolved path>'`
+   (or `-SessionId <root id>`), and classify via `## Measurement states` in
+   `../../next-plan/references/run-checkpoint.md`. Return `BLOCKED` for the
+   whole review if resolution fails, yields no readable transcript, or returns
+   `transcript.not-found`, since no lens has evidence; other blocked or error
+   codes skip only context-efficiency while friction and isolation still run.
+   Done when one transcript path and measurement state are in hand, or the
    review is `BLOCKED`.
 2. Report as friction: a bundled script errored, returned a malformed or
    contradictory result, or could not be run as documented; a workaround or
@@ -71,8 +73,9 @@ are the isolation lens.
    `inputSummary`: the repository script, skill instruction, or documented
    command that produced that output. Read the emitter in the tree. Done when
    each row names one emitter or is recorded as unidentifiable. An `Agent` or
-   `SendMessage` row is a completed subagent's handoff; its emitter is the
-   return format of the skill the dispatch named.
+   `SendMessage` (Claude) or `invoke_subagent` (`agy`) row is a completed
+   subagent's handoff; its emitter is the return format of the skill the
+   dispatch named.
 10. Classify each row, done when every row carries one class:
     - `fixable-defect` — a bounded projection, a count plus the
       decision-relevant rows, an explicit cap with a truncation flag, or a file
@@ -97,18 +100,19 @@ are the isolation lens.
     whole-file:
     `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<transcript path>'`
 
-    In the projection, inspect candidate `use Agent` rows and open only the
-    candidate records needed to identify this review's
-    `/next-plan-checkpoint-review` dispatch and, when present, the immediately
-    preceding matching dispatch and their tool-use IDs. These locate step 6's
-    boundaries. Locate the preceding dispatch's correlated completed-handoff
-    record by matching its tool-use ID to a `result` row or to the tool-use-ID
-    tag in an opened task-notification/queued-attachment string record. Do not
-    assume the delegation tool is named `Task`.
+    In the projection, inspect candidate `use Agent` or `use invoke_subagent`
+    rows and open only those needed to identify this review's
+    `/next-plan-checkpoint-review` dispatch, any immediately preceding matching
+    dispatch, and their tool-use IDs (the paired `result` row ID on `agy`)
+    for step 6's boundaries. Match the preceding dispatch's tool-use ID to a
+    `result` row, a Claude task-notification/queued-attachment string record's
+    tool-use-ID tag, or an `agy` `SYSTEM_MESSAGE` `delivery=` marker to
+    locate its completed-handoff record. Do not assume the delegation tool is
+    named `Task`.
 
-    Open a record the rows select with `Read` at that row's line number as
-    `offset` with `limit` 1; the `len` column only selects which records to open
-    and is never a `chars:` value.
+    Open selected records with `Read` (`offset` = line, `limit` 1) or
+    `read_file` (`StartLine`/`EndLine` = line); the `len` column only
+    selects which records to open and is never a `chars:` value.
 
     Report as isolation: content that entered main's context which main did not
     need verbatim to decide anything and a subagent could have consumed instead

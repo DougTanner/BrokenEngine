@@ -13,7 +13,7 @@
 # baseline and head token counts as Measure-Tokens.ps1 measures a whole file, deletions included, and
 # their `netTokens` sum, leaving out an entry with a side that is not valid UTF-8; `model-names` fails
 # on a model family name or slug in an added line, apart from `.agents/skills/codex-bridge/` and a
-# `model` setting line in a `.claude/agents/` or `.codex/agents/` file.
+# `model` setting line in an `.agents/agents/`, `.claude/agents/`, or `.codex/agents/` file.
 # `validate-skill` composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
@@ -607,7 +607,7 @@ function Invoke-ModelNameCheck([object] $Inventory, [bool] $Truncated) {
 	if ($pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $pathspec))) }
 	$failures = [Collections.Generic.List[object]]::new()
 	foreach ($line in $added) {
-		if ($line.Path -cmatch '^\.(?:claude|codex)/agents/' -and $line.Text -cmatch '^\s*model\s*[:=]') { continue }
+		if ($line.Path -cmatch '^\.(?:agents|claude|codex)/agents/' -and $line.Text -cmatch '^\s*model\s*[:=]') { continue }
 		foreach ($match in $script:ModelNamePattern.Matches($line.Text)) { $failures.Add([ordered]@{ path = $line.Path; line = $line.Line; term = $match.Value }) }
 	}
 	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }

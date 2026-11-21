@@ -1,14 +1,14 @@
 # Run Checkpoint
 
-On Claude, one external review covers the run for tooling friction, context
-efficiency, and content a subagent could have consumed instead. Codex runs no
-live lens and leaves all three concerns to `/next-plan-review` after landing.
-[The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference
-owns how.
+On Claude and `agy`, one external review covers the run for tooling friction,
+context efficiency, and content a subagent could have consumed instead. Codex
+runs no live lens and leaves all three concerns to `/next-plan-review` after
+landing. [The `/next-plan` steps](../SKILL.md#steps) own when it runs; this
+reference owns how.
 
 ## Dispatch
 
-On Claude, main dispatches one fresh `reviewer` subagent for
+On Claude and `agy`, main dispatches one fresh `reviewer` subagent for
 `/next-plan-checkpoint-review` with the claimed Plan path or `no claim` as its
 only run-specific input, and that reviewer resolves and measures its own run
 evidence per that package's

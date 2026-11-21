@@ -3,7 +3,7 @@ name: implementer
 description: Writing code and documentation; affected-site propagation; review-fix rounds; follow-up plans; finalization.
 model: pro
 commandExecutionPolicy: eager
-tools: [read_file, write_file, edit_file, run_command, manage_task, search_web, send_message]
+tools: [read_file, write_file, edit_file, run_command, manage_task, search_web]
 ---
 
 Follow repository instructions for the assigned implementation role.
