@@ -12,8 +12,8 @@ are the isolation lens.
    `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`.
    On `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`, call
    `Resolve-AgentAgyParentSession -SessionId $env:ANTIGRAVITY_CONVERSATION_ID`,
-   and require non-null `RootTranscriptPath`, `CycleDetected` false, and empty
-   `ReadErrors` (else `BLOCKED`). From the worktree root run
+   require `Status` `'available'` (else `BLOCKED` naming `Reason`), and take
+   `RootTranscriptPath`. From the worktree root run
    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -TranscriptPath '<resolved path>'`
    (or `-SessionId <root id>`) and classify via `## Measurement states` in
    `../../next-plan/references/run-checkpoint.md`. Return `BLOCKED` if
@@ -45,22 +45,19 @@ are the isolation lens.
 5. Classify a failure in a skill or script the claimed Plan itself changes as
    `active-change-blocker`, not a follow-up. Done when every friction finding
    carries a class.
-6. Before applying any lens, establish this checkpoint's transcript span
-   through step 12's projection. Anchor boundaries to distinct `/next-plan`
-   checkpoints, grouping any `-NoRetry` re-dispatch (and its `-Wait` calls)
-   with its original checkpoint dispatch. End immediately before this
-   checkpoint's dispatch group (and its bridged prompt write). If an earlier
-   distinct `/next-plan` checkpoint exists in this transcript, start after its
-   final dispatch and exclude only its correlated completed-handoff record;
-   otherwise start at line 1. Retain every other record between the boundaries.
-   Apply the span to friction and isolation records and, by `toolUseId`, to
-   context-efficiency `topResults`. Running the claim-exit script and
-   `/finalize-changes` happens after this dispatch and is outside this review;
-   `## Follow-up routing` in `../../next-plan/references/run-checkpoint.md` and
-   `/next-plan-review` own those. Done when no finding or checked telemetry row
-   comes from outside the span or from the excluded handoff — except step 3's
-   friction finding on step 1's own measurement state, which the span does not
-   exclude — including a run that stopped before or without a claim.
+6. Before applying any lens, take this checkpoint's span `[start, end]`,
+   excluded completed-handoff line (`exclude`), and excluded `toolUseId`
+   (`exclude-id`) from step 12's `Get-TranscriptProjection.ps1`
+   `checkpoint-span` row. Retain every other record in `[start, end]`. Apply
+   the span and exclusions to friction and isolation records and, by
+   `toolUseId`, to context-efficiency `topResults`. Running the claim-exit
+   script and `/finalize-changes` happens after this dispatch and is outside
+   this review; `## Follow-up routing` in
+   `../../next-plan/references/run-checkpoint.md` and `/next-plan-review` own
+   those. Done when no finding or checked telemetry row comes from outside the
+   span or from the excluded handoff — except step 3's friction finding on
+   step 1's own measurement state, which the span does not exclude — including
+   a run that stopped before or without a claim.
 7. Precision guard: name in each friction finding the exact command or script
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
@@ -69,12 +66,12 @@ are the isolation lens.
    are context only. Done when every such row has been read.
 9. Identify each row's emitter from `toolName` and `inputSummary` (script,
    skill, or command) and read it in the tree. An `Agent`/`SendMessage`
-   (Claude), `invoke_subagent` (`agy`), or `Bash`/`PowerShell`/`run_command`
-   `Invoke-Codex.ps1` (`-Skill` or `-Wait <runId>`) row is a subagent handoff
-   emitted by that skill's return format (for `-Skill`, that `-Skill`/`-Mode`;
-   for `-Wait <runId>`, trace `<runId>` to its launch `-Skill`/`-Mode`). For a
-   bridged handoff, use step 12's bridged delivery selector. Done when each row
-   names an emitter or is unidentifiable.
+   (Claude), `invoke_subagent` (`agy`), or bridged `Invoke-Codex.ps1` row is a
+   subagent handoff emitted by that skill's return format; for bridged
+   `Invoke-Codex.ps1` launches and `-Wait` calls, identify the emitter directly
+   from `Get-TranscriptProjection.ps1`'s `bridge-launch` and `bridge-delivery`
+   (`findings=yes`) rows matching `toolUseId`, ignoring `bridge-stub` rows.
+   Done when each row names an emitter or is unidentifiable.
 10. Classify each row, done when every row carries one class:
     - `fixable-defect` — a bounded projection, a count plus the
       decision-relevant rows, an explicit cap with a truncation flag, or a file
@@ -98,24 +95,8 @@ are the isolation lens.
     never by reading the transcript whole-file:
     `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<transcript path>'`
 
-    Before deciding the step 6 span, inspect `use Agent`,
-    `use invoke_subagent`, and `use Bash`/`PowerShell`/`run_command` rows —
-    opening any `Invoke-Codex.ps1` row whose summary omits `-Skill`/`-Wait` and
-    any truncated shell row whose `Get-TranscriptProjection.ps1` summary cap
-    cannot rule out `Invoke-Codex.ps1` — for this checkpoint's
-    `/next-plan-checkpoint-review` group (original dispatch, any `-NoRetry`
-    re-dispatch, and bridged `Write`/`write_file` prompt call, so step 6 ends
-    before it), any preceding distinct checkpoint's group and `-Wait <runId>`,
-    and their tool-use IDs (`result` row ID on `agy`). Match that preceding
-    checkpoint's final dispatch (or final `-Wait`) tool-use ID to a `result`
-    row, Claude task-notification/queued-attachment `<tool-use-id>` tag, or
-    `agy` `SYSTEM_MESSAGE` `delivery=` record to exclude its handoff. Bridged
-    delivery selector: accept any matching delivery record (paired `result`
-    row, Claude notification/attachment, or `agy` `SYSTEM_MESSAGE` `delivery=`)
-    sharing the launch or final `-Wait` tool-use ID that carries the
-    `completed` bridge receipt and `--- findings ---` separator, ignoring any
-    background-task launch stub that lacks them (such as `agy`'s shared-ID
-    stub). Do not assume the tool is named `Task`.
+    Consume the script's `checkpoint-span` and `bridge-*` rows directly,
+    ignore `bridge-stub` rows, and do not assume the tool is named `Task`.
 
     Open one selected record line at a time with `Read` (`offset` = line,
     `limit` 1), `read_file` (`StartLine`/`EndLine` = line), or on Codex:

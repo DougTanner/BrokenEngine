@@ -22,10 +22,12 @@
 	the same bounded wait after the launching call exits. Both calls must be in a host context where
 	the worker survives the launching call and the run records are visible.
 
-	Receipt fields: schemaVersion (broken-engine-codex-run/v1); status (completed, malformed,
-	failed, or running); runId; outFile (absolute out-file path, null when no run record exists);
-	exitCode (Codex's exit code, null while running or when unavailable); retried (true when a
-	second attempt ran); reason (null, or the malformed or failed cause).
+	Receipt fields: schemaVersion (broken-engine-codex-run/v2); status (completed, malformed,
+	failed, or running); runId; skill (routed skill name, null when unavailable or incompatible);
+	mode (optional sub-mode, null when omitted, unavailable, or incompatible); noRetry (true when
+	launched with -NoRetry); outFile (absolute out-file path, null when unavailable or
+	incompatible); exitCode (Codex's exit code, null while running, unavailable, or incompatible);
+	retried (true when a second attempt ran); reason (null, or the malformed or failed cause).
 
 	Shape check and retry: a Codex exit of 0 whose result does not end in the verdict line every
 	prompt mandates (PASS, CHANGES-REQUIRED: <n>, or BLOCKED: <reason>) is malformed. A read-only
@@ -56,9 +58,11 @@
 [CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
+	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $Skill,                                      # routed review skill name from $routes
 
 	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'InternalRun')]
 	[string] $Mode = '',                                  # optional sub-mode for multi-mode skills in $routes
 
 	[Parameter(Mandatory, ParameterSetName = 'Launch')]
@@ -96,6 +100,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+$runSchemaVersion = 'broken-engine-codex-run/v2'
 
 # Run records outlive the launching shell, so they live outside the repository.
 $recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-run'
@@ -138,9 +144,12 @@ $routes['next-plan-checkpoint-review'] = @{ Agent = 'sol'; Sandbox = 'read-only'
 function Write-Receipt([hashtable] $Fields)
 {
 	Write-Output ([ordered]@{
-		schemaVersion = 'broken-engine-codex-run/v1'
+		schemaVersion = $runSchemaVersion
 		status = $Fields.status
 		runId = $Fields.runId
+		skill = $Fields.skill
+		mode = $Fields.mode
+		noRetry = [bool] $Fields.noRetry
 		outFile = $Fields.outFile
 		exitCode = $Fields.exitCode
 		# An unset field means no second attempt is known of, which is what every non-done receipt reports.
@@ -232,6 +241,11 @@ function Wait-Run([string] $RunId)
 		if (Test-Path -LiteralPath $donePath -PathType Leaf)
 		{
 			$done = Get-Content -LiteralPath $donePath -Raw | ConvertFrom-Json
+			if ($done.schemaVersion -cne $runSchemaVersion)
+			{
+				Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $null; mode = $null; noRetry = $false; outFile = $null; exitCode = $null; reason = "incompatible run record schema version; expected $runSchemaVersion" }
+				return
+			}
 			$retried = [bool] $done.retried
 			# Records survive the wait so a repeated wait on a terminal run keeps answering the same way.
 			if ($done.exitCode -eq 0)
@@ -239,11 +253,11 @@ function Wait-Run([string] $RunId)
 				if ($done.malformed)
 				{
 					# Drafting notes never enter the caller's context, so the paths are the whole answer.
-					Write-Receipt @{ status = 'malformed'; runId = $RunId; outFile = $done.outFile; exitCode = 0; retried = $retried; reason = $done.reason }
+					Write-Receipt @{ status = 'malformed'; runId = $RunId; skill = $done.skill; mode = $done.mode; noRetry = [bool] $done.noRetry; outFile = $done.outFile; exitCode = 0; retried = $retried; reason = $done.reason }
 				}
 				else
 				{
-					Write-Receipt @{ status = 'completed'; runId = $RunId; outFile = $done.outFile; exitCode = 0; retried = $retried; reason = $null }
+					Write-Receipt @{ status = 'completed'; runId = $RunId; skill = $done.skill; mode = $done.mode; noRetry = [bool] $done.noRetry; outFile = $done.outFile; exitCode = 0; retried = $retried; reason = $null }
 					# The result rides this call's own stdout, so a successful run needs no separate read.
 					Write-Output '--- findings ---'
 					# Console.Out keeps the out-file's bytes verbatim; the pipeline would append a trailing newline.
@@ -252,18 +266,23 @@ function Wait-Run([string] $RunId)
 			}
 			else
 			{
-				Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $done.outFile; exitCode = $done.exitCode; retried = $retried; reason = $done.reason }
+				Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $done.skill; mode = $done.mode; noRetry = [bool] $done.noRetry; outFile = $done.outFile; exitCode = $done.exitCode; retried = $retried; reason = $done.reason }
 			}
 			return
 		}
 
 		if (-not (Test-Path -LiteralPath $runPath -PathType Leaf))
 		{
-			Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $null; exitCode = $null; reason = 'unavailable: no run record for that identifier (never launched, or its records were swept)' }
+			Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $null; mode = $null; noRetry = $false; outFile = $null; exitCode = $null; reason = 'unavailable: no run record for that identifier (never launched, or its records were swept)' }
 			return
 		}
 
 		$run = Get-Content -LiteralPath $runPath -Raw | ConvertFrom-Json
+		if ($run.schemaVersion -cne $runSchemaVersion)
+		{
+			Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $null; mode = $null; noRetry = $false; outFile = $null; exitCode = $null; reason = "incompatible run record schema version; expected $runSchemaVersion" }
+			return
+		}
 		$alive = $false
 		try
 		{
@@ -284,14 +303,14 @@ function Wait-Run([string] $RunId)
 				continue
 			}
 
-			Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
+			Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $run.skill; mode = $run.mode; noRetry = [bool] $run.noRetry; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
 			return
 		}
 
 		if ((Get-Date) -ge $deadline)
 		{
 			# The run outlives this call, so its identifier is what the caller resumes with.
-			Write-Receipt @{ status = 'running'; runId = $RunId; outFile = $run.outFile; exitCode = $null; reason = $null }
+			Write-Receipt @{ status = 'running'; runId = $RunId; skill = $run.skill; mode = $run.mode; noRetry = [bool] $run.noRetry; outFile = $run.outFile; exitCode = $null; reason = $null }
 			return
 		}
 
@@ -411,6 +430,8 @@ if (-not $codex)
 	exit 127
 }
 
+$modeValue = if ([string]::IsNullOrWhiteSpace($Mode)) { $null } else { $Mode }
+
 if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 {
 	# Every host shell call starts in a fresh working directory, so the detached run only ever sees absolute paths.
@@ -439,10 +460,15 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$start.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
 	$start.WorkingDirectory = $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath
 	foreach ($argument in @('-NoProfile', '-NonInteractive', '-File', $PSCommandPath,
-		'-InternalRunId', $runId, '-Worktree', $absoluteWorktree, '-PromptFile', $detachedPrompt,
+		'-InternalRunId', $runId, '-Skill', $Skill, '-Worktree', $absoluteWorktree, '-PromptFile', $detachedPrompt,
 		'-OutFile', $absoluteOutput, '-Agent', $Agent, '-Sandbox', $Sandbox))
 	{
 		$start.ArgumentList.Add($argument)
+	}
+	if ($null -ne $modeValue)
+	{
+		$start.ArgumentList.Add('-Mode')
+		$start.ArgumentList.Add($modeValue)
 	}
 	if ($NoRetry)
 	{
@@ -453,10 +479,14 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	{
 		# The launch handle identifies this worker even if it has already exited.
 		[ordered]@{
+			schemaVersion = $runSchemaVersion
 			runId = $runId
 			processId = $detached.Id
 			processStartTicks = $detached.StartTime.ToUniversalTime().Ticks
 			outFile = $absoluteOutput
+			skill = $Skill
+			mode = $modeValue
+			noRetry = [bool] $NoRetry
 		} | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath (Get-RunRecordPath $runId) -Encoding utf8NoBOM
 	}
 	finally
@@ -569,6 +599,10 @@ finally
 	# A poll reads the done record the moment it exists, so it appears whole through a same-directory rename.
 	$pendingDoneRecord = Join-Path $recordDirectory "$InternalRunId.done.partial.json"
 	[ordered]@{
+		schemaVersion = $runSchemaVersion
+		skill = $Skill
+		mode = $modeValue
+		noRetry = [bool] $NoRetry
 		exitCode = $exitCode
 		reason = $reason
 		outFile = $OutFile

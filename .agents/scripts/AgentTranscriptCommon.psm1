@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 $script:AgyUuidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 $script:AgySystemMessageWrapperPattern = '\AThe following is a <SYSTEM_MESSAGE> not actually sent by the user\. It is provided by the system as important information to pay attention to\.\r?\n\r?\n<SYSTEM_MESSAGE>\r?\n'
 $script:AgyInvokeSubagentPattern = '(?s)Created the following subagent:\s*\{[^}]*?"conversationId"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"'
-$script:AgyBackgroundTaskPattern = '(?m)(?:^|\b)with task id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/task-\d+)\b'
+$script:AgyBackgroundTaskPattern = '\A(?:Created At:[^\r\n]*\r?\n)?Tool is running as a background task with task id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/task-\d+)\b'
 
 function New-MalformedTranscriptLineException([int] $LineNumber, [string] $Message, [Exception] $Inner = $null) {
 	$ex = if ($null -ne $Inner) {
@@ -199,6 +199,10 @@ function Resolve-AgentAgyTranscriptPath {
 	return [pscustomobject]@{ Status = 'passthrough'; Path = $TranscriptPath; SessionId = $null }
 }
 
+function Open-AgentTranscriptReadStream([string] $Path) {
+	return [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+}
+
 function Add-AgyReadError([Collections.Generic.List[object]] $ReadErrors, [Collections.Generic.HashSet[string]] $Seen, [string] $Locator, [string] $Code, [string] $Message) {
 	$key = "$Code`0$Locator"
 	if ($Seen.Add($key)) {
@@ -289,11 +293,23 @@ function Resolve-AgentAgyParentSession {
 
 	$rootSessionId = $null
 	$rootTranscriptPath = $null
+	$rootResolved = $null
 	if (-not $cycleDetected) {
 		$rootSessionId = $currentId
 		$rootResolved = Resolve-AgentAgyTranscriptPath -SessionId $rootSessionId -BrainRoot $root
 		if ($rootResolved.Status -ceq 'safe') {
-			$rootTranscriptPath = $rootResolved.Path
+			$probeStream = $null
+			try {
+				$probeStream = Open-AgentTranscriptReadStream $rootResolved.Path
+				$rootTranscriptPath = $rootResolved.Path
+			}
+			catch {
+				$locator = "brain/$rootSessionId/.system_generated/logs/$([IO.Path]::GetFileName($rootResolved.Path))"
+				Add-AgyReadError $readErrors $seenErrors $locator 'transcript.read-failed' 'Root transcript file could not be opened for reading.'
+			}
+			finally {
+				if ($null -ne $probeStream) { $probeStream.Dispose() }
+			}
 		}
 		elseif ($rootResolved.Status -ceq 'unsafe' -or $rootResolved.Status -ceq 'error') {
 			$code = if ($rootResolved.Status -ceq 'unsafe') { 'transcript.unsafe-path' } else { 'transcript.read-failed' }
@@ -307,6 +323,19 @@ function Resolve-AgentAgyParentSession {
 		}
 	}
 
+	$isAvailable = (-not $cycleDetected) -and (-not [string]::IsNullOrEmpty($rootTranscriptPath)) -and ($readErrors.Count -eq 0)
+	$status = if ($isAvailable) { 'available' } else { 'unavailable' }
+	$reason = $null
+	if (-not $isAvailable) {
+		$reasons = [Collections.Generic.List[string]]::new()
+		if ($cycleDetected) { $reasons.Add('cycle-detected') }
+		if ($readErrors.Count -gt 0) { $reasons.Add('read-error') }
+		if ((-not $cycleDetected) -and ($null -ne $rootResolved) -and ($rootResolved.Status -ceq 'missing')) {
+			$reasons.Add('root-transcript-missing')
+		}
+		$reason = $reasons -join ','
+	}
+
 	return [pscustomobject]@{
 		SessionId = $SessionId
 		ParentSessionId = $parentSessionId
@@ -314,11 +343,13 @@ function Resolve-AgentAgyParentSession {
 		RootTranscriptPath = $rootTranscriptPath
 		CycleDetected = $cycleDetected
 		ReadErrors = @($readErrors)
+		Status = $status
+		Reason = $reason
 	}
 }
 
 function Test-AgentAgyTranscript([string] $Path) {
-	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$stream = Open-AgentTranscriptReadStream $Path
 	$reader = [IO.StreamReader]::new($stream)
 	try {
 		$lineNumber = 0
@@ -350,7 +381,7 @@ function Test-AgentAgyTranscript([string] $Path) {
 }
 
 function Read-AgentAgyTranscript([string] $Path) {
-	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+	$stream = Open-AgentTranscriptReadStream $Path
 	$reader = [IO.StreamReader]::new($stream)
 	$pendingToolCalls = [Collections.Generic.Queue[object]]::new()
 	$subagentToolUseIds = @{}
@@ -386,6 +417,7 @@ function Read-AgentAgyTranscript([string] $Path) {
 			$toolCallsList = [Collections.Generic.List[object]]::new()
 			$pairedToolCall = $null
 			$deliveryToolUseId = $null
+			$isIdleNotice = $false
 
 			if ($type -ceq 'PLANNER_RESPONSE') {
 				$rawCalls = Get-AgentTranscriptField $raw 'tool_calls'
@@ -412,9 +444,11 @@ function Read-AgentAgyTranscript([string] $Path) {
 						$launchedSubagentId = $Matches[1]
 						$subagentToolUseIds[$launchedSubagentId] = $dequeued.ToolUseId
 					}
-					elseif ($dequeued.Name -ceq 'run_command' -and $content -cmatch $script:AgyBackgroundTaskPattern) {
+					elseif (-not $isError -and $dequeued.Name -ceq 'run_command' -and $content -cmatch $script:AgyBackgroundTaskPattern) {
 						$launchedTaskId = $Matches[1]
-						$taskToolUseIds[$launchedTaskId] = $dequeued.ToolUseId
+						if (-not $taskToolUseIds.ContainsKey($launchedTaskId)) {
+							$taskToolUseIds[$launchedTaskId] = $dequeued.ToolUseId
+						}
 					}
 					$pairedToolCall = [pscustomobject]@{
 						ToolUseId = $dequeued.ToolUseId
@@ -443,6 +477,7 @@ function Read-AgentAgyTranscript([string] $Path) {
 						}
 					}
 					elseif ($header -cmatch '(?:^|\s)sender=system(?=\s|$)' -and $body -cmatch '\ASubagent ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) has gone idle') {
+						$isIdleNotice = $true
 						if ($subagentToolUseIds.ContainsKey($Matches[1])) {
 							$deliveryToolUseId = $subagentToolUseIds[$Matches[1]]
 						}
@@ -463,6 +498,7 @@ function Read-AgentAgyTranscript([string] $Path) {
 				ToolCalls = @($toolCallsList)
 				PairedToolCall = $pairedToolCall
 				DeliveryToolUseId = $deliveryToolUseId
+				IsIdleNotice = $isIdleNotice
 			}
 		}
 	}

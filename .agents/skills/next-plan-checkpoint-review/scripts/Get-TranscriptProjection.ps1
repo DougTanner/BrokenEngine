@@ -1,7 +1,7 @@
 # Prints one row per tool call, per tool result, per assistant text element, per string-content record, per matched
-# read/brief pair, and per unmet brief requirement of a Claude Code or native `agy` JSONL transcript, given as a path,
-# for the checkpoint isolation lens: a record with several of those yields several rows, and a record with none yields
-# none. The rows are:
+# read/brief pair, per unmet brief requirement, and per Codex bridge invocation/stub/delivery of a Claude Code or
+# native `agy` JSONL transcript, given as a path, plus one trailing `checkpoint-span` row for the checkpoint review:
+# a record with several of those yields several rows, and a record with none yields none. The rows are:
 # `<line> use <tool> <input summary capped at 160 chars>`
 # `<line> match <read path> read-at <read line>` — a delegation record's brief lists a path an earlier `Read`/`read_file`
 #   record or allowlisted read-only shell command opened; `<line>` is the delegation record's line and `<read line>` the
@@ -13,12 +13,30 @@
 #   when at least two `.agents/references/subagent-reporting.md` `## Task brief` field labels each start a line of it.
 #   One row per unmet requirement; such a field yields no `match` rows. Any string input field qualifies, including one
 #   carrying quoted or embedded brief text, such as a `Write`/`Edit` payload; open the record to dismiss such a row.
+# `<line> bridge-launch <tool_use_id> skill=<skill>[ mode=<mode>][ noretry][ prompt-write=<writeLine>]` — an unclipped
+#   `Invoke-Codex.ps1` launch call (`-Skill`, ignoring `-CheckModels`); `prompt-write=` names the latest matching
+#   `Write`/`write_file` line for `-PromptFile` (restricted after any prior distinct checkpoint group's final dispatch
+#   for `next-plan-checkpoint-review`).
+# `<line> bridge-wait <tool_use_id> runId=<runId>` — an unclipped `Invoke-Codex.ps1 -Wait <runId>` call.
+# `<line> bridge-stub <tool_use_id>` — a background launch stub (`agy` `GENERIC` with `LaunchedTaskId`, or non-error
+#   Claude `tool_result` matching a background-task stub, when no outer bridge receipt is present) for a tracked bridge call.
+# `<line> bridge-delivery <tool_use_id> status=<status> runId=<runId> skill=<skill|unknown>[ mode=<mode>][ noretry] findings=<yes|no>`
+#   — a delivery for a tracked bridge call carrying an outer compact single-line `broken-engine-codex-run/v2` JSON receipt
+#   (Claude `tool_result`, Claude `task-notification` `user` or `queued_command` `attachment` with `<tool-use-id>`,
+#   `agy` `GENERIC`, or `agy` `SYSTEM_MESSAGE`); `findings=yes` only when `status=completed` and `--- findings ---`
+#   appears after the receipt line. Pre-v2 outer receipts are ignored.
 # `<line> result <tool_use_id> len <chars>`
 # `<line> result <tool_use_id> len <chars> error` — only when `is_error` / `IsError` is true.
 # `<line> assistant-text len <chars> <text>` — original text length; whitespace collapsed and payload capped at 160 chars.
 # `<line> <record type> text len <chars>[ delivery=<tool_use_id>]` — a string-content record: a Claude
 #   task-notification/queued-attachment record, or an `agy` `USER_INPUT`/`SYSTEM_MESSAGE` record (`delivery=` when
 #   `DeliveryToolUseId` is set).
+# `checkpoint-span start=<startLine> end=<endLine> exclude=<handoffLine|none> exclude-id=<toolUseId|none>` — emitted
+#   once at end of stream; gives the 1-based inclusive line span `[start, end]` for the current
+#   `/next-plan-checkpoint-review` run (`start=0 end=0` for an empty transcript; empty span when `start > end`), plus
+#   the prior checkpoint's completed-handoff line (`exclude`, one record line excluded for friction and isolation) and
+#   dispatching `tool_use_id` (`exclude-id`, excluded from context-efficiency `topResults`). Recognizes bridged, native
+#   (`Agent`/`invoke_subagent`), and trailing desktop (`Write`/`write_file`) checkpoints.
 # `<line>` is the 1-based transcript line; on Claude only `assistant`, `user`, and `attachment` records print, and
 # sidechain records and blank lines print nothing; on `agy`, `USER_INPUT`, `SYSTEM_MESSAGE`, `PLANNER_RESPONSE`, and
 # `GENERIC` records print.
@@ -56,13 +74,488 @@ function Get-AllowedShellReadPath([string] $Command) {
 }
 
 $script:BriefLabels = @('Role:', 'Skill:', 'Objective:', 'Required sections:', 'Scope:', 'Exclusions:', 'Fixed decisions:', 'Governing paths:', 'Baseline:', 'Acceptance:', 'Prohibitions:', 'Return:')
+$script:ClaudeBridgeStubPattern = '(?i)\b(?:running in (?:the )?background|background (?:task|command|shell)|async(?:hronous)?\s+(?:task|agent|command)|with task id:)'
+$script:ClaudeNativeAgentStubPattern = '(?i)\A\s*(?:async(?:hronous)?\s+agent\s+launched\s+successfully\.?\s*\z|(?:(?:async(?:hronous)?|background)\s+agent\s+(?:launched|started)|agent\s+(?:launched|started)\s+(?:asynchronously|in\s+(?:the\s+)?background)|(?:launched|started)\s+(?:(?:an?\s+)?(?:async(?:hronous)?|background)\s+agent|asynchronously|in\s+(?:the\s+)?background))[^\r\n]*(?:\r?\n[ \t]*)?(?:\bagentId:|\bwith\s+(?:task\s+)?id:))'
+$script:BridgeReceiptOrSeparatorPattern = '(?m)(?:^|content=|<result>)[ \t]*(?:(?<sep>--- findings ---)|(?<json>\{"schemaVersion":"broken-engine-codex-run/[^\r\n]*?))(?:[ \t]*</result>)?[ \t]*\r?$'
+$script:ValidReceiptStatuses = @('completed', 'malformed', 'failed', 'running')
 
-function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, $InputObject, [Collections.Generic.List[object]] $Reads) {
+function ConvertTo-NormalizedPathKey([string] $Path) {
+	if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
+	$normalized = ($Path.Trim() -replace '\\', '/').ToLowerInvariant()
+	while ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
+	return $normalized
+}
+
+function Test-NormalizedPathMatch([string] $Left, [string] $Right) {
+	if ([string]::IsNullOrEmpty($Left) -or [string]::IsNullOrEmpty($Right)) { return $false }
+	return $Left -ceq $Right -or $Left.EndsWith('/' + $Right) -or $Right.EndsWith('/' + $Left)
+}
+
+function Test-CheckpointReviewBrief([string] $Text) {
+	if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+	$lines = $Text -split '\r?\n'
+	$firstText = $lines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1
+	if ($null -eq $firstText -or -not ($firstText.TrimStart() -like 'Role:*')) { return $false }
+	foreach ($line in $lines) {
+		if ($line -match '^\s*Skill:\s*/?next-plan-checkpoint-review\s*$') { return $true }
+	}
+	return $false
+}
+
+function Push-CheckpointGroup([hashtable] $State, [hashtable] $Group) {
+	$State.PreviousCheckpoint = $State.CurrentCheckpoint
+	$State.CurrentCheckpoint = $Group
+}
+
+function Push-PendingDesktopCheckpoint([hashtable] $State) {
+	if ($null -eq $State.PendingPromptWrite) { return }
+	$pending = $State.PendingPromptWrite
+	$State.PendingPromptWrite = $null
+	Push-CheckpointGroup $State @{
+		Kind = 'desktop'
+		FirstLine = $pending.FirstLine
+		FinalDispatchLine = $pending.LastLine
+		FinalToolUseId = $null
+		LaunchOutFile = $null
+		CompletedHandoffLine = $null
+	}
+}
+
+function Split-ShellCommands([string] $Command, [string] $Shell = 'powershell') {
+	$isBash = $Shell -ceq 'bash'
+	$escapeChar = if ($isBash) { '\' } else { '`' }
+	$commands = [Collections.Generic.List[object]]::new()
+	$current = [Collections.Generic.List[string]]::new()
+	$i = 0
+	$len = $Command.Length
+	while ($i -lt $len) {
+		$ch = $Command[$i]
+		if ($ch -eq ' ' -or $ch -eq "`t") { $i++; continue }
+		if ($ch -eq $escapeChar -and ($i + 1) -lt $len -and ($Command[$i + 1] -eq "`r" -or $Command[$i + 1] -eq "`n")) {
+			$i++
+			if ($Command[$i] -eq "`r" -and ($i + 1) -lt $len -and $Command[$i + 1] -eq "`n") { $i += 2 }
+			else { $i++ }
+			continue
+		}
+		if ($ch -eq '#') {
+			while ($i -lt $len -and $Command[$i] -ne "`r" -and $Command[$i] -ne "`n") { $i++ }
+			continue
+		}
+		if ($ch -eq ';' -or $ch -eq '|' -or $ch -eq "`r" -or $ch -eq "`n" -or $ch -eq ')') {
+			if ($current.Count -gt 0) {
+				$commands.Add($current)
+				$current = [Collections.Generic.List[string]]::new()
+			}
+			$i++
+			continue
+		}
+		if ($ch -eq '(' -and $current.Count -eq 0) {
+			$i++
+			continue
+		}
+		if ($ch -eq '&') {
+			if (($i + 1) -lt $len -and $Command[$i + 1] -eq '&') {
+				if ($current.Count -gt 0) {
+					$commands.Add($current)
+					$current = [Collections.Generic.List[string]]::new()
+				}
+				$i += 2
+				continue
+			}
+			if ($current.Count -eq 0) {
+				$current.Add('&')
+				$i++
+				continue
+			}
+			$commands.Add($current)
+			$current = [Collections.Generic.List[string]]::new()
+			$i++
+			continue
+		}
+		$sb = [Text.StringBuilder]::new()
+		while ($i -lt $len) {
+			$c = $Command[$i]
+			if ($c -eq ' ' -or $c -eq "`t" -or $c -eq ';' -or $c -eq '|' -or $c -eq "`r" -or $c -eq "`n" -or $c -eq ')') { break }
+			if ($c -eq '&' -and -not ($sb.Length -gt 0 -and $sb[$sb.Length - 1] -eq '>')) { break }
+			if ($c -eq '>' -and $sb.Length -gt 0 -and $sb.ToString() -notmatch '^[0-9*]+$') { break }
+			if ($c -eq $escapeChar -and ($i + 1) -lt $len) {
+				$next = $Command[$i + 1]
+				if ($next -eq "`r" -or $next -eq "`n") {
+					if (-not $isBash) { break }
+					$i++
+					if ($Command[$i] -eq "`r" -and ($i + 1) -lt $len -and $Command[$i + 1] -eq "`n") { $i += 2 }
+					else { $i++ }
+					continue
+				}
+				[void] $sb.Append($next)
+				$i += 2
+				continue
+			}
+			if ($c -eq "'") {
+				$i++
+				while ($i -lt $len) {
+					if ($Command[$i] -eq "'") {
+						if (-not $isBash -and ($i + 1) -lt $len -and $Command[$i + 1] -eq "'") {
+							[void] $sb.Append("'")
+							$i += 2
+							continue
+						}
+						$i++
+						break
+					}
+					[void] $sb.Append($Command[$i])
+					$i++
+				}
+				continue
+			}
+			if ($c -eq '"') {
+				$i++
+				while ($i -lt $len) {
+					if ($Command[$i] -eq '"') {
+						if (-not $isBash -and ($i + 1) -lt $len -and $Command[$i + 1] -eq '"') {
+							[void] $sb.Append('"')
+							$i += 2
+							continue
+						}
+						$i++
+						break
+					}
+					if ($isBash) {
+						if ($Command[$i] -eq '\' -and ($i + 1) -lt $len) {
+							$next = $Command[$i + 1]
+							if ($next -eq "`r" -or $next -eq "`n") {
+								$i++
+								if ($Command[$i] -eq "`r" -and ($i + 1) -lt $len -and $Command[$i + 1] -eq "`n") { $i += 2 }
+								else { $i++ }
+								continue
+							}
+							if ($next -eq '"' -or $next -eq '\' -or $next -eq '$' -or $next -eq '`') {
+								[void] $sb.Append($next)
+								$i += 2
+								continue
+							}
+						}
+					}
+					elseif ($Command[$i] -eq '`' -and ($i + 1) -lt $len) {
+						[void] $sb.Append($Command[$i + 1])
+						$i += 2
+						continue
+					}
+					[void] $sb.Append($Command[$i])
+					$i++
+				}
+				continue
+			}
+			[void] $sb.Append($c)
+			$i++
+		}
+		$current.Add($sb.ToString())
+	}
+	if ($current.Count -gt 0) { $commands.Add($current) }
+	return , $commands
+}
+
+function Parse-BridgeArguments([string[]] $Tokens) {
+	$skill = $null
+	$mode = $null
+	$promptFile = $null
+	$outFile = $null
+	$noRetry = $false
+	$waitRunId = $null
+	$isCheckModels = $false
+	for ($idx = 0; $idx -lt $Tokens.Count; $idx++) {
+		$token = $Tokens[$idx]
+		if ($token -notmatch '^-([A-Za-z]+)(?::(.*))?$') { continue }
+		$flag = $Matches[1].ToLowerInvariant()
+		$hasInline = $token.Contains(':')
+		$inlineVal = if ($hasInline) { $Matches[2] } else { $null }
+		switch ($flag) {
+			'checkmodels' {
+				if (-not $hasInline -or $inlineVal -match '^(?:\$?true|1)$') { $isCheckModels = $true }
+			}
+			'noretry' {
+				if (-not $hasInline -or $inlineVal -match '^(?:\$?true|1)$') { $noRetry = $true }
+				else { $noRetry = $false }
+			}
+			'skill' {
+				if ($hasInline -and $inlineVal -ne '') { $skill = $inlineVal }
+				elseif (($idx + 1) -lt $Tokens.Count) { $idx++; $skill = $Tokens[$idx] }
+			}
+			'mode' {
+				if ($hasInline -and $inlineVal -ne '') { $mode = $inlineVal }
+				elseif (($idx + 1) -lt $Tokens.Count) { $idx++; $mode = $Tokens[$idx] }
+			}
+			'promptfile' {
+				if ($hasInline -and $inlineVal -ne '') { $promptFile = $inlineVal }
+				elseif (($idx + 1) -lt $Tokens.Count) { $idx++; $promptFile = $Tokens[$idx] }
+			}
+			'outfile' {
+				if ($hasInline -and $inlineVal -ne '') { $outFile = $inlineVal }
+				elseif (($idx + 1) -lt $Tokens.Count) { $idx++; $outFile = $Tokens[$idx] }
+			}
+			'wait' {
+				if ($hasInline -and $inlineVal -ne '') { $waitRunId = $inlineVal }
+				elseif (($idx + 1) -lt $Tokens.Count) { $idx++; $waitRunId = $Tokens[$idx] }
+			}
+		}
+	}
+	if ($isCheckModels) { return $null }
+	if (-not [string]::IsNullOrWhiteSpace($skill)) {
+		return @{
+			Kind = 'launch'
+			Skill = $skill
+			Mode = $mode
+			PromptFile = $promptFile
+			OutFile = $outFile
+			NoRetry = $noRetry
+		}
+	}
+	if (-not [string]::IsNullOrWhiteSpace($waitRunId)) {
+		return @{
+			Kind = 'wait'
+			RunId = $waitRunId
+		}
+	}
+	return $null
+}
+
+function Parse-BridgeCommand([string] $Command, [int] $Depth = 0, [string] $Shell = 'powershell') {
+	if ($Depth -gt 3 -or [string]::IsNullOrWhiteSpace($Command) -or $Command -notmatch 'Invoke-Codex\.ps1') { return $null }
+	foreach ($tokens in (Split-ShellCommands $Command $Shell)) {
+		$cmdIdx = 0
+		while ($cmdIdx -lt $tokens.Count -and $tokens[$cmdIdx] -match '^[A-Za-z_][A-Za-z0-9_]*=') { $cmdIdx++ }
+		if ($cmdIdx -lt $tokens.Count -and $tokens[$cmdIdx] -ceq 'env') {
+			$cmdIdx++
+			while ($cmdIdx -lt $tokens.Count) {
+				if ($tokens[$cmdIdx] -match '^[A-Za-z_][A-Za-z0-9_]*=') { $cmdIdx++; continue }
+				if ($tokens[$cmdIdx] -ceq '-u' -and ($cmdIdx + 1) -lt $tokens.Count) { $cmdIdx += 2; continue }
+				if ($tokens[$cmdIdx].StartsWith('-')) { $cmdIdx++; continue }
+				break
+			}
+		}
+		if (($cmdIdx + 1) -lt $tokens.Count -and $tokens[$cmdIdx].StartsWith('$') -and $tokens[$cmdIdx + 1] -ceq '=') {
+			$cmdIdx += 2
+		}
+		if ($cmdIdx -lt $tokens.Count -and ($tokens[$cmdIdx] -ceq '&' -or $tokens[$cmdIdx] -ceq '.')) {
+			$cmdIdx++
+		}
+		if ($cmdIdx -ge $tokens.Count) { continue }
+
+		$head = $tokens[$cmdIdx]
+		if ($head -match '(?i)(?:^|[\\/])Invoke-Codex\.ps1$') {
+			$argTokens = if (($cmdIdx + 1) -lt $tokens.Count) { [string[]] $tokens.GetRange($cmdIdx + 1, $tokens.Count - $cmdIdx - 1).ToArray() } else { [string[]] @() }
+			$parsed = Parse-BridgeArguments $argTokens
+			if ($null -ne $parsed) { return $parsed }
+			continue
+		}
+		if ($head -match '(?i)(?:^|[\\/])(?:pwsh|powershell)(?:\.exe)?$') {
+			for ($j = $cmdIdx + 1; $j -lt $tokens.Count; $j++) {
+				$arg = $tokens[$j]
+				if ($arg -match '(?i)^-(?:File|f)(?::(.*))?$') {
+					$scriptPath = if ($arg.Contains(':')) { $Matches[1] } elseif (($j + 1) -lt $tokens.Count) { $j++; $tokens[$j] } else { $null }
+					if ($scriptPath -match '(?i)(?:^|[\\/])Invoke-Codex\.ps1$') {
+						$argTokens = if (($j + 1) -lt $tokens.Count) { [string[]] $tokens.GetRange($j + 1, $tokens.Count - $j - 1).ToArray() } else { [string[]] @() }
+						$parsed = Parse-BridgeArguments $argTokens
+						if ($null -ne $parsed) { return $parsed }
+					}
+					break
+				}
+				if ($arg -match '(?i)^-(?:Command|c)(?::(.*))?$') {
+					$inlineCmd = if ($arg.Contains(':')) { $Matches[1] } else { $null }
+					$restCount = $tokens.Count - $j - 1
+					if ([string]::IsNullOrEmpty($inlineCmd) -and $restCount -eq 1) {
+						$parsed = Parse-BridgeCommand $tokens[$j + 1] ($Depth + 1) 'powershell'
+					}
+					elseif ([string]::IsNullOrEmpty($inlineCmd) -and $restCount -gt 1 -and $tokens[$j + 1] -match '(?i)(?:^|[\\/])Invoke-Codex\.ps1$') {
+						$argTokens = [string[]] $tokens.GetRange($j + 2, $restCount - 1).ToArray()
+						$parsed = Parse-BridgeArguments $argTokens
+					}
+					else {
+						$parts = [Collections.Generic.List[string]]::new()
+						if (-not [string]::IsNullOrEmpty($inlineCmd)) { $parts.Add($inlineCmd) }
+						for ($k = $j + 1; $k -lt $tokens.Count; $k++) { $parts.Add($tokens[$k]) }
+						$parsed = Parse-BridgeCommand ($parts -join ' ') ($Depth + 1) 'powershell'
+					}
+					if ($null -ne $parsed) { return $parsed }
+					break
+				}
+				if ($arg -match '(?i)^-(?:ExecutionPolicy|ep|InputFormat|if|OutputFormat|of|WindowStyle|w|WorkingDirectory|wd|ConfigurationName|CustomPipeName|SettingsFile)$') {
+					$j++
+					continue
+				}
+				if ($arg.StartsWith('-')) { continue }
+				if ($arg -match '(?i)(?:^|[\\/])Invoke-Codex\.ps1$') {
+					$argTokens = if (($j + 1) -lt $tokens.Count) { [string[]] $tokens.GetRange($j + 1, $tokens.Count - $j - 1).ToArray() } else { [string[]] @() }
+					$parsed = Parse-BridgeArguments $argTokens
+				}
+				else {
+					$rest = [string[]] $tokens.GetRange($j, $tokens.Count - $j).ToArray()
+					$parsed = Parse-BridgeCommand ($rest -join ' ') ($Depth + 1) 'powershell'
+				}
+				if ($null -ne $parsed) { return $parsed }
+				break
+			}
+		}
+	}
+	return $null
+}
+
+function Get-ClaudeResultPlainText($Content) {
+	if ($Content -is [string]) { return $Content }
+	if ($Content -is [object[]]) {
+		$parts = [Collections.Generic.List[string]]::new()
+		foreach ($item in $Content) {
+			if ([string](Get-AgentTranscriptField $item 'type') -cne 'text') { continue }
+			$text = Get-AgentTranscriptField $item 'text'
+			if ($text -is [string]) { $parts.Add($text) }
+		}
+		return ($parts -join "`n")
+	}
+	return ''
+}
+
+function Get-ClaudeToolUseResultStubStatus($Record, [int] $ToolResultCount) {
+	if ($ToolResultCount -ne 1) { return $null }
+	$toolUseResult = Get-AgentTranscriptField $Record 'toolUseResult'
+	if ($null -eq $toolUseResult) { return $null }
+	if ((Get-AgentTranscriptField $toolUseResult 'isAsync') -eq $true) { return $true }
+	$status = [string](Get-AgentTranscriptField $toolUseResult 'status')
+	if ($status -ceq 'async_launched') { return $true }
+	if (-not [string]::IsNullOrWhiteSpace([string](Get-AgentTranscriptField $toolUseResult 'backgroundTaskId'))) { return $true }
+	if ($status -ceq 'completed') { return $false }
+	return $null
+}
+
+function Test-ClaudeBridgeLaunchStub($Record, [int] $ToolResultCount, [string] $PlainText) {
+	$metaStub = Get-ClaudeToolUseResultStubStatus $Record $ToolResultCount
+	if ($null -ne $metaStub) { return $metaStub }
+	return $PlainText -match $script:ClaudeBridgeStubPattern
+}
+
+function Test-ClaudeNativeAgentLaunchStub($Record, [int] $ToolResultCount, [string] $PlainText) {
+	$metaStub = Get-ClaudeToolUseResultStubStatus $Record $ToolResultCount
+	if ($null -ne $metaStub) { return $metaStub }
+	return $PlainText -match $script:ClaudeNativeAgentStubPattern
+}
+
+function Find-BridgeOuterReceipt([string] $Text) {
+	if ([string]::IsNullOrEmpty($Text) -or (-not $Text.Contains('broken-engine-codex-run/') -and -not $Text.Contains('--- findings ---'))) {
+		return @{ Kind = 'none'; Receipt = $null }
+	}
+	$match = [regex]::Match($Text, $script:BridgeReceiptOrSeparatorPattern)
+	if (-not $match.Success) {
+		return @{ Kind = 'none'; Receipt = $null }
+	}
+	if ($match.Groups['sep'].Success) {
+		return @{ Kind = 'incompatible'; Receipt = $null }
+	}
+	$jsonText = $match.Groups['json'].Value
+	try {
+		$obj = ConvertFrom-Json -InputObject $jsonText -Depth 16 -ErrorAction Stop
+	}
+	catch {
+		return @{ Kind = 'incompatible'; Receipt = $null }
+	}
+	if ($obj -isnot [Management.Automation.PSCustomObject]) {
+		return @{ Kind = 'incompatible'; Receipt = $null }
+	}
+	$schemaVersion = Get-AgentTranscriptField $obj 'schemaVersion'
+	if ($schemaVersion -isnot [string] -or $schemaVersion -cne 'broken-engine-codex-run/v2') {
+		return @{ Kind = 'incompatible'; Receipt = $null }
+	}
+	$status = Get-AgentTranscriptField $obj 'status'
+	$runId = Get-AgentTranscriptField $obj 'runId'
+	if ($status -isnot [string] -or $script:ValidReceiptStatuses -cnotcontains $status -or
+		$runId -isnot [string] -or [string]::IsNullOrWhiteSpace($runId)) {
+		return @{ Kind = 'incompatible'; Receipt = $null }
+	}
+	$skillRaw = Get-AgentTranscriptField $obj 'skill'
+	$skill = if ($skillRaw -is [string] -and -not [string]::IsNullOrWhiteSpace($skillRaw)) { $skillRaw } else { 'unknown' }
+	$modeRaw = Get-AgentTranscriptField $obj 'mode'
+	$mode = if ($modeRaw -is [string] -and -not [string]::IsNullOrWhiteSpace($modeRaw)) { $modeRaw } else { $null }
+	$noRetry = (Get-AgentTranscriptField $obj 'noRetry') -eq $true
+	$outFileRaw = Get-AgentTranscriptField $obj 'outFile'
+	$outFile = if ($outFileRaw -is [string] -and -not [string]::IsNullOrWhiteSpace($outFileRaw)) { $outFileRaw } else { $null }
+	$afterReceipt = $Text.Substring($match.Index + $match.Length)
+	$hasFindings = ($status -ceq 'completed') -and ($afterReceipt -cmatch '(?m)^--- findings ---\r?$')
+	return @{
+		Kind = 'v2'
+		Receipt = @{
+			Status = $status
+			RunId = $runId
+			Skill = $skill
+			Mode = $mode
+			NoRetry = $noRetry
+			OutFile = $outFile
+			HasFindings = $hasFindings
+		}
+	}
+}
+
+function Write-BridgeDeliveryProjection([int] $LineNumber, [string] $ToolUseId, [hashtable] $Receipt, [hashtable] $State) {
+	$findingsTag = if ($Receipt.HasFindings) { 'yes' } else { 'no' }
+	$row = '{0} bridge-delivery {1} status={2} runId={3} skill={4}' -f $LineNumber, $ToolUseId, $Receipt.Status, $Receipt.RunId, $Receipt.Skill
+	if ($null -ne $Receipt.Mode) { $row += " mode=$($Receipt.Mode)" }
+	if ($Receipt.NoRetry) { $row += ' noretry' }
+	$row += " findings=$findingsTag"
+	$row
+
+	if ($Receipt.Skill -cne 'next-plan-checkpoint-review') { return }
+	$waitLine = $State.BridgeCallByToolUseId[$ToolUseId]
+	if ($null -ne $waitLine) {
+		$group = if ($null -ne $State.CurrentCheckpoint -and $waitLine -ge $State.CurrentCheckpoint.FirstLine) {
+			$State.CurrentCheckpoint
+		}
+		else {
+			$State.PreviousCheckpoint
+		}
+		$receiptOutKey = ConvertTo-NormalizedPathKey $Receipt.OutFile
+		if ($null -ne $group -and
+			$group.Kind -ceq 'bridged' -and
+			(Test-NormalizedPathMatch $group.LaunchOutFile $receiptOutKey) -and
+			$group.FirstLine -lt $waitLine -and
+			$waitLine -ge $group.FinalDispatchLine) {
+			$group.FinalDispatchLine = $waitLine
+			$group.FinalToolUseId = $ToolUseId
+			$group.CompletedHandoffLine = if ($Receipt.Status -ceq 'completed' -and $Receipt.HasFindings) { $LineNumber } else { $null }
+		}
+	}
+	else {
+		foreach ($candidate in @($State.CurrentCheckpoint, $State.PreviousCheckpoint)) {
+			if ($null -ne $candidate -and $candidate.Kind -ceq 'bridged' -and $candidate.FinalToolUseId -ceq $ToolUseId) {
+				if ($Receipt.Status -ceq 'completed' -and $Receipt.HasFindings) {
+					$candidate.CompletedHandoffLine = $LineNumber
+				}
+				break
+			}
+		}
+	}
+}
+
+function Get-NativeCheckpointGroup([string] $ToolUseId, [hashtable] $State) {
+	foreach ($candidate in @($State.CurrentCheckpoint, $State.PreviousCheckpoint)) {
+		if ($null -ne $candidate -and $candidate.Kind -ceq 'native' -and $candidate.FinalToolUseId -ceq $ToolUseId) {
+			return $candidate
+		}
+	}
+	return $null
+}
+
+function Set-NativeCheckpointHandoff([int] $LineNumber, [string] $ToolUseId, [hashtable] $State, [bool] $OnlyWhenUnset) {
+	$group = Get-NativeCheckpointGroup $ToolUseId $State
+	if ($null -ne $group -and (-not $OnlyWhenUnset -or $null -eq $group.CompletedHandoffLine)) {
+		$group.CompletedHandoffLine = $LineNumber
+	}
+}
+
+function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string] $ToolUseId, $InputObject, [Collections.Generic.List[object]] $Reads, [hashtable] $State) {
 	$summarySource = if ($null -ne $InputObject) { $InputObject } else { @{} }
 	$summary = ($summarySource | ConvertTo-Json -Compress -Depth 100) -replace '\s+', ' '
 	'{0} use {1} {2}' -f $LineNumber, $ToolName, $summary.Substring(0, [Math]::Min(160, $summary.Length))
 
 	$readPath = $null
+	$shellCommand = $null
+	$shellKind = $null
 	if ($ToolName -ceq 'Read') {
 		$candidate = Get-AgentTranscriptField $InputObject 'file_path'
 		if ($candidate -is [string] -and -not [string]::IsNullOrWhiteSpace($candidate)) { $readPath = $candidate }
@@ -73,23 +566,135 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, $InputO
 	}
 	elseif ($ToolName -ceq 'Bash' -or $ToolName -ceq 'PowerShell') {
 		$command = Get-AgentTranscriptField $InputObject 'command'
-		if ($command -is [string]) { $readPath = Get-AllowedShellReadPath $command }
+		if ($command -is [string]) {
+			$shellCommand = $command
+			$shellKind = if ($ToolName -ceq 'Bash') { 'bash' } else { 'powershell' }
+			$readPath = Get-AllowedShellReadPath $command
+		}
 	}
 	elseif ($ToolName -ceq 'run_command') {
 		$command = Get-AgentTranscriptField $InputObject 'CommandLine'
-		if ($command -is [string]) { $readPath = Get-AllowedShellReadPath $command }
+		if ($command -is [string]) {
+			$shellCommand = $command
+			$shellKind = 'powershell'
+			$readPath = Get-AllowedShellReadPath $command
+		}
+	}
+	elseif ($ToolName -ceq 'Write' -or $ToolName -ceq 'write_file') {
+		$pathField = if ($ToolName -ceq 'Write') { 'file_path' } else { 'Path' }
+		$contentField = if ($ToolName -ceq 'Write') { 'content' } else { 'Content' }
+		$writePath = Get-AgentTranscriptField $InputObject $pathField
+		$writeContent = Get-AgentTranscriptField $InputObject $contentField
+		if ($writePath -is [string] -and -not [string]::IsNullOrWhiteSpace($writePath)) {
+			$normPath = ConvertTo-NormalizedPathKey $writePath
+			if (-not [string]::IsNullOrEmpty($normPath)) {
+				$State.LastWriteByPath[$normPath] = $LineNumber
+				if ($writeContent -is [string] -and (Test-CheckpointReviewBrief $writeContent)) {
+					if ($null -ne $State.PendingPromptWrite -and (Test-NormalizedPathMatch $State.PendingPromptWrite.PathKey $normPath)) {
+						$State.PendingPromptWrite.LastLine = $LineNumber
+					}
+					else {
+						Push-PendingDesktopCheckpoint $State
+						$State.PendingPromptWrite = @{
+							FirstLine = $LineNumber
+							LastLine = $LineNumber
+							PathKey = $normPath
+						}
+					}
+				}
+			}
+		}
 	}
 	if ($readPath) {
 		$Reads.Add(@{ Line = $LineNumber; Path = $readPath; Key = ($readPath -replace '\\', '/').ToLowerInvariant() })
 	}
 
+	if ($null -ne $shellCommand) {
+		$bridgeCmd = Parse-BridgeCommand $shellCommand 0 $shellKind
+		if ($null -ne $bridgeCmd) {
+			$idLabel = if (-not [string]::IsNullOrEmpty($ToolUseId)) { $ToolUseId } else { 'unknown' }
+			if ($bridgeCmd.Kind -ceq 'launch') {
+				if (-not [string]::IsNullOrEmpty($ToolUseId)) { $State.BridgeCallByToolUseId[$ToolUseId] = $null }
+				$promptFileKey = ConvertTo-NormalizedPathKey $bridgeCmd.PromptFile
+				$isCheckpointLaunch = $bridgeCmd.Skill -ceq 'next-plan-checkpoint-review'
+				$matchedPendingFirstLine = $null
+				if ($isCheckpointLaunch -and $null -ne $State.PendingPromptWrite) {
+					if (Test-NormalizedPathMatch $State.PendingPromptWrite.PathKey $promptFileKey) {
+						$matchedPendingFirstLine = $State.PendingPromptWrite.FirstLine
+						$State.PendingPromptWrite = $null
+					}
+					else {
+						Push-PendingDesktopCheckpoint $State
+					}
+				}
+				$isCheckpointAttach = $isCheckpointLaunch -and $bridgeCmd.NoRetry -and $null -ne $State.CurrentCheckpoint -and $State.CurrentCheckpoint.Kind -ceq 'bridged'
+				$minPromptWriteLine = 0
+				if ($isCheckpointLaunch) {
+					$priorDistinct = if ($isCheckpointAttach) { $State.PreviousCheckpoint } else { $State.CurrentCheckpoint }
+					if ($null -ne $priorDistinct) { $minPromptWriteLine = $priorDistinct.FinalDispatchLine }
+				}
+				$promptWriteLine = $null
+				if (-not [string]::IsNullOrEmpty($promptFileKey)) {
+					foreach ($entry in $State.LastWriteByPath.GetEnumerator()) {
+						if ((Test-NormalizedPathMatch $entry.Key $promptFileKey) -and $entry.Value -gt $minPromptWriteLine) {
+							if ($null -eq $promptWriteLine -or $entry.Value -gt $promptWriteLine) { $promptWriteLine = $entry.Value }
+						}
+					}
+				}
+				$launchRow = '{0} bridge-launch {1} skill={2}' -f $LineNumber, $idLabel, $bridgeCmd.Skill
+				if (-not [string]::IsNullOrWhiteSpace($bridgeCmd.Mode)) { $launchRow += " mode=$($bridgeCmd.Mode)" }
+				if ($bridgeCmd.NoRetry) { $launchRow += ' noretry' }
+				if ($null -ne $promptWriteLine) { $launchRow += " prompt-write=$promptWriteLine" }
+				$launchRow
+
+				if ($isCheckpointLaunch) {
+					$launchOutKey = ConvertTo-NormalizedPathKey $bridgeCmd.OutFile
+					if ($isCheckpointAttach) {
+						$State.CurrentCheckpoint.FinalDispatchLine = $LineNumber
+						$State.CurrentCheckpoint.FinalToolUseId = $ToolUseId
+						$State.CurrentCheckpoint.LaunchOutFile = $launchOutKey
+						$State.CurrentCheckpoint.CompletedHandoffLine = $null
+					}
+					else {
+						$firstLine = if ($null -ne $matchedPendingFirstLine) {
+							$matchedPendingFirstLine
+						}
+						elseif ($null -ne $promptWriteLine) {
+							$promptWriteLine
+						}
+						else {
+							$LineNumber
+						}
+						Push-CheckpointGroup $State @{
+							Kind = 'bridged'
+							FirstLine = $firstLine
+							FinalDispatchLine = $LineNumber
+							FinalToolUseId = $ToolUseId
+							LaunchOutFile = $launchOutKey
+							CompletedHandoffLine = $null
+						}
+					}
+				}
+			}
+			elseif ($bridgeCmd.Kind -ceq 'wait') {
+				if (-not [string]::IsNullOrEmpty($ToolUseId)) { $State.BridgeCallByToolUseId[$ToolUseId] = $LineNumber }
+				'{0} bridge-wait {1} runId={2}' -f $LineNumber, $idLabel, $bridgeCmd.RunId
+			}
+		}
+	}
+
 	if ($InputObject -isnot [Management.Automation.PSCustomObject]) { return }
+	$isNativeAgentTool = $ToolName -ceq 'Agent' -or $ToolName -ceq 'invoke_subagent'
+	$isNativeCheckpoint = $false
 	# Brief paths come from the unescaped field value, never the serialized JSON above, so a token is delimited by
 	# real whitespace, a real backtick, or the `,`/`;` a brief separates listed paths with, and loses the
 	# sentence punctuation a brief may end it with; prose in those fields yields no token.
 	$briefMissing = [Collections.Generic.List[string]]::new()
 	$briefKeys = @(foreach ($field in $InputObject.PSObject.Properties) {
 		if ($field.Value -isnot [string]) { continue }
+		if ($isNativeAgentTool -and -not $isNativeCheckpoint -and (Test-CheckpointReviewBrief $field.Value)) {
+			$isNativeCheckpoint = $true
+		}
 		$fieldLines = $field.Value -split '\r?\n'
 		$firstText = $fieldLines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1
 		$hasRole = $firstText -like 'Role:*'
@@ -109,6 +714,17 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, $InputO
 			if ($token -match '[/\\]') { ($token -replace '\\', '/').ToLowerInvariant() }
 		}
 	})
+	if ($isNativeCheckpoint) {
+		Push-PendingDesktopCheckpoint $State
+		Push-CheckpointGroup $State @{
+			Kind = 'native'
+			FirstLine = $LineNumber
+			FinalDispatchLine = $LineNumber
+			FinalToolUseId = $ToolUseId
+			LaunchOutFile = $null
+			CompletedHandoffLine = $null
+		}
+	}
 	foreach ($row in $briefMissing) { $row }
 	foreach ($read in $Reads) {
 		foreach ($briefKey in $briefKeys) {
@@ -124,6 +740,14 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, $InputO
 # that path folded to lower case with `\` as `/` for comparison. Reads always precede the brief that lists them, so one
 # streaming pass suffices.
 $reads = [Collections.Generic.List[object]]::new()
+$state = @{
+	LastWriteByPath = @{}
+	BridgeCallByToolUseId = @{}
+	PreviousCheckpoint = $null
+	CurrentCheckpoint = $null
+	PendingPromptWrite = $null
+}
+$totalLines = 0
 
 try {
 	$resolved = Resolve-AgentAgyTranscriptPath -TranscriptPath $TranscriptPath
@@ -137,17 +761,30 @@ try {
 	if (-not (Test-Path -LiteralPath $transcript -PathType Leaf)) { throw 'Transcript file does not exist.' }
 
 	if (Test-AgentAgyTranscript $transcript) {
-		foreach ($record in (Read-AgentAgyTranscript $transcript)) {
+		Read-AgentAgyTranscript $transcript | ForEach-Object {
+			$record = $_
+			$totalLines = $record.LineNumber
 			if ($record.Type -ceq 'USER_INPUT' -or $record.Type -ceq 'SYSTEM_MESSAGE') {
 				$row = '{0} {1} text len {2}' -f $record.LineNumber, $record.Type, $record.Content.Length
 				if ($record.Type -ceq 'SYSTEM_MESSAGE' -and -not [string]::IsNullOrEmpty($record.DeliveryToolUseId)) {
 					$row += " delivery=$($record.DeliveryToolUseId)"
 				}
 				$row
+				if ($record.Type -ceq 'SYSTEM_MESSAGE' -and -not [string]::IsNullOrEmpty($record.DeliveryToolUseId)) {
+					if ($state.BridgeCallByToolUseId.ContainsKey($record.DeliveryToolUseId)) {
+						$receiptLookup = Find-BridgeOuterReceipt $record.Content
+						if ($receiptLookup.Kind -ceq 'v2') {
+							Write-BridgeDeliveryProjection $record.LineNumber $record.DeliveryToolUseId $receiptLookup.Receipt $state
+						}
+					}
+					elseif (-not $record.IsIdleNotice) {
+						Set-NativeCheckpointHandoff $record.LineNumber $record.DeliveryToolUseId $state $false
+					}
+				}
 			}
 			elseif ($record.Type -ceq 'PLANNER_RESPONSE') {
 				foreach ($tc in $record.ToolCalls) {
-					Write-ToolCallProjection $record.LineNumber $tc.Name $tc.Args $reads
+					Write-ToolCallProjection $record.LineNumber $tc.Name ([string] $tc.ToolUseId) $tc.Args $reads $state
 				}
 				if (-not [string]::IsNullOrEmpty($record.Content)) {
 					$text = $record.Content
@@ -160,6 +797,21 @@ try {
 				$result = '{0} result {1} len {2}' -f $record.LineNumber, $toolUseId, $record.Content.Length
 				if ($record.IsError) { $result += ' error' }
 				$result
+				if ($null -ne $record.PairedToolCall -and -not [string]::IsNullOrEmpty($record.PairedToolCall.ToolUseId)) {
+					$pairedId = $record.PairedToolCall.ToolUseId
+					if ($state.BridgeCallByToolUseId.ContainsKey($pairedId)) {
+						$receiptLookup = Find-BridgeOuterReceipt $record.Content
+						if ($receiptLookup.Kind -ceq 'v2') {
+							Write-BridgeDeliveryProjection $record.LineNumber $pairedId $receiptLookup.Receipt $state
+						}
+						elseif ($receiptLookup.Kind -ceq 'none' -and $null -ne $record.PairedToolCall.LaunchedTaskId) {
+							'{0} bridge-stub {1}' -f $record.LineNumber, $pairedId
+						}
+					}
+					elseif (-not $record.IsError -and $null -eq $record.PairedToolCall.LaunchedSubagentId) {
+						Set-NativeCheckpointHandoff $record.LineNumber $pairedId $state $true
+					}
+				}
 			}
 		}
 	}
@@ -172,15 +824,57 @@ try {
 			if ($record.isSidechain -eq $true -or $record.type -notin @('assistant', 'user', 'attachment')) { continue }
 			$content = $record.message.content
 			if ($record.type -eq 'attachment') { $content = $record.attachment.prompt }
-			if ($content -is [string]) { '{0} {1} text len {2}' -f $n, $record.type, $content.Length; continue }
+			if ($content -is [string]) {
+				'{0} {1} text len {2}' -f $n, $record.type, $content.Length
+				$isValidStringDelivery = $false
+				if ($record.type -ceq 'user') {
+					$isValidStringDelivery = [string](Get-AgentTranscriptField (Get-AgentTranscriptField $record 'origin') 'kind') -ceq 'task-notification'
+				}
+				elseif ($record.type -ceq 'attachment') {
+					$isValidStringDelivery = [string](Get-AgentTranscriptField (Get-AgentTranscriptField $record 'attachment') 'type') -ceq 'queued_command'
+				}
+				if ($isValidStringDelivery -and $content -cmatch '<tool-use-id>([^<]+)</tool-use-id>') {
+					$deliveryToolUseId = $Matches[1]
+					if ($state.BridgeCallByToolUseId.ContainsKey($deliveryToolUseId)) {
+						$receiptLookup = Find-BridgeOuterReceipt $content
+						if ($receiptLookup.Kind -ceq 'v2') {
+							Write-BridgeDeliveryProjection $n $deliveryToolUseId $receiptLookup.Receipt $state
+						}
+					}
+					else {
+						Set-NativeCheckpointHandoff $n $deliveryToolUseId $state $false
+					}
+				}
+				continue
+			}
+			$toolResultCount = @($content | Where-Object { $_.type -eq 'tool_result' }).Count
 			foreach ($element in $content) {
 				if ($element.type -eq 'tool_use') {
-					Write-ToolCallProjection $n ([string] $element.name) $element.input $reads
+					Write-ToolCallProjection $n ([string] $element.name) ([string] $element.id) $element.input $reads $state
 				}
 				elseif ($element.type -eq 'tool_result') {
 					$result = '{0} result {1} len {2}' -f $n, $element.tool_use_id, ($element.content | ConvertTo-Json -Compress -Depth 100).Length
 					if ($element.is_error -eq $true) { $result += ' error' }
 					$result
+					$resultToolUseId = [string] $element.tool_use_id
+					if (-not [string]::IsNullOrEmpty($resultToolUseId)) {
+						$plainText = Get-ClaudeResultPlainText $element.content
+						if ($state.BridgeCallByToolUseId.ContainsKey($resultToolUseId)) {
+							$receiptLookup = Find-BridgeOuterReceipt $plainText
+							if ($receiptLookup.Kind -ceq 'v2') {
+								Write-BridgeDeliveryProjection $n $resultToolUseId $receiptLookup.Receipt $state
+							}
+							elseif ($receiptLookup.Kind -ceq 'none' -and $element.is_error -ne $true -and (Test-ClaudeBridgeLaunchStub $record $toolResultCount $plainText)) {
+								'{0} bridge-stub {1}' -f $n, $resultToolUseId
+							}
+						}
+						elseif ($element.is_error -ne $true) {
+							$nativeGroup = Get-NativeCheckpointGroup $resultToolUseId $state
+							if ($null -ne $nativeGroup -and $null -eq $nativeGroup.CompletedHandoffLine -and -not (Test-ClaudeNativeAgentLaunchStub $record $toolResultCount $plainText)) {
+								$nativeGroup.CompletedHandoffLine = $n
+							}
+						}
+					}
 				}
 				elseif ($record.type -eq 'assistant' -and $element.type -eq 'text') {
 					$text = [string] $element.text
@@ -189,7 +883,30 @@ try {
 				}
 			}
 		}
+		$totalLines = $n
 	}
+
+	Push-PendingDesktopCheckpoint $state
+	if ($null -ne $state.CurrentCheckpoint -and $null -ne $state.PreviousCheckpoint) {
+		$startLine = $state.PreviousCheckpoint.FinalDispatchLine + 1
+		$endLine = $state.CurrentCheckpoint.FirstLine - 1
+		$hasExclude = $null -ne $state.PreviousCheckpoint.CompletedHandoffLine
+		$excludeLine = if ($hasExclude) { [string] $state.PreviousCheckpoint.CompletedHandoffLine } else { 'none' }
+		$excludeId = if ($hasExclude -and -not [string]::IsNullOrEmpty($state.PreviousCheckpoint.FinalToolUseId)) { $state.PreviousCheckpoint.FinalToolUseId } else { 'none' }
+	}
+	elseif ($null -ne $state.CurrentCheckpoint) {
+		$startLine = 1
+		$endLine = $state.CurrentCheckpoint.FirstLine - 1
+		$excludeLine = 'none'
+		$excludeId = 'none'
+	}
+	else {
+		$startLine = if ($totalLines -gt 0) { 1 } else { 0 }
+		$endLine = $totalLines
+		$excludeLine = 'none'
+		$excludeId = 'none'
+	}
+	'checkpoint-span start={0} end={1} exclude={2} exclude-id={3}' -f $startLine, $endLine, $excludeLine, $excludeId
 }
 catch {
 	Write-Error $_
