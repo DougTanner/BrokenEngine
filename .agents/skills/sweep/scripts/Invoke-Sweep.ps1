@@ -1,13 +1,15 @@
-# Coordinator for /sweep (.agents/skills/sweep/SKILL.md). Every Codex run uses the one -Model at reasoning
-# effort high; agents hand off through files under Temp/Sweep/, and Status.txt carries the run's state.
+# Coordinator for /sweep (.agents/skills/sweep/SKILL.md). Refuses codex/ session branches in every mode.
+# Every Codex run uses the one -Model at reasoning effort high; agents hand off through files under Temp/Sweep/,
+# and Status.txt carries the run's state. -Spec must point to a file under Documents/Investigations/ or
+# Projects/Coretide/Documents/Investigations/.
 # -ListModels prints the list-visible Codex model slugs, marking the highest gpt-<version>-sol (recommended).
-# -Plan <path> -List prints the sweep Plan's batches and unit counts in run order: the ## Sweep Batches entries
-# first in their listed order, then the remaining top-level batches by name.
-# -Plan <path> -Model <slug> -Batch <name> runs one batch (resumable); -Unit <stem> runs one unit only.
+# -Spec <path> -List prints the sweep specification's batches and unit counts in run order: the ## Sweep Batches
+# entries first in their listed order, then the remaining top-level batches by name.
+# -Spec <path> -Model <slug> -Batch <name> runs one batch (resumable); -Unit <stem> runs one unit only.
 # -Throttle <n> sets how many units of a -Batch run execute in parallel (default 8).
-# -Plan <path> -Model <slug> -Close runs the stage close: Cleanup, Ordering, and the deferred-fixes ledger.
+# -Spec <path> -Model <slug> -Close runs the stage close: Cleanup, Ordering, and the deferred-fixes ledger.
 param(
-	[string] $Plan,
+	[string] $Spec,
 	[string] $Model,
 	[string] $Batch,
 	[string] $Unit,
@@ -19,7 +21,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
-$root = (git rev-parse --show-toplevel).Trim() -replace '/', '\'
+$rootRaw = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0) { throw "Failed to determine git repository root (git rev-parse --show-toplevel exited $LASTEXITCODE)" }
+$root = [IO.Path]::GetFullPath(($rootRaw.Trim() -replace '/', '\'))
+$branch = git -C $root rev-parse --abbrev-ref HEAD
+if ($LASTEXITCODE -ne 0) { throw "Failed to determine current git branch in '$root' (git rev-parse --abbrev-ref HEAD exited $LASTEXITCODE)" }
+if ($branch -like 'codex/*') { throw "/sweep cannot run from Codex session branch '$branch'; run from a non-Codex host session (Claude Code, Antigravity CLI, or OpenCode)" }
 $sweep = Join-Path $root 'Temp\Sweep'
 $status = Join-Path $sweep 'Status.txt'
 $baselineFile = Join-Path $sweep 'Baseline.txt'
@@ -47,13 +54,29 @@ if ($ListModels)
 	return
 }
 
-if (-not $Plan) { throw '-Plan is required except with -ListModels' }
-$planRel = $Plan -replace '\\', '/'
-$planText = Get-Content -Raw -LiteralPath (Join-Path $root $planRel)
-$sweepSection = [regex]::Match($planText, '(?ms)^## Sweep[ \t]*\r?\n(.*?)(?=^## |\z)')
-if (-not $sweepSection.Success) { throw "$planRel has no ## Sweep section" }
+if (-not $Spec) { throw '-Spec is required except with -ListModels' }
+$specFull = [IO.Path]::GetFullPath($Spec, $root)
+$allowedRoots = @(
+	([IO.Path]::GetFullPath((Join-Path $root 'Documents\Investigations')) + [IO.Path]::DirectorySeparatorChar)
+	([IO.Path]::GetFullPath((Join-Path $root 'Projects\Coretide\Documents\Investigations')) + [IO.Path]::DirectorySeparatorChar)
+)
+$inAllowedRoot = $false
+foreach ($allowedRoot in $allowedRoots)
+{
+	if (($specFull.Length -gt $allowedRoot.Length) -and $specFull.StartsWith($allowedRoot, [StringComparison]::OrdinalIgnoreCase))
+	{
+		$inAllowedRoot = $true
+		break
+	}
+}
+if (-not $inAllowedRoot) { throw "-Spec must be under Documents/Investigations/ or Projects/Coretide/Documents/Investigations/: '$Spec'" }
+if (-not (Test-Path -LiteralPath $specFull -PathType Leaf)) { throw "-Spec file not found: '$Spec'" }
+$specRel = [IO.Path]::GetRelativePath($root, $specFull) -replace '\\', '/'
+$specText = Get-Content -Raw -LiteralPath $specFull
+$sweepSection = [regex]::Match($specText, '(?ms)^## Sweep[ \t]*\r?\n(.*?)(?=^## |\z)')
+if (-not $sweepSection.Success) { throw "$specRel has no ## Sweep section" }
 
-# The backticked values of one `- <Name>:` bullet of the Plan's ## Sweep section.
+# The backticked values of one `- <Name>:` bullet of the specification's ## Sweep section.
 function Get-SweepValues([string] $Name)
 {
 	$bullet = [regex]::Match($sweepSection.Groups[1].Value, "(?ms)^- ${Name}:(.*?)(?=^- |\z)")
@@ -61,11 +84,11 @@ function Get-SweepValues([string] $Name)
 }
 
 $typeName = @(Get-SweepValues 'Type')
-if ($typeName.Count -ne 1) { throw "$planRel ## Sweep must name exactly one Type" }
+if ($typeName.Count -ne 1) { throw "$specRel ## Sweep must name exactly one Type" }
 $typeRel = "$skillRel/references/types/$($typeName[0]).md"
 if (-not (Test-Path -LiteralPath (Join-Path $root $typeRel))) { throw "sweep type '$($typeName[0])' has no file $typeRel" }
 $targets = @(Get-SweepValues 'Targets')
-if ($targets.Count -eq 0) { throw "$planRel ## Sweep names no Targets" }
+if ($targets.Count -eq 0) { throw "$specRel ## Sweep names no Targets" }
 $ownBatchDirs = @(Get-SweepValues 'Batches')
 $promptDir = Join-Path $root "$skillRel\references\prompts"
 
@@ -128,6 +151,28 @@ function Get-BuildFields([string] $Since)
 	return "cpp=yes builds=$($builds -join ',') profile=$profileBuild"
 }
 
+# Reads Temp/Sweep/Baseline.txt (line 1: baseline SHA, line 2: owning spec path) and verifies HEAD and ownership.
+function Read-SweepBaseline
+{
+	$lines = @(Get-Content -LiteralPath $baselineFile -TotalCount 2)
+	$baseline = if ($lines.Count -ge 1) { $lines[0].Trim() } else { '' }
+	$recordedSpec = if ($lines.Count -ge 2) { $lines[1].Trim() } else { '' }
+	if (-not $baseline) { throw 'Temp/Sweep/Baseline.txt is missing its baseline SHA on line 1' }
+	if (-not $recordedSpec) { throw 'Temp/Sweep/Baseline.txt is missing its sweep spec path on line 2' }
+	$headRaw = git -C $root rev-parse HEAD
+	if ($LASTEXITCODE -ne 0) { throw "Failed to resolve HEAD in '$root' (git rev-parse HEAD exited $LASTEXITCODE)" }
+	$head = $headRaw.Trim()
+	if ($baseline -cne $head)
+	{
+		throw "Temp/Sweep/Baseline.txt belongs to commit $baseline (HEAD is $head); delete Temp/Sweep before starting a new sweep"
+	}
+	if (-not [string]::Equals($recordedSpec, $specRel, [StringComparison]::OrdinalIgnoreCase))
+	{
+		throw "Temp/Sweep/Baseline.txt belongs to '$recordedSpec', not '$specRel'"
+	}
+	return $baseline
+}
+
 if ($Close)
 {
 	# Every failure writes CLOSE-FAILED <run>, so main's wait on Status.txt always ends.
@@ -136,9 +181,9 @@ if ($Close)
 	try
 	{
 		if (-not (Test-Path -LiteralPath $baselineFile)) { throw 'no -Batch run has written Temp/Sweep/Baseline.txt' }
-		$baseline = (Get-Content -LiteralPath $baselineFile -TotalCount 1).Trim()
+		$baseline = Read-SweepBaseline
 		"RUNNING close $(Get-Date -Format s)" | Set-Content $status
-		$vars = @{ ROOT = $root; TYPE = $typeRel; PLAN = $planRel; BASELINE = $baseline }
+		$vars = @{ ROOT = $root; TYPE = $typeRel; SPEC = $specRel; BASELINE = $baseline }
 
 		$closeRun = 'Cleanup'
 		$cleanupOut = Join-Path $sweep 'Cleanup.md'
@@ -161,21 +206,21 @@ if ($Close)
 		}
 
 		$closeRun = 'Ledger'
-		# Writes the ledger into the type's deferred-fixes record as one ## <Plan file stem> section, replacing
+		# Writes the ledger into the type's deferred-fixes record as one ## <Spec file stem> section, replacing
 		# that section wholesale so a rerun never duplicates it.
-		$planStem = [IO.Path]::GetFileNameWithoutExtension($planRel)
+		$specStem = [IO.Path]::GetFileNameWithoutExtension($specRel)
 		$typeText = Get-Content -Raw -LiteralPath (Join-Path $root $typeRel)
-		$deferred = [regex]::Match($typeText, '(?ms)^## Deferred fixes[ \t]*\r?\n.*?`([^`]+)`').Groups[1].Value.Replace('<Plan file stem>', $planStem)
+		$deferred = [regex]::Match($typeText, '(?ms)^## Deferred fixes[ \t]*\r?\n.*?`([^`]+)`').Groups[1].Value.Replace('<Spec file stem>', $specStem)
 		if (-not $deferred) { throw "$typeRel ## Deferred fixes names no record" }
 		$ledgerPath = Join-Path $sweep 'Ledger.md'
 		$ledgerText = if (Test-Path $ledgerPath) { (Get-Content -Raw $ledgerPath) -replace '\r\n', "`n" } else { '' }
 		$entries = @([regex]::Matches($ledgerText, '(?ms)^### .*?(?=^### |\z)') | ForEach-Object { '#' + $_.Value.TrimEnd() })
 		$outOfBound = @($entries | Where-Object { $_ -match '\A#### [^\n]*\(out-of-bound\)' })
 		$declined = @($entries | Where-Object { $_ -notmatch '\A#### [^\n]*\(out-of-bound\)' })
-		$section = "## $planStem`n`n### Out of the fix bound`n`n$(if ($outOfBound) { $outOfBound -join "`n`n" } else { 'none' })`n`n### Declined`n`n$(if ($declined) { $declined -join "`n`n" } else { 'none' })`n"
+		$section = "## $specStem`n`n### Out of the fix bound`n`n$(if ($outOfBound) { $outOfBound -join "`n`n" } else { 'none' })`n`n### Declined`n`n$(if ($declined) { $declined -join "`n`n" } else { 'none' })`n"
 		$recordPath = Join-Path $root $deferred
-		$record = if (Test-Path -LiteralPath $recordPath) { (Get-Content -Raw -LiteralPath $recordPath) -replace '\r\n', "`n" } else { "# ${planStem}: deferred fixes`n" }
-		$existing = [regex]::Match($record, "(?ms)^## $([regex]::Escape($planStem))[ \t]*\n.*?(?=^## |\z)")
+		$record = if (Test-Path -LiteralPath $recordPath) { (Get-Content -Raw -LiteralPath $recordPath) -replace '\r\n', "`n" } else { "# ${specStem}: deferred fixes`n" }
+		$existing = [regex]::Match($record, "(?ms)^## $([regex]::Escape($specStem))[ \t]*\n.*?(?=^## |\z)")
 		if ($existing.Success) { $record = $record.Remove($existing.Index, $existing.Length).Insert($existing.Index, "$section`n") }
 		else { $record = $record.TrimEnd() + "`n`n$section" }
 		[IO.File]::WriteAllText($recordPath, $record.TrimEnd() + "`n", [Text.UTF8Encoding]::new($false))
@@ -200,8 +245,22 @@ if ($Close)
 
 $batchUnits = @($units | Where-Object { $_.Batch -ceq $Batch -and (-not $Unit -or $_.Stem -ceq $Unit) })
 if ($batchUnits.Count -eq 0) { throw "no units for batch '$Batch' unit '$Unit'" }
-New-Item -ItemType Directory -Force -Path (Join-Path $sweep 'units') | Out-Null
-if (-not (Test-Path -LiteralPath $baselineFile)) { (git -C $root rev-parse HEAD).Trim() | Set-Content $baselineFile }
+if (Test-Path -LiteralPath $baselineFile)
+{
+	[void] (Read-SweepBaseline)
+	New-Item -ItemType Directory -Force -Path (Join-Path $sweep 'units') | Out-Null
+}
+else
+{
+	$dirty = @(git -C $root status --porcelain --untracked-files=no)
+	if ($LASTEXITCODE -ne 0) { throw "Failed to check working tree status in '$root' (git status exited $LASTEXITCODE)" }
+	if ($dirty.Count -gt 0) { throw 'Cannot start a new sweep with uncommitted tracked changes; commit, stash, or revert them first' }
+	$headRaw = git -C $root rev-parse HEAD
+	if ($LASTEXITCODE -ne 0) { throw "Failed to resolve HEAD in '$root' (git rev-parse HEAD exited $LASTEXITCODE)" }
+	$headSha = $headRaw.Trim()
+	New-Item -ItemType Directory -Force -Path (Join-Path $sweep 'units') | Out-Null
+	@($headSha, $specRel) | Set-Content -LiteralPath $baselineFile
+}
 # The batch-start snapshot: a commit of the tracked working tree before any unit runs, or HEAD when that tree is
 # clean. git stash create stores nothing in refs/stash.
 $startFile = Join-Path $sweep "$Batch.start.txt"
@@ -221,7 +280,7 @@ $batchUnits | ForEach-Object -ThrottleLimit $Throttle -Parallel {
 	$fileList = ($u.Files | ForEach-Object { "- $_" }) -join "`n"
 	$pathArgs = ($u.Files | ForEach-Object { "'$_'" }) -join ','
 
-	$vars = @{ ROOT = $root; FILES = $fileList; PATHARGS = $pathArgs; UNIT = $u.Stem; FINDINGS = "Temp/Sweep/units/$($u.Id).findings.md"; TYPE = $using:typeRel; PLAN = $using:planRel }
+	$vars = @{ ROOT = $root; FILES = $fileList; PATHARGS = $pathArgs; UNIT = $u.Stem; FINDINGS = "Temp/Sweep/units/$($u.Id).findings.md"; TYPE = $using:typeRel; SPEC = $using:specRel }
 	if (-not ((Test-Path $findOut) -and (Select-String -Quiet -SimpleMatch 'FIND-DONE' $findOut)))
 	{
 		if (-not (Invoke-SweepCodex (Join-Path $promptDir 'Find.md') $findOut 'read-only' $vars $root $model)) { Add-Content (Join-Path $sweep 'Failures.txt') "$($u.Stem) FIND failed"; return }
@@ -264,7 +323,7 @@ if ($cross.Count -gt 0 -and -not ((Test-Path $propOut) -and (Select-String -Quie
 {
 	"# Cross-file findings: $Batch`n`n$($cross -join "`n")" | Set-Content $crossFile
 	Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
-	$prompt = (Get-Content -Raw (Join-Path $promptDir 'Propagate.md')).Replace('{{ROOT}}', $root).Replace('{{BATCH}}', $Batch).Replace('{{CROSSFILE}}', "Temp/Sweep/$Batch.crossfile.md").Replace('{{TYPE}}', $typeRel).Replace('{{PLAN}}', $planRel)
+	$prompt = (Get-Content -Raw (Join-Path $promptDir 'Propagate.md')).Replace('{{ROOT}}', $root).Replace('{{BATCH}}', $Batch).Replace('{{CROSSFILE}}', "Temp/Sweep/$Batch.crossfile.md").Replace('{{TYPE}}', $typeRel).Replace('{{SPEC}}', $specRel)
 	$prompt | & (Get-Command codex).Source -a never exec --sandbox workspace-write -C $root -m $Model -c 'model_reasoning_effort="high"' --disable hooks --ephemeral -o $propOut - 2> "$propOut.stderr.txt" | Out-Null
 	if ($LASTEXITCODE -ne 0 -or -not (Test-Path $propOut) -or -not (Select-String -Quiet -SimpleMatch 'PROPAGATE-DONE' $propOut)) { "PROPAGATE-FAILED $Batch $(Get-Date -Format s)" | Set-Content $status; return }
 	$declined = Get-Section $propOut 'Declined'

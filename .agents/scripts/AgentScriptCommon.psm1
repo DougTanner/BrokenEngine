@@ -66,7 +66,10 @@ function Measure-AgentTokenCount([string] $Text) {
 
 function Get-AgentMarkdownSearchText
 {
-	param([string] $Body)
+	param(
+		[string] $Body,
+		[switch] $KeepInlineCode
+	)
 
 	$characters = $Body.ToCharArray()
 	$inFence = $false
@@ -75,7 +78,7 @@ function Get-AgentMarkdownSearchText
 	$offset = 0
 	while ($offset -lt $Body.Length)
 	{
-		$newline = $Body.IndexOf("`n", $offset)
+		$newline = $Body.IndexOfAny([char[]]@("`r", "`n"), $offset)
 		$lineEnd = if ($newline -lt 0) { $Body.Length } else { $newline }
 		$line = $Body.Substring($offset, $lineEnd - $offset)
 		$maskLine = $inFence
@@ -89,14 +92,18 @@ function Get-AgentMarkdownSearchText
 		}
 		else
 		{
-			$fenceMatch = [regex]::Match($line, '^ {0,3}(?<fence>`{3,}|~{3,})')
+			$fenceMatch = [regex]::Match($line, '^ {0,3}(?<fence>`{3,}|~{3,})(?<info>.*)$')
 			if ($fenceMatch.Success)
 			{
 				$fence = $fenceMatch.Groups['fence'].Value
-				$fenceCharacter = $fence[0]
-				$fenceLength = $fence.Length
-				$inFence = $true
-				$maskLine = $true
+				$info = $fenceMatch.Groups['info'].Value
+				if ($fence[0] -ne '`' -or -not $info.Contains('`'))
+				{
+					$fenceCharacter = $fence[0]
+					$fenceLength = $fence.Length
+					$inFence = $true
+					$maskLine = $true
+				}
 			}
 		}
 		if ($maskLine)
@@ -106,7 +113,23 @@ function Get-AgentMarkdownSearchText
 				$characters[$i] = ' '
 			}
 		}
-		$offset = if ($newline -lt 0) { $Body.Length } else { $newline + 1 }
+		if ($newline -lt 0)
+		{
+			$offset = $Body.Length
+		}
+		elseif ($Body[$newline] -eq "`r" -and ($newline + 1) -lt $Body.Length -and $Body[$newline + 1] -eq "`n")
+		{
+			$offset = $newline + 2
+		}
+		else
+		{
+			$offset = $newline + 1
+		}
+	}
+
+	if ($KeepInlineCode)
+	{
+		return [string]::new($characters)
 	}
 
 	for ($i = 0; $i -lt $characters.Length; $i++)
@@ -148,7 +171,7 @@ function Get-AgentMarkdownSearchText
 		$closingEnd = $closingStart + $openingLength
 		for ($masked = $openingStart; $masked -lt $closingEnd; $masked++)
 		{
-			if ($characters[$masked] -ne "`n")
+			if ($characters[$masked] -ne "`n" -and $characters[$masked] -ne "`r")
 			{
 				$characters[$masked] = ' '
 			}

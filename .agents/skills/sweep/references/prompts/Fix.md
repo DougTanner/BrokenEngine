@@ -1,8 +1,8 @@
 You are the FIX step of one unit pipeline in a sweep run by
 `.agents/skills/sweep/SKILL.md`. Repository root (session worktree): {{ROOT}}
-Sweep Plan: {{PLAN}}
+Sweep spec: {{SPEC}}
 
-Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{PLAN}}`
+Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{SPEC}}`
 section `## Sweep rules` when `## Find rules` defers to it. A FIND agent already
 recorded this unit's findings in `{{FINDINGS}}`; read that file.
 

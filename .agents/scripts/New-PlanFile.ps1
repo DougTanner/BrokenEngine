@@ -1,6 +1,6 @@
 # Writes one executable Plan file with its byte-zero metadata marker and validates the tree afterwards.
-# The body arrives as a file path so no transcript text is ever executed, and it is written verbatim:
-# this script decides nothing about plan content.
+# The body arrives as a file path so no transcript text is ever executed, and it is written verbatim
+# except for rejecting an un-fenced `## Sweep` heading (sweep specifications live under Documents/Investigations/).
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $Area,
@@ -131,7 +131,6 @@ try {
 		if (-not ($documentedAreas -ccontains (Get-PlanFileRelativePath $areaFull $areaPlansRoot))) {
 			Complete-PlanFile 1 'error' 'input.area-not-found' "Plan -Area must be an existing directory or an area Documents/Plans/AGENTS.md '## Plan files' lists: '$Area'."
 		}
-		[void] [IO.Directory]::CreateDirectory($areaFull)
 	}
 
 	$targetFull = Join-Path $areaFull $Name
@@ -143,6 +142,12 @@ try {
 	$bodyFull = if ([IO.Path]::IsPathFullyQualified($Body)) { Get-AgentCanonicalPath $Body } else { Get-AgentCanonicalPath (Join-Path $repositoryRoot $Body) }
 	if (-not (Test-Path -LiteralPath $bodyFull -PathType Leaf)) {
 		Complete-PlanFile 1 'error' 'input.body-not-found' "Plan -Body must be an existing file holding the plan text below the marker: '$Body'."
+	}
+	$bodyText = [IO.File]::ReadAllText($bodyFull)
+	foreach ($line in ((Get-AgentMarkdownSearchText $bodyText -KeepInlineCode) -split "\r\n|\n|\r")) {
+		if ($line -imatch '^##[ \t]+Sweep[ \t]*$') {
+			Complete-PlanFile 1 'error' 'input.sweep-not-allowed' 'Sweep specifications are not executable Plans; save them under Documents/Investigations/ or Projects/Coretide/Documents/Investigations/ instead of Documents/Plans/.'
+		}
 	}
 
 	$normalized = [Collections.Generic.List[string]]::new()
@@ -178,8 +183,9 @@ try {
 	$result.createdUtc = $createdUtc
 	$dependsOnJson = (@($normalized) | ForEach-Object { ConvertTo-Json $_ -Compress }) -join ','
 	$marker = '<!-- broken-engine-plan/v1 {"createdUtc":"' + $createdUtc + '","dependsOn":[' + $dependsOnJson + ']} -->'
+	[void] [IO.Directory]::CreateDirectory($areaFull)
 	# The marker must occupy byte zero, so the file is written with an explicit BOM-less UTF-8 encoding.
-	[IO.File]::WriteAllText($targetFull, $marker + "`n" + [IO.File]::ReadAllText($bodyFull), [Text.UTF8Encoding]::new($false))
+	[IO.File]::WriteAllText($targetFull, $marker + "`n" + $bodyText, [Text.UTF8Encoding]::new($false))
 	$result.written = $true
 	# WorktreeCli's Plan inventory is Git-backed, so stage only this new Plan while preserving every other index and worktree path.
 	if ($coretideArea) {

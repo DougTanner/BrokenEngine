@@ -40,16 +40,18 @@ Design-time documents live in three sibling directories:
 |-----------|-------|
 | `Plans/` (`Plans/AGENTS.md`) | Tasks ready to be picked up by another session through `/next-plan`, such as refactors and bugfixes. Debt reduction — cleaning, decomposing, renaming, deleting dead code, fixing races/NaNs/precision, defensive shader clamps. |
 | `Features/` (`Features/AGENTS.md`) | Ideas saved for another day, decided or not. Manually executed; never scheduler-tracked. |
-| `Investigations/` (`Investigations/AGENTS.md`) | Work wanted soon but not to be picked up automatically by `/next-plan`, plus findings records and overviews. Never a scheduler input. |
+| `Investigations/` (`Investigations/AGENTS.md`) | Work wanted soon outside `/next-plan`, `/sweep` specifications, findings records, and overviews. Never a scheduler input. |
 
 Decision-complete means every choice needed to implement is already made: no
 open options, no TBDs; a Plan's investigation portion (`Plans/AGENTS.md`
 `## Plan files`) is the one open part it allows.
 
-Deciding test: *is this wanted soon?* No → `Features/`. Yes, and ready to be
-picked up by another session through `/next-plan` → `Plans/`, written
-decision-complete; otherwise → `Investigations/`. Every plan document under
-`Plans/` carries a byte-zero, Git-tracked metadata marker; a marker-less one is
-a validation error, not a manual document. WorktreeCli selects executable Plans
-deterministically by immutable creation time and normalized path. Each tree uses
-area subfolders; `Plans/AGENTS.md` defines the Plans areas.
+Deciding test: a `/sweep` specification (`## Sweep`) always goes to
+`Investigations/` (never `Plans/` or `Features/`, regardless of timing).
+Otherwise, *is this wanted soon?* No → `Features/`. Yes, and ready for
+`/next-plan` → `Plans/`, written decision-complete; otherwise →
+`Investigations/`. Every plan document under `Plans/` carries a byte-zero,
+Git-tracked metadata marker; a marker-less one is a validation error, not a
+manual document. WorktreeCli selects executable Plans deterministically by
+immutable creation time and normalized path. Each tree uses area subfolders;
+`Plans/AGENTS.md` defines the Plans areas.

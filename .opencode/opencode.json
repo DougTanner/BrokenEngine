@@ -26,6 +26,7 @@
 			"reset-worktree": "ask",
 			"save-plan": "ask",
 			"session-audit": "ask",
+			"sweep": "ask",
 			"what": "ask"
 		}
 	},

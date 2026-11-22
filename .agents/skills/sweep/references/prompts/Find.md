@@ -1,8 +1,8 @@
 You are the FIND step of one unit pipeline in a sweep run by
 `.agents/skills/sweep/SKILL.md`. Repository root (session worktree): {{ROOT}}
-Sweep Plan: {{PLAN}}
+Sweep spec: {{SPEC}}
 
-Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{PLAN}}`
+Read `{{TYPE}}` sections `## Find rules` and `## Fix bound`, and `{{SPEC}}`
 section `## Sweep rules` when `## Find rules` defers to it. This FIND step only
 finds and records; a separate FIX agent applies the fixes afterwards from your
 output alone, and there is no spot-check. You are findings-only: never edit any

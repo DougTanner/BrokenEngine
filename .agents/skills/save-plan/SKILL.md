@@ -85,8 +85,8 @@ Resolve the explicitly supplied complete proposal as follows:
    whatever class it carries. Done when every returned finding is dispositioned.
 8. Present the complete revised body for explicit user approval before saving
    whenever accepted findings change its meaning, because this skill persists
-   exactly the client-supplied proposal and invoking it pre-approves landing the
-   saved file.
+   exactly the client-supplied proposal and invoking it pre-approves landing
+   per `### Landing pre-approval`.
 
    - A clean review, or accepted findings that change only sub-semantic wording,
      keeps that pre-approval in force.
@@ -108,23 +108,28 @@ Resolve the explicitly supplied complete proposal as follows:
     cause. Done when the duplicate search has run.
 12. For an executable Plan, write the plan body to a file. Done when that body
     file exists.
-13. Create the Plan with the repository-owned
-    `.agents/scripts/New-PlanFile.ps1`:
+13. Save the document:
 
-    ```powershell
-    pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
-    ```
+    - Executable Plan (`Documents/Plans/` or
+      `Projects/Coretide/Documents/Plans/`): run
+      `.agents/scripts/New-PlanFile.ps1`:
 
-    - Its parameters, the `-DependsOn` single-token rule, its result shape, and
-      its exit handling are in
+      ```powershell
+      pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+      ```
+
+      Parameters, `-DependsOn`, result, and exit handling:
       [`../../references/new-plan-file.md`](../../references/new-plan-file.md).
-    - Only the created outcome there permits reporting the plan as saved.
+      Report saved only on `created`.
+    - `Investigations/` or `Features/` per step 9: write the document directly
+      to its chosen path as ordinary Markdown without `New-PlanFile.ps1` or
+      overwriting an existing file.
 
-    Done when the script reports the created outcome.
-14. Record the folded result's invalid-plan diagnostics and stale-edge notices:
-    existing dependency paths must remain executable to block a child, and
-    missing paths are intentionally stale satisfied edges. Done when those
-    diagnostics and notices are recorded.
+    Done when created or written.
+14. For an executable Plan from `New-PlanFile.ps1`, record the folded
+    invalid-plan diagnostics and stale-edge notices: existing dependency paths
+    must remain executable to block a child, and missing paths are intentionally
+    stale satisfied edges. Done when recorded, or N/A for direct Markdown.
 
 ## Handoff
 
@@ -134,15 +139,15 @@ Plan is tracked Git content, not a queue change and not a claim.
 
 ### Landing pre-approval
 
-Invoking this skill is the user's explicit approval to commit or land the saved
-file (Plan or Feature) to the primary branch: its content was already approved
-during planning, and only that file lands. Per the authoritative
-landing-confirmation contract (`../finalize-changes/SKILL.md`, "Landing
-confirmation"), when the diff that changes primary consists solely of the saved
-file, this invocation is a yes given in advance that stays in effect, so
-`/finalize-changes` proceeds without asking the confirmation question; any
-additional changed file in the diff voids the exception and the entire change
-uses the landing gate.
+For an executable Plan, invoking this skill is the user's explicit approval to
+commit or land that sole saved Plan file to the primary branch: its content was
+already approved during planning, and only that Plan file lands. Per
+[`../finalize-changes/SKILL.md`](../finalize-changes/SKILL.md)
+`### Landing confirmation`, when the diff changing primary holds only the saved
+Plan file, `/finalize-changes` proceeds without asking the confirmation
+question; any additional changed file voids the exception and uses normal
+landing confirmation. Direct Markdown saved to `Investigations/` or `Features/`
+is not covered by this exception and uses normal landing confirmation.
 
 ## Rules
 

@@ -1,14 +1,14 @@
 ---
 name: sweep
 description: >-
-  Run a large scoped cleanup sweep on Codex with this Claude Code session as
-  the orchestrator: per-file Codex find and fix runs, per-batch propagation, a
-  Codex stage cleanup and ordering review, then Claude builds, checks, and one
-  landing. Use when a Plan claimed through /next-plan carries a `## Sweep`
-  section, or to answer a request for a large Codex-run cleanup of whole areas
-  without a saved Plan. Not for a findings-only scoped review, such as the
-  cleanup scope of /comment-review or /code-style-review. Codex callers never
-  invoke it.
+  Run a large scoped cleanup sweep on Codex from a non-Codex host (Claude
+  Code, Antigravity CLI, or OpenCode): per-unit find/fix, per-batch
+  propagation, stage cleanup/ordering, builds, static checks, and
+  /finalize-changes landing. Explicit /sweep <spec-path> under
+  Documents/Investigations/ or Projects/Coretide/Documents/Investigations/
+  only; not for findings-only reviews or Codex callers.
+disable-model-invocation: true
+argument-hint: "<Documents/Investigations/...>"
 allowed-tools: [Read, Agent, PowerShell, Skill, Monitor, AskUserQuestion]
 ---
 
@@ -16,27 +16,21 @@ allowed-tools: [Read, Agent, PowerShell, Skill, Monitor, AskUserQuestion]
 
 ## Purpose
 
-Runs one sweep Plan's scoped cleanup on Codex — per-unit find and fix,
-per-batch propagation, stage cleanup and ordering review — while this Claude
-session picks the model, builds, checks, and lands.
+Runs one sweep specification's scoped cleanup on Codex — per-unit find and fix,
+per-batch propagation, stage cleanup, and ordering review — while a non-Codex
+host picks the model, builds, checks, and lands through `/finalize-changes`.
 
 ## When to use
 
-- A Plan claimed through `/next-plan` carries a `## Sweep` section;
-  `/next-plan` `## Rules` routes it here.
-- The user asks for a large Codex-run cleanup of whole areas with no saved
-  Plan: ask the user to save one with `/save-plan`, carrying the `## Sweep`
-  section, and for `cpp-adoption` or `document` the `## Sweep rules` section,
-  that `## Inputs` defines, then run `/next-plan <Plan>`. `/save-plan` is
-  user-invoked, so never run it yourself.
-
-Claude Code only: the coordinator launches Codex, so Codex callers never invoke
-it.
+Only on explicit `/sweep <spec path>` for a specification under
+`Documents/Investigations/` or `Projects/Coretide/Documents/Investigations/`.
+Non-Codex hosts (Claude Code, Antigravity CLI, OpenCode) run `/sweep`;
+`Invoke-Sweep.ps1` enforces the non-Codex branch check.
 
 ## Inputs
 
-The claimed sweep Plan. Its `## Sweep` section holds three bullets, values in
-backticks:
+The sweep specification path (`## When to use`). Its `## Sweep` section holds
+bullets with backticked values (`Batches` optional):
 
 ```text
 ## Sweep
@@ -49,20 +43,15 @@ backticks:
 - `Type` — a file under `references/types/`, listed in `## References`.
 - `Targets` — Git pathspecs passed to `git ls-files`, exclude magic allowed.
   The coordinator rejects a target under `.agents/`.
-- `Batches` — optional directory prefixes that are batches of their own; every
-  other target file batches by its top-level directory. The listed order is the
-  run order: the listed batches run first, in that order, then the remaining
-  top-level directories by name, so list every area whose run order matters
-  relative to another. Each file goes to the first listed prefix it falls under,
-  so list a deeper prefix before its parent; listed after it, the deeper prefix
-  gets no files. List here every directory holding more than 20 C++ files, and
-  order the stage Plans so an area is swept before the areas that consume its
-  renames.
+- `Batches` — optional directory prefixes forming their own batches (listed
+  prefixes run first; first match wins, so list deeper prefixes before their
+  parent). List directories with >20 C++ files and order staged specifications
+  before consumers of their renames; use `-List` for exact batch run order.
 
-A type whose `## Find rules` defers to the Plan (`cpp-adoption`, `document`)
-also needs a `## Sweep rules` section: what FIND looks for, the target form,
-and any rulings. Files differing only in a `.h`/`.cpp` extension form one unit;
-every other file is its own unit.
+A type whose `## Find rules` defers to the specification (`cpp-adoption`,
+`document`) also needs a `## Sweep rules` section: what FIND looks for, the
+target form, and any rulings. Files differing only in a `.h`/`.cpp` extension
+form one unit; every other file is its own unit.
 
 ## Steps
 
@@ -83,7 +72,7 @@ DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
    `(recommended)` first. Done when the user has chosen; that slug is `-Model`
    for every `-Batch` and `-Close` launch.
 2. Run
-   `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
+   `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Spec '<spec>' -List`.
    Done when it prints each batch name with its unit count, in run order.
 
 ### Per batch
@@ -91,40 +80,47 @@ DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
 Run the batches one after another in the order step 2 printed them, with no
 commit before landing.
 
-3. Delete `Temp/Sweep/Status.txt` if present, then launch the coordinator
-   detached, because a batch outlives the 2-hour background-task limit:
+3. Delete `Temp/Sweep/Status.txt` and `Temp/sweep-stderr.txt` if present,
+   ensure `Temp` exists (not `Temp/Sweep/`), and launch (override default
+   `-Batch` parallelism with `'-Throttle','<n>'` inside `Start-Process`'s
+   `-ArgumentList` for detached, or `-Throttle <n>` on `pwsh` for async):
+   - Detached hosts (Claude Code, >2h limit) — record `<pid>`:
 
-   ```powershell
-   Start-Process pwsh -WindowStyle Hidden -WorkingDirectory '<worktree root>' -ArgumentList '-NoProfile','-File','.agents/skills/sweep/scripts/Invoke-Sweep.ps1','-Plan','<Plan>','-Model','<slug>','-Batch','<batch>'
-   ```
+     ```powershell
+     (Start-Process pwsh -WindowStyle Hidden -PassThru -RedirectStandardError 'Temp/sweep-stderr.txt' -WorkingDirectory '<worktree root>' -ArgumentList '-NoProfile','-File','.agents/skills/sweep/scripts/Invoke-Sweep.ps1','-Spec','"<spec>"','-Model','<slug>','-Batch','<batch>').Id
+     ```
 
-   When the user asks for more or less parallelism, append `'-Throttle','<n>'`
-   to a `-Batch` launch to set how many of the batch's units run at once
-   (`Invoke-Sweep.ps1` owns the default).
-   Done when the process has started.
-4. Wait with a Monitor until-loop until `Temp/Sweep/Status.txt` exists and no
-   longer reads `RUNNING`; the delete in step 3 keeps the previous run's final
-   line from ending the wait early. Set the Monitor to its maximum timeout, and
-   re-arm it with the same loop whenever it expires while `Status.txt` still
-   reads `RUNNING`. Done when `Status.txt` holds a final line.
-5. On `INCOMPLETE` or `PROPAGATE-FAILED`, repeat steps 3-4 for the same batch;
-   the coordinator resumes from `Temp/Sweep/Progress.md` and reruns the units
-   `Temp/Sweep/Failures.txt` lists. Done when `Status.txt` reads `BATCH-DONE`.
-6. When the `BATCH-DONE` line reads `cpp=yes`, dispatch one `builder` running
-   `/compile` for its `builds=` targets: Client and Server in Debug, the others
-   in Release. A failure goes to an
-   `implementer` running `/resolve-findings`. Done when every build passes or
-   the line reads `cpp=no`.
+   - Async-task hosts (Antigravity CLI; kills detached children) — run async:
+
+     ```powershell
+     pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Spec '<spec>' -Model '<slug>' -Batch '<batch>'
+     ```
+
+   Done when `<pid>` prints or the task starts.
+4. Wait until exit, then read `Temp/Sweep/Status.txt` once: for `<pid>`, wait
+   until `Get-Process -Id <pid> -ErrorAction SilentlyContinue` returns nothing,
+   re-arming on timeout (never advance on `Status.txt` while `<pid>` runs;
+   `Invoke-Sweep.ps1` writes a terminal line, not `RUNNING`, only before
+   exiting `0`, so `<pid>` checks `Status.txt`, not exit code); for an async
+   task, await completion. On refusal/crash — missing/`RUNNING` `Status.txt`,
+   or non-zero task exit — surface `Temp/sweep-stderr.txt` or task stderr
+   verbatim and stop without retrying. Done on a terminal `Status.txt` line
+   after `<pid>` exits or the task exits `0`.
+5. Retry steps 3-4 only on `INCOMPLETE` or `PROPAGATE-FAILED` (resumes from
+   `Progress.md`, reruns `Failures.txt`). Done on `BATCH-DONE`.
+6. If `BATCH-DONE` has `cpp=yes`, dispatch `builder` `/compile` for `builds=`
+   (Client/Server Debug, others Release); route failures to `implementer`
+   `/resolve-findings`. Done when builds pass or `cpp=no`.
 
 ### Stage close
 
-7. Delete `Temp/Sweep/Status.txt`, launch as step 3 with `'-Close'` in place of
-   `'-Batch','<batch>'`, and wait as step 4. On `CLOSE-FAILED <run>`, repeat;
-   finished runs are skipped. Done when `Status.txt` reads `CLOSE-DONE`.
-8. When the `CLOSE-DONE` line reads `ordering=` above 0, dispatch an
-   `implementer` running `/resolve-findings` on `Temp/Sweep/Ordering.md`
-   `## Findings`; each finding is fixed, never ledgered. Done when every
-   finding has a passing `/resolve-findings` handoff.
+7. Run steps 3-4 replacing `-Batch`/`<batch>` with `-Close`. On
+   `CLOSE-FAILED Baseline ...`, surface the refusal and stop without retrying;
+   retry only other `CLOSE-FAILED <run>` (finished runs skip). Done on
+   `CLOSE-DONE`.
+8. If `CLOSE-DONE` has `ordering=` > 0, dispatch `implementer`
+   `/resolve-findings` on `Temp/Sweep/Ordering.md` `## Findings` (fix all,
+   never ledger). Done when every finding passes.
 9. Run the static checks:
 
    ```powershell
@@ -136,8 +132,10 @@ commit before landing.
     `/compile` for its `builds=` targets: Client and Server in Debug and
     Release, plus Profile when the line reads `profile=yes`; the others in
     Release. Done when every build passes or the line reads `cpp=no`.
-11. Report the stage per `## Handoff`, then land through `/next-plan` steps
-    9-11. Done when `/next-plan` step 11 is done.
+11. Report the stage per `## Handoff`, land the changed files (including any
+    deferred-fixes record) through `/finalize-changes`, then remove `Temp/Sweep`
+    and `Temp/sweep-stderr.txt` if present by exact literal paths. Done when
+    `/finalize-changes` and that cleanup complete.
 
 ## Handoff
 
@@ -147,17 +145,15 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
 
 ## Rules
 
-- A sweep run does not follow the Change Workflow; it spends Codex tokens on a
-  large scoped cleanup, approved as [`/next-plan`](../next-plan/SKILL.md)
-  `## Rules` states. There is no `/prepare-change`, `/plan-alternatives`,
-  `/plan-audit`, `/plan-simplicity-review`, execution card,
-  `/repo-code-review`, `/comment-review` dispatch, `/coherence-review`,
-  `/update-claude-docs`, or `/verify-acceptance`. A sweep keeps the per-batch
-  and stage builds, the static checks, ordering fixes through
-  `/resolve-findings`, and the landing gate. Any further review or runtime
-  verification of the stage's change is main's decision: main follows the
-  review the Plan states, or, when the Plan states none, asks the user before
-  step 11.
+- A sweep skips the Change Workflow; explicit `/sweep <spec path>` approves
+  running it, landing still uses `/finalize-changes`'s confirmation, and a new
+  sweep requires a clean tracked tree. No `/prepare-change`,
+  `/plan-alternatives`, `/plan-audit`, `/plan-simplicity-review`, execution
+  card, `/repo-code-review`, `/comment-review` dispatch, `/coherence-review`,
+  `/update-claude-docs`, or `/verify-acceptance`. Keep per-batch/stage builds,
+  static checks, `/resolve-findings` ordering fixes, and the landing gate.
+  Follow any further review or runtime check the specification names, or ask
+  the user before step 11 when it names none.
 - The `/finalize-changes` brief supplies the sweep outputs for the landing
   acceptance-table rows
   ([`landing-acceptance-table.md`](../finalize-changes/references/landing-acceptance-table.md)
@@ -200,7 +196,7 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
 - [references/types/style-guide.md](references/types/style-guide.md) — the
   style guide rules, user rulings, fix bound, and cleanup checklist.
 - [references/types/cpp-adoption.md](references/types/cpp-adoption.md) — a C++
-  feature adoption ruled by the Plan's `## Sweep rules`.
+  feature adoption ruled by the specification's `## Sweep rules`.
 - [references/types/document.md](references/types/document.md) — an `AGENTS.md`
   or documentation pass.
 - [references/prompts/Find.md](references/prompts/Find.md),

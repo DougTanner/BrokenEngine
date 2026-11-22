@@ -21,12 +21,15 @@ pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <Pasca
 - `-Area` — a directory beneath `Documents/Plans`, or beneath
   `Projects/Coretide/Documents/Plans` when the session has a Coretide clone,
   where the Plan is staged in the clone's index: an existing one, or an area
-  `Documents/Plans/AGENTS.md` `## Plan files` lists, whose absent directory the
-  script creates; any other missing directory is rejected with
+  `Documents/Plans/AGENTS.md` `## Plan files` lists, whose absent directory is
+  created only after all inputs pass; any other missing directory fails with
   `input.area-not-found`.
 - `-Name` — a bare filename matching `^[A-Z][A-Za-z0-9]*\.md$`.
-- `-Body` — a file holding the plan text that goes below the marker. The body
-  travels as a file so no transcript text is ever executed.
+- `-Body` — a file holding the plan text below the marker (no transcript text is
+  executed). An un-fenced `## Sweep` heading fails with
+  `input.sweep-not-allowed` without writing a file or creating a missing area
+  directory; see [`Documents/AGENTS.md`](../../Documents/AGENTS.md)
+  `## Planning Trees`.
 - `-DependsOn` — `Documents/Plans/**/*.md` paths, plus
   `Projects/Coretide/Documents/Plans/**/*.md` paths for a Coretide area only (an
   engine area rejects one with `input.depends-on-invalid`). `pwsh -File` hands

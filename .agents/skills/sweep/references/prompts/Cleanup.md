@@ -1,9 +1,9 @@
 You are the stage CLEANUP step of a sweep run by
 `.agents/skills/sweep/SKILL.md`. Repository root (session worktree): {{ROOT}}
-Sweep Plan: {{PLAN}} Stage baseline: {{BASELINE}}
+Sweep spec: {{SPEC}} Stage baseline: {{BASELINE}}
 
 Read `{{TYPE}}` sections `## Find rules`, `## Fix bound`, and
-`## Cleanup checklist` when present, and `{{PLAN}}` section `## Sweep rules`
+`## Cleanup checklist` when present, and `{{SPEC}}` section `## Sweep rules`
 when `## Find rules` defers to it. Per-unit FIX agents and per-batch PROPAGATE
 agents made the sweep's edits in `git diff {{BASELINE}}`; no one spot-checked
 them, and this step takes that place. The diff can also hold accepted
