@@ -16,7 +16,8 @@ param(
 	[switch] $Landing,
 	[switch] $EmitTargets,
 	[switch] $EmitManifest,
-	[string] $OutputPath
+	[string] $OutputPath,
+	[string] $SavePlanPaths
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,6 +58,16 @@ $script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
 # components (upstream libraries, agent tooling, scratch) except the repository's own wrappers under
 # ThirdParty/Prebuilts/Source, which are reviewed like any other changed C++ (Test-ManifestCorpusPath).
 $script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
+# Ordinal planning-root prefixes accepted by -SavePlanPaths; a rooted, UNC, or drive-qualified path
+# cannot match any of these after separator normalization and removing at most one leading './'.
+$script:SavePlanRoots = @(
+	'Documents/Plans/',
+	'Documents/Features/',
+	'Documents/Investigations/',
+	'Projects/Coretide/Documents/Plans/',
+	'Projects/Coretide/Documents/Features/',
+	'Projects/Coretide/Documents/Investigations/'
+)
 $script:ZeroOid = '0000000000000000000000000000000000000000'
 
 $script:Root = $null
@@ -615,7 +626,53 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 	return , $regions
 }
 
-function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation) {
+function Get-SavePlanAuthorizedPaths([string] $RawPaths) {
+	if ([string]::IsNullOrWhiteSpace($RawPaths)) {
+		Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' '-SavePlanPaths must contain at least one path under a planning root.'
+	}
+	$authorized = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($segment in ($RawPaths -split ',')) {
+		$trimmed = $segment.Trim()
+		if ($trimmed.Length -eq 0) {
+			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' '-SavePlanPaths must not contain an empty comma segment.'
+		}
+		$normalized = $trimmed.Replace('\', '/')
+		if ($normalized.StartsWith('./', [StringComparison]::Ordinal)) { $normalized = $normalized.Substring(2) }
+		$parts = $normalized.Split('/')
+		foreach ($part in $parts) {
+			if ($part.Length -eq 0 -or $part -ceq '.' -or $part -ceq '..') {
+				Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': empty, '.', or '..' path segments are not allowed."
+			}
+		}
+		$inPlanningRoot = $false
+		foreach ($root in $script:SavePlanRoots) {
+			if ($normalized.StartsWith($root, [StringComparison]::Ordinal)) {
+				$inPlanningRoot = $true
+				break
+			}
+		}
+		if (-not $inPlanningRoot) {
+			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': path must be under a planning root."
+		}
+		if ($parts[-1].Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase)) {
+			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': AGENTS.md is not allowed."
+		}
+		[void] $authorized.Add($normalized)
+	}
+	# Wrap so a single-element HashSet is not unrolled into a string by the pipeline.
+	return , $authorized
+}
+
+function Test-SavePlanOnlyReviewedRows([Collections.Generic.List[object]] $Reviewed, [Collections.Generic.HashSet[string]] $AuthorizedPaths) {
+	$paths = [Collections.Generic.List[string]]::new($Reviewed.Count)
+	foreach ($row in $Reviewed) {
+		if ($row.status -cne 'A' -or $script:ManifestModes -cnotcontains $row.currentMode) { return $false }
+		$paths.Add([string] $row.path)
+	}
+	return $AuthorizedPaths.SetEquals($paths)
+}
+
+function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [Collections.Generic.HashSet[string]] $SavePlanAuthorizedPaths = $null) {
 	# The reviewed diff is the session's own three-dot range, resolved to its merge base once so the
 	# script's own entry pipeline answers it: `git diff A...B` is defined as the diff from
 	# merge-base(A, B) to B, so the two-dot pair below compares the same two trees.
@@ -670,6 +727,9 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 	foreach ($row in $reviewed) {
 		if ((Get-PathClass $row.path $row.currentMode $false) -ceq 'plan') { $planTouched = $true; break }
 		if ($null -ne $row.oldPath -and (Get-PathClass $row.oldPath $row.baselineMode $false) -ceq 'plan') { $planTouched = $true; break }
+	}
+	if ($null -ne $SavePlanAuthorizedPaths -and (Test-SavePlanOnlyReviewedRows $reviewed $SavePlanAuthorizedPaths)) {
+		$reviewedTriggers.coherenceReview = $false
 	}
 	# The rows this landing owes, each left BLOCKED for the finalizer to fill with evidence. The
 	# Executable Plan row is decided from the reviewed paths rather than from planTouched, whose
@@ -808,8 +868,9 @@ try {
 	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
 	# Those two modes keep their own stdout contracts.
 	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($EmitTargets -or $EmitManifest)
-	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+	$savePlanConflict = $PSBoundParameters.ContainsKey('SavePlanPaths') -and -not $Landing
+	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict -or $savePlanConflict) {
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
@@ -828,6 +889,10 @@ try {
 	}
 	if ($Landing -and [string]::IsNullOrWhiteSpace($Head)) {
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.landing-requires-head' '-Landing compares the reviewed diff and requires a commit-valued -Head.'
+	}
+	$savePlanAuthorizedPaths = $null
+	if ($PSBoundParameters.ContainsKey('SavePlanPaths')) {
+		$savePlanAuthorizedPaths = Get-SavePlanAuthorizedPaths $SavePlanPaths
 	}
 	if ($Baseline -cnotmatch '^[0-9a-fA-F]{40}$') {
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.baseline-unresolved' "-Baseline must be a full 40-character Git SHA: '$Baseline'."
@@ -965,7 +1030,7 @@ try {
 	$landingTruncation = $null
 	if ($Landing) {
 		$landingReference = $null
-		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference)
+		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) $savePlanAuthorizedPaths
 		$landingTruncation = $landingReference
 	}
 

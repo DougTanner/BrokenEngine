@@ -29,9 +29,11 @@ changed paths. That path set is the session's full landing set, including paths
 already committed — a deletion among them included — so a re-preparation
 dispatch passes it unchanged rather than trimming it to what is still dirty. The
 landing set may hold `Projects/Coretide/` paths of the session Coretide clone;
-they land in a separate Coretide commit. An optional `Attribution trailer` brief
-field carries the dispatching session's own attribution trailer line; when the
-brief omits it or gives `none`, the commit message has no trailer. The finalizer
+they land in a separate Coretide commit. For `/save-plan` landings, pass
+`Save-plan paths`: only the saved file and any companion Plan, excluding
+unrelated or recovery-added paths. An optional `Attribution trailer` brief field
+carries the dispatching session's own attribution trailer line; when the brief
+omits it or gives `none`, the commit message has no trailer. The finalizer
 produces the landing acceptance table itself, inside the workflow in
 `references/worker.md`, from the prepared diff final preparation and
 reconciliation produced — do not reuse an earlier table. When a Plan completion

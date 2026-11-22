@@ -20,10 +20,9 @@ Dispatched per the Codex-bridge rule in
   (`subagent-reporting.md` `## Task brief`), filled as a native dispatch would
   be.
 - Worktree — this session's worktree.
-- `-Skill` — bare skill name from
-  [`../scripts/Invoke-Codex.ps1`](../scripts/Invoke-Codex.ps1) `$routes`
-  (`$routes` and `$presets` own preset/sandbox selection and validation).
-- `-Mode` — pass the `<mode>` suffix whenever the `$routes` key is
+- `-Skill` — bare skill name from the `-ListRoutes` key (`$routes` and
+  `$presets` own preset/sandbox selection and validation).
+- `-Mode` — pass the `<mode>` suffix whenever the `-ListRoutes` key is
   `<skill>:<mode>`; omit otherwise.
 
 ## Steps
@@ -100,11 +99,11 @@ Dispatched per the Codex-bridge rule in
 - `read-only` runs cannot write `<worktree>/Temp/` or `$env:TEMP`; keep handoffs
   within the `subagent-handoff.md` `## Handoffs` shared character cap without
   `Temp/` overflow writes (`Invoke-Codex.ps1` captures full output to `<out>`).
-- For `workspace-write` routes in `Invoke-Codex.ps1` `$routes`, attempt each run
-  once (never re-dispatch; report failed or judged-malformed outcomes with
-  `git status`). Findings-only `workspace-write` runs write only their skill's
-  gitignored `Temp/` files, never edit tracked files, and may run alongside
-  `read-only` Step 6 peers. While an editing `workspace-write` run is live, hold
+- For `workspace-write` routes, attempt each run once (never re-dispatch; report
+  failed or judged-malformed outcomes with `git status`). Findings-only
+  `workspace-write` runs write only their skill's gitignored `Temp/` files,
+  never edit tracked files, and may run alongside `read-only` Step 6 peers.
+  While an editing `workspace-write` run is live, hold
   `Invoke-StaticChecks.ps1`, concurrent writers, and any review reading C++ or
   dual-language headers — such as an overlapping `/glsl-review` during Step 6
   post-validator or post-round re-runs — until it terminates.
@@ -116,5 +115,5 @@ Dispatched per the Codex-bridge rule in
 ## References
 
 - [../scripts/Invoke-Codex.ps1](../scripts/Invoke-Codex.ps1) — launcher
-  (`$routes`, `$presets`, and `.NOTES` for receipts, exit codes, verdict check,
-  retry, and `-CheckModels`).
+  (`.NOTES` for diagnosing receipts, exit codes, verdict check, retry, and
+  `-CheckModels`).

@@ -4,7 +4,8 @@
 
 	-Skill and optional -Mode select one of the $routes entries, which fixes the $presets model/effort
 	pair and the sandbox mode (read-only or workspace-write). Unrouted skills or modes fail before
-	spawning Codex. -CheckModels checks the presets' models instead of launching.
+	spawning Codex. -CheckModels checks the presets' models instead of launching; -ListRoutes prints
+	each routed <skill>[:<mode>] and sandbox without launching.
 
 .NOTES
 	Auth/billing: Codex uses ChatGPT sign-in by default -> ChatGPT subscription quota, NOT metered
@@ -39,13 +40,16 @@
 	performs exactly one attempt, because a second attempt would start from the first attempt's
 	edits.
 
-	Exit codes (launch and -Wait calls; -CheckModels has its own below): 0 for every wait whatever
+	Exit codes (launch and -Wait calls; -ListRoutes and -CheckModels below): 0 for every wait whatever
 	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, 1 for
 	an unrouted -Skill/-Mode or any other script error. None of these retry. When the codex CLI itself
 	exits non-zero, the failed receipt's reason carries its last non-empty stderr line capped at 200
 	characters, with the full stderr retained as <runId>.stderr.txt beside the run records; when the
 	CLI printed nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed
 	or malformed status is `.agents/references/codex-bridge.md`, `## Rules`.
+
+	-ListRoutes prints one `<skill>[:<mode>] <sandbox>` line per $routes entry sorted ordinally and
+	exits 0 in any environment.
 
 	-CheckModels checks each $presets model against the live Codex model catalog
 	(`codex debug models`) and prints one compact JSON receipt: schemaVersion
@@ -95,6 +99,9 @@ param(
 	[Parameter(Mandatory, ParameterSetName = 'CheckModels')]
 	[switch] $CheckModels,                                # check the $presets models; never launches
 
+	[Parameter(Mandatory, ParameterSetName = 'ListRoutes')]
+	[switch] $ListRoutes,                                 # print routed skill[:mode] keys and sandboxes; never launches
+
 	[Parameter(Mandatory, ParameterSetName = 'InternalRun')]
 	[string] $InternalRunId                               # detached-run mode: launched by this script, never by a caller
 )
@@ -102,10 +109,6 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $runSchemaVersion = 'broken-engine-codex-run/v2'
-
-# Run records outlive the launching shell, so they live outside the repository.
-$recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-run'
-$temporaryDirectory = [System.IO.Path]::GetTempPath()
 
 # One wait stays 60 seconds under the caller's 600000 ms command cap; a longer run resumes with -Wait.
 $waitBudgetSeconds = 540
@@ -140,6 +143,21 @@ $routes['external-skill-creator:validate'] = @{ Agent = 'sol'; Sandbox = 'read-o
 $routes['verify-acceptance'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
 $routes['next-plan-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
 $routes['next-plan-checkpoint-review'] = @{ Agent = 'sol'; Sandbox = 'read-only' }
+
+if ($PSCmdlet.ParameterSetName -ceq 'ListRoutes')
+{
+	[string[]] $keys = @($routes.Keys)
+	[Array]::Sort($keys, [StringComparer]::Ordinal)
+	foreach ($key in $keys)
+	{
+		Write-Output "$key $($routes[$key].Sandbox)"
+	}
+	exit 0
+}
+
+# Run records outlive the launching shell, so they live outside the repository.
+$recordDirectory = Join-Path ([System.IO.Path]::GetTempPath()) 'broken-engine-codex-run'
+$temporaryDirectory = [System.IO.Path]::GetTempPath()
 
 function Write-Receipt([hashtable] $Fields)
 {
@@ -407,7 +425,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$routeKey = if ([string]::IsNullOrWhiteSpace($Mode)) { $Skill } else { "${Skill}:${Mode}" }
 	if ($Skill.Contains(':') -or ($PSBoundParameters.ContainsKey('Mode') -and [string]::IsNullOrWhiteSpace($Mode)) -or (-not $routes.ContainsKey($routeKey)))
 	{
-		Write-Error "unrouted skill or mode '$routeKey'; see `$routes in $PSCommandPath" -ErrorAction Continue
+		Write-Error "unrouted skill or mode '$routeKey'; run -ListRoutes on $PSCommandPath" -ErrorAction Continue
 		exit 1
 	}
 
@@ -416,7 +434,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	$Sandbox = $route.Sandbox
 }
 
-# Only the modes that start Codex refuse the key; a wait or a model check runs in any environment.
+# Only the modes that start Codex refuse the key; a wait, route listing, or model check runs in any environment.
 if ($null -ne [Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'Process'))
 {
 	Write-Error 'refusing to launch Codex with inherited OPENAI_API_KEY' -ErrorAction Continue

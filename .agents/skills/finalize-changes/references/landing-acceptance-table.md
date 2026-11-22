@@ -9,13 +9,14 @@ diff, before main asks the confirmation.
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <primary-tip full SHA> -Head <session branch
    tip, or the squashed landing commit when one exists> -Landing -OutputPath
-   Temp/finalize-landing-inventory.json`. Read that JSON result file. Its
-   `landing.reviewed` rows give status, path, old path, and baseline/current
-   modes for that three-dot diff, covering additions/deletions, renames,
-   symlinks, and gitlinks. That list is diff-derived and contains no untracked
-   file, so add the untracked files declared as authorized additions and
-   reconcile each of them through `landing.porcelain`, never through
-   `landing.reviewed`.
+   Temp/finalize-landing-inventory.json`, passing `-SavePlanPaths
+   '<comma-separated paths>'` when the brief carries `Save-plan paths`. Read
+   that JSON result file. Its `landing.reviewed` rows give status, path, old
+   path, and baseline/current modes for that three-dot diff, covering
+   additions/deletions, renames, symlinks, and gitlinks. That list is
+   diff-derived and contains no untracked file, so add the untracked files
+   declared as authorized additions and reconcile each of them through
+   `landing.porcelain`, never through `landing.reviewed`.
 2. Reconcile the diff paths against the declared owned paths, the
    `Projects/Coretide/` diff paths against the Coretide landing set. Each
    changed region must name its authorizing Plan clause or user instruction.
@@ -65,9 +66,6 @@ Exempt paths owing no Review and resolve correctness row:
   authorized by that step; other edits by session instruction) and
   `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` (row additions
   by its header; row deletions by `/create-follow-up-plans`).
-- `/save-plan`-only diffs (only the saved file and any `/save-plan` companion
-  Plan): mark the aggregate `/coherence-review` row `PASS` after verifying every
-  path qualifies, recording those paths and the exemption in `evidence`.
 
 On every diff — `/save-plan`-only or mixed (including a recovery-added follow-up
 Plan) — require `Invoke-StaticChecks.ps1` `PASS` and run
