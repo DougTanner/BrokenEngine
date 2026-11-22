@@ -262,9 +262,11 @@ worker releases it with `-Release` exactly as for any other blocked landing.
 `Invoke-FinalizeCoretide.ps1 -Land` applies the same gate to the Coretide
 receipt and, when the engine pair is passed, to the engine receipt.
 
-A refreshed confirmation reruns the review against the newly reviewed candidate
-and overwrites the artifact; the stale receipt is never reused, because its
-`approvedTip` no longer matches the commit being landed.
+A refreshed summary during recovery
+([`SKILL.md`](../SKILL.md#landing-confirmation)) reruns the review against the
+newly reviewed candidate and overwrites the artifact; the stale receipt is
+never reused, because its `approvedTip` no longer matches the commit being
+landed.
 
 ### Landing and recovery
 
@@ -334,16 +336,16 @@ and overwrites the artifact; the stale receipt is never reused, because its
   through `Invoke-FinalizeLockClaim.ps1` first and pass the new owner token.
   When it acquired but did not release the lock (`lock.claimed` true,
   `lock.released` false), the claim is retained: handle it per the release
-  paragraph below before claiming anew. Blocked `rebase.patch-not-identical`
-  means the clean rebase changed the patch, which returns for re-review and a
-  refreshed confirmation; `rebase.conflicted` leaves the session branch
-  restored; `rebase.abort-failed` leaves restoration unproven and always retains
-  the lease; `landing.retry-exhausted` is retryable and leaves the confirmed
-  session commit restored. Blocked `history.source-changed` means the approved
-  source patch itself — measured from that candidate's own parent — rewrites one
-  of the three generated history paths, or that patch changed after
-  confirmation; it is a genuine block that returns for re-review and a refreshed
-  confirmation, never a condition a rebase can cure. Blocked
+  paragraph below before claiming anew. A `terminal` result ends this landing
+  attempt (do not re-invoke with the same arguments): `rebase.conflicted`
+  (branch restored), `rebase.patch-not-identical` (clean rebase changed patch),
+  and `history.source-changed` (approved source patch changes a reserved history
+  output path; never cured by rebase) return to main for recovery
+  ([`SKILL.md`](../SKILL.md#landing-confirmation),
+  [`worker.md`](worker.md#recovery)); every other `terminal` result (including
+  `rebase.abort-failed`, which leaves restoration unproven and retains the
+  lease) stops without recovery. `landing.retry-exhausted` is `retryable-wait`
+  and leaves the confirmed session commit restored. Blocked
   `history.overlay-invalid` means the temporary overlay tree changed something
   other than exactly the three reserved history paths; its message names the
   unexpected paths, and any reserved path the overlay failed to add. That guard

@@ -1,6 +1,12 @@
 ---
 name: create-follow-up-plans
-description: Converts proven pre-existing or out-of-scope Change Workflow residuals into evidence-backed follow-up Plans under `Documents/Plans/<area>/`, or `Projects/Coretide/Documents/Plans/<area>/` for a Plan naming a Coretide file, with tracked scheduler metadata. Do not route an in-scope acceptance failure out of the active change. Also use when asked to record review findings without duplicating existing Plans, and for a problem once the workflow incident log holds three rows of it.
+description: >-
+  Converts proven pre-existing or out-of-scope Change Workflow residuals into
+  evidence-backed follow-up Plans under `Documents/Plans/<area>/` (or
+  `Projects/Coretide/Documents/Plans/<area>/` for Coretide files) with tracked
+  scheduler metadata. Never route an in-scope acceptance failure out of the
+  active change. Also records non-duplicate review findings, three-row workflow
+  incidents, and standing-landing or `/save-plan` follow-up Plans.
 allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 ---
 
@@ -20,6 +26,10 @@ Plan naming a Coretide file, with tracked scheduler metadata.
 - Review findings must be recorded without duplicating an existing Plan.
 - A key of `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md`
   reaches its third row.
+- Standing landing confirmation
+  ([`../finalize-changes/SKILL.md`](../finalize-changes/SKILL.md)
+  `### Landing confirmation`) needs a follow-up Plan, or `/save-plan` needs a
+  companion Plan for saved-file gaps bare `/next-plan` will not pick up.
 - Not for these proposals, which the worker rejects, stating why:
   - an in-scope acceptance failure, including required structural work: it
     remains a blocker in the active change;
@@ -35,8 +45,9 @@ Dispatch one `implementer` with these fields:
 - `Objective` — the active intent or plan the proposals arose from.
 - `Scope` — affected symbols and files, and the session changed-file list.
 - `Fixed decisions` — prior reviewer or user decisions to preserve.
-- `Evidence` — direct finding evidence, the originating step and unmet
-  acceptance criterion, and related residuals.
+- `Evidence` — direct finding evidence, originating step/unmet criterion, and
+  residuals, or the standing-landing / `/save-plan` evidence in
+  [`references/worker.md`](references/worker.md) `## Rules`.
 - `Session provenance` — supplied only for a tooling-friction follow-up; an
   ordinary debt follow-up takes none. A `/next-plan` run sources the values per
   `.agents/skills/next-plan/references/follow-up-provenance.md`.

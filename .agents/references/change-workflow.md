@@ -362,10 +362,15 @@ Main decides each finding once:
   pair as one review row from the validator handoff, or the finder's when the
   validator is skipped; the later reviews check the applied removals like any
   other changed bytes.
-- Main puts each design suggestion from either pass to the user once, before
-  Step 9, under `### User Interaction`; an accepted one follows the Step 8
-  Leftovers rule, and one not accepted, including one still unanswered, is
-  logged at Step 9.
+- Main puts each design suggestion from either pass to the user once before
+  Step 9 under `### User Interaction` (accepted follows Step 8 Leftovers;
+  unaccepted logs at Step 9), except under standing confirmation, which files
+  it via `/create-follow-up-plans` instead of presenting or logging it.
+
+Under standing confirmation (`/finalize-changes` `### Landing confirmation`),
+outside-repository reviewer questions (`### Delegation roles`) likewise route
+to `/create-follow-up-plans` while that section's continuation,
+fix-and-retest, and stop policy governs.
 
 <!-- session-context-part: Change Workflow, Steps 7-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 7 — Apply the triggered cleanup
@@ -407,11 +412,11 @@ Leftovers:
 #### Step 9 — Verify and land
 
 - main adds to `Documents/Investigations/Engine/RefactorCandidates.md` the rows
-  its header lists, from the session's handoffs and its own context, reading no
-  further code — before the `/finalize-changes` dispatch; a changed log joins
-  the session's full landing set. Skipped for a `/save-plan` or Plan-rejection
-  landing, whose `/finalize-changes` exception requires the change to hold
-  exactly its Plan paths.
+  its header lists (excluding Step 6 suggestions filed via
+  `/create-follow-up-plans`), from handoffs and context, reading no further
+  code — before `/finalize-changes`; a changed log joins the landing set.
+  Skipped for `/save-plan` or standalone Plan rejection (`/finalize-changes`
+  `### Landing confirmation`).
 - `implementer` runs `/finalize-changes` — at a landing gate.
 
 Exactly one explicit user confirmation authorizes changing primary; after it

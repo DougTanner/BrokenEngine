@@ -24,109 +24,94 @@ Resolve the explicitly supplied complete proposal as follows:
 
 1. Read `Documents/AGENTS.md` and the selected tree's guidance. Done when both
    have been read.
-2. Require a decision-complete body: context, smallest design, critical files,
-   out-of-scope boundary, applicable risk trigger/invariants, and observable
-   acceptance criteria where the change needs them.
+2. Check the body for decision-completeness: context, smallest design, critical
+   files, out-of-scope boundary, applicable risk trigger/invariants, and
+   observable acceptance criteria where the change needs them.
 
-   - The saved plan is a file one model writes for another model to pick up: a
-     different implementing model with no access to the planning conversation
+   - A different implementing model with no access to the planning conversation
      executes it verbatim.
-   - So the body must be the final actionable plan — self-contained, with no
-     unresolved options, TBDs, or decisions deferred to the implementer beyond
-     trivial naming and local detail, apart from an investigation portion
-     (`Documents/Plans/AGENTS.md` `## Plan files`), which must state everything
-     still open.
+   - Keep it self-contained, with no unresolved options, TBDs, or decisions
+     deferred beyond trivial detail, apart from the open parts
+     `Documents/Plans/AGENTS.md` `## Plan files` allows; queue any missing,
+     undecidable (e.g., risk trigger or acceptance criteria), or unresolved gap
+     for step 8 instead of blocking.
 
-   Done when the body carries each of those, states anything still open in its
-   investigation portion, and leaves no other unresolved option.
-3. Keep the body picking exactly one design.
+   Done when every listed element is present or queued as a gap for step 8.
+3. Keep the body picking one design, or queue competing designs for step 8.
 
-   - Phrase an agent-made choice in the supplied body as the author's
-     recommendation with its rationale.
-   - Use binding language only where
+   - Phrase an agent-made choice as the author's recommendation with rationale;
+     use binding language only where
      [`../../references/authority-order.md`](../../references/authority-order.md)
      permits it.
 
-   Done when the body names one design and every agent-made choice is phrased
-   that way.
+   Done when choices are phrased that way and any competing design is queued.
 4. Require an explicit scope contract in the body:
 
-   - in-scope entries under a required `## In scope` heading, and the boundary
-     under a required `## Out of scope` heading;
-   - the listed scope is both target and ceiling: the implementer makes the
-     smallest complete change and adds no abstractions, configuration,
-     refactors, or fixes to adjacent code it encounters;
-   - scope is limited inside files, not only across them — in-scope entries name
-     the specific functions, members, or regions to change, and naming a file
-     grants no permission to touch anything in it beyond the named regions plus
-     the mechanical necessities (includes, declarations) the named change
-     requires;
-   - every file a `## Coordination` clause obliges the implementer to edit must
-     itself appear in the in-scope list with its named regions; a coordination
-     obligation is not a substitute for scope.
+   - in-scope entries under `## In scope` and boundaries under `## Out of scope`;
+   - scope is target and ceiling: smallest complete change, no added
+     abstractions, configuration, refactors, or adjacent fixes;
+   - scope is bounded inside files to named functions, members, or regions (plus
+     mechanical necessities like includes/declarations);
+   - every file a `## Coordination` clause obliges editing appears in
+     `## In scope` with named regions, unless those regions depend on an
+     unresolved scope decision;
+   - if a scope ceiling or `## Out of scope` is missing, scope is
+     file-granularity-only, or `## Coordination` regions depend on an open
+     decision, queue the gap and affected `## Coordination` obligations for
+     step 8, bound `## In scope` to open-decision resolution on claim, and
+     (when missing) add a provisional `## Out of scope` deferring all
+     implementation edits until open decisions are resolved.
 
-   Done when both headings are present with named regions and every
-   coordination-obliged file is listed in scope.
-5. Ask the user for a meaningfully missing decision — including ambiguity, a
-   missing scope ceiling, or file-granularity-only scope — rather than invent or
-   patch it. Done when no such gap is left unanswered.
-6. Once the body is final, and before classifying and writing it, dispatch one
-   fresh `reviewer` for `/plan-simplicity-review` on that final body snapshot:
+   Done when both headings exist (including any provisional `## Out of scope`)
+   and every coordination-obliged file has named regions in scope or is queued
+   as a bounded gap.
+5. Classify into `Documents/Plans/`, `Documents/Investigations/`, or
+   `Documents/Features/` by `Documents/AGENTS.md` `## Planning Trees`. Done when
+   the tree is chosen.
+6. Select the owning area and a concise PascalCase filename matching
+   `^[A-Z][A-Za-z0-9]*\.md$`. Done when both are chosen.
+7. Search live Plans for duplicate root cause and implementation boundary before
+   writing (or proven symptom for an investigation portion per
+   `Documents/Plans/AGENTS.md` `## Plan files`). Done when the search has run.
+8. Route gaps queued in steps 2-4 without halting to ask or inventing answers
+   (`Documents/Plans/AGENTS.md` `## Plan files`), and write the body file for an
+   executable Plan:
 
-   - Dispatch whenever the body adds new code or modifies non-documentation
-     behavior per the trigger in
-     [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
-     `## When to use`.
+   - Executable Plan with gaps: embed them and drafted regions as proposed scope
+     in `## Unresolved decisions`, narrow `## In scope` to open-decision
+     resolution, and defer `## Coordination` edits until resolved. For an
+     executable Plan with a blocking `dependsOn` in `WorktreeCli`'s inventory
+     (`## Git-backed scheduler` there), first create a companion Plan via
+     `/create-follow-up-plans`; besides `## Plan files` write-back, require it
+     to write resolved scope, replace any provisional boundary, and reconcile
+     deferred `## Coordination` before completing.
+   - `Documents/Features/` or `Documents/Investigations/` with gaps: first
+     create the companion Plan via `/create-follow-up-plans`.
 
-   Done when the trigger is evaluated and, where it fired, the review has
-   returned.
-7. Route the findings by disposition, not by finding class: accepted `simplify`
-   findings revise the body, and every `user-judgment` finding goes to the user,
-   whatever class it carries. Done when every returned finding is dispositioned.
-8. Present the complete revised body for explicit user approval before saving
-   whenever accepted findings change its meaning, because this skill persists
-   exactly the client-supplied proposal and invoking it pre-approves landing
-   per `### Landing pre-approval`.
+   Done when any companion exists and any executable Plan body file is written.
+9. Save the document:
 
-   - A clean review, or accepted findings that change only sub-semantic wording,
-     keeps that pre-approval in force.
-   - This save-time review does not waive the prep-time
-     `/plan-simplicity-review` that `/next-plan` runs when the plan is later
-     prepared for implementation.
+   - Executable Plan (`Documents/Plans/` or
+     `Projects/Coretide/Documents/Plans/`): run
+     `.agents/scripts/New-PlanFile.ps1`:
 
-   Done when a meaning-changing revision has explicit user approval, or no such
-   revision was made.
-9. Classify into `Documents/Plans/`, `Documents/Investigations/`, or
-   `Documents/Features/` by the deciding test in `Documents/AGENTS.md`
-   `## Planning Trees`. Done when the tree is chosen.
-10. Select the owning area and a concise PascalCase filename matching
-    `^[A-Z][A-Za-z0-9]*\.md$`. Done when the area and filename are chosen.
-11. Search live Plans for duplicate root cause and implementation boundary
-    before writing; for a Plan with an investigation portion, key the search on
-    its proven symptom instead of root cause, as the investigation portion
-    (`Documents/Plans/AGENTS.md` `## Plan files`) carries no confirmed root
-    cause. Done when the duplicate search has run.
-12. For an executable Plan, write the plan body to a file. Done when that body
-    file exists.
-13. Save the document:
+     ```powershell
+     pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
+     ```
 
-    - Executable Plan (`Documents/Plans/` or
-      `Projects/Coretide/Documents/Plans/`): run
-      `.agents/scripts/New-PlanFile.ps1`:
+     For a prerequisite-blocked executable Plan with a step-8 companion, pass
+     its normalized path with existing prerequisites in this single `-DependsOn`
+     call (`completion.plan-cited` in
+     [`claim-results.md`](../next-plan/references/claim-results.md)).
+     Parameters, single-token rule, result shape, and exit handling live in
+     [`../../references/new-plan-file.md`](../../references/new-plan-file.md);
+     report saved only on `created`.
+   - `Investigations/` or `Features/` per step 5: write the document directly
+     to its chosen path as ordinary Markdown without `New-PlanFile.ps1` or
+     overwriting an existing file.
 
-      ```powershell
-      pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <PascalCase.md> -Body <body file path> -DependsOn <plan paths as one comma-separated token>
-      ```
-
-      Parameters, `-DependsOn`, result, and exit handling:
-      [`../../references/new-plan-file.md`](../../references/new-plan-file.md).
-      Report saved only on `created`.
-    - `Investigations/` or `Features/` per step 9: write the document directly
-      to its chosen path as ordinary Markdown without `New-PlanFile.ps1` or
-      overwriting an existing file.
-
-    Done when created or written.
-14. For an executable Plan from `New-PlanFile.ps1`, record the folded
+   Done when created or written.
+10. For an executable Plan from `New-PlanFile.ps1`, record the folded
     invalid-plan diagnostics and stale-edge notices: existing dependency paths
     must remain executable to block a child, and missing paths are intentionally
     stale satisfied edges. Done when recorded, or N/A for direct Markdown.
@@ -139,15 +124,10 @@ Plan is tracked Git content, not a queue change and not a claim.
 
 ### Landing pre-approval
 
-For an executable Plan, invoking this skill is the user's explicit approval to
-commit or land that sole saved Plan file to the primary branch: its content was
-already approved during planning, and only that Plan file lands. Per
+Invoked after a proposal has been drafted and presented, `/save-plan` activates
+standing landing confirmation for every saved destination, over the paths
 [`../finalize-changes/SKILL.md`](../finalize-changes/SKILL.md)
-`### Landing confirmation`, when the diff changing primary holds only the saved
-Plan file, `/finalize-changes` proceeds without asking the confirmation
-question; any additional changed file voids the exception and uses normal
-landing confirmation. Direct Markdown saved to `Investigations/` or `Features/`
-is not covered by this exception and uses normal landing confirmation.
+`### Landing confirmation` defines for it.
 
 ## Rules
 

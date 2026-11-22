@@ -9,10 +9,11 @@ For every proposal:
 1. State the false required condition and its originating criterion, accepted
    finding, or residual.
 2. Confirm root cause and unresolved state from current source or direct logs.
-   Record durable `path:line`, symbol, and observed behavior evidence. A problem
-   proven and reproducible from that evidence whose root cause that evidence
-   cannot confirm takes the symptom substitution in `## Rules` instead.
-3. Prove it is pre-existing or outside the approved implementation boundary.
+   Record durable `path:line`, symbol, and observed behavior evidence (or use
+   the applicable `## Rules` substitution for unconfirmed root causes,
+   standing-landing, or `/save-plan` proposals).
+3. Prove it is pre-existing or outside the approved implementation boundary
+   (unless exempt under `## Rules`).
 4. Preserve user decisions and the authority order in root `AGENTS.md`
    `### Diagnosis Discipline`; report contradictions.
 
@@ -27,7 +28,7 @@ implementation boundary. Map the proposal to it unless the proven unmet
 acceptance criterion requires extending that plan.
 
 Done when every surviving proposal carries the evidence step 1 records — or its
-symptom substitute under `## Rules` — and a duplicate decision.
+applicable substitute under `## Rules` — and a duplicate decision.
 
 ### 2. Draft and classify
 
@@ -35,13 +36,11 @@ Choose the owning area `Documents/Plans/AGENTS.md` `## Plan files` lists and a
 concise PascalCase filename; never overwrite a collision. Draft the smallest
 decision-complete plan with `# Title`, `## Context`, `## Design`,
 `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria`
-when the diff is insufficient, and `## Notes`. Include verified root cause (for
-a proposal whose root cause step 1's evidence cannot confirm, its symptom
-substitute under `## Rules`, with the investigation portion
-`Documents/Plans/AGENTS.md` `## Plan files` defines), originating gap,
-implementation boundary, and applicable determinism/CRC,
-serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading,
-allocation, shader, build, or live-verification exposure.
+when the diff is insufficient, and `## Notes`. Include verified root cause (or
+the applicable symptom, standing-landing, or `/save-plan` substitute under
+`## Rules`), originating gap, implementation boundary, and applicable
+determinism/CRC, serialization/`.pack`/`kiVersion`, replay, wire, affinity,
+threading, allocation, shader, build, or live-verification exposure.
 When an acceptance criterion is settled by a live `/agent-harness` run, name
 the setup that reproduced the observed state (the harness commands or UI
 actions, in order, as the observing run recorded them), or state that the
@@ -54,10 +53,11 @@ Do not add unit tests or unsupported implementation detail.
 
 Derive the future implementation's Change Workflow Tier 1/2/3 from the highest
 risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record
-that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put
-mandatory nondirectional constraints in reciprocal standard `## Coordination`
-sections in every affected Plan. A follow-up authored during a `/next-plan` run
-never names the Plan that run is completing;
+that trigger in the Plan. Put only directional prerequisites in `dependsOn`
+(`## Unresolved decisions` follow-ups obey `Documents/Plans/AGENTS.md`
+`## Plan files`); put mandatory nondirectional constraints in reciprocal
+standard `## Coordination` sections in every affected Plan. A follow-up authored
+during a `/next-plan` run never names the Plan that run is completing;
 [`claim-results.md`](../../next-plan/references/claim-results.md#claim-exit-result-fields)
 shows why the edge cannot survive completion. Do not add score, effort ranking,
 queue tier, queue row, request file, or claim data.
@@ -135,37 +135,39 @@ failure in a Plan you wrote or edited.
   tracked facts instead.
 - Read `Documents/AGENTS.md` and `Documents/Plans/AGENTS.md` completely. Their
   current Plan shape, metadata, dependency, and Coordination rules override this
-  skill. This skill creates debt Plans only. Report a capability addition for
-  main-agent routing by the deciding test in `Documents/AGENTS.md`
-  `## Planning Trees`; do not disguise it as debt.
+  skill. This skill creates debt Plans and the standing-landing or `/save-plan`
+  follow-up Plans below. Report a capability addition for main-agent routing by
+  the deciding test in `Documents/AGENTS.md` `## Planning Trees`; do not
+  disguise it as debt.
 - Reject each proposal class [`../SKILL.md`](../SKILL.md) `## When to use`
   excludes, stating why.
 - A proposal that arrives with the rows of one key of
   `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` is a
   tooling-friction proposal, a separate category; this worker deletes those
   rows as that file's header directs.
-- For a tooling-friction proposal, and for any other proposal whose problem is
-  proven and reproducible from the supplied evidence but whose root cause that
-  evidence cannot confirm, these substitutions replace the corresponding
-  root-cause-based requirements in these rules and in `## Steps` — the proof
-  steps, the grouping and duplicate rules, and the drafted Plan's verified root
-  cause; every other requirement still applies, and a proposal whose root cause
-  the evidence confirms keeps the full root-cause bar unchanged. The observed
-  symptom with its evidence substitutes for the confirmed root cause wherever
-  one is required, including in the drafted Plan, which carries the
-  investigation portion `Documents/Plans/AGENTS.md` `## Plan files` defines. For
-  a tooling-friction proposal, that evidence is its incident rows — owner,
-  symptom, and each row's evidence — which also substitute for the unmet
-  acceptance criterion or accepted residual.
-- For a proposal under the substitution above, proving the root cause is
-  deferred to the fix session, by the route the Plan's `## Design` states.
-  Grouping and duplicate detection key on the observed symptom instead of root
-  cause; re-observing an already-recorded symptom updates nothing and is
-  rejected as a duplicate. For a tooling-friction proposal, the grouping key is
-  its incident key, and the pre-existing and out-of-scope proof verifies that
-  the key's owner is outside the claimed Plan's `## In scope`, when a Plan is
-  claimed; when it is inside, the failure is an in-scope blocker of the active
-  change and is rejected as a friction follow-up.
+- For a tooling-friction proposal or any proven reproducible problem whose
+  evidence cannot confirm root cause (confirmed root causes keep the full bar):
+  observed symptom and evidence substitute for confirmed root cause across
+  `## Steps` and these rules, using the investigation portion in
+  `Documents/Plans/AGENTS.md` `## Plan files` and deferring root-cause proof to
+  the fix session via `## Design`. Grouping and duplicate detection key on the
+  symptom (rejecting re-observed duplicates). For tooling-friction, the incident
+  rows (owner, symptom, evidence) also substitute for the unmet criterion or
+  residual, the grouping key is the incident key, and pre-existing/out-of-scope
+  proof verifies the owner is outside any claimed Plan's `## In scope` (inside
+  is an in-scope blocker, rejected as a friction follow-up).
+- For a standing-landing or `/save-plan` follow-up (`../SKILL.md`
+  `## When to use`), durable event evidence — affected paths, reviewed source
+  revision if any, and observed change, pending check, or open question (no
+  unborn landing hash; `/save-plan` companions require the selected
+  repository-relative target path in brief and Plan before the file exists) —
+  substitutes for step 1's proofs, keyed on paths and item. Draft a debt Plan
+  if a fix is known; otherwise (byte-only recovery, user checks/judgment, or
+  `/save-plan` companions) draft `## Unresolved decisions` per
+  `Documents/Plans/AGENTS.md` `## Plan files`: byte-only recovery asks the user
+  to confirm with no edits or pick a fix; a standalone user check carries its
+  procedure and expected result there and requires the user's observed result
+  as completion evidence (never defaulted by generic `/next-plan` approval).
 - Plan files and the metadata line that must be their very first bytes are
   ordinary tracked Git content; write them directly, with or without a live Plan
   claim. `Documents/Features` remains manual and is not an alternate

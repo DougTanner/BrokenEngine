@@ -56,19 +56,23 @@ behavior, required check/review, and residual:
 
 `criterion | decisive check | PASS | FAIL | BLOCKED | UNVERIFIED | evidence`
 
-A `Documents/Plans/**` file deleted by `/next-plan`'s `Complete-NextPlan.ps1` is
-authorized by that script's completion result and owes no Review and resolve
-correctness row, so it is recorded in the table with no review row of its own;
-the `Executable Plan check` row below still applies to that reviewed diff.
+Exempt paths owing no Review and resolve correctness row:
 
-A modified `Documents/Investigations/Engine/RefactorCandidates.md` or
-`Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` owes no Review
-and resolve correctness row, so it is recorded in the table with no review row
-of its own. Rows the Change Workflow Verify and land step adds to the
-refactor-candidate log are authorized by that step; any other edit to it, such
-as a reviewing session's row removals, is authorized by that session's
-instruction. Rows main records in the incident log are authorized by its
-header, and the `/create-follow-up-plans` worker's row deletions by that skill.
+- `Documents/Plans/**` deleted by `Complete-NextPlan.ps1` (authorized by its
+  completion result; `## Executable Plan check` still applies).
+- Modified (not added, deleted, or renamed)
+  `Documents/Investigations/Engine/RefactorCandidates.md` (Step 9 row additions
+  authorized by that step; other edits by session instruction) and
+  `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` (row additions
+  by its header; row deletions by `/create-follow-up-plans`).
+- `/save-plan`-only diffs (only the saved file and any `/save-plan` companion
+  Plan): mark the aggregate `/coherence-review` row `PASS` after verifying every
+  path qualifies, recording those paths and the exemption in `evidence`.
+
+On every diff — `/save-plan`-only or mixed (including a recovery-added follow-up
+Plan) — require `Invoke-StaticChecks.ps1` `PASS` and run
+`## Executable Plan check` whenever the inventory emits it; mixed diffs also run
+normal changed-region reviews including `/coherence-review` on any added Plan.
 
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their

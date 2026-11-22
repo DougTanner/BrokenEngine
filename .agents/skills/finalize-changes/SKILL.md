@@ -36,7 +36,10 @@ produces the landing acceptance table itself, inside the workflow in
 `references/worker.md`, from the prepared diff final preparation and
 reconciliation produced — do not reuse an earlier table. When a Plan completion
 or rejection belongs to the landing, the brief also carries the `/next-plan`
-step-10 `Complete-NextPlan.ps1` result verbatim.
+step-10 `Complete-NextPlan.ps1` result verbatim. Preparation and recovery
+briefs carry authorization kind (`unconfirmed`, `standing confirmation`, or
+`standalone Plan rejection`) and any prior confirmed candidate's commit and
+parent so `references/worker.md` `## Recovery` detects byte drift.
 
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`
@@ -121,11 +124,11 @@ rule: rendered message text, with the question immediately before the mandatory
 `Follow-up Plans created:` footer, and no tool call — question tools included —
 after it. The user's next message is the decision.
 
-Only a current explicit affirmative response to the latest unchanged summary,
-or a landing override below, authorizes primary change. Plan or implementation
-approval or reconciliation consent is not a substitute. After confirmation main
-dispatches a fresh landing `implementer` whose brief carries the ordinary fields
-plus the continuation capsule below
+Only standing confirmation below, or standalone user-authorized Plan rejection,
+authorizes primary change. Plan or implementation approval or reconciliation
+consent is not a substitute. After confirmation main dispatches a fresh landing
+`implementer` whose brief carries the ordinary fields plus the continuation
+capsule below
 ([`subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Continuation capsule`):
 
@@ -136,57 +139,70 @@ plus the continuation capsule below
 - whether a claimed Plan reached final preparation, so the landing invocation
   passes `-ReleasePlanClaim`;
 - the approved Coretide commit, when Coretide changes land;
-- one confirmation row: the exact question asked and the user's affirmative
-  reply.
+- one confirmation row: the authorizing user message (and question asked, if
+  any).
 
-Branches, the session label, and the receipt path are re-resolved by the
-landing worker or fixed; the path set and any `Attribution trailer` stay
-ordinary brief fields; the owner token never crosses the dispatch boundary —
-the landing worker claims the lock itself. A decline or non-answer leaves
-primary unchanged. A reply that asks for changes instead also leaves primary
-unchanged and redirects the current change rather than declining it: main
-returns to preparation and implementation for the difference — under
-`/next-plan`, by its `### Post-checkpoint outcomes` row for that reply — and
-then dispatches a fresh preparation whose path set is the session's full
-landing set, now including every path the difference changed. The unlanded
-candidate commit on the session branch is session-owned work: implementation
-continues on top of it, the fresh preparation rewrites it through
-`references/worker.md` step 2, and main asks the user nothing about it. Three
-standing exceptions skip only the question, never the
-SmartGit launch or the summary: `/save-plan`, when the change contains exactly
-the saved Plan file; an explicit user-authorized Plan rejection, when the
-change contains exactly the paths `Complete-NextPlan.ps1 -Reject` reported and
-the acceptance table has no non-PASS row; and a landing override — a direct
-user instruction to land the current change, such as `Confirm Landing` or
-`Land on main`, given before or after its summary; it stands for that change
-through every refreshed summary below. Under an exception main
-presents the summary and dispatches the landing `implementer` in the same turn,
-without waiting for a reply. The authorizing user message fills the capsule's
-confirmation row.
+Branches, session label, and receipt path are re-resolved by the landing worker
+or fixed; path set and `Attribution trailer` stay ordinary brief fields; the
+owner token never crosses the dispatch boundary (the landing worker claims the
+lock itself). A decline or non-answer leaves primary unchanged. A reply asking
+for changes also leaves primary unchanged and redirects the change: main returns
+to preparation and implementation for the difference (under `/next-plan`, its
+`### Post-checkpoint outcomes` row), then dispatches fresh preparation with the
+full landing set including the newly changed paths; implementation continues on
+the session-owned candidate commit, which `references/worker.md` step 2 rewrites
+without asking the user.
 
-Confirmation binds the reviewed diff, not commit hashes. Landing's clean
-identical rebase onto an advanced primary after confirmation lands without
-re-asking, and needs no re-review or rebuild; a rebuild before the summary is
-owned by `references/worker.md` step 5. A `builder` handoff since that step's
-meaning-change handoff whose `Residuals` names a failed
-`Get-CompileRewrittenPaths.ps1` run ([`/compile`](../compile/SKILL.md)
-`## Handoff`) is a stop for the user. After that build, main dispatches a fresh
-preparation whose path set is the session's full landing set plus every path
-that any `builder` handoff since that step's meaning-change handoff lists under
-`Changed files` ([`/compile`](../compile/SKILL.md) `## Handoff`), and whose
-brief carries the `-RequireExportOutputsRewritten` switch
-(`references/scripts.md` `## Invocation`); every later preparation brief of that
-landing keeps it, the restart after `rebase.conflicted` included. A returned
-`candidate.export-output-not-regenerated` blocker is a stop for the user: main
-reports it and dispatches no recovery. Only a direct user instruction under
-`## Inputs`' user-override paragraph clears the switch for that landing. An
-actual rebase conflict requiring manual resolution, a change to the session
-bytes, or a meaningful semantic change re-runs review of the affected regions
-and requires a refreshed summary, a fresh `SmartGit launch:` line for the new
-commit that main runs the same way, and a fresh confirmation unless a landing
-override stands, through a fresh preparation dispatch and then a fresh landing
-dispatch; `references/worker.md` defines the recovery transition after
-`rebase.conflicted`.
+**Standing confirmation** unifies three triggers: an affirmative summary reply;
+a direct landing instruction (`Confirm Landing`, `Land on main`) before or
+after the summary; and `/save-plan` pre-approval covering the saved file plus
+any companion follow-up Plan from `/save-plan` or recovery. Standalone
+user-authorized Plan rejection stays scoped to `Complete-NextPlan.ps1 -Reject`
+paths and a passing table (no companion files; any byte or path drift — even
+within a `-Reject` path — requires refreshed preparation, SmartGit launch,
+summary, and separate confirmation instead of automatic filing or landing).
+Pre-summary authorization skips only the question, never SmartGit launch or the
+summary, dispatching landing in the same turn; standing confirmation survives
+recovery, refreshed SmartGit launch, and refreshed summary without re-asking or
+halting for non-blocking checks or user-judgment prompts — unless an initial or
+refreshed summary carries a `/sweep` `UNVERIFIED` owed row unaccepted under
+`(d)` below, where main asks and waits instead of same-turn dispatch.
+
+Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
+post-confirmation rebase lands with no re-asking, re-review, rebuild, or
+follow-up Plan; pre-summary rebuilds belong to `references/worker.md` step 5.
+After that build, main adds every `builder` `Changed files` path since that
+meaning-change handoff ([`/compile`](../compile/SKILL.md) `## Handoff`) and
+passes `-RequireExportOutputsRewritten` (`references/scripts.md`
+`## Invocation`) on every later preparation brief (including after
+`rebase.conflicted`); only a direct user instruction under `## Inputs` clears
+it. On a `Get-CompileRewrittenPaths.ps1` residual or
+`candidate.export-output-not-regenerated` block, keep the switch, attempt
+bounded build/evidence recovery, and rerun preparation with it; stop if it
+still refuses. Under standing confirmation, whenever post-confirmation recovery
+(conflict, byte/meaning change, export rebuild, `rebase.conflicted`,
+`rebase.patch-not-identical`, `history.source-changed`, or fix) changes bytes
+or a non-blocking user-check or user-judgment item remains (even with unchanged
+patch bytes), file a follow-up Plan via `/create-follow-up-plans` before
+candidate preparation; existing triggers (`references/worker.md` `## Recovery`)
+decide reruns (a Plan alone never re-triggers unrelated source reviews or
+builds), then rerun preparation, SmartGit launch, summary, and (unless `(d)`
+pauses) landing in the same turn.
+
+After confirmation, stop without landing (or completing a claim) only on: (a) a
+mechanical script, lock, lease, or receipt refusal (unproven
+abort/restore/release, Coretide `-Land` block, invalid AgentTools ledger,
+receipt error, or unrecoverable export-output refusal); (b) an unfixable
+compile error; (c) an irreconcilable logic or non-export binary conflict; (d) a
+required non-PASS row or unmet criterion — except `/sweep`'s `UNVERIFIED` owed
+rows authorized by affirmative user confirmation after the landing summary
+discloses them ([`../sweep/SKILL.md`](../sweep/SKILL.md) `## Rules`) — after
+Step 6 fix-and-retest leaves no authorized fix
+([`change-workflow.md`](../../references/change-workflow.md)), or requiring
+explicit pixel-only deferral
+([`claim-exceptions.md`](../next-plan/references/claim-exceptions.md)
+`## Pixel-evidence deferral`); or (e) a breaking shared-tool change affecting
+another live worktree ([`agenttools.md`](references/agenttools.md)).
 
 ## References
 

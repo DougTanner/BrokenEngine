@@ -43,8 +43,8 @@ Design-time documents live in three sibling directories:
 | `Investigations/` (`Investigations/AGENTS.md`) | Work wanted soon outside `/next-plan`, `/sweep` specifications, findings records, and overviews. Never a scheduler input. |
 
 Decision-complete means every choice needed to implement is already made: no
-open options, no TBDs; a Plan's investigation portion (`Plans/AGENTS.md`
-`## Plan files`) is the one open part it allows.
+open options, no TBDs, apart from the bounded open parts `Plans/AGENTS.md`
+`## Plan files` allows.
 
 Deciding test: a `/sweep` specification (`## Sweep`) always goes to
 `Investigations/` (never `Plans/` or `Features/`, regardless of timing).

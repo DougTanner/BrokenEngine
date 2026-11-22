@@ -29,7 +29,7 @@ itself, to the user, who picks at most one option or combination.
   `/prepare-change` drafts the plan at Tier 2+ or after main fixes the intended
   change at Tier 1, whenever the trigger in
   [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
-  `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
+  `## When to use` fires.
 - From a `/next-plan` claim, after the preparation `planner` verifies the Plan
   and before the Plan review reviewers, whenever that same trigger fires.
 - Not for a new Collection, manager, or subsystem API:

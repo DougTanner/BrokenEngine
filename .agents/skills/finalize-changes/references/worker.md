@@ -18,9 +18,9 @@ Under its landing lease, finalization follows the Verify and land step's rule
 that exactly one explicit user confirmation authorizes changing primary, and the
 exact mechanics in [`scripts.md`](scripts.md).
 
-Immediately after the affirmative confirmation the caller claims the landing
-lock once through `../scripts/Invoke-FinalizeLockClaim.ps1`, with the landing
-lease duration `scripts.md` states, and passes that owner token to
+Immediately after confirmation the caller claims the landing lock once through
+`../scripts/Invoke-FinalizeLockClaim.ps1`, with the landing lease duration
+`scripts.md` states, and passes that owner token to
 `../scripts/Invoke-FinalizeLanding.ps1` as `-OwnerToken`, which continues under
 that same lease through the advance. This supplied-token route keeps the raw
 `$SessionLabel`; when `-OwnerToken` is omitted, landing uses
@@ -75,9 +75,9 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      omits the field or gives `none`, the text ends with no trailer.
    - Only when the brief carries the `-RequireExportOutputsRewritten` switch
      (`SKILL.md` `### Landing confirmation`), add it to the candidate-commit
-     invocation. Its `candidate.export-output-not-regenerated` block returns a
-     blocker for the user carrying the script's message verbatim, never a
-     blocked result for the recovery dispatch the `## Steps` preamble names.
+     invocation. Return a `candidate.export-output-not-regenerated` block as a
+     `BLOCKED` handoff carrying the script's message verbatim for main to route
+     per `SKILL.md` `### Landing confirmation`.
    - When the Coretide landing set is non-empty, write
      `Temp/finalize-coretide-commit-message.txt` describing only the Coretide
      changes and run `Invoke-FinalizeCoretide.ps1 -Prepare` with it
@@ -169,11 +169,9 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      `### Landing confirmation`.
    - Done when each line is filled in for the commit the summary describes, or
      a blocker was returned.
-7. Refresh that line only for a meaningful change.
-   - Whenever `SKILL.md` `### Landing confirmation` requires a refreshed
-     confirmation, refill the line for the newly reviewed landing commit and
-     return it with the refreshed summary.
-   - Done when the line names the commit the current summary describes.
+7. Whenever `SKILL.md` `### Landing confirmation` requires a refreshed summary,
+   refill the launch line for the newly reviewed commit and return it with the
+   summary. Done when the line names that commit.
 8. Assemble and return one handoff carrying the complete step-3 acceptance
    table, the `SmartGit launch:` and `Coretide SmartGit launch:` rows holding
    the step-6 lines, and a landing summary.
@@ -195,9 +193,10 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      `SKILL.md` `## Inputs`.
    - Done when that single handoff has been returned.
 9. Claim the landing lock.
-   - Only that affirmative response permits the landing worker to claim the
-     landing lock and invoke landing with that owner token, in the order
-     `## Bundled scripts` states.
+   - Only authorization under `SKILL.md` `### Landing confirmation` (standing
+     confirmation or standalone user-authorized Plan rejection) permits claiming
+     the landing lock and invoking landing with that owner token, in
+     `## Bundled scripts` order.
    - When a Coretide commit lands, land it next, before the engine landing:
      run `Invoke-FinalizeCoretide.ps1 -Land`
      ([`scripts.md#invocation`](scripts.md#invocation)) with that owner token
@@ -241,18 +240,11 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
     - On a Coretide-only landing, read the deletion or its residual from the
       `-Land` result's `planClaim` and `residuals`.
     - Done when the deletion is recorded as performed or as that residual.
-14. Dispose of a landing blocked by primary advancing.
-    - If primary advanced before the advance succeeds, landing does its own
-      bounded rebase and retry, and [`scripts.md`](scripts.md) owns the
-      resulting disposition.
-    - Never rebase or resolve by hand.
-    - Act on the blocked result's reported `disposition` and `lock` projection
-      exactly as `scripts.md` specifies, never a memorized list of codes.
-    - A `terminal` result stops this caller; one reporting a changed reviewed
-      contract or reachable source patch is returned as a handoff for the
-      recovery dispatch, for focused re-review and a refreshed confirmation per
-      `SKILL.md` `### Landing confirmation`.
-    - Done when the reported disposition has been acted on.
+14. Dispose of a landing blocked by primary advancing: landing runs its own
+    bounded rebase/retry; never rebase or resolve by hand. Act on the reported
+    `disposition` and `lock` projection per
+    [`scripts.md`](scripts.md#landing-and-recovery), which owns retry,
+    recovery-return, and stop dispositions. Done when acted on.
 15. Retain the session branch and worktree; only `/cleanup-worktrees` or
     explicit user direction removes them. Done when this worker has removed
     neither.
@@ -273,26 +265,21 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 - A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` result stops before the
   engine landing; release the lease as for any blocked landing and return the
   result as a blocker for the user.
-- Postconfirmation `rebase.conflicted`: the landing script has aborted the
-  rebase, restored the approved session commit, and released its normal
-  postconfirmation landing lease. The original landing arguments, candidate,
-  baseline, expected tips, verification evidence, SmartGit receipt, summary, and
-  confirmation are invalid; a landing override (`SKILL.md`
-  `### Landing confirmation`) still stands. Only after abort, restoration, and
-  lease release are proven, return that result as a handoff for the recovery
-  dispatch; that worker restarts preconfirmation reconciliation: it re-resolves
-  the current session and primary tips, and a fresh candidate baseline; performs
-  the ordinary linear rebase and hunk resolution under the `Recovery` section,
-  recreates and prepares a new candidate, reruns the affected reviews and the
-  acceptance table, and produces a fresh summary and launch line — main reopens
-  SmartGit from that line — for fresh user confirmation unless a landing
-  override stands. If any abort, restoration, or release is unproven, retain the
-  existing blocker and lease state and stop; do not begin recovery or expose a
-  user wait. No primary change is attempted until the fresh review and any fresh
-  confirmation complete. Never reuse the original approved landing arguments.
+- Postconfirmation `rebase.conflicted`: landing aborted the rebase, restored
+  the approved commit, and released its lease. Prior arguments, candidate,
+  baseline, expected tips, verification evidence, SmartGit receipt, and summary
+  are invalid (`SKILL.md` `### Landing confirmation` owns confirmation
+  authority and drift routing). Once abort, restoration, and release are
+  proven, return for recovery: a fresh worker re-resolves tips, runs the linear
+  rebase and hunk resolution below, and returns resolved regions before
+  candidate preparation for main's recovery steps and fresh preparation under
+  `SKILL.md` `### Landing confirmation`. If abort, restoration, or release is
+  unproven, retain the blocker and lease and stop. Never change primary until
+  fresh review and `SKILL.md` `### Landing confirmation` complete, and never
+  reuse prior landing arguments.
 - Preconfirmation reconciliation conflict: resolve under the approved
-  invariants, then re-review the affected regions and re-ask the confirmation
-  unless a landing override stands. Resolve hunk by hunk, tracing each side's
+  invariants, then re-review the affected regions and follow `SKILL.md`
+  `### Landing confirmation`. Resolve hunk by hunk, tracing each side's
   intent to its originating commit or Plan before choosing, and preserve both
   intents where they are compatible. Keep the resolution to behavior one side
   already had; never invent new behavior in a resolution. A conflict on a path
@@ -322,29 +309,30 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
   single ordinary linear rebase in [`scripts.md`](scripts.md)'s
   `Invoke-FinalizeApprovalPreparation.ps1` entry, and that rebase's exit status
   alone decides clean or conflict.
-  - Exit 0 (clean): re-invoke approval preparation with the re-resolved tips
-    and any verified-candidate pair that entry states, inspect any place that
-    rebase merged cleanly but changed the code's meaning, re-run step 3 for the
-    changed regions, then re-run step 4 and act on step 5; a re-run result of
-    `primary.path-overlap` repeats this recovery. That inspection and the step-3
-    re-run cover the rebased tip a re-resolved pair now names, so a supplied
-    gate stays supplied instead of being dropped. A blocked or failed
-    approval-preparation re-invocation is returned as a blocker. A
-    changed-region row the step-3 re-run produced or changed that is not PASS
-    returns a blocker for the user. When the inspection finds a meaning
-    change, this worker cannot delegate the changed-region review
-    (`## Rules`): it returns a handoff naming those
-    regions, with `Build required` naming the targets they build, for main to
-    run the changed-region reviews, `/compile` for those targets, and then a
-    fresh preparation dispatch; that handoff alone goes to main with no user
-    question. A changed-region review finding or a failed build on that path
-    is main's, handled through its ordinary review-and-fix round before that
-    fresh preparation dispatch.
+  - Exit 0 (clean): before re-invoking approval preparation, inspect the rebased
+    diff for code-meaning changes and — when the brief's authorization kind
+    (`SKILL.md` `## Inputs`) is `standing confirmation` or
+    `standalone Plan rejection` — patch-byte changes against its confirmed
+    candidate diff identity (or this dispatch's pre-rebase candidate). If
+    either changed, or `rebuildProjects` is non-empty (step 5), return the
+    meaning-change handoff to main without asking (`## Rules`), naming changed
+    regions and `Build required` targets (including step 5's `rebuildProjects`
+    client/server builds), so main runs needed reviews, `/compile`, fix rounds,
+    and `/create-follow-up-plans` (`SKILL.md` `### Landing confirmation`), then
+    dispatches fresh preparation re-resolving tips, verified-candidate pair,
+    and baseline per that `scripts.md` entry. Otherwise (no meaning change,
+    empty `rebuildProjects`, and byte-identical when authorized above),
+    re-invoke approval preparation with those re-resolved inputs, re-run step 3
+    for changed regions, then re-run step 4 and act on step 5; a re-run
+    `primary.path-overlap` repeats this recovery. That inspection and step-3
+    re-run cover the rebased tip a re-resolved pair now names, keeping a
+    supplied gate supplied. Return a blocked or failed approval-preparation
+    re-invocation as a blocker, and any non-PASS step-3 changed-region row as a
+    `BLOCKED` handoff for main (`SKILL.md` `### Landing confirmation`).
   - Any other exit that leaves a rebase in progress (conflict): resolve under
-    the preconfirmation reconciliation conflict rule above, then continue with
-    every Exit 0 step from the approval-preparation re-invocation on. The
-    resolved hunks count as a meaning change, so this dispatch returns the
-    meaning-change handoff.
+    the preconfirmation reconciliation conflict rule above and finish the
+    rebase; resolved hunks count as a meaning change, so return the resolved
+    regions to main as the meaning-change handoff before candidate preparation.
   - Abort instead when the approved decisions, including any user answer the
     continuation capsule carries, do not determine a valid resolution, such as
     when the two sides' intents contradict: run `git rebase --abort`. After

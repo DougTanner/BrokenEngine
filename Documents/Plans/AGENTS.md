@@ -107,15 +107,32 @@ or regions to change, required `## Out of scope` boundaries, risk
 triggers/invariants, and observable acceptance criteria when a diff is not
 decisive. Put directional prerequisites in metadata, not prose.
 
-A Plan for a proven, reproducible problem whose root cause is not yet confirmed
-carries an investigation portion, the one place a Plan states what is still
-open: `## Context` records the observed symptom and its evidence; `## In scope`
-names the root-cause investigation and the region that bounds the fix;
-`## Design` has the executing session first confirm the root cause by the route
-it names (`/external-diagnose-bug` for a defect), then make the smallest fix
-inside that region, surfacing a fix outside it for re-planning instead of
-widening scope; and an acceptance criterion states that the recorded symptom no
-longer reproduces.
+A Plan permits at most two bounded open parts:
+
+- An **investigation portion** for a proven, reproducible problem whose root
+  cause is not yet confirmed: `## Context` records the observed symptom and its
+  evidence; `## In scope` names the root-cause investigation and the region that
+  bounds the fix; `## Design` has the executing session first confirm the root
+  cause by the route it names (`/external-diagnose-bug` for a defect), then make
+  the smallest fix inside that region, surfacing a fix outside it for
+  re-planning instead of widening scope; and an acceptance criterion states that
+  the recorded symptom no longer reproduces.
+- A **`## Unresolved decisions` section**, allowed only for (a) open gaps
+  embedded in an executable Plan saved by `/save-plan`, or (b) a follow-up Plan
+  authored through `/create-follow-up-plans` under standing landing
+  confirmation or for open gaps in a saved file bare `/next-plan` will not pick
+  up. When filed as a follow-up Plan, `dependsOn` stays empty so it is
+  immediately eligible for bare `/next-plan` selection. `## Context` follows
+  the durable-evidence rule in
+  `.agents/skills/create-follow-up-plans/references/worker.md` `## Rules`.
+  `## Unresolved decisions` states options, trade-offs, and a recommendation.
+  `## In scope` bounds what is authorized pending the user's answer: an empty
+  realized change when no edit is predetermined before the user answers (using
+  `.agents/skills/next-plan/SKILL.md` `## Rules`'s empty-realized-change path),
+  or — for a `/save-plan` companion Plan — recording the resolved answer into
+  the target saved file and updating or clearing any open sections there before
+  completion so the decision survives companion deletion and `dependsOn`
+  edge-stripping (`plan complete`).
 
 Work that splits into stages (the term as
 `.agents/references/change-workflow.md` `## IMPORTANT: Change Workflow` defines
@@ -129,4 +146,5 @@ enough to enforce.
 
 Whether a document belongs here follows the deciding test in `../AGENTS.md`
 `## Planning Trees`. Work blocked on another change expresses that as a
-`dependsOn` edge; work blocked on a decision is not a Plan yet.
+`dependsOn` edge; work blocked on a decision outside the two open parts above is
+not a Plan yet.

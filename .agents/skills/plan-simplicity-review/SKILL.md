@@ -39,8 +39,7 @@ C++, shaders, scripts, or the instruction behavior defined in
 Dispatch it once per `../../references/subagent-reporting.md`
 `## Delegated execution context`, in parallel with
 `/plan-audit` on the same plan snapshot where `/plan-audit` runs (Tier 2+) and
-standalone where it does not (Tier 1, and the save-time dispatch from
-`/save-plan`).
+standalone where it does not (Tier 1).
 
 The Change Workflow Plan review step owns the one difference rerun; any further
 expansion is a separately approved planning stage.
@@ -54,8 +53,6 @@ exactly as it was, and the edit adds no net text.
 
 ## Inputs
 
-- `/save-plan`: the final unsaved Plan body snapshot, supplied inline or by
-  exact file path.
 - Change Workflow preparation: the manager supplies the final complete plan
   presented for implementation, including the execution card and exact
   refinements when they carry resolved work, inline or by exact file path.
