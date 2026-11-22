@@ -12,8 +12,8 @@
 # `.codex/agents/`): the report-only `instruction-size`, which never fails, gives each changed entry's
 # baseline and head token counts as Measure-Tokens.ps1 measures a whole file, deletions included, and
 # their `netTokens` sum, leaving out an entry with a side that is not valid UTF-8; `model-names` fails
-# on a model family name or slug in an added line, apart from `.agents/skills/codex-bridge/` and a
-# `model` setting line in an `.agents/agents/`, `.claude/agents/`, or `.codex/agents/` file.
+# on a model family name or slug in an added line, apart from a `model` setting line in an
+# `.agents/agents/`, `.claude/agents/`, or `.codex/agents/` file.
 # `validate-skill` composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
@@ -588,8 +588,7 @@ function Invoke-ModelNameCheck([object] $Inventory, [bool] $Truncated) {
 	$added = [Collections.Generic.List[object]]::new()
 	$pathspec = [Collections.Generic.List[string]]::new()
 	foreach ($entry in $Inventory.entries) {
-		# /codex-bridge selects models by name, and a role definition's model setting (below) names one by design.
-		if ($entry.status -ceq 'D' -or -not $paths.Contains($entry.path) -or $entry.path.StartsWith('.agents/skills/codex-bridge/', [StringComparison]::Ordinal)) { continue }
+		if ($entry.status -ceq 'D' -or -not $paths.Contains($entry.path)) { continue }
 		if ($untracked -ccontains $entry.path) {
 			$number = 0
 			foreach ($line in ((Get-HeadText $entry.path) -split "`r`n|`n|`r")) {
@@ -607,6 +606,7 @@ function Invoke-ModelNameCheck([object] $Inventory, [bool] $Truncated) {
 	if ($pathspec.Count -gt 0) { $added.AddRange((Get-AddedLine $diffArguments ([string[]] $pathspec))) }
 	$failures = [Collections.Generic.List[object]]::new()
 	foreach ($line in $added) {
+		# A role definition's model setting names a model by design.
 		if ($line.Path -cmatch '^\.(?:agents|claude|codex)/agents/' -and $line.Text -cmatch '^\s*model\s*[:=]') { continue }
 		foreach ($match in $script:ModelNamePattern.Matches($line.Text)) { $failures.Add([ordered]@{ path = $line.Path; line = $line.Line; term = $match.Value }) }
 	}

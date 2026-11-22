@@ -43,7 +43,7 @@
 	exits non-zero, the failed receipt's reason carries its last non-empty stderr line capped at 200
 	characters, with the full stderr retained as <runId>.stderr.txt beside the run records; when the
 	CLI printed nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed
-	or malformed status is `.agents/skills/codex-bridge/SKILL.md`, `## Rules`.
+	or malformed status is `.agents/references/codex-bridge.md`, `## Rules`.
 
 	-CheckModels checks each $presets model against the live Codex model catalog
 	(`codex debug models`) and prints one compact JSON receipt: schemaVersion
@@ -302,12 +302,7 @@ if ($PSCmdlet.ParameterSetName -ceq 'Wait')
 if ($PSCmdlet.ParameterSetName -ceq 'CheckModels')
 {
 	Set-StrictMode -Version Latest
-	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
-	if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1')))
-	{
-		$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
-	}
-	Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
+	Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 	$result = [ordered]@{
 		schemaVersion = 'broken-engine-codex-models/v1'

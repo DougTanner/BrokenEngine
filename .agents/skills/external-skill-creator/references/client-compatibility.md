@@ -7,11 +7,13 @@ another focused reference.
 
 ## Shared Package
 
-Claude Code, Codex, and Antigravity CLI consume the skill directory and
-`SKILL.md`. Claude Code and Codex have independent policy surfaces;
-Antigravity CLI follows the Claude frontmatter (`## Antigravity CLI`). Write
-portable instructions in ordinary language, then configure Claude Code and Codex
-explicitly. Never infer invocation behavior from an `external-` name.
+`.agents/skills/` holds user- or model-discovered skills consumed by Claude
+Code, Codex, and Antigravity CLI; place internal non-user-triggered workflow
+helpers in `.agents/references/` and `.agents/scripts/` instead. Claude Code and
+Codex have independent policy surfaces; Antigravity CLI reads a subset of Claude
+frontmatter (`## Antigravity CLI`). Write portable instructions, then configure
+Claude Code and Codex explicitly; never infer invocation behavior from an
+`external-` name.
 
 Repository frontmatter follows [`frontmatter-schema.md`](frontmatter-schema.md).
 The repository validator, not a client installation, owns its accepted fields
@@ -34,12 +36,15 @@ Claude Code reads the repository frontmatter controls. For a genuinely user-only
 skill, set `disable-model-invocation: true`; this prevents automatic use and
 native skill-to-skill invocation. Omit it when a documented workflow must invoke
 the skill, and make the description state the exact automatic or chaining
-contexts. Set `user-invocable: false` only for a model-only skill: it hides the
-skill from the menu and prevents explicit `/skill-name` invocation.
-`when_to_use` is appended to `description` within their combined 1,536-character
-cap, `paths` gates activation by matching files, and `shell` selects Bash or
-PowerShell for commands. This package permits automatic validate-mode selection
-while author mode remains explicitly requested.
+contexts. Set `user-invocable: false` only for a model-only skill: by
+documentation it prevents explicit `/skill-name` invocation; verified on
+2026-11-21 in Claude Code 2.1.330, it omits the skill from `slash_commands`
+while retaining the model `Skill` entry, and Claude Code ignores
+`disable-slash-command: true` without error. `when_to_use` is appended to
+`description` within their combined 1,536-character cap, `paths` gates
+activation by matching files, and `shell` selects Bash or PowerShell for
+commands. This package permits automatic validate-mode selection while author
+mode remains explicitly requested.
 
 Users invoke a listed Claude skill explicitly as `/skill-name`; `.claude/skills`
 exposes the repository package.
@@ -78,12 +83,15 @@ alternative.
 
 ## Codex
 
-Users invoke a Codex skill explicitly as `$skill-name`. Codex reads optional
-client metadata from `agents/openai.yaml`; implicit-invocation policy lives
-under `policy`, independently of Claude frontmatter, and follows the schema
-linked above. Repository acceptance of Claude-only frontmatter is structural,
-while its implemented Codex behavior remains unverified. The minimal companion
-file is:
+Users invoke a Codex skill explicitly as `$skill-name`. By documentation, Codex
+reads optional `agents/openai.yaml` metadata independently of Claude frontmatter
+(whose Codex runtime effect is unverified), where
+`policy.allow_implicit_invocation: false` disables implicit invocation while
+leaving explicit `$skill-name` invocable. Verified on 2026-11-21 in
+`codex-cli 0.170.0`, project `.codex/config.toml` parses `[[skills.config]]`
+without applying it to skill enablement even for an exact absolute `path`,
+whereas user `$CODEX_HOME/config.toml` and CLI `-c skills.config=...` disable a
+skill. The minimal companion file is:
 
 ```yaml
 policy:
@@ -98,9 +106,14 @@ execution time.
 
 ## Antigravity CLI
 
-Antigravity CLI reads `.agents/skills` directly and exposes each skill as
-`/skill-name`. It honors Claude `disable-model-invocation: true`: such a skill
-runs when the user types it and is absent from the model's skill list.
+Antigravity CLI reads `.agents/skills` directly, exposes each skill as
+`/skill-name` by default, and by documentation honors
+`disable-model-invocation: true` (manual-only, absent from the model's skill
+list). Verified on 2026-11-21 in `agy 1.5.14`, it ignores
+`user-invocable: false` (still exposing `/skill-name`) and uses
+`disable-slash-command: true` (not in the repository schema) to hide a skill
+from `/` commands while keeping it visible in the model's skill catalog (the
+official changelog documents retained model invocation).
 
 ## Cross-Client Check
 

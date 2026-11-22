@@ -6,10 +6,10 @@ roughly 2.5x fast-tier credit burn for the reviewer role.
 ## Context
 
 Reviews dispatched from Claude Code can run on Codex's fast (priority) service
-tier: `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` passes
-`-c "service_tier=..."` from its `$serviceTier` switch to the detached
-`codex exec` invocation. That switch is currently `default` (fast tier disabled)
-and was deliberately scoped to the Claude Code route only.
+tier: `.agents/scripts/Invoke-Codex.ps1` passes `-c "service_tier=..."` from
+its `$serviceTier` switch to the detached `codex exec` invocation. That switch
+is currently `default` (fast tier disabled) and was deliberately scoped to the
+Claude Code route only.
 
 Codex-hosted sessions never call that script. Their `reviewer` role resolves to
 `.codex/agents/sol.toml`, which sets only `model = "gpt-5.6-sol"` and
@@ -57,8 +57,8 @@ approval round is needed:
   machine-wide `service_tier = "fast"` is rejected as this Plan's own change
   because it would also apply to the Luna worker roles.
 
-Nothing else changes. `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`
-already handles the Claude Code route correctly and is out of scope.
+Nothing else changes. `.agents/scripts/Invoke-Codex.ps1` already handles the
+Claude Code route correctly and is out of scope.
 
 ## Critical files
 
@@ -66,8 +66,8 @@ already handles the Claude Code route correctly and is out of scope.
   key
 - `README.md` — maintainer `~/.codex/config.toml` profile at line 151, the
   documentation fallback
-- `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` — reference only for
-  the already-working Claude Code route; not to be changed
+- `.agents/scripts/Invoke-Codex.ps1` — reference only for the already-working
+  Claude Code route; not to be changed
 
 ## In scope
 
@@ -78,8 +78,7 @@ already handles the Claude Code route correctly and is out of scope.
 
 ## Out of scope
 
-- `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` and the Claude Code
-  review route
+- `.agents/scripts/Invoke-Codex.ps1` and the Claude Code review route
 - `.codex/agents/opus.toml`, `sonnet.toml`, and any non-reviewer role
 - Changing any user's `~/.codex/config.toml`, which is machine-local and
   untracked
@@ -100,7 +99,7 @@ medium effort; this Plan changes only the service tier, never model or effort.
   tier with no unknown-key or unadvertised-tier warning, or the tracked
   documentation states plainly that it does not and why
 - `.codex/agents/opus.toml` and `sonnet.toml` are byte-unchanged
-- `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` is byte-unchanged
+- `.agents/scripts/Invoke-Codex.ps1` is byte-unchanged
 
 ## Notes
 

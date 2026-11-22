@@ -41,12 +41,13 @@ model and effort settings. Skills name a role and describe the work.
 - Delegate only by a `subagent_type` from the table above, including inside
   plan mode; an ad-hoc `model:` cannot lock in effort.
 - Non-Codex hosts (Claude Code, Antigravity CLI, OpenCode) dispatch every skill
-  in `.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1` `$routes` (only Step
-  11 lens reviewers for `/external-architecture-review`, keeping its
-  orchestrator and `/verify-external-claims` in main) via `/codex-bridge`;
-  unrouted skills and modes (such as `/session-audit`, `/update-vcxproj`, and
-  `/over-engineering-review` validator) and non-review roles stay native. Codex
-  sessions use native Codex subagents and never invoke `/codex-bridge`.
+  in `.agents/scripts/Invoke-Codex.ps1` `$routes` (only Step 11 lens reviewers
+  for `/external-architecture-review`, keeping its orchestrator and
+  `/verify-external-claims` in main) through that launcher, following
+  `.agents/references/codex-bridge.md`; unrouted skills and modes (such as
+  `/session-audit`, `/update-vcxproj`, and `/over-engineering-review` validator)
+  and non-review roles stay native. Codex sessions use native Codex subagents
+  and never use the Codex bridge.
 - Do not follow review findings blindly. Use judgement on each one: accept it
   when the failure is real and reachable, and be especially careful with
   findings that add guards, options, or machinery for cases nobody has observed

@@ -23,8 +23,7 @@ Residuals: <actionable blocker or none>
 That fenced form is the whole return — nothing precedes or follows it except the
 extension fields, row forms, and typed blocks the assigned skill's `## Handoff`
 declares, and the final verdict line a Codex bridge run places after the
-complete handoff
-([`../skills/codex-bridge/SKILL.md`](../skills/codex-bridge/SKILL.md) step 2) —
+complete handoff ([`codex-bridge.md`](codex-bridge.md) step 2) —
 and `Status` carries exactly one of the three tokens alone on its line. Every
 row is one line. Do not quote code and do not repeat a row from another field.
 The whole returned handoff stays under 4,000 characters; no skill sets its own

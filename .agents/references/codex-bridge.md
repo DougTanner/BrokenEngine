@@ -1,14 +1,3 @@
----
-name: codex-bridge
-description: >-
-  Run one routed review skill on Codex headless from a non-Codex host (Claude
-  Code, Antigravity CLI, OpenCode) under the launcher's route table. Dispatched
-  automatically for routed review roles; never user-triggered or invoked by
-  Codex callers.
-user-invocable: false
-allowed-tools: [Read, Write, Bash, PowerShell]
----
-
 # Codex Bridge
 
 ## Purpose
@@ -16,18 +5,14 @@ allowed-tools: [Read, Write, Bash, PowerShell]
 Runs one routed review brief on Codex headless in a worktree from a non-Codex
 host and returns its result and out-file path without its work entering this
 session. A bridge run is the assigned role's delegated execution context
-([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+([`subagent-reporting.md`](subagent-reporting.md)
 `## Delegated execution context`), not an inline run; since `codex exec` loads
 no role definition, the brief's `Role` line carries it.
 
 ## When to use
 
-- A non-Codex host (Claude Code, Antigravity CLI, OpenCode) dispatches a
-  [`scripts/Invoke-Codex.ps1`](scripts/Invoke-Codex.ps1) `$routes` review per
-  [`../../references/change-workflow.md`](../../references/change-workflow.md)
-  `### Delegation roles`.
-
-Never user-triggered; Codex callers never invoke it.
+Dispatched per the Codex-bridge rule in
+[`change-workflow.md`](change-workflow.md) `### Delegation roles`.
 
 ## Inputs
 
@@ -35,49 +20,46 @@ Never user-triggered; Codex callers never invoke it.
   (`subagent-reporting.md` `## Task brief`), filled as a native dispatch would
   be.
 - Worktree — this session's worktree.
-- `-Skill` — bare skill name from `Invoke-Codex.ps1` `$routes` (whose `$routes`
-  and `$presets` solely own preset/sandbox mappings, replacing role model and
-  effort, and reject unrouted entries before spawning Codex); see
-  [`change-workflow.md`](../../references/change-workflow.md)
-  `### Delegation roles` for partial-skill routing limits.
-- `-Mode` — required whenever the skill's `Invoke-Codex.ps1` `$routes` key has a
-  `<skill>:<mode>` suffix; omit otherwise.
+- `-Skill` — bare skill name from
+  [`../scripts/Invoke-Codex.ps1`](../scripts/Invoke-Codex.ps1) `$routes`
+  (`$routes` and `$presets` own preset/sandbox selection and validation).
+- `-Mode` — pass the `<mode>` suffix whenever the `$routes` key is
+  `<skill>:<mode>`; omit otherwise.
 
 ## Steps
 
 1. Once per non-Codex session before the first launch, run from the worktree
-   root:
-   `pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -CheckModels`.
-   Exit `0` passes; on exit `2` halt and show each `checks` row with `reason`
-   (`slug`, `newest`); on exit `1` halt and report `message`. Done when passed
-   or reported.
+   root: `pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -CheckModels`.
+   On a non-zero exit, halt and report the receipt's diagnostics (see
+   `Invoke-Codex.ps1` `.NOTES` for exit codes and receipt fields). Done when
+   passed or reported.
 2. End the prompt with the verdict-line contract: the worker's last non-empty
    response line must be `PASS`, `CHANGES-REQUIRED: <n>`, or
    `BLOCKED: <reason>`, outside the skill's or lens's complete output — after
    `Residuals` for the shared handoff
-   ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
-   `## Handoffs`), or after a lens's own output shape (e.g.
-   `/external-architecture-review` Step 9) — supplementing `Status` (without
-   replacing it) where that shape declares it. Done when the prompt states it.
-3. Launch with one bare call placing `-Skill` (and `-Mode`) before `-Worktree`,
-   never looped or chained, with a fresh repo-relative `Temp/` `<out>`. Wait
-   rule: on blocking-shell hosts (e.g. Claude Code) pass a timeout `>= 600000`
-   ms; on Antigravity CLI (`run_command`, cap `10000` ms) pass
+   ([`subagent-handoff.md`](subagent-handoff.md) `## Handoffs`), or after a
+   lens's own output shape (e.g. `/external-architecture-review` Step 9) —
+   supplementing `Status` (without replacing it) where that shape declares it.
+   Done when the prompt states it.
+3. Make one bare call per launch, placing `-Skill` (and `-Mode`) before
+   `-Worktree` with a fresh repo-relative `Temp/` `<out>`. Wait rule: on
+   blocking-shell hosts (e.g. Claude Code) pass a timeout `>= 600000` ms; on
+   Antigravity CLI (`run_command`, cap `10000` ms) pass
    `WaitMsBeforeAsync: 10000` and await async reactive wakeup without polling,
    then act on stdout:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile <out>
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile <out>
    ```
 
    A `completed` receipt prints the result on stdout (do not read `<out>`);
    `Invoke-Codex.ps1` `.NOTES` owns receipt, wait, and separator. Done when the
    receipt returns.
-4. If `running`, resume per wake with one bare call under step 3's per-host wait
-   rule, never looped or chained:
+4. If `running`, resume with one bare call per wake under step 3's per-host
+   wait rule:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Wait <runId>
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Wait <runId>
    ```
 
    Duration alone is not a failure. Done on `completed`, `malformed`, or
@@ -107,11 +89,11 @@ Never user-triggered; Codex callers never invoke it.
   post-validator or post-round re-runs — until it terminates.
 - Verify launcher changes without Codex CLI from Bash with a stub `codex` first
   on `PATH` (`PATH=<stub dir>:$PATH pwsh -NoProfile -File
-  .agents/skills/codex-bridge/scripts/Invoke-Codex.ps1 -Skill ...`; PowerShell
-  has no inline prefix form).
+  .agents/scripts/Invoke-Codex.ps1 -Skill ...`; PowerShell has no inline prefix
+  form).
 
 ## References
 
-- [scripts/Invoke-Codex.ps1](scripts/Invoke-Codex.ps1) — launcher (`$routes`,
-  `$presets`, and `.NOTES` for receipts, exit codes, verdict check, retry, and
-  `-CheckModels`).
+- [../scripts/Invoke-Codex.ps1](../scripts/Invoke-Codex.ps1) — launcher
+  (`$routes`, `$presets`, and `.NOTES` for receipts, exit codes, verdict check,
+  retry, and `-CheckModels`).

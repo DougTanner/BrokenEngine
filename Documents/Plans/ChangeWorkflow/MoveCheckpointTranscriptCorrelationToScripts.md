@@ -144,8 +144,8 @@ exposure.
 
 ## Out of scope
 
-- `.agents/skills/codex-bridge/` (`Invoke-Codex.ps1` CLI, `$routes`, receipt
-  schemas, or `SKILL.md`).
+- `.agents/scripts/Invoke-Codex.ps1` and `.agents/references/codex-bridge.md`
+  (CLI, `$routes`, receipt schemas, or bridge reference prose).
 - `.agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1`
   envelope schema (`broken-engine-context-efficiency*/v1`).
 - `.agents/scripts/Get-ChangeWorkflowSteps.ps1`, `.codex/agents/*`, or OpenCode

@@ -110,12 +110,12 @@ established, do not infer compliance.
 Use only this allowed evidence chain from claim to conclusion: a headless
 launch is compliant only with its parent launcher invocation/result, the
 commit-time model and effort pins the commit's launcher
-(`.agents/skills/codex-bridge/scripts/Invoke-Codex.ps1`, or its earlier path)
-applies for the launched route, and fixed structured output. A requested role,
-explicit requested model/effort, or configured mapping proves intent only; when
-required model or effort evidence cannot be proved, the verdict is
-`unverified`. Record the parent launcher event, the commit-time pinned model
-and effort with their proof, the verdict, and the citation.
+(`.agents/scripts/Invoke-Codex.ps1`, or its earlier path) applies for the
+launched route, and fixed structured output. A requested role, explicit
+requested model/effort, or configured mapping proves intent only; when required
+model or effort evidence cannot be proved, the verdict is `unverified`. Record
+the parent launcher event, the commit-time pinned model and effort with their
+proof, the verdict, and the citation.
 
 Verdicts are `compliant`, `violation`, `unverified`, or `not-executed`.
 `not-executed` is a nonfinding only when the parent event/result conclusively
