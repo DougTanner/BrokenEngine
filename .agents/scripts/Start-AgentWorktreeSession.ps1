@@ -3,7 +3,13 @@ param(
 	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode', 'agy')][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[string] $ClientExecutable,
-	[string[]] $ClientArguments = @(),
+	[string[]] $ClientArguments = @(switch -CaseSensitive ($Client) {
+		'agy' { '--dangerously-skip-permissions' }
+		'codex' { '--no-daemon', '--dangerously-bypass-approvals-and-sandbox', '--dangerously-bypass-hook-trust' }
+		# PSModulePath is cleared because inherited PowerShell 7 module paths break OpenCode's Windows
+		# PowerShell archive helper, which breaks its Grep and Skill tools.
+		'opencode' { '-NoProfile', '-Command', '$env:PSModulePath = $null; & opencode.cmd; exit $LASTEXITCODE' }
+	}),
 	[string] $ReattachWorktree,
 	[switch] $PrepareOnly,
 	[int] $WaitSeconds = 500
@@ -108,7 +114,8 @@ try {
 	# Each session opens a directory agy has not trusted; trust it for this session only.
 	if ($Client -ceq 'agy') { $ClientArguments += @('--settings', (ConvertTo-Json -Compress @{ trustedWorkspaces = @($identity.Worktree) })) }
 	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
-		$ClientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+		$executableName = if ($Client -ceq 'opencode') { 'pwsh' } else { $Client }
+		$ClientExecutable = (Get-Command $executableName -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	}
 	Write-Host ''
 	$banner = if ($worktreeCreated) { "Created worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)." }

@@ -110,7 +110,7 @@ The session wrappers need no one-time coordination-state initialization:
 - Codex CLI, from PowerShell 7 at the primary checkout root:
   `.\.codex\codex-worktree.ps1`
 - Antigravity CLI, from PowerShell 7 at the primary checkout root:
-  `.\.agents\agy-worktree.ps1`
+  `.\.antigravity\agy-worktree.ps1`
 - OpenCode, from PowerShell 7 at the primary checkout root:
   `pwsh -NoProfile -File .opencode/opencode-worktree.ps1`
 

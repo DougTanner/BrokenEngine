@@ -142,16 +142,9 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
 	```
 	If `PROMPT_COMMAND` already exists, merge these operations into it rather than
 	overwriting it blindly.
-- A PowerShell 7 profile can optionally dot-source the repository helper so
-  `Invoke-CodexWorktree` is available in each session (replace `<clone>` with
-  the clone path):
-	```powershell
-	. '<clone>\.codex\codex-worktree.ps1'
-	```
-	Direct repository-relative invocation with `.\.codex\codex-worktree.ps1`
-	remains preferred. The current local prompt also emits OSC 9;9 for Windows
-	Terminal current-directory tracking; its full prompt override, history
-	injection, and cosmetic settings are personal and intentionally omitted here.
+- The current PowerShell 7 prompt also emits OSC 9;9 for Windows Terminal
+  current-directory tracking; its full prompt override, history injection, and
+  cosmetic settings are personal and intentionally omitted here.
 
 ## AI Coding CLIs
 
@@ -223,7 +216,7 @@ setting is needed to suppress that confirmation.
   subscription-backed Codex Bridge route, do not set `OPENAI_API_KEY`; doing so
   switches it to metered API billing.
 - From a PowerShell 7 tab inside Windows Terminal, opened at the repository
-  root, load the repository helper and launch Codex in a UUID-named worktree:
+  root, launch Codex in a UUID-named worktree:
 	```powershell
 	.\.codex\codex-worktree.ps1
 	```
@@ -324,7 +317,7 @@ Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`,
 - From a PowerShell 7 tab inside Windows Terminal, opened at the primary
   checkout root, launch `agy` in a UUID-named worktree:
 	```powershell
-	.\.agents\agy-worktree.ps1
+	.\.antigravity\agy-worktree.ps1
 	```
 - The wrapper creates branch `agy/<uuid>`, stores the worktree under
   `~/.agy/worktrees/<repository>/<uuid>`, and launches `agy` with

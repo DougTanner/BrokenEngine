@@ -130,27 +130,26 @@ Alternatives: original stands (<axes>)
 
 Otherwise, before the Plan review step on every route, main presents every
 returned candidate and every main-added option that applies beside the drafted
-approach in plain language per `### User Interaction`, giving each option, the
-drafted plan included:
+approach per `### User Interaction` `Comparing options`, translating researcher
+rows (`Mechanism`, `Adds/Deletes`, `Invariant surfaces`, `Pays off when`) into
+plain outcomes, giving each option, the drafted plan included:
 
 - Unique advantages: what it offers that the other options do not, each named
   with a short label, such as DRY (reuses an existing mechanism instead of
   adding a second one), KISS/YAGNI (less code, state, or machinery in the
-  finished codebase, judged by the `### User Interaction` rule for comparing
-  options), root-cause fix (the `### Comparison` cause criterion), or
-  codebase-improving refactor (the `### Comparison` codebase criterion) — or
-  `none`.
-- Pros and cons: the `### Comparison` criteria stated as pros and cons,
-  including what it adds and deletes and when it pays off, worded by the
-  `### User Interaction` rule for comparing options.
-- Constraints: each repository rule, hook, or limit that shapes the option,
-  stated with the reason the rule exists — or `none`. Main takes each rule and
-  its reason from the handoffs already in hand; for a reason they do not carry,
-  it dispatches the `### Comparison` `locator`, and writes
+  finished codebase, judged by `Comparing options`), root-cause fix (the
+  `### Comparison` cause criterion), or codebase-improving refactor (the
+  `### Comparison` codebase criterion) — or `none`.
+- Pros and cons (per `Comparing options`): the `### Comparison` criteria,
+  including what it adds and deletes and when it pays off.
+- Constraints (omit if none): repository rules, hooks, or limits unique to this
+  option, each with why it exists. For shared and unique constraints alike, main
+  takes each rule and reason from the handoffs in hand, dispatches the
+  `### Comparison` `locator` for any missing reason, and writes
   `reason not recorded` only when that returns none.
 
 Main adds each of these options itself when its condition holds and no
-researcher returned it, each presented with the same three entries:
+researcher returned it, each presented in the same form:
 
 - Change the rule: when the drafted approach exists only to work around a
   repository rule, hook, or limit, the option is to change that rule instead.
@@ -165,10 +164,10 @@ researcher returned it, each presented with the same three entries:
 
 Main proposes one combination whenever parts of different options are
 compatible and together serve the objective better than either alone, presented
-as its own option with the same three entries. When the recommendation passes
-over a wider option that would still improve the codebase, the recommendation
-names that option as a follow-up Plan candidate; when the user asks for it,
-main routes it through `/create-follow-up-plans`.
+as its own option in the same form. When the recommendation passes over a wider
+option that would still improve the codebase, the recommendation names that
+option as a follow-up Plan candidate; when the user asks for it, main routes it
+through `/create-follow-up-plans`.
 
 Main then gives a recommendation and asks verbatim:
 

@@ -87,9 +87,14 @@ model and effort settings. Skills name a role and describe the work.
   a drafted plan or current documents or code, touched wire, trust, or invariant
   surfaces as a cost in themselves, amount of change, or effort; a plan's scope
   or author's choice counts only when the user set it
-  (`.agents/references/authority-order.md`). Open each option with the text
-  label `Option 1:`, `Option 2:`, and so on, and reuse those labels in any
-  question naming options.
+  (`.agents/references/authority-order.md`). State shared facts and constraints
+  once above the options, leaving only unique points under each. In explanatory
+  prose, state outcomes, not code mechanics, omitting file paths, function
+  names, and flags unless choosing names; keep declarations and representative
+  usage for interface decisions. Open each option with `Option 1:`, `Option 2:`,
+  and so on, and reuse those labels in any question naming options. Put **Pros**
+  and **Cons** in separate bullet lists, with a blank line before and after
+  every heading, label, and list.
 - Footer: only the main-session message that asks the `/finalize-changes`
   landing confirmation question carries it; that message ends with
   `Follow-up Plans created:` and the single word `none`, or one line per Plan
@@ -157,7 +162,7 @@ Definitions:
   `broken-engine-plan/v1` metadata; selection and marker rules:
   `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh`,
-  `.codex/codex-worktree.ps1`, or `.agents/agy-worktree.ps1`, owning an
+  `.codex/codex-worktree.ps1`, or `.antigravity/agy-worktree.ps1`, owning an
   isolated worktree. A retained wrapper session reattaches only through the
   same wrapper's reattach input, whose command `/eod` gives. If the user opens
   a session directly on main, work in that checkout and do not use the

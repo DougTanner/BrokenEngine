@@ -54,9 +54,11 @@ and Antigravity CLI behavior byte-for-byte equivalent:
 
 - Session scripts: the `ValidateSet` becomes `'claude', 'codex', 'agy'`; the
   client guard tests only those three and its message names only them;
+  `Start-AgentWorktreeSession.ps1` drops the `opencode` default
+  `ClientArguments` and `ClientExecutable` branches;
   `Initialize-AgentWorktreeSession.ps1` drops
-  `Assert-AgentWorktreeOpenCodeSkills` and calls `Assert-AgentWorktreeSkillsLink`
-  unconditionally.
+  `Assert-AgentWorktreeOpenCodeSkills` and calls
+  `Assert-AgentWorktreeSkillsLink` unconditionally.
 - Branch prefix: the regex alternation becomes `(?:claude|codex|agy)`, the
   cleanup test drops its `opencode/` clause, and both comments and messages
   name only `claude/`, `codex/`, and `agy/`.
@@ -103,8 +105,9 @@ allocation, shader, build, or affinity exposure.
   `.opencode/command/next-plan.md`, and `.opencode/agent/builder.md`,
   `implementer.md`, `locator.md`, `mechanic.md`, `planner.md`,
   `researcher.md`, `reviewer.md`, `runner.md`.
-- `Start-AgentWorktreeSession.ps1`: the `$Client` `ValidateSet` and the
-  lowercase client guard with its message.
+- `Start-AgentWorktreeSession.ps1`: the `$Client` `ValidateSet`, the lowercase
+  client guard with its message, and the `opencode` default `ClientArguments`
+  and `ClientExecutable` branches.
 - `Initialize-AgentWorktreeSession.ps1`: the `$Client` `ValidateSet`, the
   function `Assert-AgentWorktreeOpenCodeSkills`, and the `if ($Client -ceq
   'opencode')` / `else` call pair (becomes one unconditional
@@ -145,7 +148,7 @@ allocation, shader, build, or affinity exposure.
 ## Notes
 
 - `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, and
-  `.agents/agy-worktree.ps1` call the same session scripts with `claude`,
+  `.antigravity/agy-worktree.ps1` call the same session scripts with `claude`,
   `codex`, and `agy`; their behavior must not change.
 - Live verification: none required; the next wrapper-started session exercises
   the edited session scripts.
