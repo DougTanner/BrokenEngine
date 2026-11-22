@@ -40,8 +40,16 @@ reconciliation produced — do not reuse an earlier table. When a Plan completio
 or rejection belongs to the landing, the brief also carries the `/next-plan`
 step-10 `Complete-NextPlan.ps1` result verbatim. Preparation and recovery
 briefs carry authorization kind (`unconfirmed`, `standing confirmation`, or
-`standalone Plan rejection`) and any prior confirmed candidate's commit and
-parent so `references/worker.md` `## Recovery` detects byte drift.
+`standalone Plan rejection`), any prior confirmed candidate's commit and parent
+so `references/worker.md` `## Recovery` detects byte drift, and — once Coretide
+lands — the [step-9 proven Coretide landing result](references/worker.md#steps).
+After an engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
+`rebase.patch-not-identical` block passes `references/worker.md`
+`## Recovery`'s restoration gate, main's recovery continuation capsule also
+carries that blocked disposition as its unresolved issue and
+`Temp/finalize-approval-preparation-result.json` as path plus selector
+(`candidate.commit`, `candidate.tree`, `candidate.parent`,
+`verifiedCandidate.supplied`, never retyped).
 
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`
@@ -55,12 +63,12 @@ This skill owns final Plan preparation, landing-commit creation, reconciliation,
 acceptance-table production, the landing summary, the landing confirmation,
 locked primary change, claim deletion, and recovery.
 
-One dispatch covers everything before the confirmation: the worker runs approval
-preparation, fills the acceptance table on the prepared diff, runs the
-primary-movement check and, only once that check reaches a usable terminal
-result, returns the completed table, the SmartGit launch line, and the landing
-summary in a single handoff. Main follows
-[Landing confirmation](#landing-confirmation).
+One dispatch covers everything before confirmation: following the
+pre-confirmation workflow order in
+[`references/worker.md`](references/worker.md#steps), only once the
+primary-movement check reaches a usable terminal result does the worker return
+the completed table, SmartGit launch line, and landing summary in one handoff.
+Main follows [Landing confirmation](#landing-confirmation).
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.

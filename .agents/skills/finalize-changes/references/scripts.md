@@ -7,16 +7,21 @@ outcome when applicable. Never return a nested tool response or file/XML/log
 body. The public `Invoke-FinalizePrimaryMovementCheck.ps1` invocation below
 redirects its complete stdout losslessly to the ignored repository-relative
 `Temp/finalize-primary-movement-result.json` artifact. The caller parses that
-artifact for every result. For the exact result with `status` `needs-review` and
-`code` `primary.disjoint-needs-review`, the finalizer handoff returns the
-artifact path and selector `$`; main reads the complete typed
+artifact for every result. For `status` `needs-review` and `code`
+`primary.disjoint-needs-review`, the finalizer handoff returns the artifact path
+and selector `$`; main reads the complete typed
 `broken-engine-finalize-primary-movement/v3` result, including the
 foreign-commit manifest, losslessly from that artifact. Never inline-copy,
-summarize, or reconstruct it; the artifact remains byte-identical and available
-through the SmartGit/summary handoff. Other results surface only short status,
-code, message, counts, and paths after parsing. Exit/result/schema mismatches
-block. For `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete
-command stdout losslessly in the ignored repository-relative
+summarize, or reconstruct it: the artifact remains byte-identical through the
+SmartGit/summary handoff or, when step 5 routes `needs-review` into overlap
+recovery ([`worker.md#steps`](worker.md#steps),
+[`worker.md#recovery`](worker.md#recovery)), through an unrecovered blocker
+handoff; a successful recovery's step-4 recheck overwrites it with the terminal
+result for the refreshed handoff (byte-identical if `needs-review`). Other
+results surface only short status, code, message, counts, and paths after
+parsing. Exit/result/schema mismatches block. For
+`Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete command stdout
+losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
 below. The two `Show-FinalizeApprovalReview.ps1` invocations likewise redirect
 their single-line stdout to the respective receipt paths below. Pass those
@@ -117,7 +122,7 @@ The fixed terminal mapping is:
 
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
-| 0 | `pass` | `ok`, `primary.tree-identical` | Continue to the SmartGit review and the landing summary. |
+| 0 | `pass` | `ok`, `primary.tree-identical` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence. |
 | 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
 | 2 | `blocked` | `primary.path-overlap` | Run the overlap recovery in the [finalizer worker workflow](worker.md#recovery). |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant` | Stop before SmartGit or the landing summary and return a blocker. |
@@ -159,15 +164,19 @@ reconstructs the assessment from Git output.
   contain.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit whose parent is the session's merge-base with primary, and never
-  requires the session to already contain the live primary tip. Recovering a
-  `primary.path-overlap` block from the primary-movement check runs the ordinary
-  linear `git rebase refs/heads/<primary-branch>` from the session worktree root
-  — never the `--onto` form and never another ref — and then re-invokes this
-  script with `-ExpectedCurrentTip` re-resolved to the rebased session tip,
-  `-ExpectedPrimaryTip` re-resolved to the live primary tip, and any
-  `-VerifiedCandidateCommit`/`-VerifiedCandidateTree` pair re-resolved to that
-  same rebased session tip and its own tree, its other arguments unchanged.
-  Carrying the pre-rebase pair forward instead blocks such a recovery with
+  requires the session to already contain the live primary tip. Overlap
+  recovery from the primary-movement check ([`worker.md`](worker.md#recovery))
+  runs exactly `git rebase <tips.livePrimary>` from the session worktree root
+  with the triggering result's immutable `tips.livePrimary` SHA, verifies the
+  freshly resolved live primary tip still descends from `tips.livePrimary`
+  (`git merge-base --is-ancestor <tips.livePrimary> <resolved-primary-tip>`,
+  blocking instead of re-invoking if not), then re-invokes this script with
+  `-ExpectedCurrentTip` re-resolved to the rebased tip, `-ExpectedPrimaryTip`
+  set to that resolved live primary tip (keeping `candidate.parent` at
+  `tips.livePrimary` so the step-4 recheck classifies any later advance), and
+  any `-VerifiedCandidateCommit`/`-VerifiedCandidateTree` pair re-resolved to
+  that rebased tip and its tree, other arguments unchanged. Carrying the
+  pre-rebase pair forward instead blocks such a recovery with
   `candidate.tree-changed`, because the rebased tree also holds the foreign
   commits' content; the pre-rebase tree is no longer what anyone is landing.
   That rebase also invalidates any `<baseline>` already resolved for
