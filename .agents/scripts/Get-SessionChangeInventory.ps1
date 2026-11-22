@@ -1,10 +1,15 @@
-# Deterministic session change inventory shared by the review, audit, and workflow skills:
+# Deterministic session change inventory CLI wrapper over SessionChangeInventory.psm1:
 # one read-only answer to "what changed between the session baseline and the head side, and
-# what artifact type is each change". The script writes no file except the -OutputPath result the
-# caller names, and no repository metadata (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the
-# index). Diagnostics go to stderr; stdout carries the result document, or with -OutputPath one
-# summary line. A session Coretide clone at Projects/Coretide is inventoried by the same pipeline in that
-# repository, from the merge base of its HEAD and upstream, and its rows are merged under that prefix.
+# what artifact type is each change". The CLI requires one of -OutputPath <path>, -EmitTargets,
+# or -EmitManifest (omitting all three or combining -OutputPath with -EmitTargets or
+# -EmitManifest exits 2 with empty stdout and one stderr line). -OutputPath writes the full
+# untruncated v2 inventory JSON (with exact truncation.outputBytes) to that file and emits one
+# summary line naming its status, code, and message on stdout; the script writes no other file
+# and no repository metadata (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index).
+# In-process callers import .agents/scripts/SessionChangeInventory.psm1 and call
+# Get-SessionChangeInventory directly with zero disk writes. A session Coretide clone at
+# Projects/Coretide is inventoried by the same pipeline in that repository, from the merge base
+# of its HEAD and upstream, and its rows are merged under that prefix.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -22,1079 +27,142 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'SourceAffinity.psm1') -Force
 
-$script:MaximumEntries = 500
-$script:MaximumRegions = 400
-$script:MaximumSymbolLength = 96
-$script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 131072
-
-# GLSL source extensions, matching the list in .agents/skills/glsl-review/SKILL.md.
-$script:ShaderExtensions = @('.vert', '.frag', '.comp', '.geom', '.tesc', '.tese', '.glsl', '.mesh', '.task', '.rgen', '.rmiss', '.rchit', '.rahit', '.rint', '.rcall')
-# C++ reachability follows PCH -> project ShaderLayouts.h -> engine ShaderLayoutsBase.h -> nested layout headers; ShaderLayoutsBase.h's branch-specific bridge setup precedes those includes, which are outside its BT_ENGINE branch.
-$script:DualLanguageHeaders = @('shaderlayouts.h', 'shaderlayoutsbase.h', 'shadergloballayout.h', 'shadermainlayout.h')
-$script:CppClasses = @('cpp', 'dual-language-header')
-# The classes whose addition, deletion, rename, or type change can move a project item.
-$script:SourceMembershipClasses = @('cpp', 'dual-language-header', 'glsl')
-# The changed-file classes that make a landing owe its Review and resolve correctness /coherence-review row: every
-# class but the C++ and GLSL ones.
-$script:CoherenceReviewClasses = @('doc', 'plan', 'script', 'skill', 'vcxproj', 'binary', 'other')
-# One BLOCKED acceptance row per triggered check in this set; this order is the emitted row order.
-$script:AcceptanceSkeletonChecks = [ordered]@{
-	coherenceReview = '/coherence-review'
-	codeStyleReview = '/code-style-review'
-	commentReview = '/comment-review'
-	updateVcxproj = '/update-vcxproj'
-	validateSkill = '/external-skill-creator validate mode'
-	updateClaudeDocs = '/update-claude-docs'
-	progressiveDisclosureReview = '/progressive-disclosure-review'
-}
-$script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
-$script:ManifestModes = @('100644', '100755')
-$script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
-# -EmitTargets is the C++ review target list its consumers read, so it omits paths under these first path
-# components (upstream libraries, agent tooling, scratch) except the repository's own wrappers under
-# ThirdParty/Prebuilts/Source, which are reviewed like any other changed C++ (Test-ManifestCorpusPath).
-$script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
-# Ordinal planning-root prefixes accepted by -SavePlanPaths; a rooted, UNC, or drive-qualified path
-# cannot match any of these after separator normalization and removing at most one leading './'.
-$script:SavePlanRoots = @(
-	'Documents/Plans/',
-	'Documents/Features/',
-	'Documents/Investigations/',
-	'Projects/Coretide/Documents/Plans/',
-	'Projects/Coretide/Documents/Features/',
-	'Projects/Coretide/Documents/Investigations/'
-)
-$script:ZeroOid = '0000000000000000000000000000000000000000'
-
-$script:Root = $null
-$script:BaselineSha = ''
-$script:HeadSha = ''
-$script:HeadPaths = $null
-# The session Coretide clone's Root, BaselineSha, HeadSha, and HeadPaths, or null; Enter-CoretideSide swaps them in.
-$script:Coretide = $null
-$script:CoretidePrefix = 'Projects/Coretide/'
-$script:EngineSide = $null
-$script:BlobHashes = @{}
+$script:MaximumMessageLength = 256
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
-$script:InventoryScriptPath = $PSCommandPath
 
-$result = [ordered]@{
-	schemaVersion = 'broken-engine-session-change-inventory/v2'
-	status = 'error'
-	code = 'internal.error'
-	message = 'Session change inventory did not run.'
-	baselineSha = $null
-	headSha = $null
-	coretide = $null
-	entries = @()
-	counts = $null
-	triggers = $null
-	regions = $null
-	landing = $null
-	truncated = $false
-	truncation = $null
-}
-
-function Write-InventoryStream([bool] $Error, [string] $Text) {
+function Write-InventoryBytes([bool] $Error, [byte[]] $Bytes) {
 	$stream = if ($Error) { [Console]::OpenStandardError() } else { [Console]::OpenStandardOutput() }
-	$bytes = $script:Utf8.GetBytes($Text)
-	$stream.Write($bytes, 0, $bytes.Length)
+	$stream.Write($Bytes, 0, $Bytes.Length)
 	$stream.Flush()
 }
 
-function Complete-SessionChangeInventory([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message) {
-	$result.status = $Status
-	$result.code = $Code
-	$result.message = if ($Message.Length -gt $script:MaximumMessageLength) { $Message.Substring(0, $script:MaximumMessageLength) } else { $Message }
-	if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-		[IO.File]::WriteAllText($OutputPath, ($result | ConvertTo-Json -Depth 32 -Compress), $script:Utf8)
-		Write-InventoryStream $false "$Status $Code $($result.message) -> $OutputPath`n"
-		exit $ExitCode
-	}
-	if ($EmitManifest) {
-		# Manifest consumers reserve stdout for one complete frozen-tree document. Any blocked or
-		# error result therefore uses the existing structured envelope on stderr instead.
-		if ($ExitCode -ne 0) { Write-InventoryStream $true (($result | ConvertTo-Json -Depth 32 -Compress) + "`n") }
-		exit $ExitCode
-	}
-	if ($EmitTargets) {
-		# The targets consumer reads raw stdout: a non-pass run leaves stdout empty and reports
-		# the structured outcome on stderr, and a pass has already written the targets bytes and
-		# adds a one-line status receipt on stderr, since a redirected stdout leaves none visible.
-		if ($ExitCode -ne 0) { Write-InventoryStream $true (($result | ConvertTo-Json -Depth 32 -Compress) + "`n") }
-		else { Write-InventoryStream $true "$Status $Code $($result.message)`n" }
-		exit $ExitCode
-	}
-	Write-InventoryStream $false ($result | ConvertTo-Json -Depth 32 -Compress)
-	exit $ExitCode
+function Write-InventoryStream([bool] $Error, [string] $Text) {
+	Write-InventoryBytes $Error ($script:Utf8.GetBytes($Text))
 }
 
-function Invoke-InventoryGit([string[]] $Arguments, [bool] $AllowFailure = $false) {
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git'
-	$start.WorkingDirectory = $script:Root
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	$start.StandardOutputEncoding = $script:Utf8
-	$start.StandardErrorEncoding = $script:Utf8
-	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
-	foreach ($argument in @('-C', $script:Root, '--no-pager') + $Arguments) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw "Could not start git for: $($Arguments -join ' ')" }
-	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
-	$stderrTask = $process.StandardError.ReadToEndAsync()
-	$process.WaitForExit()
-	$run = [pscustomobject] @{
-		ExitCode = $process.ExitCode
-		Stdout = $stdoutTask.GetAwaiter().GetResult()
-		Stderr = $stderrTask.GetAwaiter().GetResult()
-	}
-	$process.Dispose()
-	if (-not $AllowFailure -and $run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
-	return $run
+function Set-CliEnvelopeOutcome([pscustomobject] $Envelope, [string] $Status, [string] $Code, [string] $Message) {
+	$text = if ($null -eq $Message) { '' } else { $Message }
+	if ($text.Length -gt $script:MaximumMessageLength) { $text = $text.Substring(0, $script:MaximumMessageLength) }
+	$Envelope.status = $Status
+	$Envelope.code = $Code
+	$Envelope.message = $text
+	return $Envelope
 }
 
-# Points every Git read and side variable at the Coretide clone, so the engine pipeline functions answer for it with
-# unprefixed paths, until Exit-CoretideSide puts the engine values back. Calls never nest.
-function Enter-CoretideSide() {
-	$script:EngineSide = @{ Root = $script:Root; BaselineSha = $script:BaselineSha; HeadSha = $script:HeadSha; HeadPaths = $script:HeadPaths }
-	$script:Root = $script:Coretide.Root
-	$script:BaselineSha = $script:Coretide.BaselineSha
-	$script:HeadSha = $script:Coretide.HeadSha
-	$script:HeadPaths = $script:Coretide.HeadPaths
+function New-CliInventoryEnvelope([string] $Status, [string] $Code, [string] $Message) {
+	$envelope = [pscustomobject][ordered]@{
+		schemaVersion = 'broken-engine-session-change-inventory/v2'
+		status = 'error'
+		code = 'internal.error'
+		message = ''
+		baselineSha = $null
+		headSha = $null
+		coretide = $null
+		entries = @()
+		counts = $null
+		triggers = $null
+		regions = $null
+		landing = $null
+		truncated = $false
+		truncation = $null
+	}
+	return Set-CliEnvelopeOutcome $envelope $Status $Code $Message
 }
 
-function Exit-CoretideSide() {
-	$script:Coretide.HeadPaths = $script:HeadPaths
-	$script:Root = $script:EngineSide.Root
-	$script:BaselineSha = $script:EngineSide.BaselineSha
-	$script:HeadSha = $script:EngineSide.HeadSha
-	$script:HeadPaths = $script:EngineSide.HeadPaths
-}
-
-function Test-CoretidePath([string] $Path) {
-	return $null -ne $script:Coretide -and $Path.StartsWith($script:CoretidePrefix, [StringComparison]::Ordinal)
-}
-
-function Add-CoretidePrefix([object] $Entry) {
-	$Entry.Path = $script:CoretidePrefix + $Entry.Path
-	if ($null -ne $Entry.OldPath) { $Entry.OldPath = $script:CoretidePrefix + $Entry.OldPath }
-	return $Entry
-}
-
-function Get-InventoryHex([byte[]] $Hash) {
-	return [Convert]::ToHexString($Hash).ToLowerInvariant()
-}
-
-function Get-InventoryBlobSha256([string] $Oid) {
-	if ($script:BlobHashes.ContainsKey($Oid)) { return $script:BlobHashes[$Oid] }
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git'
-	$start.WorkingDirectory = $script:Root
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	$start.Environment['GIT_OPTIONAL_LOCKS'] = '0'
-	$start.Environment['GIT_NO_LAZY_FETCH'] = '1'
-	$start.StandardErrorEncoding = $script:Utf8
-	foreach ($argument in @('-C', $script:Root, '--no-pager', 'cat-file', 'blob', $Oid)) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw "Could not start git cat-file for blob $Oid." }
-	$stderrTask = $process.StandardError.ReadToEndAsync()
-	$hash = [Security.Cryptography.SHA256]::HashData($process.StandardOutput.BaseStream)
-	$process.WaitForExit()
-	$stderr = $stderrTask.GetAwaiter().GetResult()
-	$exitCode = $process.ExitCode
-	$process.Dispose()
-	if ($exitCode -ne 0) {
-		$prefix = "git cat-file blob $Oid failed with exit $exitCode"
-		$diagnostic = $stderr.Trim()
-		$remaining = $script:MaximumMessageLength - $prefix.Length - 2
-		if ($remaining -le 0) { throw $prefix.Substring(0, $script:MaximumMessageLength) }
-		if ($diagnostic.Length -gt $remaining) { $diagnostic = $diagnostic.Substring(0, $remaining) }
-		if ([string]::IsNullOrEmpty($diagnostic)) { throw $prefix }
-		throw "$prefix`: $diagnostic"
-	}
-	$script:BlobHashes[$Oid] = Get-InventoryHex $hash
-	return $script:BlobHashes[$Oid]
-}
-
-function Get-InventoryScriptSha256() {
-	$stream = [IO.File]::Open($script:InventoryScriptPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
-	try { return Get-InventoryHex ([Security.Cryptography.SHA256]::HashData($stream)) }
-	finally { $stream.Dispose() }
-}
-
-function Get-InventoryFileSha256([string] $RelativePath) {
-	$full = Join-Path $script:Root ($RelativePath -replace '/', [IO.Path]::DirectorySeparatorChar)
-	$stream = [IO.File]::Open($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
-	try { return Get-InventoryHex ([Security.Cryptography.SHA256]::HashData($stream)) }
-	finally { $stream.Dispose() }
-}
-
-function Get-InventoryWorkingMode([string] $RelativePath) {
-	$full = Join-Path $script:Root ($RelativePath -replace '/', [IO.Path]::DirectorySeparatorChar)
-	$item = Get-Item -LiteralPath $full -Force -ErrorAction Stop
-	if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return '120000' }
-	return '100644'
-}
-
-function Get-InventoryIdentity([string] $Mode, [string] $Oid, [string] $RelativePath, [bool] $WorkingTreeSide = $false) {
-	if ($Mode -ceq '000000') { return $null }
-	if ($Mode -ceq '160000') {
-		# A gitlink's identity is the SHA-256 over the ASCII bytes of its 40-character commit hex.
-		$commit = $Oid
-		if ($commit -ceq $script:ZeroOid) {
-			$submodule = Invoke-InventoryGit @('-C', $RelativePath, 'rev-parse', 'HEAD') $true
-			$commit = if ($submodule.ExitCode -eq 0) { $submodule.Stdout.Trim() } else { $null }
-		}
-		$sha256 = if ($null -eq $commit) { $null } else { Get-InventoryHex ([Security.Cryptography.SHA256]::HashData([Text.Encoding]::ASCII.GetBytes($commit))) }
-		return [ordered]@{ mode = $Mode; sha256 = $sha256 }
-	}
-	# On the working-tree side rename detection can print a destination OID that diffcore computed for the
-	# working-tree content but never wrote to the object database, so only the file bytes are a readable
-	# identity there. $script:ManifestModes is exactly the ordinary-file modes; any other mode (a symlink,
-	# for one) is not the file's own bytes and keeps blob hashing. A working-tree row with a nonzero mode and
-	# no file is an index entry Git does not compare with the disk, such as a path sparse checkout omits: a
-	# removed file Git does compare reports mode 000000 and returned above, so this OID names the index's blob.
-	$fromFile = ($WorkingTreeSide -and $script:ManifestModes -ccontains $Mode -and (Test-InventoryHeadPath $RelativePath)) -or ($Oid -ceq $script:ZeroOid)
-	$sha256 = if ($fromFile) { Get-InventoryFileSha256 $RelativePath } else { Get-InventoryBlobSha256 $Oid }
-	return [ordered]@{ mode = $Mode; sha256 = $sha256 }
-}
-
-function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
-	# A gitlink is never a source artifact even when its path resembles one.
-	if ($Mode -ceq '160000') { return 'other' }
-	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
-	$extension = if ($leaf.Contains('.')) { $leaf.Substring($leaf.LastIndexOf('.')).ToLowerInvariant() } else { '' }
-	$components = $Path -split '/'
-	# The Coretide Plans tree follows the engine Plans rules below its Projects/Coretide/ prefix.
-	$planComponents = $components
-	if ($Path.StartsWith('Projects/Coretide/', [StringComparison]::Ordinal)) { $planComponents = @($components | Select-Object -Skip 2) }
-	# A text file in a Plan's support folder (Documents/Plans/<Area>/<Name>/) is Plan content whatever its extension.
-	if (-not $IsBinary -and $planComponents.Count -gt 4 -and $planComponents[0] -ceq 'Documents' -and $planComponents[1] -ceq 'Plans') { return 'plan' }
-	if ($script:DualLanguageHeaders -ccontains $leaf.ToLowerInvariant()) { return 'dual-language-header' }
-	$underShaders = $false
-	for ($i = 0; $i -lt $components.Count - 2; $i++) {
-		if ($components[$i] -ceq 'Data' -and $components[$i + 1] -ceq 'Shaders') { $underShaders = $true; break }
-	}
-	# The directory clause covers headers and shader sources only: other files under
-	# Data/Shaders (AGENTS.md, tables) fall through to the later rules.
-	if ($script:ShaderExtensions -ccontains $extension) { return 'glsl' }
-	if ($underShaders -and $extension -ceq '.h') { return 'glsl' }
-	if ($extension -cin @('.cpp', '.h', '.inl')) { return 'cpp' }
-	if ($leaf -ceq 'SKILL.md' -and $components.Count -eq 4 -and $components[0] -ceq '.agents' -and $components[1] -ceq 'skills') { return 'skill' }
-	if ($extension -ceq '.md' -and $planComponents.Count -gt 2 -and $planComponents[0] -ceq 'Documents' -and $planComponents[1] -ceq 'Plans' -and $leaf -cne 'AGENTS.md') { return 'plan' }
-	if ($extension -cin @('.ps1', '.psm1', '.py', '.sh')) { return 'script' }
-	if ($extension -ceq '.vcxproj' -or $leaf.ToLowerInvariant().EndsWith('.vcxproj.filters')) { return 'vcxproj' }
-	if ($extension -cin @('.md', '.txt')) { return 'doc' }
-	if ($IsBinary) { return 'binary' }
-	return 'other'
-}
-
-function Get-InventoryEntry([hashtable] $Row, [hashtable] $BinaryPaths, [bool] $WorkingTreeHead) {
-	# One raw-diff row becomes one entry: both sides' identities, and both sides' classes whenever the
-	# row has a baseline side, so a rename crossing a class boundary and a type change between an
-	# ordinary file and a gitlink both stay visible to routing and to target eligibility.
-	$path = $Row.Path
-	$oldPath = $Row.OldPath
-	$isBinary = $BinaryPaths.ContainsKey($path) -or ($null -ne $oldPath -and $BinaryPaths.ContainsKey($oldPath))
-	$baselinePath = if ($null -ne $oldPath) { $oldPath } else { $path }
-	$currentMode = if ($Row.DestinationMode -cne '000000') { $Row.DestinationMode } else { $Row.SourceMode }
-	$baseline = Get-InventoryIdentity $Row.SourceMode $Row.SourceOid $baselinePath
-	$current = Get-InventoryIdentity $Row.DestinationMode $Row.DestinationOid $path $WorkingTreeHead
-	$class = Get-PathClass $path $currentMode $isBinary
-	$oldClass = if ($Row.SourceMode -ceq '000000') { $null } else { Get-PathClass $baselinePath $Row.SourceMode $isBinary }
-	return [pscustomobject] @{
-		Status = $Row.Status
-		Path = $path
-		OldPath = $oldPath
-		Baseline = $baseline
-		Current = $current
-		Class = $class
-		OldClass = $oldClass
-		Untracked = $Row.Untracked
-	}
-}
-
-function Test-InstructionDocPath([string] $Path) {
-	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
-	if ($leaf -ceq 'AGENTS.md') { return $true }
-	if (-not $leaf.ToLowerInvariant().EndsWith('.md')) { return $false }
-	return $Path.StartsWith('.agents/skills/') -or $Path.StartsWith('.agents/references/') -or $Path.StartsWith('Documents/Architecture/')
-}
-
-function Test-InventoryHeadPath([string] $Path) {
-	# A commit-valued head is answered from its tree, so a file the working tree happens to hold but
-	# that commit does not is never treated as present.
-	if ([string]::IsNullOrEmpty($script:HeadSha)) { return Test-Path -LiteralPath (Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)) -PathType Leaf }
-	if ($null -eq $script:HeadPaths) {
-		$script:HeadPaths = [Collections.Generic.HashSet[string]]::new([string[]] @())
-		foreach ($line in ((Invoke-InventoryGit @('ls-tree', '-r', '--name-only', '-z', $script:HeadSha)).Stdout -split "`0")) {
-			if (-not [string]::IsNullOrEmpty($line)) { [void] $script:HeadPaths.Add($line) }
-		}
-	}
-	return $script:HeadPaths.Contains($Path)
-}
-
-function Get-SkillPackageManifestPath([string] $Path) {
-	# Every file under `.agents/skills/<package>/` belongs to that package; a path elsewhere has none.
-	if ([string]::IsNullOrEmpty($Path)) { return $null }
-	if ($Path -cmatch '^\.agents/skills/([^/]+)/') { return ".agents/skills/$($Matches[1])/SKILL.md" }
-	return $null
-}
-
-function Get-InventorySideText([bool] $HeadSide, [string] $Path) {
-	# A commit-valued side is read from the object database; the working-tree side is the file itself.
-	# An unreadable side returns $null, which suppresses the guard candidate rather than guessing.
-	# A Coretide path is read unprefixed in the Coretide clone at its own baseline or head.
-	$coretide = Test-CoretidePath $Path
-	if ($coretide) {
-		Enter-CoretideSide
-		$Path = $Path.Substring($script:CoretidePrefix.Length)
-	}
-	try {
-		$revision = if ($HeadSide) { $script:HeadSha } else { $script:BaselineSha }
-		if ([string]::IsNullOrEmpty($revision)) {
-			$full = Join-Path $script:Root ($Path -replace '/', [IO.Path]::DirectorySeparatorChar)
-			if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $null }
-			return [IO.File]::ReadAllText($full)
-		}
-		$run = Invoke-InventoryGit @('show', "$($revision):$Path") $true
-		if ($run.ExitCode -ne 0) { return $null }
-		return $run.Stdout
-	}
-	finally { if ($coretide) { Exit-CoretideSide } }
-}
-
-function Get-InventoryGuardSide([string] $Text) {
-	# Only a proven whole-file client or server guard is one-sided; every other outcome collapses to
-	# one value, so a candidate is emitted only where /update-vcxproj's own resolver also sees a move.
-	if ($null -eq $Text) { return $null }
-	$affinity = (Resolve-FileAffinity $Text).affinity
-	if ($affinity -ceq 'client' -or $affinity -ceq 'server') { return $affinity }
-	return 'not-one-sided'
-}
-
-function Get-RoutingTrigger([object[]] $Entries) {
-	$classes = [Collections.Generic.HashSet[string]]::new([string[]] @())
-	$membershipClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
-	$coherenceClasses = [Collections.Generic.HashSet[string]]::new([string[]] @())
-	# Instruction docs span the doc and skill classes, so this one trigger is decided from the paths.
-	$instructionDoc = $false
-	# Any changed file inside a skill package that has a head-side SKILL.md can invalidate that package,
-	# which the `skill` class (SKILL.md alone) does not cover, so this trigger is decided from the paths
-	# too — both sides, because a rename out of a package can break the package it left.
-	$validateSkill = $false
-	# The paths /update-vcxproj must re-resolve, with why: a membership move the class set already
-	# counts, or a modification that flipped the file's whole-file client/server guard.
-	$candidates = [Collections.Generic.List[object]]::new()
-	$candidatePaths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
-	$guardCandidate = $false
-	foreach ($entry in $Entries) {
-		[void] $classes.Add($entry.Class)
-		if ($null -ne $entry.OldClass) { [void] $classes.Add($entry.OldClass) }
-		# A deleted Plan file never fires this trigger: /next-plan completion deletes the claimed Plan, and that deletion owes no review row.
-		# A modified refactor-candidate or workflow incident log never fires it either: their rows are added after review.
-		if (-not ($entry.Status -ceq 'D' -and $entry.Class -ceq 'plan') -and -not ($entry.Status -ceq 'M' -and $entry.Path -cin @('Documents/Investigations/Engine/RefactorCandidates.md', 'Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md'))) {
-			[void] $coherenceClasses.Add($entry.Class)
-			if ($null -ne $entry.OldClass) { [void] $coherenceClasses.Add($entry.OldClass) }
-		}
-		if ($entry.Status -cin @('A', 'D', 'R', 'T')) {
-			[void] $membershipClasses.Add($entry.Class)
-			if ($null -ne $entry.OldClass) { [void] $membershipClasses.Add($entry.OldClass) }
-			if ($script:SourceMembershipClasses -ccontains $entry.Class -or ($null -ne $entry.OldClass -and $script:SourceMembershipClasses -ccontains $entry.OldClass)) {
-				foreach ($side in @($entry.Path, $entry.OldPath)) {
-					if ($null -ne $side -and $candidatePaths.Add($side)) { $candidates.Add([ordered]@{ path = $side; reason = 'membership' }) }
-				}
-			}
-		}
-		elseif ($entry.Status -ceq 'M' -and $script:CppClasses -ccontains $entry.Class) {
-			$baselineSide = Get-InventoryGuardSide (Get-InventorySideText $false $entry.Path)
-			$currentSide = Get-InventoryGuardSide (Get-InventorySideText $true $entry.Path)
-			if ($null -ne $baselineSide -and $null -ne $currentSide -and $baselineSide -cne $currentSide) {
-				$guardCandidate = $true
-				if ($candidatePaths.Add($entry.Path)) { $candidates.Add([ordered]@{ path = $entry.Path; reason = 'guard' }) }
-			}
-		}
-		if (Test-InstructionDocPath $entry.Path) { $instructionDoc = $true }
-		if ($null -ne $entry.OldPath -and (Test-InstructionDocPath $entry.OldPath)) { $instructionDoc = $true }
-		if (-not $validateSkill) {
-			foreach ($side in @($entry.Path, $entry.OldPath)) {
-				$manifest = Get-SkillPackageManifestPath $side
-				if ($null -ne $manifest -and (Test-InventoryHeadPath $manifest)) { $validateSkill = $true; break }
-			}
-		}
-	}
-	$cpp = $classes.Contains('cpp') -or $classes.Contains('dual-language-header')
-	$glsl = $classes.Contains('glsl') -or $classes.Contains('dual-language-header')
-	$sourceMembership = @($script:SourceMembershipClasses | Where-Object { $membershipClasses.Contains($_) }).Count -gt 0
-	$coherenceReview = @($script:CoherenceReviewClasses | Where-Object { $coherenceClasses.Contains($_) }).Count -gt 0
-	return [ordered]@{
-		coherenceReview = $coherenceReview
-		repoCodeReview = $cpp
-		overEngineeringReview = $classes.Contains('cpp')
-		glslReview = $glsl
-		codeStyleReview = $cpp
-		commentReview = $cpp -or $glsl
-		updateAffectedCode = $cpp -or $glsl
-		updateVcxproj = $sourceMembership -or $guardCandidate
-		updateClaudeDocs = $cpp -or $glsl
-		validateSkill = $validateSkill
-		progressiveDisclosureReview = $instructionDoc
-		planTouched = $classes.Contains('plan')
-		vcxprojCandidates = [object[]] $candidates.ToArray()
-	}
-}
-
-function Get-InventoryCount([object[]] $Entries, [int] $UnlistedUntracked) {
-	$counts = [ordered]@{ total = $Entries.Count }
-	foreach ($name in $script:ClassNames) { $counts[$name] = @($Entries | Where-Object { $_.Class -ceq $name }).Count }
-	$counts['unlistedUntracked'] = $UnlistedUntracked
-	return $counts
-}
-
-function Get-InventoryDiffArgument([string] $BaselineSha, [string] $HeadSha) {
-	if ([string]::IsNullOrEmpty($HeadSha)) { return @($BaselineSha) }
-	return @($BaselineSha, $HeadSha)
-}
-
-function Get-InventoryRawRow([string] $BaselineSha, [string] $HeadSha) {
-	$arguments = @('diff', '--raw', '--abbrev=40', '-M', '-z', '--no-color', '--no-ext-diff') + (Get-InventoryDiffArgument $BaselineSha $HeadSha) + @('--')
-	$tokens = (Invoke-InventoryGit $arguments).Stdout -split "`0"
-	$rows = [Collections.Generic.List[hashtable]]::new()
-	$index = 0
-	while ($index -lt $tokens.Count) {
-		$token = $tokens[$index]
-		if ([string]::IsNullOrEmpty($token)) { $index++; continue }
-		$fields = $token.TrimStart(':') -split ' '
-		$status = $fields[4].Substring(0, 1)
-		$row = @{
-			SourceMode = $fields[0]
-			DestinationMode = $fields[1]
-			SourceOid = $fields[2]
-			DestinationOid = $fields[3]
-			Status = $status
-			OldPath = $null
-			Untracked = $false
-		}
-		if ($status -ceq 'R' -or $status -ceq 'C') {
-			$row.OldPath = $tokens[$index + 1]
-			$row.Path = $tokens[$index + 2]
-			$index += 3
-		}
-		else {
-			$row.Path = $tokens[$index + 1]
-			$index += 2
-		}
-		$rows.Add($row)
-	}
-	return $rows
-}
-
-function Get-InventoryBinaryPath([string] $BaselineSha, [string] $HeadSha) {
-	# Git's own numstat decides binary, so .gitattributes settings are honoured.
-	$arguments = @('diff', '--numstat', '-M', '-z', '--no-color', '--no-ext-diff') + (Get-InventoryDiffArgument $BaselineSha $HeadSha) + @('--')
-	$tokens = (Invoke-InventoryGit $arguments).Stdout -split "`0"
-	$binary = @{}
-	$index = 0
-	while ($index -lt $tokens.Count) {
-		$token = $tokens[$index]
-		if ([string]::IsNullOrEmpty($token)) { $index++; continue }
-		$fields = $token -split "`t"
-		$isBinary = $fields[0] -ceq '-' -and $fields[1] -ceq '-'
-		if ($fields.Count -ge 3 -and -not [string]::IsNullOrEmpty($fields[2])) {
-			if ($isBinary) { $binary[$fields[2]] = $true }
-			$index++
-			continue
-		}
-		if ($isBinary) {
-			$binary[$tokens[$index + 1]] = $true
-			$binary[$tokens[$index + 2]] = $true
-		}
-		$index += 3
-	}
-	return $binary
-}
-
-function Test-InventoryUntrackedBinary([string] $RelativePath) {
-	$nullDevice = if ($IsWindows) { 'NUL' } else { '/dev/null' }
-	$run = Invoke-InventoryGit @('diff', '--no-index', '--numstat', '--no-color', '--no-ext-diff', '--', $nullDevice, $RelativePath) $true
-	foreach ($line in ($run.Stdout -split "`n")) {
-		if ($line.StartsWith("-`t-`t")) { return $true }
-	}
-	return $false
-}
-
-function Get-InventoryUntrackedEntry([bool] $ListAll, [ref] $UnlistedCount) {
-	$tracked = @((Invoke-InventoryGit @('ls-files', '--others', '--exclude-standard', '-z')).Stdout -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
-	$entries = [Collections.Generic.List[object]]::new()
-	$unlisted = 0
-	foreach ($path in $tracked) {
-		if (-not $ListAll) { $unlisted++; continue }
-		$mode = Get-InventoryWorkingMode $path
-		# The binary rule is ordered after every extension rule, so the per-file Git probe only
-		# runs for a path no earlier rule already claimed.
-		$class = Get-PathClass $path $mode $false
-		if ($class -ceq 'other' -and (Test-InventoryUntrackedBinary $path)) { $class = 'binary' }
-		$entries.Add([pscustomobject] @{
-			Status = 'A'
-			Path = $path
-			OldPath = $null
-			Baseline = $null
-			Current = [ordered]@{ mode = $mode; sha256 = Get-InventoryFileSha256 $path }
-			Class = $class
-			OldClass = $null
-			Untracked = $true
-		})
-	}
-	$UnlistedCount.Value = $unlisted
-	return $entries
-}
-
-function Test-InventoryPathInScope([string] $Path, [string[]] $Prefixes) {
-	# A prefix names a whole path segment, so Engine/Source/Frame never matches Engine/Source/FrameX.
-	foreach ($prefix in $Prefixes) {
-		if ([string]::Equals($Path, $prefix, [StringComparison]::Ordinal) -or $Path.StartsWith($prefix + '/', [StringComparison]::Ordinal)) { return $true }
-	}
-	return $false
-}
-
-function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $UntrackedEntries) {
-	$arguments = @('-c', 'core.quotepath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff', '--no-textconv') + (Get-InventoryDiffArgument $BaselineSha $HeadSha) + @('--')
-	$lines = @((Invoke-InventoryGit $arguments).Stdout -split "`n")
-	foreach ($entry in $UntrackedEntries) {
-		$nullDevice = if ($IsWindows) { 'NUL' } else { '/dev/null' }
-		$run = Invoke-InventoryGit @('-c', 'core.quotepath=false', 'diff', '--no-index', '-U0', '--no-color', '--no-ext-diff', '--no-textconv', '--', $nullDevice, $entry.Path) $true
-		$lines += @($run.Stdout -split "`n")
-	}
-	$regions = [Collections.Generic.List[object]]::new()
-	$oldPath = $null
-	$newPath = $null
-	foreach ($line in $lines) {
-		if ($line.StartsWith('--- ')) {
-			$value = $line.Substring(4).TrimEnd("`r")
-			$oldPath = if ($value -ceq '/dev/null' -or $value -ceq 'NUL') { $null } else { $value.Substring(2) }
-			continue
-		}
-		if ($line.StartsWith('+++ ')) {
-			$value = $line.Substring(4).TrimEnd("`r")
-			$newPath = if ($value -ceq '/dev/null' -or $value -ceq 'NUL') { $null } else { $value.Substring(2) }
-			continue
-		}
-		if (-not $line.StartsWith('@@ ')) { continue }
-		if ($line -cnotmatch '^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$') { continue }
-		$oldStart = [int] $Matches[1]
-		$oldCount = if ([string]::IsNullOrEmpty($Matches[2])) { 1 } else { [int] $Matches[2] }
-		$newStart = [int] $Matches[3]
-		$newCount = if ([string]::IsNullOrEmpty($Matches[4])) { 1 } else { [int] $Matches[4] }
-		$symbol = $Matches[5].TrimEnd("`r").Trim()
-		if ($symbol.Length -gt $script:MaximumSymbolLength) { $symbol = $symbol.Substring(0, $script:MaximumSymbolLength) }
-		$kind = if ($oldCount -eq 0) { 'added' } elseif ($newCount -eq 0) { 'deleted' } else { 'modified' }
-		# A non-null symbol is Git's preceding-context hint from the pre-change side (nearest preceding
-		# unindented line, usually the enclosing declaration), never the region's own text, so it is emitted
-		# only for the $script:SourceMembershipClasses classes; that set picks which regions carry one.
-		# The fixed ordinary-file mode and $false are safe: Get-PathClass uses the mode only to divert a
-		# gitlink, whose hunk header carries no context text, and the flag only to relabel 'other' as
-		# 'binary' and to send a Plan support-folder file past the support-folder 'plan' rule to the
-		# extension rules, while a binary path emits no @@ header at all.
-		$regionPath = if ($null -ne $newPath) { $newPath } else { $oldPath }
-		$carriesSymbol = $script:SourceMembershipClasses -ccontains (Get-PathClass $regionPath '100644' $false)
-		$regions.Add([ordered]@{
-			path = $regionPath
-			kind = $kind
-			startLine = if ($newCount -eq 0) { $null } else { $newStart }
-			endLine = if ($newCount -eq 0) { $null } else { $newStart + $newCount - 1 }
-			oldStartLine = if ($oldCount -eq 0) { $null } else { $oldStart }
-			oldEndLine = if ($oldCount -eq 0) { $null } else { $oldStart + $oldCount - 1 }
-			addedLines = $newCount
-			deletedLines = $oldCount
-			symbol = if ($carriesSymbol -and -not [string]::IsNullOrEmpty($symbol)) { $symbol } else { $null }
-		})
-	}
-	# Wrap so a zero- or one-element table stays a collection instead of unrolling (see
-	# Find-SessionCandidates.ps1 Get-NewSideLine for the same pattern).
-	return , $regions
-}
-
-function Get-SavePlanAuthorizedPaths([string] $RawPaths) {
-	if ([string]::IsNullOrWhiteSpace($RawPaths)) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' '-SavePlanPaths must contain at least one path under a planning root.'
-	}
-	$authorized = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($segment in ($RawPaths -split ',')) {
-		$trimmed = $segment.Trim()
-		if ($trimmed.Length -eq 0) {
-			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' '-SavePlanPaths must not contain an empty comma segment.'
-		}
-		$normalized = $trimmed.Replace('\', '/')
-		if ($normalized.StartsWith('./', [StringComparison]::Ordinal)) { $normalized = $normalized.Substring(2) }
-		$parts = $normalized.Split('/')
-		foreach ($part in $parts) {
-			if ($part.Length -eq 0 -or $part -ceq '.' -or $part -ceq '..') {
-				Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': empty, '.', or '..' path segments are not allowed."
-			}
-		}
-		$inPlanningRoot = $false
-		foreach ($root in $script:SavePlanRoots) {
-			if ($normalized.StartsWith($root, [StringComparison]::Ordinal)) {
-				$inPlanningRoot = $true
-				break
-			}
-		}
-		if (-not $inPlanningRoot) {
-			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': path must be under a planning root."
-		}
-		if ($parts[-1].Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase)) {
-			Complete-SessionChangeInventory 2 'blocked' 'inventory.save-plan-paths-invalid' "Invalid -SavePlanPaths entry '$trimmed': AGENTS.md is not allowed."
-		}
-		[void] $authorized.Add($normalized)
-	}
-	# Wrap so a single-element HashSet is not unrolled into a string by the pipeline.
-	return , $authorized
-}
-
-function Test-SavePlanOnlyReviewedRows([Collections.Generic.List[object]] $Reviewed, [Collections.Generic.HashSet[string]] $AuthorizedPaths) {
-	$paths = [Collections.Generic.List[string]]::new($Reviewed.Count)
-	foreach ($row in $Reviewed) {
-		if ($row.status -cne 'A' -or $script:ManifestModes -cnotcontains $row.currentMode) { return $false }
-		$paths.Add([string] $row.path)
-	}
-	return $AuthorizedPaths.SetEquals($paths)
-}
-
-function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Truncation, [Collections.Generic.HashSet[string]] $SavePlanAuthorizedPaths = $null) {
-	# The reviewed diff is the session's own three-dot range, resolved to its merge base once so the
-	# script's own entry pipeline answers it: `git diff A...B` is defined as the diff from
-	# merge-base(A, B) to B, so the two-dot pair below compares the same two trees.
-	$mergeBase = (Invoke-InventoryGit @('merge-base', $BaselineSha, $HeadSha)).Stdout.Trim()
-	$reviewedBinaryPaths = Get-InventoryBinaryPath $mergeBase $HeadSha
-	$reviewed = [Collections.Generic.List[object]]::new()
-	$reviewedEntries = [Collections.Generic.List[object]]::new()
-	foreach ($row in (Get-InventoryRawRow $mergeBase $HeadSha)) {
-		# -Landing requires a commit-valued head, so the head side is never the working tree.
-		$reviewedEntries.Add((Get-InventoryEntry $row $reviewedBinaryPaths $false))
-		$reviewed.Add([ordered]@{
-			status = $row.Status
-			path = $row.Path
-			oldPath = $row.OldPath
-			baselineMode = $row.SourceMode
-			currentMode = $row.DestinationMode
-		})
-	}
-	# The Coretide side's baseline is already the merge base of its HEAD and upstream, so its two-dot range is its
-	# reviewed three-dot range.
-	if ($null -ne $script:Coretide) {
-		Enter-CoretideSide
-		try {
-			$coretideBinaryPaths = Get-InventoryBinaryPath $script:BaselineSha $script:HeadSha
-			foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) {
-				$reviewedEntries.Add((Add-CoretidePrefix (Get-InventoryEntry $row $coretideBinaryPaths $false)))
-				$reviewed.Add([ordered]@{
-					status = $row.Status
-					path = $script:CoretidePrefix + $row.Path
-					oldPath = if ($null -ne $row.OldPath) { $script:CoretidePrefix + $row.OldPath } else { $null }
-					baselineMode = $row.SourceMode
-					currentMode = $row.DestinationMode
-				})
-			}
-		}
-		finally { Exit-CoretideSide }
-	}
-	# Routing reads a modified file's baseline side from $script:BaselineSha, whose reviewed-diff value
-	# is the merge base. That name is the same script-scope variable the caller's own $baselineSha
-	# binds, and the completion message still reads it, so the top-level value is put back afterwards.
-	$topLevelBaselineSha = $script:BaselineSha
-	$script:BaselineSha = $mergeBase
-	$reviewedTriggers = Get-RoutingTrigger ([object[]] $reviewedEntries.ToArray())
-	$script:BaselineSha = $topLevelBaselineSha
-	$porcelain = @((Invoke-InventoryGit @('status', '--porcelain=v2', '--untracked-files=all', '--ignored=matching')).Stdout -split "`n" | ForEach-Object { $_.TrimEnd("`r") } | Where-Object { -not [string]::IsNullOrEmpty($_) })
-	# Uninitialized submodules are normal provisioning state, reported verbatim and never drift;
-	# a repository whose gitlinks have no .gitmodules entry simply reports none.
-	$submoduleRun = Invoke-InventoryGit @('submodule', 'status') $true
-	$submodules = @()
-	if ($submoduleRun.ExitCode -eq 0) { $submodules = @($submoduleRun.Stdout -split "`n" | ForEach-Object { $_.TrimEnd("`r") } | Where-Object { -not [string]::IsNullOrEmpty($_) }) }
-	$planTouched = $false
-	foreach ($row in $reviewed) {
-		if ((Get-PathClass $row.path $row.currentMode $false) -ceq 'plan') { $planTouched = $true; break }
-		if ($null -ne $row.oldPath -and (Get-PathClass $row.oldPath $row.baselineMode $false) -ceq 'plan') { $planTouched = $true; break }
-	}
-	if ($null -ne $SavePlanAuthorizedPaths -and (Test-SavePlanOnlyReviewedRows $reviewed $SavePlanAuthorizedPaths)) {
-		$reviewedTriggers.coherenceReview = $false
-	}
-	# The rows this landing owes, each left BLOCKED for the finalizer to fill with evidence. The
-	# Executable Plan row is decided from the reviewed paths rather than from planTouched, whose
-	# `plan` class deliberately excludes the Plans tree's own AGENTS.md.
-	$skeleton = [Collections.Generic.List[object]]::new()
-	foreach ($name in $script:AcceptanceSkeletonChecks.Keys) {
-		if ($reviewedTriggers[$name]) { $skeleton.Add([ordered]@{ check = $script:AcceptanceSkeletonChecks[$name]; status = 'BLOCKED' }) }
-	}
-	foreach ($row in $reviewed) {
-		$planPath = $false
-		foreach ($side in @($row.path, $row.oldPath)) {
-			if ($null -ne $side -and ($side.StartsWith('Documents/Plans/') -or $side.StartsWith('Projects/Coretide/Documents/Plans/'))) { $planPath = $true }
-		}
-		if ($planPath) {
-			$skeleton.Add([ordered]@{ check = 'Executable Plan check'; status = 'BLOCKED' })
-			break
-		}
-	}
-	$emittedReviewed = [object[]] $reviewed.ToArray()
-	$emittedPorcelain = [string[]] $porcelain
-	$emittedSubmodules = [string[]] $submodules
-	if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-		$emittedReviewed = [object[]] @($reviewed | Select-Object -First $script:MaximumEntries)
-		$emittedPorcelain = [string[]] @($porcelain | Select-Object -First $script:MaximumEntries)
-		$emittedSubmodules = [string[]] @($submodules | Select-Object -First $script:MaximumEntries)
-	}
-	$landingTruncation = [ordered]@{
-		reviewed = [ordered]@{ full = $reviewed.Count; emitted = $emittedReviewed.Count }
-		porcelain = [ordered]@{ full = $porcelain.Count; emitted = $emittedPorcelain.Count }
-		submodules = [ordered]@{ full = $submodules.Count; emitted = $emittedSubmodules.Count }
-	}
-	$Truncation.Value = $landingTruncation
-	return [ordered]@{
-		reviewed = $emittedReviewed
-		porcelain = $emittedPorcelain
-		submodules = $emittedSubmodules
-		planTouched = $planTouched
-		acceptanceSkeleton = [object[]] $skeleton.ToArray()
-	}
-}
-
-function Test-ManifestRootPath([string] $Path) {
-	$slash = $Path.IndexOf('/')
-	if ($slash -le 0) { return $false }
-	return $script:ManifestRoots -ccontains $Path.Substring(0, $slash)
-}
-
-function Get-ManifestTreeEntries([string] $CommitSha) {
-	# `-z` keeps the path unquoted and record-delimited; split only the fixed header/tab boundary
-	# so tabs and other path characters are never treated as delimiters.
-	$run = Invoke-InventoryGit @('ls-tree', '-r', '-z', '--full-tree', $CommitSha, '--')
-	$entries = [Collections.Generic.List[object]]::new()
-	foreach ($record in (($run.Stdout -split "`0") | Where-Object { -not [string]::IsNullOrEmpty($_) })) {
-		$separator = $record.IndexOf("`t")
-		if ($separator -le 0) { throw 'git ls-tree returned a malformed record without a header separator.' }
-		$header = $record.Substring(0, $separator)
-		$path = $record.Substring($separator + 1)
-		$fields = $header -split ' ', 3
-		if ($fields.Count -ne 3) { throw 'git ls-tree returned a malformed record header.' }
-		$mode = $fields[0]
-		if ($fields[1] -cne 'blob' -or $script:ManifestModes -cnotcontains $mode) { continue }
-		if (-not (Test-ManifestRootPath $path)) { continue }
-		$class = Get-PathClass $path $mode $false
-		if ($script:CppClasses -cnotcontains $class) { continue }
-		$entries.Add([ordered]@{
-			path = $path
-			class = $class
-			mode = $mode
-			sha256 = Get-InventoryBlobSha256 $fields[2]
-		})
-	}
-	$entries.Sort([Comparison[object]] {
-		param($left, $right)
-		return [string]::CompareOrdinal($left.path, $right.path)
-	})
-	return , $entries.ToArray()
-}
-
-function Write-SessionManifest([string] $CommitSha, [string] $TreeSha, [object[]] $Entries) {
-	$manifest = [ordered]@{
-		schemaVersion = 'broken-engine-cpp-manifest/v1'
-		commitSha = $CommitSha
-		treeSha = $TreeSha
-		classifierSha256 = Get-InventoryScriptSha256
-		entries = [object[]] $Entries
-	}
-	$text = ($manifest | ConvertTo-Json -Depth 32 -Compress) + "`n"
-	$bytes = $script:Utf8.GetBytes($text)
-	if ($bytes.Length -gt $script:MaximumOutputBytes) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.manifest-cap-exceeded' "The manifest is $($bytes.Length) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
-	}
-	Write-InventoryStream $false $text
-}
-
-function Test-ManifestCorpusPath([string] $Path) {
-	return ($script:ManifestExcludedRoots -cnotcontains $Path.Split('/')[0]) -or (Test-InventoryPathInScope $Path @('ThirdParty/Prebuilts/Source'))
-}
-
-function Write-SessionTargets([object[]] $Entries) {
-	# Emits the session's changed ordinary-file C++ paths that Test-ManifestCorpusPath admits. Each side
-	# qualifies on its own class, mode, and path, so a rename that crosses a class or root boundary and a
-	# type change between an ordinary file and a gitlink contribute only the eligible side's path. A
-	# gitlink side holds no reviewable C++ text, so it is skipped rather than blocked; consumers derive
-	# pairing and renames from the emitted paths.
-	$paths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
-	foreach ($entry in $Entries) {
-		$baselinePath = if ($null -ne $entry.OldPath) { $entry.OldPath } else { $entry.Path }
-		$baselineClass = if ($null -ne $entry.OldClass) { $entry.OldClass } else { $entry.Class }
-		if ($null -ne $entry.Baseline -and $script:CppClasses -ccontains $baselineClass -and (Test-ManifestCorpusPath $baselinePath) -and $script:ManifestModes -ccontains $entry.Baseline.mode) {
-			[void] $paths.Add($baselinePath)
-		}
-		if ($null -ne $entry.Current -and $script:CppClasses -ccontains $entry.Class -and (Test-ManifestCorpusPath $entry.Path) -and $script:ManifestModes -ccontains $entry.Current.mode) {
-			[void] $paths.Add($entry.Path)
-		}
-	}
-	if ($paths.Count -gt $script:MaximumEntries) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.manifest-cap-exceeded' "The targets hold $($paths.Count) paths, above the cap of $($script:MaximumEntries); truncated targets would narrow an authorized review."
-	}
-	$ordered = [Collections.Generic.List[string]]::new($paths)
-	$ordered.Sort([StringComparer]::Ordinal)
-	$targets = [ordered]@{
-		schemaVersion = 'broken-engine-code-quality-targets/v1'
-		paths = [string[]] $ordered.ToArray()
-	}
-	$text = ($targets | ConvertTo-Json -Depth 32 -Compress) + "`n"
-	if ($script:Utf8.GetByteCount($text) -gt $script:MaximumOutputBytes) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.manifest-cap-exceeded' "The targets are $($script:Utf8.GetByteCount($text)) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
-	}
-	Write-InventoryStream $false $text
+function Get-CliExitCode([string] $Status) {
+	if ($Status -ceq 'pass') { return 0 }
+	if ($Status -ceq 'blocked') { return 2 }
+	return 1
 }
 
 try {
-	$modes = @(@($Regions.IsPresent, $Landing.IsPresent, $EmitTargets.IsPresent) | Where-Object { $_ })
-	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $IncludeUntracked)
-	# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
-	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
-	# Those two modes keep their own stdout contracts.
-	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($EmitTargets -or $EmitManifest)
-	$savePlanConflict = $PSBoundParameters.ContainsKey('SavePlanPaths') -and -not $Landing
-	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict -or $savePlanConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } elseif ($savePlanConflict) { 'The -SavePlanPaths option is valid only with -Landing.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
+	$hasOutputPath = -not [string]::IsNullOrWhiteSpace($OutputPath)
+	if ($hasOutputPath -and ($EmitTargets -or $EmitManifest)) {
+		Write-InventoryStream $true "blocked inventory.mode-conflict The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.`n"
+		exit 2
 	}
-	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
-	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
+	if (-not $hasOutputPath -and -not $EmitTargets -and -not $EmitManifest) {
+		Write-InventoryStream $true "blocked inventory.output-required Supply -OutputPath <path>, -EmitTargets, or -EmitManifest; for in-process callers, import .agents/scripts/SessionChangeInventory.psm1.`n"
+		exit 2
 	}
-	$topLevel = Invoke-InventoryGit @('rev-parse', '--show-toplevel') $true
-	if ($topLevel.ExitCode -ne 0) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.repository-root-invalid' "-RepositoryRoot is not inside a Git repository: '$RepositoryRoot'."
+
+	Import-Module (Join-Path $PSScriptRoot 'SessionChangeInventory.psm1') -Force
+	$invokeParams = @{
+		RepositoryRoot = $RepositoryRoot
+		Baseline = $Baseline
 	}
-	# Every diff below is relative to the repository root, so a subdirectory root would silently
-	# report an inventory that omits everything outside it.
-	$topLevelPath = Get-AgentCanonicalPath ($topLevel.Stdout.Trim())
-	if (-not [string]::Equals($topLevelPath, $script:Root, [StringComparison]::OrdinalIgnoreCase)) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.root-not-toplevel' "-RepositoryRoot must be the repository toplevel '$topLevelPath', not '$RepositoryRoot'."
-	}
-	if ($Landing -and [string]::IsNullOrWhiteSpace($Head)) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.landing-requires-head' '-Landing compares the reviewed diff and requires a commit-valued -Head.'
-	}
-	$savePlanAuthorizedPaths = $null
-	if ($PSBoundParameters.ContainsKey('SavePlanPaths')) {
-		$savePlanAuthorizedPaths = Get-SavePlanAuthorizedPaths $SavePlanPaths
-	}
-	if ($Baseline -cnotmatch '^[0-9a-fA-F]{40}$') {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.baseline-unresolved' "-Baseline must be a full 40-character Git SHA: '$Baseline'."
-	}
-	$baselineRun = Invoke-InventoryGit @('rev-parse', '--verify', '--quiet', "$Baseline^{commit}") $true
-	if ($baselineRun.ExitCode -ne 0) {
-		Complete-SessionChangeInventory 2 'blocked' 'inventory.baseline-unresolved' "The baseline does not resolve to a commit in this repository: '$Baseline'."
-	}
-	$baselineSha = $baselineRun.Stdout.Trim()
-	$script:BaselineSha = $baselineSha
-	$result.baselineSha = $baselineSha
-	$headSha = ''
-	if (-not [string]::IsNullOrWhiteSpace($Head)) {
-		$headRun = Invoke-InventoryGit @('rev-parse', '--verify', '--quiet', "$Head^{commit}") $true
-		if ($headRun.ExitCode -ne 0) {
-			Complete-SessionChangeInventory 2 'blocked' 'inventory.head-unresolved' "The head revision does not resolve to a commit in this repository: '$Head'."
-		}
-		$headSha = $headRun.Stdout.Trim()
-		$script:HeadSha = $headSha
-		$result.headSha = $headSha
-	}
+	if ($PSBoundParameters.ContainsKey('Head')) { $invokeParams.Head = $Head }
+	if ($PSBoundParameters.ContainsKey('PathPrefix')) { $invokeParams.PathPrefix = $PathPrefix }
+	if ($IncludeUntracked) { $invokeParams.IncludeUntracked = $true }
+	if ($Regions) { $invokeParams.Regions = $true }
+	if ($Landing) { $invokeParams.Landing = $true }
+	if ($EmitTargets) { $invokeParams.EmitTargets = $true }
+	if ($EmitManifest) { $invokeParams.EmitManifest = $true }
+	if ($PSBoundParameters.ContainsKey('SavePlanPaths')) { $invokeParams.SavePlanPaths = $SavePlanPaths }
+
+	$envelope = $null
+	if ($EmitTargets -or $EmitManifest) { $invokeParams.Envelope = [ref] $envelope }
+
+	$doc = Get-SessionChangeInventory @invokeParams
+
 	if ($EmitManifest) {
-		$treeRun = Invoke-InventoryGit @('rev-parse', '--verify', "$baselineSha^{tree}")
-		$treeSha = $treeRun.Stdout.Trim()
-		if ($treeSha -notmatch '^[0-9a-fA-F]{40}$') { throw "The baseline tree did not resolve to a full Git SHA: '$treeSha'." }
-		$manifestEntries = Get-ManifestTreeEntries $baselineSha
-		Write-SessionManifest $baselineSha $treeSha ([object[]] $manifestEntries)
-		exit 0
-	}
-
-	$prefixes = [Collections.Generic.List[string]]::new()
-	foreach ($prefix in @(@($PathPrefix) -split ',')) {
-		$normalized = $prefix.Replace('\', '/').Trim()
-		if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
-		$normalized = $normalized.TrimEnd('/')
-		if ($normalized.Length -gt 0) { $prefixes.Add($normalized) }
-	}
-
-	$binaryPaths = Get-InventoryBinaryPath $baselineSha $headSha
-	$entries = [Collections.Generic.List[object]]::new()
-	$workingTreeHead = [string]::IsNullOrEmpty($headSha)
-	foreach ($row in (Get-InventoryRawRow $baselineSha $headSha)) { $entries.Add((Get-InventoryEntry $row $binaryPaths $workingTreeHead)) }
-	$unlistedUntracked = 0
-	$untrackedEntries = @()
-	if ([string]::IsNullOrEmpty($headSha)) {
-		# Untracked paths exist only against the working tree; a commit-valued head has none.
-		$unlistedReference = 0
-		$untrackedEntries = @(Get-InventoryUntrackedEntry $IncludeUntracked.IsPresent ([ref] $unlistedReference))
-		$unlistedUntracked = $unlistedReference
-		foreach ($entry in $untrackedEntries) { $entries.Add($entry) }
-	}
-	$coretideRegions = [Collections.Generic.List[object]]::new()
-	$coretideRoot = Get-AgentCoretideRepository $script:Root
-	if ($null -ne $coretideRoot) {
-		$script:Coretide = @{ Root = $coretideRoot; BaselineSha = ''; HeadSha = ''; HeadPaths = $null }
-		Enter-CoretideSide
-		try {
-			# With a commit-valued engine head the clone's HEAD stands for its side and its working tree is left out.
-			$script:BaselineSha = (Invoke-InventoryGit @('merge-base', 'HEAD', '@{upstream}')).Stdout.Trim()
-			if (-not $workingTreeHead) { $script:HeadSha = (Invoke-InventoryGit @('rev-parse', '--verify', 'HEAD^{commit}')).Stdout.Trim() }
-			$script:Coretide.BaselineSha = $script:BaselineSha
-			$script:Coretide.HeadSha = $script:HeadSha
-			$coretideBinaryPaths = Get-InventoryBinaryPath $script:BaselineSha $script:HeadSha
-			foreach ($row in (Get-InventoryRawRow $script:BaselineSha $script:HeadSha)) {
-				$entries.Add((Add-CoretidePrefix (Get-InventoryEntry $row $coretideBinaryPaths $workingTreeHead)))
+		# Manifest consumers reserve stdout for one complete frozen-tree document. Any blocked or
+		# error result therefore uses the existing structured envelope on stderr instead.
+		if ($doc.schemaVersion -ceq 'broken-engine-cpp-manifest/v1') {
+			$bytes = $script:Utf8.GetBytes(($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
+			if ($bytes.Length -gt $script:MaximumOutputBytes) {
+				$blocked = Set-CliEnvelopeOutcome $envelope 'blocked' 'inventory.manifest-cap-exceeded' "The manifest is $($bytes.Length) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
+				Write-InventoryStream $true (($blocked | ConvertTo-Json -Depth 32 -Compress) + "`n")
+				exit 2
 			}
-			$coretideUntracked = @()
-			if ($workingTreeHead) {
-				$unlistedReference = 0
-				$coretideUntracked = @(Get-InventoryUntrackedEntry $IncludeUntracked.IsPresent ([ref] $unlistedReference))
-				$unlistedUntracked += $unlistedReference
-			}
-			if ($Regions) {
-				foreach ($region in (Get-RegionTable $script:BaselineSha $script:HeadSha ([object[]] $coretideUntracked))) {
-					$region.path = $script:CoretidePrefix + $region.path
-					$coretideRegions.Add($region)
-				}
-			}
-			foreach ($entry in $coretideUntracked) { $entries.Add((Add-CoretidePrefix $entry)) }
+			Write-InventoryBytes $false $bytes
+			exit 0
 		}
-		finally { Exit-CoretideSide }
-		$result.coretide = [ordered]@{
-			baselineSha = $script:Coretide.BaselineSha
-			headSha = if ($workingTreeHead) { $null } else { $script:Coretide.HeadSha }
-		}
+		Write-InventoryStream $true (($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
+		exit (Get-CliExitCode $doc.status)
 	}
-	$sorted = [Collections.Generic.List[object]]::new($entries)
-	$sorted.Sort([Comparison[object]] {
-		param($left, $right)
-		return [string]::CompareOrdinal($left.Path, $right.Path)
-	})
 
 	if ($EmitTargets) {
-		Write-SessionTargets ([object[]] $sorted.ToArray())
-		Complete-SessionChangeInventory 0 'pass' 'ok' "Emitted targets for $($sorted.Count) inventoried change(s)."
-	}
-
-	# Counts and triggers always describe the complete inventory, never the truncated emission.
-	$result.counts = Get-InventoryCount ([object[]] $sorted.ToArray()) $unlistedUntracked
-	$result.triggers = Get-RoutingTrigger ([object[]] $sorted.ToArray())
-	# A -PathPrefix filter narrows the emitted entries and regions and their full counts, so truncated
-	# reports shedding inside the requested scope only.
-	$scoped = $sorted
-	if ($prefixes.Count -gt 0) {
-		$scoped = [Collections.Generic.List[object]]::new()
-		foreach ($entry in $sorted) { if (Test-InventoryPathInScope $entry.Path $prefixes) { $scoped.Add($entry) } }
-	}
-	# A file result has no stdout budget, so it carries every entry and region.
-	$toFile = -not [string]::IsNullOrWhiteSpace($OutputPath)
-	$entryLimit = if ($toFile) { $scoped.Count } else { $script:MaximumEntries }
-	$emittedEntries = [Collections.Generic.List[object]]::new()
-	foreach ($entry in ($scoped | Select-Object -First $entryLimit)) {
-		$emittedEntries.Add([ordered]@{
-			status = $entry.Status
-			path = $entry.Path
-			oldPath = $entry.OldPath
-			baseline = $entry.Baseline
-			current = $entry.Current
-			class = $entry.Class
-		})
-	}
-	$fullRegions = [Collections.Generic.List[object]]::new()
-	if ($Regions) {
-		$fullRegions = Get-RegionTable $baselineSha $headSha ([object[]] $untrackedEntries)
-		$fullRegions.AddRange($coretideRegions)
-	}
-	if ($prefixes.Count -gt 0) {
-		$allRegions = $fullRegions
-		$fullRegions = [Collections.Generic.List[object]]::new()
-		foreach ($region in $allRegions) { if (Test-InventoryPathInScope $region.path $prefixes) { $fullRegions.Add($region) } }
-	}
-	$emittedRegions = [Collections.Generic.List[object]]::new()
-	$regionLimit = if ($toFile) { $fullRegions.Count } else { $script:MaximumRegions }
-	foreach ($region in ($fullRegions | Select-Object -First $regionLimit)) { $emittedRegions.Add($region) }
-	$landingTruncation = $null
-	if ($Landing) {
-		$landingReference = $null
-		$result.landing = Get-LandingState $baselineSha $headSha ([ref] $landingReference) $savePlanAuthorizedPaths
-		$landingTruncation = $landingReference
-	}
-
-	$truncation = [ordered]@{
-		entries = [ordered]@{ full = $scoped.Count; emitted = $emittedEntries.Count }
-		regions = [ordered]@{ full = $fullRegions.Count; emitted = $emittedRegions.Count }
-		landing = $landingTruncation
-		outputBytes = 0
-	}
-	$result.entries = [object[]] $emittedEntries.ToArray()
-	if ($Regions) { $result.regions = [object[]] $emittedRegions.ToArray() }
-	$result.truncation = $truncation
-	$result.status = 'pass'
-	$result.code = 'ok'
-	$result.message = "Inventoried $($sorted.Count) change(s) against baseline $baselineSha."
-	# The stdout budget is enforced last: regions shed before entries, then the landing arrays, and
-	# every shed item stays visible in the reported full and emitted counts. Reporting the size of a
-	# document that carries its own size needs a fixed point, so the measurement repeats until the
-	# reported value equals the byte count of the document that actually carries it.
-	while ($true) {
-		$truncation.entries.emitted = $emittedEntries.Count
-		$truncation.regions.emitted = $emittedRegions.Count
-		$result.entries = [object[]] $emittedEntries.ToArray()
-		if ($Regions) { $result.regions = [object[]] $emittedRegions.ToArray() }
-		$result.truncated = $truncation.entries.emitted -lt $truncation.entries.full -or $truncation.regions.emitted -lt $truncation.regions.full
-		if ($null -ne $landingTruncation) {
-			foreach ($name in @('reviewed', 'porcelain', 'submodules')) {
-				if ($landingTruncation[$name].emitted -lt $landingTruncation[$name].full) { $result.truncated = $true }
+		# The targets consumer reads raw stdout: a non-pass run leaves stdout empty and reports
+		# the structured outcome on stderr, and a pass writes the targets bytes and adds a
+		# one-line status receipt on stderr, since a redirected stdout leaves none visible.
+		if ($doc.schemaVersion -ceq 'broken-engine-code-quality-targets/v1') {
+			$bytes = $script:Utf8.GetBytes(($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
+			if ($bytes.Length -gt $script:MaximumOutputBytes) {
+				$blocked = Set-CliEnvelopeOutcome $envelope 'blocked' 'inventory.manifest-cap-exceeded' "The targets are $($bytes.Length) bytes, above the stdout budget of $($script:MaximumOutputBytes)."
+				Write-InventoryStream $true (($blocked | ConvertTo-Json -Depth 32 -Compress) + "`n")
+				exit 2
 			}
+			Write-InventoryBytes $false $bytes
+			Write-InventoryStream $true "pass ok Emitted $($doc.paths.Count) target path(s).`n"
+			exit 0
 		}
-		$bytes = 0
+		Write-InventoryStream $true (($doc | ConvertTo-Json -Depth 32 -Compress) + "`n")
+		exit (Get-CliExitCode $doc.status)
+	}
+
+	if ($null -ne $doc.truncation) {
+		# Reporting the size of a document that carries its own size needs a fixed point, so the
+		# measurement repeats until the reported value equals the byte count of the encoded bytes.
+		$bytes = $null
 		while ($true) {
-			$bytes = $script:Utf8.GetByteCount(($result | ConvertTo-Json -Depth 32 -Compress))
-			if ($bytes -eq $truncation.outputBytes) { break }
-			$truncation.outputBytes = $bytes
+			$bytes = $script:Utf8.GetBytes(($doc | ConvertTo-Json -Depth 32 -Compress))
+			if ($bytes.Length -eq $doc.truncation.outputBytes) { break }
+			$doc.truncation.outputBytes = $bytes.Length
 		}
-		if ($toFile -or $bytes -le $script:MaximumOutputBytes) { break }
-		if ($emittedRegions.Count -gt 0) {
-			$drop = [Math]::Max(1, [int] [Math]::Ceiling($emittedRegions.Count * 0.1))
-			$emittedRegions.RemoveRange($emittedRegions.Count - $drop, $drop)
-			continue
-		}
-		if ($emittedEntries.Count -gt 0) {
-			$drop = [Math]::Max(1, [int] [Math]::Ceiling($emittedEntries.Count * 0.1))
-			$emittedEntries.RemoveRange($emittedEntries.Count - $drop, $drop)
-			continue
-		}
-		$shedLanding = $false
-		if ($null -ne $landingTruncation) {
-			foreach ($name in @('reviewed', 'porcelain', 'submodules')) {
-				$kept = $landingTruncation[$name].emitted
-				if ($kept -le 0) { continue }
-				$kept -= [Math]::Max(1, [int] [Math]::Ceiling($kept * 0.1))
-				$landingTruncation[$name].emitted = $kept
-				$shortened = @($result.landing[$name] | Select-Object -First $kept)
-				$result.landing[$name] = if ($name -ceq 'reviewed') { [object[]] $shortened } else { [string[]] $shortened }
-				$shedLanding = $true
-			}
-		}
-		if ($shedLanding) { continue }
-		break
 	}
-	Complete-SessionChangeInventory 0 'pass' 'ok' $result.message
+	else {
+		$bytes = $script:Utf8.GetBytes(($doc | ConvertTo-Json -Depth 32 -Compress))
+	}
+	$resolvedOutputPath = [IO.Path]::GetFullPath($OutputPath, (Get-Location).ProviderPath)
+	[IO.File]::WriteAllBytes($resolvedOutputPath, $bytes)
+	Write-InventoryStream $false "$($doc.status) $($doc.code) $($doc.message) -> $OutputPath`n"
+	exit (Get-CliExitCode $doc.status)
 }
 catch {
-	Complete-SessionChangeInventory 1 'error' 'internal.error' $_.Exception.Message
+	$envelope = New-CliInventoryEnvelope 'error' 'internal.error' $_.Exception.Message
+	Write-InventoryStream $true (($envelope | ConvertTo-Json -Depth 32 -Compress) + "`n")
+	exit 1
 }

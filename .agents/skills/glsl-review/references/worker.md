@@ -5,34 +5,28 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 
 ## Steps
 
-1. Take the changed shader files and regions from the read-only inventory:
-   `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -Regions`
-   (add `-Head <commit>` for a committed head, and the `-IncludeUntracked`
-   switch when `Scope` names untracked shader files). It writes no file and
-   prints one `broken-engine-session-change-inventory/v2` object: every
-   `entries` row whose `class` is `glsl` or `dual-language-header` is in scope,
-   and those class rules are the only statement of which `.h` files are shader
-   sources — never restate or reconstruct that classification inline. The
-   `regions` rows give the changed ranges. Done when every in-scope `entries`
-   row and its changed ranges are listed.
-2. Only `status` `pass` is usable; any other status means the changed-file list
-   is unavailable — report that outcome instead of reconstructing the list
-   inline. Done when the run's status is `pass`, or the non-pass outcome is
-   reported in place of a review.
-3. `truncated` true means the run emitted a short list, so the shader selection
-   is incomplete, which blocks the review exactly as a non-pass status does.
-   Done when `truncated` is false, or the incomplete selection is reported as
-   blocking.
-4. Include the transitive shader headers the in-scope files reach. Done when the
+1. Run below with zero disk writes (`-Head` from `Baseline` for a committed
+   head; `-UntrackedPath` or `-IncludeUntracked` from `Scope`). Require `status`
+   `pass`, else report unavailability without rebuilding the diff. Done when
+   output prints or unavailability is reported.
+
+```powershell
+pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,entries,regions|ConvertTo-Json -Depth 5'
+```
+
+2. Select every entry whose `class` is `glsl` or `dual-language-header` (those
+   rules alone pick shader `.h` files — never restate them) with its matching
+   `regions`. Done when in-scope shader files and ranges are listed.
+3. Include the transitive shader headers the in-scope files reach. Done when the
    review set holds the in-scope files plus every transitive shader header they
    reach.
-5. Read the applicable shader `AGENTS.md`, each changed file, its nearby
+4. Read the applicable shader `AGENTS.md`, each changed file, its nearby
    producers/consumers, and the relevant whole function. Done when each of those
    has been read.
-6. Search `ShaderFunctions.h` and family `*Common.h` files before recommending
+5. Search `ShaderFunctions.h` and family `*Common.h` files before recommending
    new helper logic. Done when every helper this review would recommend has been
    checked against those files.
-7. Trace every changed shader-facing header in both directions:
+6. Trace every changed shader-facing header in both directions:
    - shader entry points that transitively `#include` it;
    - C++ consumers, including the project `ShaderLayouts.h` wrapper and PCH
      inclusion path;
@@ -40,19 +34,19 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
      dependency fingerprinting.
 
    Done when every changed shader-facing header has both directions traced.
-8. Review changed dual-language declarations against the actual block qualifier
+7. Review changed dual-language declarations against the actual block qualifier
    and CPU representation. Done when every changed dual-language declaration has
    been checked against both.
-9. Compare field order, scalar widths, array strides, offsets, descriptor
+8. Compare field order, scalar widths, array strides, offsets, descriptor
    constants, writes, and binding roles. Do not infer layout from a generic
    `vec3` rule when `layout(scalar)` applies. Done when each of those attributes
    has been compared.
-10. Apply the correctness checks in the footgun reference. Done when every check
-    in that reference has been applied to the changed regions.
-11. Report only reachable failures supported by the changed code and repository
+9. Apply the correctness checks in the footgun reference. Done when every check
+   in that reference has been applied to the changed regions.
+10. Report only reachable failures supported by the changed code and repository
     evidence. Do not turn a generic checklist item into a finding. Done when
     every recorded finding cites changed code or repository evidence.
-12. Emit an external-claim request per `/verify-external-claims`
+11. Emit an external-claim request per `/verify-external-claims`
     ([`../../verify-external-claims/SKILL.md`](../../verify-external-claims/SKILL.md),
     `## Inputs`) covering one single checkable statement for every finding that
     depends on a non-obvious GLSL, Vulkan, extension, device, or compiler claim,
@@ -62,24 +56,24 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
     and keeps the dependent finding unconfirmed. Done when every such finding
     carries one single-claim request and the shared status reflects any pending
     verdict.
-13. Keep locally provable repository-contract findings separate. Done when no
+12. Keep locally provable repository-contract findings separate. Done when no
     locally provable repository-contract finding sits inside an external-claim
     request.
-14. For a Tier-2+ change, also run the scope authorization, minimality, and KISS
+13. For a Tier-2+ change, also run the scope authorization, minimality, and KISS
     passes in
     [`../../../references/scope-authorization.md`](../../../references/scope-authorization.md)
-    over the changed shader regions step 1 already produced. Done when each pass
-    has a verdict for every changed shader region, or the change is Tier 1.
-15. Report the result in the `Scope:` field. Done when the `Scope:` field
+    over the step 2 shader regions. Done when each pass has a verdict for every
+    changed shader region, or the change is Tier 1.
+14. Report the result in the `Scope:` field. Done when the `Scope:` field
     carries that verdict.
-16. Return the report. Done when the handoff carries every section the public
+15. Return the report. Done when the handoff carries every section the public
     contract's form requires.
-17. A shader-facing shared header has both C++ and GLSL surfaces, so explicitly
+16. A shader-facing shared header has both C++ and GLSL surfaces, so explicitly
     require `/repo-code-review` as the sibling domain review when such a header
     changed; this review does not replace it. Done when the report names
     `/repo-code-review` as required whenever a changed file is a shader-facing
     shared header.
-18. Report a changed shader over ~5,000 `bt-token-v1` (measure every changed
+17. Report a changed shader over ~5,000 `bt-token-v1` (measure every changed
     shader in one batched run:
     `pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path 'a','b','c' -Json"`
     — use `-Command`, not `-File`, because under `-File` the comma-separated

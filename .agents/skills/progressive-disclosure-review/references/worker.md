@@ -5,18 +5,15 @@ Steps and rules for the dispatched reviewer. The public
 
 ## Steps
 
-1. Take the changed regions from the read-only inventory rather than
-   re-deriving hunks: `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
-   repository toplevel>' -Baseline <full 40-character SHA> -Regions` (add `-Head
-   <commit>` for a committed head and the `-IncludeUntracked` switch for
-   untracked files), filtered to instruction-doc paths.
+1. Run below with zero disk writes (`-Head` from `Baseline` for a committed
+   head; `-UntrackedPath` or `-IncludeUntracked` from `Scope`). Require `status`
+   `pass`, else report unavailability without enumerating hunks. Keep
+   instruction-doc paths and read `counts.unlistedUntracked`. Done when ready or
+   unavailable.
 
-   Only `status` `pass` is usable; any other status means the diff input is
-   unavailable — report that instead of enumerating hunks inline. Read
-   `truncated` and `counts.unlistedUntracked` from the result. Done when the
-   filtered instruction-doc regions are in hand or the unavailable input is
-   reported.
+```powershell
+pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'
+```
 
 2. Flag changed prose that restates or paraphrases content another location
    already owns — a reference doc, a script's own documented usage, a parent

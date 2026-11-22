@@ -78,22 +78,18 @@ records (where that ID comes from:
 `.agents/skills/next-plan/references/follow-up-provenance.md`
 `## Conversation session ID`).
 
-On a direct `reviewer` dispatch the targets file where the assigned skill
-requires one, and the changed-file inventory where the assigned skill documents
-a run, come from that documented run of
-`.agents/scripts/Get-SessionChangeInventory.ps1`, which supplies the script's
-mandatory `-RepositoryRoot` and `-Baseline` along with any switch the skill
-requires — rather than from a call composed ad hoc or from anything retyped into
-the brief. When composing a brief for a dispatched skill, read that skill by a
-section-bounded read — such as `Grep '^## '` to find the line range of
-`## Inputs`, then a read of that range alone — of the public sections
-[`skill-skeleton.md`](skill-skeleton.md#section-placement) names, never its
-whole `SKILL.md`; `## Handoff` opens by path only when routing a returned
-result needs it. `## Inputs` states its exact form, and for
-`/repo-code-review` who performs the run:
-`.agents/skills/repo-code-review/SKILL.md` `## Inputs` for the `-EmitTargets`
-form, and `.agents/skills/adversarial-review/SKILL.md` `## Inputs` for the plain
-changed-file inventory run.
+On a direct `reviewer` dispatch, when `## Inputs` documents a pre-dispatch
+`.agents/scripts/Get-SessionChangeInventory.ps1` run, its named producer writes
+the gitignored `Temp/` receipt and passes that path — never raw JSON in main
+context, ad-hoc calls, or retyped entries; self-deriving workers take `Baseline`
+and `Scope` directly per `## Inputs`. When composing a brief for a dispatched
+skill, read that skill by a section-bounded read — such as `Grep '^## '` to
+find the line range of `## Inputs`, then a read of that range alone — of the
+public sections [`skill-skeleton.md`](skill-skeleton.md#section-placement)
+names, never its whole `SKILL.md`; `## Handoff` opens by path only when routing
+a returned result needs it. Each skill's `## Inputs` owns command form and
+producer (e.g., `.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
+`.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
 
 Use `none` when a field has no value. Add only fields required by the invoked
 skill. Cite repository paths; do not paste root instructions, skill bodies, the

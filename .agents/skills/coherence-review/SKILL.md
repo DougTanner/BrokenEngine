@@ -40,7 +40,11 @@ cleanup, and Verify the acceptance table steps in that one dispatch.
 - Tier 2+ only: the authorization source for the scope checks, as
   [`scope-authorization.md`](../../references/scope-authorization.md)
   "Authorization source:" defines it.
-- The changed files and the regions to review.
+- `Baseline` — full baseline Git SHA, repo toplevel, and committed head if any.
+- `Scope` — first-round: untracked paths (derives `-CoherenceOnly` inventory;
+  `BLOCKED` on missing baseline or failed inventory). Re-review: affected files,
+  regions, `First-round findings`, and for Coretide paths `coretide` revisions
+  from the inventory supplying those regions.
 - The tier and the mode; in combined mode, which Apply the triggered cleanup
   checks the change triggers and whether the Verify the acceptance table step
   applies.

@@ -1,8 +1,8 @@
 # Prints the dispatches main owes in the Change Workflow Steps 4-8 (Implement and propagate through Verify the
 # acceptance table) once the implementation slices return. This script owns that dispatch table: which row the tier,
 # the landing state, the runner assignment, and the changed files trigger, its role, scope, and order. The
-# changed-file triggers themselves are owned by Get-SessionChangeInventory.ps1 Get-RoutingTrigger, which this script
-# runs as a child process.
+# changed-file triggers themselves are owned by SessionChangeInventory.psm1 Get-RoutingTrigger, which this script
+# calls in-process via Get-SessionChangeInventory.
 #
 # Parameters:
 #   -RepositoryRoot, -Baseline - passed to the inventory unchanged.
@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SessionChangeInventory.psm1') -Force
 
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 
@@ -44,15 +44,12 @@ function Write-Stderr([string] $Message) {
 }
 
 try {
-	$shell = [Environment]::ProcessPath
-	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	$headArguments = if ([string]::IsNullOrWhiteSpace($Head)) { @('-IncludeUntracked') } else { @('-Head', $Head) }
-	$arguments = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'), '-RepositoryRoot', $RepositoryRoot, '-Baseline', $Baseline) + $headArguments
-	$run = Invoke-AgentProcess $shell $arguments $RepositoryRoot
-	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
-	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
-		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { $run.Stderr.Trim() }
+	$inventoryParams = @{ RepositoryRoot = $RepositoryRoot; Baseline = $Baseline }
+	if ([string]::IsNullOrWhiteSpace($Head)) { $inventoryParams.IncludeUntracked = $true }
+	else { $inventoryParams.Head = $Head }
+	$document = Get-SessionChangeInventory @inventoryParams
+	if ($null -eq $document -or $document.status -cne 'pass') {
+		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { 'no result returned' }
 		Write-Stderr "the session change inventory did not pass: $reason"
 		exit 2
 	}

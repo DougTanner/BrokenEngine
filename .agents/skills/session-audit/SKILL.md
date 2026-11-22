@@ -28,15 +28,15 @@ validation passes.
 
 Require a self-contained, immutable brief containing:
 
-- the absolute adopted worktree and the session baseline commit;
-- the changed-file inventory and touched regions with implementation,
+- the absolute adopted worktree, session baseline commit, and target (working
+  tree or expected committed head SHA);
+- the changed-file inventory receipt and touched regions with implementation,
   propagation, review-fix, conditional-role, and reconciliation attribution,
   excluding named pre-existing or concurrently owned work. The brief-writing
-  `implementer` assembles that inventory with the read-only
-  `.agents/scripts/Get-SessionChangeInventory.ps1 ... -Regions` run described
-  below, never by enumerating the changed files and hunks inline; the
-  attribution and the exclusion of pre-existing or concurrently owned work stay
-  the implementer's judgment, which the script does not make;
+  `implementer` produces that `Temp/` receipt for that target per
+  [`references/worker.md`](references/worker.md#inventory-receipt) and passes
+  its path to the read-only auditor, never enumerating files and hunks inline;
+  attribution and exclusions stay the implementer's judgment;
 - the final approved plan and the exact changes the user approved after it,
   declared invariants, and acceptance criteria;
 - one decision per conditional mode below, marked `triggered` or
@@ -57,23 +57,14 @@ Require a self-contained, immutable brief containing:
   plus reconciliation, build, external-API-verification, accepted-fix/retest,
   residual, and focus-area handoffs (`none` is valid for each).
 
-The inventory run is
-`pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute adopted worktree>' -Baseline <full 40-character SHA> -Regions`.
-It writes no file and prints one `broken-engine-session-change-inventory/v2`
-object with `entries` and their `class` values, `counts`, `triggers`, and the
-per-hunk `regions` table. Only `status` `pass` is usable; any other status means
-the inventory is missing for the rule below. The implementer reports `truncated`
-with the brief so a shortfall is never presented as a complete inventory. Add
-the `-IncludeUntracked` switch when the audit scope includes untracked files.
-
 Main dispatches one brief-writing `implementer` to assemble that brief from
 repository state and to map the user-authorized audit scope to the same named
 late, reconciled, or unseen-integration hypotheses; main then dispatches the
-`reviewer`. Return `BLOCKED` when the checkout, session baseline, attribution,
-intent, a mode decision, or an applicable prerequisite domain review is
-missing, ambiguous, moving, or incomplete. The assigned implementer's assembly
-from repository state is the only allowed source; the auditor never
-reconstructs these inputs from conversation history.
+`reviewer`. Return `BLOCKED` when the checkout, baseline, target, inventory
+receipt, attribution, intent, a mode decision, or an applicable prerequisite
+domain review is missing, ambiguous, moving, or incomplete. The assigned
+implementer's assembly from repository state is the only allowed source; the
+auditor never reconstructs these inputs from conversation history.
 
 ## Handoff
 
@@ -116,8 +107,8 @@ dispatching any fix.
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you
-  are the session executing this skill. The audit steps the dispatched reviewer
-  runs.
+  are the session executing this skill. Receipt setup for the brief-writing
+  `implementer` and audit steps for the dispatched `reviewer`.
 - [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   `## Task brief` — task brief.
 - [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)

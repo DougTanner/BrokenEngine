@@ -44,7 +44,7 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 $script:MaximumMessageLength = 256
 $script:MaximumLineLength = 500
 
-$script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
+$script:InventoryModule = Join-Path $PSScriptRoot 'SessionChangeInventory.psm1'
 $script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
@@ -132,8 +132,8 @@ function Test-CoretidePath([string] $Path) {
 }
 
 function Get-InventoryDocument() {
-	$arguments = @('-NoProfile', '-File', $script:InventoryScript, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline)
-	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
+	$inventoryParams = @{ RepositoryRoot = $script:Root; Baseline = $Baseline }
+	if (-not [string]::IsNullOrWhiteSpace($Head)) { $inventoryParams.Head = $Head }
 	if ($IncludeUntracked) {
 		# The hygiene check enumerates the same untracked set for itself.
 		$script:UntrackedPaths = @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
@@ -142,13 +142,11 @@ function Get-InventoryDocument() {
 			$script:UntrackedPaths += @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z') -Root $coretideRoot) -split "`0" |
 				Where-Object { -not [string]::IsNullOrEmpty($_) } | ForEach-Object { $script:CoretidePrefix + $_ })
 		}
-		$arguments += '-IncludeUntracked'
+		$inventoryParams.IncludeUntracked = $true
 	}
-	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) $arguments $script:Root
-	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($run.Stdout)) { $document = $run.Stdout | ConvertFrom-Json }
-	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
-		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { $run.Stderr.Trim() }
+	$document = Get-SessionChangeInventory @inventoryParams
+	if ($null -eq $document -or $document.status -cne 'pass') {
+		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { 'no result returned' }
 		Complete-StaticChecks 2 'blocked' 'static-checks.inventory-unavailable' "The session change inventory did not produce a selectable result: $reason"
 	}
 	return $document
@@ -329,9 +327,6 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	}
 	$triggered = $paths.Count -gt 0 -or [bool] $Inventory.triggers.validateSkill
 	if (-not $triggered) { return New-CheckRow 'validate-skill' $false 'skipped' $null }
-	if ($paths.Count -eq 0) {
-		if ([bool] $Inventory.truncated) { return New-CheckRow 'validate-skill' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed skill packages could not be selected.' }) }
-	}
 	$failures = [Collections.Generic.List[object]]::new()
 	$status = 'pass'
 	foreach ($path in $paths) {
@@ -349,14 +344,11 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ packageCount = $paths.Count; failures = [object[]] $failures.ToArray() })
 }
 
-function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
+function Invoke-MarkdownLinkCheck([object] $Inventory) {
 	# There is no markdown entry class: .md spans the skill, plan, and doc classes, and doc also holds
 	# .txt, so this check selects by extension across every entry.
 	$paths = Get-ChangedPath $Inventory { param($entry) $entry.path.ToLowerInvariant().EndsWith('.md') }
-	if ($paths.Count -eq 0) {
-		if (-not $Truncated) { return New-CheckRow 'markdown-links' $false 'skipped' $null }
-		return New-CheckRow 'markdown-links' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed markdown files could not be selected.' })
-	}
+	if ($paths.Count -eq 0) { return New-CheckRow 'markdown-links' $false 'skipped' $null }
 	$linkCount = 0
 	$failures = [Collections.Generic.List[object]]::new()
 	foreach ($path in $paths) {
@@ -388,16 +380,13 @@ function Get-LineLengthFailure([string] $Path) {
 	return , $failures
 }
 
-function Invoke-LineLengthCheck([object] $Inventory, [bool] $Truncated) {
+function Invoke-LineLengthCheck([object] $Inventory) {
 	$paths = Get-ChangedPath $Inventory {
 		param($entry)
 		$path = $entry.path.ToLowerInvariant()
 		$path.EndsWith('.md') -or $path -match '^documents/[^/]+\.txt$'
 	}
-	if ($paths.Count -eq 0) {
-		if (-not $Truncated) { return New-CheckRow 'line-length' $false 'skipped' $null }
-		return New-CheckRow 'line-length' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed markdown and guide files could not be selected.' })
-	}
+	if ($paths.Count -eq 0) { return New-CheckRow 'line-length' $false 'skipped' $null }
 	$failures = [Collections.Generic.List[object]]::new()
 	foreach ($path in $paths) {
 		foreach ($failure in (Get-LineLengthFailure $path)) { $failures.Add($failure) }
@@ -450,7 +439,7 @@ function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths
 	}
 }
 
-function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
+function Invoke-FileHygieneCheck([object] $Inventory) {
 	$failures = [Collections.Generic.List[object]]::new()
 	$diffArguments = @($Inventory.baselineSha)
 	if (-not [string]::IsNullOrEmpty($script:HeadSha)) { $diffArguments += $script:HeadSha }
@@ -526,10 +515,7 @@ function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
 
 	$detail = [ordered]@{ fileCount = $bytePaths.Count; failures = [object[]] $failures.ToArray() }
 	if ($failures.Count -gt 0) { return New-CheckRow 'file-hygiene' $true 'fail' $detail }
-	if ($bytePaths.Count -eq 0) {
-		if (-not $Truncated) { return New-CheckRow 'file-hygiene' $false 'skipped' $null }
-		return New-CheckRow 'file-hygiene' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed text files could not be selected.' })
-	}
+	if ($bytePaths.Count -eq 0) { return New-CheckRow 'file-hygiene' $false 'skipped' $null }
 	return New-CheckRow 'file-hygiene' $true 'pass' $detail
 }
 
@@ -545,7 +531,7 @@ function Measure-InstructionTokenCount([byte[]] $Bytes) {
 	catch { return $null }
 }
 
-function Invoke-InstructionSizeCheck([object] $Inventory, [bool] $Truncated) {
+function Invoke-InstructionSizeCheck([object] $Inventory) {
 	# Report only: a deletion counts against the sum, and a side outside the set or absent measures 0.
 	$files = [Collections.Generic.List[object]]::new()
 	$selectedCount = 0
@@ -570,19 +556,13 @@ function Invoke-InstructionSizeCheck([object] $Inventory, [bool] $Truncated) {
 		$netTokens += $headTokens - $baselineTokens
 		$files.Add([ordered]@{ path = $entry.path; baselineTokens = $baselineTokens; headTokens = $headTokens })
 	}
-	if ($selectedCount -eq 0) {
-		if (-not $Truncated) { return New-CheckRow 'instruction-size' $false 'skipped' $null }
-		return New-CheckRow 'instruction-size' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed instruction files could not be selected.' })
-	}
+	if ($selectedCount -eq 0) { return New-CheckRow 'instruction-size' $false 'skipped' $null }
 	return New-CheckRow 'instruction-size' $true 'pass' ([ordered]@{ netTokens = $netTokens; files = [object[]] $files.ToArray() })
 }
 
-function Invoke-ModelNameCheck([object] $Inventory, [bool] $Truncated) {
+function Invoke-ModelNameCheck([object] $Inventory) {
 	$paths = Get-ChangedPath $Inventory { param($entry) Test-InstructionProsePath $entry.path }
-	if ($paths.Count -eq 0) {
-		if (-not $Truncated) { return New-CheckRow 'model-names' $false 'skipped' $null }
-		return New-CheckRow 'model-names' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed instruction files could not be selected.' })
-	}
+	if ($paths.Count -eq 0) { return New-CheckRow 'model-names' $false 'skipped' $null }
 	# Untracked paths exist only against the working tree, and every line of one is added.
 	$untracked = @(if ([string]::IsNullOrEmpty($script:HeadSha)) { $script:UntrackedPaths })
 	$added = [Collections.Generic.List[object]]::new()
@@ -619,11 +599,12 @@ try {
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-StaticChecks 2 'blocked' 'static-checks.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	foreach ($composed in @($script:InventoryScript, $script:ValidateSkillScript)) {
+	foreach ($composed in @($script:InventoryModule, $script:ValidateSkillScript)) {
 		if (-not (Test-Path -LiteralPath $composed -PathType Leaf)) {
 			Complete-StaticChecks 2 'blocked' 'static-checks.script-missing' "A composed script is missing: '$composed'."
 		}
 	}
+	Import-Module $script:InventoryModule -Force
 	$inventory = Get-InventoryDocument
 	$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
 	if ($null -ne $inventory.coretide) {
@@ -634,17 +615,15 @@ try {
 			HeadPaths = $null
 		}
 	}
-	$truncated = [bool] $inventory.truncated
-	$result.truncated = $truncated
 
 	# All six rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
-		(Invoke-MarkdownLinkCheck $inventory $truncated)
-		(Invoke-FileHygieneCheck $inventory $truncated)
-		(Invoke-LineLengthCheck $inventory $truncated)
-		(Invoke-InstructionSizeCheck $inventory $truncated)
-		(Invoke-ModelNameCheck $inventory $truncated)
+		(Invoke-MarkdownLinkCheck $inventory)
+		(Invoke-FileHygieneCheck $inventory)
+		(Invoke-LineLengthCheck $inventory)
+		(Invoke-InstructionSizeCheck $inventory)
+		(Invoke-ModelNameCheck $inventory)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

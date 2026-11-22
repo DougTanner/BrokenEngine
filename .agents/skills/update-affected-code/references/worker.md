@@ -59,16 +59,19 @@
    runtime checks, domain review, and documentation sync to the manager. Done
    when the re-run searches leave no unhandled hit and those returns are in the
    handoff.
-8. Read `triggers.vcxprojCandidates` from the session-change inventory receipt;
-   when the assignment supplies none, produce it with `pwsh -NoProfile -File
-   .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
-   repository toplevel>' -Baseline <full 40-character SHA>` (add
-   `-Head <commit>` for a committed head, and the `-IncludeUntracked` switch
-   when the owned change set has untracked files). Emit an `/update-vcxproj`
-   handoff carrying its rows whose paths fall in the owned change set, each
-   with its path and reason. `/update-vcxproj` owns membership, filters, and
-   exceptions; do not inspect or modify project XML. Done when every such row
-   is named in that handoff and no project XML was opened.
+8. When no inventory receipt is supplied, create `Temp/` if absent in its own
+   call, run below (pass `-Head <commit>` for a committed head and
+   `-IncludeUntracked` for owned untracked working-tree files), and require a
+   successful CLI exit. Done when a receipt is in hand:
+
+   ```powershell
+   pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<root>' -Baseline <full baseline Git SHA> -OutputPath Temp/update-affected-code-inventory.json
+   ```
+
+9. Read `triggers.vcxprojCandidates` from the receipt and emit an
+   `/update-vcxproj` handoff for its owned rows (path and reason).
+   `/update-vcxproj` owns membership, filters, and exceptions; never open or
+   edit project XML. Done when emitted and no XML was opened.
 
 ## Rules
 

@@ -2,9 +2,8 @@
 # instrumentation and style-rule candidates on lines this session added, with namespace spacing
 # also checked throughout surviving changed C++ files. The scan reports candidates only —
 # it never decides whether a hit is temporary or a row is a violation, never edits a source file, and
-# writes only the caller's -OutputPath result and one OS temp file holding the inventory, deleted before
-# it exits (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index). Stdout carries the result
-# document, or with -OutputPath one summary line. With -Path it instead scans every line of the named
+# writes only the caller's -OutputPath result (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index).
+# Stdout carries the result document, or with -OutputPath one summary line. With -Path it instead scans every line of the named
 # tracked C++ files for the style-rule-<n> kinds only.
 [CmdletBinding(DefaultParameterSetName = 'Session')]
 param(
@@ -26,7 +25,7 @@ $script:MaximumTextLength = 200
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 131072
 
-$script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
+$script:InventoryModule = Join-Path $PSScriptRoot 'SessionChangeInventory.psm1'
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
 # step 16 removes, and style-rule-<n> kinds for forms of Documents/C++StyleGuide.txt that its step 9
@@ -163,27 +162,13 @@ function Get-NewSideLine([string] $Path) {
 }
 
 function Get-InventoryDocument() {
-	$arguments = @('-NoProfile', '-File', $script:InventoryScript, '-RepositoryRoot', $script:Root, '-Baseline', $Baseline, '-Regions')
-	if (-not [string]::IsNullOrWhiteSpace($Head)) { $arguments += @('-Head', $Head) }
-	if ($IncludeUntracked) {
-		$arguments += '-IncludeUntracked'
-	}
-	if ($PathPrefix) { $arguments += @('-PathPrefix', ($PathPrefix -join ',')) }
-	$shell = [Environment]::ProcessPath
-	if ([string]::IsNullOrEmpty($shell)) { $shell = 'pwsh' }
-	# The file result is never truncated, so every added line is scanned.
-	$inventoryFile = [IO.Path]::GetTempFileName()
-	try {
-		$run = Invoke-AgentProcess $shell ($arguments + @('-OutputPath', $inventoryFile)) $script:Root
-		$text = if (Test-Path -LiteralPath $inventoryFile -PathType Leaf) { [IO.File]::ReadAllText($inventoryFile, $script:Utf8) } else { '' }
-	}
-	finally {
-		Remove-Item -LiteralPath $inventoryFile -ErrorAction SilentlyContinue
-	}
-	$document = $null
-	if (-not [string]::IsNullOrWhiteSpace($text)) { $document = $text | ConvertFrom-Json }
-	if ($run.ExitCode -ne 0 -or $null -eq $document -or $document.status -cne 'pass') {
-		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { $run.Stderr.Trim() }
+	$inventoryParams = @{ RepositoryRoot = $script:Root; Baseline = $Baseline; Regions = $true }
+	if (-not [string]::IsNullOrWhiteSpace($Head)) { $inventoryParams.Head = $Head }
+	if ($IncludeUntracked) { $inventoryParams.IncludeUntracked = $true }
+	if ($PathPrefix) { $inventoryParams.PathPrefix = $PathPrefix }
+	$document = Get-SessionChangeInventory @inventoryParams
+	if ($null -eq $document -or $document.status -cne 'pass') {
+		$reason = if ($null -ne $document) { "$($document.code): $($document.message)" } else { 'no result returned' }
 		Complete-SessionCandidates 2 'blocked' 'candidates.inventory-unavailable' "The session change inventory did not produce a scannable result: $reason"
 	}
 	return $document
@@ -468,9 +453,10 @@ try {
 		$scope = "$(@($Path).Count) named C++ file(s)"
 	}
 	else {
-		if (-not (Test-Path -LiteralPath $script:InventoryScript -PathType Leaf)) {
-			Complete-SessionCandidates 2 'blocked' 'candidates.inventory-missing' "The session change inventory script is missing: '$($script:InventoryScript)'."
+		if (-not (Test-Path -LiteralPath $script:InventoryModule -PathType Leaf)) {
+			Complete-SessionCandidates 2 'blocked' 'candidates.inventory-missing' "The session change inventory module is missing: '$($script:InventoryModule)'."
 		}
+		Import-Module $script:InventoryModule -Force
 		$inventory = Get-InventoryDocument
 		$script:HeadSha = if ([string]::IsNullOrWhiteSpace($inventory.headSha)) { '' } else { $inventory.headSha }
 		if ($null -ne $inventory.coretide) {
