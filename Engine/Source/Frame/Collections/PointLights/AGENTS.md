@@ -1,18 +1,20 @@
 # PointLights - Circular Point Lights
 
 Client-only point lights support owner-driven and fire-and-forget controlled
-lifecycles. Each visible light emits a projected lighting deposit and a visible
-sprite.
+lifecycles.
 
 ## Invariants
 
-- Deposits pack into one buffer and cursor per lighting layer
-  (`FlightPlaneDepositKey`), independent of the single sprite cursor. A light
-  deposits into the layer of the flight plane nearest it (`NearestPlaneIndex`),
-  projected onto that plane; the sprite remains at the original world position.
-- Only the refreshing lighting layer publishes its deposit indirect count, and
-  the player-facing Lighting toggle gates it; the visible sprite retains the
-  full rendered count.
+- Visible sprites cull against the live visible area and stay at the original
+  world position; deposits pack into one shared deposit buffer, pipeline, and
+  cursor (`kCrc`), independent of the sprite cursor.
+- Deposits bypass visible-sprite culling (see `PointLightsRender.cpp` for
+  off-area clipping): when `giLightingRefreshLayer` (`Render.h`) is active, each
+  light with positive lighting area whose nearest flight plane
+  (`NearestPlaneIndex`) matches that layer projects onto that plane and emits
+  into the deposit buffer. When no layer is active, deposit buffer resizing and
+  emission are skipped and the deposit indirect count is zero, while visible
+  sprites keep their full rendered count.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The
   deposit is always world-axis-aligned and samples the blurred texture; the
   sprite samples the unblurred texture.

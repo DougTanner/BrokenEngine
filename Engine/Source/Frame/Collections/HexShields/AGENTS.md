@@ -24,9 +24,9 @@ policy).
   the flight plane nearest it (`NearestPlaneIndex`), and each layer's main and
   lighting pipelines (`FlightPlaneDepositKey`) share that layer's dynamic
   storage buffer and both rebind on resize. `EndRender` always publishes every
-  layer's main count, while only the refreshing layer's lighting pipeline gets a
-  nonzero count, and the player-facing Lighting toggle may publish zero to it
-  without hiding the shield geometry.
+  layer's main count so shield geometry stays visible, while only the layer
+  matching an active `giLightingRefreshLayer` (`Render.h`) gets a nonzero
+  lighting count; inactive frames zero every layer's lighting count.
 - Culled-packed GPU buffers: per-element visibility test with margin; culled
   elements do not advance their layer's write cursor, keeping each buffer
   tightly packed.

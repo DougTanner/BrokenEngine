@@ -3,7 +3,6 @@
 #if defined(BT_CLIENT)
 
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Profile/ProfileRows.h"
 
@@ -127,7 +126,7 @@ void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		common::crc_t uiLayerKey = DynamicPipelines::FlightPlaneDepositKey(kuiCrc, i);
 		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(uiLayerKey)->WriteIndirectBuffer(iCommandBuffer, spiRendered[i]);
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(uiLayerKey)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() && i == giLightingRefreshLayer ? spiRendered[i] : 0);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(uiLayerKey)->WriteIndirectBuffer(iCommandBuffer, i == giLightingRefreshLayer ? spiRendered[i] : 0);
 	}
 }
 

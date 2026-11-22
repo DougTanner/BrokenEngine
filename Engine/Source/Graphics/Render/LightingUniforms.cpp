@@ -18,6 +18,10 @@ namespace engine
 // The pending-layer rule below names "the other layer" as 1 - layer.
 static_assert(shaders::kiLightingLayers == 2);
 
+// Layer whose combine, temporal, and history-copy chain runs this frame, or -1 for none; kept separate from
+// giLightingRefreshLayer so a disable reset still clears each layer to black while deposit and spread stay zero.
+static int64_t siLightingCombineRefreshLayer = -1;
+
 // iScheduledLayer is the layer the cadence schedules this frame, or -1 for none.
 static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int64_t iScheduledLayer, bool bLightingEnabled)
 {
@@ -72,7 +76,8 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 		}
 	}
 	siPendingLayer = iRefreshLayer >= 0 && pbNeedsRefresh[1 - iRefreshLayer] ? 1 - iRefreshLayer : -1;
-	giLightingRefreshLayer = iRefreshLayer;
+	siLightingCombineRefreshLayer = iRefreshLayer;
+	giLightingRefreshLayer = bLightingEnabled ? iRefreshLayer : -1;
 
 	if (iRefreshLayer >= 0)
 	{
@@ -327,9 +332,9 @@ void RenderLightingMain(int64_t iCommandBuffer)
 
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 {
-	// A disabled refresh still runs combine/temporal/history once to publish black, but the unconditional spread
-	// attachment clears already provide its zero inputs, so no spread draw is needed.
-	int64_t iInstanceCount = giLightingRefreshLayer >= 0 && gLightingEnabled.Get<bool>() ? 1 : 0;
+	// giLightingRefreshLayer is -1 when disabled, skipping spread draws; the unconditional spread attachment clears
+	// already provide zero inputs for the disabled combine/temporal/history reset driven by siLightingCombineRefreshLayer.
+	int64_t iInstanceCount = giLightingRefreshLayer >= 0 ? 1 : 0;
 
 	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
 	// CreateHostVisibleIndirectBuffer zeroes slots during pipeline recreation, so recorded passes need their instance counts restored.
@@ -346,7 +351,7 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 	int64_t iCombineGroupsY = TileCount(vkCombineExtent.height);
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		int64_t iCombineGroupsZ = i == giLightingRefreshLayer ? 1 : 0;
+		int64_t iCombineGroupsZ = i == siLightingCombineRefreshLayer ? 1 : 0;
 		gpPipelineManager->mpCombinePipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
 		gpPipelineManager->mpLightingTemporalPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
 		gpPipelineManager->mpLightingHistoryCopyPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);

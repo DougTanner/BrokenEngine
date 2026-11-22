@@ -4,7 +4,6 @@
 
 #include "Data/Shader.h"
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
-#include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileRows.h"
@@ -16,23 +15,19 @@ constexpr int64_t kiDynamicBufferInitialCapacity = 8'192;
 
 void PointLightsInterpolate::GraphicsResources()
 {
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
-		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
-		gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc);
-	}
+	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, kCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc);
 	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), kiDynamicBufferInitialCapacity);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineVisibleLights(kCrc, kpcName, pVisibleLightsBuffers);
 }
 
 static int64_t siRendered = 0; // Visible-sprite cursor
-static int64_t spiDepositsRendered[shaders::kiLightingLayers] {}; // Deposit cursor per lighting layer
+static int64_t siDepositsRendered = 0; // Active-layer deposit cursor
 
 void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords)
 {
 	siRendered = 0;
-	std::ranges::fill(spiDepositsRendered, 0);
+	siDepositsRendered = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoords, [](const game::FrameInterpolate& rInterpolate) -> const PointLightsInterpolate&
 	{
@@ -44,13 +39,11 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		return;
 	}
 
-	// Each light deposits into one layer, and any layer may receive every light, so every layer's buffer takes the full capacity.
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	if (giLightingRefreshLayer >= 0)
 	{
-		common::crc_t uiDepositKey = DynamicPipelines::FlightPlaneDepositKey(kCrc, i);
-		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
-			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc), iCommandBuffer, 1, pBuffer);
 		}
 	}
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
@@ -69,12 +62,13 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		return;
 	}
 
-	shaders::AxisAlignedQuadLayout* ppPointLightsLayouts[shaders::kiLightingLayers] {};
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	int64_t iRefreshLayer = giLightingRefreshLayer;
+	shaders::AxisAlignedQuadLayout* pPointLightsLayouts = nullptr;
+	if (iRefreshLayer >= 0)
 	{
-		auto [pPointLightsLayouts, iPointLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(DynamicPipelines::FlightPlaneDepositKey(kCrc, i), kBufferMain, iCommandBuffer);
-		ASSERT(spiDepositsRendered[i] + rCurrent.iCount <= iPointLightsBufferCapacity);
-		ppPointLightsLayouts[i] = pPointLightsLayouts;
+		auto [pLayouts, iPointLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kCrc, kBufferMain, iCommandBuffer);
+		ASSERT(siDepositsRendered + rCurrent.iCount <= iPointLightsBufferCapacity);
+		pPointLightsLayouts = pLayouts;
 	}
 	auto [pVisibleLightsLayouts, iVisibleLightsBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::VisibleLightQuadLayout>(kCrc, kBufferVisibleLights, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iVisibleLightsBufferCapacity);
@@ -99,70 +93,69 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
 		}
 
-		XMFLOAT4A f4Position {};
-		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
-		{
-			continue;
-		}
-
 		// The visible sprite uses the position in the camera cell's frame before flight-plane projection.
-		XMFLOAT4A f4VisiblePosition = f4Position;
-
-		// The deposit goes to the lighting layer of the flight plane nearest the light, projected onto that plane.
-		int64_t iLayer = gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecLocalPosition));
-		XMStoreFloat4A(&f4Position, ProjectToFlightPlane(vecLocalPosition, rBasis, iLayer));
-
-		int64_t iTextureIndex = gpTextureManager->mTextureDescriptors.CrcToIndex(rType.uiCrc);
-		float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
-		XMFLOAT4A f4Parameters {};
-		f4Parameters.x = fBlurredTextureIndex;
-		f4Parameters.y = fLightingIntensity;
-		f4Parameters.z = fRotation;
-		BuildAxisAlignedQuad(ppPointLightsLayouts[iLayer][spiDepositsRendered[iLayer]], f4Position, fLightingArea, f4Parameters, rType.uiColor);
-		++spiDepositsRendered[iLayer];
-
-		float fVisibleArea = rCurrent.pfVisibleAreas[i];
-
-		shaders::VisibleLightQuadLayout& rVisibleLayout = pVisibleLightsLayouts[siRendered];
-
-		if (rType.bCameraAligned)
+		XMFLOAT4A f4VisiblePosition {};
+		if (IsPointVisible(Rebase(rBasis, vecLocalPosition), f4VisiblePosition))
 		{
-			XMVECTOR vecCenter = XMLoadFloat4A(&f4VisiblePosition);
-			XMVECTOR vecRight = XMVectorScale(vecCameraRightNormal, fVisibleArea);
-			XMVECTOR vecUp = XMVectorScale(vecCameraUpNormal, fVisibleArea);
-			XMFLOAT4A f4Corner {};
-			XMStoreFloat4A(&f4Corner, XMVectorAdd(XMVectorSubtract(vecCenter, vecRight), vecUp));
-			rVisibleLayout.pf4Vertices[0] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
-			XMStoreFloat4A(&f4Corner, XMVectorAdd(XMVectorAdd(vecCenter, vecRight), vecUp));
-			rVisibleLayout.pf4Vertices[1] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
-			XMStoreFloat4A(&f4Corner, XMVectorSubtract(XMVectorSubtract(vecCenter, vecRight), vecUp));
-			rVisibleLayout.pf4Vertices[2] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
-			XMStoreFloat4A(&f4Corner, XMVectorSubtract(XMVectorAdd(vecCenter, vecRight), vecUp));
-			rVisibleLayout.pf4Vertices[3] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
+			int64_t iTextureIndex = gpTextureManager->mTextureDescriptors.CrcToIndex(rType.uiCrc);
+			float fVisibleArea = rCurrent.pfVisibleAreas[i];
+
+			shaders::VisibleLightQuadLayout& rVisibleLayout = pVisibleLightsLayouts[siRendered];
+
+			if (rType.bCameraAligned)
+			{
+				XMVECTOR vecCenter = XMLoadFloat4A(&f4VisiblePosition);
+				XMVECTOR vecRight = XMVectorScale(vecCameraRightNormal, fVisibleArea);
+				XMVECTOR vecUp = XMVectorScale(vecCameraUpNormal, fVisibleArea);
+				XMFLOAT4A f4Corner {};
+				XMStoreFloat4A(&f4Corner, XMVectorAdd(XMVectorSubtract(vecCenter, vecRight), vecUp));
+				rVisibleLayout.pf4Vertices[0] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
+				XMStoreFloat4A(&f4Corner, XMVectorAdd(XMVectorAdd(vecCenter, vecRight), vecUp));
+				rVisibleLayout.pf4Vertices[1] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
+				XMStoreFloat4A(&f4Corner, XMVectorSubtract(XMVectorSubtract(vecCenter, vecRight), vecUp));
+				rVisibleLayout.pf4Vertices[2] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
+				XMStoreFloat4A(&f4Corner, XMVectorSubtract(XMVectorAdd(vecCenter, vecRight), vecUp));
+				rVisibleLayout.pf4Vertices[3] = {f4Corner.x, f4Corner.y, f4Corner.z, 1.0f};
+			}
+			else
+			{
+				rVisibleLayout.pf4Vertices[0] = {f4VisiblePosition.x - fVisibleArea, f4VisiblePosition.y + fVisibleArea, f4VisiblePosition.z, 1.0f};
+				rVisibleLayout.pf4Vertices[1] = {f4VisiblePosition.x + fVisibleArea, f4VisiblePosition.y + fVisibleArea, f4VisiblePosition.z, 1.0f};
+				rVisibleLayout.pf4Vertices[2] = {f4VisiblePosition.x - fVisibleArea, f4VisiblePosition.y - fVisibleArea, f4VisiblePosition.z, 1.0f};
+				rVisibleLayout.pf4Vertices[3] = {f4VisiblePosition.x + fVisibleArea, f4VisiblePosition.y - fVisibleArea, f4VisiblePosition.z, 1.0f};
+			}
+
+			rVisibleLayout.pf4TextureCoordinates[0] = {0.0f, 0.0f, 0.0f, 0.0f};
+			rVisibleLayout.pf4TextureCoordinates[1] = {1.0f, 0.0f, 0.0f, 0.0f};
+			rVisibleLayout.pf4TextureCoordinates[2] = {0.0f, 1.0f, 0.0f, 0.0f};
+			rVisibleLayout.pf4TextureCoordinates[3] = {1.0f, 1.0f, 0.0f, 0.0f};
+
+			rVisibleLayout.puiColors[0] = rType.uiColor;
+			rVisibleLayout.puiColors[1] = rType.uiColor;
+			rVisibleLayout.puiColors[2] = rType.uiColor;
+			rVisibleLayout.puiColors[3] = rType.uiColor;
+
+			rVisibleLayout.fIntensity = fVisibleIntensity;
+			rVisibleLayout.fRotation = fRotation;
+			rVisibleLayout.uiTextureIndex = static_cast<uint32_t>(iTextureIndex);
+
+			++siRendered;
 		}
-		else
+
+		// Deposits for the refreshing layer bypass visible-sprite culling. Vulkan clips the quads after the vertex shader maps f4LightingArea to clip space.
+		if (iRefreshLayer >= 0 && fLightingArea > 0.0f && gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecLocalPosition)) == iRefreshLayer)
 		{
-			rVisibleLayout.pf4Vertices[0] = {f4VisiblePosition.x - fVisibleArea, f4VisiblePosition.y + fVisibleArea, f4VisiblePosition.z, 1.0f};
-			rVisibleLayout.pf4Vertices[1] = {f4VisiblePosition.x + fVisibleArea, f4VisiblePosition.y + fVisibleArea, f4VisiblePosition.z, 1.0f};
-			rVisibleLayout.pf4Vertices[2] = {f4VisiblePosition.x - fVisibleArea, f4VisiblePosition.y - fVisibleArea, f4VisiblePosition.z, 1.0f};
-			rVisibleLayout.pf4Vertices[3] = {f4VisiblePosition.x + fVisibleArea, f4VisiblePosition.y - fVisibleArea, f4VisiblePosition.z, 1.0f};
+			XMFLOAT4A f4ProjectedPosition {};
+			XMStoreFloat4A(&f4ProjectedPosition, ProjectToFlightPlane(vecLocalPosition, rBasis, iRefreshLayer));
+
+			float fBlurredTextureIndex = gpTextureManager->mTextureDescriptors.CrcToBlurredIndex(rType.uiCrc);
+			XMFLOAT4A f4Parameters {};
+			f4Parameters.x = fBlurredTextureIndex;
+			f4Parameters.y = fLightingIntensity;
+			f4Parameters.z = fRotation;
+			BuildAxisAlignedQuad(pPointLightsLayouts[siDepositsRendered], f4ProjectedPosition, fLightingArea, f4Parameters, rType.uiColor);
+			++siDepositsRendered;
 		}
-
-		rVisibleLayout.pf4TextureCoordinates[0] = {0.0f, 0.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4TextureCoordinates[1] = {1.0f, 0.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4TextureCoordinates[2] = {0.0f, 1.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4TextureCoordinates[3] = {1.0f, 1.0f, 0.0f, 0.0f};
-
-		rVisibleLayout.puiColors[0] = rType.uiColor;
-		rVisibleLayout.puiColors[1] = rType.uiColor;
-		rVisibleLayout.puiColors[2] = rType.uiColor;
-		rVisibleLayout.puiColors[3] = rType.uiColor;
-
-		rVisibleLayout.fIntensity = fVisibleIntensity;
-		rVisibleLayout.fRotation = fRotation;
-		rVisibleLayout.uiTextureIndex = static_cast<uint32_t>(iTextureIndex);
-
-		++siRendered;
 	}
 }
 
@@ -172,11 +165,7 @@ void PointLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterPointLightsRendered).iCount = siRendered;
 	}
-	// Only the refreshing lighting layer deposits; a frame with no refresh deposits nothing.
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(DynamicPipelines::FlightPlaneDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() && i == giLightingRefreshLayer ? spiDepositsRendered[i] : 0);
-	}
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siDepositsRendered);
 	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 

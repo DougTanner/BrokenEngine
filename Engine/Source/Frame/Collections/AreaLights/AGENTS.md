@@ -10,13 +10,15 @@ world-space visible-light quad (unblurred).
 - Externally-supplied geometry: owners `Sync` four visible corner positions plus
   a per-light intensity multiplier every frame — the geometry itself is
   parent-supplied, not just a position; type index selects baked appearance.
-- Dual outputs share one frustum-cull decision (AABB over all 8 visible +
-  lighting vertices). Deposits pack into one buffer and cursor per lighting
-  layer (`FlightPlaneDepositKey`), independent of the single visible-light
-  cursor, so deposit and visible buffers are not index-aligned. Only the
-  refreshing layer publishes its deposit count, and the player-facing Lighting
-  toggle may publish zero, while the visible-light draw retains the full
-  rendered count.
+- Independent culling and single deposit buffer: the visible-light quad tests
+  an AABB over all 8 visible + lighting vertices against the live visible area,
+  while deposits bypass that cull (see `AreaLightsRender.cpp` for off-area
+  clipping) and pack into one deposit buffer, pipeline, and cursor (`kuiCrc`)
+  separate from the visible-light cursor, so deposit and visible buffers are
+  not index-aligned. Only lights matching an active `giLightingRefreshLayer`
+  (`Render.h`) emit deposits; when no layer is active, deposit buffer resizing
+  and emission are skipped and the deposit indirect count is zero, while
+  visible-light draws keep their full rendered count.
 - Orientation via corners: visible quad uses raw corners; deposit quad scales
   the corner offsets about the center so, for a nonzero horizontal visible
   center-to-corner-0 extent, the base scale makes that distance equal the type's

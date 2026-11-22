@@ -31,18 +31,19 @@ may feed simulation state.
 - Lighting deposit clears its attachments through the render pass load operation
   every frame, so no separate clear pass is recorded.
 - World lighting has one layer per flight plane. Each layer keeps its own
-  combine outputs, history, area latch, and reset flag; one shared
-  deposit, spread, combine, temporal, and history-copy chain refreshes at most
-  one layer per frame, named by `giLightingRefreshLayer` (`Render.h`). That
-  layer's refresh atomically advances its current and history area mappings,
-  then publishes full-texture work for it alone, and only its deposit lists
-  carry a nonzero count; every other layer retains its outputs and areas. A
-  frame with no refresh publishes zero deposit, draw, and compute work — the
-  deposit and spread render passes still run their unconditional attachment
-  clears, so the shared deposit textures read blank on that frame. When two
-  layers need a refresh on one frame, the other refreshes first on the next.
-  Reset resolves from current data only, and history is refreshed only after
-  temporal resolution.
+  combine outputs, history, area latch, and reset flag; one shared deposit,
+  spread, combine, temporal, and history-copy chain refreshes at most one layer
+  per frame. `giLightingRefreshLayer` (`Render.h`) gates deposit and spread
+  work in Main, while `siLightingCombineRefreshLayer` (`LightingUniforms.cpp`)
+  gates the combine, temporal, and history-copy passes. The refreshing layer
+  atomically advances its current and history area mappings and publishes
+  full-texture work for it alone; every other layer retains its outputs and
+  areas. A frame with no refresh publishes zero deposit, draw, and compute work
+  — the deposit and spread render passes still run their unconditional
+  attachment clears, so the shared deposit textures read blank on that frame.
+  When two layers need a refresh on one frame, the other refreshes first on the
+  next. Reset resolves from current data only, and history is refreshed only
+  after temporal resolution.
 - The terrain shadow elevation, source, blur, temporal, and history-copy chain
   shares one update interval, using the same current/previous area latch as
   lighting (`TemporalAreaLatch`, `Render.h`). A refresh runs on the cadence, on
@@ -78,10 +79,10 @@ may feed simulation state.
   that only pans past that area samples outside it until the next refresh. A
   lighting reset or first use needs both layers, and a teleport each layer
   whose area the center left.
-- Disabling player-facing Lighting zeroes area-, point-, and shield-light
-  deposit draws without hiding their visible sprites or shield geometry. The
-  disable edge forces one reset refresh of each layer: spread draws stay off,
-  their unconditional attachment clears feed a black combine/temporal/history
+- With player-facing Lighting disabled, visible sprites and shield geometry
+  still render; pass gating follows the refresh-layer contract above. The
+  disable edge still forces one reset refresh of each layer: spread's
+  unconditional attachment clears feed a black combine/temporal/history
   publication, and later cadence or teleport refreshes remain suppressed until
   Lighting is enabled again.
 - Downstream thresholds that the amplitude must cross before the effect applies

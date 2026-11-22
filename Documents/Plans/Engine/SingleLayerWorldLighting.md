@@ -250,9 +250,21 @@ Graphics, engine collection renderers, shaders, and the agent probe.
 
 ## Coordination
 
-- With `CullLightingDepositsByProjectedFootprint.md`, preserve independent
-  sprite and projected deposit predicates when collapsing the plane selection
-  and area latches. Apply the projected test to the active padded area.
+- Preserve independent visible-sprite culling and projected deposit emission in
+  `PointLightsInterpolate::Render` (`PointLightsRender.cpp`) and
+  `AreaLightsInterpolate::Render` (`AreaLightsRender.cpp`) when collapsing
+  plane selection to `ProjectToBaseHeight` and the area latches to one layer;
+  GPU clipping against `GlobalLayout::f4LightingArea` owns off-area culling.
+  Both collections already use a single deposit buffer, cursor, and pipeline
+  keyed by `kCrc` and `kuiCrc`, so keep those keys instead of converting them
+  to `FlightPlaneDepositKey(crc, 0)` (only `HexShieldsRender.cpp` still
+  converts from `FlightPlaneDepositKey`). Currently `giLightingRefreshLayer`
+  (`Render.h`) encodes `-1` on disabled or skipped frames while
+  `LightingUniforms.cpp` keeps a file-static combine refresh layer; when
+  replacing `giLightingRefreshLayer` with `gbLightingRefreshFrame`, carry
+  forward that split so disabled or skipped frames emit no deposits or spread
+  draws while disabling lighting still runs its separate combine reset to clear
+  output to black.
 - With `SkipEmptyLightingSpread.md`, retain the effective deposit count
   publication when collapsing the collection buffers and refresh gate. The
   new gate still applies to spread draws while combine, temporal and history

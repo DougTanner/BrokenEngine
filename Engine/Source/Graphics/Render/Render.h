@@ -257,9 +257,10 @@ inline bool gbObjectShadowsRefreshFrame = false;
 // Set by CreateLightingTextures on a recreate and by RenderLightingGlobal on a gLightingEnabled change; re-arms the
 // PopulateLightingParameters first-frame guard so neither blends stale history for one frame.
 inline bool gbLightingTemporalReset = false;
-// The lighting layer whose deposit, spread, combine, temporal, and history-copy chain runs this frame, or -1 for none.
-// PopulateLightingParameters writes it once per frame in Global; collection EndRender and RenderLightingSpreadIndirect
-// read it in Main to publish only that layer's deposit counts and chain dispatches.
+// The active lighting layer whose deposit and spread work runs this frame, or -1 when skipped or when Lighting is
+// disabled. PopulateLightingParameters writes it once per frame in Global; lighting deposit collections and
+// RenderLightingSpreadIndirect read it in Main, while LightingUniforms.cpp keeps the combine, temporal, and
+// history-copy refresh layer file-static so the disable reset still clears each layer to black.
 inline int64_t giLightingRefreshLayer = -1;
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
