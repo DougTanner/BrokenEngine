@@ -7,20 +7,27 @@ are the isolation lens.
 
 ## Steps
 
-1. Resolve and measure this run's transcript first. On Claude,
-   `$env:CLAUDE_CODE_SESSION_ID` is main's ID; resolve
+1. Resolve, project, and measure this run's transcript first. On Claude, resolve
    `(Get-ChildItem "$env:USERPROFILE/.claude/projects/*/$env:CLAUDE_CODE_SESSION_ID.jsonl").FullName`.
    On `agy`, import `./.agents/scripts/AgentTranscriptCommon.psm1`, call
    `Resolve-AgentAgyParentSession -SessionId $env:ANTIGRAVITY_CONVERSATION_ID`,
    require `Status` `'available'` (else `BLOCKED` naming `Reason`), and take
-   `RootTranscriptPath`. From the worktree root run
-   `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Measure-SessionContext.ps1 -TranscriptPath '<resolved path>'`
-   (or `-SessionId <root id>`) and classify via `## Measurement states` in
-   `../../next-plan/references/run-checkpoint.md`. Return `BLOCKED` if
-   resolution fails, yields no readable transcript, or returns
-   `transcript.not-found`; other blocked/error codes skip only
-   context-efficiency. Done when transcript path and measurement state are in
-   hand, or `BLOCKED`.
+   `RootTranscriptPath`. If resolved and readable, run
+   `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<resolved path>' -IncludeContextEnvelope`
+   once from the worktree root, capturing stdout in a PowerShell variable and
+   reading `$LASTEXITCODE` before any other command (no unbounded raw stdout or
+   temp files; sandbox is `read-only`). Classify via
+   `../../next-plan/references/run-checkpoint.md` `## Measurement states`. On a
+   whole-review `BLOCKED` state, stop immediately with no direct transcript
+   read, synthesized span, findings, or summary block (safe reason in
+   `Residuals`). Otherwise print only exit code, `checkpoint-span`,
+   `context-envelope`, total in-span row count, and a bounded first page of
+   in-span rows (`[start, end]` minus `exclude`). Fetch remaining `[start, end]`
+   pages for steps 2-7 and 12-13 by rerunning `Get-TranscriptProjection.ps1`
+   without `-IncludeContextEnvelope` or temp files, applying the same in-memory
+   capture, `## Measurement states` `BLOCKED` gate, and bounded `[start, end]`
+   minus `exclude` slice. Done when path, span, initial in-span rows, and state
+   are in hand, or `BLOCKED`.
 2. Report as friction: a bundled script errored, returned a malformed or
    contradictory result, or could not be run as documented; a workaround or
    deviation was needed; work was repeated because a skill's instructions were
@@ -28,12 +35,12 @@ are the isolation lens.
    state is in scope here even though it postdates step 6's span. Done when
    every such observation in the transcript span, plus that measurement state,
    is either a finding or excluded by step 4.
-3. Report a step 1 measurement state that skips the context-efficiency lens — a
-   blocked or error code, or a truncated measurement (`breachRowsTruncated:
-   true`, that is `skipped (breach-rows-truncated)`) — as one friction finding
-   naming the measuring command, the returned code or the truncation flag, and
-   the skipped context-efficiency lens. Done when such a state has exactly one
-   such finding.
+3. For a `skipped` state (`## Measurement states` in
+   `../../next-plan/references/run-checkpoint.md`), emit one friction finding
+   naming `Get-TranscriptProjection.ps1 -IncludeContextEnvelope`, the state's
+   code (noting a missing or malformed `context-envelope` row when applicable)
+   or truncation flag, and the skipped lens. Done when such a state has one
+   finding.
 4. Exclude from friction: ordinary review findings about the change;
    user-driven iteration; documented normal stops such as `none-available`; a
    worker's deviation from the handoff form its skill correctly declares, which
@@ -47,7 +54,7 @@ are the isolation lens.
    carries a class.
 6. Before applying any lens, take this checkpoint's span `[start, end]`,
    excluded completed-handoff line (`exclude`), and excluded `toolUseId`
-   (`exclude-id`) from step 12's `Get-TranscriptProjection.ps1`
+   (`exclude-id`) from step 1's `Get-TranscriptProjection.ps1`
    `checkpoint-span` row. Retain every other record in `[start, end]`. Apply
    the span and exclusions to friction and isolation records and, by
    `toolUseId`, to context-efficiency `topResults`. Running the claim-exit
@@ -62,8 +69,9 @@ are the isolation lens.
    path, the observed output or malformed result, and the rework, workaround, or
    skipped step it forced. No citation, no finding. Done when every friction
    finding names all three, and the rest are dropped.
-8. Review every `topResults` row marked `overThreshold: true`. The other rows
-   are context only. Done when every such row has been read.
+8. Unless step 1 skipped context-efficiency, review every `topResults` row
+   marked `overThreshold: true` in step 1's `context-envelope` row. Other rows
+   are context only. Done when every such row has been read or skipped.
 9. Identify each row's emitter from `toolName` and `inputSummary` (script,
    skill, or command) and read it in the tree. An `Agent`/`SendMessage`
    (Claude), `invoke_subagent` (`agy`), or bridged `Invoke-Codex.ps1` row is a
@@ -91,12 +99,10 @@ are the isolation lens.
     `../../../references/subagent-handoff.md`. No named emitter and mechanism,
     no finding. Done when every such finding names both, and the rest are
     dropped.
-12. Select records only through the bundled script (header owns row shapes),
-    never by reading the transcript whole-file:
-    `pwsh -NoProfile -File .agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1 -TranscriptPath '<transcript path>'`
-
-    Consume the script's `checkpoint-span` and `bridge-*` rows directly,
-    ignore `bridge-stub` rows, and do not assume the tool is named `Task`.
+12. Select records from step 1's in-span projection rows (script header owns row
+    shapes; use step 1's paging rule for remaining pages), never reading the
+    transcript whole-file. Consume `checkpoint-span` and `bridge-*` directly,
+    ignore `bridge-stub`, and never assume the tool is named `Task`.
 
     Open one selected record line at a time with `Read` (`offset` = line,
     `limit` 1), `read_file` (`StartLine`/`EndLine` = line), or on Codex:

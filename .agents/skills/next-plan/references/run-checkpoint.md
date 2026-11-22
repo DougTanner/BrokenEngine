@@ -24,21 +24,15 @@ main's recorded handoff line.
 | --- | --- | --- |
 | `pass` envelope | `pass` | `Context-efficiency follow-ups: <routing result>` |
 | `needs-review` envelope, untruncated | `needs-review` | `Context-efficiency follow-ups: <routing result>`, from the reviewer's findings |
-| blocked or error envelope | `skipped (<code>)` | `Context-efficiency follow-ups: blocked (<code>), then <routing result>` |
+| post-projection envelope error (`<code>`), or missing/malformed `context-envelope` after `checkpoint-span` (`measure.failed`) | `skipped (<code>)` | `Context-efficiency follow-ups: blocked (<code>), then <routing result>` |
 | `breachRowsTruncated: true` envelope | `skipped (breach-rows-truncated)` | `Context-efficiency follow-ups: blocked (breach-rows-truncated), then <routing result>` |
-| transcript unresolvable, unreadable, or `transcript.not-found` | `none (BLOCKED handoff)` — the reviewer returns `BLOCKED` for the whole review and carries no summary block | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
+| unresolvable/unreadable transcript, or `Get-TranscriptProjection.ps1` failure (non-zero exit or absent `checkpoint-span`) | `none (BLOCKED handoff)` — whole-review `BLOCKED`, no summary block | `blocked (transcript-unavailable)` on both `Friction follow-ups:` and `Context-efficiency follow-ups:`, routed through the post-checkpoint rule below |
 | Codex main session | none — no reviewer is dispatched and no lens runs | `none (codex)` on both lines |
 
-A `pass` envelope means the measurement completed with no rows at or over
-threshold. An untruncated `needs-review` envelope runs the reviewer's
-context-efficiency lens; a truncated one skips it and reports
-`skipped (breach-rows-truncated)`, and blocked and error states, except the
-transcript-unavailable one, skip it too while the other lenses still run. A
-transcript the reviewer can neither resolve nor read, and a
-`transcript.not-found` measurement, carry no lens at all, so that run's review
-returns `BLOCKED` instead. The review skill's
-[`## Handoff`](../../next-plan-checkpoint-review/SKILL.md#handoff) owns the
-exact reviewer summary output for each measurement state.
+Untruncated `needs-review` runs context-efficiency. The two `skipped` rows skip
+only context-efficiency while friction and isolation run. The `BLOCKED` row runs
+no lens. [`## Handoff`](../../next-plan-checkpoint-review/SKILL.md#handoff) owns
+the exact summary output for non-`BLOCKED` states.
 
 The `Handoff line recorded` column is main's own record, written from what
 `## Follow-up routing` produced, not reviewer output: `<routing result>` is

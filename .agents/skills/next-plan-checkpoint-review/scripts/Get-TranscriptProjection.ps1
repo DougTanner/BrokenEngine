@@ -1,7 +1,9 @@
 # Prints one row per tool call, per tool result, per assistant text element, per string-content record, per matched
 # read/brief pair, per unmet brief requirement, and per Codex bridge invocation/stub/delivery of a Claude Code or
-# native `agy` JSONL transcript, given as a path, plus one trailing `checkpoint-span` row for the checkpoint review:
-# a record with several of those yields several rows, and a record with none yields none. The rows are:
+# native `agy` JSONL transcript, given as a path, plus one trailing `checkpoint-span` row for the checkpoint review
+# (and, when `-IncludeContextEnvelope` is set, one trailing `context-envelope` row measuring eligible non-sidechain
+# results in the same pass): a record with several of those yields several rows, and a record with none yields none. The rows
+# are:
 # `<line> use <tool> <input summary capped at 160 chars>`
 # `<line> match <read path> read-at <read line>` — a delegation record's brief lists a path an earlier `Read`/`read_file`
 #   record or allowlisted read-only shell command opened; `<line>` is the delegation record's line and `<read line>` the
@@ -37,13 +39,25 @@
 #   the prior checkpoint's completed-handoff line (`exclude`, one record line excluded for friction and isolation) and
 #   dispatching `tool_use_id` (`exclude-id`, excluded from context-efficiency `topResults`). Recognizes bridged, native
 #   (`Agent`/`invoke_subagent`), and trailing desktop (`Write`/`write_file`) checkpoints.
+# `context-envelope <compact single-line JSON>` — emitted once after `checkpoint-span` only when
+#   `-IncludeContextEnvelope` is set (`-Top` 1..25 default 10, `-ThresholdChars` >= 1 default 20000); carries
+#   `broken-engine-context-efficiency/v1` (non-sidechain Claude `user` content-array `tool_result` entries,
+#   `assistant`/`user` `task-notification` strings, `queued_command` attachment strings with non-empty `<tool-use-id>`,
+#   plus `agy` paired `GENERIC` and delivery `SYSTEM_MESSAGE` records ranked by text chars, up to 25 breach rows and
+#   filled to `-Top`; projected array-valued attachment `tool_result` rows and unpaired `agy` `GENERIC` results are
+#   excluded) or `broken-engine-context-efficiency-error/v1` (`code: "measure.failed"`) with exit `0` when
+#   post-`checkpoint-span` envelope assembly fails.
 # `<line>` is the 1-based transcript line; on Claude only `assistant`, `user`, and `attachment` records print, and
 # sidechain records and blank lines print nothing; on `agy`, `USER_INPUT`, `SYSTEM_MESSAGE`, `PLANNER_RESPONSE`, and
-# `GENERIC` records print.
+# `GENERIC` records print. Missing, unsafe, unreadable, malformed JSON, or non-object JSON inputs fail closed in both
+# modes with exit `1`, no `checkpoint-span`, and fixed safe single-line stderr.
 
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][string] $TranscriptPath
+	[Parameter(Mandatory)][string] $TranscriptPath,
+	[switch] $IncludeContextEnvelope,
+	[ValidateRange(1, 25)][int] $Top = 10,
+	[ValidateRange(1, [int]::MaxValue)][int] $ThresholdChars = 20000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +92,50 @@ $script:ClaudeBridgeStubPattern = '(?i)\b(?:running in (?:the )?background|backg
 $script:ClaudeNativeAgentStubPattern = '(?i)\A\s*(?:async(?:hronous)?\s+agent\s+launched\s+successfully\.?\s*\z|(?:(?:async(?:hronous)?|background)\s+agent\s+(?:launched|started)|agent\s+(?:launched|started)\s+(?:asynchronously|in\s+(?:the\s+)?background)|(?:launched|started)\s+(?:(?:an?\s+)?(?:async(?:hronous)?|background)\s+agent|asynchronously|in\s+(?:the\s+)?background))[^\r\n]*(?:\r?\n[ \t]*)?(?:\bagentId:|\bwith\s+(?:task\s+)?id:))'
 $script:BridgeReceiptOrSeparatorPattern = '(?m)(?:^|content=|<result>)[ \t]*(?:(?<sep>--- findings ---)|(?<json>\{"schemaVersion":"broken-engine-codex-run/[^\r\n]*?))(?:[ \t]*</result>)?[ \t]*\r?$'
 $script:ValidReceiptStatuses = @('completed', 'malformed', 'failed', 'running')
+# Cap breach rows so the trailing context-envelope stays bounded even when a session breaches constantly.
+$script:BreachRowCap = 25
+# Input fields that name the emitting invocation without leaking result content.
+$script:ContextSummaryFields = @('command', 'CommandLine', 'file_path', 'Path', 'path', 'pattern', 'url', 'query', 'prompt', 'Prompt', 'description', 'Role', 'TypeName', 'Recipient', 'TaskId', 'Action')
+
+function Stop-ProjectionFailure([string] $Message) {
+	[Console]::Error.WriteLine($Message)
+	exit 1
+}
+
+function Get-ToolUseIdTag([string] $Text) {
+	$match = [regex]::Match($Text, '<tool-use-id>([^<]*)</tool-use-id>')
+	if ($match.Success) { return $match.Groups[1].Value }
+	return ''
+}
+
+function Measure-ContextResultChars($Content) {
+	if ($Content -is [string]) { return $Content.Length }
+	$total = 0
+	if ($Content -is [object[]]) {
+		foreach ($element in $Content) {
+			if ([string](Get-AgentTranscriptField $element 'type') -cne 'text') { continue }
+			$text = Get-AgentTranscriptField $element 'text'
+			if ($text -is [string]) { $total += $text.Length }
+		}
+	}
+	return $total
+}
+
+function Get-ContextInputSummary($ToolInput) {
+	$text = ''
+	foreach ($field in $script:ContextSummaryFields) {
+		$value = Get-AgentTranscriptField $ToolInput $field
+		if ($value -is [string] -and -not [string]::IsNullOrWhiteSpace($value)) { $text = $value; break }
+	}
+	if ($text -eq '' -and $ToolInput -is [Management.Automation.PSCustomObject]) {
+		foreach ($property in $ToolInput.PSObject.Properties) {
+			if ($property.Value -is [string] -and -not [string]::IsNullOrWhiteSpace($property.Value)) { $text = $property.Value; break }
+		}
+	}
+	$text = Protect-AgentTranscriptPath (($text -replace '\s+', ' ').Trim())
+	if ($text.Length -gt 160) { $text = $text.Substring(0, 157) + '...' }
+	return $text
+}
 
 function ConvertTo-NormalizedPathKey([string] $Path) {
 	if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
@@ -748,17 +806,30 @@ $state = @{
 	PendingPromptWrite = $null
 }
 $totalLines = 0
+$sessionLabel = ''
+$toolUses = $null
+$measured = $null
+if ($IncludeContextEnvelope) {
+	$toolUses = @{}
+	$measured = [Collections.Generic.List[object]]::new()
+}
 
 try {
 	$resolved = Resolve-AgentAgyTranscriptPath -TranscriptPath $TranscriptPath
 	switch ($resolved.Status) {
-		'passthrough' { $transcript = $resolved.Path }
-		'safe' { $transcript = $resolved.Path }
-		'missing' { throw 'Transcript file does not exist.' }
-		'unsafe' { throw 'Transcript path is an unsafe reparse point.' }
-		default { throw 'Transcript path could not be safely read.' }
+		'passthrough' {
+			$transcript = $resolved.Path
+			$sessionLabel = [IO.Path]::GetFileNameWithoutExtension($transcript)
+		}
+		'safe' {
+			$transcript = $resolved.Path
+			$sessionLabel = if (-not [string]::IsNullOrWhiteSpace($resolved.SessionId)) { $resolved.SessionId } else { [IO.Path]::GetFileNameWithoutExtension($transcript) }
+		}
+		'missing' { Stop-ProjectionFailure 'Transcript file does not exist.' }
+		'unsafe' { Stop-ProjectionFailure 'Transcript path is an unsafe reparse point.' }
+		default { Stop-ProjectionFailure 'Transcript path could not be safely read.' }
 	}
-	if (-not (Test-Path -LiteralPath $transcript -PathType Leaf)) { throw 'Transcript file does not exist.' }
+	if (-not (Test-Path -LiteralPath $transcript -PathType Leaf)) { Stop-ProjectionFailure 'Transcript file does not exist.' }
 
 	if (Test-AgentAgyTranscript $transcript) {
 		Read-AgentAgyTranscript $transcript | ForEach-Object {
@@ -771,6 +842,9 @@ try {
 				}
 				$row
 				if ($record.Type -ceq 'SYSTEM_MESSAGE' -and -not [string]::IsNullOrEmpty($record.DeliveryToolUseId)) {
+					if ($IncludeContextEnvelope) {
+						$measured.Add([pscustomobject]@{ ToolUseId = [string] $record.DeliveryToolUseId; Chars = $record.Content.Length })
+					}
 					if ($state.BridgeCallByToolUseId.ContainsKey($record.DeliveryToolUseId)) {
 						$receiptLookup = Find-BridgeOuterReceipt $record.Content
 						if ($receiptLookup.Kind -ceq 'v2') {
@@ -785,6 +859,9 @@ try {
 			elseif ($record.Type -ceq 'PLANNER_RESPONSE') {
 				foreach ($tc in $record.ToolCalls) {
 					Write-ToolCallProjection $record.LineNumber $tc.Name ([string] $tc.ToolUseId) $tc.Args $reads $state
+					if ($IncludeContextEnvelope -and -not [string]::IsNullOrEmpty($tc.ToolUseId)) {
+						$toolUses[$tc.ToolUseId] = @{ Name = $tc.Name; InputSummary = (Get-ContextInputSummary $tc.Args) }
+					}
 				}
 				if (-not [string]::IsNullOrEmpty($record.Content)) {
 					$text = $record.Content
@@ -797,6 +874,9 @@ try {
 				$result = '{0} result {1} len {2}' -f $record.LineNumber, $toolUseId, $record.Content.Length
 				if ($record.IsError) { $result += ' error' }
 				$result
+				if ($IncludeContextEnvelope -and $null -ne $record.PairedToolCall) {
+					$measured.Add([pscustomobject]@{ ToolUseId = [string] $record.PairedToolCall.ToolUseId; Chars = $record.Content.Length })
+				}
 				if ($null -ne $record.PairedToolCall -and -not [string]::IsNullOrEmpty($record.PairedToolCall.ToolUseId)) {
 					$pairedId = $record.PairedToolCall.ToolUseId
 					if ($state.BridgeCallByToolUseId.ContainsKey($pairedId)) {
@@ -819,7 +899,16 @@ try {
 		$n = 0
 		foreach ($line in [IO.File]::ReadLines($transcript)) {
 			$n++
-			$record = $line | ConvertFrom-Json
+			if ([string]::IsNullOrWhiteSpace($line)) { continue }
+			try {
+				$record = ConvertFrom-Json -InputObject $line -NoEnumerate -ErrorAction Stop
+			}
+			catch {
+				Stop-ProjectionFailure "Transcript line $n is not valid JSON."
+			}
+			if ($record -isnot [Management.Automation.PSCustomObject]) {
+				Stop-ProjectionFailure "Transcript line $n is not a JSON object."
+			}
 			# Only these types carry the conversation; others, such as request copies, repeat it or carry none.
 			if ($record.isSidechain -eq $true -or $record.type -notin @('assistant', 'user', 'attachment')) { continue }
 			$content = $record.message.content
@@ -832,6 +921,20 @@ try {
 				}
 				elseif ($record.type -ceq 'attachment') {
 					$isValidStringDelivery = [string](Get-AgentTranscriptField (Get-AgentTranscriptField $record 'attachment') 'type') -ceq 'queued_command'
+				}
+				if ($IncludeContextEnvelope) {
+					if ($record.type -ceq 'attachment') {
+						if ($isValidStringDelivery) {
+							$queuedToolUseId = Get-ToolUseIdTag $content
+							if (-not [string]::IsNullOrEmpty($queuedToolUseId)) {
+								$measured.Add([pscustomobject]@{ ToolUseId = $queuedToolUseId; Chars = $content.Length })
+							}
+						}
+					}
+					elseif (($record.type -ceq 'assistant' -or $record.type -ceq 'user') -and
+						[string](Get-AgentTranscriptField (Get-AgentTranscriptField $record 'origin') 'kind') -ceq 'task-notification') {
+						$measured.Add([pscustomobject]@{ ToolUseId = (Get-ToolUseIdTag $content); Chars = (Measure-ContextResultChars $content) })
+					}
 				}
 				if ($isValidStringDelivery -and $content -cmatch '<tool-use-id>([^<]+)</tool-use-id>') {
 					$deliveryToolUseId = $Matches[1]
@@ -851,11 +954,23 @@ try {
 			foreach ($element in $content) {
 				if ($element.type -eq 'tool_use') {
 					Write-ToolCallProjection $n ([string] $element.name) ([string] $element.id) $element.input $reads $state
+					if ($IncludeContextEnvelope -and $record.type -ceq 'assistant' -and $content -is [object[]] -and [string](Get-AgentTranscriptField $element 'type') -ceq 'tool_use') {
+						$toolUseId = [string](Get-AgentTranscriptField $element 'id')
+						if (-not [string]::IsNullOrEmpty($toolUseId)) {
+							$toolUses[$toolUseId] = @{ Name = [string](Get-AgentTranscriptField $element 'name'); InputSummary = (Get-ContextInputSummary (Get-AgentTranscriptField $element 'input')) }
+						}
+					}
 				}
 				elseif ($element.type -eq 'tool_result') {
 					$result = '{0} result {1} len {2}' -f $n, $element.tool_use_id, ($element.content | ConvertTo-Json -Compress -Depth 100).Length
 					if ($element.is_error -eq $true) { $result += ' error' }
 					$result
+					if ($IncludeContextEnvelope -and $record.type -ceq 'user' -and $content -is [object[]] -and [string](Get-AgentTranscriptField $element 'type') -ceq 'tool_result') {
+						$measured.Add([pscustomobject]@{
+							ToolUseId = [string](Get-AgentTranscriptField $element 'tool_use_id')
+							Chars = (Measure-ContextResultChars (Get-AgentTranscriptField $element 'content'))
+						})
+					}
 					$resultToolUseId = [string] $element.tool_use_id
 					if (-not [string]::IsNullOrEmpty($resultToolUseId)) {
 						$plainText = Get-ClaudeResultPlainText $element.content
@@ -909,6 +1024,46 @@ try {
 	'checkpoint-span start={0} end={1} exclude={2} exclude-id={3}' -f $startLine, $endLine, $excludeLine, $excludeId
 }
 catch {
-	Write-Error $_
-	exit 1
+	if ($null -ne $_.Exception -and $null -ne $_.Exception.Data -and $_.Exception.Data.Contains('IsMalformedTranscriptLine')) {
+		Stop-ProjectionFailure $_.Exception.Message
+	}
+	Stop-ProjectionFailure 'Transcript projection failed.'
+}
+
+if ($IncludeContextEnvelope) {
+	try {
+		$ranked = @($measured | Sort-Object -Property @{ Expression = 'Chars'; Descending = $true }, @{ Expression = 'ToolUseId'; Descending = $false })
+		$overThresholdCount = 0
+		foreach ($entry in $ranked) {
+			if ($entry.Chars -ge $ThresholdChars) { $overThresholdCount++ }
+			else { break }
+		}
+		$reportCount = [Math]::Min($ranked.Count, [Math]::Max($Top, [Math]::Min($script:BreachRowCap, $overThresholdCount)))
+		$topResults = [Collections.Generic.List[object]]::new()
+		for ($i = 0; $i -lt $reportCount; $i++) {
+			$entry = $ranked[$i]
+			$use = if (-not [string]::IsNullOrEmpty($entry.ToolUseId) -and $toolUses.ContainsKey($entry.ToolUseId)) { $toolUses[$entry.ToolUseId] } else { $null }
+			$topResults.Add([ordered]@{
+				rank = ($i + 1)
+				toolName = $(if ($null -ne $use) { $use.Name } else { 'unknown' })
+				chars = $entry.Chars
+				overThreshold = ($entry.Chars -ge $ThresholdChars)
+				toolUseId = $entry.ToolUseId
+				inputSummary = $(if ($null -ne $use) { $use.InputSummary } else { '' })
+			})
+		}
+		$envelope = [ordered]@{
+			schemaVersion = 'broken-engine-context-efficiency/v1'
+			sessionId = $sessionLabel
+			thresholds = [ordered]@{ perResultChars = $ThresholdChars }
+			verdict = $(if ($overThresholdCount -gt 0) { 'needs-review' } else { 'pass' })
+			overThresholdCount = $overThresholdCount
+			breachRowsTruncated = ($overThresholdCount -gt $script:BreachRowCap)
+			topResults = @($topResults)
+		}
+		'context-envelope {0}' -f ($envelope | ConvertTo-Json -Depth 20 -Compress)
+	}
+	catch {
+		'context-envelope {"schemaVersion":"broken-engine-context-efficiency-error/v1","status":"error","code":"measure.failed","message":"Context-efficiency measurement failed."}'
+	}
 }
