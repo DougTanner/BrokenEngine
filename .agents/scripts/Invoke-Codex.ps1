@@ -200,6 +200,8 @@ function Publish-OutputFile([string] $StagingPath, [string] $DestinationPath, [s
 # Codex's own console chatter is discarded, because anything this function writes to the pipeline
 # would be captured by the caller's assignment alongside the exit code it actually returns; its
 # stderr instead goes to the run's retained stderr file so a failure reason can quote it.
+# --disable hooks prevents .codex/config.toml SessionStart hooks from injecting main-session
+# workflow context into headless runs if hook trust is persisted.
 function Invoke-CodexAttempt([string] $StagingPath)
 {
 	Get-Content -LiteralPath $PromptFile -Raw | & $codex.Source `
@@ -210,6 +212,7 @@ function Invoke-CodexAttempt([string] $StagingPath)
 		-m $presets[$Agent].Model `
 		-c "model_reasoning_effort=`"$($presets[$Agent].Effort)`"" `
 		-c "service_tier=`"$serviceTier`"" `
+		--disable hooks `
 		--ephemeral `
 		-o $StagingPath `
 		- 2> $stderrOutput | Out-Null

@@ -96,7 +96,7 @@ function Invoke-SweepCodex([string] $Template, [string] $Out, [string] $Sandbox,
 	$codex = (Get-Command codex).Source
 	for ($attempt = 1; $attempt -le 2; $attempt++)
 	{
-		$prompt | & $codex -a never exec --sandbox $Sandbox -C $Root -m $Model -c 'model_reasoning_effort="high"' --ephemeral -o $Out - 2> "$Out.stderr.txt" | Out-Null
+		$prompt | & $codex -a never exec --sandbox $Sandbox -C $Root -m $Model -c 'model_reasoning_effort="high"' --disable hooks --ephemeral -o $Out - 2> "$Out.stderr.txt" | Out-Null
 		if ($LASTEXITCODE -eq 0 -and (Test-Path $Out)) { return $true }
 	}
 	return $false
@@ -265,7 +265,7 @@ if ($cross.Count -gt 0 -and -not ((Test-Path $propOut) -and (Select-String -Quie
 	"# Cross-file findings: $Batch`n`n$($cross -join "`n")" | Set-Content $crossFile
 	Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
 	$prompt = (Get-Content -Raw (Join-Path $promptDir 'Propagate.md')).Replace('{{ROOT}}', $root).Replace('{{BATCH}}', $Batch).Replace('{{CROSSFILE}}', "Temp/Sweep/$Batch.crossfile.md").Replace('{{TYPE}}', $typeRel).Replace('{{PLAN}}', $planRel)
-	$prompt | & (Get-Command codex).Source -a never exec --sandbox workspace-write -C $root -m $Model -c 'model_reasoning_effort="high"' --ephemeral -o $propOut - 2> "$propOut.stderr.txt" | Out-Null
+	$prompt | & (Get-Command codex).Source -a never exec --sandbox workspace-write -C $root -m $Model -c 'model_reasoning_effort="high"' --disable hooks --ephemeral -o $propOut - 2> "$propOut.stderr.txt" | Out-Null
 	if ($LASTEXITCODE -ne 0 -or -not (Test-Path $propOut) -or -not (Select-String -Quiet -SimpleMatch 'PROPAGATE-DONE' $propOut)) { "PROPAGATE-FAILED $Batch $(Get-Date -Format s)" | Set-Content $status; return }
 	$declined = Get-Section $propOut 'Declined'
 	if ($declined) { Add-Content (Join-Path $sweep 'Ledger.md') "### $Batch propagation (declined)`n$declined`n" }
