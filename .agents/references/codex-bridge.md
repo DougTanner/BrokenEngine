@@ -28,11 +28,30 @@ Dispatched per the Codex-bridge rule in
 
 ## Steps
 
-1. Once per non-Codex session before the first launch, run from the worktree
-   root: `pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -CheckModels`.
-   On a non-zero exit, halt and report the receipt's diagnostics (see
-   `Invoke-Codex.ps1` `.NOTES` for exit codes and receipt fields). Done when
-   passed or reported.
+1. Select the launch environment before checking models. Use the direct shell
+   on hosts such as Claude Code. On Antigravity CLI, use the official
+   per-command host request when available and granted, with the configured
+   Codex PATH and confirmed worker survival across calls. Use desktop
+   PowerShell when that environment is unavailable or unproven. Honor a
+   declined action.
+
+   Once per non-Codex session before the first launch, run the check from the
+   adopted worktree root in the selected environment with the same PATH and
+   temporary-root overrides as the launch.
+
+   ```powershell
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -CheckModels
+   ```
+
+   For desktop commands, give the user the exact command with actual values.
+   Quote PowerShell values as literals and double embedded apostrophes. Set
+   only the PATH and temporary-root overrides deliberately used for the run.
+   Append `> '<fresh Temp/receipt>'` to capture stdout and have the user return
+   the receipt path and `$LASTEXITCODE`.
+
+   Proceed after a passing receipt. On a non-zero exit, halt and report the
+   receipt's diagnostics (see `Invoke-Codex.ps1` `.NOTES` for exit codes and
+   receipt fields). Done when passed or reported.
 2. End the prompt with the verdict-line contract: the worker's last non-empty
    response line must be `PASS`, `CHANGES-REQUIRED: <n>`, or
    `BLOCKED: <reason>`, outside the skill's or lens's complete output — after
@@ -41,25 +60,27 @@ Dispatched per the Codex-bridge rule in
    lens's own output shape (e.g. `/external-architecture-review` Step 9) —
    supplementing `Status` (without replacing it) where that shape declares it.
    Done when the prompt states it.
-3. Make one bare call per launch, placing `-Skill` (and `-Mode`) before
-   `-Worktree` with a fresh repo-relative `Temp/` `<out>`. Wait rule: on
-   blocking-shell hosts (e.g. Claude Code) pass a timeout `>= 600000` ms; on
-   Antigravity CLI (`run_command`, cap `10000` ms) pass
-   `WaitMsBeforeAsync: 10000` and await async reactive wakeup without polling,
-   then act on stdout:
+3. Run the public launch once from the same worktree root and environment as
+   step 1, with a fresh repo-relative `Temp/` `<out>`. For direct launch and
+   wait, use a timeout `>= 600000` ms on blocking-shell hosts such as Claude
+   Code. For a direct Antigravity CLI launch, use `run_command` with
+   `WaitMsBeforeAsync: 10000` and await its asynchronous wakeup. Resolve an
+   ambiguous return using the receipt and run identity before retrying.
 
    ```powershell
-   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile <out>
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile '<out>' [-NoRetry]
    ```
 
-   A `completed` receipt prints the result on stdout (do not read `<out>`);
-   `Invoke-Codex.ps1` `.NOTES` owns receipt, wait, and separator. Done when the
-   receipt returns.
-4. If `running`, resume with one bare call per wake under step 3's per-host
-   wait rule:
+   A `completed` receipt includes the findings on stdout. `Invoke-Codex.ps1`
+   `.NOTES` owns receipt, wait, and separator. Done when the receipt returns.
+4. After the original shell exits with `running`, use the actual run ID and
+   resume with one call per receipt under step 3's wait rule. If the caller
+   cannot see desktop worker records, run the wait from the same desktop
+   worktree root with the same deliberate environment overrides. Capture its
+   stdout and exit code separately from the launch.
 
    ```powershell
-   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Wait <runId>
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Wait '<runId>'
    ```
 
    Duration alone is not a failure. Done on `completed`, `malformed`, or

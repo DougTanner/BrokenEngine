@@ -54,9 +54,8 @@ One dispatch covers everything before the confirmation: the worker runs approval
 preparation, fills the acceptance table on the prepared diff, runs the
 primary-movement check and, only once that check reaches a usable terminal
 result, returns the completed table, the SmartGit launch line, and the landing
-summary in a single handoff. Main runs that launch line, reads its receipt,
-presents that summary, and asks the confirmation below, with no tool call in
-between other than those the handoff's own result requires.
+summary in a single handoff. Main follows
+[Landing confirmation](#landing-confirmation).
 
 "Stop before any primary change" names the confirmation pause below, never an
 earlier stop.
@@ -91,9 +90,10 @@ AGENTS.md bundled-script rule, then reads `status`, `message`, and
 `manualCommand` from the receipt that line redirects to; it does the same for
 the `Coretide SmartGit launch:` line when the handoff carries one. A
 Coretide-only landing has no `SmartGit launch:` line. Between the handoff and
-the question main makes no tool call other than these and the ones the handoff's
-own result requires. A receipt with any status the line forms below do not name,
-or one that is unreadable, is a blocker to report, not a summary to present.
+the question main makes only these tool calls and those the handoff result or
+the [approval review receipt contract](references/scripts.md#approval-review-receipt)
+requires. Report any unresolved receipt failure as a blocker and wait for a
+valid receipt before presenting the summary.
 
 Main then presents the self-contained summary immediately before the question: a
 one-sentence change that names a superseded decision whenever the session record

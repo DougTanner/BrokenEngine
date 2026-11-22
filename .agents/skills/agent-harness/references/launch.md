@@ -11,12 +11,14 @@ launch notes and launch caveats.
 
 ## Launch
 
-Launch each role through the skill's launch script, `Invoke-HarnessLaunch.ps1`,
-which owns the generic launch requirements, the game argument set, the
-process-check sequence, and the readiness wait; this document supplies only each
-call's values. Every fence below is its own independent shell call and they run
-in the order shown; assign each fence's path values locally and substitute
-values retained from an earlier fence as literals.
+Run each complete `Invoke-HarnessLaunch.ps1` call, including its Register
+action and watcher, in a context where the processes survive shell exit.
+Use the direct call on a working host or its official per-command approval
+when available and granted. Prove survival with a later owned ping and an
+identity check after the launch shell exits. When the host cannot provide
+that lifetime, give the user the desktop call below with actual values.
+Run from the adopted worktree root and double embedded apostrophes in
+PowerShell single-quoted literals.
 
 The server is single-instance per machine, so a harness server started while any
 `<server process-name prefix>*` process runs exits at once. Every server launch
@@ -24,12 +26,8 @@ call therefore refuses with `launch.server-running`, starting nothing, while
 such a process runs; that includes a relaunch under worker steps 25-26, which
 first waits for this run's own server PID to exit.
 
-On that result launch nothing more. Release the claimed lock through
-`Invoke-HarnessRelease.ps1` (worker step 39) with the `pid` of each role of this
-run still running and, only when one of them is registered,
-`-ProcessCheckStatePath`; on the run's first launch that is no
-`-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`, because no process
-started and no role is registered. Return `BLOCKED` with one `Residuals` row
+On that result launch nothing more. Follow the release procedure below for
+this run's roles and claim. Return `BLOCKED` with one `Residuals` row
 naming each PID and process name the result's message lists as a running server
 blocking the harness server, mark every criterion `BLOCKED` citing that row, and
 add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it
@@ -71,26 +69,88 @@ $LaunchPaths = [ordered]@{
 $LaunchPaths | ConvertTo-Json -Compress
 ```
 
-Retain that record outside shell state. Every process-check action, wait helper,
-and release call of this run uses that one `processCheckStatePath`, and no later
-run reuses it; a per-scenario run that uses its own AppData root generates its
-own state path the same way.
+Retain that record outside shell state. Use its `processCheckStatePath` for
+every process-check action and wait helper, and follow the release block below.
+Generate a fresh path the same way for every run, including a per-scenario run
+with its own AppData root.
 
-Launch the server, then the client, each with one call that returns once its
-port answers ping. Each call passes the claim result's `gameDataDirectory` (or
-the derived copy worker step 5 permits), the recorded `appDataRoot` and
-`processCheckStatePath`, the role's log path from that record, and the role's
-crash-report game name:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'server' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute server log path>' -GameName '<server game name>'
-```
+Run this call for `server`, then after its ping succeeds for `client`. Use
+the claim's `gameDataDirectory` or the copy worker step 5 permits, the recorded
+paths, the role's log and game name, and the applicable configuration and
+switches from worker step 21:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'client' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute client log path>' -GameName '<client game name>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role '<role>' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute role log path>' -GameName '<role game name>'
 ```
 
-The skill's launch step owns the launch result's shape and codes.
+For a user-operated desktop launch, put that exact launch line immediately
+after the guard below in a single `& { ... }` block. Redirect the launch's
+stdout to a fresh worktree `Temp` receipt and print `$LASTEXITCODE` separately
+in the same block. When the guard fails, retain its output and follow the
+worker's ownership rules before supplying any next command:
+
+```powershell
+$PSNativeCommandUseErrorActionPreference = $false
+& '<absolute AgentHarness path>' lock heartbeat --key default --owner '<owner token>'
+if ($LASTEXITCODE -ne 0) { throw "Harness ownership check failed (exit $LASTEXITCODE)." }
+```
+
+Keep normal heartbeat duties while owned. Any separate Register call uses
+the same durable context, original role and state, PID, and start time.
+
+Keep every launch result, including a failed Register or readiness wait. Use
+the following release block for cleanup across calls under worker steps 39–42.
+Use both latest receipts, including an earlier successful role, and the
+project hub's executable names for their launch configurations without
+`.exe`. Use `0` and an empty timestamp where a role never started. For
+`<absolute process-check state path or empty>`, supply the original run path
+when the launch, Register, or Check receipts show any role registered or leave
+registration uncertain, as with a failed Register or unreadable state. Use an
+empty string only when the receipts establish that no role registered, such as
+when no role started or only Baseline ran.
+
+```powershell
+& {
+	$PSNativeCommandUseErrorActionPreference = $false
+	$harness = '<absolute AgentHarness path>'
+	$owner = '<owner token>'
+	$state = '<absolute process-check state path or empty>'
+	$roles = @(
+		@{ argument = '-ServerPid'; name = '<server process name>'
+			pid = <retained server PID or 0>; started = '<server startTimeUtc or empty>' }
+		@{ argument = '-ClientPid'; name = '<client process name>'
+			pid = <retained client PID or 0>; started = '<client startTimeUtc or empty>' }
+	)
+	$release = @('-AgentHarness', $harness, '-Owner', $owner)
+	$held = @()
+	try {
+		foreach ($role in $roles) {
+			if ($role.pid -eq 0) { continue }
+			$process = Get-Process -Id $role.pid -ErrorAction SilentlyContinue
+			if ($null -eq $process) { continue }
+			$held += $process
+			$name = $process.ProcessName
+			if ($name -and $name -ne $role.name) { continue }
+			try { $handle = $process.Handle; $started = $process.StartTime }
+			catch { if ($process.HasExited) { continue }; throw }
+			if ($process.HasExited) { continue }
+			if ($null -ne $started -and $started.ToUniversalTime().ToString('o') -cne $role.started) { continue }
+			if ($null -eq $handle -or $null -eq $started) { throw "Could not verify $($role.name) PID $($role.pid)." }
+			$release += @($role.argument, $role.pid)
+		}
+		if ($state) { $release += @('-ProcessCheckStatePath', $state) }
+		& $harness lock heartbeat --key default --owner $owner
+		if ($LASTEXITCODE -ne 0) { throw "Harness ownership check failed (exit $LASTEXITCODE)." }
+		pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 @release
+		"Release exit: $LASTEXITCODE"
+	} finally { $held | ForEach-Object { $_.Dispose() } }
+}
+```
+
+For a desktop release redirect the script's stdout to its own fresh receipt.
+Keep the release call even when both role arguments are omitted. If an
+operation's result is missing or ambiguous, reconcile its receipt, ownership
+and role identities before retrying.
 
 Both processes share the absolute app-data root recorded as `appDataRoot`, so
 saves, settings, caches, and replay artifacts land under this worktree instead
@@ -194,49 +254,46 @@ samples.
 
 ## Normal launch
 
-For a user request to launch the game for their own play or testing. These are
-the `## Launch` executables without the harness run: a running-server check,
-then a harness lock claim under session `normal-launch` that is released once
-both processes have started, but no process check, readiness wait, or
-heartbeat, and none of the agent-only arguments (`--agent-port`,
-`--app-data-directory`, `--log-file` outside the exception below, `--windowed`,
-hidden windows). The client
-therefore opens a normal window that takes physical input, its fullscreen state
-follows the order in
+For a user request to launch the game for their own play or testing, check
+for a running Normal server, claim under session `normal-launch`, then start
+the server and client with ordinary visible windows, loopback and per-user
+settings. The client's fullscreen state follows
 [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md)
-`## Startup and Main Loop`, and both processes use the per-user AppData, so the
-user's own settings and saves apply. `--loopback-only` stays, as in every
-same-machine run.
+`## Startup and Main Loop`. Use the granted desktop execution if required
+for window lifetime. When unavailable, give the user the applicable blocks
+below as exact commands from the adopted worktree. Collect fresh `Temp`
+receipts and exit codes from each operation before supplying a contingent
+next command.
 
-The server is single-instance per machine (a second one logs an error and exits,
-with no modal), so first check that no server started without `--agent-port` is
-running. A server carrying `--agent-port` belongs to another session's harness
-run, which the claim below waits out; a server whose command line cannot be read
-counts as started without it:
-
-```powershell
-Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'" |
-	Where-Object { [string]$_.CommandLine -notmatch '--agent-port' } |
-	Select-Object ProcessId, Name
-```
-
-If that lists a process, report it to the user instead of stopping it; take no
-lock and launch nothing. Otherwise claim the harness lock in the form worker
-step 5 shows, under that step's run rules. A normal launch uses the `Debug`
-build, not Profile or Release. The one exception is the `/analyze-gpu-stall`
-focused route, which needs the client's
-slow-operation warnings that only Profile compiles in (`kbProfilingFrameSpike`):
-pass `-Configuration Profile` to the claim, launch the `.Profile.exe` names the
-hub's configuration mapping gives, and add
-`'--log-file', ('"' + '<absolute client log path>' + '"')` to the client's
-arguments:
+The claim waits out harness servers. Check first for a Normal server, including
+one whose command line is unreadable. Report any listed processes and end the
+attempt. Otherwise use worker step 5's foreground wait and claim cap.
+Debug is the default. For `/analyze-gpu-stall`, add `-Configuration Profile`
+for the slow-operation warnings (`kbProfilingFrameSpike`) and use the Profile
+executables and absolute client log in the pair start below:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project '<Project>'
+& {
+	$conflicts = @(Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'" -ErrorAction Stop |
+		Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
+	if ($conflicts.Count) { $conflicts | Select-Object ProcessId, Name; return }
+	pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project '<Project>'
+}
 ```
 
-- Exit `0`: launch below. Keep the result's `owner` and `agentHarness` until the
-  release below, and its `gameDataDirectory`.
+- Host timeout or missing claim receipt: follow worker step 5's wait rule for a
+  running call and use its exit code and receipt if recovered. Without a
+  receipt, confirm that the original invocation and any in-flight `lock claim`
+  have exited, then run worker step 44's `lock status` command. An absent lock
+  or confirmed foreign holder permits another claim within the cap, with its
+  result routed below. A different session or canonical worktree, or a
+  previously confirmed foreign token, identifies a foreign holder. If the
+  original call's exit, lock status, or holder's identity remains uncertain,
+  report the timeout or missing receipt and the available lock evidence, then
+  end the attempt. Obtain launch ownership through the claim result or
+  conditional takeover below.
+- Exit `0`: keep the result's `owner`, `agentHarness` and `gameDataDirectory`
+  for the pair start below.
 - `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet.
   When step 11 classifies the holder fresh, re-invoke the claim within worker
   step 5's claim cap; when stale, run
@@ -247,43 +304,60 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
   owner token and that result's `agentHarness` until the release below; a
   `BLOCKED` takeover is reported to the user with nothing launched.
 - `claim.wait-timeout`: re-invoke the claim within worker step 5's claim cap.
-  When the claim cap ends the claim on any route, report the holder
-  (`currentOwner`, or the server PIDs) to the user and launch nothing.
+  When the cap prevents a retry on any route, report the latest lock status or
+  claim result, including `currentOwner` or the server PIDs when present, and
+  end the attempt.
 - Any other non-zero exit: report the claim result to the user and launch
   nothing.
 
-Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from
-the `## Machine-readable launch configuration` of the project hub,
-`Projects/<Project>/Documents/AgentHarness.md`, whose executable names are the
-Debug ones:
+On proven acquisition, run the same pair start and lock-only release together
+on both paths. Use the project hub's mapping to resolve the two absolute
+executables for the claimed configuration. Set `$clientLog` to the exact
+absolute log path for Profile and to `''` for Debug:
 
 ```powershell
-$ROOT = '<absolute adopted worktree>'
-$GameDataDirectory = '<claim result gameDataDirectory>'
-$Output = Join-Path $ROOT '<hub Output path>'
-$ServerExe = Join-Path $Output '<hub ServerExe name>'
-$ClientExe = Join-Path $Output '<hub ClientExe name>'
-$QuotedData = '"' + $GameDataDirectory + '"'
-$ServerProcess = Start-Process -FilePath $ServerExe -ArgumentList @('--loopback-only', '--data-directory', $QuotedData) -PassThru -ErrorAction Stop
-$ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @('--loopback-only', '--data-directory', $QuotedData) -PassThru -ErrorAction Stop
-[ordered]@{ serverPid = $ServerProcess.Id; clientPid = $ClientProcess.Id } | ConvertTo-Json -Compress
+& {
+	$PSNativeCommandUseErrorActionPreference = $false
+	$harness = '<absolute AgentHarness path>'
+	$owner = '<current owner token>'
+	$clientLog = '<absolute Profile client log path, or empty for Debug>'
+	$gameArguments = @('--loopback-only', '--data-directory', ('"' + '<claim result gameDataDirectory>' + '"'))
+	$receipt = [ordered]@{
+		ownershipExitCode = $null; ownershipOutput = $null
+		serverPid = $null; serverStartTimeUtc = $null; clientPid = $null; clientStartTimeUtc = $null
+		launchError = $null; releaseExitCode = $null; releaseOutput = $null; releaseError = $null
+	}
+	try {
+		$receipt.ownershipOutput = @(& $harness lock heartbeat --key default --owner $owner)
+		$receipt.ownershipExitCode = $LASTEXITCODE
+		if ($receipt.ownershipExitCode -ne 0) { throw 'Harness ownership check failed.' }
+		$conflicts = @(Get-CimInstance Win32_Process -Filter "Name LIKE '<server process-name prefix>%'" -ErrorAction Stop |
+			Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
+		if ($conflicts.Count -gt 0) { throw "A Normal server is running (PID $($conflicts.ProcessId -join ', '))." }
+		$server = Start-Process -FilePath '<absolute mapped server executable>' -ArgumentList $gameArguments -PassThru -ErrorAction Stop
+		$receipt.serverPid = $server.Id
+		$receipt.serverStartTimeUtc = $server.StartTime.ToUniversalTime().ToString('o')
+		if ($clientLog) { $gameArguments += @('--log-file', ('"' + $clientLog + '"')) }
+		$client = Start-Process -FilePath '<absolute mapped client executable>' -ArgumentList $gameArguments -PassThru -ErrorAction Stop
+		$receipt.clientPid = $client.Id
+		$receipt.clientStartTimeUtc = $client.StartTime.ToUniversalTime().ToString('o')
+	} catch { $receipt.launchError = $_.Exception.Message }
+	finally {
+		if ($receipt.ownershipExitCode -eq 0) {
+			try {
+				$receipt.releaseOutput = @(& $harness lock release --key default --owner $owner)
+				$receipt.releaseExitCode = $LASTEXITCODE
+			} catch { $receipt.releaseError = $_.Exception.Message }
+		}
+	}
+	$receipt | ConvertTo-Json -Compress
+}
 ```
 
-Then release the lock with the kept owner token, as its own shell call that runs
-even when the launch block threw:
-
-```powershell
-& '<absolute AgentHarness path>' lock release --key default --owner '<owner token>'
-```
-
-Exit `0` released the lock. Exit `2` means the lock is absent or another owner
-took it over; leave it alone. On any other exit, report the release result to
-the user. Then discard the owner token. Never release through
-`Invoke-HarnessRelease.ps1`, which quits and force-stops processes.
-
-The client connects as `## Launch` describes. If a launch fails, report it to
-the user after the release. Leave both processes running for the user, who
-closes them; never quit or stop them. After the release this session holds no
-owner token, so `/compile` never sends `quit` to these processes. A harness run
-started meanwhile claims as worker steps 5 and 7 describe; while the user's
-client stays open, it waits as `## Launch` requires.
+Read `releaseExitCode` from the receipt. Exit `0` released the lock. Exit `2`
+means the lock is absent or another owner holds it. Report any other exit or
+exception with its release result, and discard the token when release is
+settled. Report any launch failure and any process that started. Reconcile
+the returned PIDs and start times, the claim and the release before sending
+a next command after a partial or ambiguous result. Leave Normal windows
+running for the user to close. The client connects as `## Launch` describes.

@@ -18,17 +18,18 @@ code, message, counts, and paths after parsing. Exit/result/schema mismatches
 block. For `Invoke-FinalizeApprovalPreparation.ps1`, preserve the complete
 command stdout losslessly in the ignored repository-relative
 `Temp/finalize-approval-preparation-result.json` artifact during the invocation
-below. The `Show-FinalizeApprovalReview.ps1` invocation below likewise redirects
-its single-line stdout to the ignored repository-relative
-`Temp/finalize-approval-review-result.json` artifact, and that artifact path is
-what the landing invocations pass as `-ApprovalReviewResultFile`; its values are
-never re-typed by hand.
+below. The two `Show-FinalizeApprovalReview.ps1` invocations likewise redirect
+their single-line stdout to the respective receipt paths below. Pass those
+receipts intact to the corresponding landing invocations.
 
 ## Invocation
 
 Use the canonical invocation form in root AGENTS.md `## Directives`.
-Angle-bracket values are placeholders; quote every one. `<owner-token>` is a
-canonical lowercase GUID in `8-4-4-4-12` form. For the lock claim, either omit
+In both SmartGit lines, use `-HandoffOnly` for `<review-mode>` when main will run
+the line in ordinary agy. Omit that placeholder for direct Claude Code, Codex,
+or desktop execution. Quote the remaining angle-bracket values as PowerShell
+literals, doubling apostrophes. `<owner-token>` is a canonical lowercase GUID
+in `8-4-4-4-12` form. For the lock claim, either omit
 `-LandingOwner` so `Invoke-FinalizeLockClaim.ps1` creates and returns one, or
 create one explicitly with `WorktreeCli lock token`; later commands that supply
 the already-held token carry it and do not create one. `<baseline>` is the
@@ -47,10 +48,10 @@ pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLoc
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -Release
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLockClaim.ps1 -WorktreeCliExecutable '<worktreecli-exe>' -GitCommonDirectory '<git-common-dir>' -SessionLabel '<session-label>' -Worktree '<current-worktree>' -LandingOwner '<owner-token>' -LeaseSeconds '3600'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeLanding.ps1 -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -CurrentBranch '<session-branch>' -PrimaryBranch '<primary-branch>' -ExpectedCurrentTip '<current-tip>' -ExpectedPrimaryTip '<primary-tip>' -SessionLabel '<session-label>' -ApprovedSessionCommit '<approved-commit>' -ApprovedCandidateTree '<approved-tree>' -ApprovalReviewResultFile 'Temp/finalize-approval-review-result.json' -OwnerToken '<owner-token>'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' > 'Temp/finalize-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>' -ApprovedTip '<landing-commit>' <review-mode> > 'Temp/finalize-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCoretide.ps1 -Prepare -CurrentWorktree '<current-worktree>' -CommitMessageFile 'Temp/finalize-coretide-commit-message.txt'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-FinalizeCoretide.ps1 -Land -CurrentWorktree '<current-worktree>' -PrimaryWorktree '<primary-worktree>' -OwnerToken '<owner-token>' -ApprovedCoretideCommit '<coretide-commit>' -ApprovalReviewResultFile 'Temp/finalize-coretide-approval-review-result.json'
-pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>/Projects/Coretide' -ApprovedTip '<coretide-commit>' > 'Temp/finalize-coretide-approval-review-result.json'
+pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Show-FinalizeApprovalReview.ps1 -PrimaryWorktree '<primary-worktree>/Projects/Coretide' -ApprovedTip '<coretide-commit>' <review-mode> > 'Temp/finalize-coretide-approval-review-result.json'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<current-worktree>'
 pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary-worktree>' -WorktreeCliCandidate '<worktreecli-candidate>' -AgentHarnessCandidate '<agentharness-candidate>' -LandedCommit '<landed-commit>'
 pwsh -NoProfile -File .agents/scripts/Repair-SessionForkPoint.ps1
@@ -225,6 +226,27 @@ reconstructs the assessment from Git output.
 reviewed commit, expanded from an abbreviated `-ApprovedTip`. The redirected
 artifact is that receipt: landing reads `approvedTip` and `status` from the
 file named by `-ApprovalReviewResultFile`.
+
+The default call reports `opened` when SmartGit starts. `-HandoffOnly` checks
+for a normal launcher exit within its deadline and a surviving SmartGit process
+that matched the resolved executable and Windows session before launch. A cold
+start, timeout, or unconfirmed handoff reports `failed`. For `unavailable` or
+`failed`, provide the receipt's `message` and exact `manualCommand` for desktop
+PowerShell from the session worktree root. Reuse the review if it is already open
+for the candidate. Treat the desktop command as pending until its result is known.
+
+When the review returns `internal.error` because the agent host denied access
+to the supplied primary worktree before launch, first request the CLI's
+official per-command host execution under its normal approval policy, falling
+back to the filled-in [invocation](#invocation) for the user to run in
+interactive desktop PowerShell if host execution is unavailable or provides
+no verified launch attempt. Keep `-HandoffOnly` for the host retry unless
+durable interactive launch is verified in that context. Omit it for desktop.
+Run either retry from the session worktree root with the same primary worktree,
+exact approved tip, and receipt redirection. Collect the exit code and receipt.
+Continue after exit 0 and a receipt that satisfies the gate below. A user
+decline of the operation, invalid input, or any other internal error blocks the
+summary.
 
 The review outcome stays non-blocking — `opened`, `unavailable`, and `failed`
 all satisfy the gate, because only an attempted launch is required, not a

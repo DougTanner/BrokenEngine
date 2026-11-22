@@ -353,10 +353,9 @@ and the handoff this run returns.
       and drops the Vulkan validation layer, so keep it off ordinary runs (see
       the RenderDoc capture reference `renderdoc.md`).
 
-19. Process-check every launch on every host through
-    `../scripts/Invoke-AgentHarnessProcessCheck.ps1`. Done when its `Baseline`,
-    `Register`, and `Check` actions are the only way this run checks process
-    identity.
+19. Monitor every launch on every host through
+    `../scripts/Invoke-AgentHarnessProcessCheck.ps1`. Done when launch and
+    lifecycle monitoring use the run's process-check state.
 
     - The launch script runs `Baseline`, `Register`, and the immediate `Check`
       for every launch. Run an action directly only for step 33's
@@ -368,14 +367,13 @@ and the handoff this run returns.
       pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
       ```
 
-    - The wait helpers and `../scripts/Invoke-HarnessRelease.ps1` run the
-      checker themselves from the `-ProcessCheckStatePath` you pass them, so
-      never invoke it yourself mid-wait.
+    - Let the wait helpers run the checker with the `-ProcessCheckStatePath`
+      you pass them. Follow step 39 for release-time identity checks.
 
 20. Generate one absolute state path per run under
     `<absolute adopted worktree>\Temp` that no earlier run used. Done when that
-    same path is the one passed to every action, wait helper, and release call
-    of that run.
+    same path is passed to every action and wait helper of that run. Follow
+    [`launch.md`](launch.md#launch) for release.
 
     - An unused path makes the run start with no state file, so it inherits no
       earlier run's registrations.
@@ -678,60 +676,31 @@ and the handoff this run returns.
 ### Lifecycle and release
 
 39. After every successful, failed, crashed, or abandoned launch attempt,
-    release through `../scripts/Invoke-HarnessRelease.ps1`. One call performs
-    the whole sequence, and it is safe after a crashed run whose PIDs are
-    already gone. Done when that one call has returned:
+    use the release block in [`launch.md`](launch.md#launch). Done when that
+    block returns a release result or its failure is reported. Reconcile a
+    missing or ambiguous result as `launch.md` directs before retrying.
 
-    ```powershell
-    pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ServerPid <server PID> -ClientPid <client PID> -ProcessCheckStatePath '<absolute process-check state path>'
-    ```
+40. For log review, keep each role's latest launch receipt with a non-null
+    `pid`. Done when step 42 has a receipt for each role that started.
 
-40. Pass only exact non-null numeric `serverPid`/`clientPid` values retained
-    from the latest launch results' `pid`; replace the numeric placeholders and
-    omit either argument for a process that never started. Done when the call
-    carries exactly those retained PIDs.
-
-    - The latest launch results are authoritative, including after a partial
-      launch failure.
-    - The script quits both ports with the owner (server quit autosaves), waits
-      for those exact PIDs, stops only a supplied exact PID that survived the
-      quit, and runs `lock release` only once every supplied PID is confirmed
-      absent. It never searches by process name and never stops a PID you did
-      not supply.
-
-41. Supply the optional `-ProcessCheckStatePath` whenever the roles are
-    registered, which the launch sequence above makes the ordinary case. Done
-    when the registered run's release call carries that state path.
-
-    - The script then runs `-Action Check` once at entry, before the first quit,
-      so a role that already crashed is observed while its evidence is still
-      attributable, and reports the findings as an additive `crashFindings`
-      array in its JSON, with an advisory `processCheckNote` when the checker
-      returned no readable findings.
-    - Quit, exact-PID wait, stop, cleanup, and lock-release ordering and every
-      exit code are unchanged, and the reported crash reports and their evidence
-      directories are never deleted, moved, or rewritten.
-    - Exit `0` with a non-empty `crashFindings` therefore still means the run
-      failed: cleanup succeeded and the lock was released, but a registered role
-      had exited unexpectedly.
-
-42. Read the release result, then search for `DEBUG_BREAK at` in the
-    `--log-file` of each process this run started: the server and client log
-    paths from the project harness doc's launch, for each PID step 40 retains.
-    A log no process of this run opened still holds an
-    earlier run's lines and is never searched. Done when the release outcome is
-    classified and reported and every such log has been searched.
+41. Classify and report the release result, including its `crashFindings` and
+    any `processCheckNote`. Done when the handoff records the outcome.
 
     - Exit `0` (`status` `pass`) means every supplied PID is absent and the lock
-      was released; report the payload's per-step outcomes verbatim, including
-      `crashFindings`.
+      was released. Report the payload's per-step outcomes verbatim. A non-empty
+      `crashFindings` means the run failed because a registered role exited
+      unexpectedly.
     - Exit `2` (`status` `blocked`, code `release.process-survived`) means a
-      supplied PID is still alive: no release was attempted, the claim stays
-      held, and you decide whether to retry the release or escalate to the user.
+      supplied PID is still alive and the claim stays held. Decide whether to
+      retry through step 39 or escalate to the user.
     - Exit `1` is a failure naming its step, including
-      `release.lock-owner-mismatch` and `release.lock-absent`, which are never a
-      success.
-    - Never reconstruct the quit, wait, stop, or release steps inline.
+      `release.lock-owner-mismatch` and `release.lock-absent`.
+
+42. Use the receipts from step 40 to cover every role that started, including
+    those that already exited or were omitted from release. Search for
+    `DEBUG_BREAK at` in each role's current `--log-file` from step 16 if this
+    run opened it. Done when each started role's log has been checked.
+
     - Report each log with a match as one `Evidence` row: the log path with
       `DEBUG_BREAK at` as selector, the match count, the first matched line,
       and the line logged just before it, which names the cause of an `ASSERT`
@@ -799,10 +768,10 @@ case.
       launch. No quit reaches it, so after the step-14 quits wait on it with the
       listener PIDs and stop it by exact PID under step 14's rule.
 
-46. Release through step 39 with the record's `owner`, no
-    `-ServerPid`/`-ClientPid`, and no `-ProcessCheckStatePath`, then classify
-    the result per step 42 without its log search. Done when the release result
-    is reported as a `Decisive checks` row.
+46. Run `../scripts/Invoke-HarnessRelease.ps1` with only `-AgentHarness` and
+    `-Owner`, using the executable from step 44 and the record's `owner`.
+    Classify the result per step 41. Done when the release result is reported
+    as a `Decisive checks` row.
 
     - Step 45 already confirmed every validated PID gone, listening or not.
     - The stopped run's process-check state path lives only in its scratch

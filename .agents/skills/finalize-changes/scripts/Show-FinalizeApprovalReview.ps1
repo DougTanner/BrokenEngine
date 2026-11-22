@@ -7,8 +7,8 @@
 # and asks the landing confirmation in the same exchange, so the user can
 # confirm as soon as their review is done. Callers never reconstruct its SmartGit command inline.
 #
-# The script always attempts the launch, so the window opens whenever SmartGit
-# is available.
+# The script attempts the launch whenever SmartGit is available. Handoff-only
+# checks pair a normal launcher exit with a surviving pre-existing instance.
 # It runs Git only to expand an abbreviated supplied tip to its full commit ID,
 # and never mutates a ref or claims a lock.
 #
@@ -32,7 +32,8 @@
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $PrimaryWorktree,
-	[Parameter(Mandatory)][string] $ApprovedTip
+	[Parameter(Mandatory)][string] $ApprovedTip,
+	[switch] $HandoffOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,16 +85,41 @@ function Assert-Input([bool] $Condition, [string] $Message)
 
 function ConvertTo-PowerShellLiteral([string] $Value)
 {
-	return "'" + $Value.Replace("'", "''") + "'"
+	return "'" + ($Value -replace "['\u2018-\u201B]", '$0$0') + "'"
 }
 
-function ConvertTo-ProcessArgument([string] $Value)
+function Get-SmartGitReceivers([string] $Executable)
 {
-	if ($Value.Contains('"', [StringComparison]::Ordinal))
+	try
 	{
-		throw 'SmartGit arguments cannot contain a double quote.'
+		$sessionId = (Get-Process -Id $PID).SessionId
+		$candidates = [Diagnostics.Process]::GetProcessesByName([IO.Path]::GetFileNameWithoutExtension($Executable))
 	}
-	return '"' + $Value + '"'
+	catch
+	{
+		return
+	}
+	foreach ($candidate in $candidates)
+	{
+		try
+		{
+			if ($candidate.SessionId -eq $sessionId)
+			{
+				# Hold the receiver's identity through the launcher wait.
+				[void] $candidate.SafeHandle
+				if (-not $candidate.HasExited -and [string]::Equals($candidate.MainModule.FileName, $Executable, [StringComparison]::OrdinalIgnoreCase))
+				{
+					$candidate
+					continue
+				}
+			}
+		}
+		catch
+		{
+			# A process can exit or deny inspection before its image is verified.
+		}
+		$candidate.Dispose()
+	}
 }
 
 function Invoke-SmartGit
@@ -101,38 +127,86 @@ function Invoke-SmartGit
 	$standardExecutable = 'C:\Program Files\SmartGit\bin\smartgit.exe'
 	$arguments = @('--log', $script:PrimaryIdentity, "--anchor-commit=$ApprovedTip")
 	$result.arguments = $arguments
-	$result.manualCommand = ((@('&', (ConvertTo-PowerShellLiteral $standardExecutable)) + @($arguments | ForEach-Object { ConvertTo-PowerShellLiteral $_ })) -join ' ')
-	$resolvedExecutable = $null
 	if (Test-Path -LiteralPath $standardExecutable -PathType Leaf)
 	{
-		$resolvedExecutable = $standardExecutable
+		$result.executable = $standardExecutable
 	}
 	else
 	{
 		$command = Get-Command smartgit.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-		if ($null -ne $command)
+		if ($null -ne $command -and (Test-Path -LiteralPath $command.Source -PathType Leaf))
 		{
-			$resolvedExecutable = $command.Source
+			$result.executable = [IO.Path]::GetFullPath($command.Source)
 		}
 	}
-	if ([string]::IsNullOrWhiteSpace($resolvedExecutable) -or -not (Test-Path -LiteralPath $resolvedExecutable -PathType Leaf))
+	$manualExecutable = $result.executable ?? $standardExecutable
+	$manualArguments = @($manualExecutable) + $arguments
+	$result.manualCommand = '& ' + (($manualArguments | ForEach-Object { ConvertTo-PowerShellLiteral $_ }) -join ' ')
+	if ($null -eq $result.executable)
 	{
 		Complete-Review 0 'unavailable' 'review.unavailable' 'SmartGit executable was not found.'
 	}
 
-	$result.executable = [IO.Path]::GetFullPath($resolvedExecutable)
+	$receivers = @()
+	$launcher = $null
+	$message = 'SmartGit was opened for the approval candidate.'
 	try
 	{
-		$processArguments = @($arguments | ForEach-Object { ConvertTo-ProcessArgument $_ })
-		$process = Start-Process -FilePath $result.executable -ArgumentList $processArguments -PassThru
-		$result.processId = $process.Id
-		$process.Dispose()
+		if ($HandoffOnly)
+		{
+			$receivers = @(Get-SmartGitReceivers $result.executable)
+		}
+		$start = [Diagnostics.ProcessStartInfo]::new($result.executable)
+		$start.UseShellExecute = $true
+		$start.WorkingDirectory = $PWD.ProviderPath
+		foreach ($argument in $arguments)
+		{
+			$start.ArgumentList.Add($argument)
+		}
+		$launcher = [Diagnostics.Process]::Start($start)
+		if ($null -eq $launcher)
+		{
+			throw 'SmartGit did not return a launcher process.'
+		}
+		$result.processId = $launcher.Id
+		if ($HandoffOnly)
+		{
+			if ($receivers.Count -eq 0)
+			{
+				throw 'No matching SmartGit process was identified in this session before launch.'
+			}
+			if (-not $launcher.WaitForExit(10000))
+			{
+				throw 'The SmartGit launcher did not exit before the handoff deadline.'
+			}
+			if ($launcher.ExitCode -ne 0)
+			{
+				throw "The SmartGit launcher exited with code $($launcher.ExitCode)."
+			}
+			$receiver = $receivers | Where-Object { -not $_.HasExited } | Select-Object -First 1
+			if ($null -eq $receiver)
+			{
+				throw 'No matching pre-existing SmartGit process survived the launcher exit.'
+			}
+			$message = "The SmartGit launcher exited with code 0 while pre-existing SmartGit PID $($receiver.Id) was still running in this session."
+		}
 	}
 	catch
 	{
 		Complete-Review 0 'failed' 'review.launch-failed' $_.Exception.Message
 	}
-	Complete-Review 0 'opened' 'ok' 'SmartGit was opened for the approval candidate.'
+	finally
+	{
+		if ($null -ne $launcher)
+		{
+			$launcher.Dispose()
+		}
+		foreach ($receiver in $receivers)
+		{
+			$receiver.Dispose()
+		}
+	}
+	Complete-Review 0 'opened' 'ok' $message
 }
 
 try

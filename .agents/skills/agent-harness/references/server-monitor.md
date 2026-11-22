@@ -7,24 +7,27 @@
 An agent-mode server's only visible window is its console, shown minimized,
 which has no statistics view. The separate Server Monitor is a plain Win32
 GDI window; client `screenshot`, `describe_ui`, and `click` cannot drive it.
-Build it with `/compile -Target ServerMonitor`, then start it from the adopted
-worktree root:
+Build it with `/compile -Target ServerMonitor` and resolve the absolute Release
+executable in the adopted worktree. For split calls on a desktop that supports
+both process survival and physical input, start it minimized and retain its
+identity:
 
 ```powershell
-$monitor = Start-Process -FilePath 'Tools\ServerMonitor\Platforms\VisualStudio2026\Output\ServerMonitor.exe' -WindowStyle Minimized -PassThru
+$monitor = Start-Process -FilePath '<absolute ServerMonitor.exe>' -WindowStyle Minimized -PassThru -ErrorAction Stop
+[ordered]@{ pid = $monitor.Id; startTimeUtc = $monitor.StartTime.ToUniversalTime().ToString('o') } | ConvertTo-Json -Compress
 ```
 
-Retain `$monitor.Id` and pass it as `-MonitorPid` to the helper below. A harness
-server's app-data root holds no secret file unless the scenario writes one.
-Stop the monitor with `Stop-Process -Id <pid>` after capture. Copy the complete
-block below verbatim into the ignored `Temp\Capture-ServerMonitor.ps1` under
-the adopted worktree. Keep PID ownership; do not use a process-name search or
-add a tracked helper.
+A harness server's app-data root holds no secret file unless the scenario writes
+one. Copy the complete block below verbatim into the ignored
+`Temp\Capture-ServerMonitor.ps1` under the adopted worktree.
 ```powershell
 param(
 	[Parameter(Mandatory = $true)]
 	[ValidateRange(1, [int]::MaxValue)]
 	[int] $MonitorPid,
+
+	[Parameter(Mandatory = $true)]
+	[string] $MonitorStartTimeUtc,
 
 	[ValidateSet('Map', 'Profile', 'ProfileCopy')]
 	[string] $Target = 'Profile',
@@ -425,14 +428,19 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 }
 
 $serverProcess = Get-Process -Id $MonitorPid -ErrorAction Stop
-if ($serverProcess.HasExited)
+$null = $serverProcess.Handle
+if ($serverProcess.HasExited -or $serverProcess.StartTime.ToUniversalTime().ToString('o') -cne $MonitorStartTimeUtc)
 {
-	throw ('Retained monitor PID {0} has already exited.' -f $MonitorPid)
+	throw ('No live monitor matches PID {0} started at {1}.' -f $MonitorPid, $MonitorStartTimeUtc)
 }
-$serverWindowHwnd = [AgentServerMonitorNative]::FindTopLevelWindow($MonitorPid)
-if ($serverWindowHwnd -eq [IntPtr]::Zero)
+$windowDeadline = [Diagnostics.Stopwatch]::StartNew()
+while ($true)
 {
-	throw ('No top-level HWND owned by retained monitor PID {0} was found.' -f $MonitorPid)
+	if ($serverProcess.HasExited) { throw "Monitor PID $MonitorPid exited before capture." }
+	$serverWindowHwnd = [AgentServerMonitorNative]::FindTopLevelWindow($MonitorPid)
+	if ($serverWindowHwnd -ne [IntPtr]::Zero) { break }
+	if ($windowDeadline.ElapsedMilliseconds -ge 5000) { throw "No top-level window for monitor PID $MonitorPid." }
+	Start-Sleep -Milliseconds 100
 }
 
 $beforeState = Get-ServerWindowState $serverWindowHwnd
@@ -441,6 +449,7 @@ try
 {
 	Refresh-ServerWindow $serverWindowHwnd
 	Save-ServerWindowCapture $serverWindowHwnd $BeforeCapturePath
+	if ($serverProcess.HasExited) { throw "Monitor PID $MonitorPid exited before the click." }
 
 	switch ($Target)
 	{
@@ -500,14 +509,49 @@ finally
 			Write-Warning ('Could not record post-restore state: {0}' -f $_.Exception.Message)
 		}
 	}
+	$serverProcess.Dispose()
 }
 ```
 
-From the adopted worktree root, run the ignored copy with the retained PID (the
-`Profile` target is the acceptance scenario):
+For split calls, run the helper from the adopted worktree root, then stop the
+monitor in a separate call using the same identity. Save both images and the
+helper's output and exit code:
 
 ```powershell
-pwsh -NoProfile -File .\Temp\Capture-ServerMonitor.ps1 -MonitorPid <exact retained monitor PID> -Target Profile
+pwsh -NoProfile -File .\Temp\Capture-ServerMonitor.ps1 -MonitorPid <retained PID> -MonitorStartTimeUtc '<retained startTimeUtc>' -Target Profile -BeforeCapturePath '<fresh absolute before path>' -AfterCapturePath '<fresh absolute after path>'
+```
+
+```powershell
+$monitor = Get-Process -Id <retained PID> -ErrorAction Stop
+try {
+	$null = $monitor.Handle
+	if ($monitor.HasExited -or $monitor.StartTime.ToUniversalTime().ToString('o') -cne '<retained startTimeUtc>') { throw 'No live monitor matches the retained identity.' }
+	$monitor.Kill()
+	if (-not $monitor.WaitForExit(5000)) { throw 'The owned monitor did not exit.' }
+} finally { $monitor.Dispose() }
+```
+
+When the host cannot prove that split flow, use its granted desktop execution
+or have the user run this whole block in PowerShell from the adopted worktree
+on the interactive desktop. Fill the absolute values as PowerShell literals
+and collect the same evidence. The helper waits for the owned window:
+
+```powershell
+$monitor = Start-Process -FilePath '<absolute ServerMonitor.exe>' -WindowStyle Minimized -PassThru -ErrorAction Stop
+try {
+	$null = $monitor.Handle
+	$started = $monitor.StartTime.ToUniversalTime().ToString('o')
+	"Monitor PID $($monitor.Id) started at $started"
+	pwsh -NoProfile -File .\Temp\Capture-ServerMonitor.ps1 -MonitorPid $monitor.Id -MonitorStartTimeUtc $started -Target Profile -BeforeCapturePath '<fresh absolute before path>' -AfterCapturePath '<fresh absolute after path>'
+	"Capture exit: $LASTEXITCODE"
+	if ($LASTEXITCODE -ne 0) { throw 'Monitor capture failed.' }
+} finally {
+	try {
+		if (-not $monitor.HasExited) { $monitor.Kill() }
+		if (-not $monitor.WaitForExit(5000)) { throw 'The owned monitor did not exit.' }
+		"Monitor PID $($monitor.Id) exited."
+	} finally { $monitor.Dispose() }
+}
 ```
 
 Run the acceptance scenario with `-Target Profile`; it switches only the

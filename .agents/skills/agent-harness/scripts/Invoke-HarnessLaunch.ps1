@@ -115,8 +115,6 @@ try {
 	if (-not (Test-Path -LiteralPath $root -PathType Container)) {
 		Complete-HarnessLaunch 1 'error' 'launch.repository-missing' "RepositoryRoot is not a directory: '$root'."
 	}
-	# Canonical paths carry no trailing separator, which would otherwise escape the closing quote of a
-	# quoted game argument.
 	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory
 	$result.gameDataDirectory = $dataDirectory
 	$appDataRoot = Get-AgentCanonicalPath $AppDataDirectory
@@ -144,11 +142,12 @@ try {
 	}
 
 	$executable = Join-Path $launch.OutputDirectory $(if ($Role -ceq 'server') { $launch.ServerExe } else { $launch.ClientExe })
-	# Start-Process joins ArgumentList items, so every path-valued argument is quoted.
+	# Start-Process joins ArgumentList items. An app-data filesystem root retains its trailing
+	# backslash after canonicalization, so double it before the closing quote.
 	$gameArguments = @(
 		'--agent-port', "$($result.port)",
 		'--data-directory', ('"' + $dataDirectory + '"'),
-		'--app-data-directory', ('"' + $appDataRoot + '"'),
+		'--app-data-directory', ('"' + ($appDataRoot -replace '(\\+)$', '$1$1') + '"'),
 		'--log-file', ('"' + $logPath + '"'))
 	if (-not $CrossMachine) { $gameArguments += '--loopback-only' }
 	if ($Role -cne 'server' -and -not $NativeResolution) { $gameArguments += @('--windowed', '1600x900') }

@@ -322,7 +322,7 @@ try {
 			$record[0].registeredUtc = [datetime]::UtcNow.ToString('o', [cultureinfo]::InvariantCulture)
 			Write-CheckState $statePath $roles
 			# Start-Process joins ArgumentList items, so every path-valued argument is quoted.
-			Start-Process pwsh -ArgumentList @(
+			Start-Process -FilePath ([Environment]::ProcessPath) -ArgumentList @(
 				'-NoProfile', '-File', ('"' + $PSCommandPath + '"'),
 				'-Action', 'Watch',
 				'-StatePath', ('"' + $statePath + '"'),

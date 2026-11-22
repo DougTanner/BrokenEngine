@@ -19,8 +19,8 @@
 	and its status. A completed receipt is followed by the line `--- findings ---` and then the
 	out-file's bytes verbatim, so the result needs no separate read. If the budget expires with the
 	run still alive the receipt reports running, and one further -Wait <run identifier> call resumes
-	the same bounded wait. Every call stays well below the caller's command timeout, and because the
-	run is detached a killed call never kills the run.
+	the same bounded wait after the launching call exits. Both calls must be in a host context where
+	the worker survives the launching call and the run records are visible.
 
 	Receipt fields: schemaVersion (broken-engine-codex-run/v1); status (completed, malformed,
 	failed, or running); runId; outFile (absolute out-file path, null when no run record exists);
@@ -273,9 +273,14 @@ function Wait-Run([string] $RunId)
 			$alive = $false
 		}
 
-		# A dead run without a done record can never finish, so answering now beats burning the budget.
 		if (-not $alive)
 		{
+			# The worker may have published its result and exited since the first check.
+			if (Test-Path -LiteralPath $donePath -PathType Leaf)
+			{
+				continue
+			}
+
 			Write-Receipt @{ status = 'failed'; runId = $RunId; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
 			return
 		}
@@ -425,19 +430,36 @@ if ($PSCmdlet.ParameterSetName -ceq 'Launch')
 	# The prompt is copied because the detached run outlives the caller that wrote it.
 	Copy-Item -LiteralPath $absolutePrompt -Destination $detachedPrompt
 
-	$powershell = (Get-Process -Id $PID).Path
-	# One pre-quoted command line: an argument array would be re-escaped and would split these paths.
-	$noRetryArgument = if ($NoRetry) { ' -NoRetry' } else { '' }
-	$arguments = "-NoProfile -NonInteractive -File `"$PSCommandPath`" -InternalRunId `"$runId`" -Worktree `"$absoluteWorktree`" -PromptFile `"$detachedPrompt`" -OutFile `"$absoluteOutput`" -Agent `"$Agent`" -Sandbox `"$Sandbox`"$noRetryArgument"
-	$detached = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
-
-	[ordered]@{
-		runId = $runId
-		processId = $detached.Id
-		processStartTicks = $detached.StartTime.ToUniversalTime().Ticks
-		outFile = $absoluteOutput
-	} | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath (Get-RunRecordPath $runId) -Encoding utf8NoBOM
-	$detached.Dispose()
+	$start = [System.Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+	# Shell execution keeps the worker from holding the caller's capture pipes open.
+	$start.UseShellExecute = $true
+	$start.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+	$start.WorkingDirectory = $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath
+	foreach ($argument in @('-NoProfile', '-NonInteractive', '-File', $PSCommandPath,
+		'-InternalRunId', $runId, '-Worktree', $absoluteWorktree, '-PromptFile', $detachedPrompt,
+		'-OutFile', $absoluteOutput, '-Agent', $Agent, '-Sandbox', $Sandbox))
+	{
+		$start.ArgumentList.Add($argument)
+	}
+	if ($NoRetry)
+	{
+		$start.ArgumentList.Add('-NoRetry')
+	}
+	$detached = [System.Diagnostics.Process]::Start($start)
+	try
+	{
+		# The launch handle identifies this worker even if it has already exited.
+		[ordered]@{
+			runId = $runId
+			processId = $detached.Id
+			processStartTicks = $detached.StartTime.ToUniversalTime().Ticks
+			outFile = $absoluteOutput
+		} | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath (Get-RunRecordPath $runId) -Encoding utf8NoBOM
+	}
+	finally
+	{
+		$detached.Dispose()
+	}
 
 	Wait-Run $runId
 	exit 0
