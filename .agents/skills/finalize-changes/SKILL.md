@@ -38,12 +38,10 @@ produces the landing acceptance table itself, inside the workflow in
 `references/worker.md`, from the prepared diff final preparation and
 reconciliation produced — do not reuse an earlier table. When a Plan completion
 or rejection belongs to the landing, the brief also carries the `/next-plan`
-step-10 `Complete-NextPlan.ps1` result verbatim. Preparation and recovery
-briefs carry authorization kind (`unconfirmed`, `standing confirmation`, or
-`standalone Plan rejection`), any prior confirmed candidate's commit and parent
-so `references/worker.md` `## Recovery` detects byte drift, and — once Coretide
-lands — the [step-9 proven Coretide landing result](references/worker.md#steps).
-After an engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
+step-10 `Complete-NextPlan.ps1` result verbatim. Once Coretide lands,
+preparation and recovery briefs also carry the
+[step-9 proven Coretide landing result](references/worker.md#steps). After an
+engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
 `rebase.patch-not-identical` block passes `references/worker.md`
 `## Recovery`'s restoration gate, main's recovery continuation capsule also
 carries that blocked disposition as its unresolved issue and
@@ -179,25 +177,25 @@ refreshed summary carries a `/sweep` `UNVERIFIED` owed row unaccepted under
 `(d)` below, where main asks and waits instead of same-turn dispatch.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
-post-confirmation rebase lands with no re-asking, re-review, rebuild, or
-follow-up Plan; pre-summary rebuilds belong to `references/worker.md` step 5.
-After that build, main adds every `builder` `Changed files` path since that
-meaning-change handoff ([`/compile`](../compile/SKILL.md) `## Handoff`) and
-passes `-RequireExportOutputsRewritten` (`references/scripts.md`
-`## Invocation`) on every later preparation brief (including after
-`rebase.conflicted`); only a direct user instruction under `## Inputs` clears
-it. On a `Get-CompileRewrittenPaths.ps1` residual or
+post-confirmation rebase lands with no re-asking, re-review, or rebuild;
+pre-summary rebuilds belong to `references/worker.md` step 5. After that build,
+main adds every `builder` `Changed files` path since that meaning-change handoff
+([`/compile`](../compile/SKILL.md) `## Handoff`) and passes
+`-RequireExportOutputsRewritten` (`references/scripts.md` `## Invocation`) on
+every later preparation brief (including after `rebase.conflicted`); only a
+direct user instruction under `## Inputs` clears it. On a
+`Get-CompileRewrittenPaths.ps1` residual or
 `candidate.export-output-not-regenerated` block, keep the switch, attempt
-bounded build/evidence recovery, and rerun preparation with it; stop if it
-still refuses. Under standing confirmation, when recovery (conflict,
-byte/meaning change, export rebuild, `rebase.conflicted`,
-`rebase.patch-not-identical`, `history.source-changed`, or fix) changes bytes,
-`references/worker.md` `## Recovery` triggers decide reruns. Whether or not
-patch bytes changed, file a `/create-follow-up-plans` Plan before preparation
-only if a non-blocking user-check or user-judgment item remains (a Plan alone
-never re-triggers unrelated reviews or builds). After either trigger, rerun
-preparation, SmartGit launch, refreshed summary, and (unless `(d)` pauses)
-same-turn landing.
+bounded build/evidence recovery, and rerun preparation with it; stop if it still
+refuses. Under standing confirmation, when recovery (conflict, byte/meaning
+change, export rebuild, `rebase.conflicted`, `rebase.patch-not-identical`,
+`history.source-changed`, or fix) changes bytes, `references/worker.md`
+`## Recovery` triggers decide reruns. Byte drift alone files no follow-up Plan;
+file one via `/create-follow-up-plans` before preparation when a non-blocking
+user-check or user-judgment item remains (ordinary residuals follow the Verify
+the acceptance table step; a Plan alone never re-triggers unrelated reviews or
+builds). After either trigger, rerun preparation, SmartGit launch, refreshed
+summary, and (unless `(d)` pauses) same-turn landing.
 
 After confirmation, stop without landing (or completing a claim) only on: (a) a
 mechanical script, lock, lease, or receipt refusal (unproven

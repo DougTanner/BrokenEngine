@@ -322,35 +322,36 @@ preparation dispatch recovers `primary.path-overlap` itself under
   `Invoke-FinalizeApprovalPreparation.ps1` entry; its exit status alone decides
   clean or conflict. Every meaning-change handoff overlap recovery returns
   includes in `Build required` the client and server builds of each game that
-  triggering result's `rebuildProjects` lists.
+  triggering result's `rebuildProjects` lists. For a standalone Plan rejection,
+  main routes that handoff per `SKILL.md` `### Landing confirmation`'s
+  separate-confirmation sequence, even with unchanged paths and no further
+  primary movement.
   - Exit 0 (clean): before rerunning preparation, inspect the rebased diff for
-    code-meaning changes and — for `SKILL.md` `## Inputs` authorization kind
-    `standing confirmation` or `standalone Plan rejection` — patch-byte changes
-    against its confirmed candidate diff identity (or this dispatch's pre-rebase
-    candidate). If either changed, or `rebuildProjects` is non-empty, return the
-    meaning-change handoff without asking (`## Rules`), naming changed regions
-    and any `Build required` targets above (even without a meaning change), so
-    main runs needed reviews, `/compile`, fix rounds, and
-    `/create-follow-up-plans` when `SKILL.md` `### Landing confirmation`
-    requires, then dispatches fresh preparation re-resolving tips,
-    verified-candidate pair, and baseline per that `scripts.md` entry.
-    Otherwise (no meaning change, empty `rebuildProjects`, and byte-identical
-    when authorized above), read `verifiedCandidate.supplied` from the prior
-    `Temp/finalize-approval-preparation-result.json` before re-invoking
-    approval preparation overwrites it (passing the re-resolved
-    verified-candidate pair when `true`, omitting it when `false`), then
-    re-invoke approval preparation with those re-resolved inputs, run step 5's
-    skipped-Steps-1-3 completion sequence if the initial full acceptance table
-    is still owed — or re-run step 3 for changed regions once that full table
-    exists (ordinary preparation or any later primary-advance repeat) — then
-    re-run step 4 and act on step 5 under ordinary preparation rules; a re-run
-    `primary.path-overlap` repeats this recovery. That inspection and step-3
-    work cover the rebased tip a re-resolved pair now names, keeping a supplied
-    gate supplied. Return a blocked or failed approval-preparation
-    re-invocation as a blocker, and any non-PASS row of a changed-region step-3
-    re-run as a `BLOCKED` handoff for main (`SKILL.md`
-    `### Landing confirmation`); full step-3 tables follow step 5's routing
-    after the step-4 recheck.
+    code-meaning changes and — when `Complete-NextPlan.ps1`'s
+    `claim.disposition` is `rejected` — patch-byte changes against this
+    dispatch's pre-rebase candidate (`candidate.commit`/`candidate.parent`). If
+    either changed, or `rebuildProjects` is non-empty, return the meaning-change
+    handoff without asking (`## Rules`), naming changed regions and any
+    `Build required` targets above (even without a meaning change), so main runs
+    needed reviews, `/compile`, fix rounds, and `/create-follow-up-plans` when
+    `SKILL.md` `### Landing confirmation` requires, then dispatches fresh
+    preparation re-resolving tips, verified-candidate pair, and baseline per
+    that `scripts.md` entry. Otherwise, read `verifiedCandidate.supplied` from
+    the prior `Temp/finalize-approval-preparation-result.json` before
+    overwriting it (passing the re-resolved verified-candidate pair when `true`,
+    omitting it when `false`), then re-invoke approval preparation with those
+    re-resolved inputs, run step 5's skipped-Steps-1-3 completion sequence if
+    the initial full acceptance table is still owed — or re-run step 3 for
+    changed regions once that full table exists (ordinary preparation or any
+    later primary-advance repeat) — then re-run step 4 and act on step 5 under
+    ordinary preparation rules; a re-run `primary.path-overlap` repeats this
+    recovery. That inspection and step-3 work cover the rebased tip a
+    re-resolved pair now names, keeping a supplied gate supplied. Return a
+    blocked or failed approval-preparation re-invocation as a blocker, and any
+    changed-region step-3 non-PASS row as `BLOCKED` for main except `/sweep`
+    `UNVERIFIED` owed rows; those rows (continuing through steps 6 and 8 for
+    `SKILL.md` `### Landing confirmation` `(d)`) and full step-3 tables follow
+    step 5 after the step-4 recheck.
   - Any other exit leaving a rebase in progress (conflict): resolve under
     `Reconciliation conflict` above and finish the rebase; resolved hunks count
     as a meaning change, so return the resolved regions to main as the
