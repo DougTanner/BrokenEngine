@@ -91,11 +91,13 @@ a returned result needs it. Each skill's `## Inputs` owns command form and
 producer (e.g., `.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
 `.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
 
-Use `none` when a field has no value. Add only fields required by the invoked
-skill. Cite repository paths; do not paste root instructions, skill bodies, the
-complete Plan, manager transcript, unrelated handoffs, or raw XML/logs. When a
-completed Plan file has already been deleted from the tree, the manager supplies
-its approved text or the Git-history path to read it from.
+Use `none` for empty fields; add only skill-required fields. Cite paths; cite
+readable review outputs (`Temp/`, Codex `<out>`) by path/selector + finding IDs
+(inline decisions only) rather than pasting or paraphrasing findings, or pass
+the compact finding line directly when no readable output supplies it. Never
+paste root instructions, skill bodies, full Plans, manager transcript,
+unrelated handoffs, or raw XML/logs; for a deleted completed Plan, give its
+approved text or Git-history path.
 
 Workers verify supplied hints against the tree, stay within ownership, and
 expand only for a concrete dependency, decision, or failure. They never route

@@ -323,20 +323,19 @@ preparation dispatch recovers `primary.path-overlap` itself under
   clean or conflict. Every meaning-change handoff overlap recovery returns
   includes in `Build required` the client and server builds of each game that
   triggering result's `rebuildProjects` lists.
-  - Exit 0 (clean): before re-invoking approval preparation, inspect the rebased
-    diff for code-meaning changes and — when the brief's authorization kind
-    (`SKILL.md` `## Inputs`) is `standing confirmation` or
-    `standalone Plan rejection` — patch-byte changes against its confirmed
-    candidate diff identity (or this dispatch's pre-rebase candidate). If
-    either changed, or `rebuildProjects` is non-empty, return the
-    meaning-change handoff to main without asking (`## Rules`), naming changed
-    regions and any `Build required` targets above (even without a meaning
-    change), so main runs needed reviews, `/compile`, fix rounds, and
-    `/create-follow-up-plans` (`SKILL.md` `### Landing confirmation`), then
-    dispatches fresh preparation re-resolving tips, verified-candidate pair, and
-    baseline per that `scripts.md` entry. Otherwise (no meaning change, empty
-    `rebuildProjects`, and byte-identical when authorized above), read
-    `verifiedCandidate.supplied` from the prior
+  - Exit 0 (clean): before rerunning preparation, inspect the rebased diff for
+    code-meaning changes and — for `SKILL.md` `## Inputs` authorization kind
+    `standing confirmation` or `standalone Plan rejection` — patch-byte changes
+    against its confirmed candidate diff identity (or this dispatch's pre-rebase
+    candidate). If either changed, or `rebuildProjects` is non-empty, return the
+    meaning-change handoff without asking (`## Rules`), naming changed regions
+    and any `Build required` targets above (even without a meaning change), so
+    main runs needed reviews, `/compile`, fix rounds, and
+    `/create-follow-up-plans` when `SKILL.md` `### Landing confirmation`
+    requires, then dispatches fresh preparation re-resolving tips,
+    verified-candidate pair, and baseline per that `scripts.md` entry.
+    Otherwise (no meaning change, empty `rebuildProjects`, and byte-identical
+    when authorized above), read `verifiedCandidate.supplied` from the prior
     `Temp/finalize-approval-preparation-result.json` before re-invoking
     approval preparation overwrites it (passing the re-resolved
     verified-candidate pair when `true`, omitting it when `false`), then

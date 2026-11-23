@@ -162,12 +162,11 @@ failure in a Plan you wrote or edited.
   unborn landing hash; `/save-plan` companions require the selected
   repository-relative target path in brief and Plan before the file exists) —
   substitutes for step 1's proofs, keyed on paths and item. Draft a debt Plan
-  if a fix is known; otherwise (byte-only recovery, user checks/judgment, or
-  `/save-plan` companions) draft `## Unresolved decisions` per
-  `Documents/Plans/AGENTS.md` `## Plan files`: byte-only recovery asks the user
-  to confirm with no edits or pick a fix; a standalone user check carries its
-  procedure and expected result there and requires the user's observed result
-  as completion evidence (never defaulted by generic `/next-plan` approval).
+  if a fix is known; otherwise (user checks/judgment or `/save-plan`
+  companions) draft `## Unresolved decisions` per `Documents/Plans/AGENTS.md`
+  `## Plan files`: a standalone user check carries its procedure and expected
+  result there and requires the user's observed result as completion evidence
+  (never defaulted by generic `/next-plan` approval).
 - Plan files and the metadata line that must be their very first bytes are
   ordinary tracked Git content; write them directly, with or without a live Plan
   claim. `Documents/Features` remains manual and is not an alternate

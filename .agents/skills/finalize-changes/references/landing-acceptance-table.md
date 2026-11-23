@@ -65,7 +65,8 @@ Exempt paths owing no Review and resolve correctness row:
   `Documents/Investigations/Engine/RefactorCandidates.md` (Step 9 row additions
   authorized by that step; other edits by session instruction) and
   `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` (row additions
-  by its header; row deletions by `/create-follow-up-plans`).
+  and same-branch updates by its header; deletions by
+  `/create-follow-up-plans`).
 
 On every diff — `/save-plan`-only or mixed (including a recovery-added follow-up
 Plan) — require `Invoke-StaticChecks.ps1` `PASS` and run

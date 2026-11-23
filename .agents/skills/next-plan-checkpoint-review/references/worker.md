@@ -109,19 +109,18 @@ are the isolation lens.
     `Get-Content -LiteralPath '<path>' -TotalCount <line> | Select-Object -Last 1`.
     `len` selects lines only and is never `chars:`.
 
-    Report as isolation any content main did not need verbatim that a subagent
-    could have consumed: reading a file a worker's brief could name, forwarding
-    raw script output, pasting evidence inline instead of path plus selector, or
-    a handoff restating its brief (regardless of size). Detect the first case
-    via in-span `match` rows whose `read-at` line is also in span: emitter is
-    main's active skill instruction; step 11 bounding mechanism is that brief's
-    role. Done when every in-span observation is a finding or excluded by
-    step 13.
-13. Exclude from isolation, beyond the exclusions below: content main's own
-    decision required verbatim, classified `necessary-evidence` under step 10
-    whether or not a measured row exists; and a Plan body, execution card, or
-    user-facing text main itself must approve or present. Done when every
-    remaining isolation finding carries a step 10 class and passes step 11.
+    Report as isolation content main did not need verbatim that a subagent could
+    consume: a file read flagged by an in-span `match` row with in-span
+    `read-at` (after `Get-TranscriptProjection.ps1` applies its small-read
+    floor, `$script:SmallReadMaxLines`/`$script:SmallReadMaxChars`), forwarding
+    raw script output, pasting evidence instead of path/selector, or a handoff
+    restating its brief (any size). For `match` rows, the emitter is main's
+    active skill instruction and the step 11 mechanism is that brief's role.
+    Done when each such in-span item is a finding or excluded by step 13.
+13. Exclude from isolation, beyond `## Rules`: content main's decision required
+    verbatim (`necessary-evidence` in step 10 even without a measured row) and a
+    Plan body, execution card, or user-facing text main must approve or present.
+    Done when each remaining finding has a step 10 class and passes step 11.
 
 ## Rules
 

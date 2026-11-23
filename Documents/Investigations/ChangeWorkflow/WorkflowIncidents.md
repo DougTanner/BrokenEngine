@@ -1,51 +1,48 @@
 # Workflow Incidents
 
-One row per routed friction, context-efficiency, or isolation finding, and per
-accepted finding of a full `/next-plan-review` audit other than governing-scope
-conformance and solution minimality. Not recorded: an objectively wrong
-statement or bug — instruction text that is untrue or contradicts its owner, or
-a script or skill breaking its documented contract. Cost-only findings, even
-unclear but true wording, are recorded.
+One row per `(Owner, Symptom)` key per `Session branch` for routed friction,
+context-efficiency, or isolation findings, and for accepted findings of a full
+`/next-plan-review` audit other than governing-scope conformance and solution
+minimality. Not recorded: an objectively wrong statement or bug — instruction
+text that is untrue or contradicts its owner, or a script or skill breaking its
+documented contract. Cost-only findings, even unclear but true wording, are
+recorded.
 
 Key: owner plus symptom. Owner is the path of the script, `AGENTS.md`, or
 `.agents/references/` file at fault, or the skill directory
 (`.agents/skills/<name>`) when a skill's text is. Rows share a symptom when one
-fix removes both. Main, reading no code, adds its row first, reusing a matching
-symptom verbatim. Evidence: selector, result, cost or bounding mechanism;
-`|` as `;`; no transcript text or path, no absolute path; the row stays
-within the static-checks `line-length` limit.
+fix removes both. Each key holds at most one row per `Session branch`, enforced
+by the static-checks `workflow-incidents` row. Main, reading no code, adds its
+row first, reusing a matching symptom verbatim; when the same session observes
+another occurrence of an existing key for its own `Session branch`, main updates
+that row in place by appending a concise selector/result note to `Evidence`
+(`; `-separated) rather than adding a row, condensing repeat evidence when
+needed so the row stays within the static-checks `line-length` limit. Evidence:
+selector, result, cost or bounding mechanism; `|` as `;`; no transcript text or
+path, no absolute path.
 
-At a key's third row, never sooner, main has one `implementer` run
-`/create-follow-up-plans` on its rows, which deletes them once the Plan is
-created, mapped, or rejected.
+At a key's third row (three distinct session branches), never sooner, main has
+one `implementer` run `/create-follow-up-plans` on its rows, which deletes them
+once the Plan is created, mapped, or rejected.
 
 ## Entries
 
 | Owner | Symptom | Date | Session branch | Evidence |
 | --- | --- | --- | --- | --- |
 | `.agents/skills/coherence-review` | `## Inputs` edit permission does not say the `## Handoff` `Temp/` file is written when edits are not allowed | 2026-11-20 | claude/76739fc5-521a-4c6f-907a-53abe8ac86f7 | selector: Tier-1 combined dispatch briefed "no edits to any file"; result: reviewer wrote the `Temp/` cleanup-handoffs file and flagged the conflict; cost: main reworded the round-2 brief to "no edits to tracked files" |
-| `.agents/skills/create-follow-up-plans` | main copies reviewer finding prose into brief instead of citing `Temp/` output path | 2026-11-21 | agy/524cb3a1-b765-4407-bc2e-ade8b4f9209b | selector: `/create-follow-up-plans` brief for sweep findings VS001 and VS002; result: copied finding text inline; bounding: cite `Temp/` review output path plus finding IDs |
-| `.agents/skills/next-plan` | Antigravity CLI PowerShell shell lacks `rg` when locating headings | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `rg -n "^## " .agents/references/subagent-reporting.md`; result: exit 1 command not found; cost: repeated heading lookup with `Select-String` |
+| `.agents/skills/next-plan` | Antigravity CLI PowerShell shell lacks `rg` when locating headings | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `rg -n "^## "` and `rg -n '^## '` on `.agents/references/subagent-reporting.md` (two occurrences); result: exit 1 (`rg` unavailable); cost: repeated heading lookup with `Select-String` |
 | `.agents/scripts/Invoke-Codex.ps1` | Codex read-only sandbox Git ownership check blocks inspecting primary checkout | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `Invoke-Codex.ps1 -Skill adversarial-review`; result: sandbox Git ownership check rejected primary checkout access; cost: skipped independent end-to-end reattach |
 | `.agents/skills/external-grill-plan` | `## Inputs` requires referenced Plan text in brief while `tier3-workflow.md` keeps reads in planner | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `/external-grill-plan` dispatch brief; result: skill asked for referenced Plan text while Tier-3 workflow assigns reads to planner; cost: substituted paths for text |
 | `.agents/skills/next-plan` | `tier3-workflow.md` combines accepted-finding write-in and grill without stating audit-revision match | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `/external-grill-plan` combined write-in and grill dispatch; result: revised and grilled snapshot in one pass using prior audit; cost: revision-match ambiguity |
 | `.agents/skills/next-plan` | main reads extra claimed Plan sections beyond risk tier before preparation dispatch | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: claimed Plan `## Critical files` and `## Notes`; result: main read both sections before preparation; bounding: pass heading ranges to planner and let it return scope and conditions |
 | `.agents/skills/next-plan` | main reads source files directly to judge Plan review findings instead of dispatching a locator | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `Invoke-Sweep.ps1` lines 45-245 and other cited files during Plan review triage; result: 12,662+ chars entered main; bounding: dispatch `locator` with finding IDs to return deciding locations |
-| `.agents/skills/resolve-findings` | main copies reviewer finding prose into brief instead of citing `Temp/` output path | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `/resolve-findings` briefs for coherence and Step-7 rounds; result: repeated review prose inline; bounding: cite `Temp/` review out-files by finding ID plus accepted scope and decisions |
-| `.agents/skills/next-plan` | nested PowerShell double-quoting breaks ad-hoc `Select-String` or pipeline lookup | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `Select-String -Path .agents/scripts/Invoke-Codex.ps1 -Pattern '\$routes' -Context 0,25`; result: invalid regex from nested quoting; cost: clipped retry prompted another read |
-| `.agents/skills/next-plan` | nested PowerShell double-quoting breaks ad-hoc `Select-String` or pipeline lookup | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: double-quoted `pwsh -NoProfile -Command` acceptance-check search on snapshot; result: variable interpolation left empty pipeline element and exit 1; cost: repeated search with single quotes |
+| `.agents/skills/next-plan` | nested PowerShell double-quoting breaks ad-hoc `Select-String` or pipeline lookup | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `Select-String` on `Invoke-Codex.ps1` (`\$routes`); result: invalid regex; cost: clipped retry prompted another read; selector: double-quoted `pwsh -Command` snapshot search; result: empty pipeline element (exit 1); cost: repeated search with single quotes |
 | `.agents/skills/resolve-findings` | Antigravity `edit_file` prepends UTF-8 BOM to BOM-less PowerShell scripts | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `edit_file` on `.agents/skills/next-plan-checkpoint-review/scripts/Get-TranscriptProjection.ps1`; result: added UTF-8 BOM flagged by `Invoke-StaticChecks.ps1` and fix rounds; cost: separate BOM removal and check reruns |
 | `.agents/skills/plan-alternatives` | main requests multi-file verbatim blocks from `locator` instead of one shortest settling quote per fact | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `invoke_subagent` comparison `locator` for six files; result: 26,687 chars entered main (overThreshold breach); bounding: request one file:line and shortest settling quote per disputed fact |
 | `.agents/skills/next-plan` | main requests multi-file verbatim blocks from `locator` instead of one shortest settling quote per fact | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `invoke_subagent` audit-finding `locator` for five findings; result: 17,334 chars entered main; bounding: request one cited source check per finding ID |
 | `.agents/skills/implement-plan` | Antigravity `edit_file` prepends UTF-8 BOM to BOM-less PowerShell scripts | 2026-11-22 | agy/b95f7f4a-1839-415b-9a6e-26e371b9dd3a | selector: `edit_file` on `.agents/scripts/Get-SessionChangeInventory.ps1`; result: added UTF-8 BOM caused concurrent `Invoke-StaticChecks.ps1` exit 1; cost: stripped BOM and reran acceptance checks |
 | `.agents/skills/next-plan` | main reads extra claimed Plan sections beyond risk tier before preparation dispatch | 2026-11-22 | agy/b95f7f4a-1839-415b-9a6e-26e371b9dd3a | selector: claimed Plan lines 1-35 before preparation; result: read full Context section in main; bounding: pass Plan path and heading ranges to planner and read only role-assignment inputs |
 | `.agents/references/change-workflow.md` | main reads extra acceptance checks between pre-edit check and `Roles` field in preparation snapshot | 2026-11-22 | agy/b95f7f4a-1839-415b-9a6e-26e371b9dd3a | selector: preparation snapshot lines 391-449 before implementation; result: read checks 5 and 6 in main; bounding: read marked check 4 and `Roles` separately, leaving other checks to workers |
-| `.agents/references/change-workflow.md` | main copies review or retest evidence inline into fix and diagnosis briefs instead of citing `Temp/` output paths by finding ID | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `/resolve-findings` briefs across coherence and Step-7 rounds; result: repeated review evidence inline; bounding: pass each `Temp/` bridge output path with finding IDs and inline decisions |
-| `.agents/references/change-workflow.md` | main copies review or retest evidence inline into fix and diagnosis briefs instead of citing `Temp/` output paths by finding ID | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `/external-diagnose-bug` brief for CR002 and CR003; result: recopied failed retest evidence inline; bounding: cite `Temp/` re-review output path with CR002 and CR003 selectors |
 | `.agents/skills/external-diagnose-bug` | handoff exceeds shared character cap by repeating failed probes across sections | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `/external-diagnose-bug` CR002 and CR003 handoff; result: 5,432 chars repeating probes; bounding: list each probe once under Reproducing signal and cite receipt for prior findings |
 | `.agents/skills/resolve-findings` | handoff exceeds shared character cap by restating root causes from brief | 2026-11-22 | agy/4004df43-5824-4718-822f-007c9e5d0963 | selector: `/resolve-findings` CR002 and CR003 handoff; result: 4,859 chars restating brief root causes; bounding: give one evidence pointer per item, the change made, and focused check result |
-| `.agents/references/change-workflow.md` | main reads full delegated skill `SKILL.md` instead of only `## Inputs` when assembling briefs | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `implement-plan`, `coherence-review`, `external-skill-creator`, and `resolve-findings` `SKILL.md`; result: full skill bodies read in main; bounding: read `## Inputs` for briefs and give workers the skill path |
-| `.agents/references/change-workflow.md` | main reads full delegated skill `SKILL.md` instead of only `## Inputs` when assembling briefs | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `.agents/skills/progressive-disclosure-review/SKILL.md`; result: 6,592 chars entered main; bounding: read `## Inputs` in main and give reviewer the full skill path |
-| `.agents/skills/resolve-findings` | main copies reviewer finding prose into brief instead of citing `Temp/` output path | 2026-11-22 | agy/690eea56-ca81-49c6-9d35-f7503f68e7e9 | selector: `/resolve-findings` briefs; result: copied finding prose inline; bounding: pass accepted IDs with bridge `Temp/` output paths and any manager check overrides |
-| `.agents/skills/next-plan` | Antigravity CLI PowerShell shell lacks `rg` when locating headings | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `rg -n '^## ' .agents/references/subagent-reporting.md`; result: exit 1, `rg` unavailable; cost: repeated lookup with `Select-String` |
 | `.agents/scripts/Get-ChangeWorkflowSteps.ps1` | assigns baseline-only red check to edited tree in Step 8 `/agent-harness` row | 2026-11-22 | agy/bfc232ef-cb23-48db-a353-2bd2f14023ec | selector: `.agents/scripts/Get-ChangeWorkflowSteps.ps1 -Tier 2 -Landing -HarnessChecks`; result: assigns baseline-only red check to edited tree; cost: post-edit runner used saved Check 1 and ran Checks 2-3 |

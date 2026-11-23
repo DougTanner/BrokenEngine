@@ -9,7 +9,14 @@
 #   record or allowlisted read-only shell command opened; `<line>` is the delegation record's line and `<read line>` the
 #   reading record's line. A delegation record is a `tool_use` or `PLANNER_RESPONSE` tool call whose string input field
 #   starts with a `Role:` line and carries a `Governing paths:` line; that line's value and a `Scope:` line's value are
-#   the brief paths, compared case- and separator-insensitively against the read path.
+#   the brief paths, compared case- and separator-insensitively against the read path (resolving relative paths against
+#   the transcript's recorded worktree root when available). A single bounded `Read`/`read_file` call per path in its
+#   checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired successful text
+#   result length is `<= 4,000` chars (`$script:SmallReadMaxChars`) emits no `match` row; unbounded reads, over-floor
+#   reads, allowlisted shell reads, failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads
+#   of the same path in the same checkpoint span still emit `match` rows. Eligible `match` rows are emitted with their
+#   original `<line>` and `<read line>` immediately before `checkpoint-span`, while all ordinary rows stream unchanged
+#   and `checkpoint-span` and `context-envelope` formats stay unchanged.
 # `<line> brief-missing <input field> <field label>` — a delegation-shaped input field fails a brief requirement: its
 #   first non-blank line is not a `Role:` line, or it carries no `Governing paths:` line. A field is delegation-shaped
 #   when at least two `.agents/references/subagent-reporting.md` `## Task brief` field labels each start a line of it.
@@ -94,6 +101,9 @@ $script:BridgeReceiptOrSeparatorPattern = '(?m)(?:^|content=|<result>)[ \t]*(?:(
 $script:ValidReceiptStatuses = @('completed', 'malformed', 'failed', 'running')
 # Cap breach rows so the trailing context-envelope stays bounded even when a session breaches constantly.
 $script:BreachRowCap = 25
+# Small-read floor: a single bounded Read/read_file call per path in a checkpoint span at or below both limits emits no `match` row.
+$script:SmallReadMaxLines = 60
+$script:SmallReadMaxChars = 4000
 # Input fields that name the emitting invocation without leaking result content.
 $script:ContextSummaryFields = @('command', 'CommandLine', 'file_path', 'Path', 'path', 'pattern', 'url', 'query', 'prompt', 'Prompt', 'description', 'Role', 'TypeName', 'Recipient', 'TaskId', 'Action')
 
@@ -121,6 +131,33 @@ function Measure-ContextResultChars($Content) {
 	return $total
 }
 
+function Measure-ReadResultTextChars($Content) {
+	if ($Content -is [string]) { return $Content.Length }
+	if ($Content -is [object[]] -and $Content.Length -gt 0) {
+		$total = 0
+		foreach ($element in $Content) {
+			if ([string](Get-AgentTranscriptField $element 'type') -cne 'text') { return $null }
+			$text = Get-AgentTranscriptField $element 'text'
+			if ($text -isnot [string]) { return $null }
+			$total += $text.Length
+		}
+		return $total
+	}
+	return $null
+}
+
+function Get-PositiveIntegralNumber($InputObject, [string] $Name) {
+	$raw = Get-AgentTranscriptField $InputObject $Name
+	if ($null -eq $raw) { return $null }
+	if ($raw -is [int] -or $raw -is [long] -or $raw -is [double] -or $raw -is [decimal]) {
+		$d = [double] $raw
+		if ([double]::IsFinite($d) -and $d -ge 1 -and $d -le 9007199254740991 -and [Math]::Truncate($d) -eq $d) {
+			return $d
+		}
+	}
+	return [double] -1
+}
+
 function Get-ContextInputSummary($ToolInput) {
 	$text = ''
 	foreach ($field in $script:ContextSummaryFields) {
@@ -144,6 +181,96 @@ function ConvertTo-NormalizedPathKey([string] $Path) {
 	return $normalized
 }
 
+function ConvertTo-CanonicalPathKey([string] $Path, [bool] $AllowGitBashDrive = $false) {
+	if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
+	$trimmed = $Path.Trim()
+	$prefix = ''
+	$remainder = ''
+	if ($AllowGitBashDrive -and $trimmed -match '^/([A-Za-z])/(.*)$') {
+		$prefix = $Matches[1].ToLowerInvariant() + ':/'
+		$remainder = ($Matches[2] -replace '\\', '/').ToLowerInvariant()
+	}
+	else {
+		$normalized = ($trimmed -replace '\\', '/').ToLowerInvariant()
+		$remainder = $normalized
+		if ($normalized -match '^(//(?![.]{1,2}(?:/|$))[^/]+/(?![.]{1,2}(?:/|$))[^/]+)(?:/(.*))?$') {
+			$prefix = $Matches[1]
+			$remainder = if ($null -ne $Matches[2]) { $Matches[2] } else { '' }
+		}
+		elseif ($normalized -match '^([a-z]:)/(.*)$') {
+			$prefix = $Matches[1] + '/'
+			$remainder = $Matches[2]
+		}
+		elseif ($normalized.StartsWith('/')) {
+			$prefix = '/'
+			$remainder = $normalized.TrimStart('/')
+		}
+	}
+
+	$segments = [Collections.Generic.List[string]]::new()
+	foreach ($segment in ($remainder -split '/')) {
+		if ([string]::IsNullOrEmpty($segment) -or $segment -ceq '.') { continue }
+		if ($segment -ceq '..') {
+			if ($segments.Count -gt 0 -and $segments[$segments.Count - 1] -cne '..') {
+				$segments.RemoveAt($segments.Count - 1)
+			}
+			elseif ($prefix -ceq '') {
+				$segments.Add('..')
+			}
+			continue
+		}
+		$segments.Add($segment)
+	}
+
+	if ($prefix -ceq '') {
+		if ($segments.Count -eq 0) { return $null }
+		return ($segments -join '/')
+	}
+	if ($segments.Count -eq 0) { return $prefix }
+	if ($prefix.EndsWith('/')) { return $prefix + ($segments -join '/') }
+	return $prefix + '/' + ($segments -join '/')
+}
+
+function Resolve-NormalizedPathKey([string] $Key, [string] $RootKey) {
+	if ([string]::IsNullOrEmpty($Key)) { return $null }
+	if ($Key -match '^[a-z]:/' -or $Key.StartsWith('//')) { return $Key }
+	if ($Key.StartsWith('/')) {
+		if (-not [string]::IsNullOrEmpty($RootKey) -and $RootKey -match '^([a-z]:)/') {
+			return $Matches[1] + $Key
+		}
+		return $Key
+	}
+	if (-not [string]::IsNullOrEmpty($RootKey)) {
+		$joined = if ($RootKey.EndsWith('/')) { $RootKey + $Key } else { $RootKey + '/' + $Key }
+		if ($Key -ceq '..' -or $Key.StartsWith('../')) {
+			return ConvertTo-CanonicalPathKey $joined $false
+		}
+		return $joined
+	}
+	return $Key
+}
+
+function Test-PathKeyMatch([string] $LeftKey, [string] $RightKey, [string] $RootKey) {
+	if ([string]::IsNullOrEmpty($LeftKey) -or [string]::IsNullOrEmpty($RightKey)) { return $false }
+	$left = Resolve-NormalizedPathKey $LeftKey $RootKey
+	$right = Resolve-NormalizedPathKey $RightKey $RootKey
+	if ([string]::IsNullOrEmpty($left) -or [string]::IsNullOrEmpty($right)) { return $false }
+	$leftAbs = $left -match '^(?:[a-z]:/|/)'
+	$rightAbs = $right -match '^(?:[a-z]:/|/)'
+	if ($leftAbs -eq $rightAbs) { return $left -ceq $right }
+	$abs = if ($leftAbs) { $left } else { $right }
+	$rel = if ($leftAbs) { $right } else { $left }
+	return $rel.Contains('/') -and $abs.EndsWith('/' + $rel)
+}
+
+function Get-SpanIndex([int] $Line, $Checkpoints) {
+	for ($i = 0; $i -lt $Checkpoints.Count; $i++) {
+		if ($Line -lt $Checkpoints[$i].FirstLine) { return $i }
+		if ($Line -le $Checkpoints[$i].FinalDispatchLine) { return -1 }
+	}
+	return $Checkpoints.Count
+}
+
 function Test-NormalizedPathMatch([string] $Left, [string] $Right) {
 	if ([string]::IsNullOrEmpty($Left) -or [string]::IsNullOrEmpty($Right)) { return $false }
 	return $Left -ceq $Right -or $Left.EndsWith('/' + $Right) -or $Right.EndsWith('/' + $Left)
@@ -163,6 +290,7 @@ function Test-CheckpointReviewBrief([string] $Text) {
 function Push-CheckpointGroup([hashtable] $State, [hashtable] $Group) {
 	$State.PreviousCheckpoint = $State.CurrentCheckpoint
 	$State.CurrentCheckpoint = $Group
+	$State.Checkpoints.Add($Group)
 }
 
 function Push-PendingDesktopCheckpoint([hashtable] $State) {
@@ -612,15 +740,36 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 	'{0} use {1} {2}' -f $LineNumber, $ToolName, $summary.Substring(0, [Math]::Min(160, $summary.Length))
 
 	$readPath = $null
+	$isBoundedSmallLines = $false
 	$shellCommand = $null
 	$shellKind = $null
 	if ($ToolName -ceq 'Read') {
 		$candidate = Get-AgentTranscriptField $InputObject 'file_path'
-		if ($candidate -is [string] -and -not [string]::IsNullOrWhiteSpace($candidate)) { $readPath = $candidate }
+		if ($candidate -is [string] -and -not [string]::IsNullOrWhiteSpace($candidate)) {
+			$readPath = $candidate
+			$limit = Get-PositiveIntegralNumber $InputObject 'limit'
+			$offset = Get-PositiveIntegralNumber $InputObject 'offset'
+			$pages = Get-AgentTranscriptField $InputObject 'pages'
+			$isBoundedSmallLines = ($null -eq $pages -and $null -ne $limit -and $limit -ge 1 -and $limit -le $script:SmallReadMaxLines -and ($null -eq $offset -or $offset -ge 1))
+		}
 	}
 	elseif ($ToolName -ceq 'read_file') {
 		$candidate = Get-AgentTranscriptField $InputObject 'Path'
-		if ($candidate -is [string] -and -not [string]::IsNullOrWhiteSpace($candidate)) { $readPath = $candidate }
+		if ($candidate -is [string] -and -not [string]::IsNullOrWhiteSpace($candidate)) {
+			$readPath = $candidate
+			$startLine = Get-PositiveIntegralNumber $InputObject 'StartLine'
+			$endLine = Get-PositiveIntegralNumber $InputObject 'EndLine'
+			$byteOffset = Get-AgentTranscriptField $InputObject 'ByteOffset'
+			$hasByteOffset = $true
+			if ($null -eq $byteOffset) {
+				$hasByteOffset = $false
+			}
+			elseif ($byteOffset -is [int] -or $byteOffset -is [long] -or $byteOffset -is [double] -or $byteOffset -is [decimal]) {
+				if ([double] $byteOffset -eq 0) { $hasByteOffset = $false }
+			}
+			$effectiveStart = if ($null -eq $startLine) { [double] 1 } else { $startLine }
+			$isBoundedSmallLines = (-not $hasByteOffset -and $null -ne $endLine -and $endLine -ge 1 -and $effectiveStart -ge 1 -and $endLine -ge $effectiveStart -and (($endLine - $effectiveStart + 1) -le $script:SmallReadMaxLines))
+		}
 	}
 	elseif ($ToolName -ceq 'Bash' -or $ToolName -ceq 'PowerShell') {
 		$command = Get-AgentTranscriptField $InputObject 'command'
@@ -664,7 +813,20 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 		}
 	}
 	if ($readPath) {
-		$Reads.Add(@{ Line = $LineNumber; Path = $readPath; Key = ($readPath -replace '\\', '/').ToLowerInvariant() })
+		$readRecord = @{
+			Index = $Reads.Count
+			Line = $LineNumber
+			Path = $readPath
+			Key = (ConvertTo-CanonicalPathKey $readPath -AllowGitBashDrive ($shellKind -ceq 'bash'))
+			IsBoundedSmallLines = $isBoundedSmallLines
+			ResultChars = $null
+			SpanIndex = -1
+			IsSmallReadExempt = $null
+		}
+		$Reads.Add($readRecord)
+		if (-not [string]::IsNullOrEmpty($ToolUseId)) {
+			$State.ReadByToolUseId[$ToolUseId] = $readRecord
+		}
 	}
 
 	if ($null -ne $shellCommand) {
@@ -767,9 +929,44 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 			}
 			continue
 		}
+		if ([string]::IsNullOrEmpty($State.WorktreeRoot)) {
+			foreach ($fieldLine in $fieldLines) {
+				if ($fieldLine -match '^\s*Baseline:(?<pre>.*?[\s,(])(?:worktree|(?:absolute\s+)?repo(?:sitory)?\s+toplevel):\s*(?<val>.+)$') {
+					$pre = $Matches['pre']
+					$val = $Matches['val'].Trim()
+					if ($val -match '^(["''`])([^\r\n]+?)\1(?=\s*(?:[,).\s]|$))') {
+						$rawRoot = $Matches[2]
+					}
+					else {
+						$parts = $val -split ',\s*[A-Za-z][A-Za-z0-9 _-]*:(?![\\/])', 2
+						$rawRoot = $parts[0].Trim()
+						$openParens = ($pre -replace '[^(]', '').Length - ($pre -replace '[^)]', '').Length
+						if ($openParens -gt 0) {
+							if ($parts.Count -eq 1) {
+								$rawRoot = $rawRoot -replace '\)\s*\.?\s*$', ''
+							}
+							elseif ($rawRoot.EndsWith(')')) {
+								$tailCloses = ($parts[1] -replace '[^)]', '').Length - ($parts[1] -replace '[^(]', '').Length
+								if ($tailCloses -lt $openParens) {
+									$rawRoot = $rawRoot.Substring(0, $rawRoot.Length - 1)
+								}
+							}
+						}
+					}
+					$wtKey = ConvertTo-CanonicalPathKey $rawRoot
+					if (-not [string]::IsNullOrEmpty($wtKey) -and $wtKey -match '^(?:[a-z]:/|/)') {
+						$State.WorktreeRoot = $wtKey
+						break
+					}
+				}
+			}
+		}
 		foreach ($token in (($pathLines -join ' ') -split '[\s`,;]+')) {
 			$token = $token.TrimEnd('.', ')', '"', "'")
-			if ($token -match '[/\\]') { ($token -replace '\\', '/').ToLowerInvariant() }
+			if ($token -match '[/\\]') {
+				$normToken = ConvertTo-CanonicalPathKey $token
+				if (-not [string]::IsNullOrEmpty($normToken)) { $normToken }
+			}
 		}
 	})
 	if ($isNativeCheckpoint) {
@@ -784,23 +981,28 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 		}
 	}
 	foreach ($row in $briefMissing) { $row }
-	foreach ($read in $Reads) {
-		foreach ($briefKey in $briefKeys) {
-			if ($read.Key -eq $briefKey -or $read.Key.EndsWith('/' + $briefKey)) {
-				'{0} match {1} read-at {2}' -f $LineNumber, $read.Path, $read.Line
-				break
+	if ($briefKeys.Count -gt 0) {
+		foreach ($read in $Reads) {
+			foreach ($briefKey in $briefKeys) {
+				if (Test-PathKeyMatch $read.Key $briefKey $State.WorktreeRoot) {
+					$State.CandidateMatches.Add(@{ BriefLine = $LineNumber; Read = $read })
+					break
+				}
 			}
 		}
 	}
 }
 
-# Each entry is the line and printable path of one `Read`/`read_file` record or allowlisted read-only shell command, plus
-# that path folded to lower case with `\` as `/` for comparison. Reads always precede the brief that lists them, so one
-# streaming pass suffices.
+# Each entry tracks one `Read`/`read_file` record or allowlisted read-only shell command, its normalized path key,
+# bounded-line flag, paired text result length, checkpoint span index, and cached small-read exemption verdict.
 $reads = [Collections.Generic.List[object]]::new()
 $state = @{
 	LastWriteByPath = @{}
 	BridgeCallByToolUseId = @{}
+	ReadByToolUseId = @{}
+	WorktreeRoot = $null
+	Checkpoints = [Collections.Generic.List[object]]::new()
+	CandidateMatches = [Collections.Generic.List[object]]::new()
 	PreviousCheckpoint = $null
 	CurrentCheckpoint = $null
 	PendingPromptWrite = $null
@@ -879,6 +1081,14 @@ try {
 				}
 				if ($null -ne $record.PairedToolCall -and -not [string]::IsNullOrEmpty($record.PairedToolCall.ToolUseId)) {
 					$pairedId = $record.PairedToolCall.ToolUseId
+					if ($state.ReadByToolUseId.ContainsKey($pairedId)) {
+						$state.ReadByToolUseId[$pairedId].ResultChars = if (-not $record.IsError -and $record.Content.Length -gt 0) {
+							$record.Content.Length
+						}
+						else {
+							$null
+						}
+					}
 					if ($state.BridgeCallByToolUseId.ContainsKey($pairedId)) {
 						$receiptLookup = Find-BridgeOuterReceipt $record.Content
 						if ($receiptLookup.Kind -ceq 'v2') {
@@ -911,6 +1121,15 @@ try {
 			}
 			# Only these types carry the conversation; others, such as request copies, repeat it or carry none.
 			if ($record.isSidechain -eq $true -or $record.type -notin @('assistant', 'user', 'attachment')) { continue }
+			if ([string]::IsNullOrEmpty($state.WorktreeRoot)) {
+				$cwd = Get-AgentTranscriptField $record 'cwd'
+				if ($cwd -is [string] -and -not [string]::IsNullOrWhiteSpace($cwd)) {
+					$cwdKey = ConvertTo-CanonicalPathKey $cwd
+					if (-not [string]::IsNullOrEmpty($cwdKey) -and $cwdKey -match '^(?:[a-z]:/|/)') {
+						$state.WorktreeRoot = $cwdKey
+					}
+				}
+			}
 			$content = $record.message.content
 			if ($record.type -eq 'attachment') { $content = $record.attachment.prompt }
 			if ($content -is [string]) {
@@ -973,6 +1192,14 @@ try {
 					}
 					$resultToolUseId = [string] $element.tool_use_id
 					if (-not [string]::IsNullOrEmpty($resultToolUseId)) {
+						if ($state.ReadByToolUseId.ContainsKey($resultToolUseId)) {
+							$state.ReadByToolUseId[$resultToolUseId].ResultChars = if ($element.is_error -eq $true) {
+								$null
+							}
+							else {
+								Measure-ReadResultTextChars (Get-AgentTranscriptField $element 'content')
+							}
+						}
 						$plainText = Get-ClaudeResultPlainText $element.content
 						if ($state.BridgeCallByToolUseId.ContainsKey($resultToolUseId)) {
 							$receiptLookup = Find-BridgeOuterReceipt $plainText
@@ -1002,6 +1229,37 @@ try {
 	}
 
 	Push-PendingDesktopCheckpoint $state
+	if ($state.CandidateMatches.Count -gt 0) {
+		foreach ($read in $reads) {
+			$read.SpanIndex = Get-SpanIndex $read.Line $state.Checkpoints
+		}
+		foreach ($cand in $state.CandidateMatches) {
+			$read = $cand.Read
+			if ($null -eq $read.IsSmallReadExempt) {
+				if ($read.SpanIndex -ge 0 -and
+					$read.IsBoundedSmallLines -and
+					$null -ne $read.ResultChars -and
+					$read.ResultChars -le $script:SmallReadMaxChars) {
+					$hasPeer = $false
+					foreach ($other in $reads) {
+						if ($other.SpanIndex -eq $read.SpanIndex -and
+							$other.Index -ne $read.Index -and
+							(Test-PathKeyMatch $read.Key $other.Key $state.WorktreeRoot)) {
+							$hasPeer = $true
+							break
+						}
+					}
+					$read.IsSmallReadExempt = -not $hasPeer
+				}
+				else {
+					$read.IsSmallReadExempt = $false
+				}
+			}
+			if (-not $read.IsSmallReadExempt) {
+				'{0} match {1} read-at {2}' -f $cand.BriefLine, $read.Path, $read.Line
+			}
+		}
+	}
 	if ($null -ne $state.CurrentCheckpoint -and $null -ne $state.PreviousCheckpoint) {
 		$startLine = $state.PreviousCheckpoint.FinalDispatchLine + 1
 		$endLine = $state.CurrentCheckpoint.FirstLine - 1

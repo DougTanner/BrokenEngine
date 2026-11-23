@@ -48,10 +48,13 @@ replacement; without all three it is not a finding.
 6. Repeats: the same instruction body, reference, or handoff entering main more
    than once, and a re-read of content main already held.
 
-Not findings: content the user pasted or asked to display; a Plan body,
-execution card, or user-facing text main itself must approve or present; a
-handoff within those field rules whose every row main acted on; and a narrow
-change having no unnecessary subagents.
+Not findings: user-pasted or asked-to-display content; a Plan body, execution
+card, or user-facing text main must approve/present; a decision-settling read
+meeting `Get-TranscriptProjection.ps1`'s small-read eligibility
+(`$script:SmallReadMaxLines`/`$script:SmallReadMaxChars`, only when the
+transcript exposes its full eligibility evidence, not read bounds alone); a
+compliant handoff whose rows main acted on; and a narrow change without
+unnecessary subagents.
 
 ## Report observed usage
 

@@ -13,7 +13,10 @@
 # baseline and head token counts as Measure-Tokens.ps1 measures a whole file, deletions included, and
 # their `netTokens` sum, leaving out an entry with a side that is not valid UTF-8; `model-names` fails
 # on a model family name or slug in an added line, apart from a `model` setting line in an
-# `.agents/agents/`, `.claude/agents/`, or `.codex/agents/` file.
+# `.agents/agents/`, `.claude/agents/`, or `.codex/agents/` file. `workflow-incidents` checks
+# `Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md` when it changes (and exists on the
+# head side), requiring `## Entries` with its fixed 5-column table header, 5-cell separator and data
+# rows (literal `|` splitting), and unique normalized `(Owner, Symptom, Session branch)` rows.
 # `validate-skill` composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
@@ -26,7 +29,7 @@
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
 # files when checking the working tree. `markdown-links`, `file-hygiene`, `line-length`,
-# `instruction-size`, and `model-names` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
+# `instruction-size`, `model-names`, and `workflow-incidents` read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
 # Every Git read of a Projects/Coretide/ entry runs in the session Coretide clone, against the inventory's
 # `coretide` baseline and head.
 [CmdletBinding()]
@@ -54,6 +57,7 @@ $script:UntrackedPaths = @()
 # The session Coretide clone's Root, BaselineSha, HeadSha, and HeadPaths, or null.
 $script:Coretide = $null
 $script:CoretidePrefix = 'Projects/Coretide/'
+$script:WorkflowIncidentsPath = 'Documents/Investigations/ChangeWorkflow/WorkflowIncidents.md'
 $script:HeadingSlugs = @{}
 # Inline markdown link: the target is everything up to the closing parenthesis or the optional title.
 $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
@@ -63,7 +67,7 @@ $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
 $script:ModelNamePattern = [regex]::new('(?<![A-Za-z0-9_])(?:gpt-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|claude-[A-Za-z]+-[0-9][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*|opus|sonnet|haiku|astra|sol|luna|fable)(?![A-Za-z0-9_])', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v6'
+	schemaVersion = 'broken-engine-static-checks/v7'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -594,6 +598,99 @@ function Invoke-ModelNameCheck([object] $Inventory) {
 	return New-CheckRow 'model-names' $true $status ([ordered]@{ failures = [object[]] $failures.ToArray() })
 }
 
+function Split-WorkflowIncidentsRow([string] $Line) {
+	$trimmed = $Line.Trim()
+	if ($trimmed.Length -lt 2 -or -not $trimmed.StartsWith('|') -or -not $trimmed.EndsWith('|')) { return $null }
+	$rawCells = $trimmed.Substring(1, $trimmed.Length - 2).Split('|')
+	$cells = [string[]]::new($rawCells.Length)
+	for ($c = 0; $c -lt $rawCells.Length; $c++) { $cells[$c] = $rawCells[$c].Trim() }
+	return , $cells
+}
+
+function Invoke-WorkflowIncidentsCheck([object] $Inventory) {
+	$paths = Get-ChangedPath $Inventory { param($entry) $entry.path -ceq $script:WorkflowIncidentsPath }
+	if ($paths.Count -eq 0) { return New-CheckRow 'workflow-incidents' $false 'skipped' $null }
+	$lines = @((Get-HeadText $script:WorkflowIncidentsPath) -split "`r`n|`n|`r")
+	$failures = [Collections.Generic.List[object]]::new()
+	$rowCount = 0
+
+	$entriesIndex = -1
+	for ($i = 0; $i -lt $lines.Length; $i++) {
+		if ($lines[$i] -cmatch '^## Entries$') { $entriesIndex = $i; break }
+	}
+	if ($entriesIndex -lt 0) {
+		$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = $null; problem = 'missing ## Entries heading' })
+		return New-CheckRow 'workflow-incidents' $true 'fail' ([ordered]@{ rowCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+
+	$headerIndex = $entriesIndex + 1
+	while ($headerIndex -lt $lines.Length -and [string]::IsNullOrWhiteSpace($lines[$headerIndex])) { $headerIndex++ }
+	if ($headerIndex -ge $lines.Length) {
+		$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = ($entriesIndex + 1); problem = 'missing entries table header' })
+		return New-CheckRow 'workflow-incidents' $true 'fail' ([ordered]@{ rowCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+
+	$expectedHeaders = @('Owner', 'Symptom', 'Date', 'Session branch', 'Evidence')
+	$headerCells = Split-WorkflowIncidentsRow $lines[$headerIndex]
+	$headerValid = $null -ne $headerCells -and $headerCells.Length -eq 5
+	if ($headerValid) {
+		for ($c = 0; $c -lt 5; $c++) {
+			if ($headerCells[$c] -cne $expectedHeaders[$c]) { $headerValid = $false; break }
+		}
+	}
+	if (-not $headerValid) {
+		$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = ($headerIndex + 1); problem = 'unexpected entries table header' })
+		return New-CheckRow 'workflow-incidents' $true 'fail' ([ordered]@{ rowCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+
+	$sepIndex = $headerIndex + 1
+	if ($sepIndex -ge $lines.Length) {
+		$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = ($headerIndex + 1); problem = 'missing entries table separator' })
+		return New-CheckRow 'workflow-incidents' $true 'fail' ([ordered]@{ rowCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+	$sepCells = Split-WorkflowIncidentsRow $lines[$sepIndex]
+	$sepValid = $null -ne $sepCells -and $sepCells.Length -eq 5
+	if ($sepValid) {
+		foreach ($cell in $sepCells) {
+			if ($cell -cnotmatch '^:?-+:?$') { $sepValid = $false; break }
+		}
+	}
+	if (-not $sepValid) {
+		$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = ($sepIndex + 1); problem = 'unexpected entries table separator' })
+		return New-CheckRow 'workflow-incidents' $true 'fail' ([ordered]@{ rowCount = 0; failures = [object[]] $failures.ToArray() })
+	}
+
+	$seen = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+	for ($i = $sepIndex + 1; $i -lt $lines.Length; $i++) {
+		$line = $lines[$i]
+		if ($line -cmatch '^## ') { break }
+		if ($line -notmatch '^\s*\|') { continue }
+		$number = $i + 1
+		$rowCount++
+		$cells = Split-WorkflowIncidentsRow $line
+		if ($null -eq $cells -or $cells.Length -ne 5) {
+			$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = $number; problem = 'expected 5 table cells' })
+			continue
+		}
+		$owner = $cells[0]
+		$symptom = $cells[1]
+		$branch = $cells[3]
+		$ownerKey = $owner.Trim().Trim('`').Trim().ToLowerInvariant()
+		$symptomKey = ($symptom.Trim() -replace '\s+', ' ').ToLowerInvariant()
+		$branchKey = $branch.Trim().Trim('`').Trim().ToLowerInvariant()
+		$key = "$ownerKey`0$symptomKey`0$branchKey"
+		if ($seen.ContainsKey($key)) {
+			$failures.Add([ordered]@{ path = $script:WorkflowIncidentsPath; line = $number; firstLine = $seen[$key]; owner = $owner; symptom = $symptom; sessionBranch = $branch })
+		}
+		else {
+			$seen[$key] = $number
+		}
+	}
+
+	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
+	return New-CheckRow 'workflow-incidents' $true $status ([ordered]@{ rowCount = $rowCount; failures = [object[]] $failures.ToArray() })
+}
+
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
@@ -616,7 +713,7 @@ try {
 		}
 	}
 
-	# All six rows are always present, triggered or not.
+	# All seven rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory)
@@ -624,6 +721,7 @@ try {
 		(Invoke-LineLengthCheck $inventory)
 		(Invoke-InstructionSizeCheck $inventory)
 		(Invoke-ModelNameCheck $inventory)
+		(Invoke-WorkflowIncidentsCheck $inventory)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

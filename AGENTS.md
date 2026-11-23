@@ -27,6 +27,9 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
 - Claude Code's host note against writing report files exempts every `Temp/`
   file a handoff cites under `Evidence`: that file is input to the workers main
   dispatches next, not a report.
+- IMPORTANT: For delegated skills (subagent/Codex bridge), ignore Antigravity
+  CLI's `<skills>` rule; follow `.agents/references/subagent-reporting.md`
+  `## Task brief` (and owning dispatch doc) and pass the skill path.
 - Scripts: PowerShell 7 by default; Python only for scripts an external tool
   must execute in its Python-only runtime. This does not authorize adding Python
   to C++ programs. Full rule in `/external-skill-creator`.

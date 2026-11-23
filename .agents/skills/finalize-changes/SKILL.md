@@ -189,15 +189,15 @@ passes `-RequireExportOutputsRewritten` (`references/scripts.md`
 it. On a `Get-CompileRewrittenPaths.ps1` residual or
 `candidate.export-output-not-regenerated` block, keep the switch, attempt
 bounded build/evidence recovery, and rerun preparation with it; stop if it
-still refuses. Under standing confirmation, whenever post-confirmation recovery
-(conflict, byte/meaning change, export rebuild, `rebase.conflicted`,
-`rebase.patch-not-identical`, `history.source-changed`, or fix) changes bytes
-or a non-blocking user-check or user-judgment item remains (even with unchanged
-patch bytes), file a follow-up Plan via `/create-follow-up-plans` before
-candidate preparation; existing triggers (`references/worker.md` `## Recovery`)
-decide reruns (a Plan alone never re-triggers unrelated source reviews or
-builds), then rerun preparation, SmartGit launch, summary, and (unless `(d)`
-pauses) landing in the same turn.
+still refuses. Under standing confirmation, when recovery (conflict,
+byte/meaning change, export rebuild, `rebase.conflicted`,
+`rebase.patch-not-identical`, `history.source-changed`, or fix) changes bytes,
+`references/worker.md` `## Recovery` triggers decide reruns. Whether or not
+patch bytes changed, file a `/create-follow-up-plans` Plan before preparation
+only if a non-blocking user-check or user-judgment item remains (a Plan alone
+never re-triggers unrelated reviews or builds). After either trigger, rerun
+preparation, SmartGit launch, refreshed summary, and (unless `(d)` pauses)
+same-turn landing.
 
 After confirmation, stop without landing (or completing a claim) only on: (a) a
 mechanical script, lock, lease, or receipt refusal (unproven
