@@ -104,10 +104,10 @@ public:
 	// Combine pipelines [layer] (tone map accumulate → UNORM, all 3 colors in one dispatch)
 	Pipeline mpCombinePipelines[shaders::kiLightingLayers];
 
-	// Temporal-accumulation pass after combine [layer]: reprojects + EMA-blends the layer's 4 combine outputs in place against its history
+	// Temporal-accumulation pass after combine [layer]: reprojects + EMA-blends the layer's 3 directional combine outputs in place against its history
 	Pipeline mpLightingTemporalPipelines[shaders::kiLightingLayers];
 
-	// Publishes a layer's temporal-blended combine outputs into its distinct persistent history images [layer].
+	// Publishes a layer's temporal-blended directional combine outputs into its distinct persistent history images and derives its ambient combine target [layer].
 	Pipeline mpLightingHistoryCopyPipelines[shaders::kiLightingLayers];
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);

@@ -417,9 +417,8 @@ void Texture::RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture
 	vkCmdCopyImage(vkCommandBuffer, rSource.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkImageCopy);
 }
 
-void Texture::RecordClearToZero(VkCommandBuffer vkCommandBuffer)
+void Texture::RecordClearColor(VkCommandBuffer vkCommandBuffer, VkClearColorValue vkClearColorValue)
 {
-	VkClearColorValue vkClearColorValue {{0.0f, 0.0f, 0.0f, 0.0f}};
 	VkImageSubresourceRange vkImageSubresourceRange {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 	TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
 	vkCmdClearColorImage(vkCommandBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkClearColorValue, 1, &vkImageSubresourceRange);

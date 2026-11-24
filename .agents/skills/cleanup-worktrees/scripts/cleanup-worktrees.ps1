@@ -182,6 +182,8 @@ $primaryBranch = '<unproven>'
 $primaryHead = '<unproven>'
 
 try {
+	Import-Module (Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts\AgentWorktreeSession.psm1') -Force -DisableNameChecking
+
 	$rootResult = Invoke-Git -Arguments @('rev-parse', '--show-toplevel')
 	if ($rootResult.ExitCode -ne 0 -or $rootResult.Output.Count -ne 1) { throw 'cleanup-worktrees must run inside a Git repository' }
 	$repositoryRoot = Get-CanonicalPath -Path $rootResult.Output[0].Trim()
@@ -240,7 +242,7 @@ try {
 			continue
 		}
 		# Only wrapper-created session branches are disposable; any other branch is the user's.
-		if (-not ($current.Branch.StartsWith('claude/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('codex/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('opencode/', [StringComparison]::Ordinal) -or $current.Branch.StartsWith('agy/', [StringComparison]::Ordinal))) {
+		if ($null -eq (Get-AgentWorktreeSessionId -Branch $current.Branch)) {
 			$removed.Add([pscustomobject] @{ Path = $candidate; Branch = $current.Branch; BranchStatus = 'left (not a session branch)' })
 			continue
 		}
@@ -256,9 +258,14 @@ try {
 
 	$tempRoot = Get-CanonicalPath -Path (Join-Path $repositoryRoot 'Temp')
 	if (Test-Path -LiteralPath $tempRoot -PathType Container) {
-		Remove-AgedFiles -Root $tempRoot -Cutoff $cutoff -Label 'temp' -Residuals $residuals -Preview:$Preview |
-			ForEach-Object { $tempRemoved.Add($(if ($Preview) { "$($_.FullName) | eligible (preview)" } else { $_.FullName })) }
-		$tempRemoved.Sort([StringComparer]::OrdinalIgnoreCase)
+		if ((Get-Item -LiteralPath $tempRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+			$residuals.Add('Temp root is a reparse point; Temp cleanup skipped')
+		}
+		else {
+			Remove-AgedFiles -Root $tempRoot -Cutoff $cutoff -Label 'temp' -Residuals $residuals -Preview:$Preview |
+				ForEach-Object { $tempRemoved.Add($(if ($Preview) { "$($_.FullName) | eligible (preview)" } else { $_.FullName })) }
+			$tempRemoved.Sort([StringComparer]::OrdinalIgnoreCase)
+		}
 	}
 
 	$codexHome = Get-CanonicalPath -Path (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)) '.codex')

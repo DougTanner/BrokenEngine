@@ -12,6 +12,8 @@ public:
 
 	void DestroyLightingTextures();
 	void CreateLightingTextures();
+	// Clears lighting deposit, active spread, combine, and history targets to black (ambient alpha 1.0) and arms gbLightingTemporalReset. Callers have drained the graphics queue.
+	void ClearLightingTextures();
 	void RegisterDebugTextures(int64_t iPassCount);
 	void CreateShadowTextures();
 	void CreateSmokeTextures();
@@ -54,16 +56,15 @@ public:
 	Texture mpCombineTextures[shaders::kiLightingLayers][3];
 	Texture* mppLightingFinalTextures[shaders::kiLightingLayers * 3] {}; // Layer-major sampler-array binding
 
-	// Direction-averaged 0.25*(E+W+N+S) of the tone-mapped per-direction values.
-	// Terrain/Water read it with one texture sample in the ambient path.
+	// Direction-averaged 0.25*(E+W+N+S) of the finalized directional combine values, written by
+	// LightingHistoryCopy.comp. Terrain/Water read it with one texture sample in the ambient path.
 	Texture mpAmbientCombineTextures[shaders::kiLightingLayers];
 	Texture* mppAmbientCombineTextures[shaders::kiLightingLayers] {}; // Sampler-array binding
 
-	// Persistent last-refresh combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
+	// Persistent last-refresh directional combined lighting (R/G/B), reprojected by LightingTemporal.comp to
 	// de-flicker the texel-ramp resample (mirror of mShadowHistoryTexture). LightingHistoryCopy.comp publishes the
 	// temporal result over the whole texture on refresh.
 	Texture mpLightingHistoryTextures[shaders::kiLightingLayers][3];
-	Texture mpAmbientHistoryTextures[shaders::kiLightingLayers];
 
 	// Debug texture array (channels A/B/C used by formats needing 3 textures per slot, e.g., spread direction combined)
 	int64_t miDebugTextureCount = 0;

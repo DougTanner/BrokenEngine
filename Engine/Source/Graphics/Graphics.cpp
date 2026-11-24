@@ -454,6 +454,15 @@ void Graphics::Create()
 			optionalBindlessWriteEpoch.emplace(gpTextureManager->mTextureDescriptors, TextureDescriptors::kiAllFramebuffers);
 			// RecreateResources clears the flags
 			bReblurLightingTextures = mDestroyFlags & DestroyFlags::kLightingBlur;
+			if (bSwapchainRecreated)
+			{
+				// CreateScreenDependentResources below rebuilds and clears lighting textures; avoid duplicating that pass here.
+				mDestroyFlags.Set(DestroyFlags::kLightingTextures, false);
+			}
+			else if ((mDestroyFlags & DestroyFlags::kLightingClear) && !gLightingEnabled.Get<bool>() && !(mDestroyFlags & DestroyFlags::kLightingTextures))
+			{
+				gpTextureManager->mRenderTargetTextures.ClearLightingTextures();
+			}
 			RecreateResources();
 		}
 
@@ -594,6 +603,7 @@ void Graphics::Refresh()
 	PollSetting<bool>(gDebugTexture, nullptr, DestroyType::kCommandBuffers);
 	PollSetting<bool>(gWaterFoamSystemEnabled, "Water foam", DestroyType::kCommandBuffers);
 	PollSetting<int64_t>(gWaterLevel, "Water quality", DestroyType::kCommandBuffers);
+	PollSetting<bool>(gLightingEnabled, "Lighting", DestroyType::kCommandBuffers, DestroyFlags::kLightingClear, gpTextureManager != nullptr);
 
 	PollSetting<float>(gWaterShapeDetail, "Water shape detail", DestroyType::kPipelines, DestroyFlags::kWaterMesh, gpBufferManager != nullptr);
 

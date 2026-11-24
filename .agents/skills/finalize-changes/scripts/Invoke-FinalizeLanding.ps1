@@ -67,9 +67,9 @@ $result = [ordered]@{
 }
 $script:WorktreeCliPath = $null
 # What this invocation is actually landing right now. It starts as the user-confirmed candidate on
-# the parent that candidate was prepared on and is replaced, in Invoke-LandingRebaseOntoPrimary
-# alone, by the rebased commit and its new base, so every later ancestry, tree, advance, and
-# rollback check reads the state the retry produced instead of the stale anchors the caller passed in.
+# the parent that candidate was prepared on and is replaced, in the Invoke-FinalizeVerifiedRebase
+# retry block alone, by the rebased commit and its new base, so every later ancestry, tree, advance,
+# and rollback check reads the state the retry produced instead of the stale anchors the caller passed in.
 $script:LandingPrimaryTip = $ExpectedPrimaryTip
 $script:LandingCommit = $ApprovedSessionCommit
 $script:LandingTree = $ApprovedCandidateTree
@@ -372,20 +372,8 @@ function Get-FrozenCommitMetadata([string] $Commit) {
 	}
 }
 
-function Get-TreeChangeGuard([string] $BaseTree, [string] $TipTree) {
-	$fields = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('diff', '--raw', '--no-renames', '-z', $BaseTree, $TipTree)).Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
-	if ($fields.Count % 2 -ne 0) { throw 'git tree diff produced an incomplete record.' }
-	$records = [Collections.Generic.List[string]]::new()
-	for ($index = 0; $index -lt $fields.Count; $index += 2) {
-		$parts = $fields[$index].Split(' ')
-		if ($parts.Count -ne 5) { throw "git tree diff produced an unrecognized record: '$($fields[$index])'." }
-		$records.Add("$($parts[0]) $($parts[1]) $($parts[4])`t$($fields[$index + 1])")
-	}
-	return $records -join "`n"
-}
-
 function Assert-NoHistorySourceChanges([string] $Base, [string] $Tip) {
-	$guard = Get-LandingChangeGuard $Base $Tip
+	$guard = Get-FinalizeChangeGuard $script:CurrentIdentity.Worktree $Base $Tip
 	foreach ($line in @($guard -split "`n" | Where-Object { $_ })) {
 		$path = $line.Substring($line.IndexOf("`t") + 1)
 		if ($path -cin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')) {
@@ -425,7 +413,7 @@ function New-HistoryOverlayTree($Artifacts, [string] $SourceCommit) {
 		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('update-index', '--add', '--cacheinfo', "100644,$svgBlob,.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg") | Out-Null
 		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('update-index', '--add', '--cacheinfo', "100644,$overlaySvgBlob,.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg") | Out-Null
 		$tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('write-tree')).Trim()
-		$changes = Get-TreeChangeGuard (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$SourceCommit^{tree}")).Trim() $tree
+		$changes = Get-FinalizeChangeGuard $script:CurrentIdentity.Worktree (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$SourceCommit^{tree}")).Trim() $tree
 		$expected = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')
 		$actual = @($changes -split "`n" | Where-Object { $_ } | ForEach-Object { $_.Substring($_.IndexOf("`t") + 1) } | Sort-Object)
 		$unexpected = @($actual | Where-Object { $_ -cnotin $expected })
@@ -541,90 +529,11 @@ function Advance-PrimaryExactCandidate {
 	return $true
 }
 
-function Start-LandingGitProcess([string[]] $Arguments, [bool] $RedirectInput) {
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git.exe'
-	$start.WorkingDirectory = $script:CurrentIdentity.Worktree
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	$start.RedirectStandardInput = $RedirectInput
-	foreach ($argument in $Arguments) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw "Could not start 'git.exe'." }
-	return $process
-}
-
-# Patch text reaches git patch-id as the exact bytes git produced: the identity is compared across
-# the rebase to decide whether the landing bytes are still the confirmed ones, so no text decoding
-# may sit between the two commands. --verbatim keeps whitespace significant, so a commit differing
-# from the confirmed one only in whitespace cannot pass as byte-identical; it implies --stable, so
-# only hunk line numbers stay ignored and a rebase over another hunk still compares equal.
-function Get-LandingPatchId([string] $Base, [string] $Tip, [string[]] $Pathspec = @()) {
-	$worktree = $script:CurrentIdentity.Worktree
-	$patch = [IO.MemoryStream]::new()
-	try {
-		$diffArguments = @('-C', $worktree, 'diff-tree', '-p', '--no-color', '--no-ext-diff', '--full-index', '--binary', '--no-renames', '-r', $Base, $Tip)
-		if (@($Pathspec).Count -gt 0) { $diffArguments += @('--'); $diffArguments += @($Pathspec) }
-		$diff = Start-LandingGitProcess $diffArguments $false
-		$diffErrorTask = $diff.StandardError.ReadToEndAsync()
-		$diff.StandardOutput.BaseStream.CopyTo($patch)
-		$diffError = $diffErrorTask.GetAwaiter().GetResult()
-		$diff.WaitForExit()
-		$diffExit = $diff.ExitCode
-		$diff.Dispose()
-		if ($diffExit -ne 0) { throw "git diff-tree failed for the landing patch: $($diffError.Trim())" }
-		$identify = Start-LandingGitProcess @('patch-id', '--verbatim') $true
-		$identifyOutTask = $identify.StandardOutput.ReadToEndAsync()
-		$identifyErrorTask = $identify.StandardError.ReadToEndAsync()
-		$patch.Position = 0
-		$patch.CopyTo($identify.StandardInput.BaseStream)
-		$identify.StandardInput.BaseStream.Flush()
-		$identify.StandardInput.Close()
-		$identifyOut = $identifyOutTask.GetAwaiter().GetResult()
-		$identifyError = $identifyErrorTask.GetAwaiter().GetResult()
-		$identify.WaitForExit()
-		$identifyExit = $identify.ExitCode
-		$identify.Dispose()
-		if ($identifyExit -ne 0) { throw "git patch-id failed for the landing patch: $($identifyError.Trim())" }
-		$identityValue = $identifyOut.Trim().Split(' ')[0]
-		if ([string]::IsNullOrWhiteSpace($identityValue)) { return '(empty)' }
-		return $identityValue
-	}
-	finally { $patch.Dispose() }
-}
-
-# Path, mode, and status of every changed file, with the blob object IDs deliberately dropped: an
-# upstream commit touching another hunk of the same file changes the pre-image ID without changing
-# what this patch does, and content — including binary blobs — is already covered by patch-id.
-function Get-LandingChangeGuard([string] $Base, [string] $Tip) {
-	$fields = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('diff', '--raw', '--no-renames', '-z', $Base, $Tip)).Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
-	if ($fields.Count % 2 -ne 0) { throw 'git diff --raw produced an incomplete record for the landing patch.' }
-	$records = [Collections.Generic.List[string]]::new()
-	for ($index = 0; $index -lt $fields.Count; $index += 2) {
-		$parts = $fields[$index].Split(' ')
-		if ($parts.Count -ne 5) { throw "git diff --raw produced an unrecognized record: '$($fields[$index])'." }
-		$records.Add("$($parts[0]) $($parts[1]) $($parts[4])`t$($fields[$index + 1])")
-	}
-	return $records -join "`n"
-}
-
-# Two independent signals: patch-id proves the applied content, and the change guard proves the
-# patch still touches the same paths with the same modes and statuses.
-function Get-LandingPatchIdentity([string] $Base, [string] $Tip) {
-	return [pscustomobject]@{
-		PatchId = Get-LandingPatchId $Base $Tip
-		Changes = Get-LandingChangeGuard $Base $Tip
-	}
-}
-
 function Get-LandingNonHistoryPatchIdentity([string] $Base, [string] $Tip) {
 	$exclude = @('.', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')
-	$guard = Get-LandingChangeGuard $Base $Tip
+	$guard = Get-FinalizeChangeGuard $script:CurrentIdentity.Worktree $Base $Tip
 	$filtered = @($guard -split "`n" | Where-Object { $_ -and $_.Substring($_.IndexOf("`t") + 1) -cnotin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg') }) -join "`n"
-	return [pscustomobject]@{ PatchId = Get-LandingPatchId $Base $Tip $exclude; Changes = $filtered }
+	return [pscustomobject]@{ PatchId = Get-FinalizePatchId $script:CurrentIdentity.Worktree $Base $Tip $exclude; Changes = $filtered }
 }
 
 # Restoration is proven, never assumed, so an unproven session worktree also keeps the lease: only
@@ -632,56 +541,6 @@ function Get-LandingNonHistoryPatchIdentity([string] $Base, [string] $Tip) {
 function Throw-LandingRestorationUnproven([string] $Message) {
 	$script:LandingRestorationUnproven = $true
 	Throw-Landing 2 'rebase.abort-failed' $Message
-}
-
-# A blocked retry must leave the session branch exactly as the user confirmed it, which is the
-# approved commit itself even after the rebase moved the branch to its replacement.
-function Restore-LandingSessionBranch([string] $Code, [string] $Reason, [string] $Disposition = 'terminal', [int] $RetryAfterMilliseconds = 0) {
-	$worktree = $script:CurrentIdentity.Worktree
-	foreach ($marker in @('rebase-merge', 'rebase-apply')) {
-		# `git rebase --abort` exits 128 when no rebase is in progress, so only a started one is aborted.
-		if (Test-Path -LiteralPath (Invoke-FinalizeGit $worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()) {
-			$abort = Invoke-FinalizeNativeText 'git.exe' @('-C', $worktree, 'rebase', '--abort') $worktree
-			if ($abort.ExitCode -ne 0) { Throw-LandingRestorationUnproven "$Reason Aborting the rebase failed: $($abort.Stderr.Trim())" }
-			break
-		}
-	}
-	if ((Invoke-FinalizeGit $worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim() -cne $ApprovedSessionCommit) {
-		$restore = Invoke-FinalizeNativeText 'git.exe' @('-C', $worktree, 'reset', '--hard', $ApprovedSessionCommit) $worktree
-		if ($restore.ExitCode -ne 0) { Throw-LandingRestorationUnproven "$Reason Restoring the confirmed session commit failed: $($restore.Stderr.Trim())" }
-	}
-	if ((Invoke-FinalizeGit $worktree @('rev-parse', 'HEAD')).Trim() -cne $ApprovedSessionCommit -or
-		(Invoke-FinalizeGit $worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim() -cne $ApprovedSessionCommit -or
-		(Invoke-FinalizeGit $worktree @('status', '--porcelain', '-z', '--untracked-files=all')).Length -ne 0) {
-		Throw-LandingRestorationUnproven "$Reason The session worktree could not be proven restored to the confirmed commit."
-	}
-	Throw-Landing 2 $Code $Reason $Disposition $false $RetryAfterMilliseconds
-}
-
-# The single place the landing state moves off the caller's approved anchors: only a clean rebase
-# whose patch is provably identical to the confirmed one becomes the new landing candidate, so a
-# retry can never advance primary with bytes the user did not confirm.
-function Invoke-LandingRebaseOntoPrimary {
-	$worktree = $script:CurrentIdentity.Worktree
-	$approvedIdentity = Get-LandingPatchIdentity $script:LandingPrimaryTip $script:LandingCommit
-	$newPrimaryTip = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
-	$result.landed.rebaseAttempts = [int]$result.landed.rebaseAttempts + 1
-	$rebase = Invoke-FinalizeNativeText 'git.exe' @('-C', $worktree, 'rebase', '--onto', $newPrimaryTip, $script:LandingPrimaryTip, $CurrentBranch) $worktree
-	if ($rebase.ExitCode -ne 0) {
-		Restore-LandingSessionBranch 'rebase.conflicted' "Rebasing the confirmed candidate onto the current primary tip did not apply cleanly: $($rebase.Stderr.Trim())"
-	}
-	$rebasedCommit = (Invoke-FinalizeGit $worktree @('rev-parse', "refs/heads/$CurrentBranch")).Trim()
-	$rebasedIdentity = Get-LandingPatchIdentity $newPrimaryTip $rebasedCommit
-	if ($rebasedIdentity.PatchId -cne $approvedIdentity.PatchId -or $rebasedIdentity.Changes -cne $approvedIdentity.Changes) {
-		Restore-LandingSessionBranch 'rebase.patch-not-identical' 'Rebasing onto the current primary tip did not reproduce the confirmed patch.'
-	}
-	$script:LandingPrimaryTip = $newPrimaryTip
-	$script:LandingCommit = $rebasedCommit
-	$script:LandingTree = (Invoke-FinalizeGit $worktree @('rev-parse', "$rebasedCommit^{tree}")).Trim()
-	$result.rebasedSource.commit = $script:LandingCommit
-	$result.rebasedSource.tree = $script:LandingTree
-	$result.rebasedSource.parent = $script:LandingPrimaryTip
-	$result.rebasedSource.patch = Assert-NoHistorySourceChanges $script:LandingPrimaryTip $script:LandingCommit
 }
 
 function Assert-RecoveryCheckoutMatches([string] $Worktree, [string] $ExpectedRevision) {
@@ -832,7 +691,7 @@ function Find-LandedCommit([string] $PrimaryHead) {
 		if (-not (Test-LandingFrozenMetadata (Get-LandingCommitMetadata $commit))) { continue }
 		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$overlaySvgPath"))) { continue }
 		$patch = Get-LandingNonHistoryPatchIdentity $parents[0] $commit
-		$approved = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit } }
+		$approved = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { [pscustomobject]@{ PatchId = Get-FinalizePatchId $script:CurrentIdentity.Worktree $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit } }
 		if ($patch.PatchId -cne $approved.PatchId -or $patch.Changes -cne $approved.Changes) { continue }
 		$recoveryMatches.Add([pscustomobject]@{ Commit = $commit; Parent = $parents[0]; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$commit^{tree}")).Trim() })
 	}
@@ -935,7 +794,7 @@ try {
 	$result.tips.primary = $script:PrimaryIdentity.Head
 	$result.approvedSource.commit = $ApprovedSessionCommit; $result.approvedSource.tree = $ApprovedCandidateTree; $result.approvedSource.parent = $script:ApprovedSourceParent
 	$approvedPatchChanges = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit
-	$script:ApprovedPatchIdentity = [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = $approvedPatchChanges }
+	$script:ApprovedPatchIdentity = [pscustomobject]@{ PatchId = Get-FinalizePatchId $script:CurrentIdentity.Worktree $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = $approvedPatchChanges }
 	$result.approvedSource.patch = [ordered]@{ patchId = $script:ApprovedPatchIdentity.PatchId; changes = $approvedPatchChanges }
 	$script:LandingSession = if ([string]::IsNullOrWhiteSpace($OwnerToken)) { "$SessionLabel/landing" } else { $SessionLabel }
 	# A transient operation claim with a fresh per-landing owner excludes AgentTools promotion
@@ -1052,9 +911,32 @@ try {
 		# result means contention this landing should not keep fighting. The retry left the branch on the
 		# rebased commit, so exhaustion restores the confirmed one the documented rerun expects.
 		if (-not (Invoke-LandingAdvanceAttempt)) {
-			Invoke-LandingRebaseOntoPrimary
+			$newPrimaryTip = (Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-parse', "refs/heads/$PrimaryBranch")).Trim()
+			$rebase = Invoke-FinalizeVerifiedRebase -Repository $script:CurrentIdentity.Worktree -Branch $CurrentBranch -Base $script:LandingPrimaryTip -Commit $script:LandingCommit -Target $newPrimaryTip
+			if ($rebase.Code -cin @('git.operation-active', 'git.branch-mismatch')) {
+				Throw-Landing 2 $rebase.Code $rebase.Message
+			}
+			$result.landed.rebaseAttempts = [int]$result.landed.rebaseAttempts + 1
+			if ($rebase.Code -ceq 'rebase.abort-failed') {
+				Throw-LandingRestorationUnproven $rebase.Message
+			}
+			if ($rebase.Code -cne 'ok') {
+				Throw-Landing 2 $rebase.Code $rebase.Message
+			}
+			$script:LandingPrimaryTip = $newPrimaryTip
+			$script:LandingCommit = $rebase.Commit
+			$script:LandingTree = $rebase.Tree
+			$result.rebasedSource.commit = $script:LandingCommit
+			$result.rebasedSource.tree = $script:LandingTree
+			$result.rebasedSource.parent = $script:LandingPrimaryTip
+			$result.rebasedSource.patch = Assert-NoHistorySourceChanges $script:LandingPrimaryTip $script:LandingCommit
 			if (-not (Invoke-LandingAdvanceAttempt)) {
-				Restore-LandingSessionBranch 'landing.retry-exhausted' 'Primary advanced again after the rebased candidate was prepared; this landing made its one retry.' 'retryable-wait' 500
+				$retryReason = 'Primary advanced again after the rebased candidate was prepared; this landing made its one retry.'
+				$restore = Restore-FinalizeBranch $script:CurrentIdentity.Worktree $CurrentBranch $ApprovedSessionCommit
+				if (-not $restore.Restored) {
+					Throw-LandingRestorationUnproven "$retryReason $($restore.Message)"
+				}
+				Throw-Landing 2 'landing.retry-exhausted' $retryReason 'retryable-wait' $false 500
 			}
 		}
 	}

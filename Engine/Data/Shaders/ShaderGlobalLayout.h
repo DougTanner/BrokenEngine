@@ -149,7 +149,7 @@ struct GlobalLayout
 	// fCombinePassTotalScale = fCombinePassNormalizationScale / passCount (LightCombine.comp averaging).
 	float fCombinePassNormalizationScale INIT;
 	float fCombinePassTotalScale INIT;
-	float pfCombineCurvePoints[kiMaxSpreadPasses] INIT;
+	float pfCombineCurvePoints[kiMaxSpreadPasses] INIT; // Per-pass combine curve weights: LightingSpread.frag indexes by pass index; entries at or past fSpreadPassCount are unused
 	float fLightingTerrain INIT;
 	float fLightingObjects INIT;
 

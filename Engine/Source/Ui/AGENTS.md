@@ -144,9 +144,8 @@ is engine-owned here.
   editor. Endpoints remain X-locked and interior control points ordered.
 - The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and
   `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be
-  compared live against the shipping baseline. They currently hold identical
-  control points; that is the A/B setup, not dead duplication. Collapse to a
-  single curve once tuning settles.
+  compared live against the shipping baseline. Collapse to a single curve once
+  tuning settles.
 - `NetworkUiControl` disables a control while authoritative state has not
   resolved its request; call `Update` every frame with that authoritative state.
 

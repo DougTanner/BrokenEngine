@@ -48,35 +48,6 @@ function Complete-FinalizeCoretide([int] $ExitCode, [string] $Status, [string] $
 	exit $ExitCode
 }
 
-# The patch identity of a single-parent commit, the same for any rebase that replays it unchanged.
-function Get-CoretidePatchId([string] $Repository, [string] $Commit) {
-	$diff = Invoke-FinalizeGit $Repository @('diff-tree', '-p', '--no-color', '--no-ext-diff', '--full-index', '--binary', '-r', "$Commit^", $Commit)
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git.exe'
-	$start.WorkingDirectory = $Repository
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardInput = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	foreach ($argument in @('-C', $Repository, 'patch-id', '--stable')) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	if (-not $process.Start()) { throw 'Could not start git patch-id.' }
-	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
-	$stderrTask = $process.StandardError.ReadToEndAsync()
-	$bytes = [Text.UTF8Encoding]::new($false).GetBytes($diff)
-	$process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
-	$process.StandardInput.Close()
-	$stdout = $stdoutTask.GetAwaiter().GetResult()
-	$stderr = $stderrTask.GetAwaiter().GetResult()
-	$process.WaitForExit()
-	$exitCode = $process.ExitCode
-	$process.Dispose()
-	if ($exitCode -ne 0) { throw "git patch-id failed: $($stderr.Trim())" }
-	return $stdout.Trim().Split(' ')[0]
-}
-
 # The claim is machine-local bookkeeping, so a failed delete is a residual, as in Invoke-FinalizeLanding.ps1. Deleting
 # an absent claim reports already-absent, so a rerun after a crash past the advance still releases it.
 function Complete-PlanClaimRelease {
@@ -163,24 +134,26 @@ try {
 		Complete-FinalizeCoretide 2 'blocked' 'primary.dirty' 'The primary Coretide checkout is not clean.'
 	}
 
+	$landCommit = $approved
 	$upstream = (Invoke-FinalizeGit $coretide @('rev-parse', '@{upstream}')).Trim()
-	if ((Invoke-FinalizeGit $coretide @('rev-parse', "$approved^")).Trim() -cne $upstream) {
-		$approvedPatch = Get-CoretidePatchId $coretide $approved
-		if (-not (Test-FinalizeGitSuccess $coretide @('rebase', '@{upstream}'))) {
-			Invoke-FinalizeGit $coretide @('rebase', '--abort') | Out-Null
-			Complete-FinalizeCoretide 2 'blocked' 'rebase.conflicted' 'Rebasing the approved Coretide commit onto its moved upstream conflicted; the rebase was aborted.'
+	$approvedParent = (Invoke-FinalizeGit $coretide @('rev-parse', "$approved^")).Trim()
+	if ($approvedParent -cne $upstream) {
+		$rebase = Invoke-FinalizeVerifiedRebase -Repository $coretide -Branch $branch -Base $approvedParent -Commit $approved -Target $upstream
+		if ($rebase.Code -cne 'ok') {
+			Complete-FinalizeCoretide 2 'blocked' $rebase.Code $rebase.Message
 		}
-		if ((Get-CoretidePatchId $coretide 'HEAD') -cne $approvedPatch) {
-			Invoke-FinalizeGit $coretide @('reset', '--hard', $approved) | Out-Null
-			Complete-FinalizeCoretide 2 'blocked' 'rebase.patch-not-identical' 'The rebased Coretide commit changes a different patch than the approved one; the clone was reset to the approved commit.'
-		}
+		$landCommit = $rebase.Commit
 	}
-	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $primaryCoretide, 'pull', '--ff-only', '--no-rebase', $coretide, 'HEAD') $primaryCoretide
+	$advance = Invoke-FinalizeNativeText 'git.exe' @('-C', $primaryCoretide, 'pull', '--ff-only', '--no-rebase', $coretide, $landCommit) $primaryCoretide
 	if ($advance.ExitCode -ne 0) {
 		Complete-FinalizeCoretide 2 'blocked' 'primary.advance-failed' "Fast-forwarding the primary Coretide checkout from the clone failed: $($advance.Stderr.Trim())"
 	}
+	$primaryAfter = (Invoke-FinalizeGit $primaryCoretide @('rev-parse', 'HEAD')).Trim()
+	if ($primaryAfter -cne $landCommit) {
+		Complete-FinalizeCoretide 2 'blocked' 'primary.advance-failed' "The primary Coretide checkout is at '$primaryAfter', not the verified commit '$landCommit'."
+	}
 	Invoke-FinalizeGit $coretide @('fetch') | Out-Null
-	$result.coretideCommit = (Invoke-FinalizeGit $coretide @('rev-parse', 'HEAD')).Trim()
+	$result.coretideCommit = $landCommit
 	Complete-PlanClaimRelease
 	Complete-FinalizeCoretide 0 'landed' 'ok' 'The primary Coretide checkout advanced to the clone commit.'
 }

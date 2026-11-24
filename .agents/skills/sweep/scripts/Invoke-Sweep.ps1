@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to determine git repository root (git r
 $root = [IO.Path]::GetFullPath(($rootRaw.Trim() -replace '/', '\'))
 $branch = git -C $root rev-parse --abbrev-ref HEAD
 if ($LASTEXITCODE -ne 0) { throw "Failed to determine current git branch in '$root' (git rev-parse --abbrev-ref HEAD exited $LASTEXITCODE)" }
-if ($branch -like 'codex/*') { throw "/sweep cannot run from Codex session branch '$branch'; run from a non-Codex host session (Claude Code, Antigravity CLI, or OpenCode)" }
+if ($branch -like 'codex/*') { throw "/sweep cannot run from Codex session branch '$branch'; run from a non-Codex host session (Claude Code or Antigravity CLI)" }
 $sweep = Join-Path $root 'Temp\Sweep'
 $status = Join-Path $sweep 'Status.txt'
 $baselineFile = Join-Path $sweep 'Baseline.txt'
@@ -129,9 +129,18 @@ function Invoke-SweepCodex([string] $Template, [string] $Out, [string] $Sandbox,
 function Get-Section([string] $Path, [string] $Heading)
 {
 	$text = Get-Content -Raw $Path
-	$m = [regex]::Match($text, "(?ms)^## $Heading\s*\r?\n(.*?)(?=^## |^FIX-DONE)")
+	$m = [regex]::Match($text, "(?ms)^## $Heading\s*\r?\n(.*?)(?=^## |^FIX-DONE|^PROPAGATE-DONE)")
 	$body = $m.Groups[1].Value.Trim()
 	if ($body -and $body -notmatch '^(-\s*)?none$') { return $body }
+}
+
+# The final non-empty line (trailing whitespace trimmed) of a Codex output when it matches $Pattern, or $null.
+function Get-SweepReceiptLine([string] $Path, [string] $Pattern)
+{
+	if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+	$last = Get-Content -LiteralPath $Path | ForEach-Object { $_.TrimEnd() } | Where-Object { $_ } | Select-Object -Last 1
+	if ($last -and ($last -cmatch $Pattern)) { return $last }
+	return $null
 }
 
 # The build fields main branches on, from the C++ files changed since the given commit: Client and Server for any
@@ -267,42 +276,78 @@ $startFile = Join-Path $sweep "$Batch.start.txt"
 if (-not (Test-Path -LiteralPath $startFile)) { $start = git -C $root stash create; if (-not $start) { $start = git -C $root rev-parse HEAD }; $start.Trim() | Set-Content $startFile }
 "RUNNING $Batch $(Get-Date -Format s) units=$($batchUnits.Count)" | Set-Content $status
 
+$findReceiptPattern = '^FIND-DONE findings=(\d+)$'
+$fixReceiptPattern = '^FIX-DONE applied=\d+ declined=\d+ crossfile=\d+ oob=\d+$'
+$propagateReceiptPattern = '^PROPAGATE-DONE applied=\d+ declined=\d+$'
 $invokeSweepCodex = ${function:Invoke-SweepCodex}.ToString()
-$batchUnits | ForEach-Object -ThrottleLimit $Throttle -Parallel {
-	$u = $_
-	$root = $using:root
-	$sweep = $using:sweep
-	$promptDir = $using:promptDir
-	$model = $using:Model
-	${function:Invoke-SweepCodex} = $using:invokeSweepCodex
-	$findOut = Join-Path $sweep "units\$($u.Id).findings.md"
-	$fixOut = Join-Path $sweep "units\$($u.Id).fix.md"
-	$fileList = ($u.Files | ForEach-Object { "- $_" }) -join "`n"
-	$pathArgs = ($u.Files | ForEach-Object { "'$_'" }) -join ','
+$getSweepReceiptLine = ${function:Get-SweepReceiptLine}.ToString()
+try
+{
+	$unitOutcome = $batchUnits | ForEach-Object -ThrottleLimit $Throttle -Parallel {
+		$u = $_
+		$root = $using:root
+		$sweep = $using:sweep
+		$promptDir = $using:promptDir
+		$model = $using:Model
+		$findReceiptPattern = $using:findReceiptPattern
+		$fixReceiptPattern = $using:fixReceiptPattern
+		${function:Invoke-SweepCodex} = $using:invokeSweepCodex
+		${function:Get-SweepReceiptLine} = $using:getSweepReceiptLine
+		$findOut = Join-Path $sweep "units\$($u.Id).findings.md"
+		$fixOut = Join-Path $sweep "units\$($u.Id).fix.md"
+		$fileList = ($u.Files | ForEach-Object { "- $_" }) -join "`n"
+		$pathArgs = ($u.Files | ForEach-Object { "'$_'" }) -join ','
 
-	$vars = @{ ROOT = $root; FILES = $fileList; PATHARGS = $pathArgs; UNIT = $u.Stem; FINDINGS = "Temp/Sweep/units/$($u.Id).findings.md"; TYPE = $using:typeRel; SPEC = $using:specRel }
-	if (-not ((Test-Path $findOut) -and (Select-String -Quiet -SimpleMatch 'FIND-DONE' $findOut)))
-	{
-		if (-not (Invoke-SweepCodex (Join-Path $promptDir 'Find.md') $findOut 'read-only' $vars $root $model)) { Add-Content (Join-Path $sweep 'Failures.txt') "$($u.Stem) FIND failed"; return }
+		$vars = @{ ROOT = $root; FILES = $fileList; PATHARGS = $pathArgs; UNIT = $u.Stem; FINDINGS = "Temp/Sweep/units/$($u.Id).findings.md"; TYPE = $using:typeRel; SPEC = $using:specRel }
+		$findReceipt = Get-SweepReceiptLine $findOut $findReceiptPattern
+		if (-not $findReceipt)
+		{
+			$findOk = Invoke-SweepCodex (Join-Path $promptDir 'Find.md') $findOut 'read-only' $vars $root $model
+			if ($findOk) { $findReceipt = Get-SweepReceiptLine $findOut $findReceiptPattern }
+			if (-not $findReceipt) { Add-Content (Join-Path $sweep 'Failures.txt') "$($u.Stem) FIND failed"; $false; return }
+		}
+		$fixReceipt = Get-SweepReceiptLine $fixOut $fixReceiptPattern
+		if ($fixReceipt) { $true; return }
+		if ($findReceipt -match '=0+$')
+		{
+			$fixReceipt = 'FIX-DONE applied=0 declined=0 crossfile=0 oob=0'
+			"# Fix: $($u.Stem)`n`n## Applied`nnone`n`n## Declined`nnone`n`n## Cross-file`nnone`n`n## Out-of-bound`nnone`n`n$fixReceipt" | Set-Content $fixOut
+		}
+		else
+		{
+			$fixOk = Invoke-SweepCodex (Join-Path $promptDir 'Fix.md') $fixOut 'workspace-write' $vars $root $model
+			if ($fixOk) { $fixReceipt = Get-SweepReceiptLine $fixOut $fixReceiptPattern }
+			if (-not $fixReceipt) { Add-Content (Join-Path $sweep 'Failures.txt') "$($u.Stem) FIX failed"; $false; return }
+		}
+		Add-Content (Join-Path $sweep 'Progress.md') "unit $($u.Stem) $fixReceipt"
+		$true
 	}
-	if ((Test-Path $fixOut) -and (Select-String -Quiet -SimpleMatch 'FIX-DONE' $fixOut)) { return }
-	if (Select-String -Quiet 'FIND-DONE findings=0\b' $findOut)
-	{
-		"# Fix: $($u.Stem)`n`n## Applied`nnone`n`n## Declined`nnone`n`n## Cross-file`nnone`n`n## Out-of-bound`nnone`n`nFIX-DONE applied=0 declined=0 crossfile=0 oob=0" | Set-Content $fixOut
-	}
-	elseif (-not (Invoke-SweepCodex (Join-Path $promptDir 'Fix.md') $fixOut 'workspace-write' $vars $root $model)) { Add-Content (Join-Path $sweep 'Failures.txt') "$($u.Stem) FIX failed"; return }
-	Add-Content (Join-Path $sweep 'Progress.md') "unit $($u.Stem) $((Select-String 'FIX-DONE.*' $fixOut).Matches[0].Value)"
+}
+catch
+{
+	if (-not $Unit) { throw }
+	$unitOutcome = $false
 }
 
-if ($Unit) { "UNIT-DONE $Batch $Unit $(Get-Date -Format s)" | Set-Content $status; return }
+if ($Unit)
+{
+	if ($unitOutcome -is [bool] -and $unitOutcome) { "UNIT-DONE $Batch $Unit $(Get-Date -Format s)" | Set-Content $status; return }
+	"UNIT-FAILED $Batch $Unit $(Get-Date -Format s)" | Set-Content $status
+	exit 1
+}
+
+$outcomes = @($unitOutcome)
+$workersOk = $outcomes.Count -eq $batchUnits.Count
+foreach ($outcome in $outcomes) { if (-not ($outcome -is [bool] -and $outcome)) { $workersOk = $false; break } }
 
 # Collect the batch's cross-file, out-of-bound and declined sections.
 $crossFile = Join-Path $sweep "$Batch.crossfile.md"
 $cross = @(); $ledger = @(); $missing = @()
 foreach ($u in $batchUnits)
 {
+	$findOut = Join-Path $sweep "units\$($u.Id).findings.md"
 	$fixOut = Join-Path $sweep "units\$($u.Id).fix.md"
-	if (-not ((Test-Path $fixOut) -and (Select-String -Quiet -SimpleMatch 'FIX-DONE' $fixOut))) { $missing += $u.Stem; continue }
+	if (-not (Get-SweepReceiptLine $findOut $findReceiptPattern) -or -not (Get-SweepReceiptLine $fixOut $fixReceiptPattern)) { $missing += $u.Stem; continue }
 	$c = Get-Section $fixOut 'Cross-file'
 	if ($c) { $cross += "### $($u.Stem)`n$c`n" }
 	$o = Get-Section $fixOut 'Out-of-bound'
@@ -310,22 +355,23 @@ foreach ($u in $batchUnits)
 	$d = Get-Section $fixOut 'Declined'
 	if ($d) { $ledger += "### $($u.Stem) (declined)`n$d`n" }
 }
-if ($missing.Count -gt 0)
+if ($missing.Count -gt 0 -or -not $workersOk)
 {
-	"INCOMPLETE $Batch $(Get-Date -Format s) missing=$($missing -join ',')" | Set-Content $status
+	$missingText = if ($missing.Count -gt 0) { $missing -join ',' } else { 'worker-failed' }
+	"INCOMPLETE $Batch $(Get-Date -Format s) missing=$missingText" | Set-Content $status
 	return
 }
 # The cross-file file is written once per complete batch, so its absence means the ledger is not yet appended.
 if (-not (Test-Path $crossFile)) { foreach ($l in $ledger) { Add-Content (Join-Path $sweep 'Ledger.md') $l } }
 
 $propOut = Join-Path $sweep "$Batch.propagate.md"
-if ($cross.Count -gt 0 -and -not ((Test-Path $propOut) -and (Select-String -Quiet -SimpleMatch 'PROPAGATE-DONE' $propOut)))
+if ($cross.Count -gt 0 -and -not (Get-SweepReceiptLine $propOut $propagateReceiptPattern))
 {
 	"# Cross-file findings: $Batch`n`n$($cross -join "`n")" | Set-Content $crossFile
 	Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
 	$prompt = (Get-Content -Raw (Join-Path $promptDir 'Propagate.md')).Replace('{{ROOT}}', $root).Replace('{{BATCH}}', $Batch).Replace('{{CROSSFILE}}', "Temp/Sweep/$Batch.crossfile.md").Replace('{{TYPE}}', $typeRel).Replace('{{SPEC}}', $specRel)
 	$prompt | & (Get-Command codex).Source -a never exec --sandbox workspace-write -C $root -m $Model -c 'model_reasoning_effort="high"' --disable hooks --ephemeral -o $propOut - 2> "$propOut.stderr.txt" | Out-Null
-	if ($LASTEXITCODE -ne 0 -or -not (Test-Path $propOut) -or -not (Select-String -Quiet -SimpleMatch 'PROPAGATE-DONE' $propOut)) { "PROPAGATE-FAILED $Batch $(Get-Date -Format s)" | Set-Content $status; return }
+	if ($LASTEXITCODE -ne 0 -or -not (Get-SweepReceiptLine $propOut $propagateReceiptPattern)) { "PROPAGATE-FAILED $Batch $(Get-Date -Format s)" | Set-Content $status; return }
 	$declined = Get-Section $propOut 'Declined'
 	if ($declined) { Add-Content (Join-Path $sweep 'Ledger.md') "### $Batch propagation (declined)`n$declined`n" }
 }
@@ -334,7 +380,7 @@ elseif ($cross.Count -eq 0 -and -not (Test-Path $crossFile)) { 'none' | Set-Cont
 $totals = @{ applied = 0; declined = 0; crossfile = 0; oob = 0 }
 foreach ($u in $batchUnits)
 {
-	$line = (Select-String 'FIX-DONE.*' (Join-Path $sweep "units\$($u.Id).fix.md")).Matches[0].Value
+	$line = Get-SweepReceiptLine (Join-Path $sweep "units\$($u.Id).fix.md") $fixReceiptPattern
 	foreach ($k in @($totals.Keys)) { if ($line -match "$k=(\d+)") { $totals[$k] += [int] $Matches[1] } }
 }
 $summary = "units=$($batchUnits.Count) applied=$($totals.applied) declined=$($totals.declined) crossfile=$($totals.crossfile) oob=$($totals.oob)"

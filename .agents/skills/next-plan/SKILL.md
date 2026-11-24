@@ -66,52 +66,28 @@ The `argument-hint` value selects the Plan:
    [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
    `## Task brief`.
 
-   That brief carries `Skill: none` — `/prepare-change` excludes a claimed
-   executable Plan — and a `Return:` naming the shared handoff form plus the
-   extension fields this file's `## Handoff` declares, so
-   exactly one handoff contract binds the worker.
-
-   It also carries the Change Workflow step and role assignments the claimed
-   Plan triggers, as main states them from the workflow, and cites
-   [`references/preparation-brief.md`](references/preparation-brief.md) by path
-   for the snapshot, the leftovers, the citation rule for citing Plans, and the
-   stage split.
+   Pass `Skill: /prepare-change` with `mode: claimed-plan` and supply the brief
+   fields and bounds in
+   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Inputs` and
+   `## Handoff`.
 
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
    main as a card correction rather than an edit.
 
-   Main writes that brief from the claimed Plan's own citations — path plus
-   line range — citing the claimed Plan as its path plus the section line
-   ranges a `^## ` heading Grep of it returns. Main reads only the Plan
-   sections it must state from, such as the risk tier that sets the role
-   assignments, and only the `## Task brief` section cited above; it names the
-   handoff and reporting references the brief cites as paths only, leaving
-   them and the target source to the dispatched `planner`, and reads source
-   itself only for a decision it must make that the Plan and the returned
-   handoff cannot settle.
-
-   The brief bounds the card's verification evidence: no verbatim source
-   text, except an acceptance item whose purpose is proposed replacement
-   text.
-
-   A preparation handoff that returns a quantitative feasibility estimate as a
-   Finding must name the check proving that the measured trial preserved the
-   source document's rule or item inventory, or report the estimate as
-   unvalidated. That is an expectation of the dispatch, not a gate the Done
-   condition tests.
-
-   When that handoff returns `Status: BLOCKED` with the `Residuals` row this
-   file's `## Handoff` declares for an unconfirmed root cause:
+   When that handoff returns `Status: BLOCKED` with the `Residuals` row
+   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
+   declares for an unconfirmed root cause:
 
    - main dispatches one `implementer` for `/external-diagnose-bug`, on a
-     brief citing the recorded baseline and, from the heading Grep above, the
-     line ranges of the sections carrying the claimed Plan's investigation
-     portion (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main
-     reads;
-   - a proven root cause goes to a fresh preparation `planner` whose
-     continuation capsule carries the diagnosis handoff; that worker's handoff
-     is the one the rest of this step uses;
+     brief citing the recorded baseline and, from the heading lookup
+     `/prepare-change` `## Inputs` uses, the line ranges of the sections
+     carrying the claimed Plan's investigation portion
+     (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main reads;
+   - a proven root cause goes to a fresh preparation `planner` running
+     `/prepare-change` (`mode: claimed-plan`) whose continuation capsule
+     carries the diagnosis handoff; that worker's handoff is the one the rest
+     of this step uses;
    - no proven root cause is a blocker main reports to the user under the
      approval-refused row of `### Post-checkpoint outcomes`, with the claim
      held.
@@ -125,9 +101,9 @@ The `argument-hint` value selects the Plan:
    step keeps the earlier pick and does not present alternatives again.
 
    Done when the handoff cites the snapshot by the selectors
-   preparation-brief.md requires, its `Decisive checks` row reports both
-   `headings` values `true` and `card.missingFields` empty, and, when that
-   presentation ran, its pick has
+   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
+   requires, its `Decisive checks` row reports both `headings` values `true`
+   and `card.missingFields` empty, and, when that presentation ran, its pick has
    arrived and a pick other than the drafted plan is redrafted or routed to
    rejection.
 5. Run the Plan review step in
@@ -235,7 +211,7 @@ The `argument-hint` value selects the Plan:
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
 | changes requested at the `/finalize-changes` landing confirmation | held | follow [claim-exceptions.md](references/claim-exceptions.md) `## Changes requested at landing` |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
-| `Complete-NextPlan.ps1` refuses with `completion.plan-cited` | held | run the changes-requested row's difference preparation, step 5, and step 8, skipping the checkpoint for every later outcome of the run, except that the step-4 brief also states whether the refused exit was completion or `-Reject`, so step 4's citing-line rule puts each rewrite on the card and into `Slices` as scope that rule already approves, which needs no presentation of the difference, and step 7 presents only a user decision that preparation returns; skip steps 6 and 9; then run step 10 again with the same arguments |
+| `Complete-NextPlan.ps1` refuses with `completion.plan-cited` | held | run step 4's difference preparation per [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Inputs` (`mode: claimed-plan`), step 5, and step 8, skipping the checkpoint for every later outcome of the run; step 4's citing-line rule puts each rewrite on the card and into `Slices` as scope that rule already approves, which needs no presentation of the difference, and step 7 presents only a user decision that preparation returns; skip steps 6 and 9; then run step 10 again with the same arguments |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker other than `completion.plan-cited` whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
 | blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once, report the error and unknown claim state, and stop, retaining all work with the session; `claim: null` alone never proves claim absence, so add no recovery probe and do not query claim status or mutate a claim |
@@ -244,63 +220,9 @@ The `argument-hint` value selects the Plan:
 
 ## Handoff
 
-The preparation handoff extends the shared form in
-[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
-with the declared fields below. Main's brief bounds the returned handoff's
-verification content to the `Verification` rows; it never asks for a
-per-statement enumeration of unaffected results.
-
-- `Claim` — the Plan path, or none; with the resolved state when claimed.
-- `Classification` — `Tier 1`, `Tier 2`, or `Tier 3`, and the trigger.
-- `Verification` — one row per unresolved decision, contradiction needing a
-  user decision or override, problem found gone or empty realized change,
-  scope widened beyond the Plan's `## In scope`, and dropped or weakened Plan
-  acceptance criterion or invariant, on the form
-  `<kind> — <Plan citation> — <result and the change it requires>`; then one
-  row `Snapshot corrections: <count>` for every other verified Plan statement
-  whose result requires a card or implementation change, each written in the
-  snapshot's corrections section, which `Evidence` cites; then one final row
-  `Unaffected statements: <count>`; a quantitative feasibility estimate is not
-  repeated here, and step 4 governs one returned as a `Findings` row.
-- `Slices` — the only source of the slice partition; the card's `Roles`
-  carries role assignments, not the split. One row per disjoint implementation
-  slice: the snapshot items it owns, named by section and label or bullet,
-  never by their text, and its allowed file scope; one row when the work has
-  no disjoint split, and `none` for an empty realized change; when the
-  stage-split entry lists several stages, at least one row per stage the card
-  keeps in scope, each naming its stage. Refinements accepted from Plan review
-  or grill rounds are written into the preparation snapshot; every dispatch
-  that changes the snapshot's scope, such as that write-in or a redraft, names
-  `Slices` in its `Return:`, in addition to its assigned skill's handoff, and
-  returns the field again.
-- `Candidate zero` — the drafted mechanism as the `Mechanism` through
-  `Pays off when` rows exactly as
-  [`../plan-alternatives/SKILL.md`](../plan-alternatives/SKILL.md)
-  `## Handoff` declares them; `Mechanism` is written to satisfy the brief
-  exclusions of the `/plan-alternatives` bullet in
-  [`../../references/change-workflow.md`](../../references/change-workflow.md)
-  `#### Step 2 — Prepare and explore alternatives` and names neither the plan
-  file nor its `Temp/` snapshot;
-  `none` for an empty realized change and for every preparation handoff after
-  the `/plan-alternatives` pick.
-
-On the stop before the snapshot that
-[preparation-brief.md](references/preparation-brief.md)
-`## Investigation portion` directs for an unconfirmed root cause, the handoff
-returns `Status: BLOCKED`, `Evidence: none`, and one short `Residuals` row
-stating that the root cause is unconfirmed and diagnosis is next, and cites no
-card; no field this section declares is returned, which overrides their
-entries above.
-
-### Execution card
-
-The card, on the template in
-[`../../references/execution-card.md`](../../references/execution-card.md)
-`## Template`, is cited under `Evidence` and not repeated inline in the
-handoff; main presents its first two sections per `### Implementation approval`.
-When the classified tier differs from the tier the brief's role assignments
-assume, main rewrites the card's `Roles` field to the classified tier before the
-Plan review step.
+Step-4 preparation handoff and execution-card rules live in
+[`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
+(`mode: claimed-plan`).
 
 ### Implementation approval
 
@@ -372,8 +294,6 @@ work still to land — prints neither line.
 
 ## Rules
 
-- The preparation worker must never run
-  `.agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1`.
 - Every result is acted on per its `nextAction`, never by reconstructing a
   script's transitions, and for a `-Plan`-targeted invocation the manager never
   selects or claims a different candidate in that run, except through step 6's
@@ -405,9 +325,8 @@ work still to land — prints neither line.
 - [references/claim-exceptions.md](references/claim-exceptions.md) — deferral,
   pixel-evidence deferral, retained resume, takeover, and changes requested at
   landing.
-- [references/preparation-brief.md](references/preparation-brief.md) — the
-  step-4 preparation `planner`'s snapshot, leftovers, citation rule, and
-  stage split; cited in its brief, not read by main.
+- [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) — the step-4
+  preparation `planner` contract (`mode: claimed-plan`).
 - [references/tier3-workflow.md](references/tier3-workflow.md) — the additional
   Tier-3 preparation route.
 - [references/run-checkpoint.md](references/run-checkpoint.md) — the end-of-run

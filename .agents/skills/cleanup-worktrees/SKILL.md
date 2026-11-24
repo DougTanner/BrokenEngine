@@ -72,9 +72,9 @@ Return the script's complete report, including:
   second confirmation.
 - The same run deletes files under the repository-root `Temp/` directory whose
   last-write time is 48+ hours old, then removes emptied subfolders created 48+
-  hours ago; `Temp/` itself and younger files stay, and reparse-point files and
-  folders are skipped. `-Preview` lists eligible Temp files instead of deleting
-  them.
+  hours ago; `Temp/` and younger files stay, and reparse-point skips follow
+  `scripts/cleanup-worktrees.ps1`. `-Preview` lists eligible Temp files instead
+  of deleting them.
 - The same run deletes Codex CLI session log files (`rollout-*.jsonl` and
   `rollout-*.jsonl.zst` in `YYYY\MM\DD` folders) under the per-user
   `~/.codex/sessions` whose last-write time is 30+ days old, matching Claude

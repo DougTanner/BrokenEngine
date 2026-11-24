@@ -182,7 +182,7 @@ void main()
 		{
 			f3SmokeAmbientSum = ReadAmbientLighting(ambientLightingSamplers, iPlane, WorldToVisibleArea(vec3(f2PositionAtPlane, 0.0f), globalLayout.pLightingAreaToUvs[iPlane]));
 		}
-		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
+		// The 4.0f un-averages the ambient target: Lighting/LightingHistoryCopy.comp stores 0.25 * (E+W+N+S) and
 		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
 		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3SmokeAmbientSum, globalLayout, iPlane == 0 ? fSmokeObjectShadow : 1.0f);
 	}

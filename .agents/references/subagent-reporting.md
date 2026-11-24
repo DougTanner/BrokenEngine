@@ -48,8 +48,8 @@ session's work. It begins as the commit reported by
 `Get-AgentWorktreeSessionContext`, and changes only when an authorized branch
 synchronization reports its authoritative new baseline. Use the recorded
 baseline for every later delegation brief and changed-file inventory. Keep it
-in the running workflow context; do not create a second sidecar or baseline
-store. For `/next-plan`,
+in the running workflow context; do not create a second session-config or
+baseline store. For `/next-plan`,
 [`claim-results.md`](../skills/next-plan/references/claim-results.md#session-baseline-and-the-sync-object)
 owns how a claim receipt updates the recorded baseline. Every other
 machine-derivable identity value in a brief remains copied from
@@ -83,9 +83,9 @@ On a direct `reviewer` dispatch, when `## Inputs` documents a pre-dispatch
 the gitignored `Temp/` receipt and passes that path — never raw JSON in main
 context, ad-hoc calls, or retyped entries; self-deriving workers take `Baseline`
 and `Scope` directly per `## Inputs`. When composing a brief for a dispatched
-skill, read that skill by a section-bounded read — such as `Grep '^## '` to
-find the line range of `## Inputs`, then a read of that range alone — of the
-public sections [`skill-skeleton.md`](skill-skeleton.md#section-placement)
+skill, read that skill by a section-bounded read — locating `## Inputs` with a
+heading lookup (`AGENTS.md` `## Environment`), then reading only that range — of
+the public sections [`skill-skeleton.md`](skill-skeleton.md#section-placement)
 names, never its whole `SKILL.md`; `## Handoff` opens by path only when routing
 a returned result needs it. Each skill's `## Inputs` owns command form and
 producer (e.g., `.agents/skills/repo-code-review/SKILL.md` `## Inputs`,

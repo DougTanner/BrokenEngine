@@ -12,7 +12,9 @@ restrictions. Client invocation controls remain independent.
 - Put an exact `---` opening delimiter on line 1 and an exact `---` closing
   delimiter after the frontmatter.
 - Put at least one non-whitespace character in the Markdown body after the
-  closing delimiter.
+  closing delimiter, and keep the LF-normalized UTF-8 body within the
+  [`Validate-Skill.ps1`](../scripts/Validate-Skill.ps1) `BODY002` byte ceiling
+  (exact host budget and counting convention unverified).
 - Write each key once at top level as `key: value`.
 - Use a plain scalar, a single- or double-quoted scalar, an exact lowercase
   boolean, a flow list, or the folded-text marker `>-` according to the field
@@ -164,11 +166,12 @@ only for a disposable external test package.
 For validator changes, create disposable packages under a temporary directory;
 never track test packages. Require `VALID`/0 from valid main-session and
 subagent `-AllowOutsideSkills` packages; `INVALID`/1 from main-session section
-misordering and subagent section misplacement;
-`VALID`/0 with paired `context` and `agent` metadata in each shape;
-`INVALID`/1 with `RELATIONSHIP001` for an incomplete pair; `INVALID`/1 after
-corrupting a known field; `INVALID`/1 carrying `HANDOFF001` from a test
-package whose `## Handoff` fence contains a `Status:` line; `INVALID`/1 for
-broken bundled links and off-contract handoff vocabulary; `SETUP_ERROR`/2 for
-nonexistent and out-of-scope targets; and `VALID`/0 from the repository
-self-check.
+misordering and subagent section misplacement; `VALID`/0 with paired `context`
+and `agent` metadata in each shape; `INVALID`/1 with `RELATIONSHIP001` for an
+incomplete pair; `INVALID`/1 after corrupting a known field; `INVALID`/1
+carrying `HANDOFF001` from a test package whose `## Handoff` fence contains a
+`Status:` line; `INVALID`/1 for broken bundled links and off-contract handoff
+vocabulary; `VALID`/0 at the `BODY002` limit and `INVALID`/1 carrying `BODY002`
+one UTF-8 byte over the `BODY002` limit (with a multibyte character so
+character count stays at or below the limit); `SETUP_ERROR`/2 for nonexistent
+and out-of-scope targets; and `VALID`/0 from the repository self-check.

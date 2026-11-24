@@ -76,12 +76,11 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][0]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][1]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][2]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpAmbientCombineTextures[i]},
 			},
 		});
 
-		// Temporal pass: 4 history samplers + the 4 combine outputs (read-write storage images), reprojected and
-		// EMA-blended in place. No push constants — the shader reads the combine extent via imageSize().
+		// The temporal shader gets its extent from imageSize() and EMA-blends reprojected history into the directional
+		// storage images in place.
 		gpPipelineManager->mpLightingTemporalPipelines[i].Create(
 		{
 			.name = kpLightingTemporalPipelineNames[i],
@@ -93,11 +92,9 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][0]},
 				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][1]},
 				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[i][2]},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpAmbientHistoryTextures[i]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][0]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][1]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[i][2]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpAmbientCombineTextures[i]},
 			},
 		});
 
@@ -116,7 +113,6 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][0]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][1]},
 				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpLightingHistoryTextures[i][2]},
-				{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpAmbientHistoryTextures[i]},
 			},
 		});
 	}

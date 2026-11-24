@@ -30,8 +30,11 @@ skill only enforces them.
 
 Run in the delegated execution context of
 [`subagent-reporting.md`](../../references/subagent-reporting.md)
-`## Delegated execution context`; inline review
-is prohibited. Dispatch is once per review round; after the manager accepts
+`## Delegated execution context`; inline review by the main session is
+prohibited. Outside [`/coherence-review`](../coherence-review/SKILL.md)
+combined mode, use one separate dispatch per triggered round; when combined
+mode carries this check, the delegated `/coherence-review` reviewer runs it
+in its own context with no separate dispatch. After the manager accepts
 findings and fixes land, only the affected files receive a focused re-review.
 
 ## Inputs

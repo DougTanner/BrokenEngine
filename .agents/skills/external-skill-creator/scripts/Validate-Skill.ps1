@@ -1062,6 +1062,11 @@ try
 		}
 		else
 		{
+			$bodyByteCount = [System.Text.Encoding]::UTF8.GetByteCount($body)
+			if ($bodyByteCount -gt 23000)
+			{
+				Add-Diagnostic ($closingLineIndex + 2) 'BODY002' "Markdown body must be at most 23000 UTF-8 bytes ($bodyByteCount bytes)"
+			}
 			foreach ($linkMatch in (Get-MarkdownDestinations $body))
 			{
 				$target = $linkMatch.Target

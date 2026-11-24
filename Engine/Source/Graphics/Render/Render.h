@@ -254,13 +254,12 @@ inline bool gbObjectShadowsReset = true;
 // WriteModelPipelineIndirectBuffers reads it to zero the ModelShadow draws on a skipped frame.
 inline bool gbObjectShadowsRefreshFrame = false;
 
-// Set by CreateLightingTextures on a recreate and by RenderLightingGlobal on a gLightingEnabled change; re-arms the
-// PopulateLightingParameters first-frame guard so neither blends stale history for one frame.
+// Set by RenderTargetTextures::ClearLightingTextures on creation and disable; re-arms the PopulateLightingParameters
+// first-frame guard so neither blends stale history for one frame.
 inline bool gbLightingTemporalReset = false;
-// The active lighting layer whose deposit and spread work runs this frame, or -1 when skipped or when Lighting is
-// disabled. PopulateLightingParameters writes it once per frame in Global; lighting deposit collections and
-// RenderLightingSpreadIndirect read it in Main, while LightingUniforms.cpp keeps the combine, temporal, and
-// history-copy refresh layer file-static so the disable reset still clears each layer to black.
+// The active lighting layer whose deposit, spread, combine, temporal, and history-copy work runs this frame, or -1
+// when skipped or when Lighting is disabled. PopulateLightingParameters writes it once per frame in Global; lighting
+// deposit collections and RenderLightingSpreadIndirect read it in Main.
 inline int64_t giLightingRefreshLayer = -1;
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);

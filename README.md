@@ -41,8 +41,6 @@ full bootstrap (Developer Mode → clone → primary ThirdParty builds → data 
   points at an existing path, and otherwise from the default install location
   `C:\Program Files\QuadSpinner\Gaea 2\Gaea.Swarm.exe`.
 
-- Node.js with npm, required only to install OpenCode.
-
 - x64 CPython 3.12 or newer, required by every skill that needs host Python.
   `code-quality-metrics` uses the first `python` Application resolved through
   normal PATH precedence, then verifies that it is a supported CPython
@@ -152,11 +150,10 @@ The suggested launch commands below bypass permission prompts and other
 safeguards. Use them only in a repository and environment where that level of
 access is intentional.
 
-Use separate Windows Terminal profiles for the four clients: run Claude Code
-from Git Bash, and run Codex CLI, Antigravity CLI, and OpenCode from
-PowerShell 7. The repository wrappers and command examples use the native
-syntax of those shells; `pwsh` must also be available to Git Bash for shared
-PowerShell helpers.
+Use separate Windows Terminal profiles for the three clients: run Claude Code
+from Git Bash, and run Codex CLI and Antigravity CLI from PowerShell 7. The
+repository wrappers and command examples use the native syntax of those shells;
+`pwsh` must also be available to Git Bash for shared PowerShell helpers.
 
 ### Claude Code
 
@@ -227,8 +224,8 @@ setting is needed to suppress that confirmation.
   shared primary binaries under a bootstrap mutex before launch, tracks the
   client with kill-on-host-close lifetime, propagates its exit code, and
   preserves partial artifacts on provisioning failure.
-- Non-Codex sessions (Claude Code, Antigravity CLI, OpenCode) dispatch routed
-  review skills automatically through the Codex headless bridge
+- Non-Codex sessions (Claude Code, Antigravity CLI) dispatch routed review
+  skills automatically through the Codex headless bridge
   (`.agents/scripts/Invoke-Codex.ps1` with `-Skill <skill>` and optional
   `-Mode <mode>`, governed by the `.agents/references/codex-bridge.md` workflow
   reference, never user-triggered), while Codex sessions use native Codex
@@ -324,27 +321,6 @@ Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`,
   `--dangerously-skip-permissions`. `-ReattachWorktree <path>` reopens an
   existing session worktree. The wrapper trusts the new worktree for that
   session only and leaves the saved `agy` settings unchanged.
-
-### OpenCode
-
-- Install the `opencode-ai` npm package (1.18.31 observed) from PowerShell:
-	```powershell
-	npm install -g opencode-ai
-	```
-- Close and reopen the terminal, then verify the installation with
-  `opencode --version`.
-- From a PowerShell 7 tab inside Windows Terminal, opened at the primary
-  checkout root, launch the repository wrapper:
-	```powershell
-	pwsh -NoProfile -File .opencode/opencode-worktree.ps1
-	```
-- The wrapper creates branch `opencode/<uuid>` and stores the worktree under
-  `~/.opencode/worktrees/<repository>/<uuid>`. `-ReattachWorktree <path>`
-  reopens an existing session worktree, and `-PrepareOnly` prepares the worktree
-  without launching the agent.
-- OpenCode needs no bypass flag: its default permissions allow tool use without
-  prompts, except the user-only skills that `.opencode/opencode.json` gates
-  behind a confirmation.
 
 ## Compile
 

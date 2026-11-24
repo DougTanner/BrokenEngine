@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode', 'agy')][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][string] $Worktree,
 	[Parameter(Mandatory)][string] $TargetBranch,
@@ -11,6 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
 
 function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	$skillsLink = Join-Path $Worktree '.claude\skills'
@@ -51,32 +51,15 @@ function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	}
 }
 
-function Assert-AgentWorktreeOpenCodeSkills([string] $Worktree) {
-	$skillsRoot = Join-Path $Worktree '.agents\skills'
-	$skillsItem = Get-Item -LiteralPath $skillsRoot -Force -ErrorAction SilentlyContinue
-	$skillFile = if ($null -ne $skillsItem -and $skillsItem.PSIsContainer) {
-		Get-ChildItem -LiteralPath $skillsRoot -Directory -ErrorAction SilentlyContinue |
-			Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') -PathType Leaf } |
-			Select-Object -First 1
-	}
-	if ($null -eq $skillsItem -or -not $skillsItem.PSIsContainer -or $null -eq $skillFile) {
-		throw "'.agents\skills' in worktree '$Worktree' does not contain an available skill package, so OpenCode skills are unavailable."
-	}
-}
-
 $root = $RepositoryRoot
 $worktreeCli = Join-Path $root 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe'
 
-# Record the branch this session lands onto; Get-AgentWorktreeSessionContext refuses to resolve a
-# session worktree without it. Creation passes the primary branch observed at startup; a reset passes
-# the branch the sidecar already records.
-$sidecarDirectory = Join-Path $Worktree 'Temp'
-New-Item -ItemType Directory -Path $sidecarDirectory -Force | Out-Null
-$sidecar = [ordered]@{ schemaVersion = 'broken-engine-session-sidecar/v1'; targetBranch = $TargetBranch } | ConvertTo-Json
-[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-sidecar.json'), $sidecar, [Text.UTF8Encoding]::new($false))
-# The baseline hint Get-AgentWorktreeSessionContext reads. A file, not an environment variable, so a
-# child process repairing the fork point can rewrite it.
-[IO.File]::WriteAllText((Join-Path $sidecarDirectory 'session-baseline'), $Baseline + "`n", [Text.UTF8Encoding]::new($false))
+# Record the landing target and baseline hint in Git's per-worktree config (config.worktree),
+# outside disposable Temp/. Creation passes the primary branch observed at startup; a reset passes
+# the branch already recorded in config.worktree.
+Set-AgentWorktreeSessionConfig -Worktree $Worktree -TargetBranch $TargetBranch -Baseline $Baseline
+$tempDirectory = Join-Path $Worktree 'Temp'
+New-Item -ItemType Directory -Path $tempDirectory -Force | Out-Null
 # Seed the shared harness app-data root with the two caches whose cold rebuild dominates a first
 # launch. The runtime validates both on load and regenerates them on any mismatch, so a stale or
 # foreign copy costs nothing and needs no verification here. Seeding is a speed-up only, so any
@@ -98,7 +81,7 @@ try {
 			elseif (Test-Path -LiteralPath $userCache -PathType Leaf) { $cacheSources += $userCache }
 		}
 		if ($cacheSources.Count -ne 0) {
-			$cacheTarget = Join-Path $sidecarDirectory "AppData\$gameFolder"
+			$cacheTarget = Join-Path $tempDirectory "AppData\$gameFolder"
 			New-Item -ItemType Directory -Path $cacheTarget -Force | Out-Null
 			foreach ($cacheSource in $cacheSources) { Copy-Item -LiteralPath $cacheSource -Destination $cacheTarget -Force }
 		}
@@ -123,8 +106,7 @@ Write-Host ''
 & (Join-Path $root '.agents\scripts\Bootstrap-AgentTools.ps1') -RepositoryRoot $root -WaitSeconds $WaitSeconds
 Write-Host ''
 & (Join-Path $root '.agents\scripts\Provision-WorktreeThirdParty.ps1') -RepositoryRoot $Worktree -WaitSeconds $WaitSeconds
-if ($Client -ceq 'opencode') { Assert-AgentWorktreeOpenCodeSkills $Worktree }
-else { Assert-AgentWorktreeSkillsLink $Worktree }
+Assert-AgentWorktreeSkillsLink $Worktree
 Write-Host ''
 & (Join-Path $root '.agents\scripts\Build-WorktreeTarget.ps1') -Target DataPacker -Worktree $Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root -Baseline $Baseline
 Write-Host ''

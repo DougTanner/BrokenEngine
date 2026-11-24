@@ -403,8 +403,8 @@ $script:RootedPattern = '^(?:[A-Za-z]:[\\/]|[\\/]|~(?:[\\/]|$))'
 $script:ScriptPathPattern = [regex]::new('(?i)(?:^|(?<=[\s''"&=(,;|]))((?:[a-z]:[\\/]|~[\\/]|[\\/])[^\s''"<>|;&()]*\.psm?1)(?=$|[\s''",;)|&])')
 $script:Messages = @{
 	DirectoryChange = 'do not change the working directory (cd, Set-Location, Push-Location, or their aliases); run every command from the worktree root and address files by path.'
-	ExecutionPolicy = 'never use -ExecutionPolicy Bypass; run a repository script as pwsh -NoProfile -File <repo-relative script path> [arguments].'
-	AbsoluteScriptPath = 'never run a repository script by absolute path; use pwsh -NoProfile -File <repo-relative script path> [arguments] from the worktree root.'
+	ExecutionPolicy = 'never use -ExecutionPolicy Bypass; run a repository script as pwsh -NoProfile -NonInteractive -File <repo-relative script path> [arguments].'
+	AbsoluteScriptPath = 'never run a repository script by absolute path; use pwsh -NoProfile -NonInteractive -File <repo-relative script path> [arguments] from the worktree root.'
 	Stash = 'the git stash stack is shared by every worktree; use only git stash push -u -m <unique-tag>, git stash list, git stash apply <sha>, and git stash drop.'
 	InPlaceEdit = 'do not edit files in place with sed or perl outside Temp/; change tracked files with the host Edit tool.'
 	ComputedDeletion = 'delete only by exact literal paths, never by wildcard, pattern filter, pipeline, find, xargs, variable, or substitution; name each path literally (in PowerShell, -LiteralPath ''<path>''); a directory may be deleted recursively.'

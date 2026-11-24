@@ -3,6 +3,7 @@
 #include "RenderTargetTextures.h"
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/LightingWrappersBase.h"
 #include "Ui/MiscWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
 #include "TextureManager.h"
@@ -227,8 +228,8 @@ void RenderTargetTextures::CreateSmokeTextures()
 	OneShotCommandBuffer oneShotCommandBuffer;
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		mSmokeTexturesOne[i].RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
-		mSmokeTexturesTwo[i].RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
+		mSmokeTexturesOne[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+		mSmokeTexturesTwo[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
 	}
 	oneShotCommandBuffer.Execute();
 }
@@ -268,8 +269,8 @@ void RenderTargetTextures::CreateWindTextures()
 void RenderTargetTextures::ClearWindTextures()
 {
 	OneShotCommandBuffer oneShotCommandBuffer;
-	mWindTextureOne.RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
-	mWindTextureTwo.RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
+	mWindTextureOne.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+	mWindTextureTwo.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
 	VkBufferMemoryBarrier pVkWindOccupancyInitializationBarriers[2] {};
 	for (int64_t i = 0; i < 2; ++i)
 	{
@@ -277,6 +278,37 @@ void RenderTargetTextures::ClearWindTextures()
 		pVkWindOccupancyInitializationBarriers[i] = Buffer::WholeBufferBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, gpBufferManager->mpWindOccupancyVkBuffers[i]);
 	}
 	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindOccupancyInitializationBarriers)), pVkWindOccupancyInitializationBarriers, 0, nullptr);
+	oneShotCommandBuffer.Execute();
+}
+
+void RenderTargetTextures::ClearLightingTextures()
+{
+	// Re-arm the temporal first-frame guard so both layers blend pure current on their first refresh after creation or re-enable.
+	gbLightingTemporalReset = true;
+
+	static constexpr VkClearColorValue kVkAmbientClearColor {{0.0f, 0.0f, 0.0f, 1.0f}};
+	int64_t iPassCount = static_cast<int64_t>(gSpreadPassCount.mfCurrent);
+	OneShotCommandBuffer oneShotCommandBuffer;
+	for (Texture& rLightingTexture : mpLightingTextures)
+	{
+		rLightingTexture.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+	}
+	for (int64_t i = 0; i < iPassCount; ++i)
+	{
+		for (Texture& rSpreadTexture : mpSpreadTextures[i])
+		{
+			rSpreadTexture.RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+		}
+	}
+	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	{
+		for (int64_t j = 0; j < 3; ++j)
+		{
+			mpCombineTextures[i][j].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+			mpLightingHistoryTextures[i][j].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer);
+		}
+		mpAmbientCombineTextures[i].RecordClearColor(oneShotCommandBuffer.mVkCommandBuffer, kVkAmbientClearColor);
+	}
 	oneShotCommandBuffer.Execute();
 }
 

@@ -17,7 +17,6 @@ static_assert(std::ssize(game::kFlightPlanes) == shaders::kiLightingLayers);
 constexpr std::string_view kppCombineNames[shaders::kiLightingLayers][3] {{"CombineRed0", "CombineGreen0", "CombineBlue0"}, {"CombineRed1", "CombineGreen1", "CombineBlue1"}};
 constexpr std::string_view kpAmbientCombineNames[shaders::kiLightingLayers] {"CombineAmbient0", "CombineAmbient1"};
 constexpr std::string_view kppHistoryNames[shaders::kiLightingLayers][3] {{"LightingHistoryRed0", "LightingHistoryGreen0", "LightingHistoryBlue0"}, {"LightingHistoryRed1", "LightingHistoryGreen1", "LightingHistoryBlue1"}};
-constexpr std::string_view kpAmbientHistoryNames[shaders::kiLightingLayers] {"LightingHistoryAmbient0", "LightingHistoryAmbient1"};
 static std::string sppSpreadNames[shaders::kiMaxSpreadPasses][3];
 static std::string sppSpreadOnlyNames[shaders::kiMaxSpreadPasses][3];
 
@@ -33,7 +32,6 @@ void RenderTargetTextures::DestroyLightingTextures()
 			mpLightingHistoryTextures[i][j].Destroy();
 		}
 		mpAmbientCombineTextures[i].Destroy();
-		mpAmbientHistoryTextures[i].Destroy();
 	}
 
 	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
@@ -70,10 +68,6 @@ void RenderTargetTextures::CreateLightingTextures()
 {
 	DestroyLightingTextures();
 
-	// This (re)create rebuilds the history textures (below) with undefined contents; re-arm the temporal first-frame
-	// guard so PopulateLightingParameters blends pure-current and re-seeds history next frame (mirror of CreateShadowTextures).
-	gbLightingTemporalReset = true;
-
 	auto [iLightingTextureX, iLightingTextureY] = TextureManager::ExtraAreaDetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
 	// Create 3 lighting textures without individual render passes
 	TextureInfo lightingTextureInfo
@@ -86,7 +80,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.iMipLevels = 1,
 		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback (shared by all 3 lighting textures)
+		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // TRANSFER_SRC: agent dump_render_target readback; TRANSFER_DST: ClearLightingTextures
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
@@ -208,7 +202,7 @@ void RenderTargetTextures::CreateLightingTextures()
 				.iMipLevels = 1,
 				.iArrayLayers = 1,
 				.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-				.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
+				.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // TRANSFER_SRC: agent dump_render_target readback; TRANSFER_DST: ClearLightingTextures
 				.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
 				.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 				.eTextureLayout = TextureLayout::kShaderReadOnly,
@@ -329,10 +323,10 @@ void RenderTargetTextures::CreateLightingTextures()
 		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mpSpreadVkFramebuffers[i], std::format("SpreadMRT_{}", i).c_str());
 	}
 
-	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the
-	// last-refresh history into these in place; LightingHistoryCopy.comp publishes the result to history.
+	// LightingTemporal.comp blends last-refresh history into the tone-mapped UNORM directional outputs in place.
+	// LightingHistoryCopy.comp copies the result to history and derives the ambient target.
 	auto [iCombineX, iCombineY] = TextureManager::ExtraAreaDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
-	// TRANSFER_DST: the creation clear below.
+	// TRANSFER_SRC: agent dump_render_target readback; TRANSFER_DST: ClearLightingTextures.
 	TextureInfo combineTextureInfo
 	{
 		.textureFlags = {},
@@ -349,51 +343,20 @@ void RenderTargetTextures::CreateLightingTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 
-	// History textures: last-refresh combine outputs reprojected + EMA-blended by LightingTemporal.comp.
-	// Clones of the combine textures (same bumped extent, RGBA8 UNORM); SAMPLED (read as history), STORAGE
-	// (descriptor-set compatibility with combine bindings) so LightingHistoryCopy.comp can refresh them in-place.
-	TextureInfo historyTextureInfo
-	{
-		.textureFlags = {},
-		.name = kppHistoryNames[0][0],
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatCombine,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	};
-
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
 		for (int64_t j = 0; j < 3; ++j)
 		{
 			combineTextureInfo.name = kppCombineNames[i][j];
 			mpCombineTextures[i][j].Create(combineTextureInfo);
-			historyTextureInfo.name = kppHistoryNames[i][j];
-			mpLightingHistoryTextures[i][j].Create(historyTextureInfo);
+			combineTextureInfo.name = kppHistoryNames[i][j];
+			mpLightingHistoryTextures[i][j].Create(combineTextureInfo);
 		}
 		combineTextureInfo.name = kpAmbientCombineNames[i];
 		mpAmbientCombineTextures[i].Create(combineTextureInfo);
-		historyTextureInfo.name = kpAmbientHistoryNames[i];
-		mpAmbientHistoryTextures[i].Create(historyTextureInfo);
 	}
 
-	// A reset refreshes one layer per frame, so consumers read the other layer's combine outputs a frame before its first
-	// refresh writes them. History needs no clear: a reset's first refresh blends pure current and then overwrites it.
-	OneShotCommandBuffer oneShotCommandBuffer;
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		for (Texture* pCombineTexture : {&mpCombineTextures[i][0], &mpCombineTextures[i][1], &mpCombineTextures[i][2], &mpAmbientCombineTextures[i]})
-		{
-			pCombineTexture->RecordClearToZero(oneShotCommandBuffer.mVkCommandBuffer);
-		}
-	}
-	oneShotCommandBuffer.Execute();
+	ClearLightingTextures();
 
 	// Final output points to combine textures (tone-mapped UNORM)
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)

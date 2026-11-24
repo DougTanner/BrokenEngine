@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:04.470Z","dependsOn":["Documents/Plans/Engine/FixLightingSpreadCompression.md","Documents/Plans/Engine/MatchLightingAmbientToDirections.md","Documents/Plans/Engine/NormalizeLightingSpreadTaps.md","Documents/Plans/Engine/SampleLightingCurveOverActivePasses.md","Documents/Plans/Engine/StabilizeLightingToneCurve.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:04.470Z","dependsOn":["Documents/Plans/Engine/FixLightingSpreadCompression.md","Documents/Plans/Engine/NormalizeLightingSpreadTaps.md","Documents/Plans/Engine/StabilizeLightingToneCurve.md"]} -->
 # Remove the compass-shaped world lighting halo
 
 ## Context

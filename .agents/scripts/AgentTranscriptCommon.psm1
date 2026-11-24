@@ -213,7 +213,7 @@ function Add-AgyReadError([Collections.Generic.List[object]] $ReadErrors, [Colle
 function Resolve-AgentAgyParentSession {
 	[CmdletBinding()]
 	param(
-		[Parameter(Mandatory)][string] $SessionId,
+		[string] $SessionId = $env:ANTIGRAVITY_CONVERSATION_ID,
 		[string] $BrainRoot
 	)
 

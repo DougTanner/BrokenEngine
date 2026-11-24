@@ -217,10 +217,11 @@ preparation dispatch recovers `primary.path-overlap` itself under
      `none`/`coretide.already-landed` when `coretideCommit` equals the approved
      Coretide commit.
    - A Coretide-only landing passes `-ReleasePlanClaim` to `-Land` for a
-     claimed Plan in place of step 10's, skips steps 10-12, and releases the
-     lease through `Invoke-FinalizeLockClaim.ps1 -Release`.
-   - Done when that claim has returned the owner token landing carries and any
-     Coretide `-Land` has returned its result.
+     claimed Plan instead of step 10's, skips steps 10-12, releases the lease
+     with `Invoke-FinalizeLockClaim.ps1 -Release` only on `landed` or `none`,
+     and routes `blocked` through `## Recovery`.
+   - Done when that claim returns landing's owner token and any Coretide
+     `-Land` returns its result.
 10. Invoke landing with that owner token.
     - That invocation passes `-ApprovalReviewResultFile` naming the receipt that
       main's run of the step-6 line wrote; the receipt gate in
@@ -275,9 +276,9 @@ preparation dispatch recovers `primary.path-overlap` itself under
 
 ## Recovery
 
-- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` result stops before the
-  engine landing; release the lease as for any blocked landing and return the
-  result as a blocker for the user.
+- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` result stops before engine
+  landing and returns a user blocker: retain the lease on `rebase.abort-failed`;
+  otherwise release it with `Invoke-FinalizeLockClaim.ps1 -Release`.
 - Postconfirmation engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
   `rebase.patch-not-identical`: prior landing arguments, baseline, expected
   tips, landing acceptance table, SmartGit receipt, and summary are invalid,

@@ -11,29 +11,31 @@ shields provide an additional surface-normal depositor from Objects
 - Readers sample lighting layer k through `pLightingAreaToUvs[k]`;
   `f4LightingArea` holds the area of the refreshing layer,
   `uiLightingRefreshLayer`. The spread's terrain height fade applies only to
-  layer 0; layer 1's plane lies above every island. Which passes the layers
-  share and which targets each keeps is owned by Render
-  (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`).
+  layer 0; layer 1's plane lies above every island. Render
+  (`../../../Source/Graphics/Render/AGENTS.md` `## Ordering and Publication`)
+  owns shared passes, per-layer targets, and per-frame attachment load clears.
 - Area and point deposits fade against the padded lighting-texture boundary, not
   the visible-area edge. Rotation can move point-light texture coordinates
-  outside `[0,1]`, so that path uses clamped sampling. The deposit render pass
-  clears its attachments through its load operation every frame.
+  outside `[0,1]`, so that path uses clamped sampling.
 - Each spread pass carries an accumulation chain for the next pass and emits a
   separate pre-accumulation snapshot weighted by the combine curve. Combine sums
   the snapshots; substituting accumulated outputs changes the intended
   multi-pass weighting.
-- Combine normalizes the snapshots, tone maps them into the scene-lighting
-  targets, and writes the precomputed ambient target. That target holds
-  `0.25 * (E + W + N + S)` of the tone-mapped per-direction values — the average
-  of the four EWNS channels — so a consumer does one texture sample instead of
-  three. Consumers that need the un-averaged sum multiply by 4 —
-  `../Water/Water.frag` and `../Terrain/Terrain.frag`, both feeding the smoke
-  blend. Storing a differently scaled value here without changing those two puts
-  smoke on water and terrain off by 4x, with nothing to catch it but the artwork
-  looking wrong. Combine, temporal, and history copy dispatch over the whole
-  combine texture; temporal rejects history whose reprojected coordinate leaves
-  `[0, 1]`. Reset uses current data only, then a separate history copy publishes
-  the resolved result.
+- Combine normalizes the snapshots and tone maps them into the directional
+  combine targets (`RenderTargetTextures::mpCombineTextures`).
+  `LightingTemporal.comp` owns the directional temporal blend, rejecting history
+  whose reprojected coordinate leaves `[0, 1]`; reset uses current data only.
+  History copy then reads the resolved directional outputs to publish history
+  and derive the precomputed ambient target, so ambient matches those clamped
+  outputs with no separate ambient history. That ambient target holds the
+  average of the stored EWNS values (formula at `combineImageAmbient` in
+  `LightingHistoryCopy.comp`), so a consumer reads ambient in one texture sample
+  instead of sampling the directional targets. Consumers that need the
+  un-averaged sum multiply by 4 — `../Water/Water.frag` and
+  `../Terrain/Terrain.frag`, both feeding the smoke blend. Storing a differently
+  scaled value here without changing those two puts smoke on water and terrain
+  off by 4x, with nothing to catch it but the artwork looking wrong. Combine,
+  temporal, and history copy dispatch over the whole combine texture.
 - Light-type textures are pre-blurred for deposits. Visible sprites continue
   sampling the original textures.
 

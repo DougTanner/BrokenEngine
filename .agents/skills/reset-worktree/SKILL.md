@@ -32,21 +32,19 @@ the primary tip and rerunning the setup session creation runs.
    await its completion. Done when the script has exited.
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/reset-worktree/scripts/Reset-AgentWorktree.ps1
+   pwsh -NoProfile -NonInteractive -File .agents/skills/reset-worktree/scripts/Reset-AgentWorktree.ps1
    ```
 
-2. Report the script's final `Reset worktree` line on exit 0, or its refusal
-   or error message on exit 1. Done when the user has the outcome.
+2. Report the final `Reset worktree` line on exit 0, or stderr refusal/error
+   output on any nonzero exit. Done when the user has the outcome.
 
 ## Rules
 
-- Leave the cause of a refusal or error for the user to resolve. A refusal
-  changes nothing; after an error the branch may already be fast-forwarded and
-  `Temp` deleted, and a rerun is safe once the cause is resolved.
+- Leave the cause of a refusal or error for the user to resolve, using the
+  script's diagnostic; a rerun is safe once the cause is resolved.
 - The reset deletes everything in the worktree's `Temp` directory, including
-  the previous run's logs and handoff files. Any error during or after that
-  delete and before setup rewrites the session sidecar, such as a process still
-  holding a file in `Temp`, can leave the sidecar missing; the script refuses
-  every rerun while that file is missing, as its message says.
+  the previous run's logs and handoff files; session metadata lives outside
+  `Temp` and is preserved (`Initialize-AgentWorktreeSession.ps1` and
+  `Get-AgentWorktreeSessionContext` own its storage and derivation).
 - The reset does not change the worktree folder's creation time, which
   `/cleanup-worktrees` checks for removal.

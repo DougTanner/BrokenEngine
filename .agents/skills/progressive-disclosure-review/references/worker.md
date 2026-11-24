@@ -48,10 +48,14 @@ pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory
 
 5. Measure each changed `SKILL.md` with `pwsh -NoProfile -File
    .agents/scripts/Measure-Tokens.ps1 -Path <file>`. A `SKILL.md` body over
-   10,000 `bt-token-v1` needs a stated reason why the detail cannot move to a
-   reference or script, and 15,000 is the ceiling. Done when every changed
-   `SKILL.md` has a measurement and each threshold breach is a
-   `NEEDS_ACTION` finding, not advice.
+   4,500 `bt-token-v1` (measured on the body with `-StartLine` when frontmatter
+   pushes the file over) needs a stated reason why the detail cannot move to a
+   reference or script;
+   [`Validate-Skill.ps1`](../../external-skill-creator/scripts/Validate-Skill.ps1)
+   `BODY002` enforces the mechanical body-byte ceiling separately. Done when
+   every changed `SKILL.md` has a measurement and each body over 4,500
+   `bt-token-v1` lacking a stated reason is a `NEEDS_ACTION` finding, not
+   advice.
 
 ## Rules
 

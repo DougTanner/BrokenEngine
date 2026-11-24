@@ -1,22 +1,26 @@
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('claude', 'codex', 'opencode', 'agy')][string] $Client,
+	[Parameter(Mandatory)][string] $Client,
 	[Parameter(Mandatory)][string] $RepositoryRoot,
-	[string] $ClientExecutable,
 	[string[]] $ClientArguments = @(switch -CaseSensitive ($Client) {
 		'agy' { '--dangerously-skip-permissions' }
 		'codex' { '--no-daemon', '--dangerously-bypass-approvals-and-sandbox', '--dangerously-bypass-hook-trust' }
-		# PSModulePath is cleared because inherited PowerShell 7 module paths break OpenCode's Windows
-		# PowerShell archive helper, which breaks its Grep and Skill tools.
-		'opencode' { '-NoProfile', '-Command', '$env:PSModulePath = $null; & opencode.cmd; exit $LASTEXITCODE' }
 	}),
 	[string] $ReattachWorktree,
-	[switch] $PrepareOnly,
 	[int] $WaitSeconds = 500
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Client -cne 'claude' -and $Client -cne 'codex' -and $Client -cne 'opencode' -and $Client -cne 'agy') { throw "Client must be lowercase 'claude', 'codex', 'opencode', or 'agy'." }
+
+Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'WorktreeCliSessionExclusion.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $PSScriptRoot 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
+
+$supportedClients = @(Get-AgentWorktreeSupportedClients)
+if ($Client -cnotin $supportedClients) {
+	$clientList = ($supportedClients | ForEach-Object { "'$_'" }) -join ', '
+	throw "Client must be lowercase: $clientList."
+}
 
 # Claude carries client arguments out of band because -File treats a leading dash as a
 # PowerShell parameter. Do not clear the transport variable until reattach validation succeeds:
@@ -29,10 +33,6 @@ if ($Client -ceq 'claude' -and -not [string]::IsNullOrEmpty($env:BROKEN_ENGINE_C
 	if ($parts.Count -ge 2) { $ClientArguments = @($parts[0..($parts.Count - 2)]) }
 	$clearClaudeArgumentTransport = $true
 }
-
-Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'WorktreeCliSessionExclusion.psm1') -Force -DisableNameChecking
-Import-Module (Join-Path $PSScriptRoot 'AgentWorktreeSession.psm1') -Force -DisableNameChecking
 
 $worktreeCreated = $false
 $exitCode = 1
@@ -59,7 +59,7 @@ try {
 			$headName = Join-Path $markerPath 'head-name'
 			if ([string]::IsNullOrWhiteSpace($branch) -and (Test-Path -LiteralPath $headName)) { $branch = (Get-Content -LiteralPath $headName -Raw).Trim() -replace '^refs/heads/', '' }
 		}
-		if ($branch -cnotmatch "^$Client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
+		if ($null -eq (Get-AgentWorktreeSessionId -Branch $branch -Client $Client)) { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
 		$identity = [pscustomobject]@{ Worktree = $reattachTarget; Branch = $branch }
 	}
 	else {
@@ -74,10 +74,9 @@ try {
 		if (@(Invoke-AgentGit @('-C', $root, 'branch', '--list', $branch)).Count -ne 0) { throw "Generated branch already exists: '$branch'." }
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $worktree; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $primary.Head }
 		New-Item -ItemType Directory -Path $worktreeRoot -Force | Out-Null
-		# The per-worktree sparse configuration below requires this repository extension, which Git
-		# would otherwise write into the primary config implicitly on the first 'sparse-checkout set'.
-		# Setting it here, only when it is missing, keeps that single primary write a deliberate,
-		# idempotent maintenance step of the creation path.
+		# Both per-worktree session config (config.worktree) and the per-worktree sparse configuration
+		# below require extensions.worktreeConfig = true. Setting it here only when not already true
+		# keeps that single primary write a deliberate, idempotent maintenance step of the creation path.
 		if ((@(& git -C $root config --get extensions.worktreeConfig) -join '').Trim() -cne 'true') {
 			& git -C $root config extensions.worktreeConfig true
 			if ($LASTEXITCODE -ne 0) { throw "Failed to enable extensions.worktreeConfig in '$root'." }
@@ -108,22 +107,18 @@ try {
 	}
 
 	if ($worktreeCreated) {
-		& (Join-Path $PSScriptRoot 'Initialize-AgentWorktreeSession.ps1') -Client $Client -RepositoryRoot $root -Worktree $identity.Worktree -TargetBranch $identity.TargetBranch -Baseline $identity.Baseline -WaitSeconds $WaitSeconds
+		& (Join-Path $PSScriptRoot 'Initialize-AgentWorktreeSession.ps1') -RepositoryRoot $root -Worktree $identity.Worktree -TargetBranch $identity.TargetBranch -Baseline $identity.Baseline -WaitSeconds $WaitSeconds
 	}
 	if ($clearClaudeArgumentTransport) { $env:BROKEN_ENGINE_CLIENT_ARGUMENTS = $null }
 	# Each session opens a directory agy has not trusted; trust it for this session only.
 	if ($Client -ceq 'agy') { $ClientArguments += @('--settings', (ConvertTo-Json -Compress @{ trustedWorkspaces = @($identity.Worktree) })) }
-	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
-		$executableName = if ($Client -ceq 'opencode') { 'pwsh' } else { $Client }
-		$ClientExecutable = (Get-Command $executableName -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
-	}
+	$clientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	Write-Host ''
 	$banner = if ($worktreeCreated) { "Created worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)." }
 		else { "Reattached worktree $($identity.Worktree) on branch $($identity.Branch)." }
 	if ($rebaseInProgress) { $banner += "`nThis worktree has a rebase in progress." }
 	Write-Host $banner
-	if ($PrepareOnly) { $exitCode = 0 }
-	else { $exitCode = Invoke-WorktreeCliTrackedProcess -Executable $ClientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree }
+	$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $clientExecutable -ArgumentList $ClientArguments -WorkingDirectory $identity.Worktree
 }
 catch {
 	[Console]::Error.WriteLine($_.Exception.Message)

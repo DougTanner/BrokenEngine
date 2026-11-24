@@ -1,12 +1,12 @@
 ---
 name: sweep
 description: >-
-  Run a large scoped cleanup sweep on Codex from a non-Codex host (Claude
-  Code, Antigravity CLI, or OpenCode): per-unit find/fix, per-batch
-  propagation, stage cleanup/ordering, builds, static checks, and
-  /finalize-changes landing. Explicit /sweep <spec-path> under
-  Documents/Investigations/ or Projects/Coretide/Documents/Investigations/
-  only; not for findings-only reviews or Codex callers.
+  Run a large scoped cleanup sweep on Codex from a non-Codex host (Claude Code
+  or Antigravity CLI): per-unit find/fix, per-batch propagation, stage
+  cleanup/ordering, builds, static checks, and /finalize-changes landing.
+  Explicit /sweep <spec-path> under Documents/Investigations/ or
+  Projects/Coretide/Documents/Investigations/ only; not for findings-only
+  reviews or Codex callers.
 disable-model-invocation: true
 argument-hint: "<Documents/Investigations/...>"
 allowed-tools: [Read, Agent, PowerShell, Skill, Monitor, AskUserQuestion]
@@ -24,8 +24,8 @@ host picks the model, builds, checks, and lands through `/finalize-changes`.
 
 Only on explicit `/sweep <spec path>` for a specification under
 `Documents/Investigations/` or `Projects/Coretide/Documents/Investigations/`.
-Non-Codex hosts (Claude Code, Antigravity CLI, OpenCode) run `/sweep`;
-`Invoke-Sweep.ps1` enforces the non-Codex branch check.
+Non-Codex hosts (Claude Code, Antigravity CLI) run `/sweep`; `Invoke-Sweep.ps1`
+enforces the non-Codex branch check.
 
 ## Inputs
 
@@ -55,14 +55,10 @@ form one unit; every other file is its own unit.
 
 ## Steps
 
-The stage baseline is the SHA in `Temp/Sweep/Baseline.txt`, which the first
-`-Batch` run writes. The `BATCH-DONE` and `CLOSE-DONE` lines end in the fields
-`cpp=yes|no`, `builds=<targets>`, and `profile=yes|no`, which the coordinator
-derives from the changed C++ files: for `BATCH-DONE`, those changed since the
-tracked working tree as it stood before the batch's first unit ran; for
-`CLOSE-DONE`, those changed since the stage baseline.
-DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
-`## Inputs`).
+Read the stage baseline SHA (`<baseline>`, step 9) from
+`Temp/Sweep/Baseline.txt` (`scripts/Invoke-Sweep.ps1` owns it and the status
+fields). DataPacker, WorktreeCli, and AgentHarness build in Release only
+(`/compile` `## Inputs`).
 
 ### Setup
 
@@ -106,8 +102,9 @@ commit before landing.
    or non-zero task exit — surface `Temp/sweep-stderr.txt` or task stderr
    verbatim and stop without retrying. Done on a terminal `Status.txt` line
    after `<pid>` exits or the task exits `0`.
-5. Retry steps 3-4 only on `INCOMPLETE` or `PROPAGATE-FAILED` (resumes from
-   `Progress.md`, reruns `Failures.txt`). Done on `BATCH-DONE`.
+5. Retry steps 3-4 only on `INCOMPLETE` or `PROPAGATE-FAILED`;
+   `scripts/Invoke-Sweep.ps1` handles completion-marker skips and reruns. Done
+   on `BATCH-DONE`.
 6. If `BATCH-DONE` has `cpp=yes`, dispatch `builder` `/compile` for `builds=`
    (Client/Server Debug, others Release); route failures to `implementer`
    `/resolve-findings`. Done when builds pass or `cpp=no`.

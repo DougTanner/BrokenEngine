@@ -33,17 +33,6 @@ bool CurveWidget(std::string_view label, CurveData& rCurve)
 		ImPlot::SetupAxes(nullptr, nullptr, kiAxisFlags, kiAxisFlags);
 		ImPlot::SetupAxesLimits(0.0, 1.0, static_cast<double>(fYMinimum), static_cast<double>(fYMaximum), ImPlotCond_Always);
 
-		// Faint vertical tick per spread-pass sample position (drawn first so it sits behind the curve).
-		float pfPassTicks[shaders::kiMaxSpreadPasses] {};
-		for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
-		{
-			float fSamplePosition = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
-			pfPassTicks[i] = fSamplePosition;
-		}
-		ImPlotSpec passSpecification;
-		passSpecification.LineColor = ImVec4(1.0f, 1.0f, 1.0f, 0.08f);
-		ImPlot::PlotInfLines("##Passes", pfPassTicks, shaders::kiMaxSpreadPasses, passSpecification);
-
 		// y=1 is the reference level.
 		if (fYMinimum <= 1.0f && fYMaximum >= 1.0f)
 		{

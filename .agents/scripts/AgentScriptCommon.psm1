@@ -460,4 +460,46 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+# Tracked live Plans under Documents/Plans and, when present, Projects/Coretide/Documents/Plans that name Plan's file
+# name after line 1 (skipping non-.md, AGENTS.md, Plan itself, and worktree-deleted files), in engine-then-Coretide
+# git ls-files order and ascending 1-based line order. Does not require Plan to exist on disk.
+function Find-AgentLivePlanCitations([string] $RepositoryRoot, [string] $Plan) {
+	$root = [IO.Path]::GetFullPath($RepositoryRoot, (Get-Location).ProviderPath)
+	$normalizedPlan = $Plan.Trim().Replace('\', '/')
+	$fileName = [IO.Path]::GetFileName($normalizedPlan)
+	if ([string]::IsNullOrWhiteSpace($fileName)) { throw "Plan path '$Plan' must include a non-empty file name." }
+
+	$citation = [regex]::new('(?<![A-Za-z0-9])' + [regex]::Escape($fileName))
+	$listing = Invoke-AgentProcess 'git' @('-C', $root, 'ls-files', '-z', '--', 'Documents/Plans') $root
+	if ($listing.ExitCode -ne 0) { throw "git ls-files failed for 'Documents/Plans': $($listing.Stderr.Trim())" }
+	$listedPaths = @($listing.Stdout -split "`0")
+	$coretide = Get-AgentCoretideRepository $root
+	if ($coretide) {
+		$coretideListing = Invoke-AgentProcess 'git' @('-C', $coretide, 'ls-files', '-z', '--', 'Documents/Plans') $coretide
+		if ($coretideListing.ExitCode -ne 0) { throw "git ls-files failed for 'Projects/Coretide/Documents/Plans': $($coretideListing.Stderr.Trim())" }
+		$listedPaths += @(($coretideListing.Stdout -split "`0") | Where-Object { $_.Length -ne 0 } | ForEach-Object { "Projects/Coretide/$_" })
+	}
+
+	$items = [Collections.Generic.List[object]]::new()
+	foreach ($path in $listedPaths) {
+		if (-not $path.EndsWith('.md', [StringComparison]::Ordinal) -or [IO.Path]::GetFileName($path) -ceq 'AGENTS.md' -or $path -ceq $normalizedPlan) { continue }
+		# A Plan deleted in the worktree is still listed until the deletion is staged.
+		$file = Join-Path $root $path
+		if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+		$lines = [IO.File]::ReadAllLines($file)
+		for ($index = 1; $index -lt $lines.Count; $index++) {
+			if ($citation.IsMatch($lines[$index])) {
+				$items.Add([pscustomobject] @{ path = $path; line = $index + 1 })
+			}
+		}
+	}
+
+	return [pscustomobject] @{
+		plan = $normalizedPlan
+		fileName = $fileName
+		totalCount = $items.Count
+		items = [object[]]@($items)
+	}
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations

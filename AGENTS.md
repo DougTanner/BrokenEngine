@@ -17,8 +17,10 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
 ## Environment
 
 - Visual Studio 2026, C++23, Vulkan 1.2, Windows 10+
-- Agent shells: Claude Code - Git Bash; Codex CLI - PowerShell 7; Antigravity
-  CLI - PowerShell 7. Call `pwsh` explicitly for PowerShell 7 scripts.
+- Agent shells: Claude Code - Git Bash; Codex / Antigravity CLI - PowerShell 7
+  (Antigravity: no `Grep` tool or `rg`; use
+  `Select-String -LiteralPath '<path>' -Pattern '<regex>'`, e.g. `'^## '`). Call
+  `pwsh` explicitly for PowerShell 7 scripts.
 - Claude Code's bypass-permissions mode injects a host instruction to prefer
   Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked
   files with the host `Edit` tool and create files with `Write`, because a
@@ -41,11 +43,11 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   `.agents/skills/compile/references/runtime-data-mode.md`.
 - In a session worktree, ThirdParty submodule contents are symbolic links into
   the primary checkout: a Glob or Grep directory search skips them and
-  `git grep` does not see them (uninitialized submodule). Search them with Grep
-  on an explicit file path, Read on a known path, or `rg -L` from the shell.
+  `git grep` does not see them (uninitialized submodule). Search them with Grep,
+  `Select-String`, or Read on an explicit file path, or `rg -L` where installed.
   `.claude/skills` is likewise a symbolic link to `.agents/skills`; search
-  `.agents/skills` instead. A Grep `glob` containing `/` matches nothing
-  without a leading `**/` (`**/plan-*/SKILL.md`).
+  `.agents/skills` instead. A Grep `glob` containing `/` matches nothing without
+  a leading `**/` (`**/plan-*/SKILL.md`).
 
 ## IMPORTANT: Session rules
 
@@ -105,14 +107,20 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
 - Bundled scripts: run a repository script exactly as its skill documents it —
   never wrap, reimplement, or work around one; a script that cannot be run as
   documented is a bug to report. Canonical invocation form:
-  `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the
-  session worktree root; never an absolute path or `-ExecutionPolicy Bypass`.
-  Never change the working directory (no `cd`, no `Set-Location`); address
-  scratch files by path from the worktree root. Import a `.psm1` with
-  `Import-Module ./<repo-relative path>` (leading `./` required) and call its
-  functions in the same shell call. When a parameter takes an array, use
-  `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead
-  of `-File`.
+  `pwsh -NoProfile -NonInteractive -File <repo-relative script path> [arguments]`,
+  run from the session worktree root; never an absolute path or
+  `-ExecutionPolicy Bypass`. Pass `-NonInteractive` so an omitted mandatory
+  parameter fails instead of blocking stdin, including when executing older
+  documented `pwsh -NoProfile -File ...` examples with their script and
+  arguments unchanged (`Invoke-PreToolUseHook.ps1` stays permissive). Never
+  change the working directory (no `cd`, no `Set-Location`); address scratch
+  files by path from the worktree root. Import a `.psm1` with a single-quoted
+  `-Command` body so Git Bash does not expand `$env:...`:
+  `pwsh -NoProfile -NonInteractive -Command 'Import-Module ./<repo-relative path>; ...'`
+  (leading `./` required) and call its functions in the same shell call. When a
+  parameter takes an array, use
+  `pwsh -NoProfile -NonInteractive -Command "& '<repo-relative path>' -Param 'a','b'"`
+  instead of `-File`.
 - Trivial choices (naming, small implementation details, options with the same
   outcome): pick the simplest and proceed; a worker returns any other decision
   to main.

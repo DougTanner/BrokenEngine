@@ -18,3 +18,5 @@ under `## Entries`, so the newest rows are at the top and main reads only the
 top of the file. A session reviewing the log removes each row it handles.
 
 ## Entries
+
+- 2026-11-23 agy/0dd9242c-5f71-4111-812c-71056a74cb82 — Size observation — Measure-Tokens.ps1 reports 5,448 bt-token-v1 for Engine/Data/Shaders/ShaderGlobalLayout.h, above the skill’s approximate 5,000-token threshold.

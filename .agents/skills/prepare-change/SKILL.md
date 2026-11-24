@@ -1,12 +1,11 @@
 ---
 name: prepare-change
 description: >-
-  Prepare a change before its plan reviews: gather the repository evidence that
-  fixes the risk tier and, at Tier 2+, draft the implementation plan as a file
-  and the execution card. Use for the `planner` preparation the Change
-  Workflow Approve and classify and Prepare and explore alternatives steps
-  require, for a change that is not a claimed executable Plan. Preparation only;
-  never implements the change.
+  Prepare a change before Plan review: gather risk-tier evidence and draft the
+  plan or resolved claimed-Plan snapshot with its execution card. Use for
+  Change Workflow Approve and classify / Prepare and explore alternatives
+  `planner` preparation (omit `mode:`), and `/next-plan` step 4 claimed-Plan
+  preparation (`mode: claimed-plan`). Preparation only; never implements.
 allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 ---
 
@@ -14,56 +13,125 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 
 ## Purpose
 
-One `planner` produces the repository evidence that fixes the risk tier, and,
-for the Tier-2+ plan preparation the Prepare and explore alternatives step
-dispatches, the implementation plan as a file with the draft execution card
-inside it. A Tier-1 dispatch made only to classify the work returns the evidence
-alone.
+One `planner` gathers risk-tier evidence and drafts the plan or resolved
+claimed-Plan snapshot with its execution card before Plan review; an ordinary
+Tier-1 classify-only dispatch returns the evidence alone.
 
 ## When to use
 
-- The `planner` preparation bullets of the Change Workflow Approve and classify
-  and Prepare and explore alternatives steps — Tier 2 and above, or any tier
-  where classifying the work needs repository evidence.
-- Not for a claimed executable Plan:
-  [`../next-plan/SKILL.md`](../next-plan/SKILL.md) keeps its own preparation
-  route.
-- Runs in the delegated execution context of
-  [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+- Change Workflow Approve and classify and Prepare and explore alternatives
+  `planner` preparation — Tier 2+, or any tier needing repository evidence to
+  classify (omit `mode:`).
+- `/next-plan` step 4 claimed-Plan preparation, redraft, and difference
+  preparation (`mode: claimed-plan`).
+- Delegated execution context:
+  [`subagent-reporting.md`](../../references/subagent-reporting.md)
   `## Delegated execution context`.
 
 ## Inputs
 
-Supply the authoritative task-brief fields
-([`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
-`## Task brief`)
-plus these skill-specific fields:
+Supply [`subagent-reporting.md`](../../references/subagent-reporting.md)
+`## Task brief` fields plus:
 
-- user intent, quoted where its exact wording binds;
-- the request text, or the plan document this change comes from when it is not a
-  claimed executable Plan;
-- the Change Workflow step and role assignments the change triggers, as main
-  states them from the workflow;
+- `mode: claimed-plan` — sole mode override for `/next-plan` step 4; omit
+  `mode:` for ordinary preparation;
+- triggered Change Workflow step and role assignments, as main states them;
 - session baseline.
+
+Ordinary preparation (omitted `mode:`) adds:
+
+- user intent, quoted where exact wording binds;
+- request text, or non-claimed plan document.
+
+`mode: claimed-plan` adds:
+
+- ordinary claim: claimed Plan path plus section line ranges from a heading
+  lookup (`AGENTS.md` `## Environment`), written from the Plan's own citations
+  (`path:line-range`). Main reads only Plan sections it must state from (such as
+  the risk tier for roles) and only `## Task brief` above, names cited
+  handoff/reporting references by path only, leaves them and target source to
+  the `planner`, and reads source only for a decision the Plan and handoff
+  cannot settle;
+- difference re-entry (per
+  [`claim-exceptions.md`](../next-plan/references/claim-exceptions.md)
+  `## Changes requested at landing` or `completion.plan-cited`): the original
+  claimed Plan path as an identity field (for the filename-based citation rule,
+  including after Plan deletion), the existing `Temp/` snapshot with its
+  `## In scope` and `## Out of scope` as source, the requested difference, and
+  for `completion.plan-cited` whether the refused exit was completion or
+  `-Reject`;
+- evidence bounds: the card's verification evidence carries no verbatim source
+  text except an acceptance item proposing replacement text; bound handoff
+  verification to `Verification` rows without enumerating unaffected results.
 
 ## Handoff
 
-Return the shared handoff form in
-[`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
-extended with these fields:
+Extend [`subagent-handoff.md`](../../references/subagent-handoff.md) with these
+fields in every mode:
 
 ```text
-Prepared plan: <path readable from the worktree root, carrying `## In scope` and `## Out of scope` verbatim; `none` when the dispatch prepared no plan>
 Classification: Tier 1 | Tier 2 | Tier 3 — trigger, with repository-path:line evidence
-Execution card: <heading inside the prepared plan file, headed as `/plan-audit` `## Inputs` requires; `none` when the dispatch prepared no plan>
-Candidate zero: <the drafted mechanism as the `Mechanism` through `Pays off when` rows exactly as `.agents/skills/plan-alternatives/SKILL.md` `## Handoff` declares them; `Mechanism` is written to satisfy the brief exclusions of the `/plan-alternatives` bullet in `.agents/references/change-workflow.md` `#### Step 2 — Prepare and explore alternatives` and names no prepared-plan path; `none` when the dispatch prepared no plan>
-Unresolved decisions: <one row each, decision and the options main chooses between, or none>
+Candidate zero: <`Mechanism` through `Pays off when` rows per `.agents/skills/plan-alternatives/SKILL.md` `## Handoff`; `Mechanism` obeys the `/plan-alternatives` brief exclusions in `.agents/references/change-workflow.md` `#### Step 2 — Prepare and explore alternatives` and names neither the plan file nor its `Temp/` snapshot; `none` when no plan was prepared>
 ```
 
-When a plan was prepared, main passes that one file to `/plan-audit`, which
-reads the scope headings and the card marker from the supplied path alone
-([`../plan-audit/SKILL.md`](../plan-audit/SKILL.md), `## Inputs`); never inline
-the plan or card text in the handoff.
+### Ordinary preparation (omitted `mode:`)
+
+```text
+Prepared plan: <worktree-readable path with verbatim `## In scope` and `## Out of scope`; `none` when no plan was prepared>
+Execution card: <card heading in the prepared plan per `/plan-audit` `## Inputs`; `none` when no plan was prepared>
+Unresolved decisions: <one row each, decision and options for main, or none>
+```
+
+When prepared, main passes that one file to
+[`../plan-audit/SKILL.md`](../plan-audit/SKILL.md) (`## Inputs`), never
+inlining plan or card text in the handoff.
+
+### Claimed-Plan preparation (`mode: claimed-plan`)
+
+- `Claim` — Plan path (or none) with resolved state when claimed.
+- `Verification` — one row per unresolved decision, contradiction needing a
+  user decision or override, problem found gone or empty realized change,
+  scope widened beyond the Plan's `## In scope`, and dropped or weakened Plan
+  acceptance criterion or invariant, as
+  `<kind> — <Plan citation> — <result and the change it requires>`; then
+  `Snapshot corrections: <count>` for all other verified statements requiring
+  card or implementation changes (written in the snapshot's corrections
+  section, cited under `Evidence`); then `Unaffected statements: <count>`.
+  Quantitative feasibility estimates are not repeated here (governed below).
+- `Slices` — sole source of the slice partition (card `Roles` carries roles,
+  not the split). One row per disjoint slice: owned snapshot items by section
+  and label or bullet (never text) and allowed file scope; one row when not
+  disjoint; `none` for an empty realized change; with a stage split, at least
+  one row per in-scope stage naming its stage. Accepted Plan review or grill
+  refinements write into the snapshot; every dispatch changing snapshot scope
+  (write-in or redraft) adds `Slices` to `Return:` and returns it again.
+
+`Candidate zero` also returns `none` for an empty realized change and for
+every preparation handoff after the `/plan-alternatives` pick.
+
+A quantitative feasibility estimate returned as a `Findings` row must name the
+check proving the measured trial preserved the source document's rule or item
+inventory, or report the estimate as unvalidated (dispatch expectation, not a
+`/next-plan` step 4 Done gate).
+
+Cite the snapshot under `Evidence` with one `##` selector per section, and
+report `Invoke-PlanCitationsCheck.ps1`'s `headings.inScopePresent`,
+`headings.outOfScopePresent`, and `card.missingFields` values as one
+`Decisive checks` row.
+
+On an unconfirmed-root-cause stop before the snapshot (worker
+investigation-portion rule), return `Status: BLOCKED`, `Evidence: none`, and
+one short `Residuals` row stating root cause is unconfirmed and diagnosis is
+next, citing no card and returning no extension field above (overriding them).
+
+### Execution card
+
+In `mode: claimed-plan`, cite the card
+([`execution-card.md`](../../references/execution-card.md) `## Template`) under
+`Evidence`, never inline; main presents its first two sections per
+[`### Implementation approval`](../next-plan/SKILL.md#implementation-approval).
+When classified tier differs from the brief's assumed tier, main rewrites the
+card's `Roles` field to the classified tier before Plan review.
 
 ## References
 

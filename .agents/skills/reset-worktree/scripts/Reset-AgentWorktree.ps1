@@ -1,6 +1,7 @@
 # Readies a landed wrapper session worktree for another run: fast-forwards the session branch to the
-# primary tip, deletes the worktree's Temp directory, and reruns the setup a newly created session
-# worktree gets. Run it from the session worktree root. Every refusal runs before the first change.
+# primary tip (handing off to the updated script in a fresh pwsh process when HEAD advances),
+# deletes the worktree's Temp directory, and reruns the setup a newly created session worktree gets.
+# Run it from the session worktree root. Initial refusals run before the first change.
 [CmdletBinding()]
 param()
 
@@ -33,11 +34,19 @@ try {
 		if ($coretideHeld.Count -ne 0) { throw "The Coretide clone holds $($coretideHeld.Count) commit(s) its upstream does not ($($coretideHeld -join ', ')), so nothing was changed. Land them first." }
 	}
 
-	Invoke-AgentGit @('-C', $worktree, 'merge', '--ff-only', $tip) | Out-Null
+	$head = @(Invoke-AgentGit @('-C', $worktree, 'rev-parse', 'HEAD'))[0].Trim()
+	if ($head -cne $tip) {
+		Invoke-AgentGit @('-C', $worktree, 'merge', '--ff-only', $tip) | Out-Null
+		& pwsh -NoProfile -NonInteractive -File $PSCommandPath
+		if ($LASTEXITCODE -ne 0) {
+			[Console]::Error.WriteLine("Fast-forward to $tip completed before the updated reset script failed (exit $LASTEXITCODE); resolve the error above and rerun.")
+			exit $LASTEXITCODE
+		}
+		exit 0
+	}
 	$temp = Join-Path $worktree 'Temp'
 	if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force -Confirm:$false }
-	$client = $context.Branch.Split('/')[0]
-	& (Join-Path $scripts 'Initialize-AgentWorktreeSession.ps1') -Client $client -RepositoryRoot $context.PrimaryRoot -Worktree $worktree -TargetBranch $context.PrimaryBranch -Baseline $tip
+	& (Join-Path $scripts 'Initialize-AgentWorktreeSession.ps1') -RepositoryRoot $context.PrimaryRoot -Worktree $worktree -TargetBranch $context.PrimaryBranch -Baseline $tip
 	Write-Host ''
 	Write-Host "Reset worktree $worktree on branch $($context.Branch) to baseline $tip."
 	exit 0

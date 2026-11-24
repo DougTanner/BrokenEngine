@@ -16,7 +16,6 @@ layout (set = 1, binding = 3) uniform sampler2D sourcesB[kiMaxSpreadPasses];
 layout (set = 1, binding = 4, rgba8) uniform writeonly image2D combineImageR; // kVkFormatCombine
 layout (set = 1, binding = 5, rgba8) uniform writeonly image2D combineImageG; // kVkFormatCombine
 layout (set = 1, binding = 6, rgba8) uniform writeonly image2D combineImageB; // kVkFormatCombine
-layout (set = 1, binding = 7, rgba8) uniform writeonly image2D combineImageAmbient; // kVkFormatCombine
 
 // Uchimura tone curve (Gran Turismo Sport)
 // P: max brightness, a: contrast, m: linear start, c: toe curvature, b: black tightness. The segment constants
@@ -136,9 +135,4 @@ void main()
 	imageStore(combineImageR, i2Coord, f4FinalR);
 	imageStore(combineImageG, i2Coord, f4FinalG);
 	imageStore(combineImageB, i2Coord, f4FinalB);
-	// The ambient target stores the AVERAGE of the four EWNS channels (0.25 * (E+W+N+S)) per color channel, so
-	// consumers do one sample instead of three. Consumers needing the un-averaged sum multiply by 4:
-	// Water/Water.frag and Terrain/Terrain.frag pass 4.0f * f3AmbientSum into BlendSmokePrecomputed. Changing this
-	// 0.25f means changing both of those call sites in the same edit.
-	imageStore(combineImageAmbient, i2Coord, vec4(dot(f4FinalR, vec4(0.25f)), dot(f4FinalG, vec4(0.25f)), dot(f4FinalB, vec4(0.25f)), 1.0f));
 }

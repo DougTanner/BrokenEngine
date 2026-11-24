@@ -41,8 +41,11 @@ void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 	gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).RecordCopy(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerMainUniformCopy);
 
-	RecordLightingDeposit(vkCommandBuffer, iCommandBuffer);
-	RecordLightingSpreadPipeline(vkCommandBuffer, iCommandBuffer);
+	if (gLightingEnabled.Get<bool>())
+	{
+		RecordLightingDeposit(vkCommandBuffer, iCommandBuffer);
+		RecordLightingSpreadPipeline(vkCommandBuffer, iCommandBuffer);
+	}
 	RecordSmokeEmit(vkCommandBuffer, iCommandBuffer);
 	RecordWindDeposits(vkCommandBuffer, iCommandBuffer);
 	RecordObjectShadows(vkCommandBuffer, iCommandBuffer);
@@ -169,15 +172,15 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 		{
 			rCombineTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 		}
-		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 
 		gpPipelineManager->mpCombinePipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	}
 
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingCombine);
 
-	// Phase 3: Temporal accumulation reprojects + EMA-blends the previous history into the 4 combine outputs in place,
-	// then the history-copy compute pipeline publishes the blended result into distinct history images.
+	// Phase 3: Temporal accumulation reprojects + EMA-blends the previous directional history into the 3 directional
+	// combine outputs in place, then the history-copy compute pipeline publishes the blended result into distinct
+	// directional history images and derives the ambient combine target from those finalized values.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
 	auto TransitionCombineAndHistory = [&](int64_t iLayer, TextureLayout eCombineNewLayout, TextureLayout eHistoryOldLayout, TextureLayout eHistoryNewLayout)
 	{
@@ -186,8 +189,6 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 			rRenderTargetTextures.mpCombineTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
 			rRenderTargetTextures.mpLightingHistoryTextures[iLayer][j].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
 		}
-		rRenderTargetTextures.mpAmbientCombineTextures[iLayer].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, eCombineNewLayout);
-		rRenderTargetTextures.mpAmbientHistoryTextures[iLayer].TransitionImageLayout(vkCommandBuffer, eHistoryOldLayout, eHistoryNewLayout);
 	};
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
@@ -198,9 +199,11 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 		// Same-layout transitions make temporal writes visible to the history-copy shader, whose independent storage outputs
 		// preserve temporal's no-sampled/output-alias contract.
 		TransitionCombineAndHistory(i, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 		gpPipelineManager->mpLightingHistoryCopyPipelines[i].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 
 		TransitionCombineAndHistory(i, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
+		rRenderTargetTextures.mpAmbientCombineTextures[i].TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	}
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLightingTemporal);
 

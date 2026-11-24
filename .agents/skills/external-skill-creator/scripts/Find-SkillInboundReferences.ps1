@@ -25,7 +25,6 @@ $script:SweepRoots = @(
 	[ordered]@{ name = '.claude/agents/'; prefix = '.claude/agents/' }
 	[ordered]@{ name = '.codex/agents/'; prefix = '.codex/agents/' }
 	[ordered]@{ name = '.agents/agents/'; prefix = '.agents/agents/' }
-	[ordered]@{ name = '.opencode/'; prefix = '.opencode/' }
 )
 
 # Every root starts at zero so even an early failure envelope reports a count per

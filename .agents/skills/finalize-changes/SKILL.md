@@ -123,9 +123,9 @@ repository jargon. Then ask exactly:
 When Coretide changes land, the question ends
 ` and Coretide commit <coretide-commit>?` in place of `?`.
 
-`<primary-branch>` is always the sidecar-backed `PrimaryBranch` that
-`Get-AgentWorktreeSessionContext` reports — never a host-reported default or an
-assumed `main`.
+`<primary-branch>` is always the `PrimaryBranch` reported by
+`Get-AgentWorktreeSessionContext` — never a host-reported default or an assumed
+`main`.
 
 Main delivers that whole summary per the main-session conduct User Interaction
 rule: rendered message text, with the question immediately before the mandatory

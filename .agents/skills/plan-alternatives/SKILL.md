@@ -180,12 +180,13 @@ route that matches the change:
 - Tier-2+ change that is not a claimed Plan: the choice goes back to
   `/prepare-change` as a fixed decision for a redraft, and the Plan review
   reviews run on the redraft.
-- `/next-plan` claim: the claimed Plan file is immutable, so the choice goes
-  back to the preparation `planner` as a fixed decision for a redrafted
-  execution card, which that worker writes into a resolved Plan snapshot under
-  gitignored `Temp/` and cites in its handoff; the Plan review reviews then run
-  on that snapshot. A "do nothing" choice is a user-authorized Plan rejection
-  through the existing `plan reject --user-authorized-rejection` route.
+- `/next-plan` claim: the claimed Plan file is immutable, so when the user
+  chooses an alternative other than the drafted plan, it goes back to
+  `/prepare-change` (`mode: claimed-plan`) as a fixed decision for a redraft
+  before the Plan review reviews run on the redrafted snapshot; keeping the
+  drafted plan proceeds to Plan review on the existing snapshot. A "do nothing"
+  choice is a user-authorized Plan rejection through the existing
+  `plan reject --user-authorized-rejection` route.
 - Tier 1: there is no plan file, so main adopts the chosen approach directly and
   describes it in the report.
 

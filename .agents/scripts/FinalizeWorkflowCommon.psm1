@@ -199,6 +199,14 @@ function New-FinalizeLandingSanityResult([bool] $Ok, [string] $Code, [string] $M
 	}
 }
 
+function Get-FinalizeActiveGitOperationMarker([string] $Repository) {
+	foreach ($marker in @('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer')) {
+		$markerPath = (Invoke-FinalizeGit $Repository @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()
+		if (Test-Path -LiteralPath $markerPath) { return $marker }
+	}
+	return $null
+}
+
 # Structural sanity shared by approval preparation and landing: two Git top-levels of one
 # repository on the expected branches and tips, no Git operation in progress, clean trees,
 # and the canonical WorktreeCli the session reaches through its primary Output link.
@@ -236,11 +244,9 @@ function Test-FinalizeLandingSanity {
 	$executable = $null
 	try {
 		foreach ($worktree in @($session.Worktree, $primary.Worktree)) {
-			foreach ($marker in @('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer')) {
-				$markerPath = (Invoke-FinalizeGit $worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()
-				if (Test-Path -LiteralPath $markerPath) {
-					return New-FinalizeLandingSanityResult $false 'git.operation-active' "Git operation marker '$marker' is active in '$worktree'." $session $primary $null
-				}
+			$activeMarker = Get-FinalizeActiveGitOperationMarker $worktree
+			if ($null -ne $activeMarker) {
+				return New-FinalizeLandingSanityResult $false 'git.operation-active' "Git operation marker '$activeMarker' is active in '$worktree'." $session $primary $null
 			}
 		}
 		# A dirty primary reading that does not persist has been observed while primary was clean,
@@ -424,4 +430,192 @@ function Test-FinalizeApprovalReviewReceipt([string] $Path, [string] $ApprovedCo
 	return $null
 }
 
-Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Test-FinalizeApprovalReviewReceipt
+function Start-FinalizeGitProcess([string] $WorkingDirectory, [string[]] $Arguments, [bool] $RedirectInput) {
+	$start = [Diagnostics.ProcessStartInfo]::new()
+	$start.FileName = 'git.exe'
+	$start.WorkingDirectory = $WorkingDirectory
+	$start.UseShellExecute = $false
+	$start.CreateNoWindow = $true
+	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
+	$start.RedirectStandardInput = $RedirectInput
+	foreach ($argument in $Arguments) { [void] $start.ArgumentList.Add($argument) }
+	$process = [Diagnostics.Process]::new()
+	$process.StartInfo = $start
+	if (-not $process.Start()) {
+		$process.Dispose()
+		throw "Could not start 'git.exe'."
+	}
+	return $process
+}
+
+# Patch text reaches git patch-id as the exact bytes git produced: the identity is compared across
+# the rebase to decide whether the landing bytes are still the confirmed ones, so no text decoding
+# may sit between the two commands. --verbatim keeps whitespace and patch bytes significant, so a
+# commit differing from the confirmed one only in whitespace cannot pass as byte-identical; it
+# implies --stable, so hunk line numbers, file order, and text diff index headers stay ignored and
+# a rebase over another hunk still compares equal.
+function Get-FinalizePatchId([string] $Repository, [string] $Base, [string] $Tip, [string[]] $Pathspec = @()) {
+	$patch = [IO.MemoryStream]::new()
+	$diff = $null
+	$identify = $null
+	$diffErrorTask = $null
+	$identifyOutTask = $null
+	$identifyErrorTask = $null
+	try {
+		$diffArguments = @('-C', $Repository, 'diff-tree', '-p', '--no-color', '--no-ext-diff', '--full-index', '--binary', '--no-renames', '-r', $Base, $Tip)
+		if (@($Pathspec).Count -gt 0) { $diffArguments += @('--'); $diffArguments += @($Pathspec) }
+		$diff = Start-FinalizeGitProcess $Repository $diffArguments $false
+		$diffErrorTask = $diff.StandardError.ReadToEndAsync()
+		$diff.StandardOutput.BaseStream.CopyTo($patch)
+		$diffError = $diffErrorTask.GetAwaiter().GetResult()
+		$diff.WaitForExit()
+		if ($diff.ExitCode -ne 0) { throw "git diff-tree failed for the landing patch: $($diffError.Trim())" }
+		$identify = Start-FinalizeGitProcess $Repository @('patch-id', '--verbatim') $true
+		$identifyOutTask = $identify.StandardOutput.ReadToEndAsync()
+		$identifyErrorTask = $identify.StandardError.ReadToEndAsync()
+		$patch.Position = 0
+		$patch.CopyTo($identify.StandardInput.BaseStream)
+		$identify.StandardInput.BaseStream.Flush()
+		$identify.StandardInput.Close()
+		$identifyOut = $identifyOutTask.GetAwaiter().GetResult()
+		$identifyError = $identifyErrorTask.GetAwaiter().GetResult()
+		$identify.WaitForExit()
+		if ($identify.ExitCode -ne 0) { throw "git patch-id failed for the landing patch: $($identifyError.Trim())" }
+		$identityValue = $identifyOut.Trim().Split(' ')[0]
+		if ([string]::IsNullOrWhiteSpace($identityValue)) { return '(empty)' }
+		return $identityValue
+	}
+	finally {
+		foreach ($entry in @(
+			@{ Process = $identify; HasInput = $true; Tasks = @($identifyOutTask, $identifyErrorTask) }
+			@{ Process = $diff; HasInput = $false; Tasks = @($diffErrorTask) }
+		)) {
+			$process = $entry.Process
+			if ($null -eq $process) { continue }
+			try {
+				if (-not $process.HasExited) { $process.Kill($true) }
+			}
+			catch {}
+			if ($entry.HasInput) {
+				try { $process.StandardInput.Dispose() } catch {}
+			}
+			try { $process.StandardOutput.Dispose() } catch {}
+			try { $process.StandardError.Dispose() } catch {}
+			try { $null = $process.WaitForExit(5000) } catch {}
+			foreach ($task in $entry.Tasks) {
+				if ($null -ne $task) {
+					try { $null = $task.Wait(5000) } catch {}
+				}
+			}
+			try { $process.Dispose() } catch {}
+		}
+		$patch.Dispose()
+	}
+}
+
+# Path, mode, and status of every changed file, with the blob object IDs deliberately dropped: an
+# upstream commit touching another hunk of the same file changes the pre-image ID without changing
+# what this patch does, and content — including binary blobs — is already covered by patch-id.
+function Get-FinalizeChangeGuard([string] $Repository, [string] $Base, [string] $Tip) {
+	$fields = (Invoke-FinalizeGit $Repository @('diff', '--raw', '--no-renames', '-z', $Base, $Tip)).Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+	if ($fields.Count % 2 -ne 0) { throw 'git diff --raw produced an incomplete record for the landing patch.' }
+	$records = [Collections.Generic.List[string]]::new()
+	for ($index = 0; $index -lt $fields.Count; $index += 2) {
+		$parts = $fields[$index].Split(' ')
+		if ($parts.Count -ne 5) { throw "git diff --raw produced an unrecognized record: '$($fields[$index])'." }
+		$records.Add("$($parts[0]) $($parts[1]) $($parts[4])`t$($fields[$index + 1])")
+	}
+	return $records -join "`n"
+}
+
+# A blocked retry must leave the branch exactly as confirmed, never resetting a foreign branch or
+# detached checkout and returning Restored = $true only when every restoration postcondition holds.
+function Restore-FinalizeBranch([string] $Repository, [string] $Branch, [string] $Commit) {
+	try {
+		foreach ($marker in @('rebase-merge', 'rebase-apply')) {
+			# `git rebase --abort` exits 128 when no rebase is in progress, so only a started one is aborted.
+			if (Test-Path -LiteralPath (Invoke-FinalizeGit $Repository @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()) {
+				Invoke-FinalizeGit $Repository @('rebase', '--abort') | Out-Null
+				break
+			}
+		}
+		$currentBranch = (Invoke-FinalizeGit $Repository @('branch', '--show-current')).Trim()
+		if ($currentBranch -cne $Branch) {
+			return [pscustomobject]@{ Restored = $false; Message = "Branch '$Branch' is not checked out (found '$currentBranch'); refused to reset." }
+		}
+		if ((Invoke-FinalizeGit $Repository @('rev-parse', "refs/heads/$Branch")).Trim() -cne $Commit) {
+			Invoke-FinalizeGit $Repository @('reset', '--hard', $Commit) | Out-Null
+		}
+		foreach ($marker in @('rebase-merge', 'rebase-apply')) {
+			if (Test-Path -LiteralPath (Invoke-FinalizeGit $Repository @('rev-parse', '--path-format=absolute', '--git-path', $marker)).Trim()) {
+				return [pscustomobject]@{ Restored = $false; Message = "Rebase marker '$marker' remained active after restoration." }
+			}
+		}
+		if ((Invoke-FinalizeGit $Repository @('branch', '--show-current')).Trim() -cne $Branch -or
+			(Invoke-FinalizeGit $Repository @('rev-parse', 'HEAD')).Trim() -cne $Commit -or
+			(Invoke-FinalizeGit $Repository @('rev-parse', "refs/heads/$Branch")).Trim() -cne $Commit -or
+			(Invoke-FinalizeGit $Repository @('status', '--porcelain', '-z', '--untracked-files=all')).Length -ne 0) {
+			return [pscustomobject]@{ Restored = $false; Message = "The worktree could not be proven restored to commit '$Commit' on branch '$Branch'." }
+		}
+		return [pscustomobject]@{ Restored = $true; Message = "Branch '$Branch' was restored to commit '$Commit'." }
+	}
+	catch {
+		return [pscustomobject]@{ Restored = $false; Message = $_.Exception.Message }
+	}
+}
+
+# Only a clean rebase whose patch is provably identical to the confirmed one becomes the new
+# candidate, so neither engine nor Coretide landing can advance primary with unconfirmed bytes.
+function Invoke-FinalizeVerifiedRebase {
+	[CmdletBinding()] param(
+		[Parameter(Mandatory)][string] $Repository,
+		[Parameter(Mandatory)][string] $Branch,
+		[Parameter(Mandatory)][string] $Base,
+		[Parameter(Mandatory)][string] $Commit,
+		[Parameter(Mandatory)][string] $Target
+	)
+	$activeMarker = Get-FinalizeActiveGitOperationMarker $Repository
+	if ($null -ne $activeMarker) {
+		return [pscustomobject]@{ Code = 'git.operation-active'; Message = "Git operation marker '$activeMarker' is active in '$Repository'."; Commit = $null; Tree = $null }
+	}
+	$currentBranch = (Invoke-FinalizeGit $Repository @('branch', '--show-current')).Trim()
+	if ($currentBranch -cne $Branch) {
+		return [pscustomobject]@{ Code = 'git.branch-mismatch'; Message = "Checked-out branch '$currentBranch' does not match expected branch '$Branch'."; Commit = $null; Tree = $null }
+	}
+	$approvedPatchId = Get-FinalizePatchId $Repository $Base $Commit
+	$approvedChanges = Get-FinalizeChangeGuard $Repository $Base $Commit
+	$failureCode = $null
+	$failureDetail = $null
+	try {
+		$rebase = Invoke-FinalizeNativeText 'git.exe' @('-C', $Repository, 'rebase', '--onto', $Target, $Base, $Branch) $Repository
+		if ($rebase.ExitCode -ne 0) {
+			$failureCode = 'rebase.conflicted'
+			$failureDetail = "Rebasing onto the target commit did not apply cleanly: $($rebase.Stderr.Trim())"
+		}
+		else {
+			$rebasedCommit = (Invoke-FinalizeGit $Repository @('rev-parse', "refs/heads/$Branch")).Trim()
+			$rebasedPatchId = Get-FinalizePatchId $Repository $Target $rebasedCommit
+			$rebasedChanges = Get-FinalizeChangeGuard $Repository $Target $rebasedCommit
+			if ($rebasedPatchId -ceq $approvedPatchId -and $rebasedChanges -ceq $approvedChanges) {
+				$rebasedTree = (Invoke-FinalizeGit $Repository @('rev-parse', "$rebasedCommit^{tree}")).Trim()
+				return [pscustomobject]@{ Code = 'ok'; Message = 'Rebased commit matches the approved patch identity.'; Commit = $rebasedCommit; Tree = $rebasedTree }
+			}
+			$failureCode = 'rebase.patch-not-identical'
+			$failureDetail = 'Rebasing onto the target commit did not reproduce the approved patch.'
+		}
+	}
+	catch {
+		$failureCode = 'rebase.verify-failed'
+		$failureDetail = $_.Exception.Message
+	}
+	$restore = Restore-FinalizeBranch $Repository $Branch $Commit
+	return [pscustomobject]@{
+		Code = $(if ($restore.Restored) { $failureCode } else { 'rebase.abort-failed' })
+		Message = "$failureDetail $($restore.Message)".Trim()
+		Commit = $null
+		Tree = $null
+	}
+}
+
+Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Test-FinalizeApprovalReviewReceipt, Get-FinalizePatchId, Get-FinalizeChangeGuard, Restore-FinalizeBranch, Invoke-FinalizeVerifiedRebase

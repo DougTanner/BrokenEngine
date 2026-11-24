@@ -386,25 +386,24 @@ landed.
   preparation; the script then deletes the claim best-effort. Without the switch
   it invokes no `plan` command at all.
 - `Invoke-FinalizeCoretide.ps1` prints one `broken-engine-finalize-coretide/v1`
-  result carrying `status` (`pass`, `none`, `landed`, `blocked`, or `error`),
-  `code`, `message`, `coretideCommit`, `planClaim`, and `residuals`. A `pass`
-  from `-Prepare` has also fetched `coretideCommit` into the primary Coretide
-  repository, moving no ref, so the Coretide review opens a repository SmartGit
-  knows; a missing primary Coretide repository is `error` with
-  `primary.coretide-absent`. `-Land` runs under the landing lease the caller
-  already holds and first requires it live for this session and worktree under
-  `-OwnerToken`, else `landing-lock.not-held`. A rerun after landing reports
-  `none`, so `-Land` is idempotent. Pass `-ReleasePlanClaim` to it only on a
-  Coretide-only landing of a claimed Plan.
+  result (`status`, `code`, `message`, `coretideCommit`, `planClaim`,
+  `residuals`; header owns status/exit, rebase, `none` idempotency). `-Prepare`
+  `pass` fetches `coretideCommit` into primary Coretide moving no ref for
+  SmartGit (`error` `primary.coretide-absent` if missing). `-Land` requires a
+  live session/worktree `-OwnerToken` lease (`landing-lock.not-held`) and
+  advances primary to and reports the verified commit; rebase blocks return
+  `rebase.conflicted`, `rebase.patch-not-identical`, `rebase.verify-failed`, or
+  `rebase.abort-failed` (bullet above). Pass `-ReleasePlanClaim` only for
+  Coretide-only Plan landings.
 
 Release every caller-owned lease with `Invoke-FinalizeLockClaim.ps1 -Release`
-before an open-ended user wait. At the end of every landing, successful or
-failed, on both the supplied-token and omitted-token routes, the lock is
-released once every registered worktree is inspectable and provably free of Git
-operation markers; the landing re-inspects the worktrees until they are clear or
-`$script:CleanupWorktreeWaitSeconds` elapses. When that cannot be proven the
-claim is retained and reported, and a landing that otherwise succeeded reports
-blocked `cleanup.incomplete`: a supplied token's retained claim stays the
+before an open-ended user wait, except on `rebase.abort-failed`
+([`worker.md`](worker.md#recovery)). After every landing (succeeded or failed,
+supplied- or omitted-token), the lock releases once every registered worktree is
+inspectable and provably free of Git operation markers, re-inspecting until
+clear or `$script:CleanupWorktreeWaitSeconds` elapses. If unproven, the claim is
+retained and reported, and an otherwise successful landing reports blocked
+`cleanup.incomplete`: a supplied token's retained claim stays the
 caller's lease, released the same way once the worktrees are provably clear; an
 omitted-token claim is discoverable by a later invocation only when its derived
 session and canonical worktree match, and every foreign or unverifiable claim
@@ -429,7 +428,7 @@ It emits one compressed JSON line whose schema version is
 | Exit | Status | Codes | Caller action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok` | The session branch was replayed onto `primaryTip` and `baseline` was recorded as the session's new baseline. Continue. |
-| 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | `fork-point.not-recoverable` means the resolved fork point is still on primary's history, so there is nothing to replay, which after a detected rewrite means the true fork point has expired from the primary branch's reflog; `fork-point.repair-refused` means preservation, replay, or restoration failed, or another Git operation is active. `rebased` is true if replay completed but restoration failed. The message describes the actual state and any retained snapshot recovery command. Return the message as a blocker. |
+| 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | `fork-point.not-recoverable` (`rebased` false) means the resolved fork point is an ancestor of primary and no changes were made. On `fork-point.repair-refused`, do not rerun the whole repair when `rebased` is true (replay already completed). Return `message` as a blocker; the JSON fields and `message` report the cause, state, and any recovery command. |
 | 1 | `error` | `session.unresolved` | The session worktree could not be resolved. Return the message as a blocker. |
 
 When repair is needed, the shared helper preserves staged, unstaged, and

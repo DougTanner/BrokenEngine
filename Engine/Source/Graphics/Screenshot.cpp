@@ -209,7 +209,7 @@ static int64_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view n
 
 constexpr const char* kpcValidDumpNames =
 	"Log, TerrainElevation, SmokeGradient, SmokeOne[0-N], SmokeTwo[0-N], WindOne, WindTwo, "
-	"Lighting[0-2], Combine[0-5], AmbientCombine[0-1], LightingHistory[0-5], AmbientHistory[0-1], "
+	"Lighting[0-2], Combine[0-5], AmbientCombine[0-1], LightingHistory[0-5], "
 	"Spread[0-N][0-2], SpreadOnly[0-N][0-2], "
 	"ShadowElevation, Shadow, ShadowBlur, ShadowBlurIntermediate, ShadowHistory, "
 	"ObjectShadows, ObjectShadowsBlur, ObjectShadowsBlurIntermediate, WaterDisplacement, WaterDisplacementNormal";
@@ -251,10 +251,6 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	if (name == "AmbientCombine")
 	{
 		return &rRenderTargetTextures.mpAmbientCombineTextures[CheckDumpIndex(iIndex, shaders::kiLightingLayers, name)];
-	}
-	if (name == "AmbientHistory")
-	{
-		return &rRenderTargetTextures.mpAmbientHistoryTextures[CheckDumpIndex(iIndex, shaders::kiLightingLayers, name)];
 	}
 	if (name == "ShadowElevation")
 	{

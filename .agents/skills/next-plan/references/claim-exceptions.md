@@ -16,9 +16,9 @@ Deferral never touches the worktree, so uncommitted implementation work stays
 exactly as it is.
 
 A defer reply to step 4's single-stage size entry
-([preparation-brief.md](preparation-brief.md) `## Stage split`) is not an
-approval: it is that explicit current-session user instruction, and the run
-takes this deferral route instead of implementation.
+([claimed-plan.md](../../prepare-change/references/claimed-plan.md)
+`## Stage split`) is not an approval: it is that explicit current-session user
+instruction, and the run takes this deferral route instead of implementation.
 
 ## Pixel-evidence deferral
 
@@ -68,12 +68,12 @@ claim.
 
 When the user requests changes at the `/finalize-changes` landing confirmation,
 the claim stays held. Prepare only the difference at
-[the `/next-plan` steps](../SKILL.md#steps) step 4, whose brief cites
-the existing preparation snapshot, with its `## In scope` and `## Out of scope`,
-in place of the deleted claimed Plan; run step 5, then step 8 on top of the
-unlanded candidate commit, because the request is a choice under
+[the `/next-plan` steps](../SKILL.md#steps) step 4 using the difference re-entry
+brief in [`prepare-change/SKILL.md`](../../prepare-change/SKILL.md) `## Inputs`
+(`mode: claimed-plan`); run step 5, then step 8 on top of the unlanded candidate
+commit, because the request is a choice under
 [`### Implementation approval`](../SKILL.md#implementation-approval), which
-decides whether step 7 presents; skip steps
-6, 9, and 10, which already ran, and skip the checkpoint for every later outcome
-of the run; then dispatch a fresh `implementer` for the `/finalize-changes`
-preparation with the step-10 result, because the claim exit already ran.
+decides whether step 7 presents; skip steps 6, 9, and 10, which already ran, and
+skip the checkpoint for every later outcome of the run; then dispatch a fresh
+`implementer` for the `/finalize-changes` preparation with the step-10 result,
+because the claim exit already ran.

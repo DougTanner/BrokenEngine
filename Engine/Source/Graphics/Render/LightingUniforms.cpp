@@ -18,10 +18,6 @@ namespace engine
 // The pending-layer rule below names "the other layer" as 1 - layer.
 static_assert(shaders::kiLightingLayers == 2);
 
-// Layer whose combine, temporal, and history-copy chain runs this frame, or -1 for none; kept separate from
-// giLightingRefreshLayer so a disable reset still clears each layer to black while deposit and spread stay zero.
-static int64_t siLightingCombineRefreshLayer = -1;
-
 // iScheduledLayer is the layer the cadence schedules this frame, or -1 for none.
 static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int64_t iScheduledLayer, bool bLightingEnabled)
 {
@@ -60,49 +56,73 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, int
 		std::ranges::fill(spbTemporalResets, true);
 	}
 
-	bool pbNeedsRefresh[shaders::kiLightingLayers] {};
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+	if (bLightingEnabled)
 	{
-		pbNeedsRefresh[i] = spbTemporalResets[i] || i == iScheduledLayer
-		                 || (bLightingEnabled && IsVisibleCenterOutsideArea(rf4VisibleArea, spTemporalAreaLatches[i].f4CurrentArea));
-	}
-	// The shared deposit and spread chain refreshes at most one layer per frame.
-	int64_t iRefreshLayer = siPendingLayer;
-	for (int64_t i = 0; i < shaders::kiLightingLayers && iRefreshLayer < 0; ++i)
-	{
-		if (pbNeedsRefresh[i])
+		bool pbNeedsRefresh[shaders::kiLightingLayers] {};
+		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 		{
-			iRefreshLayer = i;
+			pbNeedsRefresh[i] = spbTemporalResets[i] || i == iScheduledLayer
+			                 || IsVisibleCenterOutsideArea(rf4VisibleArea, spTemporalAreaLatches[i].f4CurrentArea);
 		}
-	}
-	siPendingLayer = iRefreshLayer >= 0 && pbNeedsRefresh[1 - iRefreshLayer] ? 1 - iRefreshLayer : -1;
-	siLightingCombineRefreshLayer = iRefreshLayer;
-	giLightingRefreshLayer = bLightingEnabled ? iRefreshLayer : -1;
+		// The shared deposit and spread chain refreshes at most one layer per frame.
+		int64_t iRefreshLayer = siPendingLayer;
+		for (int64_t i = 0; i < shaders::kiLightingLayers && iRefreshLayer < 0; ++i)
+		{
+			if (pbNeedsRefresh[i])
+			{
+				iRefreshLayer = i;
+			}
+		}
+		siPendingLayer = iRefreshLayer >= 0 && pbNeedsRefresh[1 - iRefreshLayer] ? 1 - iRefreshLayer : -1;
+		giLightingRefreshLayer = iRefreshLayer;
 
-	if (iRefreshLayer >= 0)
-	{
-		TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[iRefreshLayer];
-		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent);
-		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
+		if (iRefreshLayer >= 0)
+		{
+			TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[iRefreshLayer];
+			rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.Update(area.f4Area, spbTemporalResets[iRefreshLayer], gLightingTemporalBlend.mfCurrent);
+			rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
+		}
+		else
+		{
+			// Indirect lighting workload is zero (deposit and spread attachment clears still run); carry layer 0's held chain fields.
+			const TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[0];
+			rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
+			rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.fBlend;
+		}
+		int64_t iChainLayer = iRefreshLayer >= 0 ? iRefreshLayer : 0;
+		rGlobalLayout.uiLightingRefreshLayer = static_cast<uint32_t>(iChainLayer);
+		// A reset-pending layer may still hold a zero or distant-shifted latch; publish area.f4Area until its own refresh so UVs stay finite.
+		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+		{
+			const XMFLOAT4& rf4CurrentArea = spbTemporalResets[i] ? area.f4Area : spTemporalAreaLatches[i].f4CurrentArea;
+			const XMFLOAT4& rf4PreviousArea = spbTemporalResets[i] ? area.f4Area : spTemporalAreaLatches[i].f4PreviousArea;
+			rGlobalLayout.pf4LightingAreas[i] = rf4CurrentArea;
+			PopulateAreaToUv(rGlobalLayout.pLightingAreaToUvs[i], rf4CurrentArea);
+			gPresentationContinuity.pLighting[i].f4CurrentArea = rf4CurrentArea;
+			gPresentationContinuity.pLighting[i].f4PreviousArea = rf4PreviousArea;
+		}
+		PopulateAreaToUv(rGlobalLayout.lightingAreaToUv, spTemporalAreaLatches[iChainLayer].f4CurrentArea);
+		PopulateAreaToUv(rGlobalLayout.lightingAreaPreviousToUv, spTemporalAreaLatches[iChainLayer].f4PreviousArea);
 	}
 	else
 	{
-		// No deposit or chain work runs; the chain fields carry layer 0's held values.
-		const TemporalAreaLatch& rTemporalAreaLatch = spTemporalAreaLatches[0];
-		rGlobalLayout.f4LightingArea = rTemporalAreaLatch.f4CurrentArea;
-		rGlobalLayout.fLightingTemporalBlend = rTemporalAreaLatch.fBlend;
+		// Leave spbTemporalResets unconsumed so re-enable refreshes both layers from current data; publish area.f4Area
+		// directly so UVs stay finite across cold boot and distant camera-cell jumps.
+		siPendingLayer = -1;
+		giLightingRefreshLayer = -1;
+		rGlobalLayout.f4LightingArea = area.f4Area;
+		rGlobalLayout.fLightingTemporalBlend = 1.0f;
+		rGlobalLayout.uiLightingRefreshLayer = 0;
+		for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
+		{
+			rGlobalLayout.pf4LightingAreas[i] = area.f4Area;
+			PopulateAreaToUv(rGlobalLayout.pLightingAreaToUvs[i], area.f4Area);
+			gPresentationContinuity.pLighting[i].f4CurrentArea = area.f4Area;
+			gPresentationContinuity.pLighting[i].f4PreviousArea = area.f4Area;
+		}
+		PopulateAreaToUv(rGlobalLayout.lightingAreaToUv, area.f4Area);
+		PopulateAreaToUv(rGlobalLayout.lightingAreaPreviousToUv, area.f4Area);
 	}
-	int64_t iChainLayer = iRefreshLayer >= 0 ? iRefreshLayer : 0;
-	rGlobalLayout.uiLightingRefreshLayer = static_cast<uint32_t>(iChainLayer);
-	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
-	{
-		rGlobalLayout.pf4LightingAreas[i] = spTemporalAreaLatches[i].f4CurrentArea;
-		PopulateAreaToUv(rGlobalLayout.pLightingAreaToUvs[i], spTemporalAreaLatches[i].f4CurrentArea);
-		gPresentationContinuity.pLighting[i].f4CurrentArea = spTemporalAreaLatches[i].f4CurrentArea;
-		gPresentationContinuity.pLighting[i].f4PreviousArea = spTemporalAreaLatches[i].f4PreviousArea;
-	}
-	PopulateAreaToUv(rGlobalLayout.lightingAreaToUv, spTemporalAreaLatches[iChainLayer].f4CurrentArea);
-	PopulateAreaToUv(rGlobalLayout.lightingAreaPreviousToUv, spTemporalAreaLatches[iChainLayer].f4PreviousArea);
 
 	// Edge-fade denominator reciprocal (LightingDepositEdgeFade), deliberately floored unlike smoke/wind's ceil-based
 	// full-coverage dispatch grids. The minimum of one keeps the tile count nonzero if a device clamp produces a
@@ -117,11 +137,7 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	[[maybe_unused]] auto [bLightingEnabled, bLightingEnabledPrevious, bLightingEnabledChanged] = gLightingEnabled.Changed<bool>();
-	if (bLightingEnabledChanged)
-	{
-		gbLightingTemporalReset = true;
-	}
+	bool bLightingEnabled = gLightingEnabled.Get<bool>();
 
 	// Scheduled refresh frames are the cadence's multiples, which the terrain shadow phase avoids when the cadences
 	// share a factor, and the layers take turns on them.
@@ -159,10 +175,13 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	float fCombinePassNormalizationScale = fPassNormalization * fPassScale;
 	rGlobalLayout.fCombinePassNormalizationScale = fCombinePassNormalizationScale;
 	rGlobalLayout.fCombinePassTotalScale = fCombinePassNormalizationScale / fPassCount;
-	for (int64_t i = 0; i < _countof(rGlobalLayout.pfCombineCurvePoints); ++i)
+	int64_t iActivePassCount = gSpreadPassCount.Get<int64_t>();
+	float fPassFractionDenominator = static_cast<float>(std::max(iActivePassCount - 1, 1i64));
+	const CurveData& rCombineCurve = gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld;
+	for (int64_t i = 0; i < iActivePassCount; ++i)
 	{
-		float fPassFraction = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
-		rGlobalLayout.pfCombineCurvePoints[i] = (gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld).Evaluate(fPassFraction);
+		float fPassFraction = static_cast<float>(i) / fPassFractionDenominator;
+		rGlobalLayout.pfCombineCurvePoints[i] = rCombineCurve.Evaluate(fPassFraction);
 	}
 	rGlobalLayout.fLightingTerrain = gLightingTerrain.mfCurrent;
 	rGlobalLayout.fLightingObjects = gLightingObjects.mfCurrent;
@@ -332,8 +351,6 @@ void RenderLightingMain(int64_t iCommandBuffer)
 
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 {
-	// giLightingRefreshLayer is -1 when disabled, skipping spread draws; the unconditional spread attachment clears
-	// already provide zero inputs for the disabled combine/temporal/history reset driven by siLightingCombineRefreshLayer.
 	int64_t iInstanceCount = giLightingRefreshLayer >= 0 ? 1 : 0;
 
 	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
@@ -351,7 +368,7 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 	int64_t iCombineGroupsY = TileCount(vkCombineExtent.height);
 	for (int64_t i = 0; i < shaders::kiLightingLayers; ++i)
 	{
-		int64_t iCombineGroupsZ = i == siLightingCombineRefreshLayer ? 1 : 0;
+		int64_t iCombineGroupsZ = i == giLightingRefreshLayer ? 1 : 0;
 		gpPipelineManager->mpCombinePipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
 		gpPipelineManager->mpLightingTemporalPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);
 		gpPipelineManager->mpLightingHistoryCopyPipelines[i].WriteIndirectComputeBuffer(iCommandBuffer, iCombineGroupsX, iCombineGroupsY, iCombineGroupsZ);

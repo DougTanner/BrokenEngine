@@ -2,12 +2,53 @@ Set-StrictMode -Version Latest
 
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1')
 
+$script:SupportedSessionClients = @('claude', 'codex', 'agy')
+$script:SessionBranchPattern = "^($($script:SupportedSessionClients -join '|'))/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+$script:TargetBranchConfigKey = 'brokenengine.session.targetBranch'
+$script:BaselineConfigKey = 'brokenengine.session.baseline'
+
+function Get-AgentWorktreeSupportedClients {
+	return $script:SupportedSessionClients
+}
+
+function Get-AgentWorktreeSessionId([string] $Branch, [string] $Client) {
+	if ($Branch -cmatch $script:SessionBranchPattern -and ([string]::IsNullOrWhiteSpace($Client) -or $Matches[1] -ceq $Client)) {
+		return $Matches[2]
+	}
+	return $null
+}
+
 function Get-AgentWorktreeGitValue([string] $Worktree, [string[]] $Arguments, [string] $Description) {
 	$value = @(Invoke-AgentGit (@('-C', $Worktree) + $Arguments))
 	if ($value.Count -ne 1 -or [string]::IsNullOrWhiteSpace($value[0])) {
 		throw "Git returned no unique $Description for '$Worktree'."
 	}
 	return $value[0].Trim()
+}
+
+function Assert-AgentWorktreeConfigEnabled([string] $Worktree) {
+	$value = & git -C $Worktree config --local --type=bool --get extensions.worktreeConfig 2>$null
+	if ($LASTEXITCODE -ne 0 -or $value -cne 'true') {
+		$quotedWorktree = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($Worktree)
+		throw "Git worktree config is not enabled for '$Worktree' (extensions.worktreeConfig must be true). Enable it with: git -C '$quotedWorktree' config --local --replace-all extensions.worktreeConfig true"
+	}
+}
+
+function Set-AgentWorktreeSessionConfig {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)][string] $Worktree,
+		[Parameter(Mandatory)][string] $Baseline,
+		[string] $TargetBranch
+	)
+	if ([string]::IsNullOrWhiteSpace($Worktree)) { throw 'Worktree path must not be blank.' }
+	Assert-AgentWorktreeConfigEnabled $Worktree
+	if ([string]::IsNullOrWhiteSpace($Baseline)) { throw "Session baseline for '$Worktree' must not be blank." }
+	if ($PSBoundParameters.ContainsKey('TargetBranch')) {
+		if ([string]::IsNullOrWhiteSpace($TargetBranch)) { throw "Session target branch for '$Worktree' must not be blank." }
+		Invoke-AgentGit @('-C', $Worktree, 'config', '--worktree', '--replace-all', $script:TargetBranchConfigKey, $TargetBranch.Trim()) | Out-Null
+	}
+	Invoke-AgentGit @('-C', $Worktree, 'config', '--worktree', '--replace-all', $script:BaselineConfigKey, $Baseline.Trim()) | Out-Null
 }
 
 function Get-AgentWorktreeRecords([string] $RepositoryRoot) {
@@ -65,45 +106,29 @@ function Get-AgentWorktreePrimaryIdentity([string] $RepositoryRoot) {
 
 # Session identity is entirely Git-derived: the branch names the session, the Git common directory
 # names the primary checkout, and the baseline is the attribution point the session diverged from.
-# A checkout not on a claude/, codex/, opencode/, or agy/ session branch has no session sidecar, so it resolves with
-# SessionId $null instead of failing.
-# A session worktree's primary branch is the one its wrapper recorded in the session sidecar, not the
-# branch the primary checkout currently has checked out.
+# A checkout not on a claude/, codex/, or agy/ session branch skips the worktree-config check and
+# reads, resolving with SessionId $null instead of failing.
+# A session worktree's primary branch is the one recorded in its per-worktree Git config
+# (config.worktree), not the branch the primary checkout currently has checked out.
 function Get-AgentWorktreeSessionContext {
 	[CmdletBinding()] param([string] $Worktree)
 	if ([string]::IsNullOrWhiteSpace($Worktree)) { $Worktree = (Get-Location).Path }
 	try { $top = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $Worktree @('rev-parse', '--show-toplevel') 'repository top-level') }
 	catch { throw "'$Worktree' is not inside a Git worktree: $($_.Exception.Message)" }
 	$branch = Get-AgentWorktreeGitValue $top @('branch', '--show-current') 'current branch'
-	$sessionId = if ($branch -cmatch '^(?:claude|codex|opencode|agy)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') { $Matches[1] } else { $null }
+	$sessionId = Get-AgentWorktreeSessionId -Branch $branch
 	$common = Get-AgentCanonicalPath (Get-AgentWorktreeGitValue $top @('rev-parse', '--path-format=absolute', '--git-common-dir') 'Git common directory')
 	$primaryRoot = Get-AgentCanonicalPath (Split-Path -Parent $common)
 	$primaryBranch = if ($null -ne $sessionId) {
-		# The sidecar is the session's recorded landing target; the file is opaque to this code unit, so
-		# validate it strictly. Live primary-branch lookup is deliberately not a fallback: the session
-		# lands onto its recorded parent, not whatever the primary checkout has checked out right now.
-		$sidecarPath = Join-Path $top 'Temp\session-sidecar.json'
-		if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) {
-			throw "Session sidecar '$sidecarPath' is missing. Restore the recorded landing target in this file before running session workflow operations."
+		# The recorded landing target lives in Git's per-worktree config (config.worktree), outside
+		# disposable Temp/. Live primary-branch lookup is deliberately not a fallback: the session lands
+		# onto its recorded parent, not whatever the primary checkout has checked out right now.
+		Assert-AgentWorktreeConfigEnabled $top
+		try { Get-AgentWorktreeGitValue $top @('config', '--worktree', '--get-all', $script:TargetBranchConfigKey) "worktree config '$script:TargetBranchConfigKey'" }
+		catch {
+			$quotedTop = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($top)
+			throw "$($_.Exception.Message) Restore '$script:TargetBranchConfigKey' with: git -C '$quotedTop' config --worktree --replace-all $script:TargetBranchConfigKey <branch>"
 		}
-		$sidecar = $null
-		try { $sidecar = [IO.File]::ReadAllText($sidecarPath) | ConvertFrom-Json -Depth 4 -ErrorAction Stop }
-		catch { throw "Session sidecar '$sidecarPath' is invalid: $($_.Exception.Message). Restore the recorded landing target in this file before running session workflow operations." }
-		# Every post-parse failure funnels into one diagnostic: reject a null or non-object parse result
-		# before touching properties, and compare property names case-sensitively so a wrong-case field
-		# never passes. The name check runs before any property access, so StrictMode cannot throw a raw
-		# property error on unrelated fields.
-		$valid = $sidecar -is [Management.Automation.PSCustomObject]
-		if ($valid) {
-			$names = @($sidecar.PSObject.Properties.Name)
-			$valid = $names.Count -eq 2 -and $names -ccontains 'schemaVersion' -and $names -ccontains 'targetBranch' -and
-				$sidecar.schemaVersion -ceq 'broken-engine-session-sidecar/v1' -and
-				$sidecar.targetBranch -is [string] -and -not [string]::IsNullOrWhiteSpace($sidecar.targetBranch)
-		}
-		if (-not $valid) {
-			throw "Session sidecar '$sidecarPath' is invalid: it must contain one JSON object with exactly schemaVersion 'broken-engine-session-sidecar/v1' and a non-empty string targetBranch. Restore the recorded landing target in this file before running session workflow operations."
-		}
-		$sidecar.targetBranch
 	}
 	else { Get-AgentWorktreeGitValue $primaryRoot @('branch', '--show-current') 'primary branch' }
 	$primaryTip = Get-AgentWorktreeGitValue $primaryRoot @('rev-parse', "refs/heads/$primaryBranch") 'primary tip commit'
@@ -121,10 +146,13 @@ function Get-AgentWorktreeSessionContext {
 	# only the open stage in the diff. Substituting the merge base directly instead of falling
 	# back to --fork-point keeps the answer deterministic and reflog-independent.
 	$baseline = $null
-	# The wrapper records the baseline in this gitignored file; a missing or empty file is simply no
-	# hint. A child process can rewrite the file, which is why it replaces the former environment hint.
-	$baselineHintPath = Join-Path $top 'Temp\session-baseline'
-	$configured = if (Test-Path -LiteralPath $baselineHintPath -PathType Leaf) { [IO.File]::ReadAllText($baselineHintPath).Trim() } else { $null }
+	# The wrapper records the baseline hint in Git's per-worktree config (config.worktree); a missing,
+	# empty, or non-unique entry is simply no hint. Fork-point repair updates it in place.
+	$configured = $null
+	if ($null -ne $sessionId) {
+		$configuredValues = @(& git -C $top config --worktree --get-all $script:BaselineConfigKey 2>$null)
+		if ($LASTEXITCODE -eq 0 -and $configuredValues.Count -eq 1) { $configured = $configuredValues[0].Trim() }
+	}
 	if (-not [string]::IsNullOrWhiteSpace($configured)) {
 		$resolved = @(& git -C $top rev-parse --quiet --verify "$configured^{commit}" 2>$null)
 		if ($LASTEXITCODE -eq 0 -and $resolved.Count -eq 1) {
@@ -211,9 +239,9 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 			$failure.Data['Rebased'] = $true
 			throw $failure
 		}
-		Write-Warning "Restored local work in '$Worktree'. $recovery"
+		[Console]::Error.WriteLine("Restored local work in '$Worktree'. $recovery")
 	}
 	return [pscustomobject]@{ Outcome = 'rebased'; ForkPoint = $baseline; Baseline = $PrimaryTip }
 }
 
-Export-ModuleMember -Function Get-AgentWorktreePrimaryCheckout, Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint
+Export-ModuleMember -Function Get-AgentWorktreeSupportedClients, Get-AgentWorktreeSessionId, Get-AgentWorktreePrimaryCheckout, Get-AgentWorktreePrimaryIdentity, Get-AgentWorktreeRecords, Test-AgentWorktreeNoGitOperation, Test-AgentWorktreeAncestor, Set-AgentWorktreeSessionConfig, Get-AgentWorktreeSessionContext, Repair-AgentWorktreeForkPoint

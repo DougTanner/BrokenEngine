@@ -8,9 +8,10 @@
 # `<line> match <read path> read-at <read line>` — a delegation record's brief lists a path an earlier `Read`/`read_file`
 #   record or allowlisted read-only shell command opened; `<line>` is the delegation record's line and `<read line>` the
 #   reading record's line. A delegation record is a `tool_use` or `PLANNER_RESPONSE` tool call whose string input field
-#   starts with a `Role:` line and carries a `Governing paths:` line; that line's value and a `Scope:` line's value are
-#   the brief paths, compared case- and separator-insensitively against the read path (resolving relative paths against
-#   the transcript's recorded worktree root when available). A single bounded `Read`/`read_file` call per path in its
+#   starts with a `Role:` line and carries a `Governing paths:` line; `Governing paths:` and `Scope:` values (including
+#   continuation lines up to the next column-0 1-3 word key-colon header) are the brief paths, compared case- and
+#   separator-insensitively against the read path (resolving relative paths against the transcript's recorded worktree
+#   root when available). A single bounded `Read`/`read_file` call per path in its
 #   checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired successful text
 #   result length is `<= 4,000` chars (`$script:SmallReadMaxChars`) emits no `match` row; unbounded reads, over-floor
 #   reads, allowlisted shell reads, failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads
@@ -95,6 +96,7 @@ function Get-AllowedShellReadPath([string] $Command) {
 }
 
 $script:BriefLabels = @('Role:', 'Skill:', 'Objective:', 'Required sections:', 'Scope:', 'Exclusions:', 'Fixed decisions:', 'Governing paths:', 'Baseline:', 'Acceptance:', 'Prohibitions:', 'Return:')
+$script:BriefHeaderPattern = '^[A-Za-z][A-Za-z0-9_-]*(?: [A-Za-z0-9_-]+){0,2}:(?:\s|$)'
 $script:ClaudeBridgeStubPattern = '(?i)\b(?:running in (?:the )?background|background (?:task|command|shell)|async(?:hronous)?\s+(?:task|agent|command)|with task id:)'
 $script:ClaudeNativeAgentStubPattern = '(?i)\A\s*(?:async(?:hronous)?\s+agent\s+launched\s+successfully\.?\s*\z|(?:(?:async(?:hronous)?|background)\s+agent\s+(?:launched|started)|agent\s+(?:launched|started)\s+(?:asynchronously|in\s+(?:the\s+)?background)|(?:launched|started)\s+(?:(?:an?\s+)?(?:async(?:hronous)?|background)\s+agent|asynchronously|in\s+(?:the\s+)?background))[^\r\n]*(?:\r?\n[ \t]*)?(?:\bagentId:|\bwith\s+(?:task\s+)?id:))'
 $script:BridgeReceiptOrSeparatorPattern = '(?m)(?:^|content=|<result>)[ \t]*(?:(?<sep>--- findings ---)|(?<json>\{"schemaVersion":"broken-engine-codex-run/[^\r\n]*?))(?:[ \t]*</result>)?[ \t]*\r?$'
@@ -918,8 +920,24 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 		$fieldLines = $field.Value -split '\r?\n'
 		$firstText = $fieldLines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1
 		$hasRole = $firstText -like 'Role:*'
-		$pathLines = $fieldLines | Where-Object { $_ -like 'Governing paths:*' -or $_ -like 'Scope:*' }
-		$hasGoverningPaths = [bool] ($pathLines | Where-Object { $_ -like 'Governing paths:*' })
+		$pathLines = [Collections.Generic.List[string]]::new()
+		$inPathBlock = $false
+		$hasGoverningPaths = $false
+		foreach ($fieldLine in $fieldLines) {
+			if ($fieldLine -like 'Governing paths:*' -or $fieldLine -like 'Scope:*') {
+				$inPathBlock = $true
+				$pathLines.Add($fieldLine)
+				if ($fieldLine -like 'Governing paths:*') { $hasGoverningPaths = $true }
+			}
+			elseif ($inPathBlock) {
+				if ($fieldLine -match $script:BriefHeaderPattern) {
+					$inPathBlock = $false
+				}
+				else {
+					$pathLines.Add($fieldLine)
+				}
+			}
+		}
 		if (-not ($hasRole -and $hasGoverningPaths)) {
 			# Two distinct brief labels separate a malformed brief from prose that merely carries one such line.
 			$labelHits = @($script:BriefLabels | Where-Object { $label = $_; @($fieldLines | Where-Object { $_ -like "$label*" }).Count -gt 0 })
@@ -931,14 +949,14 @@ function Write-ToolCallProjection([int] $LineNumber, [string] $ToolName, [string
 		}
 		if ([string]::IsNullOrEmpty($State.WorktreeRoot)) {
 			foreach ($fieldLine in $fieldLines) {
-				if ($fieldLine -match '^\s*Baseline:(?<pre>.*?[\s,(])(?:worktree|(?:absolute\s+)?repo(?:sitory)?\s+toplevel):\s*(?<val>.+)$') {
+				if ($fieldLine -match '^\s*Baseline:(?<pre>.*?[\s,(|;])(?:worktree|(?:absolute\s+)?repo(?:sitory)?\s+toplevel):\s*(?<val>.+)$') {
 					$pre = $Matches['pre']
 					$val = $Matches['val'].Trim()
-					if ($val -match '^(["''`])([^\r\n]+?)\1(?=\s*(?:[,).\s]|$))') {
+					if ($val -match '^(["''`])([^\r\n]+?)\1(?=\s*(?:[,|;).\s]|$))') {
 						$rawRoot = $Matches[2]
 					}
 					else {
-						$parts = $val -split ',\s*[A-Za-z][A-Za-z0-9 _-]*:(?![\\/])', 2
+						$parts = $val -split '[,|;]\s*[A-Za-z][A-Za-z0-9 _-]*:(?![\\/])', 2
 						$rawRoot = $parts[0].Trim()
 						$openParens = ($pre -replace '[^(]', '').Length - ($pre -replace '[^)]', '').Length
 						if ($openParens -gt 0) {

@@ -11,20 +11,17 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 	GlobalLayout globalLayout;
 };
 
-// 4 history samplers (last-refresh combine outputs) + 4 combine storage images (read-write, blended in place).
+// The in-place blend samples directional outputs from the last refresh.
 layout (set = 1, binding = 1) uniform sampler2D historyR;
 layout (set = 1, binding = 2) uniform sampler2D historyG;
 layout (set = 1, binding = 3) uniform sampler2D historyB;
-layout (set = 1, binding = 4) uniform sampler2D historyAmbient;
-layout (set = 1, binding = 5, rgba8) uniform image2D combineImageR; // kVkFormatCombine
-layout (set = 1, binding = 6, rgba8) uniform image2D combineImageG; // kVkFormatCombine
-layout (set = 1, binding = 7, rgba8) uniform image2D combineImageB; // kVkFormatCombine
-layout (set = 1, binding = 8, rgba8) uniform image2D combineImageAmbient; // kVkFormatCombine
+layout (set = 1, binding = 4, rgba8) uniform image2D combineImageR; // kVkFormatCombine
+layout (set = 1, binding = 5, rgba8) uniform image2D combineImageG; // kVkFormatCombine
+layout (set = 1, binding = 6, rgba8) uniform image2D combineImageB; // kVkFormatCombine
 
-// Temporal accumulation: blend the freshly-combined lighting (in place) with the last refresh's result,
-// reprojected into the current texel grid by world position. While the texel-ramp rescales the grid this
-// averages out the per-refresh resample jitter (an exponential moving average) so it stops flickering; at a
-// settled grid history == current so it is a no-op. Mirror of ShadowTemporal.comp over the four combine outputs.
+// Reprojected EMA over the three directional combine outputs (mirrors ShadowTemporal.comp) to average per-refresh
+// resample jitter during texel-ramp rescaling. After initialization, in-bounds texels blend history toward current
+// at fLightingTemporalBlend (weight >= 1 or out-of-bounds reprojected UVs keep current unchanged).
 void main()
 {
 	// The dispatch rounds the texture extent up to whole tiles, so the tail threads guard against it.
@@ -48,5 +45,4 @@ void main()
 	imageStore(combineImageR, i2Coord, mix(textureLod(historyR, f2PreviousUv, 0.0f), imageLoad(combineImageR, i2Coord), fBlend));
 	imageStore(combineImageG, i2Coord, mix(textureLod(historyG, f2PreviousUv, 0.0f), imageLoad(combineImageG, i2Coord), fBlend));
 	imageStore(combineImageB, i2Coord, mix(textureLod(historyB, f2PreviousUv, 0.0f), imageLoad(combineImageB, i2Coord), fBlend));
-	imageStore(combineImageAmbient, i2Coord, mix(textureLod(historyAmbient, f2PreviousUv, 0.0f), imageLoad(combineImageAmbient, i2Coord), fBlend));
 }
