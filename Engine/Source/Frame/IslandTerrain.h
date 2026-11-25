@@ -54,7 +54,7 @@ struct IslandTemplate
 	float fQuadFootprintY = 0.0f;
 
 #if defined(BT_SERVER)
-	std::vector<NavContour> navContours;   // one per baked graph, index-parallel with the server's NavigationGraphBake entries; empty on a plane without kTerrainCollision
+	std::vector<NavContour> navContours;   // one per baked graph, index-parallel with the server's NavigationGraphSpec entries
 #endif
 
 	int64_t iTextureSlot = -1;
@@ -126,15 +126,14 @@ struct CellElevationSampler
 	[[nodiscard]] float XM_CALLCONV Sample(FXMVECTOR vecLocalPosition) const;
 };
 
-#if defined(BT_SERVER)
-// The contour-bake input of one cell navigation graph.
-struct NavigationGraphBake
+// The contour-bake and debug-render specification of one cell navigation graph.
+struct NavigationGraphSpec
 {
-	int64_t iFlightPlane = 0;
 	float fThresholdElevation = 0.0f;
 	float fClearanceMeters = 0.0f;
+	float fDebugDrawZ = 0.0f;
+	XMFLOAT4A f4DebugColor {};
 };
-#endif
 
 class IslandTerrain : public common::Singleton<IslandTerrain>
 {
@@ -143,7 +142,7 @@ public:
 	IslandTerrain();
 
 #if defined(BT_SERVER)
-	void WaitForElevationMaps(std::span<const NavigationGraphBake> navigationGraphs);
+	void WaitForElevationMaps(std::span<const NavigationGraphSpec> navigationGraphs);
 #else
 	void WaitForElevationMaps();
 #endif
@@ -199,7 +198,7 @@ public:
 	float mfSeaFloorElevation = common::kfSeaBottomMeters;
 
 #if defined(BT_SERVER)
-	// Number of cell navigation graphs, one per NavigationGraphBake entry.
+	// Number of cell navigation graphs, one per NavigationGraphSpec entry.
 	int64_t miNavigationGraphCount = 0;
 #endif
 

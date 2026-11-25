@@ -139,7 +139,7 @@ IslandTerrain::IslandTerrain()
 }
 
 #if defined(BT_SERVER)
-void IslandTerrain::WaitForElevationMaps(std::span<const NavigationGraphBake> navigationGraphs)
+void IslandTerrain::WaitForElevationMaps(std::span<const NavigationGraphSpec> navigationGraphs)
 #else
 void IslandTerrain::WaitForElevationMaps()
 #endif
@@ -223,8 +223,7 @@ void IslandTerrain::WaitForElevationMaps()
 	}
 
 #if defined(BT_SERVER)
-	// Build one NavContour per NavigationGraphBake entry on a terrain-collision flight plane for every template so multi-template
-	// cells produce correct nav data.
+	// Cell graph i reads contour i from every placement's template.
 	miNavigationGraphCount = std::ssize(navigationGraphs);
 	LOG(kLoading, kInfo, "Building NavContour for {} island templates", mIslands.size());
 	ScopedBootTimer scopedTimer(kBootTimerIslands);
@@ -238,10 +237,7 @@ void IslandTerrain::WaitForElevationMaps()
 		rTemplate.navContours.resize(static_cast<size_t>(miNavigationGraphCount));
 		for (const auto& [i, rGraph] : std::views::enumerate(navigationGraphs))
 		{
-			if (gpFlightPlanes->Plane(rGraph.iFlightPlane).flags & FlightPlaneFlags::kTerrainCollision)
-			{
-				BuildNavContour(rTemplate.navContours.at(i), heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, rGraph.fThresholdElevation, rGraph.fClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
-			}
+			BuildNavContour(rTemplate.navContours.at(i), heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, rGraph.fThresholdElevation, rGraph.fClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
 		}
 	}
 #endif

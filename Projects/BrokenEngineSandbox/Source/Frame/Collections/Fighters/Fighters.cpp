@@ -249,9 +249,9 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	const FightersInterpolate& rPrevious = *rPreviousFrame.interpolate.pFighters;
 	const FightersPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pFighters;
 	std::chrono::duration<float> deltaTime(rCurrentFrameInterpolate.fDeltaTime);
+	float fClimbStep = kfFighterClimbRate * deltaTime.count();
 
 #if defined(BT_CLIENT)
-	float fClimbStep = kfFighterClimbRate * deltaTime.count();
 	// Indexed by ShipController: each row's clock advances through its own model's animation.
 	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kuiFighterFleetModel), LoopingAnimationData(kuiFighterRandomModel)};
 #endif
@@ -262,7 +262,6 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
-		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 #if defined(BT_CLIENT)
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 		const engine::AnimationData* pAnimationData = animationDatas[std::to_underlying(rPreviousPostRender.pController[i])];
@@ -272,17 +271,17 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 #if defined(BT_CLIENT)
 		float fHeightBeforeClimb = XMVectorGetZ(vecPosition);
 #endif
-		// PostRender Update stores velocity Z as 0; ordinary plane travel steps the position directly.
-		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kFighter, rPreviousPostRender.pController[i], vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime, uiFlightPlane);
+		// PostRender Update stores velocity Z as 0; descent back to the flight height steps the position directly.
+		vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), EffectiveShipFlightHeight(ShipType::kFighter, rPreviousPostRender.pController[i]), fClimbStep));
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 #if defined(BT_CLIENT)
-		// Full tilt at the full climb rate, none on a plane; a zero-length render step keeps the last tilt.
+		// Tilt scales by the pre-rise descent step relative to fClimbStep, before terrain raises the ship; a zero-length render step keeps the last tilt.
 		float fClimbTilt = fClimbStep > 0.0f ? kfFighterClimbTilt * ((XMVectorGetZ(vecPosition) - fHeightBeforeClimb) / fClimbStep) : rPrevious.pfClimbTilts[i];
 #endif
 		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
 		{
-			vecPosition = RaiseAboveTerrain(rStaticData, vecPosition, uiFlightPlane);
+			vecPosition = RaiseAboveTerrain(rStaticData, vecPosition);
 		}
 
 		vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * fDeltaRotation);
@@ -310,7 +309,6 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
-		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 #if defined(BT_CLIENT)
 		rCurrent.pAnimationTimes[i] = animationTime;
 		rCurrent.pfClimbTilts[i] = fClimbTilt;
@@ -381,7 +379,6 @@ void FightersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
-				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};
@@ -478,12 +475,11 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kFighter, rInfo.eController, rInfo.uiFlightPlane));
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kFighter, rInfo.eController));
 	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
-	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentInterpolate.pfClimbTilts[iIndex] = 0.0f;
@@ -603,8 +599,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				{
 					// Patrol. A Seek and Destroy tick may have set kNoAiDirection.
 					flags.Set(ShipFlags::kNoAiDirection, false);
-					ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], flags, vecVeerOffPoint, registryTarget);
-					SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
+					ShipTactic tactic = ChooseFighterFleetTactic(rPreviousFrame, rStaticData, fleetBoard.Find(rPrevious.pFlagshipGlobalIds[i]), rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rPrevious.pAlignments[i], rPrevious.pOrders[i], flags, vecVeerOffPoint, registryTarget);
 					if (tactic.bHasDestination)
 					{
 						// A tactic tick leaves the row roaming, so the next navigation tick re-steers by roaming or changes
@@ -630,7 +625,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					// Seek and Destroy, in any cell: attack, or with no enemy idle in place under drag, ignoring the flagship
 					// and the fleet's wanted cell. The row stays roaming, so a switch back to Patrol recomputes its path.
 					ShipTactic tactic {};
-					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
+					bool bHasTactic = ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic);
 					iNavigationDirection = -1;
 					// The stored wanted heading feeds the heading capture, which kNoAiDirection gates while idle, and the fleet
 					// cone test in AvoidTerrain, which reads it ungated.
@@ -639,7 +634,6 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 					bool bAccelerate = false;
 					if (bHasTactic)
 					{
-						SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
 						AimAiDirection(XMVectorSubtract(tactic.vecDestination, vecPosition), vecAiDirection);
 						bAccelerate = IsWithinHeadingCone(vecDirection, vecAiDirection);
 						fDeltaRotation = SteerHeading(vecDirection, vecAiDirection, kFighterMovement);
@@ -649,14 +643,10 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				else
 				{
 					ShipTactic tactic {};
-					if (ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rCurrentInterpolate.puiFlightPlanes[i], rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
-					{
-						SetTargetFlightPlane(rCurrent.pOrders[i], tactic.iTargetFlightPlane);
-					}
-					else
+					if (!ChooseAttackTactic(rPreviousFrame, rStaticData, vecPosition, navRectangleBoard, rPrevious.pAlignments[i], rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], flags, vecVeerOffPoint, registryTarget, tactic))
 					{
 						// No enemy in the cell: return to an island.
-						tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rCurrent.pOrders[i]), flags, tactic.bHasDestination);
+						tactic.vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kFighter), vecPosition, false, XMVectorZero(), navRectangleBoard, flags, tactic.bHasDestination);
 					}
 					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination.
 					flags.Set(ShipFlags::kNoAiDirection, !tactic.bHasDestination);
@@ -676,15 +666,14 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
-		float fHeight = XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]);
-		if ((lifecycleFlags & engine::LifecycleFlags::kDying) && TakesDeathTerrainContact(fHeight, GetTargetFlightPlane(rPrevious.pOrders[i])))
+		if (lifecycleFlags & engine::LifecycleFlags::kDying)
 		{
-			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
+			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity);
 		}
 		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying))
 		{
-			rCurrentInterpolate.pVecPositions[i] = RaiseAboveTerrain(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.puiFlightPlanes[i]);
+			rCurrentInterpolate.pVecPositions[i] = RaiseAboveTerrain(rStaticData, rCurrentInterpolate.pVecPositions[i]);
 		}
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
@@ -731,7 +720,6 @@ bool FightersInterpolate::LogDifferences(const FightersInterpolate& rOther) cons
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
-		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

@@ -9,16 +9,16 @@
 #
 # The script attempts the launch whenever SmartGit is available. Handoff-only
 # checks pair a normal launcher exit with a surviving pre-existing instance.
-# It runs Git only to expand an abbreviated supplied tip to its full commit ID,
-# and never mutates a ref or claims a lock.
+# It runs Git only to resolve the supplied tip to its full commit ID and compute its
+# reviewed diff identity, and never mutates a ref or claims a lock.
 #
-# Contract: schema broken-engine-finalize-approval-review/v1. Unlike the mutating
+# Contract: schema broken-engine-finalize-approval-review/v2. Unlike the mutating
 # scripts, every launch outcome exits 0 and none report status pass — the
 # review outcome is non-blocking, but the attempt is not: main redirects this single-line
 # stdout to Temp/finalize-approval-review-result.json, and the landing finalizer passes
-# that receipt path to the landing scripts, which read approvedTip and status from it and
-# refuse to change primary when it does not record an attempted launch for the
-# exact commit being landed.
+# that receipt path to the landing scripts, which verify reviewedRepository, approvedTip
+# (or rebase-equivalent reviewedPatchId/reviewedChanges), and status from it and refuse
+# to change primary when it does not record an attempted launch for the reviewed diff.
 # opened is the launch success path; unavailable/failed are non-blocking,
 # and the caller copies message and the exact manualCommand into the approval response while keeping the landing gate in
 # force. Only invalid input exits 1, with status error and a code naming the cause
@@ -45,11 +45,14 @@ if (-not (Test-Path -LiteralPath $workflowModule)) {
 Import-Module $workflowModule -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-approval-review/v1'
+	schemaVersion = 'broken-engine-finalize-approval-review/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Review-tool launch did not complete.'
 	approvedTip = $null
+	reviewedRepository = $null
+	reviewedPatchId = $null
+	reviewedChanges = $null
 	executable = $null
 	arguments = @()
 	manualCommand = $null
@@ -214,16 +217,22 @@ try
 	# \z rather than $: .NET's $ also matches before a trailing newline, so a hex value carrying one would pass.
 	Assert-Input ($ApprovedTip -cmatch '^[0-9a-f]{8,40}\z') 'ApprovedTip must be 8 to 40 lowercase hexadecimal characters.'
 	$script:PrimaryIdentity = Get-FinalizeExistingWindowsIdentity $PrimaryWorktree 'Primary worktree'
-	# Only an abbreviated tip is expanded, here, so the SmartGit anchor always carries the full ID; a full
-	# 40-character tip keeps the unchanged path that never resolved it.
-	if ($ApprovedTip.Length -ne 40)
+	$expansion = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity, 'rev-parse', '--verify', '--quiet', "$ApprovedTip^{commit}") $script:PrimaryIdentity
+	$expandedTip = $expansion.Stdout.Trim()
+	Assert-Input ($expansion.ExitCode -eq 0 -and $expandedTip -cmatch '^[0-9a-f]{40}\z') "ApprovedTip '$ApprovedTip' does not resolve to exactly one commit."
+	$ApprovedTip = $expandedTip
+	try
 	{
-		$expansion = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:PrimaryIdentity, 'rev-parse', '--verify', '--quiet', "$ApprovedTip^{commit}") $script:PrimaryIdentity
-		$expandedTip = $expansion.Stdout.Trim()
-		Assert-Input ($expansion.ExitCode -eq 0 -and $expandedTip -cmatch '^[0-9a-f]{40}\z') "ApprovedTip '$ApprovedTip' does not resolve to exactly one commit."
-		$ApprovedTip = $expandedTip
+		$reviewIdentity = Get-FinalizeReviewIdentity $script:PrimaryIdentity $ApprovedTip
+	}
+	catch
+	{
+		Throw-Review 1 'input.invalid' $_.Exception.Message
 	}
 	$result.approvedTip = $ApprovedTip
+	$result.reviewedRepository = $script:PrimaryIdentity
+	$result.reviewedPatchId = $reviewIdentity.PatchId
+	$result.reviewedChanges = $reviewIdentity.Changes
 	Invoke-SmartGit
 }
 catch

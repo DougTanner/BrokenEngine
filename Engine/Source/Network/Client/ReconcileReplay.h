@@ -68,9 +68,9 @@ constexpr RingLayout ComputeRetention(int64_t iHeadPhysical, int64_t iSnapshotCo
 
 struct CoordScratch
 {
-	std::vector<game::Frame*> replayStack;
+	game::Frame* ppReplayStack[engine::kiNetworkBufferSize] {};
+	int64_t iReplayStackCount = 0;
 	int64_t iReplayWriteHead = 0;
-	int64_t iReplayWriteCount = 0;
 	int64_t iLastValidatedIndex = -1;
 	// Physical slot of a full state injected during this reconcile, or -1. ComputeOutputLayout bases
 	// the output ring on it: it is the head and confirmed frame when validation reaches no later
@@ -87,32 +87,12 @@ struct CoordScratch
 	common::crc_t desyncActualCrc = 0;
 	std::unique_ptr<game::Frame> pDesyncClientFrame;
 
-	// Reset every field to its declared default while preserving replayStack's allocated capacity.
-	void Reset()
-	{
-		replayStack.clear();
-		iReplayWriteHead = 0;
-		iReplayWriteCount = 0;
-		iLastValidatedIndex = -1;
-		iInjectedBaseSlot = -1;
-		iNewConfirmedTick = -1;
-		outputLayout = {};
-		flags.meFlags = static_cast<decltype(flags.meFlags)>(0);
-		iPreReconcileTailTick = -1;
-		profiling = {};
-		iDesyncTick = -1;
-		desyncExpectedCrc = 0;
-		desyncActualCrc = 0;
-		pDesyncClientFrame.reset();
-	}
-
 	// Restart the replay stack at a base frame; replay writes begin in the slot after iBaseSlot.
 	void ResetReplayBase(game::Frame* pBaseFrame, int64_t iBaseSlot)
 	{
-		replayStack.clear();
-		replayStack.push_back(pBaseFrame);
+		ppReplayStack[0] = pBaseFrame;
+		iReplayStackCount = 1;
 		iReplayWriteHead = SnapshotIndex(iBaseSlot, 1);
-		iReplayWriteCount = 0;
 	}
 };
 
@@ -166,7 +146,7 @@ struct ReconcileDesyncInfo
 
 struct ReconcileDispatchResult
 {
-	int64_t iActiveCount = 0;
+	std::span<const CoordWork> activeWorks;
 	bool bAnyFullReplay = false;
 	ReconcileProfiling profiling;
 	// The first coord in work-list order whose reconcile ended in an unresolved CRC mismatch; bDesync is false when none
@@ -180,6 +160,8 @@ public:
 
 	ReconcileDispatchResult Run(const ReconcileInputs& rInputs);
 	void Reset();
+
+private:
 
 	std::vector<CoordWork> mWorks;
 };

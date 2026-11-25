@@ -408,25 +408,45 @@ function Invoke-FinalizeLandingLockClaim {
 	return New-FinalizeLandingLockClaimResult $false 'landing-lock.retryable-wait' 'A foreign landing lease remains live; retry this claim after its reported expiry.' 'retryable-wait' $false $PollMilliseconds $Owner $state.Status 1
 }
 
-# The approval review receipt gate: null when the 'broken-engine-finalize-approval-review/v1' receipt at Path records
-# an attempted SmartGit launch for ApprovedCommit, the full commit being landed; otherwise its blocking Code and Message.
-# SmartGit outcomes stay non-blocking; malformed, mismatched, or non-attempted receipts block.
-function Test-FinalizeApprovalReviewReceipt([string] $Path, [string] $ApprovedCommit) {
+# The approval review receipt gate: null when the 'broken-engine-finalize-approval-review/v2' receipt at Path records
+# an attempted SmartGit launch for PrimaryRepository whose reviewed commit or reviewed diff identity matches
+# ApprovedCommit; otherwise its blocking Code and Message. SmartGit outcomes stay non-blocking; malformed, mismatched,
+# or non-attempted receipts block.
+function Test-FinalizeApprovalReviewReceipt([string] $Path, [string] $ApprovedCommit, [string] $PrimaryRepository) {
 	$rerun = 'Rerun Show-FinalizeApprovalReview.ps1 for the approved commit with the documented stdout redirect so the receipt is overwritten.'
 	if ([string]::IsNullOrWhiteSpace($Path)) {
-		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = 'A broken-engine-finalize-approval-review/v1 receipt is required for postconfirmation landing.' }
+		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = 'A broken-engine-finalize-approval-review/v2 receipt is required for postconfirmation landing.' }
 	}
 	$reviewItem = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
 	if ($null -eq $reviewItem -or $reviewItem.PSIsContainer) { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' is not a readable file." } }
-	try { $reviewResult = [IO.File]::ReadAllText($reviewItem.FullName) | ConvertFrom-Json -Depth 64 -ErrorAction Stop }
+	try { $reviewResult = [IO.File]::ReadAllText($reviewItem.FullName) | ConvertFrom-Json -NoEnumerate -Depth 64 -ErrorAction Stop }
 	catch { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' is not valid JSON: $($_.Exception.Message)" } }
-	if ($null -eq $reviewResult) { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' carries no result object." } }
+	if ($null -eq $reviewResult -or $reviewResult -isnot [pscustomobject]) { return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' carries no result object." } }
 	$reviewProperties = @($reviewResult.PSObject.Properties.Name)
-	if ($reviewProperties -cnotcontains 'schemaVersion' -or $reviewProperties -cnotcontains 'status' -or $reviewProperties -cnotcontains 'approvedTip' -or [string]$reviewResult.schemaVersion -cne 'broken-engine-finalize-approval-review/v1') {
-		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' must be a 'broken-engine-finalize-approval-review/v1' result carrying status and approvedTip." }
+	if ($reviewProperties -cnotcontains 'schemaVersion' -or $reviewProperties -cnotcontains 'status' -or $reviewProperties -cnotcontains 'approvedTip' -or
+		$reviewProperties -cnotcontains 'reviewedRepository' -or $reviewProperties -cnotcontains 'reviewedPatchId' -or $reviewProperties -cnotcontains 'reviewedChanges' -or
+		$reviewResult.schemaVersion -isnot [string] -or $reviewResult.schemaVersion -cne 'broken-engine-finalize-approval-review/v2' -or
+		$reviewResult.status -isnot [string] -or [string]::IsNullOrWhiteSpace($reviewResult.status) -or
+		$reviewResult.approvedTip -isnot [string] -or $reviewResult.approvedTip -cnotmatch '^[0-9a-f]{40}\z' -or
+		$reviewResult.reviewedRepository -isnot [string] -or [string]::IsNullOrWhiteSpace($reviewResult.reviewedRepository) -or
+		$reviewResult.reviewedPatchId -isnot [string] -or [string]::IsNullOrWhiteSpace($reviewResult.reviewedPatchId) -or
+		$reviewResult.reviewedChanges -isnot [string] -or [string]::IsNullOrWhiteSpace($reviewResult.reviewedChanges)) {
+		return [pscustomobject]@{ Code = 'approval-review.missing'; Message = "Approval review receipt '$Path' must be a 'broken-engine-finalize-approval-review/v2' result carrying status, approvedTip, reviewedRepository, reviewedPatchId, and reviewedChanges." }
 	}
-	if ([string]$reviewResult.approvedTip -cne $ApprovedCommit) { return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' records a different reviewed commit than the approved commit. $rerun" } }
-	if ([string]$reviewResult.status -cnotin @('opened', 'unavailable', 'failed')) { return [pscustomobject]@{ Code = 'approval-review.not-launched'; Message = "Approval review receipt '$Path' does not record an attempted SmartGit launch for the approved commit. $rerun" } }
+	$expectedPrimary = $null
+	try { $expectedPrimary = Get-FinalizeExistingWindowsIdentity $PrimaryRepository 'Primary repository' }
+	catch { return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' could not be matched to primary repository '$PrimaryRepository': $($_.Exception.Message)" } }
+	if (-not (Test-FinalizeExistingIdentityEqual ([string]$reviewResult.reviewedRepository) $expectedPrimary)) {
+		return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' records a different repository than '$expectedPrimary'. $rerun" }
+	}
+	if ($reviewResult.approvedTip -cne $ApprovedCommit) {
+		try { $candidateIdentity = Get-FinalizeReviewIdentity $expectedPrimary $ApprovedCommit }
+		catch { return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' could not verify candidate commit '$ApprovedCommit': $($_.Exception.Message) $rerun" } }
+		if ($candidateIdentity.PatchId -cne [string]$reviewResult.reviewedPatchId -or $candidateIdentity.Changes -cne [string]$reviewResult.reviewedChanges) {
+			return [pscustomobject]@{ Code = 'approval-review.candidate-mismatch'; Message = "Approval review receipt '$Path' records a different reviewed diff than the approved commit. $rerun" }
+		}
+	}
+	if ($reviewResult.status -cnotin @('opened', 'unavailable', 'failed')) { return [pscustomobject]@{ Code = 'approval-review.not-launched'; Message = "Approval review receipt '$Path' does not record an attempted SmartGit launch for the approved commit. $rerun" } }
 	return $null
 }
 
@@ -449,13 +469,57 @@ function Start-FinalizeGitProcess([string] $WorkingDirectory, [string[]] $Argume
 	return $process
 }
 
+# Paths in $Paths whose Git attribute $Attribute equals $ExpectedValue under $Root's .gitattributes.
+# Paths go on stdin so large path lists never exceed command-line limits.
+function Get-FinalizeAttributePaths([string] $Root, [string[]] $Paths, [string] $Attribute, [string] $ExpectedValue = 'set') {
+	if ($null -eq $Paths -or $Paths.Count -eq 0) { return @() }
+	$start = [Diagnostics.ProcessStartInfo]::new()
+	$start.FileName = 'git.exe'
+	$start.WorkingDirectory = $Root
+	$start.UseShellExecute = $false
+	$start.CreateNoWindow = $true
+	$start.RedirectStandardInput = $true
+	$start.RedirectStandardOutput = $true
+	$start.RedirectStandardError = $true
+	$start.StandardInputEncoding = [Text.UTF8Encoding]::new($false)
+	$start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+	foreach ($argument in @('-C', $Root, 'check-attr', '--stdin', '-z', $Attribute)) { [void] $start.ArgumentList.Add($argument) }
+	$process = [Diagnostics.Process]::new()
+	$process.StartInfo = $start
+	try {
+		if (-not $process.Start()) { throw "$Attribute attribute read could not start." }
+		# Reading starts before writing so a full stdout pipe can never stall the stdin write.
+		$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+		$stderrTask = $process.StandardError.ReadToEndAsync()
+		$process.StandardInput.Write(($Paths -join [char] 0) + [char] 0)
+		$process.StandardInput.Close()
+		$process.WaitForExit()
+		$stdout = $stdoutTask.GetAwaiter().GetResult()
+		$stderr = $stderrTask.GetAwaiter().GetResult()
+		if ($process.ExitCode -ne 0) { throw "$Attribute attribute read failed: $($stderr.Trim())" }
+	}
+	finally { $process.Dispose() }
+	$tokens = $stdout.Split([char] 0)
+	if ($tokens.Count -ne $Paths.Count * 3 + 1 -or $tokens[$tokens.Count - 1] -cne '') {
+		throw "$Attribute attribute read returned malformed NUL-delimited output."
+	}
+	$seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	$matches = [Collections.Generic.List[string]]::new()
+	for ($index = 0; $index -lt $tokens.Count - 1; $index += 3) {
+		if ($tokens[$index + 1] -cne $Attribute) { throw "$Attribute attribute read returned a malformed record." }
+		if ($tokens[$index + 2] -ceq $ExpectedValue -and $seen.Add($tokens[$index])) { $matches.Add($tokens[$index]) }
+	}
+	$matches.Sort([StringComparer]::Ordinal)
+	return $matches.ToArray()
+}
+
 # Patch text reaches git patch-id as the exact bytes git produced: the identity is compared across
 # the rebase to decide whether the landing bytes are still the confirmed ones, so no text decoding
 # may sit between the two commands. --verbatim keeps whitespace and patch bytes significant, so a
 # commit differing from the confirmed one only in whitespace cannot pass as byte-identical; it
 # implies --stable, so hunk line numbers, file order, and text diff index headers stay ignored and
 # a rebase over another hunk still compares equal.
-function Get-FinalizePatchId([string] $Repository, [string] $Base, [string] $Tip, [string[]] $Pathspec = @()) {
+function Invoke-FinalizeRawPatchIdPipeline([string] $WorkingDirectory, [string[]] $DiffArguments, [int[]] $SuccessExitCodes = @(0)) {
 	$patch = [IO.MemoryStream]::new()
 	$diff = $null
 	$identify = $null
@@ -463,15 +527,13 @@ function Get-FinalizePatchId([string] $Repository, [string] $Base, [string] $Tip
 	$identifyOutTask = $null
 	$identifyErrorTask = $null
 	try {
-		$diffArguments = @('-C', $Repository, 'diff-tree', '-p', '--no-color', '--no-ext-diff', '--full-index', '--binary', '--no-renames', '-r', $Base, $Tip)
-		if (@($Pathspec).Count -gt 0) { $diffArguments += @('--'); $diffArguments += @($Pathspec) }
-		$diff = Start-FinalizeGitProcess $Repository $diffArguments $false
+		$diff = Start-FinalizeGitProcess $WorkingDirectory $DiffArguments $false
 		$diffErrorTask = $diff.StandardError.ReadToEndAsync()
 		$diff.StandardOutput.BaseStream.CopyTo($patch)
 		$diffError = $diffErrorTask.GetAwaiter().GetResult()
 		$diff.WaitForExit()
-		if ($diff.ExitCode -ne 0) { throw "git diff-tree failed for the landing patch: $($diffError.Trim())" }
-		$identify = Start-FinalizeGitProcess $Repository @('patch-id', '--verbatim') $true
+		if ($SuccessExitCodes -notcontains $diff.ExitCode) { throw "git diff failed for the landing patch: $($diffError.Trim())" }
+		$identify = Start-FinalizeGitProcess $WorkingDirectory @('patch-id', '--verbatim') $true
 		$identifyOutTask = $identify.StandardOutput.ReadToEndAsync()
 		$identifyErrorTask = $identify.StandardError.ReadToEndAsync()
 		$patch.Position = 0
@@ -512,6 +574,173 @@ function Get-FinalizePatchId([string] $Repository, [string] $Base, [string] $Tip
 		}
 		$patch.Dispose()
 	}
+}
+
+function Get-FinalizeRawPatchId([string] $Repository, [string] $Base, [string] $Tip, [string[]] $Pathspec = @(), [int] $UnifiedContext = 3) {
+	$diffArguments = @('-C', $Repository, 'diff-tree', '-p', "-U$UnifiedContext", '--no-color', '--no-ext-diff', '--full-index', '--binary', '--no-renames', '-r', $Base, $Tip)
+	if (@($Pathspec).Count -gt 0) { $diffArguments += @('--'); $diffArguments += @($Pathspec) }
+	return Invoke-FinalizeRawPatchIdPipeline $Repository $diffArguments @(0)
+}
+
+function Get-FinalizePatchId([string] $Repository, [string] $Base, [string] $Tip, [string[]] $Pathspec = @()) {
+	$nameArguments = @('diff-tree', '--no-commit-id', '--name-only', '-r', '-z', '--no-renames', $Base, $Tip)
+	if (@($Pathspec).Count -gt 0) { $nameArguments += @('--'); $nameArguments += @($Pathspec) }
+	$changedPaths = @((Invoke-FinalizeGit $Repository $nameArguments).Split([char] 0, [StringSplitOptions]::RemoveEmptyEntries))
+	if ($changedPaths.Count -eq 0) { return '(empty)' }
+	$unionPaths = @(Get-FinalizeAttributePaths $Repository $changedPaths 'merge' 'union')
+	if ($unionPaths.Count -eq 0) { return Get-FinalizeRawPatchId $Repository $Base $Tip $Pathspec 3 }
+	$unionExclusions = [string[]]@($unionPaths | ForEach-Object { ":(literal,exclude)$_" })
+	$nonUnionSpec = [string[]](@($Pathspec) + $unionExclusions)
+	$nonUnionId = Get-FinalizeRawPatchId $Repository $Base $Tip $nonUnionSpec 3
+	$unionSpec = [string[]]@($unionPaths | ForEach-Object { ":(literal)$_" })
+	$unionId = Get-FinalizeRawPatchId $Repository $Base $Tip $unionSpec 0
+	return "$nonUnionId|$unionId"
+}
+
+function Get-FinalizeGitBlobBytes([string] $Repository, [string] $RevisionPath) {
+	$buffer = [IO.MemoryStream]::new()
+	$process = $null
+	$stderrTask = $null
+	try {
+		$process = Start-FinalizeGitProcess $Repository @('-C', $Repository, 'show', $RevisionPath) $false
+		$stderrTask = $process.StandardError.ReadToEndAsync()
+		$process.StandardOutput.BaseStream.CopyTo($buffer)
+		$stderr = $stderrTask.GetAwaiter().GetResult()
+		$process.WaitForExit()
+		if ($process.ExitCode -ne 0) { throw "git show '$RevisionPath' failed: $($stderr.Trim())" }
+		return ,$buffer.ToArray()
+	}
+	finally {
+		if ($null -ne $process) {
+			try { if (-not $process.HasExited) { $process.Kill($true) } } catch {}
+			try { $process.StandardOutput.Dispose() } catch {}
+			try { $process.StandardError.Dispose() } catch {}
+			try { $null = $process.WaitForExit(5000) } catch {}
+			if ($null -ne $stderrTask) { try { $null = $stderrTask.Wait(5000) } catch {} }
+			try { $process.Dispose() } catch {}
+		}
+		$buffer.Dispose()
+	}
+}
+
+# Splits a raw Plan blob into its parsed byte-zero broken-engine-plan/v1 header (exact two keys:
+# createdUtc string and dependsOn string array) and raw suffix bytes starting at the line-1
+# terminator so CRLF vs LF and raw body bytes remain exact. Returns $null for any other shape.
+function Split-FinalizePlanBytes([byte[]] $Bytes) {
+	$lf = [Array]::IndexOf($Bytes, [byte] 0x0A)
+	if ($lf -lt 0) { $suffixStart = $Bytes.Length }
+	elseif ($lf -gt 0 -and $Bytes[$lf - 1] -eq 0x0D) { $suffixStart = $lf - 1 }
+	else { $suffixStart = $lf }
+	try { $line1 = $script:FinalizeUtf8.GetString($Bytes, 0, $suffixStart) }
+	catch { return $null }
+	$match = [regex]::Match($line1, '^<!-- broken-engine-plan/v1 (\{.*\}) -->\z')
+	if (-not $match.Success) { return $null }
+	$doc = $null
+	try {
+		$doc = [Text.Json.JsonDocument]::Parse($match.Groups[1].Value)
+		$root = $doc.RootElement
+		if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) { return $null }
+		$propertyCount = 0
+		$hasCreatedUtc = $false
+		$hasDependsOn = $false
+		$createdUtc = $null
+		$dependsOn = [Collections.Generic.List[string]]::new()
+		foreach ($property in $root.EnumerateObject()) {
+			$propertyCount++
+			if ($property.Name -ceq 'createdUtc') {
+				if ($hasCreatedUtc -or $property.Value.ValueKind -ne [Text.Json.JsonValueKind]::String) { return $null }
+				$hasCreatedUtc = $true
+				$createdUtc = $property.Value.GetString()
+			}
+			elseif ($property.Name -ceq 'dependsOn') {
+				if ($hasDependsOn -or $property.Value.ValueKind -ne [Text.Json.JsonValueKind]::Array) { return $null }
+				$hasDependsOn = $true
+				foreach ($item in $property.Value.EnumerateArray()) {
+					if ($item.ValueKind -ne [Text.Json.JsonValueKind]::String) { return $null }
+					$dependsOn.Add($item.GetString())
+				}
+			}
+			else { return $null }
+		}
+		if ($propertyCount -ne 2 -or -not $hasCreatedUtc -or -not $hasDependsOn) { return $null }
+		$line1Bytes = [byte[]]::new($suffixStart)
+		if ($suffixStart -gt 0) { [Buffer]::BlockCopy($Bytes, 0, $line1Bytes, 0, $suffixStart) }
+		$suffixLength = $Bytes.Length - $suffixStart
+		$suffixBytes = [byte[]]::new($suffixLength)
+		if ($suffixLength -gt 0) { [Buffer]::BlockCopy($Bytes, $suffixStart, $suffixBytes, 0, $suffixLength) }
+		return [pscustomobject]@{
+			CreatedUtc = $createdUtc
+			DependsOn = $dependsOn.ToArray()
+			Line1Bytes = $line1Bytes
+			SuffixBytes = $suffixBytes
+		}
+	}
+	catch { return $null }
+	finally { if ($null -ne $doc) { $doc.Dispose() } }
+}
+
+# Rebase-stable review identity for a single-parent commit: inherits -U3 non-union / -U0 merge=union
+# patch-id semantics and separates broken-engine-plan/v1 line-1 dependsOn edge deltas from raw body
+# diffs so concurrent dependsOn-only header merges preserve standing confirmation without relaxing
+# header-key, terminator, or raw-byte checks.
+function Get-FinalizeReviewIdentity([string] $Repository, [string] $Commit) {
+	$parents = @((Invoke-FinalizeGit $Repository @('show', '-s', '--format=%P', $Commit)).Trim() -split ' ' | Where-Object { $_ })
+	if ($parents.Count -ne 1) { throw "Commit '$Commit' must have exactly one parent." }
+	$parent = $parents[0]
+	$changes = Get-FinalizeChangeGuard $Repository $parent $Commit
+	$planExcludedPaths = [Collections.Generic.List[string]]::new()
+	$planEntries = [Collections.Generic.List[object]]::new()
+	foreach ($row in @($changes -split "`n" | Where-Object { $_ })) {
+		$tab = $row.IndexOf("`t", [StringComparison]::Ordinal)
+		if ($tab -lt 0) { continue }
+		$meta = $row.Substring(0, $tab).Split(' ')
+		$path = $row.Substring($tab + 1)
+		if ($meta.Count -lt 3 -or $meta[2] -cne 'M' -or $path -cnotmatch '^Documents/Plans/.*\.md\z') { continue }
+		$parentBytes = Get-FinalizeGitBlobBytes $Repository "${parent}:$path"
+		$commitBytes = Get-FinalizeGitBlobBytes $Repository "${Commit}:$path"
+		$parentPlan = Split-FinalizePlanBytes $parentBytes
+		$commitPlan = Split-FinalizePlanBytes $commitBytes
+		if ($null -eq $parentPlan -or $null -eq $commitPlan -or $parentPlan.CreatedUtc -cne $commitPlan.CreatedUtc) { continue }
+		$parentDeps = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+		foreach ($dep in $parentPlan.DependsOn) { [void] $parentDeps.Add($dep) }
+		$commitDeps = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+		foreach ($dep in $commitPlan.DependsOn) { [void] $commitDeps.Add($dep) }
+		$removed = [Collections.Generic.List[string]]::new()
+		foreach ($dep in $parentDeps) { if (-not $commitDeps.Contains($dep)) { $removed.Add($dep) } }
+		$removed.Sort([StringComparer]::Ordinal)
+		$added = [Collections.Generic.List[string]]::new()
+		foreach ($dep in $commitDeps) { if (-not $parentDeps.Contains($dep)) { $added.Add($dep) } }
+		$added.Sort([StringComparer]::Ordinal)
+		$sameLine1 = [Linq.Enumerable]::SequenceEqual([byte[]]$parentPlan.Line1Bytes, [byte[]]$commitPlan.Line1Bytes)
+		if (-not $sameLine1 -and $removed.Count -eq 0 -and $added.Count -eq 0) { continue }
+		if ([Linq.Enumerable]::SequenceEqual([byte[]]$parentPlan.SuffixBytes, [byte[]]$commitPlan.SuffixBytes)) {
+			$bodyId = '(empty)'
+		}
+		else {
+			$tempDir = Join-Path ([IO.Path]::GetTempPath()) ('be-plan-diff-' + [guid]::NewGuid().ToString('N'))
+			[IO.Directory]::CreateDirectory($tempDir) | Out-Null
+			try {
+				[IO.File]::WriteAllBytes((Join-Path $tempDir 'a'), $parentPlan.SuffixBytes)
+				[IO.File]::WriteAllBytes((Join-Path $tempDir 'b'), $commitPlan.SuffixBytes)
+				$bodyId = Invoke-FinalizeRawPatchIdPipeline $tempDir @('-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false', 'diff', '--no-index', '-p', '-U3', '--no-color', '--no-ext-diff', '--binary', '--', 'a', 'b') @(0, 1)
+			}
+			finally {
+				if (Test-Path -LiteralPath $tempDir) { [IO.Directory]::Delete($tempDir, $true) }
+			}
+		}
+		$planExcludedPaths.Add($path)
+		$planEntries.Add([object[]]@($path, $removed.ToArray(), $added.ToArray(), $bodyId))
+	}
+	$spec = [string[]]@($planExcludedPaths | ForEach-Object { ":(literal,exclude)$_" })
+	$basePatchId = Get-FinalizePatchId $Repository $parent $Commit $spec
+	if ($planEntries.Count -eq 0) {
+		$patchId = $basePatchId
+	}
+	else {
+		$planHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Json.JsonSerializer]::SerializeToUtf8Bytes($planEntries, [object]))).ToLowerInvariant()
+		$patchId = "$basePatchId|plans:$planHash"
+	}
+	return [pscustomobject]@{ PatchId = $patchId; Changes = $changes }
 }
 
 # Path, mode, and status of every changed file, with the blob object IDs deliberately dropped: an
@@ -618,4 +847,4 @@ function Invoke-FinalizeVerifiedRebase {
 	}
 }
 
-Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Test-FinalizeApprovalReviewReceipt, Get-FinalizePatchId, Get-FinalizeChangeGuard, Restore-FinalizeBranch, Invoke-FinalizeVerifiedRebase
+Export-ModuleMember -Function Get-FinalizeRootPreservingFullPath, Get-FinalizeExistingWindowsIdentity, Test-FinalizeExistingIdentityEqual, Invoke-FinalizeNativeText, Invoke-FinalizeGit, Test-FinalizeGitSuccess, Get-FinalizeGitIdentity, Assert-FinalizeGitPath, Get-FinalizeWorktreeRecords, Test-FinalizeWorktreeRegistration, Test-FinalizeAllWorktreesClear, Test-FinalizeLandingSanity, Test-FinalizeLandingLockClaimIdentity, Get-FinalizeLandingLockState, Invoke-FinalizeLandingLockClaim, Test-FinalizeApprovalReviewReceipt, Get-FinalizeAttributePaths, Get-FinalizePatchId, Get-FinalizeReviewIdentity, Get-FinalizeChangeGuard, Restore-FinalizeBranch, Invoke-FinalizeVerifiedRebase

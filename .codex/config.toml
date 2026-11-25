@@ -30,3 +30,11 @@ additionalContextLimit = 0
 type = "command"
 command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 4"
 additionalContextLimit = 0
+
+[[hooks.PostToolUse]]
+matcher = "^(Bash|apply_patch)$"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "pwsh -NoProfile -NonInteractive -File .agents/scripts/Invoke-SubdirectoryAgentsHook.ps1"
+additionalContextLimit = 0

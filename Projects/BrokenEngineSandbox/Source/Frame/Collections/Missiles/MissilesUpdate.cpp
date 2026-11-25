@@ -59,8 +59,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 			if (!(flags & kFalling))
 			{
-				bool bArrived = false;
-				vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), engine::gpFlightPlanes->Lowest().fHeightMeters, kfBattleshipClimbRate * deltaTime.count(), bArrived));
+				vecPosition = XMVectorSetZ(vecPosition, StepHeightTowards(XMVectorGetZ(vecPosition), engine::gpFlightPlanes->Lowest().fHeightMeters, kfBattleshipClimbRate * deltaTime.count()));
 
 				// PostRender::Update already applies the rotation delay percentage.
 				vecDirection = common::RotateDirectionAboutZ(vecDirection, deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i]);
@@ -138,8 +137,8 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				}
 			}
 
-			// Keep the target only while its ship row is past arrival grace with the lowest plane as its nearest; a
-			// target that died, transferred, is still in arrival grace, or left that plane drops the handle.
+			// Keep the target only while its ship row is past arrival grace; a target that died, transferred, or is still in
+			// arrival grace drops the handle.
 			XMVECTOR vecTargetPreviousPosition = XMVectorZero();
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
@@ -147,7 +146,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				// A targeted missile keeps its stored direction current, so losing the target, the crossing included,
 				// leaves it flying on along the heading it had.
 				vecStoredDirection = rCurrentInterpolate.pVecDirections[i];
-				bRetained = FindLowestPlaneShipByRegistryId(rFrame, rPreviousFrame, uiTarget, vecTargetPreviousPosition);
+				bRetained = FindShipByRegistryId(rPreviousFrame, uiTarget, vecTargetPreviousPosition);
 				if (!bRetained)
 				{
 					uiTarget = {};

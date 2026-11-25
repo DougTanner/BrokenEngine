@@ -16,8 +16,8 @@ param(
 	[Parameter(Mandatory)][string] $SessionLabel,
 	[Parameter(Mandatory)][string] $ApprovedSessionCommit,
 	[Parameter(Mandatory)][string] $ApprovedCandidateTree,
-	# Approval review receipt artifact ('broken-engine-finalize-approval-review/v1'); the landing
-	# reads the reviewed tip and launch status from it so the SmartGit review cannot be skipped.
+	# Approval review receipt artifact ('broken-engine-finalize-approval-review/v2'); the landing
+	# reads the reviewed repository, tip/diff identity, and launch status from it so the SmartGit review cannot be skipped.
 	[string] $ApprovalReviewResultFile,
 	# The caller's post-confirmation lease token. Supplied, the landing continues under that same
 	# lease instead of minting one; omitted, a matching retained landing claim may be adopted.
@@ -778,7 +778,7 @@ try {
 	# before session registration, the recovery scan, and this script's own lock claims, so it blocks
 	# like every other pre-landing check: the caller-owned lease is still live and the caller releases
 	# it. SmartGit outcomes stay non-blocking; malformed, mismatched, or non-attempted receipts block.
-	$receiptFailure = Test-FinalizeApprovalReviewReceipt $ApprovalReviewResultFile $ApprovedSessionCommit
+	$receiptFailure = Test-FinalizeApprovalReviewReceipt $ApprovalReviewResultFile $ApprovedSessionCommit $script:PrimaryIdentity.Worktree
 	if ($null -ne $receiptFailure) { Throw-Landing 2 $receiptFailure.Code $receiptFailure.Message }
 	$approvedParents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $ApprovedSessionCommit)).Trim() -split ' ' | Where-Object { $_ })
 	if ($approvedParents.Count -ne 1) { Throw-Landing 1 'input.commit-invalid' 'Approved session commit must have exactly one parent.' }

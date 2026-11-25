@@ -44,15 +44,6 @@ static uint64_t NextHoldGeneration(uint64_t uiGeneration)
 	return uiGeneration + 1;
 }
 
-static_assert(static_cast<uint8_t>(AudioChunkReadState::kFree) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kFree));
-static_assert(static_cast<uint8_t>(AudioChunkReadState::kQueued) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kQueued));
-static_assert(static_cast<uint8_t>(AudioChunkReadState::kLoading) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kLoading));
-static_assert(static_cast<uint8_t>(AudioChunkReadState::kReady) == static_cast<uint8_t>(AudioStreamingHarnessRigQueueState::kReady));
-static AudioStreamingHarnessRigQueueState ToHarnessRigState(AudioChunkReadState eState)
-{
-	return static_cast<AudioStreamingHarnessRigQueueState>(eState);
-}
-
 static AudioStreamingHarnessRigVoiceSummary InspectVoice(const StreamingVoice& rVoice)
 {
 	AudioStreamingHarnessRigVoiceSummary summary
@@ -259,7 +250,7 @@ void AudioStreamingHarnessRig::LoadChunk(common::crc_t crc, LoadPriority ePriori
 	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&crc, 1), ePriority);
 }
 
-void AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged)
+void AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioChunkReadState eState, int64_t iGeneration, bool bCancelAcknowledged)
 {
 	if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr)
 	{
@@ -267,7 +258,7 @@ void AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition ePartiti
 	}
 }
 
-void AudioStreamingHarnessRig::RecordEntry(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged)
+void AudioStreamingHarnessRig::RecordEntry(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioChunkReadState eState, int64_t iGeneration, bool bCancelAcknowledged)
 {
 	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 	if ((uiGate & 1) == 0)
@@ -345,9 +336,9 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 			poolOwnerships[i] = uiOwnership;
 			AudioStreamingHarnessRigPoolEntry& rPoolEntry = snapshot.poolEntries[i];
 			rPoolEntry.iIndex = i;
-			rPoolEntry.eState = ToHarnessRigState(AudioReadState(uiOwnership));
+			rPoolEntry.eState = AudioReadState(uiOwnership);
 			rPoolEntry.iGeneration = static_cast<int64_t>(AudioReadGeneration(uiOwnership));
-			if (rPoolEntry.eState != AudioStreamingHarnessRigQueueState::kFree)
+			if (rPoolEntry.eState != AudioChunkReadState::kFree)
 			{
 				rPoolEntry.crc = rEntry.crc;
 				rPoolEntry.iOffset = rEntry.iOffset;

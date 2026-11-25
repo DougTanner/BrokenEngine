@@ -97,17 +97,13 @@ struct DestroyShipData
 	}
 };
 
-// UpdateShipData::uiTargetFlightPlane value that leaves the row's target flight plane unchanged.
-inline constexpr uint8_t kuiKeepTargetFlightPlane = 255;
-
 struct UpdateShipData
 {
 	ShipType eType {};
 	int64_t iUuid = 0;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
-	uint8_t uiTargetFlightPlane = kuiKeepTargetFlightPlane;
 
-	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> Fields()
+	static constexpr engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds)> Fields()
 	{
 		return {};
 	}
@@ -251,11 +247,8 @@ bool IsOwnedEntityTransfer(const StatusChange& rChange);
 engine::GlobalId OwnedSpawnGlobalId(const StatusChange& rChange);
 engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange);
 
-// Adoptability check the replay stream reader and the harness apply: client hydration looks the Blaster type up with a
-// checked index, a ship controller or ship type outside its enumerators selects no collection, and a ship spawn's
-// target flight plane, its stored flight plane other than kuiNoFlightPlane, or an UpdateShipData target flight plane
-// other than kuiKeepTargetFlightPlane, must be one its ship type allows; a Fighter or Battleship spawn's fire time must
-// pass its type's PostRead range test.
+// Checks the Blaster index used by client hydration, ship controller and type values, and Fighter and Battleship
+// spawn and transfer fire times against their PostRead ranges.
 bool IsAdoptableStatusChange(const StatusChange& rChange);
 
 // The one application point of the post-tick batch: server harvest, replay playback, and the client post-tick loop.

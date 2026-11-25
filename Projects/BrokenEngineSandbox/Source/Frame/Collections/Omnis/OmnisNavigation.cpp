@@ -42,7 +42,6 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
-				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};

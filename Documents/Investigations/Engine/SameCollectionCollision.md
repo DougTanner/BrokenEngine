@@ -1,9 +1,9 @@
 # Same-Collection Collision
 
 Ships are being split into the Fighters, Omnis, and Battleships Collections.
-Fleets mix types, ships fly on three flight planes, and bumping and pushers use
-3D distance falloff. The engine only collides different collision layers, so
-same-type ships are kept apart only by Pushers.
+Fleets mix types, and bumping and pushers use 3D distance falloff. The engine
+only collides different collision layers, so same-type ships are kept apart only
+by Pushers.
 
 ## Why same-layer collision is unsupported
 

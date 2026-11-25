@@ -136,12 +136,7 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 			{
 				bFireTimeInRange = BattleshipsPostRender::IsMissileFireTimeInRange(rData.nextMissileFireTime.count());
 			}
-			return bFireTimeInRange && rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders)) && (rData.uiFlightPlane == kuiNoFlightPlane || IsFlightPlaneAllowed(keShipType, rData.uiFlightPlane));
-		}
-		else if constexpr (std::is_same_v<Data, UpdateShipData>)
-		{
-			// eType first: IsFlightPlaneAllowed has no plane range for an out-of-range type.
-			return rData.eType < ShipType::kCount && (rData.uiTargetFlightPlane == kuiKeepTargetFlightPlane || IsFlightPlaneAllowed(rData.eType, rData.uiTargetFlightPlane));
+			return bFireTimeInRange && rData.eController < ShipController::kCount;
 		}
 		else if constexpr (requires { rData.eType; })
 		{

@@ -226,48 +226,6 @@ function Get-RawChanges([string] $Root, [string] $Parent, [string] $Target) {
 	return $rows.ToArray()
 }
 
-# The paths whose export-output attribute the session worktree's .gitattributes sets. The paths go on stdin because an
-# overlap can hold more paths than one command line fits.
-function Get-ExportOutputPaths([string] $Root, [string[]] $Paths) {
-	if ($Paths.Count -eq 0) { return @() }
-	$start = [Diagnostics.ProcessStartInfo]::new()
-	$start.FileName = 'git.exe'
-	$start.WorkingDirectory = $Root
-	$start.UseShellExecute = $false
-	$start.CreateNoWindow = $true
-	$start.RedirectStandardInput = $true
-	$start.RedirectStandardOutput = $true
-	$start.RedirectStandardError = $true
-	$start.StandardInputEncoding = [Text.UTF8Encoding]::new($false)
-	$start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
-	foreach ($argument in @('-C', $Root, 'check-attr', '--stdin', '-z', 'export-output')) { [void] $start.ArgumentList.Add($argument) }
-	$process = [Diagnostics.Process]::new()
-	$process.StartInfo = $start
-	try {
-		if (-not $process.Start()) { Throw-Assessment 'export-output attribute read could not start.' }
-		# Reading starts before writing so a full stdout pipe can never stall the stdin write.
-		$stdoutTask = $process.StandardOutput.ReadToEndAsync()
-		$stderrTask = $process.StandardError.ReadToEndAsync()
-		$process.StandardInput.Write(($Paths -join [char] 0) + [char] 0)
-		$process.StandardInput.Close()
-		$process.WaitForExit()
-		$stdout = $stdoutTask.GetAwaiter().GetResult()
-		$stderr = $stderrTask.GetAwaiter().GetResult()
-		if ($process.ExitCode -ne 0) { Throw-Assessment "export-output attribute read failed: $($stderr.Trim())" }
-	}
-	finally { $process.Dispose() }
-	$tokens = $stdout.Split([char] 0)
-	if ($tokens.Count -ne $Paths.Count * 3 + 1 -or $tokens[$tokens.Count - 1] -cne '') {
-		Throw-Assessment 'export-output attribute read returned malformed NUL-delimited output.'
-	}
-	$set = [Collections.Generic.List[string]]::new()
-	for ($index = 0; $index -lt $tokens.Count - 1; $index += 3) {
-		if ($tokens[$index + 1] -cne 'export-output') { Throw-Assessment 'export-output attribute read returned a malformed record.' }
-		if ($tokens[$index + 2] -ceq 'set') { $set.Add($tokens[$index]) }
-	}
-	return @(Get-OrdinalUnique $set.ToArray())
-}
-
 function Test-SourcePath([string] $Path) {
 	return ($Path.StartsWith('Common/', [StringComparison]::Ordinal) -or $Path.StartsWith('Engine/', [StringComparison]::Ordinal) -or
 		$Path.StartsWith('Projects/', [StringComparison]::Ordinal)) -and
@@ -285,25 +243,45 @@ function Get-RebuildProjects([string] $Root, [string[]] $Foreign, [string[]] $Ow
 	})
 }
 
-function Set-Evidence([string] $Root, [object[]] $Foreign, [object[]] $Rows, [string[]] $Owned) {
+function Set-Evidence([string] $Root, [object[]] $Foreign, [object[]] $Rows, [string[]] $Owned, [object[]] $OwnedRows) {
 	$rowValues = @()
 	if ($null -ne $Rows) { $rowValues = @($Rows) }
+	$ownedRowValues = @()
+	if ($null -ne $OwnedRows) { $ownedRowValues = @($OwnedRows) }
 	$ownedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 	foreach ($path in $Owned) { [void] $ownedSet.Add($path) }
 	$overlap = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 	foreach ($row in $rowValues) {
-		if ($ownedSet.Contains($row.Path)) { [void] $overlap.Add($row.Path) }
+		if ($ownedSet.Contains($row.path)) { [void] $overlap.Add($row.path) }
 	}
 	$overlapPaths = @(Get-OrdinalUnique @($overlap))
+	$unionOverlap = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($path in @(Get-FinalizeAttributePaths $Root $overlapPaths 'merge' 'union')) { [void] $unionOverlap.Add($path) }
+	$hasBlockingOverlap = $false
+	if ($overlapPaths.Count -gt 0) {
+		foreach ($path in $overlapPaths) {
+			if (-not $unionOverlap.Contains($path)) { $hasBlockingOverlap = $true; break }
+		}
+		if (-not $hasBlockingOverlap) {
+			foreach ($row in $ownedRowValues) {
+				if ($overlap.Contains($row.path) -and $row.status -cne 'M') { $hasBlockingOverlap = $true; break }
+			}
+		}
+		if (-not $hasBlockingOverlap) {
+			foreach ($row in $rowValues) {
+				if ($overlap.Contains($row.path) -and $row.status -cne 'M') { $hasBlockingOverlap = $true; break }
+			}
+		}
+	}
 	$script:Result.foreignCommits = New-Evidence @($Foreign)
 	$script:Result.changes = [ordered]@{
 		totalCount = $rowValues.Count
 		items = $rowValues
 		overlapPaths = New-Evidence $overlapPaths
-		exportOutputPaths = New-Evidence @(Get-ExportOutputPaths $Root $overlapPaths)
+		exportOutputPaths = New-Evidence @(Get-FinalizeAttributePaths $Root $overlapPaths 'export-output' 'set')
 	}
 	$script:Result.rebuildProjects = @(Get-RebuildProjects $Root @($rowValues | ForEach-Object { $_.path }) $Owned)
-	return [pscustomobject]@{ OverlapPaths = $overlapPaths }
+	return $hasBlockingOverlap
 }
 
 try {
@@ -340,7 +318,8 @@ try {
 	$parents = @(Get-CandidateParent $session.Worktree $CandidateCommit)
 	if (@($parents).Count -ne 1 -or $parents[0] -cne $CandidateParent) { Throw-Blocked 'candidate.parent-mismatch' 'Candidate commit does not have the supplied sole parent.' }
 
-	$owned = @(Get-OrdinalUnique @(Get-RawChanges $session.Worktree $CandidateParent $CandidateCommit | ForEach-Object { $_.path }))
+	$ownedRows = @(Get-RawChanges $session.Worktree $CandidateParent $CandidateCommit)
+	$owned = @(Get-OrdinalUnique @($ownedRows | ForEach-Object { $_.path }))
 	if ($owned.Count -eq 0) { Throw-Input 'Candidate commit changes no paths against its parent.' }
 	$script:Result.ownedPaths = [ordered]@{ totalCount = $owned.Count; items = $owned }
 	if ($livePrimary -ceq $CandidateParent) {
@@ -359,12 +338,15 @@ try {
 
 	$foreign = Get-ForeignCommits $primary.Worktree $CandidateParent $livePrimary
 	$rows = Get-RawChanges $primary.Worktree $CandidateParent $livePrimary
-	$partition = Set-Evidence $session.Worktree $foreign $rows $owned
-	if ($partition.OverlapPaths.Count -gt 0) {
+	$hasBlockingOverlap = Set-Evidence $session.Worktree $foreign $rows $owned $ownedRows
+	if ($hasBlockingOverlap) {
 		Throw-Blocked 'primary.path-overlap' 'Foreign primary movement overlaps an owned path.'
 	}
 	if (@($rows).Count -eq 0) {
 		Complete-Result 0 'pass' 'primary.tree-identical' 'Primary moved by a descendant range with no net tree paths.'
+	}
+	if ($script:Result.changes.overlapPaths.totalCount -gt 0) {
+		Complete-Result 0 'needs-review' 'primary.disjoint-needs-review' 'Foreign primary movement overlaps only modified merge=union paths.'
 	}
 	Complete-Result 0 'needs-review' 'primary.disjoint-needs-review' 'Primary movement changes paths disjoint from the owned paths.'
 }

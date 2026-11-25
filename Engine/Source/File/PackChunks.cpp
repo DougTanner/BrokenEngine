@@ -529,7 +529,7 @@ ChunkReadResult PackChunks::PollChunkRead(ChunkReadRequest& rRequest, std::byte*
 #if defined(BT_DEBUG)
 	if constexpr (kbAudioStreamingHarnessRig)
 	{
-		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, AudioChunkReadState::kReady, rRequest.muiGeneration, false);
 	}
 #endif
 	// Only the main thread moves an entry out of ready, so no other thread can change it before this store
@@ -575,7 +575,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 #if defined(BT_DEBUG)
 		if constexpr (kbAudioStreamingHarnessRig)
 		{
-			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingHarnessRigQueueState::kQueued, uiGeneration, false);
+			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioChunkReadState::kQueued, uiGeneration, false);
 		}
 #endif
 		mLoader.PublishWake();
@@ -615,7 +615,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 #if defined(BT_DEBUG)
 			if constexpr (kbAudioStreamingHarnessRig)
 			{
-				AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+				AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rEntry.crc, rEntry.iOffset, rEntry.iLength, eState, uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 			}
 #endif
 			break;
@@ -691,7 +691,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	bool bHeld = false;
 	if constexpr (kbAudioStreamingHarnessRig)
 	{
-		AudioStreamingHarnessRig::Record(ePartition, AudioStreamingHarnessRigPhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingHarnessRigQueueState::kLoading, uiGeneration, false);
+		AudioStreamingHarnessRig::Record(ePartition, AudioStreamingHarnessRigPhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioChunkReadState::kLoading, uiGeneration, false);
 		bHeld = AudioStreamingHarnessRig::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
 	}
 #endif
@@ -711,7 +711,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 #if defined(BT_DEBUG)
 	if constexpr (kbAudioStreamingHarnessRig)
 	{
-		AudioStreamingHarnessRig::Record(ePartition, bCurrent ? AudioStreamingHarnessRigPhase::kRefillReady : AudioStreamingHarnessRigPhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingHarnessRigQueueState::kReady : AudioStreamingHarnessRigQueueState::kFree, uiGeneration, !bCurrent);
+		AudioStreamingHarnessRig::Record(ePartition, bCurrent ? AudioStreamingHarnessRigPhase::kRefillReady : AudioStreamingHarnessRigPhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioChunkReadState::kReady : AudioChunkReadState::kFree, uiGeneration, !bCurrent);
 		AudioStreamingHarnessRig::CompleteAudioRead(bHeld);
 	}
 #endif

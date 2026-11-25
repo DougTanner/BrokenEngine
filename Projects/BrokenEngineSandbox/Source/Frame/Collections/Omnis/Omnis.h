@@ -13,7 +13,6 @@
 #endif
 
 #include "Frame/Collections/Ships/ShipTypes.h"
-#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -52,10 +51,6 @@ inline constexpr float kfOmniMaximumSpeed = 33.33f;
 inline constexpr float kfOmniCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfOmniJitterRange = 0.60f;
 
-inline constexpr float kfOmniClimbRate = kfOmniMaximumSpeed * kfShipClimbSpeedFraction;
-inline constexpr int64_t kiOmniHighestFlightPlane = 1;
-static_assert(kiOmniHighestFlightPlane < std::ssize(kFlightPlanes));
-
 inline constexpr AcceleratedMovementConstants kOmniMovement
 {
 	.fAcceleration = kfOmniAcceleration,
@@ -83,7 +78,7 @@ struct HexShieldIntensities
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 18;
+	static constexpr int64_t kiVersion = 19;
 
 	static void Register();
 
@@ -103,8 +98,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
-	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
-	// The stored flight plane is kuiNoFlightPlane or a plane the type flies, and every simulation write and ship spawn stores a horizontal unit heading.
+	// Every simulation write and ship spawn stores a horizontal unit heading.
 	static void PostRead(const OmnisInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -113,15 +107,6 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 			if (!(destroyedTime.count() >= 0.0f && destroyedTime.count() <= kDestroyTime.count()))
 			{
 				throw std::ios_base::failure("OmnisInterpolate pDestroyedTimes");
-			}
-			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
-			if (!(std::isfinite(fHeight) && fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters))
-			{
-				throw std::ios_base::failure("OmnisInterpolate position height");
-			}
-			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kOmni, rCurrent.puiFlightPlanes[i]))
-			{
-				throw std::ios_base::failure("OmnisInterpolate puiFlightPlanes");
 			}
 			if (!IsShipHeadingValid(rCurrent.pVecDirections[i]))
 			{
@@ -137,8 +122,6 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	std::chrono::duration<float>* __restrict pDestroyedTimes = nullptr;
 	engine::pusher_t* __restrict pPushers = nullptr;
 	engine::registry_id_t* __restrict pRegistryIds = nullptr;
-	// The plane the ship is on, kuiNoFlightPlane while it climbs between planes.
-	uint8_t* __restrict puiFlightPlanes = nullptr;
 #if defined(BT_CLIENT)
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	float* __restrict pfRotationAccelerationXs = nullptr;
@@ -156,7 +139,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.puiFlightPlanes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -184,7 +167,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	// CRC excludes cell-local pusher handles.
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pRegistryIds, rSelf.puiFlightPlanes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pRegistryIds);
 	}
 	auto OwnedHandles(this auto&& rSelf)
 	{
@@ -230,11 +213,10 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	}
 
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
-	// Reject an unknown controller too, which selects no script, a target flight plane the type disallows, which no
-	// controller writes, an AI direction failing IsShipHeadingValid, since every simulation write and ship spawn stores a
-	// horizontal unit vector, and a client GUID or global ID on a row that is not fleet-controlled, which only a fleet spawn
-	// writes. Reject a non-finite armor or shield, which no simulation write produces: NaN armor passes no death test and
-	// NaN in either never completes healing.
+	// Reject an unknown controller too, which selects no script, an AI direction failing IsShipHeadingValid, since every
+	// simulation write and ship spawn stores a horizontal unit vector, and a client GUID or global ID on a row that is not
+	// fleet-controlled, which only a fleet spawn writes. Reject a non-finite armor or shield, which no simulation write
+	// produces: NaN armor passes no death test and NaN in either never completes healing.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -266,10 +248,6 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			if (rCurrent.pGlobalIds[i] != engine::GlobalId {} && rCurrent.pController[i] != ShipController::kFleet)
 			{
 				throw std::ios_base::failure("OmnisPostRender pGlobalIds");
-			}
-			if (!IsFlightPlaneAllowed(ShipType::kOmni, GetTargetFlightPlane(rCurrent.pOrders[i])))
-			{
-				throw std::ios_base::failure("OmnisPostRender target flight plane");
 			}
 		}
 	}
@@ -381,12 +359,11 @@ public:
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-		uint8_t uiFlightPlane = kuiNoFlightPlane;
 		// Transfers preserve supplied combat fields; navigation resets at spawn.
 		bool bTransfer = false;
 
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
-		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
+		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
 			return {};
 		}

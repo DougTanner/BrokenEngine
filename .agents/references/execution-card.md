@@ -31,9 +31,9 @@ Execution card:
   baseline run, which for that instruction prose may be a read at the session
   baseline commit; the card marks each red run on a build of the unedited tree
   and each pre-change baseline run other than a read at the session baseline
-  commit `before the first edit`, the literal text the Change Workflow
-  Implement and propagate step's pre-edit bullets key on to record that run
-  before the first slice, kept whole on one line and placed on the first line
+  commit `before the first edit`, the literal text the Change Workflow Plan
+  review and Implement and propagate steps key on to record that run before
+  the first slice, kept whole on one line and placed on the first line
   of the check it marks so a line-based search finds every marked run; within
   a card the literal appears only as that mark, so a card with no marked check
   says so without it; when any file a slice may edit is a data input as

@@ -318,3 +318,25 @@ float LightingDepositEdgeFade(vec2 f2FragCoord, vec2 f2SizeInverse)
 	float fEdgeDist = min(min(f2Uv.x, 1.0f - f2Uv.x), min(f2Uv.y, 1.0f - f2Uv.y));
 	return smoothstep(0.0f, 0.05f, fEdgeDist);
 }
+
+// Piecewise Uchimura tone curve (toe, linear, exponential shoulder). Segment constants S0/S1/CP are precomputed on the
+// CPU; clamping the linear ceiling to S1 and anchoring the shoulder at S1 keeps the S0 join monotonic, and capping the
+// shoulder exponent at 0 keeps inactive vector lanes finite.
+vec4 Uchimura(GlobalLayout globalLayout, vec4 f4X)
+{
+	float fP = globalLayout.fCombineMaxBrightness;
+	float fA = globalLayout.fCombineContrast;
+	float fM = globalLayout.fCombineLinearStart;
+	float fC = globalLayout.fCombineToe;
+	float fB = globalLayout.fCombineBlackTightness;
+	float fS0 = globalLayout.fCombineShoulderInputStart;
+	float fS1 = globalLayout.fCombineShoulderOutputStart;
+	float fCP = globalLayout.fCombineShoulderExponentCoefficient;
+
+	vec4 f4Toe = fB + (fM - fB) * pow(clamp(f4X / fM, 0.0f, 1.0f), vec4(fC));
+	vec4 f4Linear = min(fM + fA * (f4X - fM), vec4(fS1));
+	vec4 f4Shoulder = min(vec4(fS1) + vec4(fP - fS1) * (vec4(1.0f) - exp(min(fCP * (f4X - fS0), 0.0f))), vec4(fP));
+
+	vec4 f4Result = mix(f4Linear, f4Toe, lessThan(f4X, vec4(fM)));
+	return mix(f4Shoulder, f4Result, lessThan(f4X, vec4(fS0)));
+}

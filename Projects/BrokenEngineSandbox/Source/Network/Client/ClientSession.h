@@ -59,7 +59,6 @@ private:
 
 	// engine::ClientSessionBase calls this by name
 	void ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent);
-	void UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate);
 
 	// When the last map fleet markers request went out since the map opened; empty while the map is closed.
 	std::optional<std::chrono::steady_clock::time_point> mOptionalMapFleetMarkersRequestTime;

@@ -259,9 +259,12 @@ when that window must be observed or clicked.
   lighting layer * 3 + color (0-5), and `AmbientCombine` takes the lighting
   layer (0-1); `Lighting`, `Spread`, and `SpreadOnly` are the one scratch chain
   the refreshing layer reuses, so `Lighting` reads blank on a frame with no
-  lighting refresh. Single-channel output normalizes to grayscale PNG; four-byte
-  RGBA writes direct PNG; float formats require raw `.bin`. The default base
-  path is `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
+  lighting refresh. In `Engine/Source/Graphics/Screenshot.cpp`,
+  `IsSingleChannelNormalizable` formats (including single-channel floats)
+  normalize to grayscale PNG without `raw:true`, `IsFourByteColor` formats write
+  direct PNG, and all other formats require `raw:true` (writing `.bin`), as
+  enforced by `ValidateDumpRenderTargetRequest`. The default base path is
+  `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
 - `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
   Tweaks overlay is shown), game flags, framebuffer, windows, and labeled
   items with rect/disabled/checked/inputable/visible fields. Items include

@@ -27,7 +27,6 @@ void RenderLightingSection(TweaksScreen& rScreen)
 
 				rScreen.WrapperSeparatorText("2. Deposit");
 				rScreen.WrapperSlider("Lighting Deposit Texture Multiplier", gLightingDepositTextureMultiplier, iSection, 1.0f);
-				rScreen.WrapperSlider("Lighting Deposit Threshold", gLightingDepositThreshold, iSection, 1.0f);
 				rScreen.WrapperSlider("Lighting Deposit Compress", gLightingDepositCompress, iSection, 1.0f);
 				rScreen.WrapperSlider("Area Light Area Multiplier", gAreaLightAreaMultiplier, iSection, 1.0f);
 				rScreen.WrapperSlider("Area Light Forced Square", gAreaLightForcedSquare, iSection, 1.0f);
@@ -69,8 +68,6 @@ void RenderLightingSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("Spread Height Power", gSpreadHeightPower, iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("3d. Spread Output");
-				rScreen.WrapperSlider("Spread Output Threshold", gSpreadOutputThreshold, iSection, 1.0f);
-				rScreen.WrapperSlider("Spread Output Threshold End", gSpreadOutputThresholdEnd, iSection, 1.0f);
 				rScreen.WrapperSlider("Spread Output Compress", gSpreadOutputCompress, iSection, 1.0f);
 				rScreen.WrapperSlider("Spread Output Compress End", gSpreadOutputCompressEnd, iSection, 1.0f);
 

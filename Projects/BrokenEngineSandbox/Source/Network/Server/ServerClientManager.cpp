@@ -160,7 +160,6 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 		spawnInfo.vecPosition = XMVectorSet(optionalSpawnPoint->x, optionalSpawnPoint->y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 		spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
-		spawnInfo.uiFlightPlane = 0;
 		QueueFleetSpawn(rClientGuid, rFleet, rMember, engine::kOriginCoordinate, spawnInfo);
 		return engine::kOriginCoordinate;
 	};
@@ -184,7 +183,6 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 				return std::nullopt;
 			}
 
-			int64_t iTargetFlightPlane = DefaultFlightPlane(ShipType::kFighter);
 			const BattleshipsInterpolate& rBattleshipsInterpolate = *rBattleshipFrame.interpolate.pBattleships;
 			int64_t iBattleshipRow = optionalBattleship->iRow;
 			std::span<const common::PackedModelHardpoint> bays = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rBattleshipFrame.postRender.pBattleships->pController[iBattleshipRow])].fighterLaunchBays;
@@ -205,8 +203,7 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 				XMVECTOR vecAlignedDirection = XMVector2Normalize(XMVectorSetZ(XMLoadFloat3(&rBay.f3Direction), 0.0f));
 				XMVECTOR vecLaunchDirection = common::TransformDirection(vecAlignedDirection, XMMATRIX(fCos, fSin, 0.0f, 0.0f, -fSin, fCos, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 				// Terrain admission uses the Fighter's own avoidance at its authored launch heading.
-				int64_t iLaunchNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecLaunchPosition), iTargetFlightPlane);
-				if (ComputeTerrainAvoidance(gpGame->mCells.at(flagshipCoordinate).staticData, vecLaunchPosition, vecLaunchDirection, 0.0f, iLaunchNavigationPlane) != 0.0f)
+				if (ComputeTerrainAvoidance(gpGame->mCells.at(flagshipCoordinate).staticData, vecLaunchPosition, vecLaunchDirection, 0.0f) != 0.0f)
 				{
 					continue;
 				}
@@ -215,7 +212,6 @@ std::optional<engine::GridCoord> ServerClientManager::SpawnFleetMember(const eng
 					.vecPosition = vecLaunchPosition,
 					.vecDirection = vecLaunchDirection,
 					.vecVelocity = rBattleshipFrame.postRender.pBattleships->pVecVelocities[iBattleshipRow],
-					.uiFlightPlane = rBattleshipsInterpolate.puiFlightPlanes[iBattleshipRow],
 				};
 				QueueFleetSpawn(rClientGuid, rFleet, rMember, flagshipCoordinate, spawnInfo);
 				return flagshipCoordinate;

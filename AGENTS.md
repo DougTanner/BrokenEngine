@@ -18,9 +18,10 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
 
 - Visual Studio 2026, C++23, Vulkan 1.2, Windows 10+
 - Agent shells: Claude Code - Git Bash; Codex / Antigravity CLI - PowerShell 7
-  (Antigravity: no `Grep` tool or `rg`; use
-  `Select-String -LiteralPath '<path>' -Pattern '<regex>'`, e.g. `'^## '`). Call
-  `pwsh` explicitly for PowerShell 7 scripts.
+  (Antigravity: no `Grep` or `rg`; run
+  `Select-String -LiteralPath '<path>' -Pattern '<regex>'` directly with
+  single-quoted arguments, e.g. `'^## '`). Call `pwsh` explicitly for
+  PowerShell 7 scripts.
 - Claude Code's bypass-permissions mode injects a host instruction to prefer
   Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked
   files with the host `Edit` tool and create files with `Write`, because a
@@ -93,8 +94,10 @@ are not, and stay out of the CRC, split as `Engine/Source/Frame/AGENTS.md`
   only where no positive form exists, paired with what to do instead, and
   prefer making the wrong action impossible. Name roles, not models; the
   static-checks `model-names` row owns the exemptions.
-- Bounded reading: a citation that names a `##` section is the reading scope —
-  locate that heading and read only that section, never the whole file.
+- Bounded reading: when a citation names a `##` section, read only that
+  section, never the whole file. Before editing a file or relying on
+  subdirectory contracts, read every unread ancestor `AGENTS.md` down to its
+  directory (excluding `Temp/` and reparse points).
 - One term per concept: use the established repository term or the code's own
   name, never a coined nickname; prefer plain words over formal ones.
 - Prose wrapping: wrap the prose of Markdown files and the top-level

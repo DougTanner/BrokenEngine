@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T21:46:45.729Z","dependsOn":["Documents/Plans/Engine/SingleLayerSmoke.md","Documents/Plans/Engine/SingleLayerWorldLighting.md","Documents/Plans/Game/SingleFlightHeightShips.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T21:46:45.729Z","dependsOn":["Documents/Plans/Engine/SingleLayerSmoke.md","Documents/Plans/Engine/SingleLayerWorldLighting.md"]} -->
 # Remove the Flight-Plane Table
 
 ## Context
@@ -12,11 +12,10 @@
 entirely, delivered as a series of Plans. Earlier stages already put every
 ship on one flight height, world lighting on one layer, and smoke on one
 field. What remains of the concept is plumbing: the table and its second
-entry, the `kTerrainCollision` flag and the per-plane navigation bake input,
-one pusher zone grid per plane, the model layout's nearest-plane index, the
-object-shadow B and A channels for ships on planes 1 and 2, the plane-keyed
-deposit key, and the camera and audio heights derived from the highest
-plane. This stage removes all of it.
+entry, the `kTerrainCollision` flag, one pusher zone grid per plane, the model
+layout's nearest-plane index, the object-shadow B and A channels for ships on
+planes 1 and 2, the plane-keyed deposit key, and the camera and audio heights
+derived from the highest plane. This stage removes all of it.
 
 The user's height decision (their words, binding): "Do 10m to start, I will
 tweak later" — BES uses 10 m for gameplay, navigation contours, and graphics.
@@ -39,10 +38,9 @@ changed format bumps its owning version.
   `Engine.h` include and the `FlightPlanes` construction on the client and
   server (`Engine/Source/Main.cpp:229`, `:317`) and in ModelViewer
   (`Projects/ModelViewer/Source/Main.cpp:179`).
-- Navigation bake: `NavigationGraphBake::iFlightPlane` goes, every entry
-  bakes its contour (the `kTerrainCollision` gate in
-  `IslandTerrain.cpp:241` goes), and the server bake loop takes its threshold
-  from `game::kfBaseHeightMeters`. `BuildPlaneNavigationData` becomes
+- Navigation bake: `kNavigationGraphSpecs` in `TerrainUtils.h` takes its
+  threshold height and debug draw Z from `game::kfBaseHeightMeters` instead of
+  `kFlightPlanes.at(0).fHeightMeters`. `BuildPlaneNavigationData` becomes
   `BuildGraphNavigationData` (author's recommendation: its name names a
   per-plane graph that no longer exists).
 - Pushers: one zone grid. `kiPusherLayers`, the layer dimension of
@@ -110,8 +108,7 @@ changed format bumps its owning version.
   `Projects/{BrokenEngineSandbox,ModelViewer}/Source/Frame/BaseHeight.h`
   (new, replacing `FlightPlaneTable.h`)
 - `Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp`
-- `Engine/Source/Frame/IslandTerrain.{h,cpp}`, `NavCellData.cpp`,
-  `Engine/Source/Main.cpp`
+- `Engine/Source/Frame/NavCellData.cpp`, `Engine/Source/Main.cpp`
 - `Engine/Source/Graphics/Render/GlobalUniforms.cpp`, `Render.h`,
   `Engine/Data/Shaders/Model/{Model.frag,ModelShadow.frag,ModelCommon.h}`
 - Project files of the BES client and server and ModelViewer
@@ -123,14 +120,12 @@ changed format bumps its owning version.
   `Frame/FlightPlaneTable.h`.
 - Delete `Engine/Source/Frame/FlightPlanes.h` and `.cpp`;
   `Engine/Source/Engine.h:76` include.
-- `Engine/Source/Main.cpp`: `FlightPlanes` construction (`:229`, `:317`) and
-  the bake loop (`:230-239`).
+- `Engine/Source/Main.cpp`: `FlightPlanes` construction (`:229`, `:317`).
 - `Projects/ModelViewer/Source/Main.cpp` (`:179`),
   `ModelViewerApplication.cpp` (`:686`, `:828-829`),
   `Graphics/Camera.cpp` (`:26`).
-- `Engine/Source/Frame/IslandTerrain.h` (`:57` comment, `:129-136`),
-  `IslandTerrain.cpp` (`:240-246`), `NavCellData.cpp`
-  (`BuildPlaneNavigationData` and its log text, the `:353` comment).
+- `Engine/Source/Frame/NavCellData.cpp`: `BuildPlaneNavigationData` rename and
+  its log text.
 - `Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp`: the include and
   constants (`:3-18`), `PusherZone` (`:31-34`), `SetupZones` (`:60-119`),
   `ApplyPush` (`:121-194`); `Pushers.h`: the `ApplyPush` declaration comment
@@ -139,8 +134,8 @@ changed format bumps its owning version.
   (`:57-66`), the constructor (`:117-121`), `ResolveTarget` (`:259`).
 - `Engine/Source/Audio/StaticVoices.cpp`: the listener height (`:572-580`)
   and the fade-band comment's "highest flight plane" (`:588-593`).
-- `Engine/Source/Graphics/Render/MainUniforms.cpp` (`:21`, `:59`, `:172`, and
-  the underwater-hull comment's "lowest flight plane" at `:107`),
+- `Engine/Source/Graphics/Render/MainUniforms.cpp` (`:21`, `:59`, and the
+  underwater-hull comment's "lowest flight plane" at `:107`),
   `GlobalUniforms.cpp` (the object-shadow block `:460-472` and the base
   height `:624`), `Render.h` (`FillModelLayout` and its comment, `:54-61`).
 - `Engine/Source/Graphics/BaseHeightProjection.cpp` (renamed from
@@ -165,7 +160,7 @@ changed format bumps its owning version.
   `Fighters.h`, `Omnis.h`, `Battleships.h`, `MissilesUpdate.cpp`,
   `FightersRender.cpp` (`:129-130`), `OmnisRender.cpp` (`:158`),
   `BattleshipsRender.cpp` (`:64`), `MissilesRender.cpp` (`:78-79`),
-  `TerrainUtils.h` (`NavigationThresholdElevation`'s parameter name),
+  `TerrainUtils.h` (`kNavigationGraphSpecs`'s `kFlightPlanes` reads),
   `ServerClientManager.cpp`, `ServerSimulationHarnessRigs.cpp`,
   `Graphics/Camera.cpp`, all under `Projects/BrokenEngineSandbox/Source`:
   every `gpFlightPlanes` read and `Frame/FlightPlanes.h` include, plus any
@@ -181,9 +176,7 @@ changed format bumps its owning version.
   - `Engine/Source/Frame/AGENTS.md`: the `FlightPlanes` bullet in
     `## Architecture` (`:115-123`) becomes the base-height contract
     (`game::kfBaseHeightMeters` in `Frame/BaseHeight.h`, supplied by each
-    project on both builds, read directly by engine code); the
-    `NavigationGraphBake` bullet (`:272-275`) and the contour-bake bullet
-    (`:310-312`) in `## Terrain and Navigation`.
+    project on both builds, read directly by engine code).
   - `Engine/Source/Frame/Collections/Pushers/AGENTS.md` `## Unique Aspects`
     zone bullet (`:12-32`).
   - `Engine/Source/Graphics/AGENTS.md` `:131` ("lowest flight plane").

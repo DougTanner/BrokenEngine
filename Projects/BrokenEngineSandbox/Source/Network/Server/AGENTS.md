@@ -110,7 +110,7 @@ game state around the deterministic Frame tick.
   member stays dead and is retried on the next tick. `ServerClientManager.cpp`
   owns the candidate set, the clearance, and the blocked-episode logging. A
   Fighter launches in its fleet Battleship's cell from a packed bay of that
-  row's model, yawed by its heading, inheriting velocity and stored plane. The
+  row's model, yawed by its heading, inheriting velocity. The
   fleet step calls `CellStaticData::BuildNavigationDataIfUnbuilt` on the
   Battleship's cell before the bay terrain admission. A wholly refused batch
   leaves `Fleet::iNextFighterLaunchTick` unchanged and retries next tick; every

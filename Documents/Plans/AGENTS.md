@@ -105,7 +105,9 @@ An executable plan provides metadata, `# Title`, context, design, critical
 files, a required `## In scope` section naming the specific functions, members,
 or regions to change, required `## Out of scope` boundaries, risk
 triggers/invariants, and observable acceptance criteria when a diff is not
-decisive. Put directional prerequisites in metadata, not prose.
+decisive. Put directional prerequisites and file-overlap dependencies in
+`dependsOn` metadata (`.agents/references/new-plan-file.md` `## Invocation`),
+not prose.
 
 A Plan permits at most two bounded open parts:
 

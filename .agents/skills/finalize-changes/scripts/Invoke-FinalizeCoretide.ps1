@@ -118,14 +118,14 @@ try {
 	$approved = Resolve-FinalizeCommit $coretide $ApprovedCoretideCommit
 	$head = (Invoke-FinalizeGit $coretide @('rev-parse', 'HEAD')).Trim()
 	if ($head -cne $approved) { Complete-FinalizeCoretide 2 'blocked' 'coretide.unapproved-head' "The clone HEAD $head is not the approved Coretide commit $ApprovedCoretideCommit." }
-	$receiptFailure = Test-FinalizeApprovalReviewReceipt $ApprovalReviewResultFile $approved
+	$primaryCoretide = Join-Path $PrimaryWorktree 'Projects\Coretide'
+	$receiptFailure = Test-FinalizeApprovalReviewReceipt $ApprovalReviewResultFile $approved $primaryCoretide
 	if ($null -eq $receiptFailure -and -not ([string]::IsNullOrWhiteSpace($ApprovedEngineCommit) -and [string]::IsNullOrWhiteSpace($EngineApprovalReviewResultFile))) {
-		$receiptFailure = Test-FinalizeApprovalReviewReceipt $EngineApprovalReviewResultFile (Resolve-FinalizeCommit $session.Worktree $ApprovedEngineCommit)
+		$receiptFailure = Test-FinalizeApprovalReviewReceipt $EngineApprovalReviewResultFile (Resolve-FinalizeCommit $session.Worktree $ApprovedEngineCommit) $PrimaryWorktree
 	}
 	if ($null -ne $receiptFailure) { Complete-FinalizeCoretide 2 'blocked' $receiptFailure.Code $receiptFailure.Message }
 	$branch = (Invoke-FinalizeGit $coretide @('symbolic-ref', '--short', 'HEAD')).Trim()
 	$upstreamBranch = (Invoke-FinalizeGit $coretide @('config', '--get', "branch.$branch.merge")).Trim() -replace '^refs/heads/', ''
-	$primaryCoretide = Join-Path $PrimaryWorktree 'Projects\Coretide'
 	$primaryBranch = (Invoke-FinalizeGit $primaryCoretide @('symbolic-ref', '--short', 'HEAD')).Trim()
 	if ($primaryBranch -cne $upstreamBranch) {
 		Complete-FinalizeCoretide 2 'blocked' 'primary.branch-mismatch' "The primary Coretide checkout is on '$primaryBranch', not the clone upstream branch '$upstreamBranch'."

@@ -8,10 +8,11 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 1. Fix mode and components from the brief; on focused re-review, read its
    files, regions, and `First-round findings`, skipping step 2. Done when scope
    is settled.
-2. On first-round review, run below with zero disk writes (`-Head` from
-   `Baseline` for a committed head; `-UntrackedPath` or `-IncludeUntracked` from
-   `Scope`). Require `status` `pass`, else return `BLOCKED` without rebuilding
-   the diff. Done when regions and omitted count print.
+2. First-round: run below with no disk writes (`-Head` from `Baseline` if
+   committed; from `Scope`, `-UntrackedPath`/`-IncludeUntracked`, plus
+   `-PathPrefix "<prefixes>"` if set). Require `status` `pass`, else return
+   `BLOCKED` without rebuilding the diff. Done when regions and omitted count
+   print.
 
 ```powershell
 pwsh -NoProfile -Command 'Import-Module ./.agents/scripts/SessionChangeInventory.psm1; Get-SessionChangeInventory -RepositoryRoot (Get-Location).Path -Baseline <baseline SHA> -Regions -CoherenceOnly|Select-Object status,coretide,counts,entries,regions|ConvertTo-Json -Depth 5'

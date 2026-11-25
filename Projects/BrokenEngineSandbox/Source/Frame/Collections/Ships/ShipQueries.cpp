@@ -43,7 +43,7 @@ bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, en
 	return bFound;
 }
 
-bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight)
+bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight)
 {
 	auto PickDistanceSquared = [&](FXMVECTOR vecEnemyPosition)
 	{
@@ -52,7 +52,6 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	};
 
 	bool bKept = false;
-	bool bKeptAboveHighestPlane = false;
 	XMVECTOR vecKeptPosition = XMVectorZero();
 	bool bFound = false;
 	float fNearestDistanceSquared = std::numeric_limits<float>::max();
@@ -60,13 +59,7 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	XMVECTOR vecNearestPosition = XMVectorZero();
 	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
-		bool bIsKept = rRegistryTarget.uuid.iValue != 0 && registryId == rRegistryTarget;
-		if (NearestFlightPlane(vecEnemyPosition) > iHighestFlightPlane)
-		{
-			bKeptAboveHighestPlane = bKeptAboveHighestPlane || bIsKept;
-			return;
-		}
-		if (bIsKept)
+		if (rRegistryTarget.uuid.iValue != 0 && registryId == rRegistryTarget)
 		{
 			bKept = true;
 			vecKeptPosition = vecEnemyPosition;
@@ -82,10 +75,6 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	});
 	if (!bFound)
 	{
-		if (bKeptAboveHighestPlane)
-		{
-			rRegistryTarget = {};
-		}
 		return false;
 	}
 
@@ -104,7 +93,7 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 		return true;
 	}
 
-	if (bKept && HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecKeptPosition))
+	if (bKept && HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, vecPosition, vecKeptPosition))
 	{
 		rVecResult = vecKeptPosition;
 		rbInLineOfSight = true;
@@ -118,12 +107,8 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	XMVECTOR vecVisiblePosition = XMVectorZero();
 	ForEachEnemyShip(rPreviousFrame.interpolate, rPreviousFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
-		if (NearestFlightPlane(vecEnemyPosition) > iHighestFlightPlane)
-		{
-			return;
-		}
 		float fDistanceSquared = PickDistanceSquared(vecEnemyPosition);
-		if ((!bVisibleFound || fDistanceSquared < fVisibleDistanceSquared) && HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecEnemyPosition))
+		if ((!bVisibleFound || fDistanceSquared < fVisibleDistanceSquared) && HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, vecPosition, vecEnemyPosition))
 		{
 			bVisibleFound = true;
 			fVisibleDistanceSquared = fDistanceSquared;
@@ -152,7 +137,7 @@ bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::Cel
 	return true;
 }
 
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
 	bool bTargetInRange = false;
 	bool bKeptTargetInRange = false;
@@ -169,21 +154,16 @@ void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellSt
 		{
 			return;
 		}
-		int64_t iTargetFlightPlane = NearestFlightPlane(vecTargetPosition);
-		if (iTargetFlightPlane > iHighestFlightPlane)
-		{
-			return;
-		}
 		bool bKeptTarget = registryTarget.uuid.iValue != 0 && registryId == registryTarget;
 		float fDistance = common::Distance(vecPosition, vecTargetPosition);
 		// A kept target within range wins over every nearer candidate.
-		bool bInRangeCandidate = iTargetFlightPlane == uiFlightPlane && (bKeptTarget ? fDistance < fBlasterTargetRange : (!bKeptTargetInRange && fDistance < fBestInRange));
+		bool bInRangeCandidate = bKeptTarget ? fDistance < fBlasterTargetRange : (!bKeptTargetInRange && fDistance < fBestInRange);
 		bool bLookCandidate = fDistance < fBestForLook;
 		if (!(bInRangeCandidate || bLookCandidate))
 		{
 			return;
 		}
-		if (!HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecPosition, vecTargetPosition))
+		if (!HasShipLineOfSight(rPreviousFrame, rStaticData, kiFiringClearanceTier, vecPosition, vecTargetPosition))
 		{
 			return;
 		}
@@ -295,17 +275,16 @@ float ShipHull(const Frame& rFrame, ShipLocator locator)
 	});
 }
 
-bool FindLowestPlaneShipByRegistryId(const Frame& rFrame, const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition)
+bool FindShipByRegistryId(const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition)
 {
 	bool bFound = false;
-	ForEachShipType(rFrame.interpolate, rPreviousFrame.postRender, [&](ShipType eType, const auto& rInterpolate, const auto& rGracePostRender)
+	ForEachShipType(rPreviousFrame, [&]([[maybe_unused]] ShipType eType, const auto& rInterpolate, const auto& rPostRender)
 	{
 		for (int64_t i = 0; i < rInterpolate.iCount && !bFound; ++i)
 		{
-			if (rInterpolate.pRegistryIds[i] == registryId && rGracePostRender.pArrivalGracePeriods[i].count() <= 0.0f && NearestFlightPlane(rInterpolate.pVecPositions[i]) == 0)
+			if (rInterpolate.pRegistryIds[i] == registryId && rPostRender.pArrivalGracePeriods[i].count() <= 0.0f)
 			{
-				// No row is added or removed before the Update phase ends, so the previous row matches the current one.
-				rVecPreviousPosition = ShipPosition(rPreviousFrame.interpolate, ShipLocator {.eType = eType, .iRow = i});
+				rVecPreviousPosition = rInterpolate.pVecPositions[i];
 				bFound = true;
 			}
 		}

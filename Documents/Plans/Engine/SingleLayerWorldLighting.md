@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T21:46:44.438Z","dependsOn":["Documents/Plans/Game/SingleFlightHeightShips.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-20T21:46:44.438Z","dependsOn":[]} -->
 # Single World Lighting Layer
 
 ## Context

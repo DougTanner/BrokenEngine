@@ -28,6 +28,12 @@
           }
         ]
       }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "pwsh -NoProfile -NonInteractive -File scripts/Invoke-SubdirectoryAgentsHook.ps1"
+      }
     ]
   }
 }

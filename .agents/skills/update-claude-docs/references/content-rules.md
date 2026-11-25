@@ -36,9 +36,9 @@
   for an intentional Claude import; use Markdown links for see-also references,
   except that an engine document's reference to a game document follows
   `Engine/Source/AGENTS.md` `## Hub Conventions`.
-- Every ancestor AGENTS.md loads automatically alongside a child document, so a
-  child never references, links, or "See Also"s its parent or any other ancestor
-  AGENTS.md. Remove such a reference whenever you edit the text around it.
+- Ancestors load via client auto-loading, runtime hooks, or root `AGENTS.md`
+  (`Bounded reading`), so never reference, link, or "See Also" an ancestor from
+  a child; remove any when editing nearby.
 
 ## Removing Text
 

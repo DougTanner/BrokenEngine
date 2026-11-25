@@ -15,16 +15,14 @@ and the handoff this run returns.
 pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
 ```
 
-   - Append `-RepositoryRoot`/`-PrimaryCheckout`/`-Baseline` only when the
-     caller explicitly supplied that input; an empty or unset value counts as
-     not supplied, so omit the parameter and let the derived default apply.
-     Pass the same explicitly supplied values to the build invocation.
+   - Append `-RepositoryRoot`/`-PrimaryCheckout`/`-Baseline` only when
+     explicitly supplied (omit empty or unset values so defaults apply), and
+     pass those same values to the build invocation.
    - Append `-Project <Name>` only as step 3's game selection directs.
-   - For a requested ModelViewer build, append `-Target ModelViewer`; its
-     context resolves BrokenEngineSandbox as data owner even with several game
-     projects.
-   - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
-     requests DevEnvDir itself for every game build.
+   - Append `-Target <Target>` for a requested `ModelViewer` or non-game
+     target: `ModelViewer` resolves its fixed data owner, and non-game targets
+     skip the stamp wait. Rerun step 1 without a non-game `-Target` if a
+     recommended game or `ModelViewer` build needs game data.
 
 2. Read that result as evidence of which targets to build and which data mode
    each game build uses. Done when every field below has been read and no
@@ -112,8 +110,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      1. Build `-Target ThirdParty` first, in the same dispatch.
      2. Build it in each game or ModelViewer build's own configuration.
      3. Also build it in Release for each DataPacker build and each Local
-        client, server, or ModelViewer build, because a Local PreBuildEvent
-        builds DataPacker Release.
+        client, server, or ModelViewer build
+        ([runtime-data-mode.md](runtime-data-mode.md) `## Local generation`).
 
      A missing candidate fails the consumer's PreBuildEvent library check.
      Missing source or library links are provisioning failures. Without that
@@ -373,9 +371,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <ar
   the derived default; step 2's `baseline` field states how the baseline
   resolves.
 - Never reconstruct these operations inline: no hand-typed changed-path
-  `git diff`/`git ls-files` commands, no hand-resolved repository root, primary
-  checkout, or baseline, and no inline `vswhere`/`DevEnvDir` discovery. A
-  blocked result is a stop, not a cue to redo its work by hand.
+  `git diff`/`git ls-files` commands, and no hand-resolved repository root,
+  primary checkout, or baseline. A blocked result is a stop, not a cue to redo
+  its work by hand.
 - Session setup at each worktree creation or `/reset-worktree` seeds the
   worktree's DataPacker and ModelViewer Release Output by verified copy from the
   primary bootstrap prebuilds, and otherwise builds each locally, so

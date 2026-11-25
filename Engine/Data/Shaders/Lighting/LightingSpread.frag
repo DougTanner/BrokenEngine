@@ -32,38 +32,29 @@ layout (location = 3) out vec4 f4OutRedSpread;
 layout (location = 4) out vec4 f4OutGreenSpread;
 layout (location = 5) out vec4 f4OutBlueSpread;
 
-// Hue-preserving per-EWNS Reinhard compressor: maps each EWNS channel's RGB average above fThreshold and
-// scales all three channels by the resulting ratio. Identity when fCompress == 0. Shared by the pass-0
-// deposit compress and the per-pass output compress below.
-void CompressHuePreserving(inout vec4 f4Red, inout vec4 f4Green, inout vec4 f4Blue, float fThreshold, float fCompress)
+// Unthresholded Reinhard compression preserves hue in each EWNS component. Zero strength leaves RGB unchanged, and zero RGB stays zero.
+void CompressHuePreserving(inout vec4 f4Red, inout vec4 f4Green, inout vec4 f4Blue, float fCompress)
 {
-	for (int k = 0; k < 4; ++k)
-	{
-		float fAvg = (f4Red[k] + f4Green[k] + f4Blue[k]) / 3.0f;
-		float fExcess = max(fAvg - fThreshold, 0.0f);
-		float fMapped = fThreshold + fExcess / (1.0f + fExcess * fCompress);
-		float fRatio = fMapped / max(fAvg, 1e-4f);
-		f4Red[k]   *= fRatio;
-		f4Green[k] *= fRatio;
-		f4Blue[k]  *= fRatio;
-	}
+	vec4 f4Avg = max((f4Red + f4Green + f4Blue) * (1.0f / 3.0f), vec4(0.0f));
+	vec4 f4Ratio = 1.0f / (1.0f + f4Avg * fCompress);
+	f4Red *= f4Ratio;
+	f4Green *= f4Ratio;
+	f4Blue *= f4Ratio;
 }
 
 void main()
 {
 	// Per-pass interpolation: t=0 at pass 0 (Start values), t=1 at last pass (End values)
 	float fPassIndex = pushConstantsLayout.f4Pipeline.z;
+	const uint32_t uiPassIndex = uint32_t(fPassIndex);
 	float fT = fPassIndex / max(globalLayout.fSpreadPassCount - 1.0f, 1.0f);
 
 	// Interpolate spread parameters between Start and End
 	float fDirectionality = mix(globalLayout.fSpreadDirectionalityStart, globalLayout.fSpreadDirectionalityEnd, fT);
 	float fSpreadDistance = mix(globalLayout.fSpreadDistanceStart, globalLayout.fSpreadDistanceEnd, fT);
-	float fDirectionCountBase = mix(globalLayout.fSpreadDirectionCountStart, globalLayout.fSpreadDirectionCountEnd, fT);
-	float fRingCountF = mix(globalLayout.fSpreadRingCountStart, globalLayout.fSpreadRingCountEnd, fT);
 	float fDecay = mix(globalLayout.fSpreadDecayStart, globalLayout.fSpreadDecayEnd, fT);
 	float fAccumulationDecay = mix(globalLayout.fSpreadAccumulationDecayStart, globalLayout.fSpreadAccumulationDecayEnd, fT);
 	float fDistanceFalloff = mix(globalLayout.fSpreadDistanceFalloffStart, globalLayout.fSpreadDistanceFalloffEnd, fT);
-	float fOutputThreshold = mix(globalLayout.fSpreadOutputThresholdStart, globalLayout.fSpreadOutputThresholdEnd, fT);
 	float fOutputCompress = mix(globalLayout.fSpreadOutputCompressStart, globalLayout.fSpreadOutputCompressEnd, fT);
 
 	// Height fade: attenuate spread above base height. Only the low layer spreads over terrain; the high layer's plane lies
@@ -90,23 +81,17 @@ void main()
 	f4OutGreen = vec4(0.0f);
 	f4OutBlue = vec4(0.0f);
 
-	// Configurable direction count: evenly spaced unit vectors around the circle
-	const uint32_t uiRingCount = uint32_t(fRingCountF);
-
-	// Constant per-sample weight (not per-ring falloff): softens outer ring contributions relative to
-	// inner rings within a single spread, cancelled out in the final normalization for brightness invariance
-	float fInvSqrtDistance = inversesqrt(float(1 + uiRingCount));
-	float fTotalSamples = 0.0f;
+	// The CPU precomputes per-pass loop counts and EWNS weight-sum reciprocals for ideal evenly spaced directions.
+	const SpreadPassNormalizationLayout passNormalization = globalLayout.pSpreadPassNormalizations[uiPassIndex];
+	const uint32_t uiRingCount = passNormalization.uiRingCount;
+	const uint32_t uiDirectionCountBase = passNormalization.uiDirectionCountBase;
 
 	for (uint32_t j = 0; j < uiRingCount; ++j)
 	{
 		float fRingFalloff = 1.0f - fDistanceFalloff * (float(j + 1) / float(uiRingCount));
 
-		float fDirectionCount = fDirectionCountBase + float(j);
-		const uint32_t uiDirectionCount = uint32_t(fDirectionCount);
-		fDirectionCount = float(uiDirectionCount);
-		const float fDirectionStep = (2.0f * kfPi) / fDirectionCount;
-		fTotalSamples += fDirectionCount * fRingFalloff;
+		const uint32_t uiDirectionCount = uiDirectionCountBase + j;
+		const float fDirectionStep = (2.0f * kfPi) / float(uiDirectionCount);
 
 		// Reset each ring to the positive-X unit vector to bound drift from incremental rotation.
 		vec2 f2Direction = vec2(1.0f, 0.0f);
@@ -127,15 +112,16 @@ void main()
 			vec4 f4Green = texture(greenSampler, f2Coord);
 			vec4 f4Blue = texture(blueSampler, f2Coord);
 
-			// Pass 0 reads the deposit texture; Reinhard compress above threshold, hue-preserving per-EWNS
+			// Pass 0 compresses deposit samples before directional weighting.
 			if (fPassIndex < 0.5f)
 			{
-				CompressHuePreserving(f4Red, f4Green, f4Blue, globalLayout.fLightingDepositThreshold, globalLayout.fLightingDepositCompress);
+				CompressHuePreserving(f4Red, f4Green, f4Blue, globalLayout.fLightingDepositCompress);
 			}
 
-			f4OutRed += mix(f4Red, f4DirWeight * f4Red, fDirectionality) * fInvSqrtDistance * fRingFalloff;
-			f4OutGreen += mix(f4Green, f4DirWeight * f4Green, fDirectionality) * fInvSqrtDistance * fRingFalloff;
-			f4OutBlue += mix(f4Blue, f4DirWeight * f4Blue, fDirectionality) * fInvSqrtDistance * fRingFalloff;
+			vec4 f4TapWeight = mix(vec4(1.0f), f4DirWeight, fDirectionality) * fRingFalloff;
+			f4OutRed += f4Red * f4TapWeight;
+			f4OutGreen += f4Green * f4TapWeight;
+			f4OutBlue += f4Blue * f4TapWeight;
 
 			// Advance to the next evenly-spaced direction by rotating f2Direction by fDirectionStep
 			f2Direction = vec2(f2Direction.x * fCosStep - f2Direction.y * fSinStep,
@@ -143,20 +129,20 @@ void main()
 		}
 	}
 
-	float fNorm = fTotalSamples * fInvSqrtDistance * mix(1.0f, 0.32f, fDirectionality);
-	f4OutRed /= fNorm;
-	f4OutGreen /= fNorm;
-	f4OutBlue /= fNorm;
+	vec4 f4WeightSumInverse = passNormalization.f2WeightSumInverse.xxyy;
+	f4OutRed *= f4WeightSumInverse;
+	f4OutGreen *= f4WeightSumInverse;
+	f4OutBlue *= f4WeightSumInverse;
 
 	f4OutRed *= fDecay;
 	f4OutGreen *= fDecay;
 	f4OutBlue *= fDecay;
 
 	// Per-pass output Reinhard compressor: hue-preserving per-EWNS. Identity when fOutputCompress == 0.
-	CompressHuePreserving(f4OutRed, f4OutGreen, f4OutBlue, fOutputThreshold, fOutputCompress);
+	CompressHuePreserving(f4OutRed, f4OutGreen, f4OutBlue, fOutputCompress);
 
 	// Spread-only outputs: pre-accumulation snapshot, weighted by the per-pass curve, read by LightCombine
-	float fCurveWeight = globalLayout.pfCombineCurvePoints[uint(fPassIndex)];
+	float fCurveWeight = globalLayout.pfCombineCurvePoints[uiPassIndex];
 	f4OutRedSpread = f4OutRed * fCurveWeight;
 	f4OutGreenSpread = f4OutGreen * fCurveWeight;
 	f4OutBlueSpread = f4OutBlue * fCurveWeight;

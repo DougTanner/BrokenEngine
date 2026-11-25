@@ -36,7 +36,9 @@ Supply [`subagent-reporting.md`](../../references/subagent-reporting.md)
 - `mode: claimed-plan` — sole mode override for `/next-plan` step 4; omit
   `mode:` for ordinary preparation;
 - triggered Change Workflow step and role assignments, as main states them;
-- session baseline.
+- session baseline;
+- Plan-review write-in: cite readable review outputs in `Continuation capsule:`
+  per `## Task brief` above.
 
 Ordinary preparation (omitted `mode:`) adds:
 
@@ -60,6 +62,8 @@ Ordinary preparation (omitted `mode:`) adds:
   `## In scope` and `## Out of scope` as source, the requested difference, and
   for `completion.plan-cited` whether the refused exit was completion or
   `-Reject`;
+- scope-changing write-in or redraft: add `Slices` to `Return:` so the handoff
+  returns the updated slice partition;
 - evidence bounds: the card's verification evidence carries no verbatim source
   text except an acceptance item proposing replacement text; bound handoff
   verification to `Verification` rows without enumerating unaffected results.
@@ -103,8 +107,8 @@ inlining plan or card text in the handoff.
   and label or bullet (never text) and allowed file scope; one row when not
   disjoint; `none` for an empty realized change; with a stage split, at least
   one row per in-scope stage naming its stage. Accepted Plan review or grill
-  refinements write into the snapshot; every dispatch changing snapshot scope
-  (write-in or redraft) adds `Slices` to `Return:` and returns it again.
+  refinements write into the snapshot; return updated `Slices` whenever the
+  brief names `Slices` in `Return:`.
 
 `Candidate zero` also returns `none` for an empty realized change and for
 every preparation handoff after the `/plan-alternatives` pick.
@@ -130,8 +134,6 @@ In `mode: claimed-plan`, cite the card
 ([`execution-card.md`](../../references/execution-card.md) `## Template`) under
 `Evidence`, never inline; main presents its first two sections per
 [`### Implementation approval`](../next-plan/SKILL.md#implementation-approval).
-When classified tier differs from the brief's assumed tier, main rewrites the
-card's `Roles` field to the classified tier before Plan review.
 
 ## References
 

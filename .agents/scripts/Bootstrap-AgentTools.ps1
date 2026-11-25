@@ -162,16 +162,9 @@ try {
 	}
 
 	# PC-global mutex scoped like the session ledger mutex (Global\ + SID + repo hash) so concurrent
-	# always-rebuild bootstraps serialize. The distinct AgentToolsBootstrap suffix keeps ledger
-	# transitions unblocked.
-	$bootstrapMutexName = "$((Get-WorktreeCliRepositoryIdentity $root).MutexName)_AgentToolsBootstrap"
-	$mutex = [Threading.Mutex]::new($false, $bootstrapMutexName)
-	$held = $false
-	try {
-		$deadline = [DateTime]::UtcNow.AddSeconds($WaitSeconds)
-		$milliseconds = [Math]::Max(0, [Math]::Min([int]::MaxValue, [Math]::Ceiling(($deadline - [DateTime]::UtcNow).TotalMilliseconds)))
-		try { $held = $mutex.WaitOne([int]$milliseconds) } catch [Threading.AbandonedMutexException] { $held = $true }
-		if (-not $held) { throw "Timed out after $WaitSeconds seconds waiting for the AgentTools bootstrap mutex. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
+	# always-rebuild bootstraps and primary SharedDataStamp.txt access serialize. The distinct
+	# AgentToolsBootstrap suffix keeps ledger transitions unblocked.
+	Invoke-AgentBootstrapLock -PrimaryCheckout $root -WaitSeconds $WaitSeconds -Action {
 
 		# -SharedDataOnly refreshes Shared data mid-session, so it skips the shared AgentTools and ThirdParty
 		# builds, which only worktree creation, /reset-worktree, or explicit primary maintenance runs in place.
@@ -297,7 +290,6 @@ try {
 		if (-not $SharedDataOnly) { Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'." }
 		foreach ($refreshedDataDirectory in $refreshedDataDirectories) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
 	}
-	finally { if ($held) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
 }
 finally {
 	Unregister-WorktreeCliSession -RepositoryRoot $root -Owner $claimOwner

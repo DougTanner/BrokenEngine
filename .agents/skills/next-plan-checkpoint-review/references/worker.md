@@ -110,13 +110,17 @@ are the isolation lens.
     `len` selects lines only and is never `chars:`.
 
     Report as isolation content main did not need verbatim that a subagent could
-    consume: a file read flagged by an in-span `match` row with in-span
-    `read-at` (after `Get-TranscriptProjection.ps1` applies its small-read
-    floor, `$script:SmallReadMaxLines`/`$script:SmallReadMaxChars`), forwarding
-    raw script output, pasting evidence instead of path/selector, or a handoff
-    restating its brief (any size). For `match` rows, the emitter is main's
-    active skill instruction and the step 11 mechanism is that brief's role.
-    Done when each such in-span item is a finding or excluded by step 13.
+    consume: an in-span `match` row with in-span `read-at`, forwarding raw
+    script output, pasting evidence instead of path/selector, or a handoff
+    restating its brief (any size).
+
+    `Get-TranscriptProjection.ps1` applies its header-documented `match`
+    exemptions before emitting rows; treat every emitted `match` row as
+    non-exempt.
+
+    For `match` rows, the emitter is main's active skill instruction and the
+    step 11 mechanism is that brief's role. Done when each such in-span item is
+    a finding or excluded by step 13.
 13. Exclude from isolation, beyond `## Rules`: content main's decision required
     verbatim (`necessary-evidence` in step 10 even without a measured row) and a
     Plan body, execution card, or user-facing text main must approve or present.

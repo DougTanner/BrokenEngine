@@ -16,12 +16,12 @@
 	Codex warns and runs standard.
 
 	One-call contract: a launch call (-Skill [-Mode]/-Worktree/-PromptFile/-OutFile) starts Codex detached,
-	then waits up to 540 seconds for it and returns a single-line JSON receipt naming the run identifier
-	and its status. A completed receipt is followed by the line `--- findings ---` and then the
-	out-file's bytes verbatim, so the result needs no separate read. If the budget expires with the
-	run still alive the receipt reports running, and one further -Wait <run identifier> call resumes
-	the same bounded wait after the launching call exits. Both calls must be in a host context where
-	the worker survives the launching call and the run records are visible.
+	then waits up to -WaitBudgetSeconds (default 540; 0 waits without a deadline until the run exits) and
+	returns a single-line JSON receipt naming the run identifier and its status. A completed receipt is
+	followed by the line `--- findings ---` and then the out-file's bytes verbatim, so the result needs no
+	separate read. If a non-zero budget expires with the run still alive the receipt reports running, and
+	one further -Wait <run identifier> call resumes the wait after the launching call exits. Both calls
+	must be in a host context where the worker survives the launching call and the run records are visible.
 
 	Receipt fields: schemaVersion (broken-engine-codex-run/v2); status (completed, malformed,
 	failed, or running); runId; skill (routed skill name, null when unavailable or incompatible);
@@ -43,10 +43,11 @@
 	Exit codes (launch and -Wait calls; -ListRoutes and -CheckModels below): 0 for every wait whatever
 	its status; 126 if an inherited OPENAI_API_KEY is refused, 127 if the codex CLI is not found, 1 for
 	an unrouted -Skill/-Mode or any other script error. None of these retry. When the codex CLI itself
-	exits non-zero, the failed receipt's reason carries its last non-empty stderr line capped at 200
-	characters, with the full stderr retained as <runId>.stderr.txt beside the run records; when the
-	CLI printed nothing it stays `codex exited <n>`. How the caller reports a non-zero exit or a failed
-	or malformed status is `.agents/references/codex-bridge.md`, `## Rules`.
+	exits non-zero, or when the detached run ends without publishing a result, the failed receipt's reason
+	carries the last non-empty stderr line capped at 200 characters, with the full stderr retained as
+	<runId>.stderr.txt beside the run records; when stderr is empty it stays `codex exited <n>` or
+	`detached run ended without publishing a result; exit code unavailable`. How the caller reports a
+	non-zero exit or a failed or malformed status is `.agents/references/codex-bridge.md`, `## Rules`.
 
 	-ListRoutes prints one `<skill>[:<mode>] <sandbox>` line per $routes entry sorted ordinally and
 	exits 0 in any environment.
@@ -96,6 +97,11 @@ param(
 	[Parameter(Mandatory, ParameterSetName = 'Wait')]
 	[string] $Wait,                                       # run identifier from a running receipt
 
+	[Parameter(ParameterSetName = 'Launch')]
+	[Parameter(ParameterSetName = 'Wait')]
+	[ValidateRange(0, [int]::MaxValue)]
+	[int] $WaitBudgetSeconds = 540,                       # wait deadline in seconds (540 stays 60s under a 600s cap; 0 waits without a deadline)
+
 	[Parameter(Mandatory, ParameterSetName = 'CheckModels')]
 	[switch] $CheckModels,                                # check the $presets models; never launches
 
@@ -110,8 +116,6 @@ $ErrorActionPreference = 'Stop'
 
 $runSchemaVersion = 'broken-engine-codex-run/v2'
 
-# One wait stays 60 seconds under the caller's 600000 ms command cap; a longer run resumes with -Wait.
-$waitBudgetSeconds = 540
 $waitSleepSeconds = 5
 
 # 'default' or 'fast'. Fast is disabled for now; set 'fast' to re-enable it (see .NOTES for the cost).
@@ -120,12 +124,12 @@ $serviceTier = 'default'
 # The only presets: $routes maps each routed skill/mode to one, and -CheckModels checks their models.
 $presets = @{
 	sol = @{ Model = 'gpt-6.2-sol'; Effort = 'xhigh' }
-	astra = @{ Model = 'gpt-6.2-astra'; Effort = 'high' }
+	astra = @{ Model = 'gpt-6.2-astra'; Effort = 'xhigh' }
 }
 
 # Exact case-sensitive (Skill[:Mode]) -> (Agent, Sandbox) routing table for non-Codex review dispatch.
 $routes = [Collections.Hashtable]::new([StringComparer]::Ordinal)
-# Astra (gpt-6.2-astra, high)
+# Astra (gpt-6.2-astra, xhigh)
 $routes['repo-code-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
 $routes['glsl-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
 $routes['adversarial-review'] = @{ Agent = 'astra'; Sandbox = 'read-only' }
@@ -184,6 +188,27 @@ function Get-RunRecordPath([string] $RunId)
 function Get-DoneRecordPath([string] $RunId)
 {
 	return (Join-Path $recordDirectory "$RunId.done.json")
+}
+
+function Get-StderrRecordPath([string] $RunId)
+{
+	return (Join-Path $recordDirectory "$RunId.stderr.txt")
+}
+
+function Get-StderrTail([string] $StderrPath)
+{
+	$tail = @(Get-Content -LiteralPath $StderrPath -ErrorAction SilentlyContinue) -match '\S' | Select-Object -Last 1
+	if ($null -eq $tail)
+	{
+		return $null
+	}
+
+	$tail = $tail.Trim()
+	if ($tail.Length -gt 200)
+	{
+		$tail = $tail.Substring(0, 200)
+	}
+	return $tail
 }
 
 # The one output contract shared by every run: the mandated final verdict line. Nothing
@@ -251,7 +276,7 @@ function Wait-Run([string] $RunId)
 {
 	$runPath = Get-RunRecordPath $RunId
 	$donePath = Get-DoneRecordPath $RunId
-	$deadline = (Get-Date).AddSeconds($waitBudgetSeconds)
+	$deadline = if ($WaitBudgetSeconds -eq 0) { $null } else { (Get-Date).AddSeconds($WaitBudgetSeconds) }
 
 	while ($true)
 	{
@@ -321,11 +346,18 @@ function Wait-Run([string] $RunId)
 				continue
 			}
 
-			Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $run.skill; mode = $run.mode; noRetry = [bool] $run.noRetry; outFile = $run.outFile; exitCode = $null; reason = 'detached run ended without publishing a result; exit code unavailable' }
+			$reason = 'detached run ended without publishing a result; exit code unavailable'
+			$tail = Get-StderrTail (Get-StderrRecordPath $RunId)
+			if ($null -ne $tail)
+			{
+				$reason = "${reason}: $tail"
+			}
+
+			Write-Receipt @{ status = 'failed'; runId = $RunId; skill = $run.skill; mode = $run.mode; noRetry = [bool] $run.noRetry; outFile = $run.outFile; exitCode = $null; reason = $reason }
 			return
 		}
 
-		if ((Get-Date) -ge $deadline)
+		if (($null -ne $deadline) -and ((Get-Date) -ge $deadline))
 		{
 			# The run outlives this call, so its identifier is what the caller resumes with.
 			Write-Receipt @{ status = 'running'; runId = $RunId; skill = $run.skill; mode = $run.mode; noRetry = [bool] $run.noRetry; outFile = $run.outFile; exitCode = $null; reason = $null }
@@ -333,8 +365,15 @@ function Wait-Run([string] $RunId)
 		}
 
 		# The last sleep is clamped to what is left, so the call never returns past the budget.
-		$remainingSeconds = ($deadline - (Get-Date)).TotalSeconds
-		Start-Sleep -Milliseconds ([int]([Math]::Min($waitSleepSeconds, $remainingSeconds) * 1000))
+		$sleepSeconds = if ($null -eq $deadline)
+		{
+			$waitSleepSeconds
+		}
+		else
+		{
+			[Math]::Max(0.0, [Math]::Min([double]$waitSleepSeconds, ($deadline - (Get-Date)).TotalSeconds))
+		}
+		Start-Sleep -Milliseconds ([int]($sleepSeconds * 1000))
 	}
 }
 
@@ -522,7 +561,7 @@ $retryStagingOutput = Join-Path $temporaryDirectory "broken-engine-codex-run-$In
 $pendingOutput = Join-Path ([System.IO.Path]::GetDirectoryName($OutFile)) "$InternalRunId.partial.md"
 # Retained beside the run records: both attempts truncate and rewrite it, so it always holds the
 # stderr of the attempt whose exit code is reported.
-$stderrOutput = Join-Path $recordDirectory "$InternalRunId.stderr.txt"
+$stderrOutput = Get-StderrRecordPath $InternalRunId
 $exitCode = 1
 $reason = $null
 $retried = $false
@@ -592,16 +631,10 @@ try
 		# The CLI's own error text is the only diagnosis a caller gets, but the receipt is read into
 		# a parent session's context, so only the last non-empty line survives, capped in length.
 		$reason = "codex exited $exitCode"
-		$tail = @(Get-Content -LiteralPath $stderrOutput -ErrorAction SilentlyContinue) -match '\S' | Select-Object -Last 1
+		$tail = Get-StderrTail $stderrOutput
 		if ($null -ne $tail)
 		{
-			$tail = $tail.Trim()
-			if ($tail.Length -gt 200)
-			{
-				$tail = $tail.Substring(0, 200)
-			}
-
-			$reason = "codex exited ${exitCode}: $tail"
+			$reason = "${reason}: $tail"
 		}
 	}
 }

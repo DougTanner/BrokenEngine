@@ -24,12 +24,7 @@ static bool FlagshipReachesEdge(const Frame& rFlagshipFrame, ShipLocator flagshi
 	rStaticData.BuildNavigationDataIfUnbuilt();
 
 	XMVECTOR vecPosition = ShipPosition(rFlagshipFrame.interpolate, flagship);
-	int64_t iTargetFlightPlane = VisitShip(rFlagshipFrame, flagship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
-	{
-		return GetTargetFlightPlane(rPostRender.pOrders[iRow]);
-	});
-	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), iTargetFlightPlane);
-	return engine::NavQueryEdgeReachable(vecPosition, iDirection, NavigationPlaneData(rStaticData, ShipTypeClearanceTier(flagship.eType), iNavigationPlane));
+	return engine::NavQueryEdgeReachable(vecPosition, iDirection, NavigationTierData(rStaticData, ShipTypeClearanceTier(flagship.eType)));
 }
 
 // Directions are collected in index order so a draw index maps to one direction; the origin is never a candidate.

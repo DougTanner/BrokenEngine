@@ -100,12 +100,13 @@ JSON result. The schema version is
   `candidate.parent`. `foreignCommits.items` contains foreign commit
   identities ordered oldest-to-newest; the aggregate changed-path manifest is
   in `changes`.
-- `changes` is `{totalCount,items,overlapPaths,exportOutputPaths}`. Each
-  `items` row has exactly the tuple fields `(path,status,oldMode,newMode)`.
-  `overlapPaths` is the evidence object of the overlap paths, computed over
-  every changed path. `exportOutputPaths` is the evidence object of the
-  overlap paths whose `export-output` attribute, read by Git's attribute
-  lookup in the session worktree, is `set`: tracked export outputs.
+- `changes` is `{totalCount,items,overlapPaths,exportOutputPaths}`, where
+  `overlapPaths` and `exportOutputPaths` are `{totalCount,items}` evidence
+  objects. Each `changes.items` row has exactly `(path,status,oldMode,newMode)`,
+  while `overlapPaths.items` and `exportOutputPaths.items` hold path strings.
+  `overlapPaths` lists every overlapping path truthfully; `exportOutputPaths`
+  lists overlap paths whose session-worktree `export-output` attribute is `set`:
+  tracked export outputs.
 - `rebuildProjects` is the ordinal-sorted array of game project names
   (`Get-AgentGameProjects`) the session must rebuild with the foreign changes:
   every game when `changes.items` and `ownedPaths.items` each hold a `.cpp` or
@@ -123,8 +124,8 @@ The fixed terminal mapping is:
 | Exit | Status | Codes | Finalizer action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok`, `primary.tree-identical` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence. |
-| 0 | `needs-review` | `primary.disjoint-needs-review` | Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
-| 2 | `blocked` | `primary.path-overlap` | Run the overlap recovery in the [finalizer worker workflow](worker.md#recovery). |
+| 0 | `needs-review` | `primary.disjoint-needs-review` | Non-blocking movement classified by `Invoke-FinalizePrimaryMovementCheck.ps1`. Follow the [finalizer worker workflow](worker.md#steps) for terminal handling and the SmartGit/summary sequence; the Verify and land step's rule that exactly one explicit user confirmation authorizes changing primary owns primary-movement policy. The normal postconfirmation claim uses the existing 3,600-second lease and owner-token continuation. |
+| 2 | `blocked` | `primary.path-overlap` | Blocking overlap classified by `Invoke-FinalizePrimaryMovementCheck.ps1`; run overlap recovery in [finalizer worker workflow](worker.md#recovery). |
 | 2 | `blocked` | `candidate.session-tip-changed`, `candidate.tree-mismatch`, `candidate.parent-mismatch`, `primary.not-descendant` | Stop before SmartGit or the landing summary and return a blocker. |
 | 1 | `error` | `input.invalid`, `assessment.failed` | Stop before SmartGit or the landing summary and return a blocker. |
 
@@ -228,13 +229,14 @@ reconstructs the assessment from Git output.
 
 ### Approval review receipt
 
-`Show-FinalizeApprovalReview.ps1` emits one JSON line whose schema version is
-`broken-engine-finalize-approval-review/v1`, carrying exactly `schemaVersion`,
-`status`, `code`, `message`, `approvedTip`, `executable`, `arguments`,
-`manualCommand`, and `processId`. `approvedTip` is the full 40-character
-reviewed commit, expanded from an abbreviated `-ApprovedTip`. The redirected
-artifact is that receipt: landing reads `approvedTip` and `status` from the
-file named by `-ApprovalReviewResultFile`.
+`Show-FinalizeApprovalReview.ps1` emits one JSON line
+(`broken-engine-finalize-approval-review/v2`) carrying `schemaVersion`,
+`status`, `code`, `message`, `approvedTip`, `reviewedRepository`,
+`reviewedPatchId`, `reviewedChanges`, `executable`, `arguments`,
+`manualCommand`, and `processId`. `approvedTip` is the expanded 40-character
+reviewed commit; `reviewedRepository`, `reviewedPatchId`, and `reviewedChanges`
+bind the receipt to the primary repository and reviewed diff. Landing reads
+those fields and `status` from `-ApprovalReviewResultFile`.
 
 The default call reports `opened` when SmartGit starts. `-HandoffOnly` checks
 for a normal launcher exit within its deadline and a surviving SmartGit process
@@ -259,23 +261,23 @@ summary.
 
 The review outcome stays non-blocking — `opened`, `unavailable`, and `failed`
 all satisfy the gate, because only an attempted launch is required, not a
-successful one. An `error` status does not satisfy it. A receipt that is absent,
-unreadable, not valid JSON, or not a `broken-engine-finalize-approval-review/v1`
-result carrying `status` and `approvedTip` blocks with
-`approval-review.missing`, one whose `approvedTip` is not the commit being
-landed blocks with `approval-review.candidate-mismatch`, and one recording no
-attempted launch blocks with `approval-review.not-launched`. All three are exit
-2, `blocked`, `terminal`, and happen before the landing changes anything on
-primary. The landing lease claimed after confirmation is already live, and the
-worker releases it with `-Release` exactly as for any other blocked landing.
-`Invoke-FinalizeCoretide.ps1 -Land` applies the same gate to the Coretide
-receipt and, when the engine pair is passed, to the engine receipt.
+successful one. An `error` status does not satisfy it.
+`Test-FinalizeApprovalReviewReceipt`
+(`.agents/scripts/FinalizeWorkflowCommon.psm1`) owns the `v2` schema and
+repository/commit/patch-identity checks, blocking with `approval-review.missing`
+(absent or invalid `v2` receipt), `approval-review.candidate-mismatch`
+(repository or diff identity mismatch), or `approval-review.not-launched` (no
+attempted launch). All three are exit 2, `blocked`, `terminal`, and happen
+before the landing changes anything on primary. The landing lease claimed after
+confirmation is already live, and the worker releases it with `-Release` exactly
+as for any other blocked landing. `Invoke-FinalizeCoretide.ps1 -Land` applies
+the same gate to the Coretide receipt and, when the engine pair is passed, to
+the engine receipt.
 
-A refreshed summary during recovery
-([`SKILL.md`](../SKILL.md#landing-confirmation)) reruns the review against the
-newly reviewed candidate and overwrites the artifact; the stale receipt is
-never reused, because its `approvedTip` no longer matches the commit being
-landed.
+During recovery ([`SKILL.md`](../SKILL.md#landing-confirmation)), a
+non-meaning-change rebase reuses the `v2` receipt only when
+`Test-FinalizeApprovalReviewReceipt` passes; a genuine meaning change reruns the
+review and overwrites the artifact.
 
 ### Landing and recovery
 
@@ -335,10 +337,11 @@ landed.
   `rebasedSource`, `historyUpdate`, and `final` commit/tree fields. The reviewed
   PNG deletion remains an ordinary source change; only the three generated paths
   are allowed after confirmation. When primary advanced first it makes at most
-  one internal rebase, which requires a provably byte-identical patch outside
-  those three paths. Report the commit from the result's `landed` block rather
-  than `candidate`. A blocked result reports its `disposition` and a `lock`
-  projection; act on those, never a memorized code list. A `retryable-wait`
+  one internal rebase requiring a provably identical patch outside those three
+  paths (`Get-FinalizePatchId`, `.agents/scripts/FinalizeWorkflowCommon.psm1`).
+  Report the commit from the result's `landed` block rather than `candidate`. A
+  blocked result reports its `disposition` and a `lock` projection; act on
+  those, never a memorized code list. A `retryable-wait`
   result may be re-invoked with the approval-bound arguments after its reported
   `retryAfterMilliseconds`. When it acquired no lock (`lock.claimed` false),
   simply re-invoke — on the caller-token route claim the landing lock anew

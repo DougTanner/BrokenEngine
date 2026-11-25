@@ -30,18 +30,19 @@ Role: <role name from the delegation role table>
 Skill: <skill to run, or none>
 Objective: <one sentence>
 Required sections: <handoff fields or report sections the caller will read>
-Scope: <files, regions, or artifacts owned>
+Scope: <files, regions, artifacts; review outputs per below>
 Exclusions: <what this worker must not touch>
-Fixed decisions: <user decisions already made, or none>
-Governing paths: <repository paths that bind this work>
+Fixed decisions: <user/manager decisions, or none>
+Governing paths: <binding paths and subdirectory AGENTS.md chain>
 Baseline: <full SHA and worktree/branch from Get-AgentWorktreeSessionContext>
 Acceptance: <checks and expected observations>
 Prohibitions: <task-specific bans, or none>
 Return: <the shared handoff plus the named skill's declared extension fields, or the typed report that skill's `## Handoff` requires>
 ```
 
-`Required sections` names which skill-specific report sections the caller will
-read; the worker skips the rest. The shared handoff is always returned in full.
+`Required sections` names skill-specific sections to return; skip the rest.
+Always return the full shared handoff. Cite readable review outputs per
+[`change-workflow.md`](change-workflow.md#subagents) `### Subagents`.
 
 The session baseline is the attribution and delegation fork point for the
 session's work. It begins as the commit reported by
@@ -82,22 +83,27 @@ On a direct `reviewer` dispatch, when `## Inputs` documents a pre-dispatch
 `.agents/scripts/Get-SessionChangeInventory.ps1` run, its named producer writes
 the gitignored `Temp/` receipt and passes that path — never raw JSON in main
 context, ad-hoc calls, or retyped entries; self-deriving workers take `Baseline`
-and `Scope` directly per `## Inputs`. When composing a brief for a dispatched
-skill, read that skill by a section-bounded read — locating `## Inputs` with a
-heading lookup (`AGENTS.md` `## Environment`), then reading only that range — of
-the public sections [`skill-skeleton.md`](skill-skeleton.md#section-placement)
-names, never its whole `SKILL.md`; `## Handoff` opens by path only when routing
-a returned result needs it. Each skill's `## Inputs` owns command form and
-producer (e.g., `.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
+and `Scope` directly per `## Inputs`. Public subagent `SKILL.md` files (paired
+with `references/worker.md`, per
+[`skill-skeleton.md`](skill-skeleton.md#section-placement)) may be read whole
+when composing a brief or routing a handoff; main never opens
+`references/worker.md` or worker-only references such as
+`scope-authorization.md`. Multi-topic reference files (e.g.,
+`subagent-reporting.md`, `subagent-handoff.md`, `tier3-workflow.md`,
+`claim-results.md`, `change-workflow.md`) stay section-bounded per `AGENTS.md`
+`## Directives` Bounded reading: locate the cited heading with a `^#{2,4} `
+lookup (`AGENTS.md` `## Environment`) and read only its range. Each skill's
+`## Inputs` owns command form and producer (e.g.,
+`.agents/skills/repo-code-review/SKILL.md` `## Inputs`,
 `.agents/skills/adversarial-review/SKILL.md` `## Inputs`).
 
-Use `none` for empty fields; add only skill-required fields. Cite paths; cite
-readable review outputs (`Temp/`, Codex `<out>`) by path/selector + finding IDs
-(inline decisions only) rather than pasting or paraphrasing findings, or pass
-the compact finding line directly when no readable output supplies it. Never
-paste root instructions, skill bodies, full Plans, manager transcript,
-unrelated handoffs, or raw XML/logs; for a deleted completed Plan, give its
-approved text or Git-history path.
+Use `none` for empty fields; add only skill-required fields. Cite paths; get
+nested `AGENTS.md` chains from
+`.agents/skills/update-claude-docs/scripts/Get-AffectedAgentsDocs.ps1`,
+omitting `Temp/` and reparse points before citing (including hookless Codex
+runs). Never paste root instructions, skill bodies, full Plans, manager
+transcript, unrelated handoffs, or raw XML/logs (for a deleted completed Plan,
+give its approved text or Git-history path).
 
 Workers verify supplied hints against the tree, stay within ownership, and
 expand only for a concrete dependency, decision, or failure. They never route

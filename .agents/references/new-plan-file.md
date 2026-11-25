@@ -30,13 +30,13 @@ pwsh -NoProfile -File .agents/scripts/New-PlanFile.ps1 -Area <area> -Name <Pasca
   `input.sweep-not-allowed` without writing a file or creating a missing area
   directory; see [`Documents/AGENTS.md`](../../Documents/AGENTS.md)
   `## Planning Trees`.
-- `-DependsOn` — `Documents/Plans/**/*.md` paths, plus
-  `Projects/Coretide/Documents/Plans/**/*.md` paths for a Coretide area only (an
-  engine area rejects one with `input.depends-on-invalid`). `pwsh -File` hands
-  every argument over as one literal string, so several dependencies can only
-  travel as one comma-separated token. Omit the parameter entirely when the Plan
-  has no dependencies: the script rejects a blank entry and defaults to an empty
-  dependency list only when the parameter is absent.
+- `-DependsOn` — `Documents/Plans/**/*.md` paths (and Coretide Plans for a
+  Coretide area; engine areas reject them with `input.depends-on-invalid`), as
+  one comma-separated token for `pwsh -File`; omit when none (blanks fail).
+  Auto-adds live Plans overlapping `## Critical files` or `## In scope`,
+  skipping reverse-reachable Plans.
+- `-UnresolvedFollowUp` — for `## Unresolved decisions` follow-ups: rejects
+  `-DependsOn` (`input.depends-on-not-allowed`) and skips overlap detection.
 
 ## Result
 
@@ -62,5 +62,5 @@ tell the user and retry validation later; `scheduler.guard-unavailable` (exit
 not help. Editing the Plan body changes neither outcome.
 
 `truncated` `true` means a cap applied — 64 `dependsOn` entries, 16 diagnostics
-or notices, a 256-character message, or a `validation` projection dropped from
-an oversized envelope — so the reported detail is incomplete.
+or notices, a 256-character message, or a `MaximumOutputBytes` envelope trim
+(which may drop `validation` to `null`) — so the reported detail is incomplete.

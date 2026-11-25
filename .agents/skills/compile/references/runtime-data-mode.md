@@ -35,15 +35,9 @@ The build resolves the mode by one rule, from the data inputs and the context's
     fires: Shared.
   - `inputs-differ` — a data input differs: Local, with the differing paths
     reported.
-  - `stamp-missing` — the stamp does not exist: Local. A refresh deletes the
-    stamp for as long as its export runs, so a game build during a running
-    refresh resolves Local; when no data input of the worktree changed and no
-    `thirdparty-candidate` row fires, waiting for the refresh to finish and
-    rebuilding resolves Shared again. That refresh can come from another session
-    (`## Wrapper bootstrap Shared-data refresh`), and Windows keeps a file's
-    creation time when it is deleted and quickly recreated (NTFS file-name
-    tunneling), so a stamp creation time older than the build does not prove
-    the stamp existed when the build resolved its mode.
+  - `stamp-missing` — the stamp does not exist after any active refresh releases
+    the bootstrap mutex (`## Wrapper bootstrap Shared-data refresh`, which also
+    owns `shared-data.refresh-timeout`): Local.
   - `stamp-unresolvable` — the stamp's text does not resolve to a commit:
     Local.
   - `thirdparty-candidate` — no data input differs but the context's
@@ -138,11 +132,6 @@ The viewer's identity never changes pack names or export inputs. Viewer builds
 do not write sandbox harness Shared-data records.
 
 Every Local game build sets `RunDataPacker=true`; every other build is `false`.
-A Local game build also needs `DevEnvDir` for the game project's nested
-DataPacker build. The invocation resolves `DevEnvDir` for every game build, so
-an unresolvable `DevEnvDir` blocks every game build, Shared included, under
-`context.unresolved` naming `dev-env-dir.unresolved`; only a Local game build
-passes it, so it cannot leak into a Shared one.
 
 ## Generated Data directory inventory
 
@@ -203,21 +192,25 @@ for example with the host's background-execution parameter such as
 `run_in_background`; a killed shell stops the export midway and leaves the
 primary data unstamped.
 
-Each game's refresh also writes the data stamp (`## Mode selection`). Before
-its export it deletes the stamp, aborting the
-bootstrap run if the delete fails, and records `HEAD`. After a successful
-export it writes that commit only when the data inputs (`## Mode selection`)
-show no committed or uncommitted difference from it, so a commit landed during
-the export also leaves it unwritten; when they differ, its warning lists the
-differing paths and worktree game builds resolve Local until a clean refresh.
-A failure to record `HEAD` or to compare likewise warns and leaves the stamp
-unwritten. An export can itself rewrite tracked data inputs, such as island BC
-textures and scene `.PreExport` markers; the stamp then stays unwritten until
-those files are committed in the primary, which restores Shared at the next
-refresh. A skipped refresh leaves the stamp alone. A primary DataPacker run
-outside the bootstrap, such as a Visual Studio build in the primary checkout,
-rewrites Shared data without updating the stamp; the next refresh stamps it
-again.
+Each game's refresh also writes the data stamp (`## Mode selection`). The
+repository AgentTools bootstrap mutex serializes `Bootstrap-AgentTools.ps1`
+from stamp deletion through export and stamp publish, primary-checkout Local
+generation from stamp deletion through its last data-writing build, and
+game-target context resolution and Shared listing, which block with
+`shared-data.refresh-timeout` on timeout. Before its export a refresh deletes
+the stamp, aborting the bootstrap run if the delete fails, and records `HEAD`.
+After a successful export it writes that commit only when the data inputs
+(`## Mode selection`) show no committed or uncommitted difference from it, so a
+commit landed during the export also leaves it unwritten; when they differ, its
+warning lists the differing paths and worktree game builds resolve Local until
+a clean refresh. A failure to record `HEAD` or to compare likewise warns and
+leaves the stamp unwritten. An export can itself rewrite tracked data inputs,
+such as island BC textures and scene `.PreExport` markers; the stamp then stays
+unwritten until those files are committed in the primary, which restores Shared
+at the next refresh. A skipped refresh leaves the stamp alone. A primary
+DataPacker run outside the bootstrap, such as a Visual Studio build in the
+primary checkout, rewrites Shared data without updating the stamp; the next
+refresh stamps it again.
 
 Ordinary Shared work otherwise remains unchanged: primary Data, no
 `RunDataPacker`, and no materialization or export.

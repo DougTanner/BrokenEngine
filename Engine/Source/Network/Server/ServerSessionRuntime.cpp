@@ -48,10 +48,7 @@ void ServerSessionRuntime::ResetOnLastClientLeave()
 	if (mbHadClients && !bHasClients)
 	{
 		game::gpGame->mGameFlags.Set(engine::GameFlags::kPaused, false);
-		if (game::gpGame->mTimeStep.miTimeMultiply != 1 || game::gpGame->mTimeStep.miTimeDivide != 1)
-		{
-			game::gpGame->mTimeStep.SetTimeScale(1, 1);
-		}
+		game::gpGame->mTimeStep.SetTimeScale(1, 1);
 	}
 	mbHadClients = bHasClients;
 }

@@ -1,6 +1,7 @@
 #version 460
 
 #include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
 
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
@@ -30,22 +31,8 @@ void main()
 
 	if (iFormat == kiDebugTextureFormatFloat16LightingDirectional)
 	{
-		// Float16 EWNS: Same tone mapping as LightCombine.comp (Uchimura). Pass scaling and the Uchimura
-		// segment constants (S0/S1/CP) are precomputed on the CPU (globalLayout.fCombine*).
-		vec4 f4Scaled = f4Sample * globalLayout.fCombinePassNormalizationScale;
-
-		float P = globalLayout.fCombineMaxBrightness;
-		float a = globalLayout.fCombineContrast;
-		float m = globalLayout.fCombineLinearStart;
-		float c = globalLayout.fCombineToe;
-		float b = globalLayout.fCombineBlackTightness;
-		float S0 = globalLayout.fCombineShoulderInputStart;
-		float S1 = globalLayout.fCombineShoulderOutputStart;
-		float CP = globalLayout.fCombineShoulderExponentCoefficient;
-		vec4 f4W0 = vec4(1.0f) - smoothstep(vec4(0.0f), vec4(m), f4Scaled);
-		vec4 f4W2 = step(vec4(S0), f4Scaled);
-		vec4 f4W1 = vec4(1.0f) - f4W0 - f4W2;
-		f4Scaled = (m * pow(max(f4Scaled, 0.0f) / m, vec4(c)) + b) * f4W0 + (m + a * (f4Scaled - m)) * f4W1 + (P - (P - S1) * exp(CP * (f4Scaled - S0))) * f4W2;
+		// Float16 EWNS: Same tone mapping as LightCombine.comp (Uchimura); pass scaling is precomputed on the CPU.
+		vec4 f4Scaled = Uchimura(globalLayout, f4Sample * globalLayout.fCombinePassNormalizationScale);
 		float fTotal = f4Scaled.r + f4Scaled.g + f4Scaled.b + f4Scaled.a;
 		float fIntensity = min(fTotal, 1.0f);
 		float fEastWest = fTotal > 0.0f ? (f4Scaled.r - f4Scaled.g) / fTotal * 0.5f + 0.5f : 0.0f;

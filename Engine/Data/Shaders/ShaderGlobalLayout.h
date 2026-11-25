@@ -21,6 +21,14 @@ struct AreaToUvLayout
 	vec4 f4ScaleOffset INIT; // (1 / width, -1 / height, -left / width, top / height)
 };
 
+// LightingUniforms.cpp precomputes per-pass loop counts and ideal EWNS tap-weight sum reciprocals for LightingSpread.frag.
+struct SpreadPassNormalizationLayout
+{
+	vec2 f2WeightSumInverse INIT; // (1 / eastWestWeightSum, 1 / northSouthWeightSum)
+	uint32_t uiRingCount INIT;
+	uint32_t uiDirectionCountBase INIT;
+};
+
 struct GlobalLayout
 {
 	float fElapsedTime INIT;
@@ -132,10 +140,10 @@ struct GlobalLayout
 	vec2 f2WindTilesInverse INIT; // (1/uiWindTilesX, 1/uiWindTilesY) (WindOccupancyDilate output-tile-center UV)
 
 	float fLightingObjectsAdd INIT;
-	float fLightingDepositThreshold INIT;
 	float fLightingDepositCompress INIT;
-	// Uchimura tone curve inputs (LightCombine.comp / DebugTexture.frag). fCombineLinearLength folds CPU-side into
-	// fCombineShoulderInputStart/fCombineShoulderOutputStart; fCombineShoulderExponentCoefficient is the segment CP constant (epsilon-guarded on P - S1 in LightingUniforms.cpp).
+	// Uchimura tone curve inputs (LightCombine.comp / DebugTexture.frag). fCombineLinearStart and fCombineBlackTightness
+	// resolve CPU-side from normalized wrapper fractions, fCombineLinearLength folds into fCombineShoulderInputStart and
+	// fCombineShoulderOutputStart, and fCombineShoulderExponentCoefficient is -a / (P - S1) (P - S1 >= 0.004f by wrapper bounds).
 	float fCombineMaxBrightness INIT;
 	float fCombineContrast INIT;
 	float fCombineLinearStart INIT;
@@ -150,6 +158,7 @@ struct GlobalLayout
 	float fCombinePassNormalizationScale INIT;
 	float fCombinePassTotalScale INIT;
 	float pfCombineCurvePoints[kiMaxSpreadPasses] INIT; // Per-pass combine curve weights: LightingSpread.frag indexes by pass index; entries at or past fSpreadPassCount are unused
+	SpreadPassNormalizationLayout pSpreadPassNormalizations[kiMaxSpreadPasses] INIT; // Per-pass spread loop counts and EW/NS weight-sum reciprocals: LightingSpread.frag indexes by pass index; entries at or past fSpreadPassCount are unused
 	float fLightingTerrain INIT;
 	float fLightingObjects INIT;
 
@@ -166,25 +175,19 @@ struct GlobalLayout
 	vec2 f2LightingDepositSizeInverse INIT; // 1 / (lightTiles * kiComputeTileSize) (LightingDepositEdgeFade)
 
 	// Spread Start (radial directional spread)
-	float fSpreadDirectionCountStart INIT;
 	float fSpreadDistanceStart INIT;
-	float fSpreadRingCountStart INIT;
 	float fSpreadDecayStart INIT;
 	float fSpreadAccumulationDecayStart INIT;
 	float fSpreadDistanceFalloffStart INIT;
-	float fSpreadOutputThresholdStart INIT;
 	float fSpreadOutputCompressStart INIT;
 	float fSpreadPassCount INIT;
 
 	// Spread End (interpolation targets for last spread pass)
 	float fSpreadDirectionalityEnd INIT;
-	float fSpreadDirectionCountEnd INIT;
 	float fSpreadDistanceEnd INIT;
-	float fSpreadRingCountEnd INIT;
 	float fSpreadDecayEnd INIT;
 	float fSpreadAccumulationDecayEnd INIT;
 	float fSpreadDistanceFalloffEnd INIT;
-	float fSpreadOutputThresholdEnd INIT;
 	float fSpreadOutputCompressEnd INIT;
 
 	float fSpreadHeightMultiplier INIT;

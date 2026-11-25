@@ -23,7 +23,8 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 # compiles the primary's generated data headers and embeds the primary data path. The copy runs
 # outside the bootstrap mutex, so the copied exe is re-hashed against the stamp to close torn-read
 # races against a concurrent primary rebuild or user VS build. Any failure removes the files this
-# run copied, warns with the reason, and falls through to the Target's local build below.
+# run copied; a resolver shared-data.refresh-timeout then throws without falling back, while any
+# other failure warns with the reason and falls through to the Target's local build below.
 # The tree lists match Bootstrap-AgentTools.ps1's, in stamp order. ThirdParty is included because
 # directly tracked files under it are on the include path; the tree-hash check only catches
 # committed drift, so uncommitted edits need the clean gate.
@@ -37,6 +38,7 @@ $stampPath = Join-Path $primaryOutput "$($Target)PrebuildStamp.txt"
 $compileScripts = Join-Path $PSScriptRoot '..\skills\compile\scripts'
 $copiedFiles = [Collections.Generic.List[string]]::new()
 $seeded = $false
+$abortMessage = $null
 try {
 	if (-not (Test-Path -LiteralPath $stampPath -PathType Leaf)) { throw "No $Target prebuild stamp at '$stampPath'." }
 	$stampLines = @([IO.File]::ReadAllText($stampPath).Replace("`r", '').Split("`n") | Where-Object { $_.Length -ne 0 })
@@ -56,7 +58,22 @@ try {
 		# end this script's caller too.
 		$contextScript = Join-Path $compileScripts 'Resolve-CompileContext.ps1'
 		$contextRun = Invoke-AgentProcess 'pwsh' @('-NoProfile', '-File', $contextScript, '-Target', 'ModelViewer', '-RepositoryRoot', $Worktree, '-PrimaryCheckout', $PrimaryCheckout, '-Baseline', $Baseline) $PSScriptRoot
-		if ($contextRun.ExitCode -ne 0) { throw "Resolve-CompileContext.ps1 exited $($contextRun.ExitCode): $($contextRun.Stderr.Trim())" }
+		if ($contextRun.ExitCode -ne 0) {
+			if ($contextRun.ExitCode -eq 2 -and -not [string]::IsNullOrWhiteSpace($contextRun.Stdout)) {
+				$blockedContext = $null
+				try { $blockedContext = $contextRun.Stdout | ConvertFrom-Json } catch { }
+				if ($null -ne $blockedContext -and $blockedContext.PSObject.Properties['code'] -and [string]$blockedContext.code -ceq 'shared-data.refresh-timeout') {
+					$abortMessage = if ($blockedContext.PSObject.Properties['message'] -and -not [string]::IsNullOrWhiteSpace([string]$blockedContext.message)) {
+						[string]$blockedContext.message
+					}
+					else {
+						'Timed out waiting for the AgentTools bootstrap mutex before reading SharedDataStamp.txt.'
+					}
+					throw $abortMessage
+				}
+			}
+			throw "Resolve-CompileContext.ps1 exited $($contextRun.ExitCode): $($contextRun.Stderr.Trim())"
+		}
 		if ([string]::IsNullOrWhiteSpace($contextRun.Stdout)) { throw 'Resolve-CompileContext.ps1 produced no JSON result.' }
 		try { $context = $contextRun.Stdout | ConvertFrom-Json }
 		catch { throw 'Resolve-CompileContext.ps1 produced an unparsable JSON result.' }
@@ -87,6 +104,7 @@ try {
 }
 catch {
 	foreach ($copiedFile in $copiedFiles) { Remove-Item -LiteralPath $copiedFile -Force -ErrorAction SilentlyContinue }
+	if ($null -ne $abortMessage) { throw $abortMessage }
 	Write-Warning "Could not seed worktree $Target from the primary prebuild, building locally: $($_.Exception.Message)"
 }
 if ($seeded) { return }

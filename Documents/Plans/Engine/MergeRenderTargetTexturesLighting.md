@@ -27,8 +27,7 @@ create, and debug-slot regions), and
 `Documents/Plans/Engine/RemoveFlightPlanes.md` cite line numbers at the top of
 `RenderTargetTextures.cpp`, where the merge adds an include; landing this merge
 first would invalidate their citations. `SingleLayerWorldLighting` also deletes
-the `static_assert` that `Documents/Plans/Game/SingleFlightHeightShips.md`
-cites at `RenderTargetTexturesLighting.cpp:14`, and it depends on that Plan.
+the `static_assert` at `RenderTargetTexturesLighting.cpp:14`.
 
 ## Design
 

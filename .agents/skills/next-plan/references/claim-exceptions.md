@@ -27,14 +27,17 @@ the claimed Plan can be settled only by reading values off rendered pixels,
 because no harness query exposes them, the pixel-evidence prohibition in
 `/agent-harness` `## Handoff` binds main too: never settle it from a screenshot
 yourself. Report the gap and, on the explicit user deferral instruction
-[`../SKILL.md`](../SKILL.md) `## Rules` requires, act in this order: file the
-missing query as a follow-up Plan through `/create-follow-up-plans`, citing the
-harness command documentation that exposes no such query and naming the values
-the client already computes and the narrowest query that would expose them; add
-that Plan's normalized path to the claimed Plan's `dependsOn` through that
-skill's existing-Plan dependency-change case; then defer. That Plan and the
-`dependsOn` edit are already in the worktree when the checkpoint runs and are
-the followup-only landing gate's content under the deferred row in
+[`../SKILL.md`](../SKILL.md) `## Rules` requires, dispatch
+`/create-follow-up-plans` (citing the lacking command doc, client-computed
+values, and narrowest query) to file the missing query and add its path to the
+claimed Plan's `dependsOn`: for a new Plan, that worker adds its chosen path
+before `New-PlanFile.ps1`
+([`new-plan-file.md`](../../../references/new-plan-file.md#invocation)); for a
+reused Plan, update `dependsOn` (dependency-change case) and validate — on
+`dependency-cycle`, stop without deferring and ask the user rather than drop an
+existing prerequisite. Defer only after creation or reuse and validation
+succeed. That prerequisite and edit are already in the worktree at the
+checkpoint and feed the followup-only landing gate under the deferred row in
 [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes). Deferral is
 not waiver: the criterion stays unmet and the Plan stays unimplemented in the
 tree.

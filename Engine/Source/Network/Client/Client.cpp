@@ -118,29 +118,19 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 			case ENET_EVENT_TYPE_DISCONNECT:
 				if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
 				{
-					// ENet can acknowledge a reliable rejection before the simulated receive delay releases it.
-					// Deliver that rejection before the disconnect tears down the session and its delay queue.
-					auto it = std::ranges::find_if(mDelayedPackets, [](const DelayedPacket& rPacket)
+					if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
 					{
-						// Read throws on a layout it cannot decode and Receive's catches do not cover this predicate, so the size and type tests come first.
-						if (std::ssize(rPacket.data) < NetworkMessages::ServerConnectionResponseMessage::kiMinSize)
+						// ENet can acknowledge a reliable rejection before the simulated receive delay releases it.
+						// Deliver that rejection before the disconnect tears down the session and its delay queue.
+						auto it = std::ranges::find_if(mDelayedPackets, [](const DelayedPacket& rPacket)
 						{
-							return false;
-						}
-
-						if (static_cast<PacketType>(rPacket.data.at(0)) != PacketType::kServerConnectionResponse)
+							return !rPacket.data.empty() && static_cast<PacketType>(rPacket.data.at(0)) == PacketType::kServerConnectionResponse;
+						});
+						if (it != mDelayedPackets.end())
 						{
-							return false;
+							Receive(it->data);
+							mDelayedPackets.erase(it);
 						}
-
-						NetworkMessages::ServerConnectionResponseMessage message {};
-						NetworkMessages::Read(rPacket.data, message);
-						return message.uiAccepted == 0;
-					});
-					if (it != mDelayedPackets.end())
-					{
-						Receive(it->data);
-						mDelayedPackets.erase(it);
 					}
 				}
 				mStateFlags.Set(ClientStateFlags::kConnected, false);
@@ -826,13 +816,7 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 
 	LOG(kNetwork, kDebug, "Client::ServerTimespeedUpdate Multiply: {} Divide: {} Paused: {}", message.iMultiply, message.iDivide, message.uiPaused);
 
-	// SetTimeScale always flags a change, and ClientUpdate clears the debug note on a 1:1 change, so an unchanged ratio
-	// must not call it or the echo of a SPACE pause would erase the PAUSED note.
-	TimeStep& rTimeStep = game::gpGame->mTimeStep;
-	if (message.iMultiply != rTimeStep.miTimeMultiply || message.iDivide != rTimeStep.miTimeDivide)
-	{
-		rTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
-	}
+	game::gpGame->mTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
 
 	bool bPaused = message.uiPaused != 0;
 	mStateFlags.Set(ClientStateFlags::kServerPaused, bPaused);

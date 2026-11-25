@@ -52,11 +52,11 @@ heading turn in `ShipBehaviours` follows the
   only (`../../../../../../DataPacker/Source/ExportJobs/AGENTS.md`
   `## Model Alignment`), so a sidecar `offset` must not move the Z range off it.
 - Shared startup caches each controller model's minimum origin height from its
-  aligned upright geometry, keeping the hull at least 1 meter above water.
-  A ship's effective flight height is the maximum of that minimum and its
-  requested flight-plane height; bank and pitch do not affect it. Genuine
-  spawns apply this height once before initializing owned objects; transfers
-  preserve their carried position.
+  aligned upright geometry, keeping the hull at least 1 meter above water. A
+  ship's effective flight height (`EffectiveShipFlightHeight`) is the maximum
+  of that minimum and the lowest flight-plane height; bank and pitch do not
+  affect it. Genuine spawns apply this height once before initializing owned
+  objects; transfers preserve their carried position.
 - A row's CRC'd `ShipController` selects its script branch and its model.
   Fleet-controlled rows are the owned entities (`Frame::OwnedEntityCount`) and
   run the fleet navigation below, except a fleet Fighter in its flagship's cell
@@ -93,30 +93,18 @@ heading turn in `ShipBehaviours` follows the
   behavior by one tick.
 - Each ship type's PostRender `PostRead` rejects an unknown controller, a
   nonzero `pClientGuids` or `pGlobalIds` on a row that is not
-  `ShipController::kFleet`, a target flight plane the type disallows, and an AI
-  direction that fails `IsShipHeadingValid`. On every Frame read, Interpolate
-  `PostRead` requires a finite Fighter or Omni height at or above the lowest
-  plane, allowing terrain-raised heights above the highest plane; Battleships
-  retain the lowest-to-highest plane range. Every type rejects a stored plane
-  that is neither `kuiNoFlightPlane` nor allowed for the type, and a heading
-  that fails `IsShipHeadingValid`.
-- A ship's target flight plane lives in its orders, set at spawn and changed by
-  `kUpdateShip`, by the Fighters and fleet Omnis PostRender Update tactics, and
-  by the random-spawn Omni chase (`../Fighters/AGENTS.md`,
-  `../Omnis/AGENTS.md`); target planes must be allowed for the type
-  (`IsFlightPlaneAllowed`). Its current plane is stored in the shared
-  Interpolate column `puiFlightPlanes`: the plane index once ordinary plane
-  travel lands it at that plane's exact effective height, `kuiNoFlightPlane`
-  between or above planes and after a terrain rise, even one ending at an exact
-  effective height. A genuine spawn stores its spawn plane and a transfer
-  arrival carries the stored value.
-- Between the two flight planes, the lower plane carries the union of terrain
-  restrictions because the upper plane has none. A ship navigates on its
-  `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the
-  terrain-contact start snap use that plane's graph of the ship type's clearance
-  tier (`ShipTypeClearanceTier`, `TerrainUtils.h`), and terrain steering and
-  avoidance read terrain relative to that plane's height, ignoring it on a plane
-  without terrain collision.
+  `ShipController::kFleet`, and an AI direction that fails
+  `IsShipHeadingValid`; Interpolate `PostRead` rejects a heading that fails
+  `IsShipHeadingValid`. On build-local `Frame` reads (`ValidateShipHeights`,
+  `Frame.cpp`), Omni and Battleship heights must equal their controller's
+  `EffectiveShipFlightHeight`, Fighter heights must be finite and at or above
+  it (allowing terrain-raised Fighters), and every ship row's velocity Z must
+  be zero.
+- Path queries and the terrain-contact start snap use the ship type's clearance
+  tier graph (`ShipTypeClearanceTier`, looked up via `NavigationTierData`),
+  while `ComputeAiSteering` compares raw cell-elevation samples and
+  `ComputeTerrainAvoidance` compares weighted averages of raw cell elevations
+  against their steering thresholds.
 - Path queries route around large ships. `NavRectangleBoard`, built once per
   ship type's PostRender Update, holds one rectangle per previous-frame row
   `IsNavRectangleRow` accepts, so a navigation-obstacle ship's rectangle exists
@@ -132,10 +120,9 @@ heading turn in `ShipBehaviours` follows the
   that hull.
 - A query sees only the rectangles `NavRectangleBoard::Select` picks, so no
   exception code exists for a ship's own rectangle, a flagship, or an attack
-  target. Plane sharing reads each ship's `CappedOccupiedPlanes`, and the
-  terrain graph stays on `NavigationFlightPlane`. Pushers move a ship out of a
-  box it starts in. A stored destination is never snapped out of a box, because
-  a point left beside a ship that moves on might never be reached.
+  target. Pushers move a ship out of a box it starts in. A stored destination is
+  never snapped out of a box, because a point left beside a ship that moves on
+  might never be reached.
 - Only path queries (`ComputeNavigation`, `NextRouteWaypoint`) see rectangles,
   except the veer-off side test (`AttackOrStartVeerOff`,
   `../Fighters/AGENTS.md`). Veer-off (`FleeRouteWaypoint`) and return to an
@@ -145,86 +132,61 @@ heading turn in `ShipBehaviours` follows the
   in a neighbouring cell makes none.
 - Line of sight reads no rectangle. `HasShipLineOfSight` tests the unmodified
   model box of every `IsNavRectangleRow` Battleship in the frame its caller
-  reads that occupies the tested plane. That Battleship-only walk matches the
-  rows `NavRectangleBoard` holds only while `navigationObstacle` stays on the
-  two Battleship models.
-- Interpolate Update owns ordinary plane travel: `ClimbTowardsFlightPlane` lands
-  exactly on the effective flight height, so client and server match
-  bit-exactly. A descent blocked by the lower plane's clearance graph at the
-  integrated XY returns toward the upper plane, keeping order and horizontal
-  motion, until the first clear update.
-- A live ship whose type allows plane 1 immediately rises to at least the
-  terrain elevation sampled at its center XY plus the lowest plane's height.
-  Apply this floor after ordinary Interpolate plane travel and after the final
-  PostRender pusher correction, without a rise-rate or highest-plane ceiling.
-  Preserve XY/W, target orders, and the ordinary effective model-origin floor;
-  a rise's stored plane follows the `puiFlightPlanes` rule above. These
-  ships bypass horizontal terrain push/contact. Dying ships receive no terrain
-  floor; Fighter and Omni death contact retains the exact-height skip and also
-  requires the actual navigation plane to enable terrain collision.
-  PostRender Update stores velocity Z as 0 as its last velocity write in every
-  type. Height changes step position directly, never through velocity.
+  reads. That Battleship-only walk matches the rows `NavRectangleBoard` holds
+  only while `navigationObstacle` stays on the two Battleship models.
+- A live Fighter rises automatically above terrain (`RaiseAboveTerrain`), and
+  in Interpolate Update steps Z back toward `EffectiveShipFlightHeight` at
+  `kfFighterClimbRate` via `StepHeightTowards` so client and server land on it
+  bit-exactly. Apply `RaiseAboveTerrain` after that descent step and after the
+  final PostRender pusher correction, without a rise-rate ceiling, preserving
+  XY/W, target orders, and the effective model-origin floor. Live Fighters
+  bypass horizontal terrain push and contact. Omnis and Battleships stay at
+  their spawn height with no terrain rise. PostRender Update stores velocity Z
+  as 0 as its last velocity write in every type. Height changes step position
+  directly, never through velocity.
 - Ships taking horizontal terrain contact in PostRender Update sweep their disc
   from the previous to the current Interpolate position against the cell's
   elevation grid, blocked at the current position's height, and write the
-  resolved position back to the current Interpolate row. A ship on a plane
-  without terrain collision skips contact, as does a dying Battleship. On
-  contact Omnis slide along the terrain once and Fighters and Battleships bounce
-  off it. A start already inside terrain logs a warning; spawn sites test at
-  most the body's center against terrain, so a warning right after a spawn is
-  expected.
-- Headings stay horizontal: a direction that can aim at another plane, such as
-  the Omni wanted direction or the random-wave heading, is flattened before it
-  becomes or turns a ship's heading. Every simulation write and every ship spawn
-  stores a horizontal unit vector in `pVecAiDirections`, and spawn stores the
-  heading; the agent `edit_frame` command writes raw values, bounded only by the
-  read check (`IsShipHeadingValid`). An Omni row carrying
-  `ShipFlags::kNoAiDirection` has no AI direction it wants, so the Omni thrust
-  ignores it; the [turning rule](#turning-invariants) covers Fighter and
-  Battleship rows.
-- Target choice treats a ship as on its nearest flight plane
-  (`NearestFlightPlane`), while collision and hits stay normal 3D. Omni blasters
-  target only an enemy whose nearest plane is the shooter's stored plane, and
-  Battleship missiles only one whose nearest plane is the launching tube's
-  nearest plane, each hitting a climbing target only by 3D contact: a missile
-  aims along the horizontal offset to its target and flies on the lowest plane
-  (`../Missiles/AGENTS.md`), and an Omni bolt flies flat along the Omni's hull.
-  The Fighter beam has its own plane rule (`../Fighters/AGENTS.md`). All three
-  weapons fire only at an enemy in line of sight (`HasShipLineOfSight`): the
-  Omni blaster and Fighter beam from the shooter's origin on its stored plane,
-  a Battleship missile from the launching tube on that tube's nearest plane
+  resolved position back to the current Interpolate row. Live Omnis take
+  terrain push, pusher push, and `ApplyTerrainBounce`; dying Omnis take
+  terrain push, pusher push, and `ResolveTerrainContact` (sliding once); live
+  Battleships and dying Fighters bounce via `ApplyTerrainBounce`; dying
+  Battleships skip contact (`../Battleships/AGENTS.md`). A start already inside
+  terrain logs a warning; spawn sites test at most the body's center against
+  terrain, so a warning right after a spawn is expected.
+- Headings stay horizontal: a 3D direction, such as the Omni wanted direction or
+  the random-wave heading, is flattened before it becomes or turns a ship's
+  heading. Every simulation write and every ship spawn stores a horizontal unit
+  vector in `pVecAiDirections`, and spawn stores the heading; the agent
+  `edit_frame` command writes raw values, bounded only by the read check
+  (`IsShipHeadingValid`). An Omni row carrying `ShipFlags::kNoAiDirection` has
+  no AI direction it wants, so the Omni thrust ignores it; the
+  [turning rule](#turning-invariants) covers Fighter and Battleship rows.
+- All three weapons fire only at an enemy in line of sight
+  (`HasShipLineOfSight`): the Omni blaster and Fighter beam from the shooter's
+  origin, and a Battleship missile from the launching tube
   (`../Battleships/AGENTS.md` `## Weapon Invariants`). The test is 2D against
   the Battleship model boxes above and tier 0's inflated navigation polygons
   for every shooter (`kiFiringClearanceTier`), so it blocks slightly early near
-  terrain; it is unchecked on a plane without terrain collision, which no
-  Battleship box occupies (`kiBattleshipHighestFlightPlane`). An Omni faces
-  only an enemy in line of sight. A ship storing `kuiNoFlightPlane` fires none
-  of them, and a Battleship launches missiles only while exactly at its stored
-  plane's effective flight height. No Omni targets, chases, or faces an enemy
-  above its highest plane.
-  These plane rules govern only target choice and aim; blaster and missile
-  collision and explosion damage ignore planes, and pushers follow their
-  height-derived layer rule above.
+  terrain. An Omni faces only an enemy in line of sight, its bolt flies flat
+  along its hull, and a missile aims along the horizontal offset to its target
+  and flies on the lowest flight plane (`../Missiles/AGENTS.md`).
 - Every Fighter, Omni, and random-spawn Battleship keeps one attack target, the
   enemy row in the previous frame whose registry id its `pRegistryTargets`
   stores, chosen by `FindAttackTarget` (`ShipQueries.h`) or, for a
   `kTargetFlagship` row or a random-spawn Battleship, the flagship rule above.
   A fleet ship picks from its flagship (`## Fleet Coordination Invariants`), a
   random-spawn ship from itself as its type's `AGENTS.md` states, except where
-  a fleet Fighter's squadron settings pick for it (`../Fighters/AGENTS.md`).
-  Sight is tested on the ship's stored plane, so a ship changing layer sees
-  every enemy and flies its regular attack pattern. In `FindAttackTarget`'s
-  pick an enemy in line of sight always wins: a hidden kept target is kept, and
-  routed to, only while no enemy is in sight, except under `FindAttackTarget`'s
-  `AttackTargetFlags::kIgnoreLineOfSight`, used only for those squadron
-  settings. An enemy above the type's highest plane is never a target; a pick
-  that finds no other enemy clears a kept target there. The pick and the
-  imposed-target chases (flagship and squadron settings) test
-  `HasShipLineOfSight`, a chase on the ship's own clearance tier. Movement
-  decisions after a pick retest terrain only (`HasLineOfSight`) on the ship's
-  own clearance tier, which can hide a target the tier-0 pick saw; the box test
-  does not depend on the tier. While the target is hidden the ship steers at
-  its `NextRouteWaypoint` on the target's nearest plane every tick, an
+  a fleet Fighter's squadron settings pick for it (`../Fighters/AGENTS.md`). In
+  `FindAttackTarget`'s pick an enemy in line of sight always wins: a hidden
+  kept target is kept, and routed to, only while no enemy is in sight, except
+  under `FindAttackTarget`'s `AttackTargetFlags::kIgnoreLineOfSight`, used only
+  for those squadron settings. The pick and the imposed-target chases (flagship
+  and squadron settings) test `HasShipLineOfSight`, a chase on the ship's own
+  clearance tier. Movement decisions after a pick retest terrain only
+  (`HasLineOfSight`) on the ship's own clearance tier, which can hide a target
+  the tier-0 pick saw; the box test does not depend on the tier. While the
+  target is hidden the ship steers at its `NextRouteWaypoint` every tick, an
   exception to the path-query cadence (`## Fleet Navigation Invariants`), and
   starts no veer-off; a random-spawn Fighter or Omni returning to an island
   skips that route. Fleet Battleships pick none.
@@ -249,9 +211,8 @@ heading turn in `ShipBehaviours` follows the
   target first (`../Fighters/AGENTS.md`). Escort and veer-off leave the id
   untouched, except for a Fighter's squadron-setting picks
   (`../Fighters/AGENTS.md`), so a target that died or left keeps its stale id
-  until the next pick; in Update only leaving the flagship's cell, or a pick
-  dropping a kept target above the type's highest plane (`## Ship Invariants`),
-  clears it. Registry ids come from a frame-wide counter (`MakeUuid`,
+  until the next pick; in Update only leaving the flagship's cell clears it.
+  Registry ids come from a frame-wide counter (`MakeUuid`,
   `../../../../../../Engine/Source/Frame/FrameBase.h`), so a stale id never
   names another row.
 
@@ -279,7 +240,7 @@ heading turn in `ShipBehaviours` follows the
   `kSquadron1`, and both setting bits; the leader picks, and every other such
   row takes the leader's previous-frame destination whenever it is set and
   differs from its own, recomputing its path on that change, and skips the
-  off-plane snap and the arrival reset.
+  blocked-destination snap and the arrival reset.
 - Flagship following has no frame-local exit when the flagship row is not in
   the follower's cell, and the server never reassigns the flagship: a fleet's
   flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
@@ -318,7 +279,7 @@ heading turn in `ShipBehaviours` follows the
   `## Terrain and Navigation`), so no ship heads for an island centred in
   another cell. A centred island's footprint can still pass the cell edge and a
   navigation snap can push a point past it, so a fresh island destination, or a
-  stored one snapped when its plane's polygons cover it, that fails
+  stored one snapped when its clearance tier's polygons cover it, that fails
   `IsInsideCell` after the snap is dropped: the destination clears, and the next
   tick draws again. A dropped largest or smallest pick still advances to the
   next waypoint.

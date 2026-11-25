@@ -33,77 +33,20 @@ constexpr float kfReturnedDistance = kfReturnDistance - 20.0f;
 constexpr float kfTerrainBounceRotation = 8.0f;
 constexpr float kfTerrainBounceVelocity = 4.0f;
 
-int64_t HighestFlightPlane(ShipType eType)
+float EffectiveShipFlightHeight(ShipType eType, ShipController eController)
 {
-	return kShipTypeHighestFlightPlanes.at(std::to_underlying(eType));
+	return std::max(engine::gpFlightPlanes->Lowest().fHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
 }
 
-int64_t DefaultFlightPlane(ShipType eType)
-{
-	return eType == ShipType::kOmni ? 0 : HighestFlightPlane(eType);
-}
-
-bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane)
-{
-	return iFlightPlane >= 0 && iFlightPlane <= HighestFlightPlane(eType);
-}
-
-float EffectiveShipFlightHeight(ShipType eType, ShipController eController, int64_t iFlightPlane)
-{
-	return std::max(engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters, gShipHitboxShapes[std::to_underlying(eType)][std::to_underlying(eController)].fMinimumOriginZ);
-}
-
-static std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
-{
-	for (int64_t i = 0; i < engine::gpFlightPlanes->Count(); ++i)
-	{
-		if (engine::gpFlightPlanes->Plane(i).fHeightMeters == fHeight)
-		{
-			return i;
-		}
-	}
-	return std::nullopt;
-}
-
-int64_t XM_CALLCONV NearestFlightPlane(FXMVECTOR vecPosition)
-{
-	return engine::gpFlightPlanes->NearestPlaneIndex(XMVectorGetZ(vecPosition));
-}
-
-int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane)
-{
-	// Heights ascend, and a ship's Z never drops below the lowest plane, so plane 0 is the floor.
-	int64_t iBelow = 0;
-	for (int64_t i = 1; i < engine::gpFlightPlanes->Count() && engine::gpFlightPlanes->Plane(i).fHeightMeters <= fHeight; ++i)
-	{
-		iBelow = i;
-	}
-	return std::min(iBelow, iTargetPlane);
-}
-
-bool SkipsTerrainContact(float fHeight)
-{
-	std::optional<int64_t> optionalFlightPlane = FlightPlaneAtHeight(fHeight);
-	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
-}
-
-bool TakesDeathTerrainContact(float fHeight, int64_t iTargetPlane)
-{
-	return !SkipsTerrainContact(fHeight)
-	    && (engine::gpFlightPlanes->Plane(NavigationFlightPlane(fHeight, iTargetPlane)).flags & engine::FlightPlaneFlags::kTerrainCollision);
-}
-
-const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane)
+const engine::NavData& NavigationTierData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier)
 {
 	static const engine::NavData sEmptyNavData;
-	int64_t iGraph = NavigationGraphIndex(iClearanceTier, iNavigationPlane);
-	return (iGraph >= 0 && iGraph < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iGraph)) : sEmptyNavData;
+	return rStaticData.navigationData.empty() ? sEmptyNavData : rStaticData.navigationData.at(static_cast<size_t>(iClearanceTier));
 }
 
-float StepHeightTowards(float fHeight, float fTargetHeight, float fStep, bool& rbArrived)
+float StepHeightTowards(float fHeight, float fTargetHeight, float fStep)
 {
 	float fHeightGap = fTargetHeight - fHeight;
-	rbArrived = false;
 	if (fHeightGap > fStep)
 	{
 		return fHeight + fStep;
@@ -112,38 +55,16 @@ float StepHeightTowards(float fHeight, float fTargetHeight, float fStep, bool& r
 	{
 		return fHeight - fStep;
 	}
-	rbArrived = true;
 	return fTargetHeight;
 }
 
-XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
-{
-	// Fixed operation order and the exact effective height on arrival keep client and server bit-identical.
-	float fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
-	float fClimbStep = fClimbRate * deltaTime.count();
-	float fHeight = XMVectorGetZ(vecPosition);
-	if (fTargetHeight < fHeight && engine::NavQueryPointBlocked(vecPosition, NavigationPlaneData(rStaticData, ShipTypeClearanceTier(eType), iTargetFlightPlane)))
-	{
-		iTargetFlightPlane += 1;
-		fTargetHeight = EffectiveShipFlightHeight(eType, eController, iTargetFlightPlane);
-	}
-	bool bArrived = false;
-	fHeight = StepHeightTowards(fHeight, fTargetHeight, fClimbStep, bArrived);
-	if (ruiFlightPlane != iTargetFlightPlane)
-	{
-		ruiFlightPlane = bArrived ? static_cast<uint8_t>(iTargetFlightPlane) : kuiNoFlightPlane;
-	}
-	return XMVectorSetZ(vecPosition, fHeight);
-}
-
-XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane)
+XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition)
 {
 	float fMinimumHeight = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) + engine::gpFlightPlanes->Lowest().fHeightMeters;
 	if (XMVectorGetZ(vecPosition) >= fMinimumHeight)
 	{
 		return vecPosition;
 	}
-	ruiFlightPlane = kuiNoFlightPlane;
 	return XMVectorSetZ(vecPosition, fMinimumHeight);
 }
 
@@ -171,17 +92,7 @@ struct NavRectangleBoard::BoardRectangle
 	XMFLOAT2 f2Center {};
 	float fHalfDiagonal = 0.0f;
 	float fReach = 0.0f;
-	int64_t iLowestPlane = 0;
-	int64_t iHighestPlane = 0;
 };
-
-// OccupiedPlanes reads raw plane heights, so a Battleship at its effective height reads as between planes; the cap at the
-// type's highest plane keeps it on its own.
-static std::pair<int64_t, int64_t> CappedOccupiedPlanes(float fHeight, ShipType eType)
-{
-	auto [iLowestPlane, iHighestPlane] = engine::gpFlightPlanes->OccupiedPlanes(fHeight);
-	return {iLowestPlane, std::min(iHighestPlane, HighestFlightPlane(eType))};
-}
 
 // The handle test is ApplyPusherPush's, so a rectangle exists exactly while its ship's pusher does.
 template <typename SHIP_INTERPOLATE, typename SHIP_POST_RENDER>
@@ -223,8 +134,7 @@ static void PoseInflatedBox(const engine::CollisionHitbox& rShapeHitbox, float f
 }
 
 NavRectangleBoard::NavRectangleBoard(const Frame& rPreviousFrame, ShipType eSelfType)
-: meSelfType(eSelfType)
-, miRectangleCount(CountNavRectangles(rPreviousFrame))
+: miRectangleCount(CountNavRectangles(rPreviousFrame))
 , mRectangles(common::gpThreadLocal->mWorkbuffer.PushBuffer<BoardRectangle*>(miRectangleCount * static_cast<int64_t>(sizeof(BoardRectangle))))
 , mPicked(common::gpThreadLocal->mWorkbuffer.PushBuffer<engine::NavRectangle*>(miRectangleCount * static_cast<int64_t>(sizeof(engine::NavRectangle))))
 {
@@ -267,10 +177,6 @@ NavRectangleBoard::NavRectangleBoard(const Frame& rPreviousFrame, ShipType eSelf
 			rRectangle.f2Center = {f2Corner.x + 0.5f * fDiagonalX, f2Corner.y + 0.5f * fDiagonalY};
 			rRectangle.fHalfDiagonal = 0.5f * std::sqrt(fDiagonalX * fDiagonalX + fDiagonalY * fDiagonalY);
 			rRectangle.fReach = kfNavRectangleReachScale * (fSelfRadius + rShape.fRadius);
-
-			auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), eType);
-			rRectangle.iLowestPlane = iLowestPlane;
-			rRectangle.iHighestPlane = iHighestPlane;
 		}
 	});
 }
@@ -279,7 +185,6 @@ std::span<const engine::NavRectangle> XM_CALLCONV NavRectangleBoard::Select(FXMV
 {
 	engine::ScopedCpuProfile scopedCpuProfile(kCpuTimerPostRenderUpdateNavigationRectangles);
 
-	auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), meSelfType);
 	XMFLOAT2 f2Position {XMVectorGetX(vecPosition), XMVectorGetY(vecPosition)};
 	XMFLOAT2 f2Destination {XMVectorGetX(vecDestination), XMVectorGetY(vecDestination)};
 
@@ -287,10 +192,6 @@ std::span<const engine::NavRectangle> XM_CALLCONV NavRectangleBoard::Select(FXMV
 	for (int64_t i = 0; i < miRectangleCount; ++i)
 	{
 		const BoardRectangle& rRectangle = mRectangles.mpData[i];
-		if (rRectangle.iLowestPlane > iHighestPlane || rRectangle.iHighestPlane < iLowestPlane)
-		{
-			continue;
-		}
 
 		float fOffsetX = rRectangle.f2Center.x - f2Position.x;
 		float fOffsetY = rRectangle.f2Center.y - f2Position.y;
@@ -309,18 +210,16 @@ std::span<const engine::NavRectangle> XM_CALLCONV NavRectangleBoard::Select(FXMV
 	return {mPicked.mpData, static_cast<size_t>(iPickedCount)};
 }
 
-XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, bool& rbFinal)
+XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard)
 {
-	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iClearanceTier, NavigationFlightPlane(XMVectorGetZ(vecPosition), iTargetFlightPlane));
+	const engine::NavData& rNavData = NavigationTierData(rStaticData, iClearanceTier);
 	XMVECTOR vecLevelDestination = XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition));
 	XMVECTOR vecWaypoint = XMVectorZero();
 	engine::NavQueryDirection(vecPosition, vecLevelDestination, rNavData, rNavRectangleBoard.Select(vecPosition, vecLevelDestination), vecWaypoint);
-	// NavQueryDirection snaps its destination with the same polygon snap, so a final waypoint matches it exactly.
-	rbFinal = XMVector2Equal(vecWaypoint, engine::NavQuerySnapToNavigable(vecLevelDestination, rNavData));
 	return vecWaypoint;
 }
 
-XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane)
+XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard)
 {
 	// The neighbouring cell centre whose horizontal direction from the ship has the largest cosine with the ship's
 	// horizontal offset from the threat; an exact tie, a zero offset included, keeps the first entry in table order.
@@ -337,11 +236,10 @@ XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData
 			vecPickedCenter = vecCenter;
 		}
 	}
-	bool bFinalWaypoint = false;
-	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecPickedCenter, rNavRectangleBoard, iTargetFlightPlane, bFinalWaypoint);
+	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecPickedCenter, rNavRectangleBoard);
 }
 
-XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination)
+XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, ShipFlags_t& rFlags, bool& rbHasDestination)
 {
 	std::span<const engine::IslandPlacement> centredIslands = engine::CentredIslands(rStaticData.islands);
 	if (centredIslands.empty())
@@ -379,8 +277,7 @@ XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rSta
 	{
 		return vecNearestEnemy;
 	}
-	bool bFinalWaypoint = false;
-	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecIslandCenter, rNavRectangleBoard, iTargetFlightPlane, bFinalWaypoint);
+	return NextRouteWaypoint(rStaticData, iClearanceTier, vecPosition, vecIslandCenter, rNavRectangleBoard);
 }
 
 bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection)
@@ -437,15 +334,14 @@ static void AvoidTerrainRows(const Frame& rFrame, const Frame& rPreviousFrame, c
 			{
 				XMVECTOR vecToEnemyNormal = XMVector3Normalize(vecToEnemy);
 				float fAngleToEnemy = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToEnemyNormal));
-				if (fAngleToEnemy < kfAvoidTerrainEnemyAngle && HasLineOfSight(rStaticData, ShipTypeClearanceTier(TYPE), rCurrentInterpolate.puiFlightPlanes[i], rCurrentInterpolate.pVecPositions[i], vecNearestEnemy))
+				if (fAngleToEnemy < kfAvoidTerrainEnemyAngle && HasLineOfSight(rStaticData, ShipTypeClearanceTier(TYPE), rCurrentInterpolate.pVecPositions[i], vecNearestEnemy))
 				{
 					continue;
 				}
 			}
 		}
 
-		int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]), GetTargetFlightPlane(rCurrentPostRender.pOrders[i]));
-		float fAvoidanceDeltaRotation = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i], iNavigationPlane);
+		float fAvoidanceDeltaRotation = ComputeTerrainAvoidance(rStaticData, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], rCurrentInterpolate.pfDeltaRotations[i]);
 
 		// Rows still align with the previous frame here: Update calls this before Transfer, Destroy, and Spawn.
 		rCurrentInterpolate.pfDeltaRotations[i] = RampHeadingTurnRate(rPreviousInterpolate.pfDeltaRotations[i], fAvoidanceDeltaRotation, std::chrono::duration<float>(rFrame.interpolate.fDeltaTime), rConstants);
@@ -515,20 +411,11 @@ void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXM
 	}
 }
 
-// The clearance tier's graph of the plane a ship at fHeight navigates. Callers skip terrain contact on a plane without
-// kTerrainCollision, and kFlightPlanes clears that flag only on its highest plane, so the navigated plane carries it.
-static const engine::NavData& TerrainContactNavData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, float fHeight, int64_t iTargetFlightPlane)
-{
-	int64_t iNavigationPlane = NavigationFlightPlane(fHeight, iTargetFlightPlane);
-	ASSERT(engine::gpFlightPlanes->Plane(iNavigationPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
-	return NavigationPlaneData(rStaticData, iClearanceTier, iNavigationPlane);
-}
-
-void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane)
+void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity)
 {
 	// Hard contact at the sweep end's height; ApplyTerrainPush is the softer band in front of it.
 	float fHeight = XMVectorGetZ(rVecPosition);
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, ShipTypeClearanceTier(self.eType), fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, true);
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, NavigationTierData(rStaticData, ShipTypeClearanceTier(self.eType)), vecPreviousPosition, rVecPosition, fRadius, fHeight, true);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iQ, rStaticData.coordinate.iR, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
@@ -542,10 +429,10 @@ void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData
 	}
 }
 
-void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane)
+void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
 {
 	float fHeight = XMVectorGetZ(rVecPosition);
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, ShipTypeClearanceTier(self.eType), fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, false);
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, NavigationTierData(rStaticData, ShipTypeClearanceTier(self.eType)), vecPreviousPosition, rVecPosition, fRadius, fHeight, false);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iQ, rStaticData.coordinate.iR, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
@@ -559,7 +446,10 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 		rfDeltaRotation = fDirectionTerrainCrossZ > 0.0f ? kfTerrainBounceRotation : -kfTerrainBounceRotation;
 
 		// Velocity W stays exactly 0 because ResolveDiscAgainstTerrain returns the contact normal with W=0.
-		rVecVelocity = XMVector3Reflect(rVecVelocity, result.vecNormal);
+		if (XMVectorGetX(XMVector3Dot(rVecVelocity, result.vecNormal)) < 0.0f)
+		{
+			rVecVelocity = XMVector3Reflect(rVecVelocity, result.vecNormal);
+		}
 		rVecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count() * kfTerrainBounceVelocity), result.vecNormal, rVecVelocity);
 	}
 }
@@ -580,15 +470,15 @@ void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, f
 	}
 }
 
-bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
+bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
 {
-	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iClearanceTier, uiFlightPlane);
+	const engine::NavData& rNavData = NavigationTierData(rStaticData, iClearanceTier);
 	return !engine::NavQuerySegmentBlocked(engine::NavQuerySnapToNavigable(vecShooterPosition, rNavData), engine::NavQuerySnapToNavigable(vecTargetPosition, rNavData), rNavData);
 }
 
-bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
+bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition)
 {
-	if (!HasLineOfSight(rStaticData, iClearanceTier, uiFlightPlane, vecShooterPosition, vecTargetPosition))
+	if (!HasLineOfSight(rStaticData, iClearanceTier, vecShooterPosition, vecTargetPosition))
 	{
 		return false;
 	}
@@ -609,12 +499,6 @@ bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStati
 		}
 
 		XMVECTOR vecPosition = rInterpolate.pVecPositions[i];
-		auto [iLowestPlane, iHighestPlane] = CappedOccupiedPlanes(XMVectorGetZ(vecPosition), ShipType::kBattleship);
-		if (uiFlightPlane < iLowestPlane || uiFlightPlane > iHighestPlane)
-		{
-			continue;
-		}
-
 		const ShipHitboxShape& rShape = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rPostRender.pController[i])];
 		XMVECTOR vecDirection = rInterpolate.pVecDirections[i];
 		XMFLOAT2 f2Position {XMVectorGetX(vecPosition), XMVectorGetY(vecPosition)};
@@ -693,8 +577,8 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 		XMFLOAT3A f3NavigationStart {};
 		XMFLOAT3A f3NavigationEnd {};
 		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
-		// The waypoint line end and circle draw at the ship's own height, whatever height navigation stored, so a ship
-		// on a higher plane shows no vertical drop.
+		// The waypoint line end and circle draw at the ship's own height, whatever height navigation stored, so a raised
+		// ship shows no vertical drop.
 		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, XMVectorGetZ(vecPosition))));
 		engine::DebugRender::Line(f3NavigationStart, f3NavigationEnd, {0.0f, 1.0f, 0.0f, 1.0f});
 		engine::DebugRender::Circle(f3NavigationEnd, fRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});

@@ -11,13 +11,17 @@
 #   starts with a `Role:` line and carries a `Governing paths:` line; `Governing paths:` and `Scope:` values (including
 #   continuation lines up to the next column-0 1-3 word key-colon header) are the brief paths, compared case- and
 #   separator-insensitively against the read path (resolving relative paths against the transcript's recorded worktree
-#   root when available). A single bounded `Read`/`read_file` call per path in its
-#   checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired successful text
-#   result length is `<= 4,000` chars (`$script:SmallReadMaxChars`) emits no `match` row; unbounded reads, over-floor
-#   reads, allowlisted shell reads, failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads
-#   of the same path in the same checkpoint span still emit `match` rows. Eligible `match` rows are emitted with their
-#   original `<line>` and `<read line>` immediately before `checkpoint-span`, while all ordinary rows stream unchanged
-#   and `checkpoint-span` and `context-envelope` formats stay unchanged.
+#   root when available). Two exemptions suppress `match` rows: (1) a single bounded `Read`/`read_file` call per path in
+#   its checkpoint span whose requested line count is `<= 60` (`$script:SmallReadMaxLines`) and whose paired successful
+#   text result length is `<= 4,000` chars (`$script:SmallReadMaxChars`), and (2) a resolved worktree public subagent
+#   `SKILL.md` directly under `.agents/skills/<skill>/SKILL.md` or `.claude/skills/<skill>/SKILL.md` when
+#   `.agents/skills/<skill>/references/worker.md` exists. Non-exempt paths (including `references/worker.md`,
+#   main-session `SKILL.md` files without `references/worker.md`, source files, Plans, worker-only references, and
+#   same-named files outside the worktree's skills roots) still emit `match` rows for unbounded reads, over-floor reads,
+#   allowlisted shell reads, failed/unpaired/non-text/missing results, checkpoint-dispatch reads, and repeat reads of the
+#   same path in the same checkpoint span. Eligible `match` rows are emitted with their original `<line>` and
+#   `<read line>` immediately before `checkpoint-span`, while all ordinary rows stream unchanged and `checkpoint-span`
+#   and `context-envelope` formats stay unchanged.
 # `<line> brief-missing <input field> <field label>` — a delegation-shaped input field fails a brief requirement: its
 #   first non-blank line is not a `Role:` line, or it carries no `Governing paths:` line. A field is delegation-shaped
 #   when at least two `.agents/references/subagent-reporting.md` `## Task brief` field labels each start a line of it.
@@ -106,6 +110,9 @@ $script:BreachRowCap = 25
 # Small-read floor: a single bounded Read/read_file call per path in a checkpoint span at or below both limits emits no `match` row.
 $script:SmallReadMaxLines = 60
 $script:SmallReadMaxChars = 4000
+# Repository skills root and per-skill cache for the worktree public subagent `SKILL.md` `match`-row exemption.
+$script:SkillsRoot = Join-Path $PSScriptRoot '..\..'
+$script:PublicSubagentSkillCache = @{}
 # Input fields that name the emitting invocation without leaking result content.
 $script:ContextSummaryFields = @('command', 'CommandLine', 'file_path', 'Path', 'path', 'pattern', 'url', 'query', 'prompt', 'Prompt', 'description', 'Role', 'TypeName', 'Recipient', 'TaskId', 'Action')
 
@@ -276,6 +283,24 @@ function Get-SpanIndex([int] $Line, $Checkpoints) {
 function Test-NormalizedPathMatch([string] $Left, [string] $Right) {
 	if ([string]::IsNullOrEmpty($Left) -or [string]::IsNullOrEmpty($Right)) { return $false }
 	return $Left -ceq $Right -or $Left.EndsWith('/' + $Right) -or $Right.EndsWith('/' + $Left)
+}
+
+function Test-PublicSubagentSkillPath([string] $Key, [string] $RootKey) {
+	if ([string]::IsNullOrEmpty($Key)) { return $false }
+	$resolvedKey = Resolve-NormalizedPathKey $Key $RootKey
+	if ([string]::IsNullOrEmpty($resolvedKey)) { return $false }
+	$relKey = $resolvedKey
+	if (-not [string]::IsNullOrEmpty($RootKey)) {
+		$rootPrefix = if ($RootKey.EndsWith('/')) { $RootKey } else { $RootKey + '/' }
+		if (-not $resolvedKey.StartsWith($rootPrefix, [StringComparison]::Ordinal)) { return $false }
+		$relKey = $resolvedKey.Substring($rootPrefix.Length)
+	}
+	if ($relKey -cnotmatch '^\.(?:agents|claude)/skills/([^/]+)/skill\.md$') { return $false }
+	$skillName = $Matches[1]
+	if (-not $script:PublicSubagentSkillCache.ContainsKey($skillName)) {
+		$script:PublicSubagentSkillCache[$skillName] = Test-Path -LiteralPath (Join-Path $script:SkillsRoot "$skillName\references\worker.md") -PathType Leaf
+	}
+	return $script:PublicSubagentSkillCache[$skillName]
 }
 
 function Test-CheckpointReviewBrief([string] $Text) {
@@ -1253,6 +1278,7 @@ try {
 		}
 		foreach ($cand in $state.CandidateMatches) {
 			$read = $cand.Read
+			if (Test-PublicSubagentSkillPath $read.Key $state.WorktreeRoot) { continue }
 			if ($null -eq $read.IsSmallReadExempt) {
 				if ($read.SpanIndex -ge 0 -and
 					$read.IsBoundedSmallLines -and

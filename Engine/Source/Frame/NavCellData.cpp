@@ -350,7 +350,6 @@ static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector
 
 void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements)
 {
-	// A graph on a plane without kTerrainCollision has empty template contours, so it builds empty.
 	rNavigationData.resize(static_cast<size_t>(gpIslandTerrain->miNavigationGraphCount));
 	for (const auto& [i, rGraphNavigationData] : std::views::enumerate(rNavigationData))
 	{

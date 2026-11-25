@@ -268,11 +268,11 @@ collision, terrain sampling, navigation, and generic collections.
   is adopted; otherwise restoration records it. Eviction retires images and mesh
   ranges, so arena room returns only when retirement frees them; do not evict
   another template for arena room while earlier evictions are still retiring.
-- Each `NavigationGraphBake` entry the server receives at startup gets one
-  template contour and one cell graph, index-parallel with the entries
-  (`IslandTemplate::navContours`, `CellStaticData::navigationData`); an entry on
-  a plane without `kTerrainCollision` builds an empty one. A caller picks a
-  graph by passing it, and queries take waypoint Z from the query position.
+- Each `NavigationGraphSpec` entry (`IslandTerrain.h`) the server receives at
+  startup gets one template contour and one cell graph, index-parallel with the
+  entries (`IslandTemplate::navContours`, `CellStaticData::navigationData`). A
+  caller picks a graph by passing it, and queries take waypoint Z from the query
+  position.
 - The obstacle visibility graph is built once per cell, in that cell's local
   meters, over the obstacle polygons of every island the cell lists; island
   templates contribute contour geometry only, because per-template building
@@ -307,9 +307,9 @@ collision, terrain sampling, navigation, and generic collections.
   require source-grouped, ascending targets for gap encoding. The client
   rebuilds navigation acceleration, never visibility connections; elevation is
   not transmitted.
-- The contour bake takes each entry's flight plane, clearance distance, and
-  elevation threshold from the caller (the game derives them and the server
-  passes them in at startup) and forwards them unchanged; engine navigation code
+- The contour bake takes each `NavigationGraphSpec` entry's clearance distance
+  and elevation threshold from the caller (the game project's own
+  `Source/Frame/AGENTS.md`) and forwards them unchanged; engine navigation code
   must not reach back into game constants for them.
 - Frame and gameplay geometry uses meters (one meter per engine unit); UV is
   only the normalized template representation. For navigation contours, union in

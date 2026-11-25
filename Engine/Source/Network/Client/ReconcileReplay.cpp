@@ -18,7 +18,7 @@ void ReconcileInjectPendingFullState(CoordWork& rWork, engine::Cell::PendingFull
 	CoordScratch& rScratch = rWork.scratch;
 
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
-	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
+	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayStackCount - 1);
 	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
 	rCell.ppSnapshots[iSlot] = std::move(rPending.pFrame);
 	rScratch.ResetReplayBase(rCell.ppSnapshots[iSlot].get(), iSlot);
@@ -234,7 +234,7 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 			iBaseHead = rScratch.iInjectedBaseSlot;
 			iBaseOffset = 0;
 		}
-		rScratch.outputLayout = ComputeRetention(iBaseHead, iBaseOffset + 1 + rScratch.iReplayWriteCount, iBaseOffset + rScratch.iLastValidatedIndex);
+		rScratch.outputLayout = ComputeRetention(iBaseHead, iBaseOffset + rScratch.iReplayStackCount, iBaseOffset + rScratch.iLastValidatedIndex);
 
 		// Writes past the ring size overwrote the oldest pre-replay slots; drop them from the head.
 		int64_t iExcess = rScratch.outputLayout.iCount - engine::kiNetworkBufferSize;
@@ -249,7 +249,7 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 	{
 		// The confirmed frame is the replay base: the walk's confirmed frame, a frame validated at
 		// the base, or an injected full state. Keep it as the base and include new catch-up frames.
-		rScratch.outputLayout.iCount = rScratch.iReplayWriteCount + 1;
+		rScratch.outputLayout.iCount = rScratch.iReplayStackCount;
 	}
 	else
 	{
@@ -259,7 +259,7 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 		rScratch.outputLayout =
 		{
 			.iHead = SnapshotIndex(rCell.iSnapshotHead, iRollbackOffset),
-			.iCount = rScratch.iReplayWriteCount + 1,
+			.iCount = rScratch.iReplayStackCount,
 			.iConfirmedInner = 0,
 		};
 	}
@@ -334,7 +334,7 @@ static void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 
 	ComputeOutputLayout(rWork, iRollbackOffset);
 
-	ASSERT(rScratch.replayStack.back()->interpolate.iTick <= rInputs.iTargetTick);
+	ASSERT(rScratch.ppReplayStack[rScratch.iReplayStackCount - 1]->interpolate.iTick <= rInputs.iTargetTick);
 
 	ApplyCoordWriteback(rWork);
 }
@@ -346,45 +346,31 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	{
 		dispatchStartTime = std::chrono::steady_clock::now();
 	}
-	// Heap: work list growth and per-coord scratch retention
+	// Heap: work list growth
 	ScopedSuppressAllocationTracking suppress;
 
-	// Reusing work slots preserves replayStack capacity across Run() calls and avoids per-frame allocations.
-	int64_t iEligibleCount = 0;
-	for (const auto& [rCoord, rCell] : game::gpGame->mCells)
-	{
-		if (rCell.iConfirmedTick >= 0)
-		{
-			++iEligibleCount;
-		}
-	}
-	if (std::ssize(mWorks) < iEligibleCount)
-	{
-		mWorks.resize(static_cast<size_t>(iEligibleCount));
-	}
-	int64_t iSlot = 0;
+	mWorks.clear();
+	mWorks.reserve(game::gpGame->mCells.size());
 	for (auto& [rCoord, rCell] : game::gpGame->mCells)
 	{
 		if (rCell.iConfirmedTick < 0)
 		{
 			continue;
 		}
-		CoordWork& rWork = mWorks.at(iSlot++);
+		CoordWork& rWork = mWorks.emplace_back();
 		rWork.coord = rCoord;
 		rWork.pCell = &rCell;
-		rWork.scratch.Reset();
 	}
-	int64_t iActiveCount = iSlot;
 
 	ReconcileDispatchResult result;
-	result.iActiveCount = iActiveCount;
+	result.activeWorks = mWorks;
 	auto PublishDiagnostics = [&]()
 	{
 		if constexpr (kbProfilingFrameSpike)
 		{
 			gpProfileManager->mReconciliationDiagnostics = ReconciliationDiagnostics
 			{
-				.iActiveCoords = result.iActiveCount,
+				.iActiveCoords = std::ssize(result.activeWorks),
 				.iExecutedCoordTicks = result.profiling.iExecutedCoordTicks,
 				.iRecalculatedCoordTicks = result.profiling.iRecalculatedCoordTicks,
 				.iTickExecutionNanoseconds = result.profiling.iTickExecutionNanoseconds,
@@ -397,30 +383,28 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		}
 	};
 
-	if (iActiveCount == 0)
+	if (mWorks.empty())
 	{
 		PublishDiagnostics();
 		return result;
 	}
 
 	// Each worker touches only its own Cell entry.
-	std::span<CoordWork> activeWorks(mWorks.data(), static_cast<size_t>(iActiveCount));
-	int64_t iCount = iActiveCount;
 	auto ProcessRange = [&](int64_t iBegin, int64_t iEnd)
 	{
-		// Heap: ReconcileCoord may grow per-coord scratch (frames, replay buffers) on dispatch
+		// Heap: ReconcileCoord allocates frames and replay inputs on dispatch
 		ScopedSuppressAllocationTracking suppress;
 		for (int64_t i = iBegin; i < iEnd; ++i)
 		{
-			ReconcileCoord(activeWorks[i], rInputs);
+			ReconcileCoord(mWorks.at(static_cast<size_t>(i)), rInputs);
 		}
 	};
-	common::gpMultithreading->Dispatch(iCount, ProcessRange);
+	common::gpMultithreading->Dispatch(std::ssize(mWorks), ProcessRange);
 
 	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay, full-state injection
 	CoordWork* pDesyncWork = nullptr;
 	bool bAnyInjectedFullState = false;
-	for (CoordWork& rWork : activeWorks)
+	for (CoordWork& rWork : mWorks)
 	{
 		const CoordScratch& rScratch = rWork.scratch;
 		if constexpr (kbProfilingFrameSpike)
@@ -464,11 +448,11 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 			{
 				if (rScratch.iDesyncTick >= 0)
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, std::ssize(rScratch.replayStack), static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 				else
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, std::ssize(rScratch.replayStack), static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 			}
 		}
@@ -487,7 +471,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		char pcExpected[20] {}, pcActual[20] {};
 		common::ToHex(std::span<char, 20>(pcExpected), rScratch.desyncExpectedCrc);
 		common::ToHex(std::span<char, 20>(pcActual), rScratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iQ, pDesyncWork->coord.iR, rScratch.iDesyncTick, pcExpected, pcActual, std::ssize(rScratch.replayStack), rScratch.iNewConfirmedTick);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iQ, pDesyncWork->coord.iR, rScratch.iDesyncTick, pcExpected, pcActual, rScratch.iReplayStackCount, rScratch.iNewConfirmedTick);
 
 		result.desync.bDesync = true;
 		result.desync.iDesyncTick = rScratch.iDesyncTick;
@@ -509,7 +493,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	int64_t iResimulationTicks = result.profiling.iStatusChangeReplayTicks + result.profiling.iKnockOnReplayTicks;
 	if (iResimulationTicks >= 8)
 	{
-		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iResimulationTicks, result.profiling.iStatusChangeReplayTicks, result.profiling.iKnockOnReplayTicks, result.profiling.iAssumedFrameTicks, result.profiling.iCrcValidatedFrameTicks, result.iActiveCount);
+		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iResimulationTicks, result.profiling.iStatusChangeReplayTicks, result.profiling.iKnockOnReplayTicks, result.profiling.iAssumedFrameTicks, result.profiling.iCrcValidatedFrameTicks, std::ssize(result.activeWorks));
 	}
 
 	if (result.bAnyFullReplay)

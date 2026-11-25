@@ -40,11 +40,10 @@ reconciliation produced — do not reuse an earlier table. When a Plan completio
 or rejection belongs to the landing, the brief also carries the `/next-plan`
 step-10 `Complete-NextPlan.ps1` result verbatim. Once Coretide lands,
 preparation and recovery briefs also carry the
-[step-9 proven Coretide landing result](references/worker.md#steps). After an
-engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
-`rebase.patch-not-identical` block passes `references/worker.md`
-`## Recovery`'s restoration gate, main's recovery continuation capsule also
-carries that blocked disposition as its unresolved issue and
+[step-9 proven Coretide landing result](references/worker.md#steps). After a
+blocked landing passes [`references/worker.md`](references/worker.md#recovery)'s
+recovery gate, main's recovery continuation capsule carries that disposition as
+its unresolved issue, whether standing confirmation is held, and (for engine)
 `Temp/finalize-approval-preparation-result.json` as path plus selector
 (`candidate.commit`, `candidate.tree`, `candidate.parent`,
 `verifiedCandidate.supplied`, never retyped).
@@ -86,25 +85,29 @@ with `Build required` present and `Residuals` last, extended by one row each for
 finalization state, objective state, checkout/branches/resulting commit,
 lock/reconcile/sign-off/landing status, files changed during reconciliation, and
 `SmartGit launch:` — the `Show-FinalizeApprovalReview.ps1` command line from
-`references/scripts.md` `## Invocation`, every placeholder filled in for the
-prepared landing commit, present whenever the handoff carries a landing summary.
-Emit one final line beginning `SESSION COMPLETE` stating
-that landing succeeded, the claim was released, the worktree is clean, and every
-objective stage is complete or explicitly deferred to a named unclaimed Plan —
-only when all of that holds. Never emit it for uncommitted, blocked, dirty,
-retained-claim, or still-active work.
+`references/scripts.md` `## Invocation` filled for the prepared landing commit,
+or `none` (and likewise `Coretide SmartGit launch: none`) when
+standing-confirmation recovery kept the prior `v2` receipt valid, present
+whenever the handoff carries a landing summary. Emit one final line beginning
+`SESSION COMPLETE` stating that landing succeeded, the claim was released, the
+worktree is clean, and every objective stage is complete or explicitly deferred
+to a named unclaimed Plan — only when all of that holds. Never emit it for
+uncommitted, blocked, dirty, retained-claim, or still-active work.
 
 ### Landing confirmation
 
-Main first runs the handoff's `SmartGit launch:` line verbatim under the root
-AGENTS.md bundled-script rule, then reads `status`, `message`, and
-`manualCommand` from the receipt that line redirects to; it does the same for
-the `Coretide SmartGit launch:` line when the handoff carries one. A
-Coretide-only landing has no `SmartGit launch:` line. Between the handoff and
-the question main makes only these tool calls and those the handoff result or
-the [approval review receipt contract](references/scripts.md#approval-review-receipt)
-requires. Report any unresolved receipt failure as a blocker and wait for a
-valid receipt before presenting the summary.
+For each launch row (`SmartGit launch:`, omitted when Coretide-only; `Coretide
+SmartGit launch:` when present): if `none`, skip
+`Show-FinalizeApprovalReview.ps1` and reuse that `v2` receipt; else run it
+verbatim (root AGENTS.md bundled-script rule). If every applicable row is
+`none` under standing confirmation and `(d)` does not pause on the fresh
+acceptance table, skip the summary and land same-turn with the existing
+receipt(s). Otherwise — whenever main presents a summary, including a `(d)`
+pause or mixed engine/Coretide handoff — read `status`, `message`, and
+`manualCommand` from each fresh or reused `v2` receipt. Between handoff and
+question main makes only these tool calls and those the handoff or
+[receipt contract](references/scripts.md#approval-review-receipt) requires;
+block on any unresolved receipt failure before presenting the summary.
 
 Main then presents the self-contained summary immediately before the question: a
 one-sentence change that names a superseded decision whenever the session record
@@ -169,12 +172,12 @@ user-authorized Plan rejection stays scoped to `Complete-NextPlan.ps1 -Reject`
 paths and a passing table (no companion files; any byte or path drift — even
 within a `-Reject` path — requires refreshed preparation, SmartGit launch,
 summary, and separate confirmation instead of automatic filing or landing).
-Pre-summary authorization skips only the question, never SmartGit launch or the
-summary, dispatching landing in the same turn; standing confirmation survives
-recovery, refreshed SmartGit launch, and refreshed summary without re-asking or
-halting for non-blocking checks or user-judgment prompts — unless an initial or
-refreshed summary carries a `/sweep` `UNVERIFIED` owed row unaccepted under
-`(d)` below, where main asks and waits instead of same-turn dispatch.
+Pre-summary authorization skips only the question (never initial SmartGit launch
+or summary), dispatching landing same-turn; standing confirmation survives
+recovery without re-asking or halting for non-blocking checks or user-judgment
+prompts (following the launch/summary routing above), unless a summary carries
+a `/sweep` `UNVERIFIED` owed row unaccepted under `(d)` below, where main asks
+and waits.
 
 Confirmation binds the reviewed diff, not commit hashes. A clean byte-identical
 post-confirmation rebase lands with no re-asking, re-review, or rebuild;
@@ -187,25 +190,29 @@ direct user instruction under `## Inputs` clears it. On a
 `Get-CompileRewrittenPaths.ps1` residual or
 `candidate.export-output-not-regenerated` block, keep the switch, attempt
 bounded build/evidence recovery, and rerun preparation with it; stop if it still
-refuses. Under standing confirmation, when recovery (conflict, byte/meaning
-change, export rebuild, `rebase.conflicted`, `rebase.patch-not-identical`,
-`history.source-changed`, or fix) changes bytes, `references/worker.md`
-`## Recovery` triggers decide reruns. Byte drift alone files no follow-up Plan;
-file one via `/create-follow-up-plans` before preparation when a non-blocking
-user-check or user-judgment item remains (ordinary residuals follow the Verify
-the acceptance table step; a Plan alone never re-triggers unrelated reviews or
-builds). After either trigger, rerun preparation, SmartGit launch, refreshed
-summary, and (unless `(d)` pauses) same-turn landing.
+refuses. Under standing confirmation, recovery without a code-meaning change
+follows [`references/worker.md`](references/worker.md#steps) step 6 and
+[`## Recovery`](references/worker.md#recovery) for `v2` receipt eligibility and
+the launch/summary routing above. On a genuine code-meaning change
+(non-`dependsOn` conflict, export rebuild, fix round, `history.source-changed`
+edit, or standalone Plan rejection drift),
+[`references/worker.md`](references/worker.md#recovery) triggers decide
+reviews/builds; byte drift alone files no follow-up Plan, while any remaining
+non-blocking user-check or user-judgment item files one via
+`/create-follow-up-plans` before preparation (ordinary residuals follow the
+Verify the acceptance table step's Leftovers rule; a Plan alone never
+re-triggers unrelated reviews/builds); then rerun preparation and the routing
+above (or separate confirmation for standalone Plan rejection).
 
 After confirmation, stop without landing (or completing a claim) only on: (a) a
 mechanical script, lock, lease, or receipt refusal (unproven
-abort/restore/release, Coretide `-Land` block, invalid AgentTools ledger,
-receipt error, or unrecoverable export-output refusal); (b) an unfixable
-compile error; (c) an irreconcilable logic or non-export binary conflict; (d) a
-required non-PASS row or unmet criterion — except `/sweep`'s `UNVERIFIED` owed
-rows authorized by affirmative user confirmation after the landing summary
-discloses them ([`../sweep/SKILL.md`](../sweep/SKILL.md) `## Rules`) — after
-Step 6 fix-and-retest leaves no authorized fix
+abort/restore/release, non-recoverable Coretide `-Land` block, invalid
+AgentTools ledger, receipt error, or unrecoverable export-output refusal); (b)
+an unfixable compile error; (c) an irreconcilable logic or non-export binary
+conflict; (d) a required non-PASS row or unmet criterion — except `/sweep`'s
+`UNVERIFIED` owed rows authorized by affirmative user confirmation after the
+landing summary discloses them ([`../sweep/SKILL.md`](../sweep/SKILL.md)
+`## Rules`) — after Step 6 fix-and-retest leaves no authorized fix
 ([`change-workflow.md`](../../references/change-workflow.md)), or requiring
 explicit pixel-only deferral
 ([`claim-exceptions.md`](../next-plan/references/claim-exceptions.md)

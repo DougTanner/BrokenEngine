@@ -141,7 +141,7 @@ static void SplitBindingsBySet(const Pipeline& rPipeline, std::span<const VkDesc
 static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLayoutCreateInfo& rVkLayoutCreateInfo, VkPipelineLayoutCreateInfo& rVkPipelineLayoutCreateInfo, const VkPushConstantRange& rVkPushConstantRange, std::span<const VkDescriptorSetLayoutBinding> set1Bindings)
 {
 	// Create Set 1 layout (unless using external layout from first ModelPipeline material)
-	if (rPipeline.mExternalSet1VkDescriptorSetLayout == VK_NULL_HANDLE)
+	if (rPipeline.mInfo.vkExternalSet1DescriptorSetLayout == VK_NULL_HANDLE)
 	{
 		rVkLayoutCreateInfo.bindingCount = static_cast<uint32_t>(std::ssize(set1Bindings));
 		rVkLayoutCreateInfo.pBindings = set1Bindings.data();
@@ -154,8 +154,8 @@ static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLay
 
 	VkDescriptorSetLayout pVkSetLayouts[2] =
 	{
-		rPipeline.mExternalVkDescriptorSetLayout,
-		rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE ? rPipeline.mExternalSet1VkDescriptorSetLayout : rPipeline.mVkDescriptorSetLayout,
+		gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout,
+		rPipeline.mInfo.vkExternalSet1DescriptorSetLayout != VK_NULL_HANDLE ? rPipeline.mInfo.vkExternalSet1DescriptorSetLayout : rPipeline.mVkDescriptorSetLayout,
 	};
 	rVkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(std::ssize(pVkSetLayouts));
 	rVkPipelineLayoutCreateInfo.pSetLayouts = pVkSetLayouts;

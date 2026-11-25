@@ -227,17 +227,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
 	auto pFlightPlanes = std::make_unique<FlightPlanes>();
-	std::vector<NavigationGraphBake> navigationGraphs(game::kNavigationGraphs.size());
-	for (const auto& [i, rGraph] : std::views::enumerate(game::kNavigationGraphs))
-	{
-		navigationGraphs.at(i) =
-		{
-			.iFlightPlane = rGraph.iFlightPlane,
-			.fThresholdElevation = game::NavigationThresholdElevation(rGraph.iClearanceTier, gpFlightPlanes->Plane(rGraph.iFlightPlane).fHeightMeters),
-			.fClearanceMeters = game::NavigationClearanceMeters(rGraph.iClearanceTier),
-		};
-	}
-	gpIslandTerrain->WaitForElevationMaps(navigationGraphs);
+	gpIslandTerrain->WaitForElevationMaps(game::kNavigationGraphSpecs);
 
 	auto pGame = std::make_unique<game::Game>();
 	auto pServerMonitorHost = std::make_unique<ServerMonitorHost>();

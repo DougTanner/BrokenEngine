@@ -256,12 +256,10 @@ generating/consuming StatusChange events.
      otherwise every subsequent Tick would immediately mismatch again and thrash
      reconciliation every frame until the buffer drains
 - **Per-frame replay bound**: replay per call runs to `iMaximumConsecutive` (the
-  validated replay range, capped at `iTargetTick`); `ReconcileCatchUpCoord` then
-  unconditionally forward-sims the remainder up to `iTargetTick` in the same
-  frame. Because catch-up covers whatever replay leaves short, capping replay
-  count does **not** bound per-frame `RunFrameTick` cost — the real per-frame
-  bound is the ring budget `iBudget = kiNetworkBufferSize - iReplayWriteCount`
-  (how many ticks fit before the snapshot ring fills)
+  validated replay range, capped at `iTargetTick`), and `ReconcileCatchUpCoord`
+  then forward-sims toward `iTargetTick` in the same frame, stopping early if
+  the remaining ring budget it calculates runs out. Capping replay count
+  therefore does **not** bound per-frame `RunFrameTick` cost
 - **Pending full-state handling**: a pending state ahead of `iTargetTick` stays
   queued and is excluded from every pending-induced replay gate, so it cannot
   advance confirmed or rendered time. For a due state, replay computes the
@@ -435,6 +433,11 @@ sizes are the full packet including the type byte.
 
 Server→client types and unknown type bytes resolve to the sentinel (not
 client-sendable). The current wire-protocol version is `kiProtocolVersion`.
+Version 58 removed `uiFlightPlane` from the Fighters, Omnis, and Battleships
+`SpawnInfo` `Fields()` lists, removed `uiTargetFlightPlane` from the
+`UpdateShipData` `Fields()` list, and made `kServerCoordinateStaticData`
+serialize `CellStaticData::navigationData` (contents owned by
+`game::kNavigationGraphSpecs`).
 Version 57 moved the squadron settings out of the FleetSync member flags into
 one 16-bit `ShipOrders` value per squadron at the end of each FleetSync fleet
 header, and made the `kClientSquadronOrdersRequest` settings a 16-bit

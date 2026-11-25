@@ -28,6 +28,35 @@ static void AdmitMirrorFleetUuids(const FramePostRender& rPostRender)
 	}
 }
 
+// Omnis and Battleships stay at their controller's effective flight height; Fighters may rise above it over terrain.
+// Every ship moves horizontally; height changes step position directly, never through velocity.
+static void ValidateShipHeights(const Frame& rFrame)
+{
+	ForEachShipType(rFrame, [](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
+	{
+		for (int64_t i = 0; i < rShipInterpolate.iCount; ++i)
+		{
+			float fHeight = XMVectorGetZ(rShipInterpolate.pVecPositions[i]);
+			float fEffectiveHeight = EffectiveShipFlightHeight(eType, rShipPostRender.pController[i]);
+			if (eType == ShipType::kFighter)
+			{
+				if (!std::isfinite(fHeight) || fHeight < fEffectiveHeight)
+				{
+					throw std::ios_base::failure("Frame ship height");
+				}
+			}
+			else if (fHeight != fEffectiveHeight)
+			{
+				throw std::ios_base::failure("Frame ship height");
+			}
+			if (XMVectorGetZ(rShipPostRender.pVecVelocities[i]) != 0.0f)
+			{
+				throw std::ios_base::failure("Frame ship vertical velocity");
+			}
+		}
+	});
+}
+
 // Requires the Pushers id map already rebuilt from the read ids; that rebuild rejects id 0, so the map lookup also
 // rejects a living ship's zero handle. Released pushers must be compacted before the frame is persisted.
 static void ValidatePusherOwners(const Frame& rFrame)
@@ -270,24 +299,22 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 
 	// Every id the cell minted earlier is lower, so a row at or above this one was placed by this wave.
 	int64_t iWaveFirstUuid = CounterUuid(rFrame.postRender, rFrame.postRender.uiNextUuid);
-	// The wave starts settled on its type's default flight plane.
-	int64_t iWaveFlightPlane = DefaultFlightPlane(eWaveType);
-	const engine::FlightPlane& rWaveFlightPlane = engine::gpFlightPlanes->Plane(iWaveFlightPlane);
+	float fWaveHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
 	float fWaveRadius = kShipHitboxTypes[std::to_underlying(eWaveType)].fGameplayRadius;
 	float fTerrainClearance = fWaveRadius * 2.0f;
 	float fChevronStagger = fWaveRadius * 2.0f;
 	float fShipSideSpacing = fWaveRadius * 3.0f;
 
-	// Reject positions outside the cell, inside terrain at the wave's plane (with full body clearance; none on a plane
-	// without terrain collision), within horizontal visible range of any alive fleet ship on any plane, or horizontally
-	// closer than the wave's side spacing plus the row's radius to any alive random-spawn row placed before the wave
+	// Reject positions outside the cell, within fTerrainClearance of terrain at the wave height, closer than
+	// kfMinimumFleetDistance in XY to any living fleet ship, or closer in XY than the wave's side spacing plus the
+	// row's radius to any living random-spawn ship placed before the wave.
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
 		if (!engine::IsInsideCell(vecPosition))
 		{
 			return false;
 		}
-		if ((rWaveFlightPlane.flags & engine::FlightPlaneFlags::kTerrainCollision) && engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > rWaveFlightPlane.fHeightMeters - fTerrainClearance)
+		if (engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > fWaveHeight - fTerrainClearance)
 		{
 			return false;
 		}
@@ -328,7 +355,7 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 	{
 		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
-			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, rWaveFlightPlane.fHeightMeters, 1.0f);
+			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, fWaveHeight, 1.0f);
 			pbValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
@@ -412,26 +439,23 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 	int64_t iBestGridY = iBestAnchorIndex / kiGridDimension;
 	float fBestAnchorX = fAreaMinimumX + (static_cast<float>(iBestGridX) + 0.5f) * fPitchX;
 	float fBestAnchorY = fAreaMinimumY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
-	ShipOrders_t waveOrders {};
-	SetTargetFlightPlane(waveOrders, iWaveFlightPlane);
-	uint8_t uiWaveFlightPlane = static_cast<uint8_t>(iWaveFlightPlane);
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fLocalForward = pf2LocalOffsets[i].x;
 		float fLocalSide = pf2LocalOffsets[i].y;
 		float fWorldX = fBestAnchorX + fBestFacingCosine * fLocalForward - fBestFacingSine * fLocalSide;
 		float fWorldY = fBestAnchorY + fBestFacingSine * fLocalForward + fBestFacingCosine * fLocalSide;
-		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, rWaveFlightPlane.fHeightMeters, 1.0f);
+		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, fWaveHeight, 1.0f);
 		if (!IsSpawnPositionValid(vecSpawnPosition))
 		{
 			continue;
 		}
 
-		// Flattened because the reference fleet ship may fly another plane; the validity check keeps its horizontal part nonzero.
+		// Flattened because the reference fleet ship may sit at another height; the validity check keeps its horizontal part nonzero.
 		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFleetPosition, vecSpawnPosition), 0.0f));
 		// A coin toss per placed ship, drawn before its Spawn draws, picks the Fighters and Omnis that target the enemy
 		// flagship; Battleships chase it whatever the toss.
-		ShipOrders_t orders = waveOrders;
+		ShipOrders_t orders {};
 		orders.Set(ShipOrders::kTargetFlagship, common::Random(1i64, rFrame.postRender.randomEngine) == 1);
 		ForEachShipType(rFrame, [&](ShipType eType, [[maybe_unused]] const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
 		{
@@ -446,7 +470,6 @@ static void SpawnRandomShipWave(Frame& __restrict rFrame, const engine::CellStat
 				.alignment = rFrame.postRender.randomAlignment,
 				.eController = ShipController::kRandomSpawn,
 				.orders = orders,
-				.uiFlightPlane = uiWaveFlightPlane,
 			});
 		});
 	}
@@ -798,9 +821,14 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 	Frame loadedFrame;
 	loadedFrame.interpolate.Read(rStream);
 	loadedFrame.postRender.Read(rStream);
+	if (!rStream.good())
+	{
+		throw std::ios_base::failure("Frame stream");
+	}
 
 	engine::ValidateBaseCollectionPairs(loadedFrame.interpolate, loadedFrame.postRender);
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
+	ValidateShipHeights(loadedFrame);
 	ValidatePusherOwners(loadedFrame);
 	ValidateFlyingMissiles(loadedFrame);
 	ValidateNoTransferRows(loadedFrame);

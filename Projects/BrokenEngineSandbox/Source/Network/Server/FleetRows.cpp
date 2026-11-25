@@ -6,7 +6,6 @@
 
 #include "Network/Server/ServerTransferManager.h"
 
-#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -51,7 +50,6 @@ void QueueFleetSpawn(const engine::ClientGuid& rClientGuid, const Fleet& rFleet,
 	{
 		orders.Set(ShipOrders::kIsFlagship);
 	}
-	SetTargetFlightPlane(orders, DefaultFlightPlane(rMember.eType));
 
 	spawnInfo.alignment = gpGame->mFleetAlignment;
 	spawnInfo.eController = ShipController::kFleet;

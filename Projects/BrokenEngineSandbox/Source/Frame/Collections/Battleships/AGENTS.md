@@ -7,39 +7,36 @@ fleet health, and death below and the Fighters' beam, client-only climb tilt
 and turn roll, fleet tactics, `pVecVeerOffPoints`, and flagship chase differ: a
 random-spawn Battleship chases an enemy flagship under the flagship rule
 (`../Ships/AGENTS.md` `## Ship Invariants`), else the kept attack target
-`FindAttackTarget` picks from itself in 3D at or below plane 0, clearing the
-return-to-island state while it chases; only with no enemy does it return to an
-island, under distance hysteresis, and in a cell with no island candidates it
-then clears the return-to-island state and ramps its turn rate to zero. Its
-missiles keep the rule below, which already covers the flagship. A dying
-Battleship has none of the Fighters' death knockback, shrink, or staged
-explosions: it holds still, skips terrain contact, and the client draws its
-model as a wreck, which emits its death explosions (`## Wreck Invariants`).
+`FindAttackTarget` picks from itself in 3D, clearing the return-to-island state
+while it chases; only with no enemy does it return to an island, under distance
+hysteresis, and in a cell with no island candidates it then clears the
+return-to-island state and ramps its turn rate to zero. Its missiles keep the
+rule below, which already covers the flagship. A dying Battleship has none of
+the Fighters' death knockback, shrink, or staged explosions: it holds still,
+skips terrain contact, and the client draws its model as a wreck, which emits
+its death explosions (`## Wreck Invariants`).
 
 ## Weapon Invariants
 
 - Homing tube missiles replace the Fighter's beam: the PostRender Spawn hook
   only launches them, in one sequential pass over the rows in ascending order.
-  A row launches when it is not dying, its arrival grace has run out, the
-  shared plane and height rule allows it (`../Ships/AGENTS.md`
-  `## Ship Invariants`), and its `pNextMissileFireTimes` cooldown is at or
-  below zero. A launch resets the cooldown to `kBattleshipMissileCooldown`,
-  and the cooldown transfers with the ship, so launches come exactly
-  `kBattleshipMissileCooldown` apart. The simulation keeps the cooldown finite
-  and at most `kBattleshipMissileCooldown`, with no lower clamp; `PostRead`
-  rejects any other row on every Frame read.
+  A row launches when it is not dying, its arrival grace has run out, and its
+  `pNextMissileFireTimes` cooldown is at or below zero. A launch resets the
+  cooldown to `kBattleshipMissileCooldown`, and the cooldown transfers with the
+  ship, so launches come exactly `kBattleshipMissileCooldown` apart. The
+  simulation keeps the cooldown finite and at most `kBattleshipMissileCooldown`,
+  with no lower clamp; `PostRead` rejects any other row on every Frame read.
 - A launching row launches at most one missile per tick, choosing among every
   (enemy, tube) pair the one nearest by 3D distance from the tube, among pairs
   whose enemy is within `kfBattleshipMissileRange` of that tube, passes the
-  shared plane and line-of-sight targeting rules taken from that tube
-  (`../Ships/AGENTS.md`), and is targeted by fewer missiles than its type's
-  `kiMissilesPerTarget` cap; an exact distance tie keeps the first enemy in
-  `ForEachEnemyShip` order, then its first authored tube. Missiles do not
-  prefer the kept attack target. The count covers every missile targeting that
-  enemy, other Battleships' missiles included, and every launch made earlier in
-  the same tick, so a later shooter sees an earlier shooter's launches. Each
-  missile receives that enemy as its target at launch, with no registry
-  acquisition (`../Missiles/AGENTS.md`).
+  shared line-of-sight rule taken from that tube (`../Ships/AGENTS.md`), and is
+  targeted by fewer missiles than its type's `kiMissilesPerTarget` cap; an exact
+  distance tie keeps the first enemy in `ForEachEnemyShip` order, then its first
+  authored tube. Missiles do not prefer the kept attack target. The count covers
+  every missile targeting that enemy, other Battleships' missiles included, and
+  every launch made earlier in the same tick, so a later shooter sees an earlier
+  shooter's launches. Each missile receives that enemy as its target at launch,
+  with no registry acquisition (`../Missiles/AGENTS.md`).
 - Tubes are the controller model's packed missile tubes
   ([exporter](../../../../../../DataPacker/Source/ExportJobs/AGENTS.md#model-alignment));
   these armed models require at least one. A launch uses the selected pair's

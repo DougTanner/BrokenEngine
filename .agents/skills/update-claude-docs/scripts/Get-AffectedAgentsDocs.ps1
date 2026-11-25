@@ -372,6 +372,11 @@ try
 	$changedRelativePaths = [Collections.Generic.List[string]]::new()
 	foreach ($suppliedPath in $ChangedPath)
 	{
+		if ($suppliedPath.StartsWith('-', [StringComparison]::Ordinal))
+		{
+			Complete-AffectedAgentsDocs 1 'error' 'input.unknown-parameter' "Unknown parameter '$suppliedPath'. Prefix a repository-relative path starting with '-' with './'."
+		}
+
 		$rooted = if ([IO.Path]::IsPathRooted($suppliedPath)) { $suppliedPath } else { Join-Path $script:RepositoryRoot $suppliedPath }
 		$relative = Convert-ToRepositoryRelativePath (Get-AgentCanonicalPath $rooted)
 		if ($null -eq $relative)

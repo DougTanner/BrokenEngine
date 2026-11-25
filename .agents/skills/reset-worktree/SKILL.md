@@ -35,8 +35,10 @@ the primary tip and rerunning the setup session creation runs.
    pwsh -NoProfile -NonInteractive -File .agents/skills/reset-worktree/scripts/Reset-AgentWorktree.ps1
    ```
 
-2. Report the final `Reset worktree` line on exit 0, or stderr refusal/error
-   output on any nonzero exit. Done when the user has the outcome.
+2. On exit 0, report the final `Reset worktree` line, then end the turn's final
+   message, after a newline, with the bare line `WORKTREE RESET DONE` followed
+   by the bare last line `/clear?`, asking nothing else. On any nonzero exit,
+   report stderr refusal/error output and print neither line.
 
 ## Rules
 

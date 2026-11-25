@@ -38,7 +38,7 @@ struct CellStaticData
 	// frame-tick thread (server-only) and refreshed when the network resends staticData,
 	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
 	// through the const CellStaticData& it gets from ActiveFrameReference. One NavData per
-	// baked graph, index-parallel with the server's NavigationGraphBake entries; a client cell whose static
+	// baked graph, index-parallel with the server's NavigationGraphSpec entries; a client cell whose static
 	// data has not arrived holds an empty vector.
 	mutable std::vector<NavData> navigationData;
 

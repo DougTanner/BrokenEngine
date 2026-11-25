@@ -68,10 +68,16 @@ Exempt paths owing no Review and resolve correctness row:
   and same-branch updates by its header; deletions by
   `/create-follow-up-plans`).
 
-On every diff — `/save-plan`-only or mixed (including a recovery-added follow-up
-Plan) — require `Invoke-StaticChecks.ps1` `PASS` and run
-`## Executable Plan check` whenever the inventory emits it; mixed diffs also run
-normal changed-region reviews including `/coherence-review` on any added Plan.
+On every diff — `/save-plan`-only or mixed (including post-review or
+recovery-added follow-up Plans) — require `Invoke-StaticChecks.ps1` `PASS` and
+run `## Executable Plan check` whenever emitted; mixed diffs also require
+changed-region review handoffs covering every non-exempt path. A first-round
+`/coherence-review` handoff covering every path owing coherence review
+satisfies that row alone; when earlier evidence covers part of that scope, a
+pre-preparation handoff over the `PathPrefix` `Scope` in
+[`../../coherence-review/SKILL.md`](../../coherence-review/SKILL.md) `## Inputs`
+pairs with the still-valid earlier handoff and any carried recheck its
+`## When to use` exception requires.
 
 Every `PASS` cites evidence read or run here, or a mandated handoff whose fields
 prove the row. Narrative alone is `UNVERIFIED`. Duplicate checks name their

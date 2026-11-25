@@ -146,28 +146,27 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	int64_t iScheduledLayer = bScheduledFrame ? (gpGraphics->miFrameCounter / iLightingUpdateCadence) % shaders::kiLightingLayers : -1;
 
 	rGlobalLayout.fLightingObjectsAdd = gLightingObjectsAdd.mfCurrent;
-	rGlobalLayout.fLightingDepositThreshold = gLightingDepositThreshold.mfCurrent;
 	rGlobalLayout.fLightingDepositCompress = gLightingDepositCompress.mfCurrent;
 
 	float fCombineMaxBrightness = gCombineMaxBrightness.mfCurrent;
 	float fCombineContrast = gCombineContrast.mfCurrent;
-	float fCombineLinearStart = gCombineLinearStart.mfCurrent;
+	float fCombineLinearStart = fCombineMaxBrightness * gCombineLinearStart.mfCurrent;
 	float fCombineLinearLength = gCombineLinearLength.mfCurrent;
+	float fCombineBlackTightness = fCombineLinearStart * gCombineBlackTightness.mfCurrent;
 	rGlobalLayout.fCombineMaxBrightness = fCombineMaxBrightness;
 	rGlobalLayout.fCombineContrast = fCombineContrast;
 	rGlobalLayout.fCombineLinearStart = fCombineLinearStart;
 	rGlobalLayout.fCombineToe = gCombineToe.mfCurrent;
-	rGlobalLayout.fCombineBlackTightness = gCombineBlackTightness.mfCurrent;
+	rGlobalLayout.fCombineBlackTightness = fCombineBlackTightness;
 	rGlobalLayout.fCombineHuePreserve = gCombineHuePreserve.mfCurrent;
 
-	// Precompute Uchimura segment constants S0/S1/CP from six invocation-invariant uniforms for LightCombine.comp and DebugTexture.frag; both
-	// use the same P-S1 epsilon guard.
-	float fCombineLinearSegmentLength = ((fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength) / fCombineContrast;
-	float fCombineShoulderStart = fCombineLinearStart + fCombineContrast * fCombineLinearSegmentLength;
-	float fCombineShoulderCoefficient = (fCombineContrast * fCombineMaxBrightness) / std::max(fCombineMaxBrightness - fCombineShoulderStart, shaders::kfEpsilon);
-	rGlobalLayout.fCombineShoulderInputStart = fCombineLinearStart + fCombineLinearSegmentLength;
+	// LightCombine.comp and DebugTexture.frag share the CPU-computed Uchimura segment constants S0/S1/CP.
+	// The wrapper bounds keep P - S1 at least 0.004f across the slider domain.
+	float fCombineLinearOutputSpan = (fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength;
+	float fCombineShoulderStart = fCombineLinearStart + fCombineLinearOutputSpan;
+	rGlobalLayout.fCombineShoulderInputStart = fCombineLinearStart + fCombineLinearOutputSpan / fCombineContrast;
 	rGlobalLayout.fCombineShoulderOutputStart = fCombineShoulderStart;
-	rGlobalLayout.fCombineShoulderExponentCoefficient = -fCombineShoulderCoefficient / fCombineMaxBrightness;
+	rGlobalLayout.fCombineShoulderExponentCoefficient = -fCombineContrast / (fCombineMaxBrightness - fCombineShoulderStart);
 
 	float fPassCount = gSpreadPassCount.mfCurrent;
 	float fPassNormalization = std::lerp(1.0f, 1.0f / fPassCount, gCombinePassNormalize.mfCurrent);
@@ -175,6 +174,15 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	float fCombinePassNormalizationScale = fPassNormalization * fPassScale;
 	rGlobalLayout.fCombinePassNormalizationScale = fCombinePassNormalizationScale;
 	rGlobalLayout.fCombinePassTotalScale = fCombinePassNormalizationScale / fPassCount;
+	float fSpreadDirectionalityStart = gSpreadDirectionality.mfCurrent;
+	float fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.mfCurrent;
+	float fSpreadDirectionCountStart = gSpreadDirectionCount.mfCurrent;
+	float fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.mfCurrent;
+	float fSpreadRingCountStart = gSpreadRingCount.mfCurrent;
+	float fSpreadRingCountEnd = gSpreadRingCountEnd.mfCurrent;
+	float fSpreadDistanceFalloffStart = gSpreadDistanceFalloff.mfCurrent;
+	float fSpreadDistanceFalloffEnd = gSpreadDistanceFalloffEnd.mfCurrent;
+
 	int64_t iActivePassCount = gSpreadPassCount.Get<int64_t>();
 	float fPassFractionDenominator = static_cast<float>(std::max(iActivePassCount - 1, 1i64));
 	const CurveData& rCombineCurve = gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld;
@@ -182,31 +190,57 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	{
 		float fPassFraction = static_cast<float>(i) / fPassFractionDenominator;
 		rGlobalLayout.pfCombineCurvePoints[i] = rCombineCurve.Evaluate(fPassFraction);
+
+		float fDirectionality = std::lerp(fSpreadDirectionalityStart, fSpreadDirectionalityEnd, fPassFraction);
+		float fDistanceFalloff = std::lerp(fSpreadDistanceFalloffStart, fSpreadDistanceFalloffEnd, fPassFraction);
+		uint32_t uiRingCount = static_cast<uint32_t>(std::lerp(fSpreadRingCountStart, fSpreadRingCountEnd, fPassFraction));
+		uint32_t uiDirectionCountBase = static_cast<uint32_t>(std::lerp(fSpreadDirectionCountStart, fSpreadDirectionCountEnd, fPassFraction));
+		float fRingCount = static_cast<float>(uiRingCount);
+
+		float fWeightSumEastWest = 0.0f;
+		float fWeightSumNorthSouth = 0.0f;
+		for (uint32_t j = 0; j < uiRingCount; ++j)
+		{
+			uint32_t uiDirectionCount = uiDirectionCountBase + j;
+			float fDirectionCount = static_cast<float>(uiDirectionCount);
+			float fRingFalloff = 1.0f - fDistanceFalloff * (static_cast<float>(j + 1) / fRingCount);
+
+			// Closed-form sums over ideal evenly spaced directions: max(+/-cos(2*pi*k/N), 0) (EW) and
+			// max(+/-sin(2*pi*k/N), 0) (NS) for k in [0, N-1].
+			float fParityScale = (uiDirectionCount % 2ui32 == 0ui32) ? 1.0f : 0.5f;
+			float fHalfAngle = fParityScale * XM_PI / fDirectionCount;
+			float fPeakSum = fParityScale / std::sin(fHalfAngle);
+			float fDirectionSumNorthSouth = fPeakSum * std::cos(fHalfAngle);
+			float fDirectionSumEastWest = (uiDirectionCount % 4ui32 == 0ui32) ? fDirectionSumNorthSouth : fPeakSum;
+
+			fWeightSumEastWest += std::lerp(fDirectionCount, fDirectionSumEastWest, fDirectionality) * fRingFalloff;
+			fWeightSumNorthSouth += std::lerp(fDirectionCount, fDirectionSumNorthSouth, fDirectionality) * fRingFalloff;
+		}
+
+		shaders::SpreadPassNormalizationLayout& rPassNormalization = rGlobalLayout.pSpreadPassNormalizations[i];
+		rPassNormalization.f2WeightSumInverse.x = 1.0f / fWeightSumEastWest;
+		rPassNormalization.f2WeightSumInverse.y = 1.0f / fWeightSumNorthSouth;
+		rPassNormalization.uiRingCount = uiRingCount;
+		rPassNormalization.uiDirectionCountBase = uiDirectionCountBase;
 	}
 	rGlobalLayout.fLightingTerrain = gLightingTerrain.mfCurrent;
 	rGlobalLayout.fLightingObjects = gLightingObjects.mfCurrent;
 	rGlobalLayout.fLightingAddTerrain = gLightingAddTerrain.mfCurrent;
 
-	rGlobalLayout.fSpreadDirectionalityStart = gSpreadDirectionality.mfCurrent;
-	rGlobalLayout.fSpreadDirectionCountStart = gSpreadDirectionCount.mfCurrent;
+	rGlobalLayout.fSpreadDirectionalityStart = fSpreadDirectionalityStart;
 	rGlobalLayout.fSpreadDistanceStart = gSpreadDistance.mfCurrent;
-	rGlobalLayout.fSpreadRingCountStart = gSpreadRingCount.mfCurrent;
 	rGlobalLayout.fSpreadDecayStart = gSpreadDecay.mfCurrent;
 	rGlobalLayout.fSpreadAccumulationDecayStart = gSpreadAccumulationDecay.mfCurrent;
-	rGlobalLayout.fSpreadDistanceFalloffStart = gSpreadDistanceFalloff.mfCurrent;
-	rGlobalLayout.fSpreadOutputThresholdStart = gSpreadOutputThreshold.mfCurrent;
+	rGlobalLayout.fSpreadDistanceFalloffStart = fSpreadDistanceFalloffStart;
 	rGlobalLayout.fSpreadOutputCompressStart = gSpreadOutputCompress.mfCurrent;
 	rGlobalLayout.fSpreadPassCount = gSpreadPassCount.mfCurrent;
 
 	// Spread End (interpolation targets for last spread pass)
-	rGlobalLayout.fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.mfCurrent;
-	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.mfCurrent;
+	rGlobalLayout.fSpreadDirectionalityEnd = fSpreadDirectionalityEnd;
 	rGlobalLayout.fSpreadDistanceEnd = engine::LerpAtHeight(engine::gpCamera->RenderFraming(), gSpreadDistanceEnd);
-	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.mfCurrent;
 	rGlobalLayout.fSpreadDecayEnd = gSpreadDecayEnd.mfCurrent;
 	rGlobalLayout.fSpreadAccumulationDecayEnd = gSpreadAccumulationDecayEnd.mfCurrent;
-	rGlobalLayout.fSpreadDistanceFalloffEnd = gSpreadDistanceFalloffEnd.mfCurrent;
-	rGlobalLayout.fSpreadOutputThresholdEnd = gSpreadOutputThresholdEnd.mfCurrent;
+	rGlobalLayout.fSpreadDistanceFalloffEnd = fSpreadDistanceFalloffEnd;
 	rGlobalLayout.fSpreadOutputCompressEnd = gSpreadOutputCompressEnd.mfCurrent;
 
 	rGlobalLayout.fSpreadHeightMultiplier = gSpreadHeightMultiplier.mfCurrent;

@@ -165,22 +165,25 @@ preparation dispatch recovers `primary.path-overlap` itself under
    - Done when the result is a usable terminal, a blocker was returned, or the
      overlap recovery returned a blocker or the meaning-change handoff.
 6. Fill in the SmartGit launch line.
-   - Only after this checker has returned a usable terminal result, take the
-     `Show-FinalizeApprovalReview.ps1` command from
-     [`scripts.md#invocation`](scripts.md#invocation), redirect included, and
-     fill `<primary-worktree>` and, as `<landing-commit>`, the prepared landing
-     commit.
-   - When `-Prepare` returned `pass`, also fill in a `Coretide SmartGit launch:`
-     line from the Coretide review command in
-     [`scripts.md#invocation`](scripts.md#invocation), redirect included, with
-     `<primary-worktree>` and its `coretideCommit`.
-   - Do not run them: main runs them after this handoff, per `SKILL.md`
+   - After a usable terminal result, fill the engine (when non-empty) and
+     Coretide (when `-Prepare` returned `pass`)
+     `Show-FinalizeApprovalReview.ps1` commands from
+     [`scripts.md#invocation`](scripts.md#invocation) (redirects included).
+   - Emit `none` for a row only on standing-confirmation recovery outside
+     standalone Plan rejection — for engine when no code-meaning change occurred
+     (empty `rebuildProjects`), and for Coretide when no code-meaning change
+     occurred or paired `coretideCommit` is unchanged — and only after
+     `Test-FinalizeApprovalReviewReceipt`
+     (`.agents/scripts/FinalizeWorkflowCommon.psm1`) returns `$null` for that
+     invocation's receipt path, commit, and primary repository; any non-`$null`
+     result keeps the filled command for refreshed review.
+   - Do not run them: main handles them per `SKILL.md`
      `### Landing confirmation`.
-   - Done when each line is filled in for the commit the summary describes, or
-     a blocker was returned.
-7. Whenever `SKILL.md` `### Landing confirmation` requires a refreshed summary,
-   refill the launch line for the newly reviewed commit and return it with the
-   summary. Done when the line names that commit.
+   - Done when each line is filled (or `none`) or a blocker was returned.
+7. When `SKILL.md` `### Landing confirmation` requires a refreshed summary,
+   refill the launch line for the newly reviewed commit (or `none` per step 6)
+   and return it with the summary. Done when the line names that commit or
+   `none`.
 8. Assemble and return one handoff carrying the complete step-3 acceptance
    table, the `SmartGit launch:` and `Coretide SmartGit launch:` rows holding
    the step-6 lines, and a landing summary.
@@ -194,9 +197,9 @@ preparation dispatch recovers `primary.path-overlap` itself under
      remaining operation.
    - Retain all existing summary fields and do not state
      `Primary has not advanced.` when the live tip is newer.
-   - Main runs the launch line, then presents the summary immediately before the
-     authoritative confirmation question. That summary is a terminal return: the
-     worker ends its turn with it as its final answer.
+   - Main decides launch, summary presentation, and pause `(d)` per `SKILL.md`
+     `### Landing confirmation`. That handoff is a terminal return: the worker
+     ends its turn with it as its final answer.
    - The preparation dispatch changes nothing on primary, so a brief that says
      to stop before any primary change still ends with this summary, per
      `SKILL.md` `## Inputs`.
@@ -216,10 +219,10 @@ preparation dispatch recovers `primary.path-overlap` itself under
      `coretideCommit`) in the blocked handoff only for `landed`/`ok`, or for
      `none`/`coretide.already-landed` when `coretideCommit` equals the approved
      Coretide commit.
-   - A Coretide-only landing passes `-ReleasePlanClaim` to `-Land` for a
-     claimed Plan instead of step 10's, skips steps 10-12, releases the lease
-     with `Invoke-FinalizeLockClaim.ps1 -Release` only on `landed` or `none`,
-     and routes `blocked` through `## Recovery`.
+   - A Coretide-only landing passes `-ReleasePlanClaim` to `-Land` for a claimed
+     Plan instead of step 10's, skips steps 10-12, releases the lease with
+     `Invoke-FinalizeLockClaim.ps1 -Release` only on `landed` or `none`, and
+     routes `blocked` through `## Recovery`.
    - Done when that claim returns landing's owner token and any Coretide
      `-Land` returns its result.
 10. Invoke landing with that owner token.
@@ -276,24 +279,31 @@ preparation dispatch recovers `primary.path-overlap` itself under
 
 ## Recovery
 
-- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` result stops before engine
-  landing and returns a user blocker: retain the lease on `rebase.abort-failed`;
-  otherwise release it with `Invoke-FinalizeLockClaim.ps1 -Release`.
+- A `blocked` `Invoke-FinalizeCoretide.ps1 -Land` stops before engine landing:
+  on `rebase.conflicted` or `rebase.patch-not-identical` (restoration proven),
+  release the lease (`Invoke-FinalizeLockClaim.ps1 -Release`) and return for
+  recovery to rebase Coretide onto `@{upstream}` and re-run `-Prepare`, then
+  continue through steps 3-6 (fresh step-3 acceptance table, applicable
+  movement checks, and step-6 receipt reuse or refreshed review, or return the
+  meaning-change handoff if code meaning changed). If `-Prepare` returns
+  `coretide.no-changes` after a recovery rebase, stop, release any held landing
+  lease, and report to main without auto-releasing the Plan claim or
+  auto-completing. Any other `-Land` block returns a user blocker, retaining the
+  lease only on `rebase.abort-failed`.
 - Postconfirmation engine `Invoke-FinalizeLanding.ps1` `rebase.conflicted` or
   `rebase.patch-not-identical`: prior landing arguments, baseline, expected
-  tips, landing acceptance table, SmartGit receipt, and summary are invalid,
-  while each prior verification handoff remains valid where its evidence still
-  applies under
-  [`landing-acceptance-table.md`](landing-acceptance-table.md#reviewed-diff-and-authorization)
-  (`SKILL.md` `### Landing confirmation` owns confirmation authority and drift
-  routing). Gate dispatch on the typed `Invoke-FinalizeLanding.ps1` recovery
-  code (`rebase.conflicted` or `rebase.patch-not-identical`, which already
-  proves restoration) and `lock.released: true`, then return for a fresh
-  preparation worker entering at step 4 (`SKILL.md` `## Inputs`). If
-  restoration or release is unproven (`rebase.abort-failed`,
-  `lock.released: false`), retain the blocker and lease and stop. Never change
-  primary before a fresh landing acceptance table and `SKILL.md`
-  `### Landing confirmation` complete, or reuse prior landing arguments.
+  tips, and acceptance table are invalid; confirmation authority, drift routing,
+  and receipt reuse follow `SKILL.md` `### Landing confirmation` and step 6,
+  while prior verification handoffs stay valid where their evidence still
+  applies under the
+  [table rules](landing-acceptance-table.md#reviewed-diff-and-authorization).
+  Gate dispatch on those two typed codes (which prove restoration) and
+  `lock.released: true`, then return for a fresh preparation worker entering at
+  step 4 (`SKILL.md` `## Inputs`). If restoration or release is unproven
+  (`rebase.abort-failed`, `lock.released: false`), retain the blocker and lease
+  and stop. Never change primary before a fresh landing acceptance table and
+  `SKILL.md` `### Landing confirmation` complete, or reuse prior landing
+  arguments.
 - Reconciliation conflict: resolve under the approved invariants, then
   re-review the affected regions and follow `SKILL.md`
   `### Landing confirmation`. Resolve hunk by hunk, tracing each side's
@@ -354,10 +364,14 @@ preparation dispatch recovers `primary.path-overlap` itself under
     `SKILL.md` `### Landing confirmation` `(d)`) and full step-3 tables follow
     step 5 after the step-4 recheck.
   - Any other exit leaving a rebase in progress (conflict): resolve under
-    `Reconciliation conflict` above and finish the rebase; resolved hunks count
-    as a meaning change, so return the resolved regions to main as the
-    meaning-change handoff (carrying those `Build required` targets) before
-    candidate preparation.
+    `Reconciliation conflict` and finish the rebase. When every conflict was a
+    `broken-engine-plan/v1` `dependsOn` merge, `rebuildProjects` is empty, and
+    this is not standalone Plan rejection, re-invoke approval preparation with
+    the re-resolved inputs above and continue through step 3 (`plan validate`)
+    and steps 4-6, where `Test-FinalizeApprovalReviewReceipt` verifies the
+    resolved commit's dependency deltas and preserved bytes and decides `none`
+    vs refreshed review. Any other conflict returns resolved regions as the
+    meaning-change handoff (with `Build required`) before candidate preparation.
   - Abort instead when approved decisions, including any user answer the
     continuation capsule carries, do not determine a valid resolution (such as
     contradicting intents): run `git rebase --abort`. After that abort, or any

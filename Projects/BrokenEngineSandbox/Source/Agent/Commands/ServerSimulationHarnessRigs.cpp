@@ -107,8 +107,8 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		{
 			throw std::runtime_error(std::format("'{}' must be an [x,y] array of finite numbers", kName));
 		}
-		// The caller supplies local XY only; the position sits on the lowest flight plane until a ship spawn seats its
-		// target plane's height, and the W lane follows the position/direction invariant.
+		// The caller supplies local XY only; positions sit on the lowest flight plane, and the W lane follows the
+		// position/direction invariant.
 		static constexpr bool kbIsPosition = kName == "vecPosition";
 		rMember = XMVectorSet(engine::AgentFloatValue(rValue.at(0), kName), engine::AgentFloatValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
@@ -252,20 +252,6 @@ static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& r
 	return rData;
 }
 
-// The plane is tested before its height is read, because the plane lookup is unchecked and the orders byte can name
-// any index up to 255.
-template <typename SPAWN_INFO>
-static void SeatShipSpawnHeight(SPAWN_INFO& rData, ShipType eType)
-{
-	int64_t iFlightPlane = GetTargetFlightPlane(rData.orders);
-	if (!IsFlightPlaneAllowed(eType, iFlightPlane))
-	{
-		throw std::runtime_error(std::format("'{}' target flight plane is not allowed for {}", FRAME_COLUMN(SPAWN_INFO, orders)::kName, EnumToken(eType)));
-	}
-	rData.vecPosition = XMVectorSetZ(rData.vecPosition, engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters);
-	rData.uiFlightPlane = static_cast<uint8_t>(iFlightPlane);
-}
-
 // Validates one entry without touching any queue.
 static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(const nlohmann::json& rEntry)
 {
@@ -298,9 +284,8 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 	switch (eType)
 	{
 		case StatusChangeType::kSpawnFighter:
-			SeatShipSpawnHeight(ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kFighter);
-			// The controller parses as a token and SeatShipSpawnHeight has already refused a disallowed target plane and
-			// seated an allowed stored plane, so only the fire time can fail here.
+			ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			// The controller parses as a token, so only the fire time can fail here.
 			if (!IsAdoptableStatusChange(scheduled.change))
 			{
 				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(FightersPostRender::SpawnInfo, nextBeamFireTime)::kName));
@@ -309,7 +294,6 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		case StatusChangeType::kSpawnOmni:
 		{
 			OmnisPostRender::SpawnInfo& rData = ParseSpawnEntry<OmnisPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
-			SeatShipSpawnHeight(rData, ShipType::kOmni);
 			// An omni coasts under a transfer lock the entry may set. A velocity that crosses a whole cell in one tick
 			// outruns the one-cell transfer delta and asserts at the destination's Spawn, so cap it at the speed
 			// navigation never exceeds.
@@ -324,8 +308,8 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			break;
 		}
 		case StatusChangeType::kSpawnBattleship:
-			SeatShipSpawnHeight(ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kBattleship);
-			// As for SpawnFighter, only the fire time can fail here.
+			ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			// The controller parses as a token, so only the fire time can fail here.
 			if (!IsAdoptableStatusChange(scheduled.change))
 			{
 				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(BattleshipsPostRender::SpawnInfo, nextMissileFireTime)::kName));
@@ -369,11 +353,6 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			if (!IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 			{
 				throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(UpdateShipData, navigationDelaySeconds)::kName));
-			}
-			// eType parsed as a token, so only the target flight plane can fail here.
-			if (!IsAdoptableStatusChange(scheduled.change))
-			{
-				throw std::runtime_error(std::format("'{}' is not allowed for {}", FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)::kName, EnumToken(rData.eType)));
 			}
 			break;
 		}

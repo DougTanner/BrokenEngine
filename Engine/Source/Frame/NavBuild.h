@@ -32,7 +32,7 @@ inline int64_t NavGridCell(float fValue, float fMinimum, float fMaximum, int64_t
 	return std::clamp(iCell, 0i64, iZones - 1);
 }
 
-// Cell-local navigation data for one baked graph; CellStaticData holds one per graph, index-parallel with the server's NavigationGraphBake entries.
+// Cell-local navigation data for one baked graph; CellStaticData holds one per graph, index-parallel with the server's NavigationGraphSpec entries.
 struct NavData
 {
 	// Serialized content; layout changes require a kiNavDataVersion bump.

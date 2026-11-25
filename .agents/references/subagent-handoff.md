@@ -77,17 +77,15 @@ replaces it.
 
 ## Continuation capsule
 
-The next step after a pause — user confirmation, external verdicts, interview
-answers, an accepted finding, recovery — is a fresh worker of the same role with
-the ordinary task brief plus a `Continuation capsule:` field carrying only what
-that step consumes:
+After a pause (confirmation, external verdicts, interview answers, accepted
+finding, recovery), dispatch a fresh same-role worker with the task brief plus
+`Continuation capsule:` carrying only what the step consumes:
 
 - objective and scope;
-- the identity of the prior worker's artifacts — commit hashes, paths, receipt
-  files, tokens — as path plus selector where a file holds them;
-- the decision or answers that unblocked the step;
-- the unresolved issue;
-- the next action; and
-- the skill to run.
+- prior artifacts (commits, paths, receipts, tokens) by path + selector when
+  file-backed; saved review outputs per `subagent-reporting.md` `## Task brief`;
+- unblocking decision or answers;
+- unresolved issues;
+- next action and skill to run.
 
 Never the prior worker's transcript or reasoning.

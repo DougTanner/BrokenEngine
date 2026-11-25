@@ -49,7 +49,7 @@ constexpr const char* ShipControllerName(ShipController eController)
 }
 
 // Set by controllers (the fleet path through the spawn, kUpdateShip, and kUpdateSquadronOrders, and the random-wave
-// spawn); kUpdateShip and the Fighters and Omnis PostRender Update tactics also write the target flight plane.
+// spawn).
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
@@ -63,25 +63,11 @@ enum class ShipOrders : uint16_t
 	// Fleet Omni rows only: the squadron's settings (Fleet::pSquadronOrders, Fleet.h).
 	kPatrolCell         = 0x0020,
 	kPatrolTogether     = 0x0040,
-
-	// Target flight plane index in bits 8-15 (0 = lowest)
 };
 using ShipOrders_t = common::Flags<ShipOrders>;
 
 // Every squadron setting bit, the ones kUpdateSquadronOrders replaces.
 inline constexpr ShipOrders_t kSquadronOrderBits {ShipOrders::kSeekAndDestroy, ShipOrders::kSharedTarget, ShipOrders::kPatrolCell, ShipOrders::kPatrolTogether};
-
-inline constexpr int64_t GetTargetFlightPlane(ShipOrders_t orders)
-{
-	return static_cast<int64_t>((std::to_underlying(orders.meFlags) >> 8) & 0xFF);
-}
-
-inline void SetTargetFlightPlane(ShipOrders_t& rOrders, int64_t iFlightPlane)
-{
-	uint16_t uiRaw = std::to_underlying(rOrders.meFlags);
-	uiRaw = static_cast<uint16_t>((uiRaw & ~0xFF00) | (static_cast<uint16_t>(iFlightPlane) << 8));
-	rOrders.meFlags = static_cast<ShipOrders>(uiRaw);
-}
 
 // Ship-internal state written by the ship's own phases.
 enum class ShipFlags : uint16_t
@@ -166,17 +152,12 @@ struct HeadingMovementConstants
 	float fCaptureRate = 0.0f;
 };
 
-// A ship's stored flight plane while it climbs between planes.
-inline constexpr uint8_t kuiNoFlightPlane = 255;
-
 // Every ship type climbs at this fraction of its maximum speed.
 inline constexpr float kfShipClimbSpeedFraction = 0.25f;
 
 // Firing and target picking test line of sight on this clearance tier's graphs for every shooter; movement decisions use
 // the ship type's own tier (ShipTypeClearanceTier, TerrainUtils.h).
 inline constexpr int64_t kiFiringClearanceTier = 0;
-
-[[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
 
 // The admitted navigation-delay range in seconds, which the HUD slider also spans.
 inline constexpr float kfMinimumNavigationDelaySeconds = 0.0f;

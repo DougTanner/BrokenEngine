@@ -149,11 +149,6 @@ public:
 	VkPipelineLayout mVkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline mVkPipeline = VK_NULL_HANDLE;
 
-	// External Set 0 layout (global descriptor set from TextureManager, not owned)
-	VkDescriptorSetLayout mExternalVkDescriptorSetLayout = VK_NULL_HANDLE;
-	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
-	VkDescriptorSetLayout mExternalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
-
 	// Indirect draw/dispatch buffer; host-visible commands are CPU-written, device-local commands are GPU-written.
 	VkBuffer mIndirectVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mIndirectVmaAllocation = VK_NULL_HANDLE;

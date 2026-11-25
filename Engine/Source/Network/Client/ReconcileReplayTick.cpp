@@ -87,19 +87,19 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 
 	// The slot before the write head holds the ring base the output layout keeps (rollback base,
 	// injected full state, or fast-path tail), so writes must never wrap onto it.
-	if (rScratch.iReplayWriteCount >= engine::kiNetworkBufferSize - 1)
+	if (rScratch.iReplayStackCount >= engine::kiNetworkBufferSize)
 	{
-		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord Ring buffer full WriteCount: {} ForTick: {}", rScratch.iReplayWriteCount, iTick);
+		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord Ring buffer full WriteCount: {} ForTick: {}", rScratch.iReplayStackCount - 1, iTick);
 		return false;
 	}
 
-	int64_t iNextSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
+	int64_t iNextSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayStackCount - 1);
 	if (rCell.ppSnapshots[iNextSlot] == nullptr)
 	{
 		rCell.ppSnapshots[iNextSlot] = std::make_unique<game::Frame>();
 	}
 
-	game::Frame* pCurrent = rScratch.replayStack.back();
+	game::Frame* pCurrent = rScratch.ppReplayStack[rScratch.iReplayStackCount - 1];
 	game::Frame* pNext = rCell.ppSnapshots[iNextSlot].get();
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, iTick <= rScratch.iPreReconcileTailTick);
@@ -163,8 +163,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 		pNext->postRender.uiSharedCrc = pNext->Crc();
 	}
 
-	rScratch.replayStack.push_back(pNext);
-	++rScratch.iReplayWriteCount;
+	rScratch.ppReplayStack[rScratch.iReplayStackCount++] = pNext;
 
 	return true;
 }
@@ -174,7 +173,7 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	game::Frame& rCurrentFrame = *rScratch.replayStack.back();
+	game::Frame& rCurrentFrame = *rScratch.ppReplayStack[rScratch.iReplayStackCount - 1];
 	rCurrentFrame.interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	common::crc_t uiClientCrc = rCurrentFrame.postRender.uiSharedCrc;
 
@@ -199,7 +198,7 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 		return false;
 	}
 
-	rScratch.iLastValidatedIndex = std::ssize(rScratch.replayStack) - 1;
+	rScratch.iLastValidatedIndex = rScratch.iReplayStackCount - 1;
 	rScratch.iNewConfirmedTick = iTick;
 	rCell.iHighWaterValidatedTick = std::max(rCell.iHighWaterValidatedTick, iTick);
 
@@ -281,10 +280,10 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick)
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	int64_t iStartWriteCount = rScratch.iReplayWriteCount;
-	int64_t iCurrentTick = rScratch.replayStack.back()->interpolate.iTick;
+	int64_t iStartWriteCount = rScratch.iReplayStackCount - 1;
+	int64_t iCurrentTick = rScratch.ppReplayStack[rScratch.iReplayStackCount - 1]->interpolate.iTick;
 
-	int64_t iBudget = engine::kiNetworkBufferSize - 1 - rScratch.iReplayWriteCount;
+	int64_t iBudget = engine::kiNetworkBufferSize - rScratch.iReplayStackCount;
 	int64_t iCappedTarget = std::min(iTargetTick, iCurrentTick + iBudget);
 
 	while (iCurrentTick < iCappedTarget)
@@ -293,7 +292,7 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick)
 		ReconcileForwardStepCoord(rWork, iCurrentTick);
 	}
 
-	for (int64_t i = iStartWriteCount; i < rScratch.iReplayWriteCount; ++i)
+	for (int64_t i = iStartWriteCount; i < rScratch.iReplayStackCount - 1; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
 		rCell.ppSnapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
@@ -331,13 +330,13 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 		ReconcileForwardStepCoord(rWork, iCurrentTick);
 	}
 
-	for (int64_t i = 0; i < rScratch.iReplayWriteCount; ++i)
+	for (int64_t i = 0; i < rScratch.iReplayStackCount - 1; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
 		rCell.ppSnapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 
-	rCell.iSnapshotCount = iStartCount + rScratch.iReplayWriteCount;
+	rCell.iSnapshotCount = iStartCount + (rScratch.iReplayStackCount - 1);
 	ASSERT(rCell.iSnapshotCount <= engine::kiNetworkBufferSize);
 }
 

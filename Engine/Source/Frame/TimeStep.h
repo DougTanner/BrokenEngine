@@ -48,6 +48,7 @@ public:
 		return (simulationNanoseconds * miTimeDivide) / miTimeMultiply;
 	}
 
+	// No-op when the ratio is unchanged, leaving mbTimeScaleChanged alone.
 	void SetTimeScale(int64_t iMultiply, int64_t iDivide);
 
 	static constexpr int64_t kiMaximumTicksPerFrame = 12;  // Threshold for the server's auto-reduction

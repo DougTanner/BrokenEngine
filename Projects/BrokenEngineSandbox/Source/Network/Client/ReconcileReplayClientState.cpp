@@ -31,10 +31,10 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 			continue;
 		}
 
-		// replayStack[0] is the confirmed frame; scan from index 1 onwards
-		for (int64_t i = 1; i < std::ssize(rScratch.replayStack); ++i)
+		// Skip the replay base at index 0 so transfer migration only scans frames produced after it.
+		for (int64_t i = 1; i < rScratch.iReplayStackCount; ++i)
 		{
-			const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
+			const Frame& rFrame = *rScratch.ppReplayStack[i];
 			for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 			{
 				if (!IsOwnedEntityTransfer(rRequest.change))

@@ -385,7 +385,8 @@ public:
 	// Created at submit and completed later by the fence, image-wait, and retirement hooks.
 	struct GpuFrameTimeline
 	{
-		int64_t iSequence = 0;
+		// Submission sequences start at 1, so -1 never matches any sequence, including 0.
+		int64_t iSequence = -1;
 		int64_t iFramebuffer = 0;
 		bool bWorld = false;
 		bool bAcquireBarriers = false;

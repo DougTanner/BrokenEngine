@@ -43,9 +43,8 @@ findings and fixes land, only the affected files receive a focused re-review.
   repository toplevel, plus the committed head when the review runs against one.
 - `Scope` — any untracked paths the review must cover.
 - `First-round findings` — focused re-review only: each accepted first-round
-  `Findings` row being re-checked, verbatim as the first round returned it,
-  carried in the dispatch's `Continuation capsule:` field
-  (`.agents/references/subagent-handoff.md` `## Continuation capsule`).
+  finding being re-checked, in `Continuation capsule:` per
+  `../../references/subagent-reporting.md` `## Task brief`.
 - `Stated net size` — the net instruction size change the session's plan
   states; omitted when the session has no plan or the plan states none.
 

@@ -3,6 +3,7 @@
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 
 #include "File/FileManager.h"
+#include "File/PackChunks.h"
 
 namespace engine
 {
@@ -28,14 +29,6 @@ enum class AudioStreamingHarnessRigPhase : uint8_t
 	kRefillCancelled,
 	kExistingQueued,
 	kExistingComplete,
-};
-
-enum class AudioStreamingHarnessRigQueueState : uint8_t
-{
-	kFree,
-	kQueued,
-	kLoading,
-	kReady,
 };
 
 enum class AudioStreamingHarnessRigHoldOwner : uint8_t
@@ -89,14 +82,14 @@ struct AudioStreamingHarnessRigRecord
 	int64_t iLength = 0;
 	AudioStreamingHarnessRigPartition ePartition = AudioStreamingHarnessRigPartition::kMain;
 	AudioStreamingHarnessRigPhase ePhase = AudioStreamingHarnessRigPhase::kStartup;
-	AudioStreamingHarnessRigQueueState eState = AudioStreamingHarnessRigQueueState::kFree;
+	AudioChunkReadState eState = AudioChunkReadState::kFree;
 	bool bCancelAcknowledged = false;
 };
 
 struct AudioStreamingHarnessRigPoolEntry
 {
 	int64_t iIndex = 0;
-	AudioStreamingHarnessRigQueueState eState = AudioStreamingHarnessRigQueueState::kFree;
+	AudioChunkReadState eState = AudioChunkReadState::kFree;
 	int64_t iGeneration = 0;
 	common::crc_t crc = 0;
 	int64_t iOffset = 0;
@@ -116,7 +109,7 @@ struct AudioStreamingHarnessRigSnapshot
 	AudioStreamingHarnessRigSnapshotFlags_t flags;
 	int64_t iHeldIndex = kiAudioStreamingHarnessRigNoPoolIndex;
 	int64_t iHeldGeneration = 0;
-	AudioStreamingHarnessRigQueueState eHeldState = AudioStreamingHarnessRigQueueState::kFree;
+	AudioChunkReadState eHeldState = AudioChunkReadState::kFree;
 	int64_t iMainHead = 0;
 	int64_t iLoader0Head = 0;
 	int64_t iLoader1Head = 0;
@@ -175,7 +168,7 @@ public:
 	void ReleaseLoaders();
 	void LoadChunk(common::crc_t crc, LoadPriority ePriority);
 
-	static void Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
+	static void Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioChunkReadState eState, int64_t iGeneration, bool bCancelAcknowledged);
 	static bool HoldAudioRead(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iIndex, int64_t iGeneration);
 	static void CompleteAudioRead(bool bHeld);
 	static void CountRetry();
@@ -207,7 +200,7 @@ private:
 	};
 
 	void ResetHistory();
-	void RecordEntry(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
+	void RecordEntry(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioChunkReadState eState, int64_t iGeneration, bool bCancelAcknowledged);
 
 	std::atomic<uint64_t> muiScenarioGate = 0;
 	std::atomic<int64_t> miActiveWriters = 0;

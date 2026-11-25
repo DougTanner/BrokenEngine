@@ -144,7 +144,7 @@ static const engine::AnimationData* LoopingAnimationData(common::crc_t uiModel)
 }
 #endif
 
-void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData)
+void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rCurrentFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerInterpolateUpdateBattleships);
 
@@ -164,15 +164,12 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
-		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 #if defined(BT_CLIENT)
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 		const engine::AnimationData* pAnimationData = animationDatas[std::to_underlying(rPreviousPostRender.pController[i])];
 #endif
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
-		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kBattleship, rPreviousPostRender.pController[i], vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -201,7 +198,6 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
-		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 #if defined(BT_CLIENT)
 		rCurrent.pAnimationTimes[i] = animationTime;
 #endif
@@ -261,7 +257,6 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
-				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};
@@ -339,12 +334,11 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kBattleship, rInfo.eController, rInfo.uiFlightPlane));
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kBattleship, rInfo.eController));
 	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
-	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
 #endif
@@ -462,12 +456,12 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 						flags.Set(ShipFlags::kReturnToIslandCenter, false);
 						vecDestination = vecTarget;
 						bHasDestination = true;
-						bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+						bRouteToTarget = !HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget);
 					}
 					else
 					{
 						bool bInLineOfSight = false;
-						bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rCurrentInterpolate.puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiBattleshipHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
+						bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, vecPosition, {}, rPrevious.pAlignments[i], registryTarget, vecTarget, bInLineOfSight);
 						if (bEnemyFound)
 						{
 							// An attack never returns to an island.
@@ -476,17 +470,16 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 							bHasDestination = true;
 							// The pick tests sight on kiFiringClearanceTier; flying at the target also needs sight on the Battleship's own
 							// tier.
-							bRouteToTarget = !bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), rCurrentInterpolate.puiFlightPlanes[i], vecPosition, vecTarget);
+							bRouteToTarget = !bInLineOfSight || !HasLineOfSight(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget);
 						}
 						else
 						{
-							vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, false, XMVectorZero(), navRectangleBoard, GetTargetFlightPlane(rPrevious.pOrders[i]), flags, bHasDestination);
+							vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, false, XMVectorZero(), navRectangleBoard, flags, bHasDestination);
 						}
 					}
 					if (bRouteToTarget)
 					{
-						bool bFinalWaypoint = false;
-						vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
+						vecDestination = NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kBattleship), vecPosition, vecTarget, navRectangleBoard);
 					}
 					// The stored wanted heading feeds only the heading capture, which kNoAiDirection gates while there is no destination:
 					// random-spawn rows run no fleet navigation or cone test.
@@ -504,9 +497,9 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 		}
 
 		// A dying Battleship holds still, so it skips terrain contact.
-		if (!(lifecycleFlags & engine::LifecycleFlags::kDying) && !SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
+		if (!(lifecycleFlags & engine::LifecycleFlags::kDying))
 		{
-			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
+			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity);
 		}
 		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
 		// Last velocity write, after pusher response and bounce: a stored Z speed would reach the next
@@ -550,7 +543,6 @@ bool BattleshipsInterpolate::LogDifferences(const BattleshipsInterpolate& rOther
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
-		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

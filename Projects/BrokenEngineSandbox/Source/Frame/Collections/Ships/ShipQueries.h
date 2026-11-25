@@ -83,19 +83,18 @@ enum class AttackTargetFlags : uint8_t
 };
 using AttackTargetFlags_t = common::Flags<AttackTargetFlags>;
 
-// The kept attack target rRegistryTarget in line of sight from vecPosition on uiFlightPlane, else the enemy nearest
-// vecPickFrom in line of sight, else the kept target hidden, else the nearest enemy hidden. Nearest is x/y with
-// kHorizontal, else 3D, ties keeping the first row in ForEachShipType order; enemies above iHighestFlightPlane never
-// qualify. Returns false when the previous frame holds no such enemy, clearing rRegistryTarget when its row is above
-// iHighestFlightPlane and leaving every other output unchanged. With kIgnoreLineOfSight it tests no sight: the kept
-// target, else the nearest enemy, with rbInLineOfSight false.
-[[nodiscard]] bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t uiFlightPlane, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, int64_t iHighestFlightPlane, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight);
+// The kept attack target rRegistryTarget in line of sight from vecPosition, else the enemy nearest vecPickFrom in line
+// of sight, else the kept target hidden, else the nearest enemy hidden. Nearest is x/y with kHorizontal, else 3D, ties
+// keeping the first row in ForEachShipType order. Returns false when the previous frame holds no enemy, leaving every
+// output unchanged. With kIgnoreLineOfSight it tests no sight: the kept target, else the nearest enemy, with
+// rbInLineOfSight false.
+[[nodiscard]] bool XM_CALLCONV FindAttackTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecPickFrom, AttackTargetFlags_t flags, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryTarget, XMVECTOR& rVecResult, bool& rbInLineOfSight);
 
-// Firing and look targets from previous-frame data, ignoring enemies above iHighestFlightPlane: sets kFireBlaster for an
-// enemy within fBlasterTargetRange on the shooter's stored plane uiFlightPlane with clear line of sight, so a climbing
-// shooter holds fire. The look position leads the nearest such target, preferring the kept attack target registryTarget
-// when it qualifies, else is the nearest enemy in line of sight at any range.
-void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, uint8_t uiFlightPlane, int64_t iHighestFlightPlane, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
+// Firing and look targets from previous-frame data, testing only visible enemies (FrameInterpolate::IsVisible): sets
+// kFireBlaster for an enemy within fBlasterTargetRange with clear line of sight. The look position leads the nearest
+// such target, preferring the kept attack target registryTarget when it qualifies, else is the nearest visible enemy
+// in line of sight.
+void XM_CALLCONV AcquireTarget(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, engine::AlignmentIdentifier alignment, engine::registry_id_t registryTarget, float fBlasterSpeed, float fBlasterTargetRange, ShipFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
 
 // The enemy kIsFlagship Battleship row nearest vecFrom, with its registry id; returns false, leaving both outputs
 // unchanged, when none qualifies; ties keep the first row.
@@ -113,10 +112,8 @@ struct ShipUuid
 // Armor for Omnis, health otherwise.
 [[nodiscard]] float ShipHull(const Frame& rFrame, ShipLocator locator);
 
-// The previous-frame position of the first row, in ForEachShipType order, whose current registry id is the nonzero
-// registryId, whose previous-frame arrival grace has run out, and whose current Interpolate position's nearest flight
-// plane is the lowest; returns false, leaving rVecPreviousPosition unchanged, when none matches. Call it before the ship
-// Updates, while current ship rows still align with previous rows.
-[[nodiscard]] bool FindLowestPlaneShipByRegistryId(const Frame& rFrame, const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition);
+// The previous-frame position of the first row, in ForEachShipType order, whose registry id is the nonzero registryId
+// and whose arrival grace has run out; returns false, leaving rVecPreviousPosition unchanged, when none matches.
+[[nodiscard]] bool FindShipByRegistryId(const Frame& rPreviousFrame, engine::registry_id_t registryId, XMVECTOR& rVecPreviousPosition);
 
 } // namespace game

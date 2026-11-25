@@ -204,7 +204,7 @@ bool PipelineDescriptorWriter::BindingExistsInShaderLayout(const Pipeline& rPipe
 
 void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 {
-	bool bHasExternalSet1 = rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE;
+	bool bHasExternalSet1 = rPipeline.mInfo.vkExternalSet1DescriptorSetLayout != VK_NULL_HANDLE;
 
 	int64_t iPerCommandBuffer = rPipeline.mbPerCommandBuffer ? std::ssize(gpSwapchainManager->mFramebuffers) : 1;
 	if (!bHasExternalSet1)

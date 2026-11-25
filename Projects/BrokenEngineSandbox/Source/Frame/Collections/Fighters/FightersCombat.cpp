@@ -60,11 +60,10 @@ void XM_CALLCONV FightersPostRender::BeginExplosion(Frame& rFrame, [[maybe_unuse
 #endif
 }
 
-// Hits the kept attack target when it qualifies, else the nearest enemy ship whose nearest flight plane is the shooter's
-// stored plane, that is inside the cell, within beam range, lined up with the heading, and in clear line of sight. Only a
-// strictly nearer row replaces the best, so an exact distance tie keeps the first row in ForEachShipType order. Returns
-// false when no ship qualifies.
-static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t i, uint8_t uiFlightPlane)
+// Hits the kept attack target when it qualifies, else the nearest enemy ship that is inside the cell, within beam
+// range, lined up with the heading, and in clear line of sight. Only a strictly nearer row replaces the best, so an
+// exact distance tie keeps the first row in ForEachShipType order. Returns false when no ship qualifies.
+static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t i)
 {
 	static constexpr float kfBeamRangeSquared = kfFighterBeamRange * kfFighterBeamRange;
 
@@ -80,10 +79,6 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 	float fNearestDistanceSquared = 0.0f;
 	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecPosition, [[maybe_unused]] FXMVECTOR vecVelocity)
 	{
-		if (NearestFlightPlane(vecPosition) != uiFlightPlane)
-		{
-			return;
-		}
 		// A row outside the cell is leaving it this tick, whether or not its own PostCollision has flagged it yet.
 		if (!engine::IsInsideCell(vecPosition))
 		{
@@ -102,7 +97,7 @@ static bool FireBeam(Frame& rFrame, const engine::CellStaticData& rStaticData, i
 			return;
 		}
 		bool bKeptTarget = registryTarget.uuid.iValue != 0 && registryId == registryTarget;
-		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, uiFlightPlane, vecShooterPosition, vecPosition))
+		if ((!optionalTarget || bKeptTarget || (!bKeptTargetChosen && fDistanceSquared < fNearestDistanceSquared)) && HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, vecShooterPosition, vecPosition))
 		{
 			optionalTarget = locator;
 			bKeptTargetChosen = bKeptTarget;
@@ -212,19 +207,12 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		// A ship climbing between planes stores no plane and holds fire.
-		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
-		if (uiFlightPlane == kuiNoFlightPlane)
-		{
-			continue;
-		}
-
 		if (!(rCurrentPostRender.pNextBeamFireTimes[i] < std::chrono::duration<float>::zero()))
 		{
 			continue;
 		}
 
-		if (FireBeam(rFrame, rStaticData, i, uiFlightPlane))
+		if (FireBeam(rFrame, rStaticData, i))
 		{
 			rCurrentPostRender.pNextBeamFireTimes[i] = kFighterBeamCooldown;
 		}

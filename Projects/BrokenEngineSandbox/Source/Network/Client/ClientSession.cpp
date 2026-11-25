@@ -148,14 +148,18 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	}
 
 	// Spawned and ChangedCell each carry the assignment.
-	if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntities, rEvent.globalId, &engine::OwnedEntity::globalId)))
+	auto it = std::ranges::find(gpGame->mClientOwnedEntities, rEvent.globalId, &engine::OwnedEntity::globalId);
+	if (it == gpGame->mClientOwnedEntities.end())
 	{
 		LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iQ, rEvent.coordinate.iR, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR);
 		gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
 	}
+	else
+	{
+		it->coord = rEvent.coordinate;
+	}
 	mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
 
-	UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
 	// Not at the fleet sync that clears the member's kIsDead: that sync shares this event's reliable flush, and the client
 	// applies owned-entity events before game packets, so this event arrives first.
 	if (rEvent.eState == engine::OwnedEntityState::kSpawned && rEvent.globalId == gpGame->mFleetSelection.mPendingFocusMemberGlobalId)
@@ -167,15 +171,6 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 		gpGame->SetClientGridCoordinate(rEvent.coordinate);
 	}
 	mpRuntime->UpdateDesiredCoordinates(ToString(rEvent.eState == engine::OwnedEntityState::kSpawned ? SubscriptionChangeReason::kSpawned : SubscriptionChangeReason::kChangedCell));
-}
-
-void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate)
-{
-	auto it = std::ranges::find(gpGame->mClientOwnedEntities, globalId, &engine::OwnedEntity::globalId);
-	if (it != gpGame->mClientOwnedEntities.end())
-	{
-		it->coord = coordinate;
-	}
 }
 
 void ClientSession::OnServerLoad()

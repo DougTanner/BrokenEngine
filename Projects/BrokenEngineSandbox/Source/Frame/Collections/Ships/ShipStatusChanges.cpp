@@ -75,10 +75,6 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			bool bFound = VisitShipByUuid(rFrame, rUpdate.eType, rUpdate.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
 				rPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
-				if (rUpdate.uiTargetFlightPlane != kuiKeepTargetFlightPlane)
-				{
-					SetTargetFlightPlane(rPostRender.pOrders[iIndex], rUpdate.uiTargetFlightPlane);
-				}
 			});
 			if (!bFound)
 			{

@@ -235,7 +235,7 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	engine::GrowPairedCollections(rCurrentInterpolate, rCurrentPostRender, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	auto [iIndex, newId] = engine::AddIndexableElement(rCurrentInterpolate, rCurrentPostRender, rFrame.postRender);
 
-	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kOmni, rInfo.eController, rInfo.uiFlightPlane));
+	XMVECTOR vecPosition = rInfo.bTransfer ? rInfo.vecPosition : XMVectorSetZ(rInfo.vecPosition, EffectiveShipFlightHeight(ShipType::kOmni, rInfo.eController));
 	rCurrentInterpolate.pVecPositions[iIndex] = vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>::zero();
@@ -244,7 +244,6 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// Generate the missile-homing registry ID with one frame UUID after the pusher ID, preserving per-spawn UUID
 	// order for replay.
 	rCurrentInterpolate.pRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
-	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentInterpolate.pfRotationAccelerationXs[iIndex] = 0.0f;
@@ -328,7 +327,6 @@ bool OmnisInterpolate::LogDifferences(const OmnisInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
-		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

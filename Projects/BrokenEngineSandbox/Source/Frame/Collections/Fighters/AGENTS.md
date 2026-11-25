@@ -7,18 +7,17 @@ client skeletal rendering. Battleships mirror this collection
 ## Behavior Invariants
 
 - A fleet-controlled fighter in its flagship's cell steers by its fleet's
-  stance (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`) on the
-  highest Fighter plane: in escort it closes on and holds its own slot on the
-  fleet's escort clock (`../Ships/FleetCoordination.cpp`), a point
-  `kfEscortDistance` from the flagship. The fleet's non-dying Fighters in the
-  cell's previous frame share the circle evenly in global-ID order, and the
-  clock turns clockwise once per `kiEscortLapTicks` as a pure function of the
-  frame tick, never stored. It aims ahead of its slot along the slot's path
-  under the escort tactic's own maximum speed, `ShipTactic::fMaximumSpeed`
-  from `ChooseFleetTactic`, which rises while it trails its slot and falls
-  while it is ahead; every other tactic keeps `kFighterMovement`'s. Weapons
-  free it attacks. Outside that cell it keeps the shared fleet navigation on the
-  highest Fighter plane. A random-spawn fighter attacks whenever its cell's
+  stance (`../Ships/AGENTS.md` `## Fleet Coordination Invariants`): in escort
+  it closes on and holds its own slot on the fleet's escort clock
+  (`../Ships/FleetCoordination.cpp`), a point `kfEscortDistance` from the
+  flagship. The fleet's non-dying Fighters in the cell's previous frame share
+  the circle evenly in global-ID order, and the clock turns clockwise once per
+  `kiEscortLapTicks` as a pure function of the frame tick, never stored. It aims
+  ahead of its slot along the slot's path under the escort tactic's own maximum
+  speed, `ShipTactic::fMaximumSpeed` from `ChooseFleetTactic`, which rises while
+  it trails its slot and falls while it is ahead; every other tactic keeps
+  `kFighterMovement`'s. Weapons free it attacks. Outside that cell it keeps the
+  shared fleet navigation. A random-spawn fighter attacks whenever its cell's
   previous frame holds an enemy ship, finishes a veer-off in progress even when
   none remains, and otherwise heads for the nearest island center, setting the
   return-to-island state with distance hysteresis, or only ramps its turn rate
@@ -38,21 +37,18 @@ client skeletal rendering. Battleships mirror this collection
   free; Seek and Destroy with Same Target off picks from the row itself. Both
   picks run before a veer-off continues, so a veering row also stores the
   current target.
-- Attack heads for its target and targets that enemy's nearest plane. Its
-  target is its kept attack target (`../Ships/AGENTS.md` `## Ship Invariants`),
-  picked from itself in x/y for a random-spawn fighter, by the squadron
-  settings above, or the enemy flagship for a `kTargetFlagship` row. Within
-  the `kfVeerOffStartDistanceSquared` x/y distance it sets `ShipFlags::kVeerOff`,
-  stores the enemy position, shifted so the fighter turns to the clear side
-  when only one side is blocked (`AttackOrStartVeerOff`), in
-  `pVecVeerOffPoints`, and routes away from that veer-off point
-  (`FleeRouteWaypoint`) on the point's nearest plane until the
-  `kfVeerOffEndDistanceSquared` x/y distance from it, then attacks again while
-  an enemy remains. An attack, veer-off, or escort tick writes its target plane
-  into the current row's orders; only a fleet fighter's such tick also leaves
-  the row roaming (navigation direction -1). `kVeerOff` clears in escort, for a
-  Patrol fighter outside the flagship's cell, and on spawn and transfer
-  arrival.
+- Attack heads for its target. Its target is its kept attack target
+  (`../Ships/AGENTS.md` `## Ship Invariants`), picked from itself in x/y for a
+  random-spawn fighter, by the squadron settings above, or the enemy flagship
+  for a `kTargetFlagship` row. Within the `kfVeerOffStartDistanceSquared` x/y
+  distance it sets `ShipFlags::kVeerOff`, stores the enemy position, shifted so
+  the fighter turns to the clear side when only one side is blocked
+  (`AttackOrStartVeerOff`), in `pVecVeerOffPoints`, and routes away from that
+  veer-off point (`FleeRouteWaypoint`) until the `kfVeerOffEndDistanceSquared`
+  x/y distance from it, then attacks again while an enemy remains. A fleet
+  fighter's attack, veer-off, or escort tick leaves the row roaming (navigation
+  direction -1). `kVeerOff` clears in escort, for a Patrol fighter outside the
+  flagship's cell, and on spawn and transfer arrival.
 - Steering turn rate crosses cell boundaries with the ship rather than
   restarting on arrival.
 - Direct blaster hits arrive through collision; missile splash damage arrives
@@ -61,9 +57,9 @@ client skeletal rendering. Battleships mirror this collection
   knockback and a staged explosion sequence. Separation and pusher death
   ownership follow the [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The nose climb tilt is client-only render state: Interpolate Update derives
-  it from ordinary plane travel before terrain rise, and Render pitches the
-  model by it, while the simulated heading stays yaw-only. Terrain displacement
-  contributes no tilt.
+  it from the descent step toward the base height before terrain rise, and
+  Render pitches the model by it, while the simulated heading stays yaw-only.
+  Terrain displacement contributes no tilt.
 - Body and effect sizing derive from `kfFighterRadius`; collision dimensions
   follow the [shared ship policy](../Ships/AGENTS.md#ship-invariants).
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn
@@ -86,12 +82,11 @@ client skeletal rendering. Battleships mirror this collection
   amount) lives in the Interpolate struct and is read by Interpolate Update and
   by Render, but it is ramped and written from PostRender Update. That crossing
   is deliberate — do not "fix" it by moving the field to PostRender, which would
-  change the CRC member set and the render read path. The position and stored
-  plane, corrected under the shared ship policy, and the client-only beam light
-  handle `pBeamAreaLights`, which it releases and clears
-  (`## Weapon Invariants`), are the only other Interpolate fields PostRender
-  Update writes; do not treat any other Interpolate field as writable from
-  PostRender Update.
+  change the CRC member set and the render read path. The position, corrected
+  under the shared ship policy, and the client-only beam light handle
+  `pBeamAreaLights`, which it releases and clears (`## Weapon Invariants`), are
+  the only other Interpolate fields PostRender Update writes; do not treat any
+  other Interpolate field as writable from PostRender Update.
 
 ## Weapon Invariants
 
@@ -100,17 +95,15 @@ client skeletal rendering. Battleships mirror this collection
   runs after the Blasters' and Missiles' and before the Omnis' and Battleships'
   (`../../FrameCollections.h`), so a shot sees neither this tick's collision
   results for Omnis and Battleships nor this tick's area damage. A row fires
-  when it is neither dying nor transferring, its arrival grace has run out, it
-  stores a flight plane, and its `pNextBeamFireTimes` cooldown is below zero; a
-  shot resets the cooldown to `kFighterBeamCooldown`, and the cooldown
-  transfers with the ship. The simulation keeps the cooldown finite and at most
-  `kFighterBeamCooldown`, with no lower clamp; `PostRead` rejects any other row
-  on every Frame read.
+  when it is neither dying nor transferring, its arrival grace has run out, and
+  its `pNextBeamFireTimes` cooldown is below zero; a shot resets the cooldown
+  to `kFighterBeamCooldown`, and the cooldown transfers with the ship. The
+  simulation keeps the cooldown finite and at most `kFighterBeamCooldown`, with
+  no lower clamp; `PostRead` rejects any other row on every Frame read.
 - The beam hits the shooter's kept attack target when it qualifies, else the
   nearest qualifying enemy ship by 3D distance. A qualifying ship is inside the
-  cell, its nearest flight plane is the shooter's stored plane, it is in line
-  of sight (`../Ships/AGENTS.md` `## Ship Invariants`) and within
-  `kfFighterBeamRange`, and its horizontal offset is within
+  cell, is in line of sight (`../Ships/AGENTS.md` `## Ship Invariants`), is
+  within `kfFighterBeamRange`, and its horizontal offset is within
   `kfFighterBeamAimAngle` of the heading; with none the beam holds fire. A
   `kTargetFlagship` shooter's kept attack target is the enemy flagship. An
   exact distance tie keeps the first row in `ForEachShipType` order, and a

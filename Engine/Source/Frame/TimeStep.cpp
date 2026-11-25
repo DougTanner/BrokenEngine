@@ -81,6 +81,11 @@ void TimeStep::SetDiagnosticFocus(bool bHasFocus)
 
 void TimeStep::SetTimeScale(int64_t iMultiply, int64_t iDivide)
 {
+	if (iMultiply == miTimeMultiply && iDivide == miTimeDivide)
+	{
+		return;
+	}
+
 	miTimeMultiply = iMultiply;
 	miTimeDivide = iDivide;
 	mbTimeScaleChanged = true;

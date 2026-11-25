@@ -41,10 +41,6 @@ void GpuStallTimeline::RecordTicks(int64_t iSequence, GpuTimers eGpuTimer, uint6
 void GpuStallTimeline::FenceObserved(int64_t iSequence)
 {
 	GpuFrameTimeline& rTimeline = mGpuTimeline[static_cast<size_t>(iSequence % kiGpuTimelineCapacity)];
-	if (iSequence == 0)
-	{
-		return;
-	}
 	if (rTimeline.iSequence != iSequence)
 	{
 		return;
@@ -57,10 +53,6 @@ void GpuStallTimeline::FenceObserved(int64_t iSequence)
 
 void GpuStallTimeline::ImageWait(int64_t iNewestSequence, std::chrono::steady_clock::time_point waitStart, std::chrono::steady_clock::time_point waitEnd)
 {
-	if (iNewestSequence == 0)
-	{
-		return;
-	}
 	GpuFrameTimeline& rTimeline = mGpuTimeline[static_cast<size_t>(iNewestSequence % kiGpuTimelineCapacity)];
 	if (rTimeline.iSequence != iNewestSequence)
 	{
@@ -78,7 +70,7 @@ void GpuStallTimeline::LogGraphicsStall(const char* pcOperation, const Acquisiti
 {
 	// A pending dump at least kiGpuTimelineCapacity submissions old has lost its ring entries, so the new stall replaces it.
 	// Destroy clears the ring without resetting the sequence, so the newest submission's slot no longer matches until the next GpuSubmitted.
-	bool bSetPending = iNewestSequence != 0 && mGpuTimeline[static_cast<size_t>(iNewestSequence % kiGpuTimelineCapacity)].iSequence == iNewestSequence && (miPendingStallSequence == 0 || iNewestSequence - miPendingStallSequence >= kiGpuTimelineCapacity);
+	bool bSetPending = mGpuTimeline[static_cast<size_t>(iNewestSequence % kiGpuTimelineCapacity)].iSequence == iNewestSequence && (miPendingStallSequence == 0 || iNewestSequence - miPendingStallSequence >= kiGpuTimelineCapacity);
 	if (bSetPending)
 	{
 		miPendingStallSequence = iNewestSequence;

@@ -38,7 +38,7 @@ constexpr float kfRotationTiltFactor = 0.015f;
 constexpr float kfRotationTiltMaximum = 0.4f;
 #endif // BT_CLIENT
 
-void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData)
+void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	OmnisInterpolate& rCurrent = *rFrameInterpolate.pOmnis;
 	const OmnisInterpolate& rPrevious = *rPreviousFrame.interpolate.pOmnis;
@@ -50,22 +50,16 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
-		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 
 		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = ClimbTowardsFlightPlane(rStaticData, ShipType::kOmni, rPreviousPostRender.pController[i], vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime, uiFlightPlane);
-		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
-		{
-			vecPosition = RaiseAboveTerrain(rStaticData, vecPosition, uiFlightPlane);
-		}
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
 		// The hull turns only about Z: it follows the horizontal part of a wanted direction that may aim at another
-		// plane, and holds when the target is exactly overhead.
+		// height, and holds when the target is exactly overhead.
 		XMVECTOR vecWantedHorizontal = XMVectorSetZ(rPreviousPostRender.pVecWantedDirections[i], 0.0f);
 		if (XMVectorGetX(XMVector3LengthSq(vecWantedHorizontal)) > 0.0f)
 		{
@@ -80,7 +74,6 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
-		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 
 		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
@@ -289,8 +282,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				{
 					view.eStance = FleetStance::kEscort;
 				}
-				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rFrame.interpolate.pOmnis->puiFlightPlanes[i], rPrevious.pAlignments[i], registryTarget);
-				SetTargetFlightPlane(orders, tactic.iTargetFlightPlane);
+				ShipTactic tactic = ChooseFleetTactic(ShipType::kOmni, rPreviousFrame, rStaticData, view, rPrevious.pGlobalIds[i], vecPosition, navRectangleBoard, rPrevious.pAlignments[i], registryTarget);
 				if (tactic.bHasDestination)
 				{
 					if (tactic.bAttacking)
@@ -313,13 +305,11 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 				flags.Set(ShipFlags::kNoAiDirection, false);
 				bWithinPatrolRadius = view.flagshipGlobalId.iValue != 0 && XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, view.vecFlagshipPosition))) <= kfOmniPatrolRadius * kfOmniPatrolRadius;
 			}
-			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship) && NearestFlightPlane(vecFlagship) <= kiOmniHighestFlightPlane)
+			else if (XMVECTOR vecFlagship = XMVectorZero(); (orders & ShipOrders::kTargetFlagship) && FindNearestEnemyFlagship(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], registryTarget, vecFlagship))
 			{
 				// A flagship chase never returns to an island.
-				SetTargetFlightPlane(orders, NearestFlightPlane(vecFlagship));
 				flags.Set(ShipFlags::kReturnToIslandCenter, false);
-				bool bFinalWaypoint = false;
-				XMVECTOR vecDestination = HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kOmni), rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard, NearestFlightPlane(vecFlagship), bFinalWaypoint);
+				XMVECTOR vecDestination = HasShipLineOfSight(rPreviousFrame, rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship) ? OmniCirclingPoint(vecPosition, vecFlagship) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecFlagship, navRectangleBoard);
 				AimAiDirection(XMVectorSubtract(vecDestination, vecPosition), vecAiDirection);
 				flags.Set(ShipFlags::kNoAiDirection, false);
 			}
@@ -327,23 +317,14 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			{
 				XMVECTOR vecTarget = XMVectorZero();
 				bool bInLineOfSight = false;
-				bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, rFrame.interpolate.pOmnis->puiFlightPlanes[i], vecPosition, {}, rPrevious.pAlignments[i], kiOmniHighestFlightPlane, registryTarget, vecTarget, bInLineOfSight);
-				if (bEnemyFound)
-				{
-					SetTargetFlightPlane(orders, NearestFlightPlane(vecTarget));
-				}
-				else
-				{
-					SetTargetFlightPlane(orders, DefaultFlightPlane(ShipType::kOmni));
-				}
+				bool bEnemyFound = FindAttackTarget(rPreviousFrame, rStaticData, vecPosition, vecPosition, {}, rPrevious.pAlignments[i], registryTarget, vecTarget, bInLineOfSight);
 				bool bHasDestination = false;
-				XMVECTOR vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, bEnemyFound, vecTarget, navRectangleBoard, GetTargetFlightPlane(orders), flags, bHasDestination);
+				XMVECTOR vecDestination = ComputeReturnDestination(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, bEnemyFound, vecTarget, navRectangleBoard, flags, bHasDestination);
 				if (bEnemyFound && !(flags & ShipFlags::kReturnToIslandCenter))
 				{
 					// Circling reads the pick's sight, tested on kiFiringClearanceTier, so that must be the Omni's own tier.
 					static_assert(ShipTypeClearanceTier(ShipType::kOmni) == kiFiringClearanceTier);
-					bool bFinalWaypoint = false;
-					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecTarget, navRectangleBoard, NearestFlightPlane(vecTarget), bFinalWaypoint);
+					vecDestination = bInLineOfSight ? OmniCirclingPoint(vecPosition, vecDestination) : NextRouteWaypoint(rStaticData, ShipTypeClearanceTier(ShipType::kOmni), vecPosition, vecTarget, navRectangleBoard);
 				}
 				if (bHasDestination)
 				{
@@ -354,7 +335,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
-			AcquireTarget(rPreviousFrame, rStaticData, vecPosition, rPrevious.pAlignments[i], registryTarget, rFrame.interpolate.pOmnis->puiFlightPlanes[i], kiOmniHighestFlightPlane, kfOmniBlastersSpeed, kfBlasterTargetRange, flags, bLookTargetFound, vecLookPosition);
+			AcquireTarget(rPreviousFrame, rStaticData, vecPosition, rPrevious.pAlignments[i], registryTarget, kfOmniBlastersSpeed, kfBlasterTargetRange, flags, bLookTargetFound, vecLookPosition);
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
@@ -395,23 +376,20 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 
 		// Shield regeneration and pushes also run while transfer-locked. Terrain contact uses the sweep end's height.
 		float fHeight = XMVectorGetZ(rFrame.interpolate.pOmnis->pVecPositions[i]);
-		bool bTerrainContact = (rPrevious.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && TakesDeathTerrainContact(fHeight, GetTargetFlightPlane(orders));
 		RegenerateShield(deltaTime, shieldCooldown, kfOmniShield, kfOmniShieldRegeneration, fShield);
-		if (bTerrainContact)
-		{
-			ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, fHeight, kfPushMargin, vecVelocity);
-		}
+		ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, fHeight, kfPushMargin, vecVelocity);
 		float fPositionCorrectionX = 0.0f;
 		ApplyPusherPush(rFrame, rFrame.interpolate.pOmnis->pPushers[i], kfOmniMaximumPusherPushVelocity, vecVelocity, fPositionCorrectionX);
-		if (bTerrainContact)
+		if (rPrevious.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
-			ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity, GetTargetFlightPlane(orders));
+			ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity);
+		}
+		else
+		{
+			float fIgnoredDeltaRotation = 0.0f;
+			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], rFrame.interpolate.pOmnis->pVecDirections[i], kfOmniRadius, deltaTime, fIgnoredDeltaRotation, vecVelocity);
 		}
 		rFrame.interpolate.pOmnis->pVecPositions[i] = XMVectorSetX(rFrame.interpolate.pOmnis->pVecPositions[i], XMVectorGetX(rFrame.interpolate.pOmnis->pVecPositions[i]) + fPositionCorrectionX);
-		if (!(rPrevious.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
-		{
-			rFrame.interpolate.pOmnis->pVecPositions[i] = RaiseAboveTerrain(rStaticData, rFrame.interpolate.pOmnis->pVecPositions[i], rFrame.interpolate.pOmnis->puiFlightPlanes[i]);
-		}
 		// Height changes step the position directly.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 

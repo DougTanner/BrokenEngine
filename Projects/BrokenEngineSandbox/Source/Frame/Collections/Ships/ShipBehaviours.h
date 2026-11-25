@@ -25,34 +25,15 @@ struct FrameInterpolate;
 // A fleet Omni in its flagship's cell patrols random points within this x/y distance of the flagship, and heals within it.
 inline constexpr float kfOmniPatrolRadius = 100.0f;
 
-// The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
-[[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
-// The plane a ship of the type flies while not engaging: the lowest for Omnis, the type's highest otherwise.
-[[nodiscard]] int64_t DefaultFlightPlane(ShipType eType);
-// The upright model's minimum origin or the authored plane height, whichever is higher.
-[[nodiscard]] float EffectiveShipFlightHeight(ShipType eType, ShipController eController, int64_t iFlightPlane);
-// The plane nearest the position's height, which target choice treats the position as on.
-[[nodiscard]] int64_t XM_CALLCONV NearestFlightPlane(FXMVECTOR vecPosition);
-// The plane whose graph a ship paths and steers on: min(highest plane at or below its height, target plane).
-[[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
-// True on a plane without kTerrainCollision.
-[[nodiscard]] bool SkipsTerrainContact(float fHeight);
-// A dying Fighter or Omni at fHeight takes terrain contact: off an exact plane without terrain collision, and its
-// NavigationFlightPlane has terrain collision.
-[[nodiscard]] bool TakesDeathTerrainContact(float fHeight, int64_t iTargetPlane);
-// Tier iClearanceTier's graph on the plane. The empty graph stands in on a plane the tier has no graph on,
-// kuiNoFlightPlane included, and in a client cell whose static data has not arrived, which holds no graphs.
-[[nodiscard]] const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, int64_t iNavigationPlane);
-// Moves fHeight toward fTargetHeight by at most fStep, landing exactly on it within one step; rbArrived: it landed.
-[[nodiscard]] float StepHeightTowards(float fHeight, float fTargetHeight, float fStep, bool& rbArrived);
-// Moves Z toward the ordered plane, or the upper plane while the type's lower clearance graph blocks descent at
-// vecPosition. Moves at most fClimbRate times the delta and lands on the effective ship height; W is untouched. Stores
-// the plane on arrival and kuiNoFlightPlane in transit.
-[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(const engine::CellStaticData& rStaticData, ShipType eType, ShipController eController, FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
+// The upright model's minimum origin or the base flight height, whichever is higher.
+[[nodiscard]] float EffectiveShipFlightHeight(ShipType eType, ShipController eController);
+// Tier iClearanceTier's navigation graph, or the empty graph in a client cell whose static data has not arrived.
+[[nodiscard]] const engine::NavData& NavigationTierData(const engine::CellStaticData& rStaticData, int64_t iClearanceTier);
+// Moves fHeight toward fTargetHeight by at most fStep, landing exactly on it within one step.
+[[nodiscard]] float StepHeightTowards(float fHeight, float fTargetHeight, float fStep);
 
-// Raises vecPosition to terrain plus the lowest plane's clearance, without changing XY/W; a raised position stores
-// kuiNoFlightPlane, and the next ClimbTowardsFlightPlane arrival stores its plane.
-[[nodiscard]] XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, uint8_t& ruiFlightPlane);
+// Raises vecPosition to terrain plus the base flight clearance, without changing XY/W.
+[[nodiscard]] XMVECTOR XM_CALLCONV RaiseAboveTerrain(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition);
 
 // vecBase's XY plus vecOffset's XY rotated by the horizontal unit vecHeadingDirection, whose (x, y) is the yaw's
 // (cos, sin); Z and W are zero.
@@ -70,28 +51,27 @@ public:
 
 	NavRectangleBoard(const Frame& rPreviousFrame, ShipType eSelfType);
 
-	// In board order, the rectangles sharing a flight plane with a meSelfType ship at vecPosition, within their reach of it,
-	// and holding neither point, which also leaves out the asker's own. The span is valid until the next Select.
+	// In board order, the rectangles within their reach of vecPosition and holding neither point, which also leaves out
+	// the asker's own. The span is valid until the next Select.
 	[[nodiscard]] std::span<const engine::NavRectangle> XM_CALLCONV Select(FXMVECTOR vecPosition, FXMVECTOR vecDestination);
 
-	ShipType meSelfType = ShipType::kFighter;
 	int64_t miRectangleCount = 0;
 	common::ScopedWorkbufferAllocation<BoardRectangle*> mRectangles;
 	common::ScopedWorkbufferAllocation<engine::NavRectangle*> mPicked;
 };
 
-// The next route waypoint toward vecDestination on clearance tier iClearanceTier's NavigationFlightPlane graph, around
-// the rectangles rNavRectangleBoard selects; rbFinal: it is the destination snapped clear of terrain.
-[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, bool& rbFinal);
+// The next waypoint toward vecDestination uses tier iClearanceTier's navigation graph and applies crossing penalties for
+// the rectangles rNavRectangleBoard selects.
+[[nodiscard]] XMVECTOR XM_CALLCONV NextRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecDestination, NavRectangleBoard& rNavRectangleBoard);
 
 // The next route waypoint, as NextRouteWaypoint gives it, toward the neighbouring cell center most nearly away from
 // vecThreat as seen from vecPosition. Recomputed from the current positions on every call; nothing is stored.
-[[nodiscard]] XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane);
+[[nodiscard]] XMVECTOR XM_CALLCONV FleeRouteWaypoint(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, FXMVECTOR vecThreat, NavRectangleBoard& rNavRectangleBoard);
 
 // Random-spawn steering destination: the next route waypoint toward the nearest island center when returning or with
 // no enemy, else the nearest enemy. Updates the kReturnToIslandCenter hysteresis from the raw distance to that island
 // center; rbHasDestination is false in an island-free cell with no enemy.
-[[nodiscard]] XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, int64_t iTargetFlightPlane, ShipFlags_t& rFlags, bool& rbHasDestination);
+[[nodiscard]] XMVECTOR XM_CALLCONV ComputeReturnDestination(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecPosition, bool bEnemyFound, FXMVECTOR vecNearestEnemy, NavRectangleBoard& rNavRectangleBoard, ShipFlags_t& rFlags, bool& rbHasDestination);
 
 // The horizontal AI bearing is inside the inclusive +/-45-degree forward cone.
 [[nodiscard]] bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection);
@@ -121,21 +101,20 @@ void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags,
 // only the XY of the terrain samples.
 void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, float fRadius, float fHeight, float fPushMargin, XMVECTOR& rVecVelocity);
 // Hard contact at the height of rVecPosition: rVecPosition slides along the terrain once. An overlapped start snaps on
-// the NavigationFlightPlane graph.
-void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
+// the ship type's clearance-tier graph.
+void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity);
 // Hard contact at the height of rVecPosition: rVecPosition stops at the terrain and the heading bounces off it. An
-// overlapped start snaps on the NavigationFlightPlane graph.
-void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
+// overlapped start snaps on the ship type's clearance-tier graph.
+void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
 // Pass the row's own pusher; adds to the caller-initialized rfPositionCorrectionX, applied after terrain resolution.
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity, float& rfPositionCorrectionX);
 
-// No terrain on clearance tier iClearanceTier's graph of the shooter's plane crosses the segment between the two
-// positions, each first snapped clear of terrain as a route destination is; always true on a plane without terrain
-// collision.
-[[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
-// HasLineOfSight, and no model box of a live rFrame Battleship occupying uiFlightPlane crosses the unsnapped segment. A
-// box holding either position does not block, which spares the shooter's and the target's own.
-[[nodiscard]] bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, uint8_t uiFlightPlane, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
+// No terrain on clearance tier iClearanceTier's graph crosses the segment between the two positions, each first snapped
+// clear of terrain as a route destination is.
+[[nodiscard]] bool XM_CALLCONV HasLineOfSight(const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
+// HasLineOfSight, and no model box of a live rFrame Battleship crosses the unsnapped segment. A box holding either
+// position does not block, which spares the shooter's and the target's own.
+[[nodiscard]] bool XM_CALLCONV HasShipLineOfSight(const Frame& rFrame, const engine::CellStaticData& rStaticData, int64_t iClearanceTier, FXMVECTOR vecShooterPosition, FXMVECTOR vecTargetPosition);
 // The unsnapped segment crosses a polygon edge of rNavData or the box of one of the rectangles, boundary included.
 [[nodiscard]] bool XM_CALLCONV IsSegmentBlocked(const engine::NavData& rNavData, std::span<const engine::NavRectangle> rectangles, FXMVECTOR vecStart, FXMVECTOR vecEnd);
 

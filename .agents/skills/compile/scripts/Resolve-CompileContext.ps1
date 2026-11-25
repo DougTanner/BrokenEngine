@@ -1,6 +1,6 @@
 # Resolves the deterministic build context /compile needs before any build command runs:
 # repository identities, the game project (the -Project name, else the only game project
-# discovered), the changed-path set, the data mode and its directories, and optionally DevEnvDir.
+# discovered), the changed-path set, and the data mode and its directories.
 # Read-only: it launches no writing command and emits nothing but stdout JSON and stderr
 # diagnostics.
 #
@@ -14,8 +14,7 @@ param(
 	[string] $Baseline,
 	[string] $PrimaryCheckout,
 	[string] $Project,
-	[ValidateSet('ModelViewer')][string] $Target,
-	[switch] $IncludeDevEnvDir
+	[ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ClientServer', 'ModelViewer', 'ServerMonitor', 'WorktreeCli', 'AgentHarness')][string] $Target
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,7 +54,6 @@ $script:Result = [ordered]@{
 	generatedDataIncludeRoot = $null
 	recommendedTargets = @()
 }
-if ($IncludeDevEnvDir) { $script:Result.devEnvDir = $null }
 
 function Complete-CompileContext([int] $ExitCode, [string] $Status, [string] $Code, [string] $Message) {
 	$script:Result.status = $Status
@@ -153,24 +151,6 @@ function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project, [bo
 	return $targets.ToArray()
 }
 
-function Get-ContextDevEnvDirectory {
-	$candidate = Join-Path 'C:\Program Files\Microsoft Visual Studio\18\Community' 'Common7\IDE'
-	if (-not (Test-ContextIdeDirectory $candidate)) {
-		$vsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-		if (-not (Test-Path -LiteralPath $vsWhere -PathType Leaf)) { Stop-CompileContext 'dev-env-dir.unresolved' "Visual Studio 2026 is not at the fixed install path and vswhere is missing at '$vsWhere'." }
-		$response = Invoke-FinalizeNativeText $vsWhere @('-latest', '-version', '[18.0,19.0)', '-products', '*', '-requires', 'Microsoft.Component.MSBuild', '-property', 'installationPath') $PSScriptRoot
-		$install = $response.Stdout.Trim()
-		if ($response.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($install)) { Stop-CompileContext 'dev-env-dir.unresolved' "vswhere did not report a Visual Studio 2026 installation: $($response.Stderr.Trim())" }
-		$candidate = Join-Path ($install -split "`n")[0].Trim() 'Common7\IDE'
-		if (-not (Test-ContextIdeDirectory $candidate)) { Stop-CompileContext 'dev-env-dir.unresolved' "Visual Studio IDE executable missing under '$candidate'." }
-	}
-	return (Get-AgentCanonicalPath $candidate) + '\'
-}
-
-function Test-ContextIdeDirectory([string] $Directory) {
-	return (Test-Path -LiteralPath (Join-Path $Directory 'devenv.com') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Directory 'devenv.exe') -PathType Leaf)
-}
-
 try {
 	# Identity precedence per input: explicit parameter, then derived default.
 	$rootInput = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { $null } else { $RepositoryRoot.Trim() }
@@ -257,13 +237,21 @@ try {
 	$script:Result.changedPaths = @(@($changed) | Select-Object -First $script:MaximumReportedPaths)
 	$recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project $script:Result.isLinkedWorktree)
 
-	if ($null -ne $script:Result.project) {
+	$needsDataMode = [string]::IsNullOrWhiteSpace($Target) -or $Target -in @('Client', 'Server', 'ClientServer', 'ModelViewer')
+	if ($needsDataMode -and $null -ne $script:Result.project) {
 		# The stamp vouches for the Shared data only as exported from its own commit, so Shared needs this
 		# worktree's data inputs to equal that commit's, and a thirdparty-candidate row resolves Local so
 		# DataPacker exports with the session ThirdParty candidate; every other case resolves Local.
 		$stamp = $null
-		try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $script:Result.project)).Trim() }
-		catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
+		try {
+			$stamp = Invoke-AgentBootstrapLock -PrimaryCheckout $primary -Action {
+				try { return [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $script:Result.project)).Trim() }
+				catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { return $null }
+			}
+		}
+		catch [TimeoutException] {
+			Stop-CompileContext 'shared-data.refresh-timeout' 'Timed out waiting for the AgentTools bootstrap mutex before reading SharedDataStamp.txt.'
+		}
 		$script:Result.sharedDataStamp = $stamp
 		if ($null -eq $stamp) { $reason = 'stamp-missing' }
 		else {
@@ -288,14 +276,12 @@ try {
 		$script:Result.generatedDataIncludeRoot = Get-AgentCanonicalPath ([IO.Path]::GetDirectoryName($gameDataDirectory))
 	}
 
-	if ($IncludeDevEnvDir) { $script:Result.devEnvDir = Get-ContextDevEnvDirectory }
-
 	if ($script:Result.changedPathsTruncated) {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
 
 	$script:Result.recommendedTargets = $recommendedTargets
-	$modeText = if ($null -eq $script:Result.dataBuildMode) { 'unresolved without a game project' } else { "$($script:Result.dataBuildMode) ($($script:Result.dataBuildModeReason))" }
+	$modeText = if (-not $needsDataMode) { "not applicable for target $Target" } elseif ($null -eq $script:Result.dataBuildMode) { 'unresolved without a game project' } else { "$($script:Result.dataBuildMode) ($($script:Result.dataBuildModeReason))" }
 	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $modeText."
 }
 catch {

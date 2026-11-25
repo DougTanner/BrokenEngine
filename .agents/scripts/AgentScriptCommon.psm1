@@ -6,6 +6,14 @@ Set-StrictMode -Version Latest
 
 function Get-AgentCanonicalPath([string] $Path) {
 	$full = [System.IO.Path]::GetFullPath($Path)
+	if ($full.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase) -or
+		$full.StartsWith('\\.\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+		$full = [System.IO.Path]::GetFullPath('\\' + $full.Substring(8))
+	}
+	elseif (($full.StartsWith('\\?\', [StringComparison]::Ordinal) -or $full.StartsWith('\\.\', [StringComparison]::Ordinal)) -and
+		$full.Length -ge 6 -and $full[5] -eq ':') {
+		$full = [System.IO.Path]::GetFullPath($full.Substring(4))
+	}
 	$root = [System.IO.Path]::GetPathRoot($full)
 	if ($full.Length -gt $root.Length) { return $full.TrimEnd('\', '/') }
 	return $full
@@ -267,6 +275,41 @@ function Get-AgentSharedDataStampPath([string] $Root, [string] $Project) {
 	return Join-Path $Root "Projects\$Project\Platforms\VisualStudio2026\Output\SharedDataStamp.txt"
 }
 
+function Get-AgentWorktreeCliRepositoryIdentity([string] $GitCommonDir) {
+	$common = Get-AgentCanonicalPath $GitCommonDir
+	$sha256 = [Security.Cryptography.SHA256]::Create()
+	try { $sha = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($common.ToUpperInvariant())) } finally { $sha256.Dispose() }
+	$hash = [BitConverter]::ToString($sha).Replace('-', '').ToLowerInvariant()
+	$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value.Replace('-', '_')
+	$directory = Join-Path $env:LOCALAPPDATA 'BrokenEngineLocks'
+	return [pscustomobject]@{
+		Repository = $common
+		LedgerPath = Join-Path $directory "worktreecli-sessions-$hash.json"
+		MutexName = "Global\BrokenEngine_WorktreeCli_${sid}_$hash"
+	}
+}
+
+# Serializes primary AgentTools/Shared-data refreshes and primary SharedDataStamp.txt reads/writes on the
+# PC-global repository AgentToolsBootstrap mutex (Global\ + SID + repo hash + _AgentToolsBootstrap).
+function Invoke-AgentBootstrapLock([string] $PrimaryCheckout, [scriptblock] $Action, [int] $WaitSeconds = 500) {
+	$lockMutexName = "$((Get-AgentWorktreeCliRepositoryIdentity (Join-Path $PrimaryCheckout '.git')).MutexName)_AgentToolsBootstrap"
+	$lockMutex = [Threading.Mutex]::new($false, $lockMutexName)
+	$lockHeld = $false
+	try {
+		$lockDeadline = [DateTime]::UtcNow.AddSeconds($WaitSeconds)
+		$lockMilliseconds = [Math]::Max(0, [Math]::Min([int]::MaxValue, [Math]::Ceiling(($lockDeadline - [DateTime]::UtcNow).TotalMilliseconds)))
+		try { $lockHeld = $lockMutex.WaitOne([int]$lockMilliseconds) } catch [Threading.AbandonedMutexException] { $lockHeld = $true }
+		if (-not $lockHeld) {
+			throw [TimeoutException]::new("Timed out after $WaitSeconds seconds waiting for the AgentTools bootstrap mutex. If another live worktree session is holding these executables, wrap up active worktree sessions and retry.")
+		}
+		return & $Action
+	}
+	finally {
+		if ($lockHeld) { $lockMutex.ReleaseMutex() }
+		$lockMutex.Dispose()
+	}
+}
+
 # The record every successful, non-selective game build of Target and Configuration writes: the format marker, the
 # GameDataDirectory it passed to MSBuild, and, for a Shared build only, that directory's listing. It sits under the
 # gitignored per-worktree game Output.
@@ -502,4 +545,4 @@ function Find-AgentLivePlanCitations([string] $RepositoryRoot, [string] $Plan) {
 	}
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentCoretideRepository, Test-AgentDataInputPath, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentWorktreeCliRepositoryIdentity, Invoke-AgentBootstrapLock, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation, Find-AgentLivePlanCitations

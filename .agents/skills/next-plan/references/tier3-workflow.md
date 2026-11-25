@@ -22,8 +22,10 @@ identity, semantics, layout, guard scope, or named invariant.
 
 ## Plan review
 
-Main returns the accepted findings of the Plan review step's reviewers to the
-preparation `planner`. That worker performs every repository read and search
+Main sends accepted findings to the preparation `planner`, citing readable
+review outputs per
+[subagent-reporting.md](../../../references/subagent-reporting.md)
+`## Task brief`. That worker performs every repository read and search
 `/external-grill-plan` requires and returns an immutable decision brief in the
 shape that skill's `## Handoff` defines; it never interviews, chooses, or
 delegates. Main routes external-claim requests to a `locator` through

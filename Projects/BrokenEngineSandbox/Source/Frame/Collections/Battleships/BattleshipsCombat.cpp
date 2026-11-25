@@ -179,26 +179,14 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 			continue;
 		}
 
-		// Launch only while settled at the controller's effective height on its stored plane.
-		XMVECTOR vecShipPosition = rCurrentInterpolate.pVecPositions[i];
-		float fShipHeight = XMVectorGetZ(vecShipPosition);
-		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
-		if (uiFlightPlane == kuiNoFlightPlane)
-		{
-			continue;
-		}
-
-		if (fShipHeight != EffectiveShipFlightHeight(ShipType::kBattleship, rCurrentPostRender.pController[i], uiFlightPlane))
-		{
-			continue;
-		}
-
 		// At or below zero, unlike the Fighter beam's strictly below, so launches come exactly the cooldown apart.
 		if (rCurrentPostRender.pNextMissileFireTimes[i] > std::chrono::duration<float>::zero())
 		{
 			continue;
 		}
 
+		XMVECTOR vecShipPosition = rCurrentInterpolate.pVecPositions[i];
+		float fShipHeight = XMVectorGetZ(vecShipPosition);
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 
 		std::span<const common::PackedModelHardpoint> tubes = gShipHitboxShapes[std::to_underlying(ShipType::kBattleship)][std::to_underlying(rCurrentPostRender.pController[i])].missileTubes;
@@ -212,18 +200,12 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 		XMVECTOR vecTubePosition = XMVectorZero();
 		ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&](ShipLocator locator, engine::registry_id_t registryId, FXMVECTOR vecEnemyPosition, [[maybe_unused]] FXMVECTOR vecEnemyVelocity)
 		{
-			int64_t iEnemyFlightPlane = NearestFlightPlane(vecEnemyPosition);
 			// Set once the per-target cap has passed for this enemy.
 			std::optional<engine::registry_id_t> optionalEnemy;
 			for (const auto& [k, rTube] : std::views::enumerate(tubes))
 			{
 				const XMFLOAT3& rf3Position = rTube.f3Position;
 				XMVECTOR vecPosition = XMVectorSetW(XMVectorSetZ(RotateByHeading(vecHullDirection, XMLoadFloat3(&rf3Position), vecShipPosition), fShipHeight + rf3Position.z), 1.0f);
-				int64_t iTubeFlightPlane = NearestFlightPlane(vecPosition);
-				if (iEnemyFlightPlane != iTubeFlightPlane)
-				{
-					continue;
-				}
 				float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecEnemyPosition, vecPosition)));
 				if (fDistanceSquared > kfMissileRangeSquared)
 				{
@@ -251,7 +233,7 @@ void BattleshipsPostRender::SpawnMissiles(Frame& __restrict rFrame, const engine
 					}
 					optionalEnemy = registryId;
 				}
-				if (!HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, static_cast<uint8_t>(iTubeFlightPlane), vecPosition, vecEnemyPosition))
+				if (!HasShipLineOfSight(rFrame, rStaticData, kiFiringClearanceTier, vecPosition, vecEnemyPosition))
 				{
 					continue;
 				}

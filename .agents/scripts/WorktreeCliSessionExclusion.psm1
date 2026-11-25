@@ -9,17 +9,7 @@ function Get-WorktreeCliRepositoryIdentity([string] $RepositoryRoot) {
 	$root = Get-AgentCanonicalPath $RepositoryRoot
 	$common = @(& git -C $root rev-parse --path-format=absolute --git-common-dir 2>&1)
 	if ($LASTEXITCODE -ne 0 -or $common.Count -ne 1) { throw "Unable to resolve Git common directory for '$root': $($common -join '; ')." }
-	$common = Get-AgentCanonicalPath $common[0].Trim()
-	$sha256 = [Security.Cryptography.SHA256]::Create()
-	try { $sha = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($common.ToUpperInvariant())) } finally { $sha256.Dispose() }
-	$hash = [BitConverter]::ToString($sha).Replace('-', '').ToLowerInvariant()
-	$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value.Replace('-', '_')
-	$directory = Join-Path $env:LOCALAPPDATA 'BrokenEngineLocks'
-	return [pscustomobject]@{
-		Repository = $common
-		LedgerPath = Join-Path $directory "worktreecli-sessions-$hash.json"
-		MutexName = "Global\BrokenEngine_WorktreeCli_${sid}_$hash"
-	}
+	return Get-AgentWorktreeCliRepositoryIdentity $common[0].Trim()
 }
 
 function Get-ProcessStartUtc([int] $ProcessId) {

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:06.020Z","dependsOn":["Documents/Plans/Engine/RemoveCompassHaloFromLighting.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-11-21T21:04:06.020Z","dependsOn":["Documents/Plans/Engine/MergeRenderTargetTexturesLighting.md","Documents/Plans/Engine/RemoveCompassHaloFromLighting.md"]} -->
 # Sample zero-radius lighting spread once per color
 
 ## Context

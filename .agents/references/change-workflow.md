@@ -18,6 +18,12 @@ delivered at session start.
 - While workers run, continue useful independent work when available; avoid
   unnecessary status checks, duplicating their investigation or implementation,
   and context-heavy work unless it advances a useful independent task.
+- Cite readable review outputs (`Temp/`, Codex `<out>`) in write-in,
+  `/resolve-findings`, and re-review briefs once in the skill's named field (or
+  `Scope` if none is named) by path/selector, finding IDs/locators, and
+  dispositions only — never pasting or paraphrasing finding claims, evidence, or
+  proposed fixes; pass the compact finding line only when no readable output
+  holds a finding.
 
 ### Delegation roles
 
@@ -225,7 +231,8 @@ and Tier-1 routes.
 
 #### Step 3 — Plan review
 
-Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then
+Order: `/plan-audit` and `/plan-simplicity-review` in parallel alongside any
+eligible `before the first edit` unedited-tree checks below; then
 `/verify-external-claims` for the requests the audit handoff raises; then, at
 Tier 3, `/external-grill-plan` rounds until the plan is decision-complete, with
 `/verify-external-claims` between rounds; then, when it triggers, the difference
@@ -237,14 +244,29 @@ plan snapshot.
   every tier, when the plan adds new code or changes non-documentation behavior
   (both defined in that skill's `## When to use`); when unsure whether a plan
   triggers it, dispatch it.
+- for eligible `before the first edit` checks on the unedited tree (if the card
+  has any): search that literal in `Acceptance checks` alone (`- Acceptance
+  checks:` to `- Roles:`, matched text only), then read each match to its end
+  for executor, build (project, configuration, `Local` form per
+  `.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`,
+  or none), and steps. Run `builder` `/compile` if needed (in that `Local`
+  form), then `runner` `/agent-harness` or `implementer` for non-harness checks,
+  recording baseline SHA (and Coretide `HEAD` for `Projects/Coretide/`) in each
+  brief. Defer to Step 4 checks interleaving edits with builds (`/compile`
+  `## Purpose`), needing unauthorized flags (`-AllowGaeaExport`, PREfast,
+  clang-tidy per `/compile` `## Inputs`), or running `Local` `export` or
+  tracked-input-rewriting builds (Step 3 stays non-mutating: `Shared`, `Local`
+  `no-effect`, or non-build). Live Step 3 pre-edit workers (and `Local`
+  `no-effect` temp cleanup) finish before `/next-plan` step 6
+  (`Invoke-NextPlanClaim.ps1`) and Step 4 slices; non-`none` `Changed files`
+  (`/compile` `## Handoff`) from a Step 3 `builder` blocks before claim refresh.
 - `planner` owns `/external-grill-plan` repository evidence and short written
   decision summaries, updated round by round — Tier 3 only.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence
   worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and
   at Tier 3 also for the claims a grill round raises.
-- fresh `planner` carrying a continuation capsule from the preparation writes
-  the Plan review findings main accepts into the plan snapshot; main does not
-  write those findings into the snapshot itself — Tier 1-2 with a plan
+- only the fresh `planner` with a preparation continuation capsule writes
+  accepted Plan review findings into the plan snapshot — Tier 1-2 with a plan
   snapshot, after main accepts a finding; Tier 3 follows
   `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
 - fresh `reviewer` runs `/plan-simplicity-review` over only the difference those
@@ -261,40 +283,30 @@ handoffs, then presents the resolved plan for approval per `/next-plan`
 <!-- session-context-part: Change Workflow, Steps 4-6 (continued from the previous part; continues in the next part) -->
 #### Step 4 — Implement and propagate
 
-Order: the acceptance checks the execution card marks `before the first edit`
-run first, on the unedited tree; then the slices run in parallel. To find the
-marked checks, main runs one line search for that literal over the card's
-`Acceptance checks` field alone (its `- Acceptance checks:` line up to its
-`- Roles:` line), printing only the matched text, since a host may hide a long
-matching line. Main then reads only each marked check, from its marked line to
-the check's end, taking from it the executor, the build (project and
-configuration, or none), and the scenario steps for the `builder` and `runner`
-briefs.
+Order: after Step 3's pre-edit join, run (or rerun) on the unedited tree any
+deferred, unstarted (e.g., Tier 1, via Step 3's lookup), or stale `before the
+first edit` check — stale if its definition, `Local` form, engine baseline SHA,
+or (`Projects/Coretide/`) Coretide `HEAD` changed during Plan review,
+`/external-grill-plan`, approval, or claim refresh — reusing unchanged Step 3
+results; then slices run in parallel.
 
-- `builder` runs `/compile` for the unedited-tree build a check marked
-  `before the first edit` needs — when it needs one — in the Local form its
-  marked line names, through
-  `.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`,
-  when it names one; a check whose steps interleave file edits with builds
-  follows the `/compile` `## Purpose` exception instead.
-- `runner` runs each acceptance check the execution card marks
-  `before the first edit` that is an `/agent-harness` scenario, and
-  `implementer` records the others, on the unedited tree — a card with none
-  adds no step.
+- remaining or stale `before the first edit` checks use Step 3's executor rule;
+  edit-interleaved checks follow `/compile` `## Purpose` (executor runs builds).
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
 
 When the slices return, main runs
 `pwsh -NoProfile -File .agents/scripts/Get-ChangeWorkflowSteps.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -Tier <tier>`,
 adding `-Landing` when the stage lands in this session and `-HarnessChecks`
-when the execution card's `Roles` field names the `runner`, which it does
-exactly when at least one acceptance check is an `/agent-harness` check; main
-reads that field alone. Main dispatches the rows the output lists, step by step
-through the Verify the acceptance table step; within a step, rows run in
-parallel except that a row waits for the rows its `after` clause names. Main
-reruns the script as the Review and resolve correctness step states. The rows
-the output lists under a step are what that step names. The script owns which
-dispatches the tier and the changed files trigger, their roles, scopes, and
-order; each brief carries what its skill's `## Inputs` requires.
+when the execution card's `Roles` field names `runner` (main reads that field
+alone). Main dispatches rows per the script header's `Output:` contract. A
+zero-dispatch row satisfies non-harness dependents immediately, never
+`runner /agent-harness`, which requires the emitted `/compile` row's
+matching-build condition. Waiting on a Step 6 review row waits until that
+review settles (disposition, `/verify-external-claims`, accepted fixes,
+affected rebuilds, and re-reviews), not merely a first-round `NEEDS_ACTION`.
+Main reruns the script as the Review and resolve correctness step states. The
+script owns triggered dispatches, roles, scopes, and order, and each brief
+carries its skill's `## Inputs`.
 
 Main splits the work into disjoint slices where possible. Review-fix exceptions
 belong to `/resolve-findings`.
@@ -306,12 +318,14 @@ The static-checks runner is
 `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked`;
 it selects its own checks, and its header documents the result and options.
 Main has an `implementer` rewrap every `line-length` failure it reports,
-whether or not the change added the line.
+whether or not the change added the line; dependent rows wait until that rewrap
+finishes.
 
 Each `Build required` handoff compiles as it arrives, waiting only for its
 row's `after` clause.
 
-Full builds and runtime or harness scenarios remain acceptance-table work.
+Full landing-gate builds and acceptance sign-off remain acceptance-table work
+(the step script schedules post-edit `/agent-harness`).
 
 A path nothing reaches today (a rejection, ASSERT, or recovery path no existing
 harness command or ordinary save file triggers) is verified by code reading,
@@ -332,21 +346,36 @@ Main runs `/verify-external-claims`, dispatching one `locator`, on the external
 claims a review or `/resolve-findings` handoff raises, before deciding the
 dependent finding or resolution. A separate `implementer` runs
 `/resolve-findings` for each finding main accepts; then only the affected
-regions are re-reviewed and retested, each re-review brief carrying the
-first-round findings its skill's `## Inputs` requires, and a reviewer with no
-accepted finding whose region a fix changed reruns as a fresh first-round pass.
-A second round needs a reproducible blocker. Before any further
-`/resolve-findings` attempt on a cause whose fix failed its retest, an
-`implementer` runs `/external-diagnose-bug`; its proven cause returns to
-`/resolve-findings` or a plan. When the `/over-engineering-review` validator or
-a round changes C++, `/code-style-review` over the newly changed ranges, then
-`/compile` of its `Build required`, run before `/repo-code-review` and
-`/comment-review` start (after a round, as its re-reviews); no other review
-waits for them. `/over-engineering-review` runs once per stage; a later round's
-re-review covers its own fix. Main reruns the step script after
-`/update-affected-code`, `/update-claude-docs`, the validator, and each round
-that changed files, and dispatches each row a rerun first lists in the current
-step or a later one.
+regions are re-reviewed and retested, each `/resolve-findings` and re-review
+brief following its skill's `## Inputs`, and a reviewer with no accepted
+finding whose region a fix changed reruns as a fresh first-round pass. A second
+round needs a reproducible blocker. Before any further `/resolve-findings`
+attempt on a cause whose fix failed its retest, an `implementer` runs
+`/external-diagnose-bug`; its proven cause returns to `/resolve-findings` or a
+plan. When the `/over-engineering-review` validator or a round changes C++,
+`/code-style-review` over the newly changed ranges, then `/compile` of its
+`Build required`, run before `/repo-code-review` and `/comment-review` start
+(after a round, as its re-reviews); no other review waits for them.
+`/over-engineering-review` runs once per stage; a later round's re-review covers
+its own fix. While a post-edit `runner /agent-harness` is live, hold any
+`/compile` targeting the same executables or writing its Shared/Local data packs
+(including Local ModelViewer or sibling builds sharing the data owner per
+`.agents/skills/compile/references/runtime-data-mode.md`
+`## Build invocation and derived properties`) and any writer to
+`Common/DataFile.h` until `runner` releases its claim
+(`.agents/skills/compile/references/worker.md` step 4, `/agent-harness`
+`## When to use`), keeping `.agents/references/codex-bridge.md` `## Rules` for
+`workspace-write` runs; after held edits or Step 6/7 C++, GLSL, or data-input
+rebuilds, rebuild as needed, rerun `/agent-harness` (or affected checks per
+`/agent-harness` `## Handoff`), and route `NEEDS_ACTION` to `/resolve-findings`.
+Main reruns the step script after `/update-affected-code`,
+`/update-claude-docs`, the validator, `/create-follow-up-plans`, and each
+file-changing round, dispatching every newly triggered row; for post-Step-6
+`/create-follow-up-plans` or `/update-claude-docs` non-C++ edits, pick the
+`/coherence-review` pass per its `## When to use` (overlapping remaining
+landing-gate or recovery `/compile` builds), resolve accepted findings on
+affected regions, and run final `Invoke-StaticChecks.ps1` after those builds,
+late writes, and fix rounds finish, before `/finalize-changes` preparation.
 
 Main decides each finding once:
 
@@ -404,10 +433,11 @@ Leftovers:
   defer, goes through `/create-follow-up-plans`. One whose root cause is not
   yet confirmed need not be diagnosed first; its Plan's investigation portion
   (`Documents/Plans/AGENTS.md` `## Plan files`) leaves diagnosis to the
-  executing session. One proven before the Step 6 dispatch is authored first,
-  with the Plan path and its support-folder files recorded as approved scope,
-  so that round's reviews cover it; one proven later follows this route
-  unchanged.
+  executing session. Record every follow-up Plan and its support-folder files
+  as approved scope regardless of when proven; author one proven before Step 6
+  first so that round's reviews cover it, and route any added or edited after
+  Step 6 (Step 8, `/next-plan` checkpoint, or `/finalize-changes` recovery)
+  through Step 6's rerun and final static-checks rule.
 
 #### Step 9 — Verify and land
 

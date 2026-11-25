@@ -13,12 +13,11 @@ rather than direct collision damage.
   missile flies on unguided along its stored direction until its lifetime ends.
   A missile launched with no target flies unguided the same way.
 - A missile flies on the lowest flight plane. It keeps a target only while that
-  target's ship row is past arrival grace and has the lowest plane as its
-  nearest flight plane; a target failing that test is dropped. A flying missile
-  — neither falling nor dying — moves vertically from its launch height toward
-  the lowest plane at the Battleship climb speed, clamping exactly on arrival,
-  while direction and propulsion velocity Z remain zero. Falling and dying
-  missiles do not perform this return.
+  target's ship row is past arrival grace; a target failing that test is
+  dropped. A flying missile — neither falling nor dying — moves vertically from
+  its launch height toward the lowest plane at the Battleship climb speed,
+  clamping exactly on arrival, while direction and propulsion velocity Z remain
+  zero. Falling and dying missiles do not perform this return.
 - Validate and clear target handles on target loss, falling, explosion,
   transfer, and destruction. Removal is idempotent.
 - Lifetime, velocity, falling state, stored direction, boost-ramp delay, and

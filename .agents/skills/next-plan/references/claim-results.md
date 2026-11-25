@@ -17,6 +17,8 @@ the `Get-NextPlanContext` baseline holds only until the first claim reports a
 [baseline rule](../../../references/subagent-reporting.md#task-brief) owns its
 later use and storage.
 
+### Reuse, dirty-worktree, fast-forward, and integrity
+
 A bare request or an exact request for the Plan this session already holds,
 made while the session is at the primary tip, is reported as `reused` with
 `nextAction: prepare` before the tree is examined, so that result is unchanged

@@ -17,7 +17,6 @@ inline Wrapper gLightingBlurEdgeFalloff(0.6f, 0.01f, 1.0f);
 
 // Write - Deposit
 inline Wrapper gLightingDepositTextureMultiplier(0.2f, 0.1f, 1.0f);
-inline Wrapper gLightingDepositThreshold(0.0f, 0.0f, 0.1f);
 inline Wrapper gLightingDepositCompress(0.0f, 0.0f, 128.0f);
 #if defined(BT_CLIENT)
 inline Wrapper gAreaLightAreaMultiplier(3.0f, 1.0f, 16.0f);
@@ -41,8 +40,8 @@ inline Wrapper gLightingUpdateCadence(2.0f, 1.0f, 4.0f, 1.0f);
 // Write - Spread Sampling
 inline Wrapper gSpreadDirectionality(0.9f, 0.0f, 1.0f);
 inline Wrapper gSpreadDirectionalityEnd(1.0f, 0.0f, 1.0f);
-inline Wrapper gSpreadDirectionCount(8.0f, 4.0f, 32.0f, 1.0f);
-inline Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f, 1.0f);
+inline Wrapper gSpreadDirectionCount(8.0f, 4.0f, 32.0f, 1.0f); // min >= 4.0f load-bearing: guarantees every EWNS lobe receives a positive directional tap weight at full directionality so LightingUniforms.cpp's EW/NS weight-sum reciprocals stay finite.
+inline Wrapper gSpreadDirectionCountEnd(4.0f, 4.0f, 16.0f, 1.0f); // min >= 4.0f load-bearing: see gSpreadDirectionCount — interpolated direction count must also stay >= 4.
 inline Wrapper gSpreadDistance(0.0f, 0.0f, 10.0f);
 inline HeightLerpWrapperQuartet gSpreadDistanceEnd  // camera-height-lerped fSpreadDistanceEnd
 {
@@ -51,7 +50,7 @@ inline HeightLerpWrapperQuartet gSpreadDistanceEnd  // camera-height-lerped fSpr
 	.low = Wrapper(20.0f, 1.0f, 40.0f),
 	.high = Wrapper(20.0f, 1.0f, 40.0f),
 };
-inline Wrapper gSpreadRingCount(8.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps fTotalSamples > 0 so the fNorm divide in LightingSpread.frag can't hit 0/0 (single ring at fDistanceFalloff=1.0 zeroes the only ring).
+inline Wrapper gSpreadRingCount(8.0f, 2.0f, 24.0f, 1.0f); // min >= 2.0f load-bearing: keeps inner-ring falloff positive at fDistanceFalloff=1.0 so LightingUniforms.cpp's EW/NS weight-sum reciprocals stay finite.
 inline Wrapper gSpreadRingCountEnd(2.0f, 2.0f, 16.0f, 1.0f); // min >= 2.0f load-bearing: see gSpreadRingCount — interpolated ring count must also stay >= 2.
 inline Wrapper gSpreadDistanceFalloff(0.0f, 0.0f, 1.0f);
 inline Wrapper gSpreadDistanceFalloffEnd(0.0f, 0.0f, 1.0f);
@@ -62,18 +61,16 @@ inline Wrapper gSpreadHeightEndHeight(10.0f, 0.1f, 100.0f);
 inline Wrapper gSpreadHeightPower(3.0f, 0.1f, 8.0f);
 
 // Write - Spread Output
-inline Wrapper gSpreadOutputThreshold(0.001f, 0.0f, 0.005f);
-inline Wrapper gSpreadOutputThresholdEnd(0.0f, 0.0f, 0.01f);
 inline Wrapper gSpreadOutputCompress(0.0f, 0.0f, 2.0f);
 inline Wrapper gSpreadOutputCompressEnd(2.5f, 0.0f, 4.0f);
 
 // Combine (Uchimura tone curve)
 inline Wrapper gCombineMaxBrightness(1.3f, 0.1f, 4.0f);
 inline Wrapper gCombineContrast(1.3f, 0.1f, 2.0f); // Contrast must stay positive: LightingUniforms.cpp divides by fCombineContrast when computing the tone-curve segment length.
-inline Wrapper gCombineLinearStart(0.3f, 0.01f, 0.5f);
+inline Wrapper gCombineLinearStart(0.3f / 1.3f, 0.01f, 0.8f); // Fraction of gCombineMaxBrightness; paired with gCombineMaxBrightness >= 0.1f and gCombineLinearLength <= 0.8f, bounds keep 0 < m < S1 < P, m >= 0.001f, and P - S1 >= 0.004f.
 inline Wrapper gCombineLinearLength(0.5f, 0.01f, 0.8f);
 inline Wrapper gCombineToe(3.5f, 1.3f, 6.0f);
-inline Wrapper gCombineBlackTightness(0.0f, 0.0f, 0.5f);
+inline Wrapper gCombineBlackTightness(0.0f, 0.0f, 1.0f); // Fraction of resolved linear start m; bounds keep 0 <= b <= m across the entire slider domain.
 inline Wrapper gCombinePassNormalize(0.7f, 0.0f, 1.0f);
 inline Wrapper gCombineExposurePassScale(0.0f, 0.0f, 1.0f); // Paired with gSpreadPassCount min=1.0f: pow(fPassCount, -scale) stays finite (base>=1, exponent in [-1,0]).
 inline Wrapper gCombineHuePreserve(0.0f, 0.0f, 1.0f);

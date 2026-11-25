@@ -50,17 +50,17 @@ static const char* AudioStreamingHarnessRigPhaseName(engine::AudioStreamingHarne
 	return "unknown";
 }
 
-static const char* AudioStreamingHarnessRigQueueStateName(engine::AudioStreamingHarnessRigQueueState eState)
+static const char* AudioStreamingHarnessRigQueueStateName(engine::AudioChunkReadState eState)
 {
 	switch (eState)
 	{
-		case engine::AudioStreamingHarnessRigQueueState::kFree:
+		case engine::AudioChunkReadState::kFree:
 			return "free";
-		case engine::AudioStreamingHarnessRigQueueState::kQueued:
+		case engine::AudioChunkReadState::kQueued:
 			return "queued";
-		case engine::AudioStreamingHarnessRigQueueState::kLoading:
+		case engine::AudioChunkReadState::kLoading:
 			return "loading";
-		case engine::AudioStreamingHarnessRigQueueState::kReady:
+		case engine::AudioChunkReadState::kReady:
 			return "ready";
 	}
 	return "unknown";

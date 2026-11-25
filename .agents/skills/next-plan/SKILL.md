@@ -61,63 +61,63 @@ The `argument-hint` value selects the Plan:
    [claim-results.md](references/claim-results.md) `## nextAction`; `prepare`
    needs no reference read.
    Done when the result reports `nextAction: prepare`.
-4. Dispatch one preparation `planner` to verify every Plan statement against
-   current code, on the single task brief in
-   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
+4. Dispatch one preparation `planner` to verify the Plan against current code
+   per [subagent-reporting.md](../../references/subagent-reporting.md)
    `## Task brief`.
 
-   Pass `Skill: /prepare-change` with `mode: claimed-plan` and supply the brief
-   fields and bounds in
-   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Inputs` and
-   `## Handoff`.
+   Pass `Skill: /prepare-change`, `mode: claimed-plan`, `Return:` by citation,
+   and [prepare-change/SKILL.md](../prepare-change/SKILL.md) `## Inputs`.
 
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
    main as a card correction rather than an edit.
 
-   When that handoff returns `Status: BLOCKED` with the `Residuals` row
-   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
-   declares for an unconfirmed root cause:
+   When that handoff returns `Status: BLOCKED` reporting an unconfirmed root
+   cause in `Residuals`:
 
    - main dispatches one `implementer` for `/external-diagnose-bug`, on a
      brief citing the recorded baseline and, from the heading lookup
      `/prepare-change` `## Inputs` uses, the line ranges of the sections
      carrying the claimed Plan's investigation portion
      (`Documents/Plans/AGENTS.md` `## Plan files`), none of which main reads;
-   - a proven root cause goes to a fresh preparation `planner` running
-     `/prepare-change` (`mode: claimed-plan`) whose continuation capsule
-     carries the diagnosis handoff; that worker's handoff is the one the rest
-     of this step uses;
+   - a proven root cause goes to a fresh `/prepare-change`
+     (`mode: claimed-plan`) `planner` whose
+     [subagent-handoff.md](../../references/subagent-handoff.md)
+     `## Continuation capsule` carries the diagnosis handoff; that handoff
+     feeds the rest of this step;
    - no proven root cause is a blocker main reports to the user under the
      approval-refused row of `### Post-checkpoint outcomes`, with the claim
      held.
 
-   After that preparation handoff, and before the Plan review reviewers, main
-   runs `/plan-alternatives` when its trigger fires and presents per that
-   skill's `### User presentation`; step 5 runs only on the approach the user
-   picks, after the redraft a pick other than the drafted plan requires.
+   When that handoff classifies a tier that differs from the brief's assumed
+   tier, main rewrites the execution card's `Roles` field to the classified
+   tier before Plan review. After that handoff, before Plan review, run
+   [plan-alternatives/SKILL.md](../plan-alternatives/SKILL.md) when its trigger
+   fires and present per `### User presentation`; step 5 runs on the user's
+   pick, after redrafting any non-drafted pick.
 
    `/plan-alternatives` runs and is presented once per run: a re-entry of this
    step keeps the earlier pick and does not present alternatives again.
 
-   Done when the handoff cites the snapshot by the selectors
-   [`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
-   requires, its `Decisive checks` row reports both `headings` values `true`
+   Done when the handoff cites the snapshot by `##` section selectors under
+   `Evidence`, its `Decisive checks` row reports both `headings` values `true`
    and `card.missingFields` empty, and, when that presentation ran, its pick has
-   arrived and a pick other than the drafted plan is redrafted or routed to
-   rejection.
-5. Run the Plan review step in
-   [change-workflow.md](../../references/change-workflow.md), after preparation
-   and alternatives and before the final claim refresh. Tier 3 retains the
-   additional route in [tier3-workflow.md](references/tier3-workflow.md). Done
-   when every required review has completed and accepted findings are resolved,
-   or a missing mandatory reviewer is reported as a blocker.
+   arrived and a non-drafted pick is redrafted or routed to rejection.
+5. Run [change-workflow.md](../../references/change-workflow.md)
+   `#### Step 3 — Plan review` after preparation and alternatives and before the
+   final claim refresh; Tier 3 adds
+   [tier3-workflow.md](references/tier3-workflow.md) `## Plan review`.
+
+   Done when every required review completes and accepted findings resolve, or
+   main reports a missing mandatory reviewer as a blocker.
 6. Unless step 10 already ran (the changes-requested row in
-   `### Post-checkpoint outcomes`), invoke step 3's `Invoke-NextPlanClaim.ps1`
+   `### Post-checkpoint outcomes`), after the pre-claim join in
+   [change-workflow.md](../../references/change-workflow.md)
+   `#### Step 3 — Plan review`, invoke step 3's `Invoke-NextPlanClaim.ps1`
    idempotently with `-Plan '<claimed Plan path>'`, never bare, immediately
    before the final preparation handoff: another session's `plan validate` or
-   `plan claim-next` can release this session's claim, and a bare run would
-   then claim a different Plan the user never confirmed.
+   `plan claim-next` can release this session's claim, and a bare run would then
+   claim a different Plan the user never confirmed.
 
    On a `claim.plan-moved` result, main asks the user whether to claim
    `moved.to`; a yes reruns step 3's claim with `-Plan '<moved.to>'`, from then
@@ -125,14 +125,11 @@ The `argument-hint` value selects the Plan:
    `### Post-checkpoint outcomes` row for an authoritative result that
    explicitly reports no claim is held.
 
-   When this step has a sync range, as
-   [claim-results.md](references/claim-results.md)
-   `## Final-refresh sync brief` defines it, the tree moved under the
-   preparation evidence: main never lists or reads that range itself, and
-   dispatches one `researcher` on the sync brief in that section.
-   From that file main reads for that brief only that section and the first
-   paragraph of `## Session baseline and the sync object`, which sets the
-   session baseline.
+   On a sync range per [claim-results.md](references/claim-results.md)
+   `## Final-refresh sync brief`, never list or read the range; dispatch one
+   `researcher` on that brief, reading only that section and
+   `## Session baseline and the sync object` (to its first `###`) per
+   `subagent-reporting.md` `## Task brief` lookup.
 
    When any row of that `researcher`'s handoff reports a touch, return to step
    4, rerun the affected Plan review checks in step 5, and repeat this final
@@ -148,44 +145,36 @@ The `argument-hint` value selects the Plan:
 7. Present for approval per this file's `### Implementation approval`, unless
    that section sends the run to implementation on an earlier user choice. Done
    when the user's decision arrives or that earlier choice stands.
-8. Implement the approved change. A pre-edit acceptance check whose brief
-   `Baseline:` differs from the recorded session baseline
-   ([claim-results.md](references/claim-results.md)
-   `## Session baseline and the sync object`) is stale and runs again under the
-   changed-inputs re-run rule `/verify-acceptance` applies. After the pre-edit
-   acceptance checks the Change Workflow Implement and propagate step in
-   [change-workflow.md](../../references/change-workflow.md) orders, main
-   dispatches one `/implement-plan` `implementer` per `Slices` row of the
-   latest handoff that returned that field, each brief citing as the approved
-   plan the step-4 preparation snapshot (the `Temp/` path whose `## In scope`
-   and `## Out of scope` the preparation handoff cites, or the difference
-   preparation's snapshot on the changes-requested or `completion.plan-cited`
-   route) and copying that row
-   as the assigned items and allowed file scope; main never reads the
-   snapshot's `## In scope` itself. Main assigns each change the user approved
-   after the plan to exactly one row, adding one slice when none fits, and
-   passes `none` for those changes to every other row. `Slices: none`
-   dispatches no implementer. When step 4's split question is answered no,
-   including one accepted as its recommendation, no stage of the claimed Plan
-   lands mid-run while the claim stays held: main runs the stages in the order
-   the stage-split entry lists them, dispatching a stage's `Slices` rows only
-   after the previous stage's acceptance checks pass; each stage but the last
-   completes without landing, through its own acceptance checks and the Change
-   Workflow Verify the acceptance table step in change-workflow.md, and step
-   10's one claim exit and one `/finalize-changes` landing carry every stage.
-   Done when the last stage's acceptance checks pass; a change kept as one
-   stage is its own last stage.
-9. Run the checkpoint exactly once, however the run ends: after step 8's
-   acceptance checks, before step 10 when that step applies, and before
-   `/finalize-changes` prepares the
-   landing commit, so a Plan it produces is an ordinary new worktree file riding
-   the same squash with no landing-commit join.
-
-   Main never performs the review itself; it dispatches it per
-   [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when
-   both follow-up lines are recorded per
-   [run-checkpoint.md](references/run-checkpoint.md) `## Measurement states` and
-   `## Follow-up routing`.
+8. Implement the approved change. After the Implement and propagate step's
+   pre-slice gate in [change-workflow.md](../../references/change-workflow.md)
+   runs any remaining or stale pre-edit checks (using step 6's recorded
+   baseline in [claim-results.md](references/claim-results.md)
+   `## Session baseline and the sync object`, under `/verify-acceptance`'s
+   changed-inputs rule), main dispatches one `/implement-plan` `implementer`
+   per `Slices` row of the latest handoff that returned that field, each brief
+   citing as the approved plan the step-4 preparation snapshot (the `Temp/`
+   path whose `## In scope` and `## Out of scope` the preparation handoff
+   cites, or the difference preparation's snapshot on the changes-requested or
+   `completion.plan-cited` route) and copying that row as the assigned items
+   and allowed file scope; main never reads the snapshot's `## In scope`
+   itself. Main assigns each change the user approved after the plan to exactly
+   one row, adding one slice when none fits, and passes `none` for those
+   changes to every other row. `Slices: none` dispatches no implementer. When
+   step 4's split question is answered no, including one accepted as its
+   recommendation, no stage of the claimed Plan lands mid-run while the claim
+   stays held: main runs the stages in the order the stage-split entry lists
+   them, dispatching a stage's `Slices` rows only after the previous stage's
+   acceptance checks pass; each stage but the last completes without landing,
+   through its own acceptance checks and the Change Workflow Verify the
+   acceptance table step in change-workflow.md, and step 10's one claim exit
+   and one `/finalize-changes` landing carry every stage. Done when the last
+   stage's acceptance checks pass; a change kept as one stage is its own last
+   stage.
+9. Run the checkpoint exactly once, however the run ends, per
+   [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch` (overlap
+   gate and pre-step-10 / pre-preparation join). Main never performs the review
+   itself. Done when both follow-up lines are recorded per that file's
+   `## Measurement states` and `## Follow-up routing`.
 10. Only after implementation is accepted and verified, or after the user
    explicitly authorizes rejection, exit the held claim before landing-commit
    creation: main runs, as its own shell call from the PowerShell tool,
@@ -215,14 +204,10 @@ The `argument-hint` value selects the Plan:
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker other than `completion.plan-cited` whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
 | blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once, report the error and unknown claim state, and stop, retaining all work with the session; `claim: null` alone never proves claim absence, so add no recovery probe and do not query claim status or mutate a claim |
-| user separately and explicitly directs deferral, or the run is already deferred | released/absent only through `Defer-NextPlan.ps1`'s documented result | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, which runs no Plan completion or rejection and releases no other held claim, otherwise report and stop |
+| user separately and explicitly directs deferral, or run is already deferred | released/absent only via `Defer-NextPlan.ps1`'s result | run the checkpoint once; if deferral or checkpoint created tracked follow-up content, use a followup-only landing gate (runs no Plan completion or rejection and releases no other held claim), else report and stop |
 | authoritative result explicitly reports that no claim is held, including `none-available` | absent | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate as the previous row defines it, otherwise report and stop |
 
 ## Handoff
-
-Step-4 preparation handoff and execution-card rules live in
-[`../prepare-change/SKILL.md`](../prepare-change/SKILL.md) `## Handoff`
-(`mode: claimed-plan`).
 
 ### Implementation approval
 

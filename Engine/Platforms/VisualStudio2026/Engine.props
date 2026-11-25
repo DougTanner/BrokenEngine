@@ -81,10 +81,6 @@
       <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
 if errorlevel 1 exit /b %errorlevel%
 if not EXIST "$(ThirdPartyLibraryDirectory)\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
-if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
-    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
-    if errorlevel 1 exit /b 1
-)
 if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
     "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
     if errorlevel 1 exit /b 1

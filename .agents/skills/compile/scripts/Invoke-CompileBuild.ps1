@@ -138,10 +138,6 @@ function ConvertFrom-ChildJson([string] $Text, [string] $Label) {
 	catch { Stop-CompileInvoke 'child.output-invalid' "$Label produced an unparsable JSON result." }
 }
 
-function Test-JsonProperty([object] $Object, [string] $Name) {
-	return $null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name]
-}
-
 # --- Build invocation --------------------------------------------------------------------------
 
 function Get-AnalysisArguments([bool] $Requested) {
@@ -258,11 +254,13 @@ try {
 	if (-not [string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $contextArguments.AddRange([string[]]@('-PrimaryCheckout', $PrimaryCheckout)) }
 	if (-not [string]::IsNullOrWhiteSpace($Baseline)) { $contextArguments.AddRange([string[]]@('-Baseline', $Baseline)) }
 	if (-not [string]::IsNullOrWhiteSpace($Project)) { $contextArguments.AddRange([string[]]@('-Project', $Project)) }
-	if ($Target -ceq 'ModelViewer') { $contextArguments.AddRange([string[]]@('-Target', 'ModelViewer')) }
-	if ($isGameTarget) { $contextArguments.Add('-IncludeDevEnvDir') }
+	$contextArguments.AddRange([string[]]@('-Target', $Target))
 	$contextResponse = Invoke-CompileScript 'Resolve-CompileContext.ps1' $contextArguments.ToArray()
 	$context = ConvertFrom-ChildJson $contextResponse.Stdout 'Resolve-CompileContext.ps1'
 	if ($contextResponse.ExitCode -ne 0) {
+		if ($contextResponse.ExitCode -eq 2 -and $context.PSObject.Properties['code'] -and [string]$context.code -ceq 'shared-data.refresh-timeout') {
+			Stop-CompileInvoke 'shared-data.refresh-timeout' ([string]$context.message)
+		}
 		Stop-CompileInvoke 'context.unresolved' "Compile context resolution failed with $($context.code): $($context.message)"
 	}
 	$script:Root = [string]$context.repositoryRoot
@@ -273,8 +271,8 @@ try {
 	# Resolve-CompileContext.ps1 emits the ThirdParty row only when this linked worktree's consumers
 	# link the session candidate.
 	if ($Target -cin @('Client', 'Server', 'ClientServer', 'ModelViewer', 'DataPacker') -and @($context.recommendedTargets | Where-Object { $_.project -ceq 'ThirdParty' }).Count -gt 0) {
-		# An environment variable, not a /p: switch, so the nested devenv DataPacker build of a Local
-		# PreBuildEvent, which receives no global property, links the same candidate.
+		# An environment variable, not a /p: switch, so the -LocalDataPacker build, which passes no
+		# data properties, inherits and links the same candidate.
 		[Environment]::SetEnvironmentVariable('ThirdPartyLibraryDirectory', $script:ThirdPartyCandidateDirectory)
 		$script:Summary.Add("ThirdPartyLibraryDirectory=$($script:ThirdPartyCandidateDirectory) (thirdparty-candidate row).")
 	}
@@ -374,21 +372,25 @@ try {
 
 	if (-not $runGeneration) {
 		# The harness claim reads its data directory from this record, and the claim and launch compare the
-		# Shared data directory against its listing. A refresh that deletes and rewrites the primary stamp
-		# leaves it absent while DataPacker stages files, so the stamp is re-read after the listing, and an
-		# absent stamp or one rewritten with a different commit since mode selection blocks the build. A
-		# refresh that runs during the listing and finishes with the same commit before the re-read is not
-		# caught here; the claim's record comparison refuses any record that differs from the published data.
-		# The listing is taken before MSBuild runs, so a refresh during the build differs at the next
-		# comparison, and a failed build keeps the previous record.
+		# Shared data directory against its listing. Taking the stamp check and listing under the bootstrap
+		# mutex excludes any in-flight refresh, so an absent stamp or one rewritten with a different commit
+		# since mode selection blocks before enumeration. The listing is taken before MSBuild runs, so a
+		# refresh during the build differs at the next comparison, and a failed build keeps the previous record.
 		[string[]] $sharedDataListing = @()
 		if ($dataBuildMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
-			$sharedDataListing = [string[]]@(Get-AgentDataListing $gameDataDirectory)
-			$stamp = $null
-			try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $gameProject)).Trim() }
-			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
-			if ($stamp -cne [string]$context.sharedDataStamp) {
-				Stop-CompileInvoke 'shared-data.refresh-overlap' "A primary Shared data refresh is running or ended without rewriting the stamp, or completed with a different commit since data mode selection, so the Shared data listing may not match the published data. Rerun /compile once the primary SharedDataStamp.txt exists again; a rerun while it is missing resolves Local and runs a full Local generation build."
+			try {
+				$sharedDataListing = [string[]]@(Invoke-AgentBootstrapLock -PrimaryCheckout $primary -Action {
+					$stamp = $null
+					try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $gameProject)).Trim() }
+					catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
+					if ($stamp -cne [string]$context.sharedDataStamp) {
+						Stop-CompileInvoke 'shared-data.refresh-overlap' "The primary Shared data stamp was left unwritten or rewritten with a different commit since data mode selection, so the Shared data listing may not match the published data. Rerun /compile once the primary SharedDataStamp.txt exists again; a rerun while it is missing resolves Local and runs a full Local generation build."
+					}
+					return [string[]]@(Get-AgentDataListing $gameDataDirectory)
+				})
+			}
+			catch [TimeoutException] {
+				Stop-CompileInvoke 'shared-data.refresh-timeout' 'Timed out waiting for the AgentTools bootstrap mutex before listing Shared data.'
 			}
 		}
 		foreach ($buildTarget in $script:BuildTargets) {
@@ -403,9 +405,6 @@ try {
 	# Local generation: materialize once, then run each build target's RunDataPacker=true build under
 	# the Gaea guard unless -AllowGaeaExport is passed, and under the expensive-export guard when
 	# -ForbidExpensiveExport is passed.
-	if (-not (Test-JsonProperty $context 'devEnvDir') -or [string]::IsNullOrWhiteSpace($context.devEnvDir)) {
-		Stop-CompileInvoke 'dev-env-dir.unresolved' 'The generation build requires DevEnvDir, which the compile context did not report.'
-	}
 	# Session worktrees are created with the two large Engine/Data art subtrees skipped by sparse
 	# checkout, and this is the one build that reads them as DataPacker inputs, so restore the full
 	# working tree first. Disabling sparse checkout is idempotent and keeps uncommitted edits.
@@ -425,8 +424,7 @@ try {
 		}
 	}
 	if ($script:IsLinkedWorktree) {
-		# The PreBuildEvent's nested devenv DataPacker build can skip DataPacker as up to date after
-		# ThirdPartyLibraryDirectory switches, leaving it linked to the other library; MSBuild relinks.
+		# Build DataPacker Release through WorktreeCli under datapacker.lock before exporting.
 		# A failure reports this build's envelope in place of the requested builds' envelopes.
 		$localDataPackerBuild = Invoke-WorktreeCliBuild $null @() -LocalDataPacker
 		if ($localDataPackerBuild.ExitCode -ne 0) {
@@ -439,72 +437,85 @@ try {
 	if (-not (Test-Path -LiteralPath $dataPacker -PathType Leaf)) {
 		Stop-CompileInvoke 'datapacker.missing' "The worktree DataPacker is missing: '$dataPacker'. Build -Target DataPacker first."
 	}
-	# In the primary checkout the Local data directory is the Shared one, so this export rewrites the
-	# Shared data, which the stamp may only vouch for as exported from its own commit. A failed delete
-	# throws here, before any data is written.
-	if ($script:Root.Equals($primary, [StringComparison]::OrdinalIgnoreCase)) {
-		$primaryStampPath = Get-AgentSharedDataStampPath $primary $gameProject
-		if (Test-Path -LiteralPath $primaryStampPath -PathType Leaf) { [IO.File]::Delete($primaryStampPath) }
-	}
-	# DataPacker writes progress and mutex-wait notices to stdout, which is reserved for the JSON
-	# envelopes, so its output is captured and forwarded as a diagnostic instead.
-	$materialize = Start-CompileChild $dataPacker @(
-		'--materialize-data',
-		(Join-Path $script:Root 'Engine\Data'),
-		(Join-Path $script:Root "Projects\$gameProject\Data"),
-		$gameDataDirectory) $true
-	if (-not [string]::IsNullOrWhiteSpace($materialize.Stdout)) { Write-CompileDiagnostic $materialize.Stdout.Trim() }
-	if ($materialize.ExitCode -ne 0) {
-		# DataPacker prints its failure reason last, and only to stdout; one bounded line keeps the
-		# envelope message a one-line handoff row.
-		$reason = $materialize.Stdout -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -Last 1
-		$suffix = if ($reason) { $reason = $reason.Trim(); ": $($reason.Substring(0, [Math]::Min(300, $reason.Length)))" } else { '.' }
-		Stop-CompileInvoke 'data-materialize.failed' "DataPacker --materialize-data exited $($materialize.ExitCode) for '$gameDataDirectory'$suffix"
-	}
+	$isPrimaryLocal = (Get-AgentCanonicalPath $script:Root).Equals((Get-AgentCanonicalPath $primary), [StringComparison]::OrdinalIgnoreCase)
+	$runLocalGeneration = {
+		# In the primary checkout the Local data directory is the Shared one, so this export rewrites the
+		# Shared data, which the stamp may only vouch for as exported from its own commit. A failed delete
+		# throws here, before any data is written.
+		if ($isPrimaryLocal) {
+			$primaryStampPath = Get-AgentSharedDataStampPath $primary $gameProject
+			if (Test-Path -LiteralPath $primaryStampPath -PathType Leaf) { [IO.File]::Delete($primaryStampPath) }
+		}
+		# DataPacker writes progress and mutex-wait notices to stdout, which is reserved for the JSON
+		# envelopes, so its output is captured and forwarded as a diagnostic instead.
+		$materialize = Start-CompileChild $dataPacker @(
+			'--materialize-data',
+			(Join-Path $script:Root 'Engine\Data'),
+			(Join-Path $script:Root "Projects\$gameProject\Data"),
+			$gameDataDirectory) $true
+		if (-not [string]::IsNullOrWhiteSpace($materialize.Stdout)) { Write-CompileDiagnostic $materialize.Stdout.Trim() }
+		if ($materialize.ExitCode -ne 0) {
+			# DataPacker prints its failure reason last, and only to stdout; one bounded line keeps the
+			# envelope message a one-line handoff row.
+			$reason = $materialize.Stdout -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -Last 1
+			$suffix = if ($reason) { $reason = $reason.Trim(); ": $($reason.Substring(0, [Math]::Min(300, $reason.Length)))" } else { '.' }
+			Stop-CompileInvoke 'data-materialize.failed' "DataPacker --materialize-data exited $($materialize.ExitCode) for '$gameDataDirectory'$suffix"
+		}
 
-	$generationProperties = @($dataProperties) + "/p:DevEnvDir=$($context.devEnvDir)"
-	$hadGaeaGuard = Test-Path "Env:$($script:GaeaGuardVariable)"
-	$previousGaeaGuard = [Environment]::GetEnvironmentVariable($script:GaeaGuardVariable)
-	$hadGaeaAllow = Test-Path "Env:$($script:GaeaAllowVariable)"
-	$previousGaeaAllow = [Environment]::GetEnvironmentVariable($script:GaeaAllowVariable)
-	if ($ForbidExpensiveExport) {
-		$hadExpensiveExportGuard = Test-Path "Env:$($script:ExpensiveExportGuardVariable)"
-		$previousExpensiveExportGuard = [Environment]::GetEnvironmentVariable($script:ExpensiveExportGuardVariable)
-	}
-	try {
-		if (-not $AllowGaeaExport) {
-			[Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, '1')
-			$script:Summary.Add("Gaea guard applied: $($script:GaeaGuardVariable)=1 for the generation build.")
-		}
-		else {
-			[Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, '1')
-			$script:Summary.Add('Gaea authoring enabled under explicit -AllowGaeaExport authorization; caller forbid guards remain effective.')
-		}
+		$hadGaeaGuard = Test-Path "Env:$($script:GaeaGuardVariable)"
+		$previousGaeaGuard = [Environment]::GetEnvironmentVariable($script:GaeaGuardVariable)
+		$hadGaeaAllow = Test-Path "Env:$($script:GaeaAllowVariable)"
+		$previousGaeaAllow = [Environment]::GetEnvironmentVariable($script:GaeaAllowVariable)
 		if ($ForbidExpensiveExport) {
-			[Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, '1')
-			$script:Summary.Add("Expensive-export guard applied: $($script:ExpensiveExportGuardVariable)=1 for the generation build.")
+			$hadExpensiveExportGuard = Test-Path "Env:$($script:ExpensiveExportGuardVariable)"
+			$previousExpensiveExportGuard = [Environment]::GetEnvironmentVariable($script:ExpensiveExportGuardVariable)
 		}
-		foreach ($buildTarget in $script:BuildTargets) {
-			$buildExitCode = Invoke-WorktreeCliBuild $targetPaths[$buildTarget] $generationProperties
-			# Local output needs no listing: the comparison skips data directories under the worktree root.
-			if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
-				Write-AgentSharedDataRecord $script:Root $gameProject $buildTarget $script:ResolvedConfiguration $gameDataDirectory @()
+		try {
+			if (-not $AllowGaeaExport) {
+				[Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, '1')
+				$script:Summary.Add("Gaea guard applied: $($script:GaeaGuardVariable)=1 for the generation build.")
+			}
+			else {
+				[Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, '1')
+				$script:Summary.Add('Gaea authoring enabled under explicit -AllowGaeaExport authorization; caller forbid guards remain effective.')
+			}
+			if ($ForbidExpensiveExport) {
+				[Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, '1')
+				$script:Summary.Add("Expensive-export guard applied: $($script:ExpensiveExportGuardVariable)=1 for the generation build.")
+			}
+			foreach ($buildTarget in $script:BuildTargets) {
+				$buildExitCode = Invoke-WorktreeCliBuild $targetPaths[$buildTarget] $dataProperties
+				# Local output needs no listing: the comparison skips data directories under the worktree root.
+				if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
+					Write-AgentSharedDataRecord $script:Root $gameProject $buildTarget $script:ResolvedConfiguration $gameDataDirectory @()
+				}
+			}
+		}
+		finally {
+			if (-not $AllowGaeaExport) {
+				if ($hadGaeaGuard) { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $previousGaeaGuard) }
+				else { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $null) }
+			}
+			if ($AllowGaeaExport) {
+				if ($hadGaeaAllow) { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $previousGaeaAllow) }
+				else { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $null) }
+			}
+			if ($ForbidExpensiveExport) {
+				if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }
+				else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
 			}
 		}
 	}
-	finally {
-		if (-not $AllowGaeaExport) {
-			if ($hadGaeaGuard) { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $previousGaeaGuard) }
-			else { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $null) }
+	if ($isPrimaryLocal) {
+		try {
+			Invoke-AgentBootstrapLock -PrimaryCheckout $primary -Action $runLocalGeneration
 		}
-		if ($AllowGaeaExport) {
-			if ($hadGaeaAllow) { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $previousGaeaAllow) }
-			else { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $null) }
+		catch [TimeoutException] {
+			Stop-CompileInvoke 'shared-data.refresh-timeout' 'Timed out waiting for the AgentTools bootstrap mutex before running primary Local generation.'
 		}
-		if ($ForbidExpensiveExport) {
-			if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }
-			else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
-		}
+	}
+	else {
+		& $runLocalGeneration
 	}
 	if ($script:BuildExitCode -ne 0 -and -not $AllowGaeaExport) {
 		$script:Summary.Add("A failure reporting 'Gaea.Swarm export blocked by $($script:GaeaGuardVariable)=1' means this worktree's island inputs differ from the shared Gaea bake. When this worktree is behind primary main, rebase onto it. A change to this worktree's own island inputs exports only through -AllowGaeaExport, which only an approved plan or acceptance criterion requiring that island re-bake authorizes.")

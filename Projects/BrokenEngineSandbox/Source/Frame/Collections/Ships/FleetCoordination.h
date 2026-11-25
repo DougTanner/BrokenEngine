@@ -51,7 +51,6 @@ public:
 struct ShipTactic
 {
 	XMVECTOR vecDestination = DirectX::XMVectorZero();
-	int64_t iTargetFlightPlane = 0;
 	// 0: the ship type's own maximum speed; only the Fighter escort tactic sets one.
 	float fMaximumSpeed = 0.0f;
 	// False: no destination; a fleet ship then runs the shared fleet navigation instead.
@@ -61,28 +60,26 @@ struct ShipTactic
 };
 
 // For fleet Fighters and Omnis (eType). Escort flies a Fighter to its own slot around its flagship and gives an Omni no
-// destination, so ComputeNavigation patrols it; weapons free, Attack takes over; outside its flagship's cell a ship
-// navigates on its type's default plane (DefaultFlightPlane), as escort does. Attack targets rRegistryTarget
-// (FindAttackTarget, picked from the flagship in x/y, sight from stored plane uiFlightPlane), routing to its next waypoint
-// on the type's clearance tier's graph while hidden from the pick or on that tier. Escort leaves rRegistryTarget
-// untouched; only the outside-the-cell branch and FindAttackTarget's drop of a target above the highest plane clear it.
-// No tactic targets above the type's highest plane.
-[[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryTarget);
+// destination, so ComputeNavigation patrols it; weapons free, Attack takes over. Attack targets rRegistryTarget
+// (FindAttackTarget, picked from the flagship in x/y), routing to its next waypoint on the type's clearance tier's
+// graph while hidden from the pick or on that tier. Escort leaves rRegistryTarget untouched; only the outside-the-cell
+// branch clears it.
+[[nodiscard]] ShipTactic XM_CALLCONV ChooseFleetTactic(ShipType eType, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, engine::AlignmentIdentifier alignment, engine::registry_id_t& rRegistryTarget);
 
 // ChooseFleetTactic for a fleet Fighter, plus veer-off: with its flagship in the cell and weapons free, a row whose
 // orders carry ShipOrders::kSharedTarget first takes ChooseAttackTactic's tactic when it finds one, and otherwise a
 // veer-off in progress continues before any target pick; an Attack result starts a veer-off within
 // kfVeerOffStartDistanceSquared of its enemy in x/y, from a veer-off point moved off the enemy toward a side blocked on
 // one side only; every other result clears ShipFlags::kVeerOff.
-[[nodiscard]] ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
+[[nodiscard]] ShipTactic XM_CALLCONV ChooseFighterFleetTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, const FleetView& rView, engine::GlobalId globalId, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, engine::AlignmentIdentifier alignment, ShipOrders_t orders, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget);
 
 // For a Fighter: veer-off until kfVeerOffEndDistanceSquared from the veer-off point, else Attack the kept attack target
-// rRegistryTarget on its plane (FindAttackTarget from itself in x/y, at or below the Fighter's highest plane), starting a
-// veer-off as ChooseFighterFleetTactic does, or route to its next waypoint on the Fighter clearance tier's graph while
-// hidden on that tier or from the pick. kTargetFlagship (the nearest enemy flagship, when the previous frame holds one),
-// kSharedTarget (FindSquadronTarget), else kSeekAndDestroy (FindAttackTarget's no-sight pick from itself) impose the
-// target even while hidden; the last two store rRegistryTarget even on a veer-off tick. Returns false, leaving rTactic
-// unchanged, when not veering off and the previous frame holds no such enemy.
-[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, uint8_t uiFlightPlane, engine::AlignmentIdentifier alignment, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic);
+// rRegistryTarget (FindAttackTarget from itself in x/y), starting a veer-off as ChooseFighterFleetTactic does, or route
+// to its next waypoint on the Fighter clearance tier's graph while hidden on that tier or from the pick.
+// kTargetFlagship (the nearest enemy flagship, when the previous frame holds one), kSharedTarget (FindSquadronTarget),
+// else kSeekAndDestroy (FindAttackTarget's no-sight pick from itself) impose the target even while hidden; the last two
+// store rRegistryTarget even on a veer-off tick. Returns false, leaving rTactic unchanged, when not veering off and the
+// previous frame holds no such enemy.
+[[nodiscard]] bool XM_CALLCONV ChooseAttackTactic(const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, NavRectangleBoard& rNavRectangleBoard, engine::AlignmentIdentifier alignment, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, ShipFlags_t& rFlags, XMVECTOR& rVecVeerOffPoint, engine::registry_id_t& rRegistryTarget, ShipTactic& rTactic);
 
 } // namespace game

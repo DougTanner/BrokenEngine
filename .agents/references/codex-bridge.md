@@ -30,8 +30,9 @@ Dispatched per the Codex-bridge rule in
 1. Select the launch environment before checking models. Use the direct shell
    on hosts such as Claude Code. On Antigravity CLI, use the official
    per-command host request when available and granted, with the configured
-   Codex PATH and confirmed worker survival across calls. Use desktop
-   PowerShell when that environment is unavailable or unproven. Honor a
+   Codex PATH (confirm worker survival across calls only for workflows that
+   resume after the launch shell exits; direct launches follow step 3). Use
+   desktop PowerShell when that environment is unavailable or unproven. Honor a
    declined action.
 
    Once per non-Codex session before the first launch, run the check from the
@@ -62,12 +63,15 @@ Dispatched per the Codex-bridge rule in
 3. Run the public launch once from the same worktree root and environment as
    step 1, with a fresh repo-relative `Temp/` `<out>`. For direct launch and
    wait, use a timeout `>= 600000` ms on blocking-shell hosts such as Claude
-   Code. For a direct Antigravity CLI launch, use `run_command` with
-   `WaitMsBeforeAsync: 10000` and await its asynchronous wakeup. Resolve an
-   ambiguous return using the receipt and run identity before retrying.
+   Code. For a direct Antigravity CLI launch, pass `-WaitBudgetSeconds 0` to
+   `Invoke-Codex.ps1` via `run_command` with `WaitMsBeforeAsync: 10000` and
+   await its asynchronous wakeup, because `run_command` has no 600s cap and its
+   Windows Job Object terminates detached children if the parent exits early
+   with `running`. Resolve an ambiguous return using the receipt and run
+   identity before retrying.
 
    ```powershell
-   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile '<out>' [-NoRetry]
+   pwsh -NoProfile -File .agents/scripts/Invoke-Codex.ps1 -Skill <skill> [-Mode <mode>] -Worktree '<worktree>' -PromptFile '<prompt>' -OutFile '<out>' [-WaitBudgetSeconds 0] [-NoRetry]
    ```
 
    A `completed` receipt includes the findings on stdout. `Invoke-Codex.ps1`
@@ -89,9 +93,18 @@ Dispatched per the Codex-bridge rule in
 
 ## Rules
 
-- Report genuine failures (`failed`, `malformed`, non-zero exit, or step 1
-  block/error) to the user with `reason` (or `checks`/`message`) without another
-  diagnostic call.
+- On a `failed` `read-only` receipt (see `Invoke-Codex.ps1` `.NOTES` for
+  exit-code semantics), diagnose the cause first by inspecting the run and
+  stderr records from the original launch environment (`$recordDirectory`,
+  `Get-RunRecordPath`, and `Get-StderrRecordPath` in `Invoke-Codex.ps1`) when
+  available, or using the receipt's `reason` when those records are missing. Fix
+  or report non-transient script, auth, or config errors immediately; for
+  transient failures, retry up to 2 more times with a fresh `<out>`, waiting 10
+  seconds before the first retry and 60 seconds before the second using a timer,
+  and report to the user with `reason` if retries still fail. Report
+  `malformed`, a non-zero `Invoke-Codex.ps1` process exit, or step 1 block/error
+  to the user with `reason` (or `checks`/`message`) without another diagnostic
+  call.
 - If a `completed` `read-only` result passes the verdict-line check but is
   judged malformed (leaked notes or wrong task), re-dispatch the identical
   prompt once with a fresh `<out>` and `-NoRetry`; a second malformed result is

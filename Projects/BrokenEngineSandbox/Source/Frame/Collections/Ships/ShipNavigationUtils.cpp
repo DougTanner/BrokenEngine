@@ -116,7 +116,7 @@ static void XM_CALLCONV FollowFlagship(const Frame& rPreviousFrame, FXMVECTOR ve
 	}
 
 	XMVECTOR vecFlagshipPosition = ShipPosition(rPreviousFrame.interpolate, *optionalFlagship);
-	// Horizontal, so a wingman on another flight plane than its flagship can still close in.
+	// Horizontal, so a raised wingman can still close in on its flagship.
 	float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, vecFlagshipPosition)));
 
 	if (fDistanceSquared > kfFlagshipFollowDistanceSquared)
@@ -193,11 +193,11 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 
 	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
 	// either the kfNavigationLookahead point or current position is inside a nav polygon: lookahead alone misses ships
-	// already stranded inside. NavigationThresholdElevation uses the navigated flight plane's height minus the ship's
-	// clearance-tier radius and kfPushMargin, for an Omni (tier 0) the height where its ApplyTerrainPush starts; the nav
-	// polygon inflates that contour, leaving a no-nav band with zero terrain push. vecAiDirection, vecPosition, and
-	// server-built, wire-shipped navigationData match on client/server, and this check draws no RNG. Roam mode -1 is
-	// exempt because ComputeAiSteering re-steers every tick.
+	// already stranded inside. kNavigationGraphSpecs uses the base flight height minus the ship's clearance-tier radius and
+	// kfPushMargin, for an Omni (tier 0) the height where its ApplyTerrainPush starts; the nav polygon inflates that
+	// contour, leaving a no-nav band with zero terrain push. vecAiDirection, vecPosition, and server-built, wire-shipped
+	// navigationData match on client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeAiSteering
+	// re-steers every tick.
 	if (!bRecompute && iNavigationDirection >= 0)
 	{
 		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavigationLookahead), vecAiDirection, vecPosition);
@@ -213,8 +213,8 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, [[maybe_unused]] ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::NavData& rNavData, NavRectangleBoard& rNavRectangleBoard, XMVECTOR& rVecAiDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
-	// Destinations can sit on another plane's height; at the ship's own Z the query delta, and so the direction, stays
-	// horizontal.
+	// A raised ship can sit above the destination's height; at the ship's own Z the query delta, and so the direction,
+	// stays horizontal.
 	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition)), rNavData, rNavRectangleBoard.Select(vecPosition, vecDestination), vecDebugWaypoint);
 	if (XMVectorGetX(XMVector3LengthSq(vecNavigationDirection)) > 0.001f)
 	{
@@ -257,8 +257,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	// immediate pathfind below (see bRecompute).
 	int64_t iEntryNavigationDirection = riNavigationDirection;
 
-	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
-	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, ShipTypeClearanceTier(self.eType), iNavigationPlane);
+	const engine::NavData& rNavData = NavigationTierData(rStaticData, ShipTypeClearanceTier(self.eType));
 
 	// A fleet Omni with its flagship in the cell patrols in mode 6, around the flagship (Escort) or across the cell (Patrol
 	// Cell), preempting fleet navigation as the in-cell fleet tactic does; running the fleet override first would reset
@@ -313,8 +312,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		if (bPatrolFollower)
 		{
 			// A Patrol Together follower draws nothing: it takes its leader's previous-frame destination whenever that is
-			// set and differs, and skips the off-plane snap and the arrival reset, since a snapped or cleared copy would
-			// differ from the leader's and be recopied and repathed every tick. With no destination of its own and none
+			// set and differs, and skips the blocked-destination snap and the arrival reset, since a snapped or cleared copy
+			// would differ from the leader's and be recopied and repathed every tick. With no destination of its own and none
 			// from the leader it keeps its cached steering, as a dropped pick does.
 			if (XMVectorGetW(vecLeaderDestination) != 0.0f && !XMVector4Equal(vecLeaderDestination, rVecIslandDestination))
 			{
@@ -406,9 +405,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		}
 		else if (engine::NavQueryPointBlocked(rVecIslandDestination, rNavData))
 		{
-			// A destination snapped on a higher plane's graph can lie inside this plane's polygons once the navigation
-			// plane drops; left there, the path stops at the polygon edge, so the arrival test passes only when that edge lies
-			// within its radius of the destination.
+			// A stored destination inside this tier's navigation polygons would stop the path at the polygon edge, so the
+			// arrival test would pass only when that edge lies within its radius of the destination.
 			// NavQueryDirection already snaps its destination to this same point, so the snap needs no immediate recompute.
 			// A polygon can pass the cell edge; a snap past it is dropped as a fresh pick's is, and the next tick draws again.
 			rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);
@@ -454,7 +452,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	else
 	{
 		rVecIslandDestination = XMVectorZero();
-		auto [vecNewAiDirection] = ComputeAiSteering(rStaticData, vecPosition, rVecAiDirection, vecCellCenter, deltaTime.count(), self.iRow % 2 == 0, iNavigationPlane);
+		auto [vecNewAiDirection] = ComputeAiSteering(rStaticData, vecPosition, rVecAiDirection, vecCellCenter, deltaTime.count(), self.iRow % 2 == 0);
 		rVecAiDirection = vecNewAiDirection;
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)

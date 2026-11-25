@@ -12,7 +12,6 @@
 #endif
 
 #include "Frame/Collections/Ships/ShipTypes.h"
-#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -34,8 +33,6 @@ inline constexpr float kfFighterDrag = 0.25f;
 inline constexpr float kfFighterMaxSpeed = 45.0f;
 
 inline constexpr float kfFighterClimbRate = kfFighterMaxSpeed * kfShipClimbSpeedFraction;
-inline constexpr int64_t kiFighterHighestFlightPlane = 1;
-static_assert(kiFighterHighestFlightPlane == std::ssize(kFlightPlanes) - 1);
 // Render-only nose pitch in radians at the full climb rate.
 inline constexpr float kfFighterClimbTilt = 0.35f;
 
@@ -61,7 +58,7 @@ inline constexpr float kfFighterBeamRange = 50.0f;
 
 struct FightersInterpolate : public engine::Collection<FightersInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 8;
+	static constexpr int64_t kiVersion = 9;
 
 	static void Register();
 
@@ -69,8 +66,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kFighterDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
-	// Terrain rise can exceed the highest plane; admit finite heights at or above the lowest plane.
-	// The stored flight plane is kuiNoFlightPlane or a plane the type flies, and every simulation write and ship spawn stores a horizontal unit heading.
+	// Every simulation write and ship spawn stores a horizontal unit heading.
 	static void PostRead(const FightersInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -79,15 +75,6 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 			if (!(destroyedTime == std::chrono::duration<float>(-1.0f) || (destroyedTime.count() >= 0.0f && destroyedTime.count() <= kFighterDestroyTime.count())))
 			{
 				throw std::ios_base::failure("FightersInterpolate pDestroyedTimes");
-			}
-			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
-			if (!(std::isfinite(fHeight) && fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters))
-			{
-				throw std::ios_base::failure("FightersInterpolate position height");
-			}
-			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kFighter, rCurrent.puiFlightPlanes[i]))
-			{
-				throw std::ios_base::failure("FightersInterpolate puiFlightPlanes");
 			}
 			if (!IsShipHeadingValid(rCurrent.pVecDirections[i]))
 			{
@@ -112,8 +99,6 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 #endif
 	float* __restrict pfDeltaRotations = nullptr;
-	// The plane the ship is on, kuiNoFlightPlane while it climbs between planes.
-	uint8_t* __restrict puiFlightPlanes = nullptr;
 #if defined(BT_CLIENT)
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	// Render-only nose pitch from this tick's climb.
@@ -125,7 +110,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.pfDeltaRotations, rSelf.puiFlightPlanes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.pfDeltaRotations);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -185,8 +170,8 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, a NaN or +inf
 	// beam countdown never fires and one above the cooldown delays the shot past it, an unknown controller selects no
-	// script, every simulation write and ship spawn stores a horizontal unit AI direction, no controller writes a target
-	// flight plane the type disallows, and only a fleet spawn writes a client GUID or a global ID.
+	// script, every simulation write and ship spawn stores a horizontal unit AI direction, and only a fleet spawn writes
+	// a client GUID or a global ID.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -214,10 +199,6 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 			if (!IsShipHeadingValid(rCurrent.pVecAiDirections[i]))
 			{
 				throw std::ios_base::failure("FightersPostRender pVecAiDirections");
-			}
-			if (!IsFlightPlaneAllowed(ShipType::kFighter, GetTargetFlightPlane(rCurrent.pOrders[i])))
-			{
-				throw std::ios_base::failure("FightersPostRender target flight plane");
 			}
 		}
 	}
@@ -312,12 +293,11 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-		uint8_t uiFlightPlane = kuiNoFlightPlane;
 		// Transfers preserve the supplied health; navigation resets at spawn.
 		bool bTransfer = false;
 
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
-		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBeamFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
+		static constexpr engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBeamFireTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> Fields()
 		{
 			return {};
 		}

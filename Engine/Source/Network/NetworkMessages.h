@@ -428,7 +428,6 @@ struct ClientHelloMessage
 struct ServerConnectionResponseMessage
 {
 	static constexpr PacketType keType = PacketType::kServerConnectionResponse;
-	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiAccepted = 0;

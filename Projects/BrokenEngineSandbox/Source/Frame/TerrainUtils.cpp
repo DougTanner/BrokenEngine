@@ -14,19 +14,7 @@ constexpr float kfUrgentSteerMultiplier = 3.0f;
 constexpr float kfMinimumGradientSquared = 0.0001f;
 constexpr float kfReturnToIslandDistance = 150.0f;
 
-// The elevation constants are tuned for the lowest plane; subtracting this offset from a terrain sample keeps each one
-// the same distance below iFlightPlane.
-static float FlightPlaneElevationOffset(int64_t iFlightPlane)
-{
-	return engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters - engine::gpFlightPlanes->Lowest().fHeightMeters;
-}
-
-static bool HasTerrainCollision(int64_t iFlightPlane)
-{
-	return engine::gpFlightPlanes->Plane(iFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision;
-}
-
-AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour, int64_t iFlightPlane)
+AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour)
 {
 	float fLocalSteerRate = kfSteerRate;
 	XMVECTOR vecDesiredDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecCellCenter, vecPosition), 0.0f));
@@ -42,25 +30,22 @@ AiSteeringResult XM_CALLCONV ComputeAiSteering(const engine::CellStaticData& rSt
 		float fNormalY = XMVectorGetY(vecNormal);
 		float fGradientSquared = fNormalX * fNormalX + fNormalY * fNormalY;
 
-		// Without terrain collision the plane flies over every island, so it steers as an island-free cell does.
-		if (HasTerrainCollision(iFlightPlane) && fGradientSquared > kfMinimumGradientSquared)
+		if (fGradientSquared > kfMinimumGradientSquared)
 		{
-			float fElevationOffset = FlightPlaneElevationOffset(iFlightPlane);
-
 			// Contour direction: perpendicular to downhill gradient
 			XMVECTOR vecContour = bAlternateContour
 				? XMVectorSet(fNormalY, -fNormalX, 0.0f, 0.0f)
 				: XMVectorSet(-fNormalY, fNormalX, 0.0f, 0.0f);
 
 			// Elevation correction: push toward preferred elevation
-			float fElevationAi = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) - fElevationOffset;
+			float fElevationAi = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
 			float fElevationError = fElevationAi - kfPreferredElevation;
 			XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNormalX, fNormalY, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
 
 			vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
 
 			XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecCurrentDirection, kfLookAheadDistance));
-			float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead) - fElevationOffset;
+			float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead);
 			if (fElevationAhead > kfHighElevationThreshold)
 			{
 				fLocalSteerRate *= kfUrgentSteerMultiplier;
@@ -84,16 +69,10 @@ constexpr float kfAvoidTerrainDeltaAngleMinimum = 16.0f;
 constexpr float kfAvoidTerrainDeltaAngleMaximum = 32.0f;
 constexpr float kfDeltaAngleChangeAvoidTerrain = 0.995f;
 
-float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation, int64_t iFlightPlane)
+float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation)
 {
-	if (!HasTerrainCollision(iFlightPlane))
-	{
-		return fCurrentDeltaRotation;
-	}
-
 	// All samples use this cell's grid, so reuse one sampler across the nested loop.
 	engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData);
-	float fElevationOffset = FlightPlaneElevationOffset(iFlightPlane);
 
 	XMVECTOR vecLeftDirection = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), vecDirection);
 	float fLeftElevation = 0.0f;
@@ -111,10 +90,10 @@ float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticD
 			fTotalWeight += fWeight;
 
 			XMVECTOR vecSamplePositionLeft = XMVectorMultiplyAdd(XMVectorReplicate(static_cast<float>(k + 1) * kfSideSamplesStep), vecLeftDirection, vecSamplePosition);
-			fLeftElevation += fWeight * (sampler.Sample(vecSamplePositionLeft) - fElevationOffset);
+			fLeftElevation += fWeight * sampler.Sample(vecSamplePositionLeft);
 
 			XMVECTOR vecSamplePositionRight = XMVectorMultiplyAdd(XMVectorReplicate(static_cast<float>(k + 1) * -kfSideSamplesStep), vecLeftDirection, vecSamplePosition);
-			fRightElevation += fWeight * (sampler.Sample(vecSamplePositionRight) - fElevationOffset);
+			fRightElevation += fWeight * sampler.Sample(vecSamplePositionRight);
 		}
 	}
 

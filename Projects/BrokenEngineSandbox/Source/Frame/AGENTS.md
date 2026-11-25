@@ -69,10 +69,9 @@ order or participation changes.
   (`Collections/Missiles/AGENTS.md` `## Invariants`). They also reject any row
   of a `GameServerPostRenderCollections` collection with `kTransfer` set.
 - Navigation and elevation are deterministic derived data excluded from both the
-  CRC and persisted frame payload. The game derives the clearance tiers, the
-  planes each tier has graphs on, and each graph's clearance and elevation
-  threshold for its contour bake (`TerrainUtils.h`; the threshold server-only)
-  and hands them to engine startup, the only way engine navigation gets them.
+  CRC and persisted frame payload. The game derives the clearance tiers and each
+  tier's `engine::NavigationGraphSpec` entry (`TerrainUtils.h`) and hands them
+  to engine startup, the only way engine navigation gets them.
   `FlightPlaneTable.h` supplies the game's heights under the engine's
   flight-plane contract (`../../../../Engine/Source/Frame/AGENTS.md`
   `## Architecture`).
@@ -105,10 +104,9 @@ order or participation changes.
   `../../../../Engine/Source/Frame/AGENTS.md`) calls
   `AdmitFrameInputStatusChange`, which rejects a payload the game cannot adopt:
   an unregistered Blaster type index, an out-of-range ship controller or ship
-  type, a target or stored flight plane the ship type disallows, or a Fighter or
-  Battleship spawn or transfer payload whose fire time fails its type's
-  `PostRead` range test (`IsAdoptableStatusChange`), or a fleet-controlled ship
-  spawn payload with global ID 0.
+  type, a Fighter or Battleship spawn or transfer payload whose fire time fails
+  its type's `PostRead` range test (`IsAdoptableStatusChange`), or a
+  fleet-controlled ship spawn payload with global ID 0.
 - Delayed behavior updates use countdowns that transfer with the entity;
   transfer and spawn status changes apply immediately. Destroy status changes
   follow the shared ship lifecycle contract (`Collections/Ships/AGENTS.md`

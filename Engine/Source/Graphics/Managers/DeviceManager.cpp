@@ -432,12 +432,6 @@ static std::vector<uint8_t> ReadPipelineCacheFile()
 	}
 
 	fileStream.seekg(0, std::ios::beg);
-	if (!fileStream)
-	{
-		LOG(kGraphics, kDebug, "Discarded unreadable pipeline cache ({} bytes)", iSize);
-		return {};
-	}
-
 	std::vector<uint8_t> cacheData(static_cast<size_t>(iSize));
 	fileStream.read(reinterpret_cast<char*>(cacheData.data()), static_cast<std::streamsize>(iSize));
 	if (fileStream.gcount() != static_cast<std::streamsize>(iSize) || !fileStream)

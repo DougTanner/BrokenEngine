@@ -87,9 +87,6 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 
 	mInfo = rInfo;
 
-	mExternalVkDescriptorSetLayout = gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
-	mExternalSet1VkDescriptorSetLayout = mInfo.vkExternalSet1DescriptorSetLayout;
-
 	if (mInfo.flags & kRenderTarget)
 	{
 		ASSERT(mInfo.vkTargetRenderPass != VK_NULL_HANDLE);

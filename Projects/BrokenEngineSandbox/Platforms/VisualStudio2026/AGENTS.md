@@ -60,9 +60,10 @@ physics binary.
   `## Build invocation and derived properties`.
 - PreBuildEvent: Every configuration first provisions ThirdParty and requires
   its prebuilt configuration library; consumers never build ThirdParty
-  recursively. Local `RunDataPacker=true` incrementally rebuilds Release
-  DataPacker before linked-worktree export. Primary Local preserves
-  missing-executable-only DataPacker bootstrap; Shared builds skip it. See
+  recursively. Linked worktrees never rebuild DataPacker in PreBuildEvent
+  (rebuild Release DataPacker after editing its sources before a direct IDE
+  export). Primary Local preserves missing-executable-only DataPacker bootstrap;
+  Shared builds skip it. See
   `../../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`.
 	- Provisioning steps invoke `powershell.exe` (Windows PowerShell 5.1), never
 	  `pwsh.exe`. 5.1 ships with every Windows install, so an unassisted vcxproj or
